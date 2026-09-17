@@ -34,6 +34,8 @@ The full architectural description is in [WHITE_PAPER.md](WHITE_PAPER.md).
 
 [![First boot](https://asciinema.org/a/jIr3t0Ax2W43uSJz.svg)](https://asciinema.org/a/jIr3t0Ax2W43uSJz)
 
+[![Learning an ARC rule: fail → teach → solve → transfer (82→7 nodes)](https://asciinema.org/a/WrqKmM4NNTkthjMC.svg)](https://asciinema.org/a/WrqKmM4NNTkthjMC)
+
 ---
 
 ## What this is not
