@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: System deps (v4l)
+        run: sudo apt-get update && sudo apt-get install -y libv4l-dev
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build
+      - run: cargo test
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: System deps (pycairo)
+        run: sudo apt-get update && sudo apt-get install -y libcairo2-dev pkg-config
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ hashFiles('python/requirements*.txt') }}
+      - run: pip install -r python/requirements-dev.txt
+      - run: python3 -c "import nltk; nltk.download('wordnet', quiet=True); nltk.download('punkt_tab', quiet=True)"
+      - run: ruff check
+      - run: python3 -m pyflakes python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ evals/*.py scripts/*.py
+      - run: python3 -m mypy python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ --ignore-missing-imports
+      - run: python3 -m pytest python/tests/ -q -o addopts=''

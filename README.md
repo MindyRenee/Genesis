@@ -1,6 +1,7 @@
 # Genesis
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22817337.svg)](https://doi.org/10.5281/zenodo.22817337)
+[![CI](https://github.com/MindyRenee/Genesis/actions/workflows/ci.yml/badge.svg)](https://github.com/MindyRenee/Genesis/actions/workflows/ci.yml)
 
 ### A machine-native cognitive architecture with coupled neurochemical dynamics and active inference — running on a single machine, with no external model.
 
