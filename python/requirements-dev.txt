@@ -1,0 +1,14 @@
+# Genesis — Python dev/test dependencies
+# Install on top of requirements.txt: pip install -r requirements-dev.txt
+
+-r requirements.txt
+
+# Lint
+ruff==0.16.5
+pyflakes==3.2.0
+# mypy 2.x line does not exist upstream yet; accept 1.18+ so fresh
+# installs don't break. Re-pin exact once 2.x is published.
+mypy>=1.18.1
+
+# Test
+pytest==9.1.1
