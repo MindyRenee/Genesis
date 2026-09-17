@@ -200,6 +200,11 @@ spatial-teaching harness (`teach_spatial_live.py`). `eval_arc3.py` (ARC-AGI-3 in
 environments) requires the `arc-agi` toolkit in a separate venv.
 Eval results are written to `evals/results/`.
 
+`evals/demo_arc.py` is the interactive one-task-at-a-time demo shown
+in the recording above — fail, teach, retry, transfer to an unseen
+ARC task. Run it with `PYTHONPATH=python:evals python3
+evals/demo_arc.py`.
+
 ---
 
 ## State integrity framework
