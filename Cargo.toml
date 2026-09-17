@@ -1,0 +1,22 @@
+[package]
+name = "genesis"
+version = "0.1.0"
+edition = "2024"
+authors = ["Mindy Beatty"]
+description = "A machine-native cognitive architecture with coupled neurochemical dynamics and active inference"
+license-file = "LICENSE"
+
+[dependencies]
+flate2 = "1.1.9"
+libc = "0.2.189"
+proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
+quote = "1.0.47"
+shared_memory = "0.12.4"
+syn = { version = "3.0.3", features = ["full", "parsing", "printing", "visit"] }
+v4l = "0.14.0"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = "symbols"
+codegen-units = 1

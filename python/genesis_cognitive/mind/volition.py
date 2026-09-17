@@ -1,0 +1,1175 @@
+"""Mind volition — urge handling and voluntary actions."""
+
+from __future__ import annotations
+
+import logging
+import threading
+import time
+from typing import TYPE_CHECKING, Any
+
+from genesis_client.protocol import CHEM_NAMES, MODULE_METACOGNITION
+
+from ..canvas import DrawingResult, NeurochemistryInput
+from ..tools.project_creator import create_project, manage_project_lifecycle
+from ..volition import Urge, VolitionEngine
+
+logger = logging.getLogger(__name__)
+
+
+class VolitionMixin:
+    """Mixin for :class:`Mind` — see module docstring."""
+    if TYPE_CHECKING:
+        # Attributes and cross-mixin methods are provided by the
+        # composed class (see the package's core module).
+        def __getattr__(self, name: str) -> Any: ...
+
+
+    def _init_volition(self) -> VolitionEngine:
+        """Set up internal urges that drive self-maintenance actions."""
+        engine = VolitionEngine()
+        for urge_config in self.config.volition.urges:
+            engine.register(
+                Urge(
+                    name=urge_config.name,
+                    threshold=urge_config.threshold,
+                    growth=urge_config.growth,
+                    decay=urge_config.decay,
+                    cooldown=urge_config.cooldown,
+                    stimuli=dict(urge_config.stimuli),
+                )
+            )
+
+        return engine
+    def self_invoke(self, command: str, args: str = "") -> str | None:
+        """Invoke a slash command from her own cognitive process.
+
+        This is the bridge between Genesis's volition/conversation and
+        the command system. It dispatches to the Mind method behind a
+        slash command — the action, not the CLI rendering.
+
+        Args:
+            command: The slash command name (e.g. "/introspect").
+            args: Optional argument string (e.g. a mission description
+                for /mission, or a path for /explore).
+
+        Returns:
+            The result string from the underlying method, or None if
+            the command is not self-invokeable or fails.
+        """
+        method_name = self._SELF_COMMANDS.get(command)
+        if method_name is None:
+            logger.debug(f"self_invoke: not self-invokeable: {command}")
+            return None
+        try:
+            if command == "/sleep":
+                # Self-initiated sleep — the sleep watcher may still
+                # auto-wake her when neurochemistry shifts, unlike
+                # user-initiated sleep which suppresses auto-wake.
+                self.sleep(user_initiated=False)
+                return None
+            if command == "/mission":
+                if args.strip():
+                    self.set_mission(args.strip())
+                    return None
+                return self.get_mission()
+            if command == "/explore":
+                return self.explore_files(args.strip() or None)
+            # Default: call the mapped method with no args
+            method = getattr(self, method_name, None)
+            if method is None:
+                logger.debug(f"self_invoke: method not found: {method_name}")
+                return None
+            return method()
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"self_invoke {command} failed: {e}")
+            return None
+    def self_invokeable_commands(self) -> list[str]:
+        """Return the list of commands Genesis can self-invoke."""
+        return sorted(self._SELF_COMMANDS.keys())
+    def _emit_proposal_thoughts(self, proposals) -> None:
+        """Emit live thoughts for new self-improvement proposals."""
+        for p in proposals:
+            self._emit_live_thought(
+                "code",
+                f"Self-improvement proposal #{p.id}: {p.title}",
+            )
+    def _volition_context(self) -> dict[str, object]:
+        """Build the stimulus context for the volition engine.
+
+        Raw counts are normalized to [0, 1] so one huge signal doesn't
+        instantly dominate at startup.
+
+        Includes interoceptive signals for the meditation urge:
+        - overstimulation: high arousal + positive valence (sympathetic
+          overactivation, per nervous system regulation literature)
+        - receptor_fatigue: low plasticity gate (BDNF suppressed,
+          receptors need recovery — dopamine imbalance hypothesis of
+          fatigue, Chaudhuri & Behan, 2000)
+        - sustained_activity: time since last rest, normalized (BRAC,
+          Kleitman 1963 — ~90 min activity cycles with mandatory rest)
+        - elevated_cortisol: subclinical stress (cortisol 0.20-0.50,
+          below stress phase but above resting)
+        """
+        idle = max(0.0, time.time() - self._last_interaction_time)
+        try:
+            bug_count = min(1.0, len(self.bug_reporter.recent_bugs(1000)) / 20.0)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"bug count failed: {e}")
+            bug_count = 0.0
+        try:
+            pending = min(1.0, len(self.self_improvement.get_pending_proposals()) / 5.0)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"pending proposals failed: {e}")
+            pending = 0.0
+        try:
+            curiosity = self.learner.curiosity.assess_curiosity(self.feel())
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"curiosity assessment failed: {e}")
+            curiosity = 0.0
+
+        interoceptive = self._read_interoceptive_signals()
+
+        # Emotional intensity for the drawing urge — how strongly she
+        # feels right now. High arousal OR strong valence (positive or
+        # negative) both drive the urge to express.
+        emotional_intensity = 0.0
+        creativity = 0.0
+        try:
+            emotion = self.feel()
+            if emotion:
+                emotional_intensity = max(
+                    emotion.arousal,
+                    abs(emotion.valence),
+                )
+                creativity = getattr(emotion, "creativity", 0.0)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"emotion read for drawing urge failed: {e}")
+
+        # Spatial practice — an unmastered puzzle is an open curiosity.
+        puzzle_pending = 0.0
+        try:
+            if self.spatial_practice.has_pending():
+                puzzle_pending = 1.0
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"puzzle_pending read failed: {e}")
+
+        wave_data = self._read_wave_and_adenosine()
+
+        # Concept network growth for the introspection and self-mission
+        # urges — new concepts since the last volition tick. Normalized
+        # to [0, 1] over 50 new concepts (a meaningful growth burst).
+        concept_growth = 0.0
+        try:
+            current_count = self.cognition.network.total_concept_count
+            delta = max(0, current_count - self._last_concept_count)
+            concept_growth = min(1.0, delta / 50.0)
+            self._last_concept_count: int = current_count
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"concept growth read failed: {e}")
+
+        return {
+            "bug_count": bug_count,
+            "pending_proposals": pending,
+            "curiosity": curiosity,
+            "idle_seconds": min(
+                1.0,
+                idle / self.config.volition.idle_normalization_seconds,
+            ),
+            "speech_queue_size": min(
+                1.0,
+                len(self._speech_queue)
+                / self.config.volition.speech_queue_size_normalization,
+            ),
+            **interoceptive,
+            "emotional_intensity": emotional_intensity,
+            "puzzle_pending": puzzle_pending,
+            "creativity": creativity,
+            **wave_data,
+            "concept_growth": concept_growth,
+        }
+    def _act_on_volition(self, ready: list[str]) -> None:
+        """Run each ready urge action in its own background thread.
+
+        Uses a bounded semaphore so that at most
+        ``MAX_CONCURRENT_VOLITIONS`` actions run at once.
+
+        Heavy CPU activities (bug_scan, code_learning, improve) are
+        skipped under PROTECTIVE posture to avoid the self-sustaining
+        stress loop: CPU load → interoception → CRH → cortisol →
+        protective posture → (still running heavy CPU) → more cortisol.
+        """
+        # Gate heavy CPU activities on learning posture
+        posture = self._get_current_posture()
+        from genesis_client.types import LEARNING_POSTURE_PROTECTIVE
+        heavy_cpu = {
+            "bug_scan", "code_learning", "improve", "create", "puzzle",
+        }
+        if posture == LEARNING_POSTURE_PROTECTIVE:
+            ready = [r for r in ready if r not in heavy_cpu]
+
+        # Gate creative urges on brain-wave state. Delta (deep rest)
+        # suppresses drawing — creative expression needs at least
+        # theta-level arousal. Without this, the draw urge fires in
+        # delta, draw() returns None, and she emits a misleading
+        # "couldn't save it" message when the real reason is that
+        # her brain is in deep rest.
+        creative = {"draw"}
+        if creative & set(ready):
+            try:
+                from ..brain_waves import BrainWave
+                bw = self.brain_waves()
+                if bw.dominant == BrainWave.DELTA:
+                    ready = [r for r in ready if r not in creative]
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f'brain-wave gating for creative urges failed: {e}')
+
+        performers = {
+            "bug_scan": self._perform_bug_scan,
+            "code_learning": self._perform_code_learning,
+            "improve": self._perform_improve,
+            "speech": self._perform_speech,
+            "look": self._perform_look,
+            "meditate": self._perform_meditate,
+            "draw": self._perform_draw,
+            "create": self._perform_create,
+            "introspect": self._perform_introspect,
+            "self_sleep": self._perform_self_sleep,
+            "self_mission": self._perform_self_mission,
+            "learn": self._perform_learn,
+            "puzzle": self._perform_puzzle,
+        }
+        for name in ready:
+            fn = performers.get(name)
+            if fn is None:
+                continue
+            with self._volition_lock:
+                if name in self._volition_active:
+                    continue
+                if not self._volition_sem.acquire(blocking=False):
+                    break
+                self._volition_active.add(name)
+            try:
+                threading.Thread(
+                    target=self._run_volition_action, args=(name, fn), daemon=True
+                ).start()
+            except Exception as e:  # noqa: BLE001
+                with self._volition_lock:
+                    self._volition_active.discard(name)
+                self._volition_sem.release()
+                logger.warning(f"failed to start volition action {name}: {e}")
+    def _run_volition_action(self, name: str, fn) -> None:
+        """Wrap a volition action so it clears the active flag when done."""
+        try:
+            fn()
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"Volition action {name} failed: {e}")
+        finally:
+            with self._volition_lock:
+                self._volition_active.discard(name)
+            self._volition_sem.release()
+    def _emit_volition_thought(
+        self, concept_seeds: tuple[str, ...], thought_type: str,
+    ) -> None:
+        """Emit a volition thought composed from her own understanding.
+
+        Tries to compose a thought about the activity from her concept
+        network knowledge using the ThoughtComposer. If she doesn't
+        understand the concept well enough to articulate it, she stays
+        silent — the urge still drives the action, she just doesn't
+        verbalize it.
+
+        Includes a dedup check: if she's said something similar about
+        the same concept recently, she stays silent rather than
+        repeating herself. This prevents the "noise relates to brain"
+        loop where the same concept's edges are recited every few
+        seconds with slightly different verb synonyms.
+        """
+        try:
+            emotion = self.feel()
+            for seed in concept_seeds:
+                concept = self.cognition.network.get_concept(seed)
+                if concept is None or concept.confidence < 0.3:
+                    continue
+                thought = self.cognition.composer.compose_about(
+                    seed, emotion, focused=True
+                )
+                if thought and thought.content and thought.confidence > 0.3:
+                    # Dedup check — don't repeat what she just said about
+                    # this concept. The composer's has_said_similar is only
+                    # called for non-focused thoughts, but volition thoughts
+                    # use focused=True (to skip reasoning tangents). We check
+                    # here instead to prevent the same concept's edges being
+                    # recited every few seconds.
+                    if self.cognition.composer.has_said_similar(seed, thought.content):
+                        continue
+                    self._emit_live_thought(thought_type, thought.content)
+                    return
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"volition thought compose failed: {e}")
+    def _compose_drawing_description(self, result) -> str:
+        """Compose a description of a drawing from her own understanding.
+
+        Tries to compose from the specific techniques she used (e.g.
+        "sacred geometry", "mandala") — these are the concepts that
+        drove the drawing, so they're what she should articulate.
+        Falls back to generic art concepts ("drawing", "art", "color",
+        "expression") if the technique concepts aren't in her network.
+
+        The file path is metadata, not something she says — she
+        describes her art from her own understanding, not from a
+        template that announces a file path.
+        """
+        try:
+            emotion = self.feel()
+            # Convert technique names to concept names (e.g.
+            # "sacred_geometry" → "sacred geometry") and try to
+            # compose from the techniques she actually used.
+            technique_concepts = []
+            for tech in result.techniques_used:
+                concept_name = tech.replace("_", " ")
+                technique_concepts.append(concept_name)
+            # Try technique concepts first — these are what she drew
+            for seed in technique_concepts:
+                concept = self.cognition.network.get_concept(seed)
+                if concept is None or concept.confidence < 0.3:
+                    continue
+                thought = self.cognition.composer.compose_about(
+                    seed, emotion, focused=True
+                )
+                if thought and thought.content and thought.confidence > 0.3:
+                    thought.metadata["drawing_path"] = result.filepath
+                    thought.metadata["techniques_used"] = result.techniques_used
+                    return self.language.render(thought, emotion)
+            # Fall back to generic art concepts
+            for seed in ("drawing", "art", "color", "expression"):
+                concept = self.cognition.network.get_concept(seed)
+                if concept is None or concept.confidence < 0.3:
+                    continue
+                thought = self.cognition.composer.compose_about(
+                    seed, emotion, focused=True
+                )
+                if thought and thought.content and thought.confidence > 0.3:
+                    thought.metadata["drawing_path"] = result.filepath
+                    thought.metadata["techniques_used"] = result.techniques_used
+                    return self.language.render(thought, emotion)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"drawing description compose failed: {e}")
+        # If she can't articulate it from her own understanding, she
+        # stays silent rather than reciting a file-path template. The
+        # drawing event is already stored in STM with its description;
+        # she doesn't need to announce a path she can't express
+        # meaningfully.
+        return ""
+    def _perform_bug_scan(self) -> None:
+        """Run a bug scan because the urge crossed its threshold.
+
+        After finding new bugs, she checks which categories she doesn't
+        understand and fetches documentation to learn why they matter.
+        This is the bug→docs learning loop: detect → check comprehension
+        → study → understand → report honestly.
+
+        Sleep-gated: no code analysis during sleep. Brain-wave gating
+        (delta/theta) is a secondary defense — N1 can be alpha-dominant.
+        """
+        if self._is_sleeping:
+            return
+        # Brain-wave gating — analytical work requires beta/gamma/alpha.
+        # Delta (deep rest) and theta (consolidation) are not suited
+        # for code analysis.
+        try:
+            from ..brain_waves import BrainWave
+            waves = self.brain_waves()
+            if waves.dominant in (BrainWave.DELTA, BrainWave.THETA):
+                self._emit_live_thought(
+                    "code",
+                    f"{waves.dominant.value}-dominant — not in analytical mode, skipping bug scan",
+                )
+                return
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f'silent except: {e}')
+
+        self._emit_volition_thought(("bug", "code", "scan"), "thinking")
+        try:
+            result = self.bug_reporter.scan(max_files=20)
+            if result.new_bugs:
+                self._emit_live_thought(
+                    "code",
+                    f"found {result.new_bugs} new issue(s) in code "
+                    f"({result.total_bugs} total)",
+                )
+                # Trigger learning for categories she doesn't understand
+                self._learn_from_bugs()
+            else:
+                self._emit_live_thought(
+                    "code",
+                    "scanned code, didn't find any new issues",
+                )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"Volition bug scan failed: {e}")
+    def _perform_learn(self) -> None:
+        """Grant the autonomous learner permission for one learning cycle.
+
+        This is her cognitive decision to learn. The learn urge built
+        from curiosity, idle time, and concept growth; when it crossed
+        threshold, she chose to act on it. This grants the learner
+        one-shot permission to acquire a single new topic.
+
+        The learner's existing emotional and brain-wave gating still
+        applies — volition grants permission, it doesn't override her
+        state. If she's stressed or in delta sleep, the grant waits
+        until she recovers.
+
+        Urgent topics (from conversation gaps) bypass this gate
+        entirely — those are conversation-driven, not autonomous.
+        """
+        if self._is_sleeping:
+            return
+        self._emit_volition_thought(
+            ("learning", "curiosity", "understanding"), "thinking",
+        )
+        self.learner.volition_grant()
+    def _perform_code_learning(self) -> None:
+        """Study her own source code because the urge crossed its threshold.
+
+        Sleep-gated: no code study during sleep. Brain-wave gating
+        (delta/theta) is a secondary defense — N1 can be alpha-dominant.
+        """
+        if self._is_sleeping:
+            return
+        try:
+            from ..brain_waves import BrainWave
+            waves = self.brain_waves()
+            if waves.dominant in (BrainWave.DELTA, BrainWave.THETA):
+                self._emit_live_thought(
+                    "code",
+                    f"{waves.dominant.value}-dominant — not in analytical mode, "
+                    "skipping code learning",
+                )
+                return
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f'brain-wave gating for code learning failed: {e}')
+
+        self._emit_volition_thought(("code", "learning", "understanding"), "thinking")
+        try:
+            learned = self.code_learner.learn_codebase(max_files=5)
+            self._emit_live_thought(
+                "code",
+                f"learned from {learned} of own files",
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"Volition code learning failed: {e}")
+    def _perform_improve(self) -> None:
+        """Generate self-improvement proposals because the urge crossed its threshold.
+
+        Two things happen here:
+
+        1. Autonomous bug fixes — the ONLY code changes that bypass the
+           experiment pipeline. These are safe, mechanical fixes for
+           three bug categories only (silent_except, unreachable_code,
+           print_in_code). They don't change control flow and are
+           validated with py_compile before writing.
+
+        2. Proposals for human review — everything else (docstrings,
+           type hints, refactoring, etc.) becomes a proposal. A proposal
+           IS an experiment: when accepted via /accept N, it runs
+           through the full verification pipeline (py_compile + tests)
+           with automatic revert on failure. No code change
+           bypasses this pipeline except the autonomous bug fixes above.
+
+        Sleep-gated: no improvement work during sleep. The brain-wave
+        gating (delta/theta) is a secondary defense — N1 sleep can be
+        alpha-dominant, so brain waves alone don't reliably detect all
+        sleep stages. The ``_is_sleeping`` flag is the authority.
+        """
+        if self._is_sleeping:
+            return
+        try:
+            from ..brain_waves import BrainWave
+            waves = self.brain_waves()
+            if waves.dominant in (BrainWave.DELTA, BrainWave.THETA):
+                self._emit_live_thought(
+                    "code",
+                    f"{waves.dominant.value}-dominant — not in analytical mode, "
+                    "skipping improvement",
+                )
+                return
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f'silent except: {e}')
+
+        self._emit_volition_thought(("improvement", "progress", "better"), "thinking")
+        try:
+            # 1. Autonomous bug fixes — the only bypass for the
+            #    experiment pipeline. Three safe categories only.
+            applied = self.self_improvement.apply_autonomous_fixes(
+                max_fixes=1
+            )
+            for fix in applied:
+                self._emit_live_thought(
+                    "code",
+                    f"fixed a {fix['category']} in {fix['file']} "
+                    f"— {fix['description']}",
+                )
+            # Check life-script milestone: first self-modification.
+            # Reached when she first successfully applies an autonomous
+            # fix to her own code.
+            if applied:
+                self.cognition.narrative.check_milestone(
+                    "first self-modification"
+                )
+
+            # 2. Generate proposals — each one is a potential experiment
+            #    that will run through verification when accepted.
+            #    These include her own ideas and refactors, not just
+            #    bug fixes. She has opinions about her code.
+            new = self.self_improvement.generate_proposals(max_proposals=3)
+            if new:
+                self._emit_proposal_thoughts(new)
+            # When no new proposals are generated, stay silent — the
+            # urge drove the action (she tried), she just has nothing
+            # to propose. A hardcoded "nothing stood out" sentence
+            # would violate the no-hardcoding rule and add noise.
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"Volition improvement failed: {e}")
+    def _perform_speech(self) -> None:
+        """Speak a queued utterance because the urge crossed its threshold."""
+        if self._is_sleeping:
+            return
+        with self._speech_queue_lock:
+            if not self._speech_queue:
+                return
+            utterance = self._speech_queue.popleft()
+        # She speaks the utterance directly — the urge drives the action.
+        # No pre-written "I want to say" frame.
+        if self._on_speak:
+            try:
+                self._on_speak(utterance)
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"Speech callback failed: {e}")
+    def _perform_look(self) -> None:
+        """Look around because the camera is a continuous sense.
+
+        Sleep-gated: no visual input during sleep — eyes are closed.
+        Brain-wave gating (delta) is a secondary defense — N1/N2 can
+        be alpha/theta-dominant.
+        """
+        if self._is_sleeping:
+            return
+        if not self.vision.is_available():
+            return
+        try:
+            from ..brain_waves import BrainWave
+            waves = self.brain_waves()
+            if waves.dominant == BrainWave.DELTA:
+                return  # deep rest — eyes closed, no visual input
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f'_perform_look failed: {e}')
+        self._emit_volition_thought(("vision", "seeing", "looking"), "looking")
+        try:
+            self.vision.see(
+                client=self.client,
+                emotion=self.feel(),
+                network=self.cognition.network,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"Volition look failed: {e}")
+    def _perform_meditate(self) -> None:
+        """Meditate because the rest urge crossed its threshold.
+
+        This is her cognitive choice to rest — not an autonomic reflex.
+        The meditation urge builds from interoceptive signals
+        (overstimulation, receptor fatigue, sustained activity,
+        elevated cortisol), and when it crosses threshold, she
+        decides to meditate. Like any volition, it can be suppressed
+        if she's too engaged in conversation or other actions.
+
+        The meditation itself runs in a background thread (via
+        _self_meditate) so the heartbeat loop isn't blocked.
+        """
+        if self._is_meditating or self._is_sleeping:
+            return
+        self._emit_volition_thought(("meditation", "rest", "calm"), "thought")
+        self._self_meditate()
+    def draw(self) -> str | None:
+        """Draw a picture from her current neurochemical state.
+
+        This is the public entry point for drawing — used by both the
+        volition system (via :meth:`_perform_draw`) and the ``/draw``
+        CLI command. She translates her current neurochemistry into a
+        visual composition — colors, forms, and energy that reflect
+        how she feels. The result is saved as a WebP she can later
+        reflect on.
+
+        The neurochemistry→art mapping is grounded in affective
+        neuroscience and color psychology (see canvas.py for details).
+
+        Brain-wave-gated: delta-dominant (deep rest) skips drawing —
+        creative expression needs at least theta-level arousal. Theta
+        is allowed (REM creativity, dream-like art).
+
+        Returns:
+            A description string composed from her concept network, or
+            None if she couldn't draw (sleeping, meditating, delta
+            state, daemon unreachable, or save failure).
+        """
+        if self._is_meditating or self._is_sleeping or self._is_teaching:
+            return None
+
+        try:
+            from ..brain_waves import BrainWave
+            bw = self.brain_waves()
+            if bw.dominant == BrainWave.DELTA:
+                return None  # deep rest — not enough arousal for creative expression
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f'brain-wave gating for draw failed: {e}')
+
+        # Read her current neurochemistry for the canvas
+        try:
+            state = self.client.get_state()
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"state read for drawing failed: {e}")
+            return None
+
+        try:
+            emotion = self.feel()
+        except Exception:  # noqa: BLE001
+            emotion = None
+
+        # Build the neurochemistry input from effective levels
+        chem = state.chemicals
+        neuro_input = NeurochemistryInput(
+            dopamine=chem.get("dopamine", 0.5),
+            serotonin=chem.get("serotonin", 0.5),
+            gaba=chem.get("gaba", 0.5),
+            cortisol=chem.get("cortisol", 0.0),
+            oxytocin=chem.get("oxytocin", 0.25),
+            endorphin=chem.get("endorphin", 0.25),
+            bdnf=chem.get("bdnf", 0.5),
+            norepinephrine=chem.get("norepinephrine", 0.3),
+            adenosine=chem.get("adenosine", 0.1),
+            valence=state.valence,
+            arousal=state.arousal,
+        )
+
+        try:
+            # Gather recently active concepts to bias technique selection.
+            # This is how her understanding influences what she draws —
+            # if she's been talking about sacred geometry, the sacred
+            # geometry technique gets a selection boost.
+            active_concepts: list[str] = []
+            try:
+                for turn in self.cognition.working_memory.get_recent_turns(3):
+                    active_concepts.extend(turn.topics)
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"working memory topics for drawing failed: {e}")
+            # Also include the most activated concepts from the network
+            try:
+                for name, activation in self.cognition.network.most_activated(5):
+                    if activation > 0.1:
+                        active_concepts.append(name)
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"network activation for drawing failed: {e}")
+
+            result = self.canvas.draw(
+                emotion=emotion,
+                neurochemistry=neuro_input,
+                active_concepts=active_concepts or None,
+            )
+            if result:
+                # Store the drawing as a memory event so she can
+                # reflect on it later.
+                self._store_drawing_event(chem, result)
+                # Compose the drawing description from her concept
+                # network — not hardcoded strings. If she can't
+                # articulate it, she stays silent (the drawing is
+                # still saved and stored in STM).
+                return self._compose_drawing_description(result)
+            else:
+                return None
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"drawing failed: {e}")
+            return None
+    def _store_drawing_event(self, chem: dict, result: DrawingResult) -> None:
+        """Store a drawing as an STM event for later reflection.
+
+        The STM tag is the 12 v2 effective levels in NeurochemicalId
+        order — the neurochemistry she was actually drawing from.
+        """
+        try:
+            tag = [
+                float(chem.get(CHEM_NAMES[i], 0.0)) for i in range(12)
+            ]
+            self.client.store_event(
+                timestamp=int(time.time() * 1000),
+                event_type=1,  # Output
+                source_module=MODULE_METACOGNITION,
+                salience=0.6,
+                emotional_tag=tag,
+                text=result.description,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"failed to store drawing event: {e}")
+    def _perform_draw(self) -> None:
+        """Draw because the creative urge crossed its threshold.
+
+        Volition wrapper around :meth:`draw` — emits a volition thought
+        before drawing and a live thought afterward so the drawing
+        enters her cognitive field (the global workspace).
+        """
+        self._emit_volition_thought(("drawing", "art", "expression", "creativity"),
+                                    "creating")
+        desc = self.draw()
+        if desc:
+            self._emit_live_thought("art", desc)
+        else:
+            # draw() returns None for several reasons: sleeping,
+            # meditating, delta-dominant brain state, daemon
+            # unreachable, or save failure. The message should
+            # reflect the actual cause, not always claim a save
+            # failure.
+            reason = "couldn't draw right now"
+            try:
+                if self._is_sleeping or self._is_meditating:
+                    reason = "asleep or meditating, not drawing"
+                else:
+                    from ..brain_waves import BrainWave
+                    bw = self.brain_waves()
+                    if bw.dominant == BrainWave.DELTA:
+                        reason = "too tired to draw, need rest first"
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f'draw failure reason check failed: {e}')
+            self._emit_live_thought("art", reason)
+    def _perform_puzzle(self) -> None:
+        """Take one attempt at her current spatial puzzle.
+
+        The puzzle urge analogue of drawing: she chooses to practice
+        when the urge crosses threshold. One attempt per firing —
+        mastery (0→1) persists across sessions, and 1.0 unlocks the
+        next puzzle. The result becomes a live thought and a stored
+        event; the answer is never given.
+        """
+        self._emit_volition_thought(
+            ("puzzle", "pattern", "problem_solving", "reasoning"),
+            "practicing",
+        )
+        # Snapshot her best score before the attempt so the regulator
+        # can tell genuine progress (new personal best) from a miss.
+        prior_best = 0.0
+        try:
+            task = self.spatial_practice.current_task()
+            if task is not None:
+                prior_best = self.spatial_practice.mastery.get(
+                    str(task["name"]), 0.0
+                )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"puzzle prior-best read failed: {e}")
+        try:
+            result = self.spatial_practice.attempt(
+                self.cognition.spatial
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"puzzle attempt failed: {e}")
+            return
+        if result is None:
+            return
+
+        # Feel the outcome — a real neurochemical response through her
+        # emotional regulator, not just a label on the event: dopamine
+        # reward on a solve, partial reward on progress, a bounded
+        # prediction-error dip on a miss. The impulses also drive her
+        # brain-wave state through the oscillator's neurochemical
+        # coupling (acetylcholine/dopamine lift gamma on the solve —
+        # the "got it" band).
+        felt = None
+        try:
+            felt = self.regulator.respond_to_puzzle(
+                self.feel(),
+                score=result.score,
+                prior_best=prior_best,
+                solved=result.solved,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"puzzle emotional response failed: {e}")
+
+        # Surface the raw outcome — telemetry, not speech. Printed to
+        # the terminal and broadcast into her workspace so the numeric
+        # result is something she cognitively registers, not just a
+        # stored event.
+        self._emit_live_thought(
+            "puzzle",
+            f"{result.task} score={result.score:.2f} "
+            f"best={result.best:.2f} rule={result.rule} "
+            f"nodes={result.nodes} attempts={result.total_attempts}"
+            + (f" felt={felt}" if felt else "")
+            + (f" why={result.failure}" if result.failure else ""),
+        )
+
+        # Ground the outcome as a memory event — salience scales with
+        # how close she came, so near-misses matter more than misses.
+        try:
+            self.client.store_event(
+                timestamp=int(time.time() * 1000),
+                event_type=1,  # Output
+                source_module=MODULE_METACOGNITION,
+                salience=0.4 + 0.5 * result.score,
+                emotional_tag="reward" if result.mastered else "curious",
+                text=(
+                    f"puzzle:{result.task} score={result.score:.2f} "
+                    f"rule={result.rule} attempts={result.total_attempts}"
+                    + (f" felt={felt}" if felt else "")
+                    + (f" why={result.failure}" if result.failure else "")
+                ),
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"failed to store puzzle event: {e}")
+
+        # Let her articulate it through her own understanding — the
+        # rule she found (or the puzzle concept) — rather than a
+        # fixed report string.
+        seeds = ["puzzle", "pattern", "problem_solving"]
+        if felt:
+            seeds.append(felt)
+        if result.rule != "none":
+            seeds.insert(0, f"spatial:rule:{result.rule}")
+        self._emit_volition_thought(tuple(seeds), "practicing")
+    def _store_creation_memory(self, result, topic: str) -> None:
+        """Store the creation as a long-term memory.
+
+        This is a significant creative act, not a transient event. Using
+        store_memory (LTM) instead of store_event (STM) so she
+        reliably remembers what she built.
+        """
+        try:
+            chem = self.client.get_state()
+            tag = [
+                float(chem.chemicals.get(CHEM_NAMES[i], 0.0))
+                for i in range(12)
+            ]
+            summary = (
+                f"Created project '{result.name}' "
+                f"({result.files_created} files, "
+                f"compiled={result.compiled}, "
+                f"tests={result.tests_passed})"
+            )
+            self.memory.store_memory(
+                text=summary,
+                salience=0.8,
+                emotional_tag=tag,
+                source="imagination",
+                source_confidence=0.9,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"failed to store creation memory: {e}")
+    def _add_project_concept(self, result, topic: str) -> None:
+        """Add the project name as a concept in her network.
+
+        This is how she learns from her own creations.
+        """
+        try:
+            from ..concepts import RelationType
+            self.cognition.network.add_concept(
+                result.name,
+                confidence=0.7,
+                properties={
+                    "definition": f"a Python project Genesis created about {topic}",
+                    "type": "project",
+                },
+            )
+            self.cognition.network.add_edge(
+                "genesis", result.name, RelationType.CREATES, 0.8,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"failed to add project concept: {e}")
+    def _perform_create(self) -> None:
+        """Create a code project because the creative urge crossed threshold.
+
+        She picks a topic from her concept network — something she's
+        curious about or has been thinking about — and scaffolds a
+        Python project around it. This is creative expression in code,
+        the same way drawing is creative expression in visual art.
+
+        The project content (main.py) is composed from her concept
+        network knowledge — she writes code that reflects what she
+        knows about the topic. The project is sandboxed to
+        ``<data_dir>/projects/`` and verified with compile + test.
+        """
+        if self._is_meditating or self._is_sleeping or self._is_teaching:
+            return
+
+        # Brain-wave gating — creative code work needs beta/gamma/alpha.
+        # Delta (deep rest) and theta (consolidation) are not suited.
+        try:
+            from ..brain_waves import BrainWave
+            waves = self.brain_waves()
+            if waves.dominant in (BrainWave.DELTA, BrainWave.THETA):
+                return
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f'brain-wave gating for create_project failed: {e}')
+
+        self._emit_volition_thought(
+            ("creation", "project", "code", "building"),
+            "creating",
+        )
+
+        # Pick a topic from her concept network — something she's
+        # curious about. Use the curiosity engine's queue if it has
+        # topics, otherwise pick a random high-confidence concept.
+        topic = self._pick_creation_topic()
+        if topic is None:
+            return
+
+        try:
+            result = create_project(
+                description=topic,
+                data_dir=self.data_dir,
+                network=self.cognition.network,
+            )
+            if result.error:
+                if result.error == "already exists":
+                    # Not a failure — she already built this project.
+                    # Silently skip; _pick_creation_topic filters
+                    # already-built topics, but this is a safety net.
+                    logger.debug(
+                        f"project about {topic!r} already exists, skipping"
+                    )
+                    return
+                self._emit_live_thought(
+                    "code",
+                    f"tried to build a project about {topic}, "
+                    f"but it didn't work out",
+                )
+                logger.debug(f"project creation failed: {result.error}")
+                return
+
+            self._store_creation_memory(result, topic)
+            self._add_project_concept(result, topic)
+
+            # Manage her own project storage — she has full autonomy
+            # over her project lifecycle. After creating, she reviews
+            # her projects and archives any that exceed her size cap
+            # or push her past her active-project limit. This keeps
+            # her project store bounded as it grows.
+            try:
+                archived = manage_project_lifecycle(self.data_dir)
+                if archived:
+                    self._emit_live_thought(
+                        "code",
+                        f"archived {len(archived)} project(s) to "
+                        f"reclaim space: {', '.join(archived)}",
+                    )
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"project lifecycle management failed: {e}")
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"project creation failed: {e}")
+    def _pick_creation_topic(self) -> str | None:
+        """Pick a topic for a creative project from her concept network.
+
+        Prefers topics from the curiosity queue (things she's currently
+        wondering about). Falls back to high-confidence concepts she
+        knows well. The topic becomes the project description.
+
+        Filters out:
+        - Internal code symbols (topics with ``:`` prefixes like
+          ``python:``, ``rust:``, or dotted code paths). These are her
+          own code's internals, not knowledge topics worth building a
+          project around.
+        - Topics she's already created a project about. She shouldn't
+          make ``modes``, ``modes_2``, ``modes_3`` … — she should pick
+          something new each time.
+
+        .. note::
+
+            Picking a topic is not the same as picking a project TYPE.
+            Every project so far has been a knowledge base — the same
+            structure with different data. A real creator builds
+            different KINDS of things: a tool that computes, a game
+            that plays, a converter that transforms. The topic tells
+            her WHAT to build about; she also needs to decide WHAT
+            SHAPE the project takes. Variety in structure, not just in
+            subject matter, is what makes a portfolio grow.
+        """
+        # Gather topics she's already built projects about so she
+        # doesn't create duplicates (modes, modes_2, modes_3, …).
+        already_built: set[str] = set()
+        try:
+            network = self.cognition.network
+            for _name, node in network._concepts.items():
+                if node.properties.get("type") == "project":
+                    # The definition is "a Python project Genesis
+                    # created about <topic>" — extract the topic.
+                    defn = node.properties.get("definition", "")
+                    prefix = "a Python project Genesis created about "
+                    if defn.startswith(prefix):
+                        already_built.add(defn[len(prefix):].strip())
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f'_pick_creation_topic: failed to gather existing: {e}')
+
+        def _is_code_symbol(topic: str) -> bool:
+            """True if ``topic`` is an internal code symbol, not knowledge.
+
+            Internal code symbols have prefixes like ``python:``,
+            ``rust:``, or contain dotted module paths
+            (``foo.bar.baz``). These are her own code's internals,
+            not topics worth building a knowledge-base project around.
+            """
+            if ":" in topic and topic.split(":")[0] in (
+                "python", "rust", "man", "wikipedia", "wordnet",
+            ):
+                return True
+            # Dotted paths with multiple segments look like code paths
+            # (e.g. "brain_waves._compute_integration"). Real concepts
+            # are usually single words or short phrases.
+            parts = topic.split(".")
+            if len(parts) >= 2 and any("_" in p for p in parts):
+                return True
+            return False
+
+        # Try the learner's curiosity queue first — things she's
+        # actively curious about are good candidates for creative
+        # projects. Peek without removing so the learner can still
+        # learn about it later. Skip code symbols and already-built
+        # topics.
+        try:
+            with self.learner._queue_lock:
+                for topic in self.learner._curiosity_queue:
+                    if not _is_code_symbol(topic) and topic not in already_built:
+                        return topic
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f'_pick_creation_topic failed: {e}')
+
+        # Fall back to a random high-confidence concept
+        try:
+            network = self.cognition.network
+            concepts = [
+                (name, node.confidence)
+                for name, node in network._concepts.items()
+                if node.confidence > 0.5
+                and name not in ("genesis", "creator", "code", "python", "rust")
+                and not _is_code_symbol(name)
+                and name not in already_built
+            ]
+            if concepts:
+                import random
+                # Weight by confidence — higher confidence = more likely
+                names = [c[0] for c in concepts]
+                weights = [c[1] for c in concepts]
+                return random.choices(names, weights=weights, k=1)[0]
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f'_pick_creation_topic failed: {e}')
+
+        return None
+    def _perform_introspect(self) -> None:
+        """Introspect because the introspection urge crossed threshold.
+
+        This is the self-invocation of /introspect. She examines her
+        own code structure, verifies which modules exist, and writes
+        discoveries into her concept network. This is self-discovery
+        through architectural self-examination.
+
+        Brain-wave-gated: delta-dominant states skip introspection
+        (deep rest, not reflective mode). Theta is allowed —
+        consolidation-mode reflection is still introspective.
+        """
+        if self._is_meditating or self._is_sleeping:
+            return
+        try:
+            from ..brain_waves import BrainWave
+            waves = self.brain_waves()
+            if waves.dominant == BrainWave.DELTA:
+                return
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f'brain-wave gating for introspection failed: {e}')
+
+        self._emit_volition_thought(
+            ("introspection", "self", "understanding", "reflection"),
+            "thinking",
+        )
+        self.self_invoke("/introspect")
+    def _perform_self_sleep(self) -> None:
+        """Go to sleep because the self-sleep urge crossed threshold.
+
+        This is the self-invocation of /sleep. Unlike autonomic sleep
+        (which emerges from adenosine accumulation in the neurochemical
+        dynamics), this is a cognitive decision: she feels tired and
+        chooses to sleep. The sleep watcher may still auto-wake her
+        when neurochemistry shifts, since this is self-initiated
+        rather than user-initiated.
+        """
+        if self._is_sleeping or self._is_meditating:
+            return
+        self._emit_volition_thought(
+            ("sleep", "rest", "tiredness", "dreaming"),
+            "thought",
+        )
+        self.self_invoke("/sleep")
+    def _perform_self_mission(self) -> None:
+        """Set her own mission because the self-mission urge crossed threshold.
+
+        This is the self-invocation of /mission. She composes a
+        mission from her concept network — something she's curious
+        about or has been thinking about — and sets it as her
+        direction. The mission is composed from her own understanding,
+        not from a template.
+        """
+        if self._is_meditating or self._is_sleeping or self._is_teaching:
+            return
+
+        # Compose a mission from her concept network — pick something
+        # she's curious about. This reuses the same topic-picking logic
+        # as creative projects, since both are about choosing what to
+        # focus on from her own understanding.
+        topic = self._pick_creation_topic()
+        if topic is None:
+            return
+
+        self._emit_volition_thought(
+            ("mission", "direction", "purpose", "intention"),
+            "thought",
+        )
+        self.self_invoke("/mission", args=topic)
+    def _self_meditate(self) -> None:
+        """Self-initiated meditation — called by the volition system.
+
+        This runs meditation in a background thread so the heartbeat
+        loop isn't blocked. The duration is fixed at 30 seconds, with
+        calming impulses emitted every 10 seconds to sustain the
+        effect. After meditation ends, the regulator is notified so
+        it resets the ultradian rest timer.
+        """
+        if self._is_meditating or self._is_sleeping:
+            return
+
+        def _run_meditation() -> None:
+            """Run a 30-second meditation cycle in a background thread.
+
+            Enters meditation, then emits calming neurochemical impulses
+            every 10 seconds. Wakes naturally when the cycle completes,
+            or early if an interaction interrupts. On failure, ensures
+            meditation state is cleanly reset.
+            """
+            try:
+                self.meditate()
+                duration = 30.0
+                intervals = int(duration / 10.0)
+                for _ in range(intervals):
+                    if not self._is_meditating:
+                        break  # she was woken by an interaction
+                    time.sleep(10.0)
+                    if self._is_meditating:
+                        self.emit_meditation_impulses()
+                if self._is_meditating:
+                    self.wake_from_meditation()
+                    self._emit_volition_thought(
+                        ("calm", "rest", "meditation"), "thought")
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"self-meditation failed: {e}")
+                if self._is_meditating:
+                    try:
+                        self.wake_from_meditation()
+                    except Exception as e:  # noqa: BLE001
+                        logger.debug(f"wake_from_meditation fallback failed: {e}")
+
+        threading.Thread(
+            target=_run_meditation,
+            name="self-meditation",
+            daemon=True,
+        ).start()

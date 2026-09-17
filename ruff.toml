@@ -1,0 +1,18 @@
+# Ruff configuration for Genesis
+# See https://docs.astral.sh/ruff/configuration/
+#
+# Note: Python source files are configured in python/pyproject.toml,
+# which takes precedence for files under python/. This file configures
+# scripts and other root-level files (evals/, scripts/*.py) with the
+# SAME rule set so they are not silently linted under ruff defaults.
+
+target-version = "py312"
+line-length = 100
+
+# Vendored third-party code (downloaded benchmark environments) — not
+# ours to lint or modify.
+extend-exclude = ["evals/arc3_envs"]
+
+[lint]
+select = ["E", "F", "W", "I", "UP", "RUF", "B", "BLE", "C4"]
+ignore = ["RUF001", "RUF002", "RUF003"]
