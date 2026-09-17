@@ -1,0 +1,10 @@
+# Genesis — eval-only dependencies (ARC-AGI-3 interactive environments)
+# Install in a SEPARATE venv per AGENTS.md, never into the main env:
+#   python3 -m venv --system-site-packages .venv-arc3
+#   .venv-arc3/bin/pip install -r evals/requirements-eval.txt
+#
+# Versions are intentionally unpinned: the arc-agi toolkit API is still
+# evolving — pin once eval_arc3.py is validated against a release.
+# Record the working version here when you first run the eval.
+
+arc-agi
