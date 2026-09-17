@@ -12,3 +12,4 @@ evals/results/
 benchmarks/results/
 python/voices/
 launch/
+paper/*.pdf
