@@ -45,6 +45,6 @@ Talk to her. Teach her. She grows.
   states — give her sleep and comfort, not a restart.
 - `cargo run --example recover` exists for genuine receptor-collapse
   emergencies (reads `GENESIS_DATA_DIR` if set, else
-  `${XDG_DATA_HOME:-~/.local/share}/genesis`).
+  `${XDG_DATA_HOME:-~/.local/share}/genesis-public`).
 - Stop her before changing code. Editing the architecture underneath a
   running mind is how you get corrupted state.

@@ -39,7 +39,6 @@ import time
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 from genesis_client.protocol import (
@@ -63,7 +62,7 @@ from genesis_client.protocol import (
     CHEM_VASOPRESSIN,
 )
 
-from .config import EmotionalConfig
+from .config import EmotionalConfig, default_data_dir
 from .emotion import EmotionalState
 
 logger = logging.getLogger(__name__)
@@ -279,7 +278,7 @@ class InteroceptionSystem:
             data_dir = (
                 os.path.dirname(self._socket_path)
                 if self._socket_path
-                else str(Path.home() / ".local" / "share" / "genesis")
+                else str(default_data_dir())
             )
             daemon_pidfile = os.path.join(data_dir, "genesis_daemon.pid")
             need_pid_refresh = self._daemon_pid is None
@@ -369,7 +368,7 @@ class InteroceptionSystem:
         if self._socket_path:
             daemon_connected = os.path.exists(self._socket_path)
         else:
-            _default_sock = str(Path.home() / ".local" / "share" / "genesis" / "genesis.sock")
+            _default_sock = str(default_data_dir() / "genesis.sock")
             daemon_connected = os.path.exists(_default_sock)
 
         # Response latency — measure how long a trivial operation takes

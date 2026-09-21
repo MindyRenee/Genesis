@@ -16,9 +16,11 @@ from pathlib import Path
 
 import numpy as np
 
+from ..config import default_data_dir
+
 logger = logging.getLogger(__name__)
 
-_DATA_DIR = Path.home() / ".local/share/genesis/visual_cortex"
+_DATA_DIR = default_data_dir() / "visual_cortex"
 _MTL_FILE = _DATA_DIR / "memory_bridge.npz"
 
 @dataclass

@@ -13,3 +13,4 @@ benchmarks/results/
 python/voices/
 launch/
 paper/*.pdf
+evals/arc_official/
