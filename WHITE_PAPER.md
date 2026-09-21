@@ -284,9 +284,7 @@ scores:
   self-authored capability gauntlet over the Common Model of
   Cognition and Pickett's checklist
 - `evals/` — teaching, metacognitive, generalization,
-  emotion-gated, and cognitive-trajectory evals, plus ARC-AGI-1
-  (`eval_arc.py`, self-contained with the `arc_tasks/` corpus) and
-  ARC-AGI-3 (`eval_arc3.py`, needs the `arc-agi` toolkit venv)
+  emotion-gated, and cognitive-trajectory evals
 
 All of it runs locally; eval output goes to `evals/results/` and
 `benchmarks/results/` (gitignored). Readers are encouraged to run

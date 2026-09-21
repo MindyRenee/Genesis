@@ -198,36 +198,6 @@ class VolitionConfig:
                     "idle_seconds": 0.02,
                 },
             ),
-            # Study urge — an unstudied ARC lesson is an open
-            # curiosity, like a pending puzzle. One action reads the
-            # current lesson through her real learning path.
-            UrgeConfig(
-                name="study",
-                threshold=0.62,
-                growth=0.0005,
-                decay=0.0004,
-                cooldown=900.0,  # at most every 15 minutes
-                stimuli={
-                    "curiosity": 0.03,
-                    "lesson_pending": 0.05,
-                    "idle_seconds": 0.02,
-                },
-            ),
-            # Exam urge — she declares herself ready by taking the
-            # current lesson's cold exam. Higher threshold and a long
-            # cooldown: an exam is a commitment, not a whim.
-            UrgeConfig(
-                name="exam",
-                threshold=0.72,
-                growth=0.0004,
-                decay=0.0004,
-                cooldown=1800.0,  # at most every 30 minutes
-                stimuli={
-                    "curiosity": 0.02,
-                    "exam_pending": 0.05,
-                    "sustained_activity": 0.02,
-                },
-            ),
             # Introspection urge — she feels like examining herself.
             # This is the self-invocation of /introspect. It builds
             # from curiosity (she wants to understand herself), concept

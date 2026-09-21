@@ -61,12 +61,6 @@ not — those must be generated, not recited.
 - Type check: `mypy python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ --ignore-missing-imports` (0 errors)
 - Optional voice deps (not in requirements.txt): `vosk`, `sounddevice`,
   `speechrecognition` — install separately for microphone/TTS support
-- ARC-AGI-3 eval (`evals/eval_arc3.py`) needs the `arc-agi` toolkit in a
-  separate venv (e.g. `python3 -m venv --system-site-packages .venv-arc3`,
-  then `.venv-arc3/bin/pip install arc-agi`). Downloaded environments
-  live in `evals/arc3_envs/` (auto-fetched on first run). The static
-  ARC-AGI-1 eval (`evals/eval_arc.py`) loads task JSONs from
-  `evals/arc_tasks/` and needs no extra deps.
 
 ## Keep the project tidy
 The project is large. Dead code, unused files, and stale leftovers

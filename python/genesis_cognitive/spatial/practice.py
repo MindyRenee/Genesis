@@ -2043,62 +2043,9 @@ def _cell_match(pred: Grid, expected: Grid) -> float:
     return same / total
 
 
-_ARC_DIR = (
-    Path(__file__).resolve().parents[3] / "evals" / "arc_tasks"
-)
 # Attempts without mastery before a task parks and the next unlocks.
 # Parked tasks stay retryable — nothing is ever forced or closed.
 _PARK_AFTER = 8
-_ARC_HINT = "Transform each input grid the way the examples show."
-
-# Per-task instructions — one sentence describing the goal for tasks
-# where the generic hint undersells the structure.
-_ARC_HINTS = {
-    "22233c11": (
-        "The objects lie on invisible diagonal lines; paint copies "
-        "of their shape, in the new color, where each line continues."
-    ),
-}
-
-
-def _load_arc_tasks() -> list[dict]:
-    """Append real ARC-AGI-1 tasks to the curriculum, easy-first.
-
-    Ordering is by total training cells — a neutral size heuristic,
-    not a difficulty ranking tuned to her solver.
-    """
-    tasks: list[dict] = []
-    if not _ARC_DIR.is_dir():
-        return tasks
-    for path in sorted(_ARC_DIR.glob("*.json")):
-        try:
-            data = json.loads(path.read_text())
-            train = [
-                (_g(p["input"]), _g(p["output"])) for p in data["train"]
-            ]
-            test = [
-                (_g(p["input"]), _g(p["output"]))
-                for p in data["test"]
-                if "output" in p
-            ]
-        except (OSError, json.JSONDecodeError, KeyError, TypeError):
-            continue
-        if train and test:
-            size = sum(g.height * g.width for g, _ in train)
-            tasks.append({
-                "name": f"arc:{path.stem}",
-                "hint": _ARC_HINTS.get(path.stem, _ARC_HINT),
-                "train": train,
-                "test": test,
-                "_size": size,
-            })
-    tasks.sort(key=lambda t: t["_size"])
-    for t in tasks:
-        del t["_size"]
-    return tasks
-
-
-CURRICULUM.extend(_load_arc_tasks())
 
 
 @dataclass

@@ -280,38 +280,6 @@ def compute_accuracy(results: list[FactResult]) -> tuple[int, int, float]:
     return correct, total, acc
 
 
-def score_arc_solution(sol: Any, expected: list[Any]) -> tuple[bool, str]:
-    """Score one ARC solution against expected test outputs (ARC convention).
-
-    A task passes iff the solver reports solved with a hypothesis AND
-    at least one guess set matches every expected grid exactly (equal
-    length, element-wise equal). Length is checked explicitly —
-    ``zip`` without ``strict`` would silently ignore trailing expected
-    grids and false-pass short predictions.
-    """
-    hypothesis = getattr(sol, "hypothesis", None)
-    if not getattr(sol, "solved", False) or hypothesis is None:
-        if hypothesis is not None:
-            describe = getattr(hypothesis, "describe", lambda: "?")()
-            score = getattr(hypothesis, "score", None)
-            detail = f"unsolved — best: {describe}"
-            if score is not None:
-                detail += f" (score {score:.0%})"
-            return False, detail
-        return False, "unsolved — no hypotheses"
-    guesses = getattr(sol, "guesses", None) or []
-    predictions = getattr(sol, "predictions", None) or []
-    guess_sets = list(guesses) or ([predictions] if predictions else [])
-    for guesses_one in guess_sets:
-        if len(guesses_one) != len(expected) or not expected:
-            continue
-        if all(p == e for p, e in zip(guesses_one, expected, strict=True)):
-            describe = getattr(hypothesis, "describe", lambda: "?")()
-            return True, f"rule: {describe}"
-    describe = getattr(hypothesis, "describe", lambda: "?")()
-    return False, f"rule '{describe}' fit training but test prediction was wrong"
-
-
 def run_condition(
     name: str,
     description: str,
