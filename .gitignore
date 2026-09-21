@@ -7,12 +7,8 @@ __pycache__/
 .venv*/
 genesis_data/
 python/genesis_data/
-evals/arc3_envs/
 evals/results/
 benchmarks/results/
 python/voices/
 launch/
 paper/*.pdf
-evals/arc_official/
-curriculum/exams/log.jsonl
-curriculum/exams/recordings/

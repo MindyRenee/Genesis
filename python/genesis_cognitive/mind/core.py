@@ -311,13 +311,6 @@ class Mind(
         # canvas, this is an ability she owns: nobody drives her
         # through it; the puzzle urge lets her choose to attempt.
         self.spatial_practice = SpatialPractice(self.data_dir)
-
-        # ARC curriculum — her self-directed lesson/exam pathway.
-        # Like the canvas and spatial practice, this is an ability she
-        # owns: nobody drives her through it; the study and exam urges
-        # let her choose to read a lesson or declare herself ready.
-        from ..learning.arc_curriculum import ArcCurriculum
-        self.arc_curriculum = ArcCurriculum(self.data_dir)
     def _init_vision_systems(self) -> None:
         """Initialize vision, visual cortex, and wire them to the learner.
 

@@ -34,8 +34,6 @@ The full architectural description is in [WHITE_PAPER.md](WHITE_PAPER.md).
 
 [![First boot](https://asciinema.org/a/jIr3t0Ax2W43uSJz.svg)](https://asciinema.org/a/jIr3t0Ax2W43uSJz)
 
-[![Learning an ARC rule: fail → teach → solve → transfer (82→7 nodes)](https://asciinema.org/a/WrqKmM4NNTkthjMC.svg)](https://asciinema.org/a/WrqKmM4NNTkthjMC)
-
 ---
 
 ## What this is not
@@ -192,18 +190,9 @@ python3 -m mypy python/genesis_cognitive/ python/genesis_client/ \
 ### Evals
 
 `evals/` contains the evaluation harnesses: teaching, metacognitive,
-generalization, emotion-gated, and cognitive-trajectory evals, plus the
-ARC-AGI-1 spatial eval (`eval_arc.py`, self-contained with the
-`arc_tasks/` corpus), the sequential/transfer ARC variants
-(`eval_arc_sequential.py`, `eval_arc_transfer.py`), and the live
-spatial-teaching harness (`teach_spatial_live.py`). `eval_arc3.py` (ARC-AGI-3 interactive
-environments) requires the `arc-agi` toolkit in a separate venv.
+generalization, emotion-gated, and cognitive-trajectory evals, plus
+the live spatial-teaching harness (`teach_spatial_live.py`).
 Eval results are written to `evals/results/`.
-
-`evals/demo_arc.py` is the interactive one-task-at-a-time demo shown
-in the recording above — fail, teach, retry, transfer to an unseen
-ARC task. Run it with `PYTHONPATH=python:evals python3
-evals/demo_arc.py`.
 
 ---
 
