@@ -34,9 +34,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from pathlib import Path
 
 import numpy as np
+
+from ..config import default_data_dir
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ def _require_cv2():  # type: ignore[no-untyped-def]
     return cv2
 
 # Model path — YOLOv5s ONNX from the Ultralytics release
-_MODEL_DIR = Path.home() / ".local/share/genesis/models"
+_MODEL_DIR = default_data_dir() / "models"
 _MODEL_FILE = _MODEL_DIR / "yolov5s.onnx"
 
 # COCO class names (80 categories) — the vocabulary of her IT cortex.

@@ -14,7 +14,7 @@ fn main() {
                     std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
                 )
             });
-            format!("{}/genesis/core_state.bin", base)
+            format!("{}/genesis-public/core_state.bin", base)
         });
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

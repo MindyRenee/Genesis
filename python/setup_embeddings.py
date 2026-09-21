@@ -10,7 +10,7 @@ for words she hasn't explicitly learned.
 Usage:
     python3 setup_embeddings.py [--data-dir DIR] [--dim 50]
 
-If no data dir is specified, defaults to ~/.local/share/genesis.
+If no data dir is specified, defaults to ~/.local/share/genesis-public.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ def _parse_setup_args() -> tuple[str, int]:
     data_dir = (
         sys.argv[sys.argv.index("--data-dir") + 1]
         if "--data-dir" in sys.argv
-        else str(Path.home() / ".local" / "share" / "genesis")
+        else str(Path.home() / ".local" / "share" / "genesis-public")
     )
     dim = int(sys.argv[sys.argv.index("--dim") + 1]) if "--dim" in sys.argv else GLOVE_DIM
     return data_dir, dim

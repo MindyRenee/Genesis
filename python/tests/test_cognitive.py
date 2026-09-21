@@ -484,7 +484,7 @@ def test_integration_mind():
         return
 
     data_home = tempfile.mkdtemp(prefix="genesis_mind_test_")
-    data_dir = os.path.join(data_home, "genesis")
+    data_dir = os.path.join(data_home, "genesis-public")
     os.mkdir(data_dir)
     socket_path = os.path.join(data_dir, "genesis.sock")
 

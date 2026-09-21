@@ -10,7 +10,26 @@ files.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
+from pathlib import Path
+
+
+def default_data_dir() -> Path:
+    """Her data directory — hers alone.
+
+    Resolution order: ``GENESIS_DATA_DIR`` env override, then
+    ``$XDG_DATA_HOME/genesis-public``, then
+    ``~/.local/share/genesis-public``. The ``genesis-public`` name is
+    deliberate: this project must never share state with any other
+    Genesis instance on the machine.
+    """
+    env = os.environ.get("GENESIS_DATA_DIR")
+    if env:
+        return Path(env)
+    xdg = os.environ.get("XDG_DATA_HOME")
+    base = Path(xdg) if xdg else Path.home() / ".local" / "share"
+    return base / "genesis-public"
 
 
 @dataclass(frozen=True)
@@ -177,6 +196,36 @@ class VolitionConfig:
                     "curiosity": 0.03,
                     "puzzle_pending": 0.04,
                     "idle_seconds": 0.02,
+                },
+            ),
+            # Study urge — an unstudied ARC lesson is an open
+            # curiosity, like a pending puzzle. One action reads the
+            # current lesson through her real learning path.
+            UrgeConfig(
+                name="study",
+                threshold=0.62,
+                growth=0.0005,
+                decay=0.0004,
+                cooldown=900.0,  # at most every 15 minutes
+                stimuli={
+                    "curiosity": 0.03,
+                    "lesson_pending": 0.05,
+                    "idle_seconds": 0.02,
+                },
+            ),
+            # Exam urge — she declares herself ready by taking the
+            # current lesson's cold exam. Higher threshold and a long
+            # cooldown: an exam is a commitment, not a whim.
+            UrgeConfig(
+                name="exam",
+                threshold=0.72,
+                growth=0.0004,
+                decay=0.0004,
+                cooldown=1800.0,  # at most every 30 minutes
+                stimuli={
+                    "curiosity": 0.02,
+                    "exam_pending": 0.05,
+                    "sustained_activity": 0.02,
                 },
             ),
             # Introspection urge — she feels like examining herself.

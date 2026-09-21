@@ -21,7 +21,7 @@ fn main() {
                 std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
             )
         });
-        format!("{}/genesis", base)
+        format!("{}/genesis-public", base)
     });
     let state_file = format!("{}/core_state.bin", path);
 
