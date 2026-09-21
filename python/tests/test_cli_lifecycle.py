@@ -104,7 +104,7 @@ def _run_shell_helpers(code, data_dir):
 
 @pytest.mark.parametrize("pid", ["0", "-1", "1", "not-a-pid"])
 def test_stop_rejects_invalid_pid_files(tmp_path, pid):
-    data_dir = tmp_path / "genesis"
+    data_dir = tmp_path / "genesis-public"
     data_dir.mkdir()
     (data_dir / "genesis_cli.pid").write_text(pid)
     result = _run_shell_helpers(
@@ -115,7 +115,7 @@ def test_stop_rejects_invalid_pid_files(tmp_path, pid):
 
 
 def test_stop_timeout_preserves_locks_and_never_sigkills(tmp_path):
-    data_dir = tmp_path / "genesis"
+    data_dir = tmp_path / "genesis-public"
     data_dir.mkdir()
     lock = data_dir / "genesis.lock"
     lock.write_text("held")
@@ -137,7 +137,7 @@ _stop_all
 
 
 def test_stop_rejects_reused_pid_from_unrelated_process(tmp_path):
-    data_dir = tmp_path / "genesis"
+    data_dir = tmp_path / "genesis-public"
     data_dir.mkdir()
     (data_dir / "genesis_cli.pid").write_text(str(os.getpid()))
     result = _run_shell_helpers('_read_pid "$DATA_DIR/genesis_cli.pid"', tmp_path)

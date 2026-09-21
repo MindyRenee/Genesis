@@ -9,8 +9,8 @@ IPC protocol defined in the Rust crate's `daemon::ipc` module.
     import os
     from genesis_client import GenesisClient
 
-    # The daemon's socket lives in the data dir (default: ~/.local/share/genesis/)
-    with GenesisClient(os.path.expanduser("~/.local/share/genesis/genesis.sock")) as client:
+    # The daemon's socket lives in the data dir (default: ~/.local/share/genesis-public/)
+    with GenesisClient(os.path.expanduser("~/.local/share/genesis-public/genesis.sock")) as client:
         summary = client.get_neuro_summary()
         print(f"Genesis is feeling: {summary.phase_name}")
         print(f"  arousal: {summary.arousal:.2f}")

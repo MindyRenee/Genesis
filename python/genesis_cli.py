@@ -88,6 +88,7 @@ from genesis_client.protocol import PHASE_ACTIVE, PHASE_ALERT, PHASE_NREM, PHASE
 from genesis_cognitive.ambient import AmbientListener, contains_wake_word, strip_wake_word
 from genesis_cognitive.auditory import AuditoryCortex, SoundEvent
 from genesis_cognitive.concepts import RelationType
+from genesis_cognitive.config import default_data_dir
 from genesis_cognitive.mind import Mind
 from genesis_cognitive.speech import Voice, VoiceInput
 
@@ -118,7 +119,9 @@ logger = logging.getLogger(__name__)
 LIVE_THOUGHT_POLL_INTERVAL = 2.0
 
 # Default data directory (XDG-compliant, persists across reboots).
-DEFAULT_DATA_DIR = str(Path.home() / ".local" / "share" / "genesis")
+# Resolved via GENESIS_DATA_DIR → $XDG_DATA_HOME/genesis-public —
+# this instance's state is never shared with any other Genesis.
+DEFAULT_DATA_DIR = str(default_data_dir())
 DEFAULT_DAEMON_SOCKET = "genesis.sock"
 
 # File descriptor for the per-data-dir CLI singleton lock.

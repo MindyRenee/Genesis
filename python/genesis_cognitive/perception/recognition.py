@@ -44,6 +44,8 @@ from pathlib import Path
 
 import numpy as np
 
+from ..config import default_data_dir
+
 __all__ = ["DetectedFace", "FaceRecognizer", "KnownFace"]
 
 logger = logging.getLogger(__name__)
@@ -61,7 +63,7 @@ def _require_cv2():  # type: ignore[no-untyped-def]
     return cv2
 
 # Model paths — downloaded from OpenCV model zoo
-_MODEL_DIR = Path.home() / ".local/share/genesis/models"
+_MODEL_DIR = default_data_dir() / "models"
 _DETECTOR_MODEL = _MODEL_DIR / "face_detection_yunet.onnx"
 _RECOGNIZER_MODEL = _MODEL_DIR / "face_recognition_sface.onnx"
 

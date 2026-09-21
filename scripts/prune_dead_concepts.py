@@ -449,7 +449,7 @@ def main() -> int:
         ),
         help=(
             "Path to the data directory "
-            "(default: ${XDG_DATA_HOME:-~/.local/share}/genesis, same as run.sh)."
+            "(default: ${XDG_DATA_HOME:-~/.local/share}/genesis-public, same as run.sh)."
         ),
     )
     parser.add_argument(

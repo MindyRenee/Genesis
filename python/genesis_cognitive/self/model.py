@@ -43,10 +43,10 @@ import logging
 import os
 from collections import deque
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 from ..concepts import RelationType
+from ..config import default_data_dir
 
 __all__ = [
     "AgencyDetector",
@@ -817,7 +817,7 @@ class SelfModel:
             body.daemon_connected = os.path.exists(body.socket_path)
         else:
             # Try the default socket path
-            default_socket = str(Path.home() / ".local" / "share" / "genesis" / "genesis.sock")
+            default_socket = str(default_data_dir() / "genesis.sock")
             body.daemon_connected = os.path.exists(default_socket)
             if body.daemon_connected:
                 body.socket_path = default_socket

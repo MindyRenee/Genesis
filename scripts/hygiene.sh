@@ -12,7 +12,7 @@
 #
 # Two locations are tracked:
 #   PROJECT  — the source tree (cwd, where this script lives)
-#   RUNTIME  — ~/.local/share/genesis/ (live state + runtime artifacts)
+#   RUNTIME  — ~/.local/share/genesis-public/ (live state + runtime artifacts)
 #
 # Usage:
 #   scripts/hygiene.sh                  # report (default — measure only)
@@ -39,7 +39,7 @@ cd "$ROOT"
 # Runtime data directory (where Genesis stores her live state + artifacts).
 # Same resolution as run.sh: XDG_DATA_HOME (or ~/.local/share), with
 # GENESIS_DATA_DIR kept as a manual override.
-RUNTIME_DIR="${GENESIS_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/genesis}"
+RUNTIME_DIR="${GENESIS_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/genesis-public}"
 
 # ── Colors ────────────────────────────────────────────────────────────
 if [ -t 1 ]; then
@@ -708,7 +708,7 @@ Usage:
 
 Two locations are tracked:
   PROJECT  — the source tree (build artifacts, caches, source code)
-  RUNTIME  — ~/.local/share/genesis/ (live state + runtime artifacts)
+  RUNTIME  — ~/.local/share/genesis-public/ (live state + runtime artifacts)
 
 The --clean variants are safe: they never touch source code, configs,
 binary assets (python/voices/), live runtime state (cognitive_state,
