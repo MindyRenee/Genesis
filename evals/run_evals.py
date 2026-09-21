@@ -31,7 +31,6 @@ _PYTHON_DIR = _EVALS_DIR.parent / "python"
 if str(_PYTHON_DIR) not in sys.path:
     sys.path.insert(0, str(_PYTHON_DIR))
 
-import eval_arc  # noqa: E402
 import eval_cognitive_trajectory  # noqa: E402
 import eval_emotion_gated  # noqa: E402
 import eval_generalization  # noqa: E402
@@ -41,16 +40,13 @@ from harness import EvalResult, append_csv, print_result, write_json  # noqa: E4
 
 # Registry of all evaluations run by default.
 # Each entry is (name, module.run_function).
-# Excluded by design (run separately): eval_arc3 (needs the arc-agi
-# toolkit venv), eval_arc_sequential / eval_arc_transfer (long-running
-# ARC sweeps with their own drivers), teach_spatial_live (interactive).
+# Excluded by design (run separately): teach_spatial_live (interactive).
 _EVALS = [
     ("teaching", eval_teaching.run),
     ("generalization", eval_generalization.run),
     ("emotion_gated", eval_emotion_gated.run),
     ("cognitive_trajectory", eval_cognitive_trajectory.run),
     ("metacognitive", eval_metacognitive.run),
-    ("arc_spatial", eval_arc.run),
 ]
 
 

@@ -1,15 +1,14 @@
-"""Interactive agent — playing ARC-AGI-3-style environments.
+"""Interactive agent — acting in unseen grid environments.
 
 The static solver answers "what rule maps input to output?" The
-interactive benchmark asks something harder: *act* in an unseen
+interactive problem asks something harder: *act* in an unseen
 environment, observe the consequences, and find the goal — with no
 instructions. That is a perception→action loop, which is exactly the
 shape of Genesis's architecture.
 
 This module provides the policy layer. The environment side (frames,
-actions, win states) is deliberately kept generic — the adapter in
-``evals/eval_arc3.py`` binds it to the ``arc_agi`` toolkit — so the
-policy can also be tested against hand-built mock environments.
+actions, win states) is deliberately kept generic so the policy can
+be tested against hand-built mock environments.
 
 Policy v2 — agency + navigation:
 
