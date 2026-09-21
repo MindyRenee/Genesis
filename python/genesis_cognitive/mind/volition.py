@@ -7,7 +7,12 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any
 
-from genesis_client.protocol import CHEM_NAMES, MODULE_METACOGNITION
+from genesis_client.protocol import (
+    CHEM_NAMES,
+    MODULE_LANGUAGE,
+    MODULE_METACOGNITION,
+    MODULE_REASONING,
+)
 
 from ..canvas import DrawingResult, NeurochemistryInput
 from ..tools.project_creator import create_project, manage_project_lifecycle
@@ -153,6 +158,18 @@ class VolitionMixin:
         except Exception as e:  # noqa: BLE001
             logger.debug(f"puzzle_pending read failed: {e}")
 
+        # ARC curriculum — an unstudied lesson or an exam she's ready
+        # for are open curiosities of the same kind.
+        lesson_pending = 0.0
+        exam_pending = 0.0
+        try:
+            if self.arc_curriculum.lesson_pending():
+                lesson_pending = 1.0
+            elif self.arc_curriculum.exam_pending():
+                exam_pending = 1.0
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"arc_curriculum pending read failed: {e}")
+
         wave_data = self._read_wave_and_adenosine()
 
         # Concept network growth for the introspection and self-mission
@@ -183,6 +200,8 @@ class VolitionMixin:
             **interoceptive,
             "emotional_intensity": emotional_intensity,
             "puzzle_pending": puzzle_pending,
+            "lesson_pending": lesson_pending,
+            "exam_pending": exam_pending,
             "creativity": creativity,
             **wave_data,
             "concept_growth": concept_growth,
@@ -203,6 +222,7 @@ class VolitionMixin:
         from genesis_client.types import LEARNING_POSTURE_PROTECTIVE
         heavy_cpu = {
             "bug_scan", "code_learning", "improve", "create", "puzzle",
+            "exam",
         }
         if posture == LEARNING_POSTURE_PROTECTIVE:
             ready = [r for r in ready if r not in heavy_cpu]
@@ -237,6 +257,8 @@ class VolitionMixin:
             "self_mission": self._perform_self_mission,
             "learn": self._perform_learn,
             "puzzle": self._perform_puzzle,
+            "study": self._perform_study,
+            "exam": self._perform_exam,
         }
         for name in ready:
             fn = performers.get(name)
@@ -831,6 +853,118 @@ class VolitionMixin:
         if result.rule != "none":
             seeds.insert(0, f"spatial:rule:{result.rule}")
         self._emit_volition_thought(tuple(seeds), "practicing")
+
+    def _perform_study(self) -> None:
+        """Read her current ARC curriculum lesson.
+
+        The study urge: an unstudied lesson is an open curiosity.
+        One action reads the lesson through her real learning path —
+        ``learn_from_input`` grounds the material into her concept
+        network like anything else she's taught — and marks it
+        studied, which makes the lesson's exam available.
+        """
+        self._emit_volition_thought(
+            ("lesson", "study", "reasoning", "arc"),
+            "studying",
+        )
+        try:
+            result = self.arc_curriculum.study(
+                self.cognition.self_learner.learn_from_input
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"study action failed: {e}")
+            return
+        if result is None:
+            return
+        lesson, events = result
+
+        self._emit_live_thought(
+            "study",
+            f"lesson={lesson} learning_events={events}",
+        )
+        try:
+            self.client.store_event(
+                timestamp=int(time.time() * 1000),
+                event_type=1,  # Output
+                source_module=MODULE_LANGUAGE,
+                salience=0.5,
+                emotional_tag="curious",
+                text=f"curriculum:study lesson={lesson} events={events}",
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"failed to store study event: {e}")
+        self._emit_volition_thought(
+            ("lesson", "study", "reasoning", "arc"), "studying",
+        )
+
+    def _perform_exam(self) -> None:
+        """Take her current lesson's cold exam.
+
+        The exam urge is her declaration of readiness: the protocol's
+        "you decide when to take it" made volitional. One unseen
+        official task, a fresh reasoner, one attempt, exact-match
+        scoring — recorded to a transcript before the verdict exists,
+        logged to exams/log.jsonl, and felt through the same
+        neurochemical outcome path as a puzzle attempt (RPE reward on
+        a pass, bounded prediction-error dip on a fail).
+        """
+        self._emit_volition_thought(
+            ("exam", "reasoning", "problem_solving", "arc"),
+            "concentrating",
+        )
+        try:
+            result = self.arc_curriculum.take_exam()
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"exam action failed: {e}")
+            return
+        if result is None:
+            return
+
+        felt = None
+        try:
+            felt = self.regulator.respond_to_puzzle(
+                self.feel(),
+                score=result.score,
+                prior_best=0.0,
+                solved=result.solved,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"exam emotional response failed: {e}")
+
+        verdict = "PASS" if result.solved else "FAIL"
+        self._emit_live_thought(
+            "exam",
+            f"lesson={result.lesson} task={result.task} {verdict} "
+            f"rule={result.rule} nodes={result.nodes} "
+            f"recording={result.recording}"
+            + (f" felt={felt}" if felt else ""),
+        )
+        try:
+            self.client.store_event(
+                timestamp=int(time.time() * 1000),
+                event_type=1,  # Output
+                source_module=MODULE_REASONING,
+                salience=0.7 if result.solved else 0.55,
+                emotional_tag=(
+                    "reward" if result.solved else "determined"
+                ),
+                text=(
+                    f"curriculum:exam lesson={result.lesson} "
+                    f"task={result.task} {verdict} rule={result.rule} "
+                    f"nodes={result.nodes}"
+                    + (f" felt={felt}" if felt else "")
+                ),
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"failed to store exam event: {e}")
+
+        seeds = ["exam", "problem_solving", "arc"]
+        if result.rule:
+            seeds.insert(0, f"spatial:rule:{result.rule}")
+        if felt:
+            seeds.append(felt)
+        self._emit_volition_thought(tuple(seeds), "concentrating")
+
     def _store_creation_memory(self, result, topic: str) -> None:
         """Store the creation as a long-term memory.
 
