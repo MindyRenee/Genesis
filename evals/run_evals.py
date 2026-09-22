@@ -35,6 +35,7 @@ import eval_cognitive_trajectory  # noqa: E402
 import eval_emotion_gated  # noqa: E402
 import eval_generalization  # noqa: E402
 import eval_metacognitive  # noqa: E402
+import eval_structural_generalization  # noqa: E402
 import eval_teaching  # noqa: E402
 from harness import EvalResult, append_csv, print_result, write_json  # noqa: E402
 
@@ -47,6 +48,7 @@ _EVALS = [
     ("emotion_gated", eval_emotion_gated.run),
     ("cognitive_trajectory", eval_cognitive_trajectory.run),
     ("metacognitive", eval_metacognitive.run),
+    ("structural_generalization", eval_structural_generalization.run),
 ]
 
 
