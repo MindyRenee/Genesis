@@ -35,3 +35,10 @@ jobs:
       - run: python3 -m pyflakes python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ evals/*.py scripts/*.py
       - run: python3 -m mypy python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ --ignore-missing-imports
       - run: python3 -m pytest python/tests/ -q -o addopts=''
+      - name: Blind structural generalization (10 seeds)
+        run: |
+          set -o pipefail
+          for seed in $(seq 1 10); do
+            echo "===== Structural generalization seed ${seed} ====="
+            python3 evals/eval_structural_generalization.py --seed "${seed}" --cooldown 0
+          done
