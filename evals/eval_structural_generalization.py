@@ -12,21 +12,16 @@ A passing result therefore cannot come from memorizing words such as
 structure it generated.
 
 Design:
-- 50 independent worlds per condition.
-- One world is presented and processed at a time.
+- One independent world per condition — a minimal one-shot probe of
+  whether she can close a structure she has never seen. Raise
+  _WORLD_COUNT for repeated trials.
 - Each world is a 6-node PART_OF chain using random synthetic tokens.
 - Genesis receives only adjacent edges.
 - The evaluator asks for a non-adjacent edge (4 hops apart).
-- Distractor edges form separate components and must not bridge worlds.
+- A distractor edge forms a disconnected component that closure must
+  not bridge (the negative control).
 - Inferred edges are required to have origin="inferred".
-- A negative control checks that unrelated endpoints are not connected.
-- A configurable cooldown separates worlds so state-dependent processing
-  is not forced to handle all worlds simultaneously.
-- Feedback is supportive and never reveals the correct answer.
-
-The feedback is deliberately kept outside Genesis's knowledge graph. This
-preserves the benchmark's validity: encouragement must not teach the
-answer or add synthetic facts to long-term knowledge.
+- A configurable cooldown separates worlds when _WORLD_COUNT > 1.
 
 This is evidence for structural generalization, not a general-intelligence
 or consciousness test.
@@ -50,26 +45,27 @@ from harness import (
 )
 
 
-_WORLD_COUNT = 50
+_WORLD_COUNT = 1
 _CHAIN_LENGTH = 6
 _QUERY_HOPS = 4
 _DEFAULT_COOLDOWN_SECONDS = 1.0
 
 
-def _token(rng: random.Random, prefix: str, world: int, node: int) -> str:
+def _token(rng: random.Random, kind: str, world: int, node: int) -> str:
     """Create an opaque concept token with no semantic content.
 
     Tokens must be single lowercase words: her fact extractor only
     recognizes alphabetic concept names, and a trailing "s" would be
-    singularized away by concept normalization. World/node position is
-    encoded as letters so failures stay debuggable; the random suffix
-    keeps each token unique and meaningless.
+    singularized away by concept normalization. They contain no real
+    morphemes — kind ("n"/"d") and world/node position are encoded as
+    letters purely so failures stay debuggable; the random suffix keeps
+    each token unique and meaningless to her.
     """
     letters = string.ascii_lowercase
     position = f"{letters[world // 26]}{letters[world % 26]}{letters[node]}"
     suffix = "".join(rng.choice(letters) for _ in range(7))
     suffix += rng.choice(letters.replace("s", ""))
-    return f"{prefix}{position}{suffix}"
+    return f"{kind}{position}{suffix}"
 
 
 def _teach_part_of(em: EvalMind, source: str, target: str) -> None:
@@ -104,16 +100,6 @@ def _run_closure(em: EvalMind, max_cycles: int = 30) -> int:
     return total_new
 
 
-def _feedback(passed: bool, world_index: int) -> None:
-    """Give supportive feedback without revealing the correct answer."""
-    if passed:
-        print(f"      Feedback: Excellent work, Genesis — world {world_index + 1} "
-              "was handled correctly.")
-    else:
-        print(f"      Feedback: That's okay, Genesis — keep working. "
-              f"World {world_index + 1} is complete; no answer is revealed.")
-
-
 def _condition_randomized_structural_generalization(
     em: EvalMind,
     seed: int,
@@ -122,23 +108,37 @@ def _condition_randomized_structural_generalization(
     """Generate and evaluate opaque graph worlds one at a time."""
     rng = random.Random(seed)
 
-    worlds: list[list[str]] = []
     all_results: list[FactResult] = []
     total_inferred = 0
 
     for world_index in range(_WORLD_COUNT):
         nodes = [
-            _token(rng, "node", world_index, node_index)
+            _token(rng, "n", world_index, node_index)
             for node_index in range(_CHAIN_LENGTH)
         ]
-        worlds.append(nodes)
 
         # Independent distractor component. It is never connected to the
         # chain and therefore must not create a path to the queried target.
         distractor = [
-            _token(rng, "distractor", world_index, node_index)
+            _token(rng, "d", world_index, node_index)
             for node_index in range(2)
         ]
+
+        # Blindness precondition: every generated token must be absent
+        # from her network — otherwise the trial isn't "never seen".
+        unseen = all(
+            em.network.get_concept(t) is None for t in (*nodes, *distractor)
+        )
+        all_results.append(
+            FactResult(
+                concept=nodes[0],
+                passed=unseen,
+                detail=(
+                    f"world {world_index + 1}: all generated tokens "
+                    f"previously unseen={unseen}"
+                ),
+            )
+        )
 
         for left, right in pairwise(nodes):
             _teach_part_of(em, left, right)
@@ -162,24 +162,20 @@ def _condition_randomized_structural_generalization(
             ),
         )
         all_results.append(positive)
-        _feedback(passed, world_index)
 
-        # Negative control against a world that has already been generated.
-        if len(worlds) > 1:
-            other_world = worlds[world_index - 1]
-            negative_target = other_world[_QUERY_HOPS]
-            negative_exists = _edge_exists(em, source, negative_target)
-            negative_passed = not negative_exists
-            all_results.append(
-                FactResult(
-                    concept=source,
-                    passed=negative_passed,
-                    detail=(
-                        f"world {world_index + 1}: cross-world negative control "
-                        f"to '{negative_target}': edge_exists={negative_exists}"
-                    ),
-                )
+        # Negative control: the distractor is a disconnected component —
+        # closure must never bridge from the chain into it.
+        negative_exists = _edge_exists(em, source, distractor[1])
+        all_results.append(
+            FactResult(
+                concept=source,
+                passed=not negative_exists,
+                detail=(
+                    f"world {world_index + 1}: distractor negative control "
+                    f"to '{distractor[1]}': edge_exists={negative_exists}"
+                ),
             )
+        )
 
         # Structural audit: the direct edge supplied by this evaluator must
         # exist as a taught ("stated") edge — a check that also proves the
@@ -223,8 +219,7 @@ def run(seed: int = 42, cooldown_seconds: float = _DEFAULT_COOLDOWN_SECONDS) -> 
         description=(
             "Tests whether Genesis can learn and transitively close unseen "
             "graph structures built from opaque, randomly generated concept "
-            "names. Worlds are processed sequentially with a configurable "
-            "cooldown; supportive feedback never reveals answers."
+            "names."
         ),
         timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
     )
@@ -235,7 +230,7 @@ def run(seed: int = 42, cooldown_seconds: float = _DEFAULT_COOLDOWN_SECONDS) -> 
             (
                 f"{_WORLD_COUNT} independent {_CHAIN_LENGTH}-node PART_OF "
                 f"chains; process one world at a time; test {_QUERY_HOPS}-hop "
-                "inferred edges, cross-world negative controls, and direct "
+                "inferred edges, distractor negative controls, and direct "
                 "edge provenance."
             ),
             lambda em=em: _condition_randomized_structural_generalization(
