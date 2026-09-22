@@ -29,7 +29,14 @@ import string
 import time
 from itertools import pairwise
 
-from harness import EvalMind, EvalResult, FactResult, RelationType, print_result, run_condition
+from harness import (
+    EvalMind,
+    EvalResult,
+    FactResult,
+    RelationType,
+    print_result,
+    run_condition,
+)
 
 
 _WORLD_COUNT = 50
