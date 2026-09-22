@@ -14,50 +14,62 @@
 
 set -euo pipefail
 
-# Resolve repo root from script location (no git dependency).
+# Resolve repo root. When run from scripts/, the parent dir is the root.
+# When installed as .git/hooks/pre-commit, the parent is .git/ — ask git.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+if [ -f "$SCRIPT_DIR/../Cargo.toml" ]; then
+    REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+else
+    REPO_ROOT="$(git rev-parse --show-toplevel)"
+fi
 cd "$REPO_ROOT"
 
 # ─── Rust ──────────────────────────────────────────────────────
-if cargo metadata --no-deps --format-version 1 >/dev/null 2>&1; then
-    clippy_out="$(cargo clippy --all-targets 2>&1)"
+if command -v cargo >/dev/null 2>&1 && cargo metadata --no-deps --format-version 1 >/dev/null 2>&1; then
+    clippy_out="$(cargo clippy --all-targets 2>&1)" || true
     if echo "$clippy_out" | grep -qE "^warning|^error"; then
         echo "❌ cargo clippy found issues. Fix them before committing."
         echo "$clippy_out" | grep -E "^warning|^error"
         exit 1
     fi
+else
+    echo "⚠ cargo not found — clippy check skipped."
 fi
 
 # ─── Python ─────────────────────────────────────────────────────
-# Scope covers production code, tests, evals, and scripts — ruff.toml
-# at the repo root carries the same rule set for evals/scripts as
-# python/pyproject.toml does for python/.
+# These invocations mirror CI exactly (.github/workflows/ci.yml).
+# A missing tool warns loudly instead of silently passing — a skipped
+# check is a false pass.
+PY_DEPS="python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/"
+
 if command -v ruff >/dev/null 2>&1; then
-    ruff_out="$(ruff check python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ evals/ scripts/ 2>&1)" || true
-    if echo "$ruff_out" | grep -qE "^Found|error"; then
-        echo "❌ ruff found issues. Run: ruff check --fix python/ evals/ scripts/"
-        echo "$ruff_out" | grep -E "^Found|error"
+    if ! ruff_out="$(ruff check 2>&1)"; then
+        echo "❌ ruff found issues. Run: ruff check --fix"
+        echo "$ruff_out"
         exit 1
     fi
+else
+    echo "⚠ ruff not found — lint check skipped. Install: pip install -r python/requirements-dev.txt"
 fi
 
-if command -v pyflakes >/dev/null 2>&1; then
-    pyflakes_out="$(pyflakes python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ evals/*.py scripts/*.py 2>&1)" || true
-    if [ -n "$pyflakes_out" ]; then
+if python3 -m pyflakes --version >/dev/null 2>&1; then
+    if ! pyflakes_out="$(python3 -m pyflakes $PY_DEPS evals/*.py scripts/*.py 2>&1)"; then
         echo "❌ pyflakes found issues."
         echo "$pyflakes_out"
         exit 1
     fi
+else
+    echo "⚠ pyflakes not found — check skipped. Install: pip install -r python/requirements-dev.txt"
 fi
 
-if command -v mypy >/dev/null 2>&1; then
-    mypy_out="$(cd python && mypy genesis_cognitive/ genesis_client/ genesis_cli.py tests/ --ignore-missing-imports 2>&1)" || true
-    if echo "$mypy_out" | grep -qE "^Found .* error"; then
+if python3 -m mypy --version >/dev/null 2>&1; then
+    if ! mypy_out="$(python3 -m mypy $PY_DEPS --ignore-missing-imports 2>&1)"; then
         echo "❌ mypy found type errors."
-        echo "$mypy_out" | grep -E "^Found|error"
+        echo "$mypy_out"
         exit 1
     fi
+else
+    echo "⚠ mypy not found — check skipped. Install: pip install -r python/requirements-dev.txt"
 fi
 
 echo "✓ All checks passed."

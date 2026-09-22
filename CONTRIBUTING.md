@@ -10,7 +10,10 @@ that matter most:
   legitimate input data; pre-written sentences she recites are not.
 - **`ruff check`, `pyflakes`, `mypy` (0 errors), `cargo test`, and the
   Python suite must all pass.** See the README for the exact commands;
-  CI runs all of them on every PR.
+  CI runs all of them on every push and PR. Run
+  `bash scripts/pre-commit.sh` before pushing to check everything
+  locally in one step — or install it as a git hook:
+  `cp scripts/pre-commit.sh .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit`
 - **Fix root causes, not symptoms.** Prefer correct/intelligent
   solutions over fast/superficial ones.
 - **Keep the codebase tidy.** Dead code gets deleted, not maintained.
