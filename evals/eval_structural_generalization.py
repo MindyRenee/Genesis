@@ -29,7 +29,7 @@ import string
 import time
 from itertools import pairwise
 
-from harness import (
+from harness import (  # noqa: I001
     EvalMind,
     EvalResult,
     FactResult,
