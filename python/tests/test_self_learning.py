@@ -2372,6 +2372,25 @@ def test_integration_part_of_creates_edge():
     assert len(part_of) == 1
 
 
+def test_integration_unparseable_name_no_function_word_edge():
+    """Unparseable identifiers must not mint function-word concepts.
+
+    "The node_0_1_x is part of the node_0_2_y" contains digits and
+    underscores the extractor can't read. The regex used to slide past
+    them and match the verb phrase itself, creating a spurious
+    "is → part of → the" edge. Nothing should be learned from input
+    whose endpoints can't be parsed.
+    """
+    net = ConceptNetwork()
+    learner = SelfDirectedLearner(net)
+    events = learner.learn_from_input(
+        "The node_0_1_abcdefgh is part of the node_0_2_wxyzabcd."
+    )
+    assert events == []
+    assert net.get_concept("is") is None
+    assert net.get_concept("the") is None
+
+
 def test_integration_no_duplicate_concepts():
     """Same concept mentioned twice doesn't create duplicates."""
     net = ConceptNetwork()
