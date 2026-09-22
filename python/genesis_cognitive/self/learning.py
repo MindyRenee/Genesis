@@ -67,7 +67,7 @@ from collections import deque
 from dataclasses import dataclass, field
 
 from ..brain_waves import BrainWave
-from ..concepts import ConceptNetwork, RelationType
+from ..concepts import _FUNCTION_WORDS, ConceptNetwork, RelationType
 
 logger = logging.getLogger(__name__)
 
@@ -3267,6 +3267,15 @@ class SelfDirectedLearner:
         """Check if a word is meaningful enough to be a concept."""
         word = word.lower().strip()
         if not word:
+            return False
+        # Function words are grammatical, not conceptual — a misparse
+        # like "is → part of → the" must not mint concepts for them.
+        if word in _FUNCTION_WORDS:
+            return False
+        # Multi-word fragments that begin with a function word are
+        # conversation fragments, not concepts ("i know the computer").
+        words = word.split()
+        if len(words) > 1 and words[0] in _FUNCTION_WORDS:
             return False
         return True
 
