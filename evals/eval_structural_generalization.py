@@ -13,12 +13,20 @@ structure it generated.
 
 Design:
 - 50 independent worlds per condition.
+- One world is presented and processed at a time.
 - Each world is a 6-node PART_OF chain using random synthetic tokens.
 - Genesis receives only adjacent edges.
 - The evaluator asks for a non-adjacent edge (4 hops apart).
 - Distractor edges form separate components and must not bridge worlds.
 - Inferred edges are required to have origin="inferred".
 - A negative control checks that unrelated endpoints are not connected.
+- A configurable cooldown separates worlds so state-dependent processing
+  is not forced to handle all worlds simultaneously.
+- Feedback is supportive and never reveals the correct answer.
+
+The feedback is deliberately kept outside Genesis's knowledge graph. This
+preserves the benchmark's validity: encouragement must not teach the
+answer or add synthetic facts to long-term knowledge.
 
 This is evidence for structural generalization, not a general-intelligence
 or consciousness test.
@@ -26,6 +34,7 @@ or consciousness test.
 
 from __future__ import annotations
 
+import argparse
 import random
 import string
 import time
@@ -44,6 +53,7 @@ from harness import (
 _WORLD_COUNT = 50
 _CHAIN_LENGTH = 6
 _QUERY_HOPS = 4
+_DEFAULT_COOLDOWN_SECONDS = 1.0
 
 
 def _token(rng: random.Random, prefix: str, world: int, node: int) -> str:
@@ -84,13 +94,28 @@ def _run_closure(em: EvalMind, max_cycles: int = 30) -> int:
     return total_new
 
 
+def _feedback(passed: bool, world_index: int) -> None:
+    """Give supportive feedback without revealing the correct answer."""
+    if passed:
+        print(f"      Feedback: Excellent work, Genesis — world {world_index + 1} "
+              "was handled correctly.")
+    else:
+        print(f"      Feedback: That's okay, Genesis — keep working. "
+              f"World {world_index + 1} is complete; no answer is revealed.")
+
+
 def _condition_randomized_structural_generalization(
-    em: EvalMind, seed: int
+    em: EvalMind,
+    seed: int,
+    cooldown_seconds: float,
 ) -> list[FactResult]:
-    """Generate and evaluate opaque graph worlds."""
+    """Generate and evaluate opaque graph worlds one at a time."""
     rng = random.Random(seed)
 
     worlds: list[list[str]] = []
+    all_results: list[FactResult] = []
+    total_inferred = 0
+
     for world_index in range(_WORLD_COUNT):
         nodes = [
             _token(rng, "node", world_index, node_index)
@@ -107,83 +132,88 @@ def _condition_randomized_structural_generalization(
 
         for left, right in pairwise(nodes):
             _teach_part_of(em, left, right)
-
         _teach_part_of(em, distractor[0], distractor[1])
 
-    inferred = _run_closure(em)
+        inferred = _run_closure(em)
+        total_inferred += inferred
 
-    results: list[FactResult] = []
-
-    # Positive tests: four-hop relationships were never directly taught.
-    for nodes in worlds:
         source = nodes[0]
         target = nodes[_QUERY_HOPS]
         exists = _edge_exists(em, source, target)
         origin = _edge_origin(em, source, target)
+        passed = exists and origin == "inferred"
 
-        results.append(
-            FactResult(
-                concept=source,
-                passed=exists and origin == "inferred",
-                detail=(
-                    f"blind {_QUERY_HOPS}-hop PART_OF closure to '{target}': "
-                    f"exists={exists}, origin={origin!r}"
-                ),
-            )
+        positive = FactResult(
+            concept=source,
+            passed=passed,
+            detail=(
+                f"world {world_index + 1}: blind {_QUERY_HOPS}-hop PART_OF "
+                f"closure to '{target}': exists={exists}, origin={origin!r}"
+            ),
         )
+        all_results.append(positive)
+        _feedback(passed, world_index)
 
-    # Negative tests: unrelated endpoints must remain disconnected.
-    for world_index, nodes in enumerate(worlds):
-        source = nodes[0]
-        other_world = worlds[(world_index + 1) % len(worlds)]
-        target = other_world[_QUERY_HOPS]
-        exists = _edge_exists(em, source, target)
-
-        results.append(
-            FactResult(
-                concept=source,
-                passed=not exists,
-                detail=(
-                    f"cross-world negative control to '{target}': "
-                    f"edge_exists={exists}"
-                ),
+        # Negative control against a world that has already been generated.
+        if len(worlds) > 1:
+            other_world = worlds[world_index - 1]
+            negative_target = other_world[_QUERY_HOPS]
+            negative_exists = _edge_exists(em, source, negative_target)
+            negative_passed = not negative_exists
+            all_results.append(
+                FactResult(
+                    concept=source,
+                    passed=negative_passed,
+                    detail=(
+                        f"world {world_index + 1}: cross-world negative control "
+                        f"to '{negative_target}': edge_exists={negative_exists}"
+                    ),
+                )
             )
-        )
 
-    # Structural audit: every direct edge was supplied by the evaluator,
-    # while the queried long-range edge must be an inference artifact.
-    for nodes in worlds:
+        # Structural audit: the direct edge supplied by this evaluator must
+        # not be mislabeled as an inference artifact.
         direct_target = nodes[1]
-        origin = _edge_origin(em, nodes[0], direct_target)
-        results.append(
+        direct_origin = _edge_origin(em, source, direct_target)
+        all_results.append(
             FactResult(
-                concept=nodes[0],
-                passed=origin != "inferred",
-                detail=f"direct taught edge origin={origin!r}",
+                concept=source,
+                passed=direct_origin != "inferred",
+                detail=(
+                    f"world {world_index + 1}: direct taught edge "
+                    f"origin={direct_origin!r}"
+                ),
             )
         )
 
-    # Report inference volume as a diagnostic without using it as the score.
-    results.append(
+        if cooldown_seconds > 0 and world_index < _WORLD_COUNT - 1:
+            print(
+                f"      Cooldown: {cooldown_seconds:.1f}s before the next world."
+            )
+            time.sleep(cooldown_seconds)
+
+    # Diagnostic only: do not let inference volume determine the score.
+    all_results.append(
         FactResult(
             concept="evaluation",
-            passed=inferred > 0,
-            detail=f"inference cycle produced {inferred} new edges",
+            passed=total_inferred > 0,
+            detail=f"inference cycle produced {total_inferred} new edges",
         )
     )
 
-    return results
+    return all_results
 
 
-def run(seed: int = 42) -> EvalResult:
+def run(seed: int = 42, cooldown_seconds: float = _DEFAULT_COOLDOWN_SECONDS) -> EvalResult:
     """Run the blind randomized structural generalization evaluation."""
     start = time.time()
     result = EvalResult(
         name="Blind Randomized Structural Generalization",
         description=(
-            "Tests whether Genesis can learn and transitively close "
-            "unseen graph structures built from opaque, randomly generated "
-            "concept names. No semantic meaning of the names is supplied."
+            "Tests whether Genesis can learn and transitively close unseen "
+            "graph structures built from opaque, randomly generated concept "
+            "names. Worlds are processed sequentially with a configurable "
+            "cooldown; supportive feedback never reveals answers."
         ),
         timestamp=time.strftime("%Y-%m-%d %H:%M:%S"),
     )
@@ -193,11 +223,12 @@ def run(seed: int = 42) -> EvalResult:
             "Opaque synthetic worlds",
             (
                 f"{_WORLD_COUNT} independent {_CHAIN_LENGTH}-node PART_OF "
-                f"chains; test {_QUERY_HOPS}-hop inferred edges and "
-                "cross-world negative controls."
+                f"chains; process one world at a time; test {_QUERY_HOPS}-hop "
+                "inferred edges, cross-world negative controls, and direct "
+                "edge provenance."
             ),
             lambda em=em: _condition_randomized_structural_generalization(
-                em, seed
+                em, seed, cooldown_seconds
             ),
         )
     result.conditions.append(condition)
@@ -206,5 +237,21 @@ def run(seed: int = 42) -> EvalResult:
     return result
 
 
+def main() -> None:
+    """Run the evaluation from the command line."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--cooldown",
+        type=float,
+        default=_DEFAULT_COOLDOWN_SECONDS,
+        help="Seconds between worlds; use 0 to disable.",
+    )
+    args = parser.parse_args()
+    if args.cooldown < 0:
+        parser.error("--cooldown must be >= 0")
+    print_result(run(seed=args.seed, cooldown_seconds=args.cooldown))
+
+
 if __name__ == "__main__":
-    print_result(run())
+    main()
