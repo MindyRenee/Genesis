@@ -387,8 +387,8 @@ impl TickLoop {
             super::interoception::publish_body_state(&self.last_body_state);
         }
         let body_impulses = self.interoceptor.neuro_impulses(&self.last_body_state);
-        if !body_impulses.is_empty() {
-            if let Err(e) = mmap.modify(now_ms, |state| {
+        if !body_impulses.is_empty()
+            && let Err(e) = mmap.modify(now_ms, |state| {
                 for (chem_id, amount) in &body_impulses {
                     state
                         .neurochemicals
@@ -396,12 +396,12 @@ impl TickLoop {
                 }
                 state.neurochemicals.recompute_derived();
                 state.sync_neurochemistry_to_state();
-            }) {
-                if matches!(e, crate::store::StateFileError::FileLockBusy) {
-                    eprintln!("[tick] interoception impulse skipped (state locked): {e}");
-                } else {
-                    panic!("interoception impulse failed: {e}");
-                }
+            })
+        {
+            if matches!(e, crate::store::StateFileError::FileLockBusy) {
+                eprintln!("[tick] interoception impulse skipped (state locked): {e}");
+            } else {
+                panic!("interoception impulse failed: {e}");
             }
         }
 
