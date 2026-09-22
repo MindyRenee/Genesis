@@ -1,3 +1,5 @@
+# ruff: isort: skip_file
+
 """Evaluation: blind structural generalization on unseen synthetic concepts.
 
 This evaluation is deliberately different from the hand-authored
@@ -29,7 +31,7 @@ import string
 import time
 from itertools import pairwise
 
-from harness import (  # noqa: I001
+from harness import (
     EvalMind,
     EvalResult,
     FactResult,
@@ -150,7 +152,7 @@ def _condition_randomized_structural_generalization(
 
     # Structural audit: every direct edge was supplied by the evaluator,
     # while the queried long-range edge must be an inference artifact.
-    for world_index, nodes in enumerate(worlds):
+    for nodes in worlds:
         direct_target = nodes[1]
         origin = _edge_origin(em, nodes[0], direct_target)
         results.append(
