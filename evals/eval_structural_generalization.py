@@ -27,6 +27,7 @@ from __future__ import annotations
 import random
 import string
 import time
+from itertools import pairwise
 
 from harness import EvalMind, EvalResult, FactResult, RelationType, print_result, run_condition
 
@@ -95,7 +96,7 @@ def _condition_randomized_structural_generalization(
             for node_index in range(2)
         ]
 
-        for left, right in zip(nodes, nodes[1:]):
+        for left, right in pairwise(nodes):
             _teach_part_of(em, left, right)
 
         _teach_part_of(em, distractor[0], distractor[1])
@@ -105,7 +106,7 @@ def _condition_randomized_structural_generalization(
     results: list[FactResult] = []
 
     # Positive tests: four-hop relationships were never directly taught.
-    for world_index, nodes in enumerate(worlds):
+    for nodes in worlds:
         source = nodes[0]
         target = nodes[_QUERY_HOPS]
         exists = _edge_exists(em, source, target)
