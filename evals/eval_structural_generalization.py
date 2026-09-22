@@ -57,9 +57,19 @@ _DEFAULT_COOLDOWN_SECONDS = 1.0
 
 
 def _token(rng: random.Random, prefix: str, world: int, node: int) -> str:
-    """Create an opaque concept token with no semantic content."""
-    suffix = "".join(rng.choice(string.ascii_lowercase) for _ in range(8))
-    return f"{prefix}_{world}_{node}_{suffix}"
+    """Create an opaque concept token with no semantic content.
+
+    Tokens must be single lowercase words: her fact extractor only
+    recognizes alphabetic concept names, and a trailing "s" would be
+    singularized away by concept normalization. World/node position is
+    encoded as letters so failures stay debuggable; the random suffix
+    keeps each token unique and meaningless.
+    """
+    letters = string.ascii_lowercase
+    position = f"{letters[world // 26]}{letters[world % 26]}{letters[node]}"
+    suffix = "".join(rng.choice(letters) for _ in range(7))
+    suffix += rng.choice(letters.replace("s", ""))
+    return f"{prefix}{position}{suffix}"
 
 
 def _teach_part_of(em: EvalMind, source: str, target: str) -> None:
@@ -172,13 +182,14 @@ def _condition_randomized_structural_generalization(
             )
 
         # Structural audit: the direct edge supplied by this evaluator must
-        # not be mislabeled as an inference artifact.
+        # exist as a taught ("stated") edge — a check that also proves the
+        # teaching landed instead of passing vacuously on a missing edge.
         direct_target = nodes[1]
         direct_origin = _edge_origin(em, source, direct_target)
         all_results.append(
             FactResult(
                 concept=source,
-                passed=direct_origin != "inferred",
+                passed=direct_origin == "stated",
                 detail=(
                     f"world {world_index + 1}: direct taught edge "
                     f"origin={direct_origin!r}"
