@@ -28,8 +28,7 @@ import random
 import string
 import time
 
-from genesis_cognitive.concepts import RelationType
-from harness import EvalMind, EvalResult, FactResult, run_condition, print_result
+from harness import EvalMind, EvalResult, FactResult, RelationType, print_result, run_condition
 
 
 _WORLD_COUNT = 50
