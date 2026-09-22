@@ -367,6 +367,13 @@ fn main() {
         }
     }
 
+    // The wait can end via either flag — signals set `shutdown_flag`,
+    // an IPC SHUTDOWN command sets `ipc_shutdown_flag`. Normalize so
+    // the auxiliary threads (which watch `shutdown_flag`) exit too;
+    // otherwise an IPC-initiated shutdown would hang the joins below
+    // before the final state sync.
+    shutdown_flag.store(true, std::sync::atomic::Ordering::Relaxed);
+
     // Shutdown sequence
     eprintln!("[genesis] Shutting down...");
 
@@ -493,6 +500,13 @@ fn setup_signal_handlers(
             if SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
                 eprintln!("\n[genesis] Received shutdown signal, stopping...");
                 flag.store(true, Ordering::Relaxed);
+                break;
+            }
+            // Shutdown can also be initiated without a signal (the IPC
+            // SHUTDOWN command sets the IPC server's flag and the main
+            // thread then sets this one). Exit in that case too so the
+            // main thread's join doesn't hang.
+            if flag.load(Ordering::Relaxed) {
                 break;
             }
             std::thread::sleep(Duration::from_millis(50));
