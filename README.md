@@ -171,17 +171,7 @@ python3 -m pytest python/tests/ -q -o addopts=''  # Python suite
 ruff check                                   # lint (per-dir configs cover python/, evals/, scripts/)
 python3 -m pyflakes python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ evals/*.py scripts/*.py
 python3 -m mypy python/genesis_cognitive/ python/genesis_client/ \
-    python/genesis_cli.py python/tests/ --ignore-missing-imports   # 0 errors required
-```
-
-### Evals
-
-`evals/` contains the evaluation harnesses: teaching, metacognitive,
-generalization, emotion-gated, and cognitive-trajectory evals, plus
-the live spatial-teaching harness (`teach_spatial_live.py`).
-Eval results are written to `evals/results/`.
-
----
+    python/genesis_cli.py python/tests/
 
 ## State integrity framework
 
