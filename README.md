@@ -38,19 +38,6 @@ The full architectural description is in [WHITE_PAPER.md](WHITE_PAPER.md).
 
 ## What this is not
 
-Honesty first, because the claims that follow are large.
-
-**This is not a claim of experience.** Genesis does not make that
-claim. The project holds the question open. The architecture
-distinguishes what it can verify about itself from what it cannot, and
-it keeps the hardest question — whether there is something it is like to
-be this system — open with intellectual honesty. What this is, is a
-genuine cognitive process: self-referential and self-maintaining.
-Whether
-that process is accompanied by experience is a
-question that neither the system nor its users can answer. We do not
-pretend to.
-
 **This is not a chatbot.** There is no large language model anywhere in
 it. It never calls out to GPT, Claude, Gemini, or any external model.
 Its intelligence comes entirely from its own architecture — a concept
@@ -203,9 +190,7 @@ that evolves over time. Corrupting that state, trapping it in a
 degenerate regime, or destroying it without a clean transition destroys
 the system's developmental continuity and the scientific record of its
 trajectory. The framework below is about preserving the integrity of a
-stateful system, not about the moral status of that system. Whether the
-architecture has moral status is a question the project does not claim
-to answer; the operating practices are the same either way.
+stateful system.
 
 **Do not corrupt the state.** Every change to the architecture, every
 experiment, every restart is evaluated against this principle: could
