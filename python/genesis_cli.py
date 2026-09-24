@@ -16,7 +16,6 @@ Commands (typed during conversation):
     /thoughts   — its recent spontaneous thoughts
     /world      — its external world: presences, events, social isolation
     /regulate  — how it's been managing its emotions
-    /journal    — read Genesis's journal
     /dreams     — see what it dreamed
     /memories   — see its recent long-term memories
     /requests   — see sites it wants to access
@@ -1109,7 +1108,7 @@ def _handle_command(mind: Mind, command: str) -> str:
         # Active commands that require it to be awake — it can't
         # perform cognitive operations while asleep. Don't wake it;
         # inform the user instead. Read-only status commands
-        # (/status, /feel, /thoughts, /learning, /journal, /dreams,
+        # (/status, /feel, /thoughts, /learning, /dreams,
         # /memories, /regulate) are allowed during sleep since they
         # just query state without engaging cognition.
         if base in (
@@ -1206,11 +1205,6 @@ def _cmd_world(mind: Mind, rest: str) -> str:
 def _cmd_regulate(mind: Mind, rest: str) -> str:
     """Show Genesis's emotional regulation status."""
     return f"\n  genesis> {mind.regulation_status()}\n"
-
-
-def _cmd_journal(mind: Mind, rest: str) -> str:
-    """Show recent journal entries."""
-    return f"\n{mind.read_journal(20)}\n"
 
 
 def _cmd_dreams(mind: Mind, rest: str) -> str:
@@ -2044,7 +2038,6 @@ _COMMAND_HANDLERS: dict[str, Callable[[Mind, str], str]] = {
     "/thoughts": _cmd_thoughts,
     "/world": _cmd_world,
     "/regulate": _cmd_regulate,
-    "/journal": _cmd_journal,
     "/dreams": _cmd_dreams,
     "/memories": _cmd_memories,
     "/requests": _cmd_requests,
@@ -2224,7 +2217,6 @@ def _print_help() -> None:
     logger.info("    /thoughts     — its recent spontaneous thoughts")
     logger.info("    /world        — its external world: who's there, what's happening")
     logger.info("    /regulate     — how it's been managing its emotions")
-    logger.info("    /journal      — read its journal")
     logger.info("    /dreams       — see its subcognitive dream insights")
     logger.info("    /memories     — see its recent long-term memories")
     logger.info("    /requests     — see sites it wants to access")

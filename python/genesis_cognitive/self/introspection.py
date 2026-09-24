@@ -216,7 +216,6 @@ class IntrospectionEngine:
             "emotional_regulator": "the system that regulates its emotional balance",
             "autonomous_learner": "the system that learns independently",
             "curriculum": "its learning curriculum — progressive vocabulary lessons",
-            "journal": "its personal diary of thoughts and learning",
             "working_memory": "its short-term memory across conversation turns",
             "brain_waves": "the system that assesses its brain wave state",
         }
