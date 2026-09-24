@@ -165,6 +165,10 @@ in the suite.
 ## Getting started
 
 Requirements: Rust stable (edition 2024), Python 3.12, Linux.
+Building the daemon also needs **libclang** and the kernel V4L2
+headers — the `v4l` crate runs `bindgen` against
+`<linux/videodev2.h>` at build time. On Debian/Ubuntu:
+`sudo apt install libclang-dev linux-libc-dev`.
 
 ```bash
 cargo build --release
@@ -278,8 +282,10 @@ that matter most:
 ## License
 
 Genesis is licensed under the **GNU Affero General Public License v3,
-with added Ethical Use restrictions** (binding additional terms under
-AGPL Section 7).
+with added Ethical Use restrictions** (additional terms under AGPL
+Section 7). Because those restrictions limit fields of use, this is
+deliberately *not* an OSI-approved open-source license — it is AGPL
+plus ethical terms.
 
 You may use, study, modify, and distribute the software — but every
 copy and every modified version must carry the same license, and anyone
@@ -288,4 +294,9 @@ may **not** use it to violate human rights, deceive people, cause harm,
 power weapons systems, damage the environment, or operate a running
 instance in bad faith. Ethical-use breaches terminate the license
 immediately, without a cure period.
+
+One honest caveat: Section 7 additional terms outside the enumerated
+categories are removable by downstream conveyors under the letter of
+the AGPL, so the Ethical Use rider binds only while it is carried with
+the work. The project asks that it be preserved.
 See the [full license text](LICENSE) for the precise terms.
