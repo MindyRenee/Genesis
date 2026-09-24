@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import html.parser
 import logging
+import random
 import re
 import ssl
 import threading
@@ -713,6 +714,10 @@ class AutonomousLearner:
         self._init_queues()
         self._init_learning_systems()
         self._init_posture()
+
+        # Instance RNG — topic selection must not be steered by (or
+        # perturb) the global random state.
+        self._rng = random.Random()
 
         # Visual cortex — optionally attached by Mind after creation.
         # Used to learn visual-concept associations from images
@@ -2253,8 +2258,7 @@ class AutonomousLearner:
                 quality_candidates.append(topic)
 
         if quality_candidates:
-            import random
-            return random.choice(quality_candidates)
+            return self._rng.choice(quality_candidates)
 
         # No quality concepts left — fall back to isolated concepts
         # (gaps in understanding). Strip polysemy sense suffixes
@@ -2277,9 +2281,7 @@ class AutonomousLearner:
             return None
 
         # Pick randomly from candidates
-        import random
-
-        return random.choice(candidates)
+        return self._rng.choice(candidates)
 
     def _learn_about(self, topic: str) -> None:
         """Search for and learn about a topic from the right source.
@@ -3804,7 +3806,8 @@ class AutonomousLearner:
                 continue
             # Saturating confidence reinforcement.
             concept.confidence = concept.confidence + (1.0 - concept.confidence) * 0.05
-            concept.activation = min(1.0, concept.activation + 0.2)
+            concept.activation = min(1.0, (concept.activation or 0.0) + 0.2)
+            self.network._mark_active(cid)
             replayed += 1
         self._replay_count += 1
         return replayed
@@ -4059,7 +4062,8 @@ class AutonomousLearner:
             # Re-activate: reinforce confidence (saturating update)
             # and boost activation, mimicking memory reactivation.
             c.confidence = c.confidence + (1.0 - c.confidence) * 0.05
-            c.activation = min(1.0, c.activation + 0.1)
+            c.activation = min(1.0, (c.activation or 0.0) + 0.1)
+            self.network._mark_active(concept)
             # Record the review as successful (she recalled it).
             # This expands the next interval via the ease factor.
             self.spaced_repetition.record_review(concept, success=True)

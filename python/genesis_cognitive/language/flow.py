@@ -32,13 +32,15 @@ The emotional state sets the momentum: high arousal → high momentum →
 fast transitions → shorter sentences; low arousal → low momentum →
 slow transitions → longer, contemplative sentences.
 
-# Sacred geometry constraints
+# Hub neighborhood bias
 
-The holonomy of the connection determines which trajectories are
-allowed. Six-fold rotational symmetry (Flower of Life) groups six
-related concepts around each hub. The vesica piscis (overlap region
-between two cells) is where relations live — the trajectory passes
-through vesica regions to express typed relations between concepts.
+A local swirl perturbation biases trajectories near hub concepts:
+when the walk passes within a fixed angular radius of a hub, its
+first two coordinates are rotated by up to 60° (π/3), steering it
+through the hub's neighborhood ring. Typed relations act as
+directional channels — where two concepts' potential wells overlap,
+the relation's channel tilts the gradient so the trajectory tends
+to cross between them, expressing the relation between concepts.
 
 # Why this produces flow
 
@@ -74,10 +76,11 @@ logger = logging.getLogger(__name__)
 
 # ─── Constants ────────────────────────────────────────────────────
 
-# Toroidal dimension — how many angular coordinates each concept has.
-# This must match the spectral embedding dimension used by the
-# EmbeddingStore. 32 dims gives enough resolution to distinguish
-# ~100K concepts while keeping the geodesic computation fast.
+# Toroidal dimension — how many angular coordinates each concept has
+# in the flow field. When the EmbeddingStore is wired in, its
+# toroidal angle matrix (built from the experiential embedding block,
+# EXPERIENTIAL_DIM = 32) is truncated to this size; otherwise the
+# fallback spectral embedding produces this many angles directly.
 _FLOW_DIM = 16
 
 # Kernel bandwidth for the von Mises potential. Controls how sharply
@@ -103,10 +106,14 @@ _MIN_GRADIENT = 1e-4
 # flow settle into a natural endpoint.
 _FRICTION = 0.15
 
-# Six-fold symmetry constant (Flower of Life). Concepts around a hub
-# are grouped in sixes — each 60° (π/3 radians) rotation brings a
-# semantically related neighbor.
-_SIX_FOLD = math.pi / 3.0
+# Hub swirl: within _HUB_SWIRL_RADIUS (radians) of a hub concept, the
+# trajectory's first two coordinates are rotated by up to
+# _HUB_SWIRL_ROTATION (π/3, i.e. 60°), scaled by proximity. This is a
+# hand-tuned steering bias, not a geometric invariant — it nudges the
+# walk through a hub's neighborhood so hub-adjacent concepts are more
+# likely to be traversed together.
+_HUB_SWIRL_RADIUS = math.pi / 3.0
+_HUB_SWIRL_ROTATION = math.pi / 3.0
 
 
 class FlowGenerator:
@@ -277,9 +284,15 @@ class FlowGenerator:
                 neighbors.setdefault(si, []).append((ti, edge.weight))
                 neighbors.setdefault(ti, []).append((si, edge.weight))
 
-        # Power iteration: start with random vectors, iterate
-        # x_{k+1} = A @ x_k / |A @ x_k|
-        # This converges to the top eigenvectors of the adjacency matrix.
+        # Orthogonal (subspace) iteration: V_{k+1} = QR(A @ V_k).
+        # Per-column power iteration (V ← AV/|AV|) would collapse every
+        # column onto the same dominant eigenvector — for a nonnegative
+        # symmetric adjacency that is the all-positive Perron vector,
+        # leaving every concept at nearly the same angle. QR
+        # orthonormalization after each multiplication keeps the columns
+        # spanning the dominant d-dimensional invariant subspace, so
+        # they converge to the top-d eigenvectors of the symmetric
+        # adjacency instead.
         rng = np.random.default_rng(42)
         vectors = rng.standard_normal((n, d)).astype(np.float32)
 
@@ -289,10 +302,7 @@ class FlowGenerator:
             for i in range(n):
                 for j, w in neighbors.get(i, []):
                     new_vectors[i] += w * vectors[j]
-            # Normalize columns
-            norms = np.linalg.norm(new_vectors, axis=0, keepdims=True)
-            norms[norms < 1e-8] = 1.0
-            vectors = new_vectors / norms
+            vectors = np.linalg.qr(new_vectors)[0].astype(np.float32)
 
         # Map to angles via arctan2 of pairs of eigenvectors
         # Each pair of eigenvectors → one angular coordinate
@@ -407,7 +417,7 @@ class FlowGenerator:
         p = momentum.copy()
         trajectory: list[np.ndarray] = [theta.copy()]
 
-        visited_regions: set[int] = set()
+        visited_regions: set[bytes] = set()
 
         for _ in range(max_steps):
             # Compute gradient at current position
@@ -433,15 +443,14 @@ class FlowGenerator:
             # Wrap angles to [0, 2π)
             theta = np.mod(theta, 2.0 * np.pi)
 
-            # Apply six-fold holonomy when passing near a hub
-            # (Flower of Life pattern — six related concepts around each hub)
+            # Apply the hub swirl bias when passing near a hub
             nearest = self._nearest_concept(theta)
             if nearest and nearest in self._angles:
                 hub_angles = self._angles[nearest]
                 hub_weight = self._weights.get(nearest, 0.0)
-                # Only apply holonomy near significant hubs
+                # Only apply the swirl near significant hubs
                 if hub_weight > 1.0:
-                    theta = self._apply_holonomy(theta, hub_angles)
+                    theta = self._apply_hub_swirl(theta, hub_angles)
 
             # Check if we've been in this region before
             region = self._region_of(theta)
@@ -453,16 +462,17 @@ class FlowGenerator:
 
         return trajectory
 
-    def _region_of(self, theta: np.ndarray) -> int:
-        """Map an angular position to a discrete region index.
+    def _region_of(self, theta: np.ndarray) -> bytes:
+        """Map an angular position to a discrete region key.
 
         Used to detect when the trajectory revisits a region (closed
-        orbit). The torus is divided into coarse cells.
+        orbit). The torus is divided into coarse cells. The raw sector
+        bytes are the key — exact, unlike `hash()` which is salted per
+        process and could theoretically collide.
         """
         # Quantize each angle to 8 sectors: 0-7
         sectors = (theta * 4.0 / np.pi).astype(int) % 8
-        # Hash to a single integer
-        return hash(sectors.tobytes())
+        return sectors.tobytes()
 
     # ─── Word emission ────────────────────────────────────────────
 
@@ -1115,21 +1125,23 @@ class FlowGenerator:
         }
         return verbs.get(rel_type)
 
-    # ─── Sacred geometry constraints ──────────────────────────────
+    # ─── Hub swirl bias ───────────────────────────────────────────
 
-    def _apply_holonomy(
+    def _apply_hub_swirl(
         self,
         theta: np.ndarray,
         center: np.ndarray,
     ) -> np.ndarray:
-        """Apply six-fold holonomy rotation around a hub.
+        """Apply the hub swirl rotation near a hub concept.
 
-        When the trajectory passes near a hub concept, the fiber
-        rotates by 60° (π/3). This groups six related concepts around
-        each hub — the Flower of Life pattern.
-
-        The rotation is applied to the first two angular coordinates
-        (the "base" torus), leaving the fiber coordinates unchanged.
+        When the trajectory passes within ``_HUB_SWIRL_RADIUS`` of a
+        hub, its first two angular coordinates are rotated about the
+        torus origin by up to ``_HUB_SWIRL_ROTATION`` (60°), scaled by
+        proximity. This is a heuristic steering bias — it nudges the
+        walk through hub neighborhoods so concepts clustered near a
+        hub tend to be visited together. It is a plain rotation kick,
+        not differential-geometric holonomy: nothing is parallel
+        transported and there is no path-dependent phase.
         """
         # Distance to center
         diff = theta - center
@@ -1137,12 +1149,12 @@ class FlowGenerator:
         dist = float(np.sqrt(np.sum(diff[:2] * diff[:2])))
 
         # Only apply if close to a hub
-        if dist > _SIX_FOLD:
+        if dist > _HUB_SWIRL_RADIUS:
             return theta
 
         # Rotation angle proportional to proximity
-        proximity = 1.0 - dist / _SIX_FOLD
-        rotation = _SIX_FOLD * proximity
+        proximity = 1.0 - dist / _HUB_SWIRL_RADIUS
+        rotation = _HUB_SWIRL_ROTATION * proximity
 
         # Rotate the first two coordinates
         result = theta.copy()

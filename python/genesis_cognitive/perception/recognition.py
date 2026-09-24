@@ -67,10 +67,14 @@ _MODEL_DIR = default_data_dir() / "models"
 _DETECTOR_MODEL = _MODEL_DIR / "face_detection_yunet.onnx"
 _RECOGNIZER_MODEL = _MODEL_DIR / "face_recognition_sface.onnx"
 
-# Recognition threshold — cosine distance below this means "same person"
-# SFace with cosine similarity: threshold ~0.363 is recommended by OpenCV.
-# Lower = stricter (fewer false positives, more false negatives).
+# Recognition threshold — cosine similarity above this means "same person"
+# SFace: OpenCV recommends a cosine threshold of ~0.363.
+# Higher = stricter (fewer false positives, more false negatives).
 _RECOGNITION_THRESHOLD = 0.4
+
+# Cap on stored embeddings per name — each registration appends one,
+# so without a bound the JSON grows on every re-registration.
+_MAX_EMBEDDINGS_PER_NAME = 20
 
 
 @dataclass
@@ -215,8 +219,10 @@ class FaceRecognizer:
         for face in faces:
             x, y, w, h = int(face[0]), int(face[1]), int(face[2]), int(face[3])
 
-            # Extract 128-d embedding using SFace
-            aligned = recognizer.alignCrop(bgr, faces[0:1] if len(faces) == 1 else faces)
+            # Extract 128-d embedding using SFace. alignCrop takes one
+            # face row (15 values); passing the whole N×15 matrix would
+            # align every embedding to the first face's landmarks.
+            aligned = recognizer.alignCrop(bgr, face[None])
             embedding = recognizer.feature(aligned).flatten()
 
             # Try to recognize
@@ -234,28 +240,37 @@ class FaceRecognizer:
     def _match_face(self, embedding: np.ndarray) -> tuple[str | None, float]:
         """Compare an embedding to known faces.
 
-        Returns (name, confidence). If no match below threshold,
+        Returns (name, confidence). If no match above threshold,
         returns (None, 0.0).
         """
         if not self._known_faces:
             return None, 0.0
 
         best_name: str | None = None
-        best_dist = float("inf")
+        best_sim = -1.0
+        norm = float(np.linalg.norm(embedding))
 
         for name, face_list in self._known_faces.items():
             for known in face_list:
                 known_emb = np.array(known.embedding, dtype=np.float32)
-                # Cosine distance (SFace uses cosine similarity)
-                dist = float(np.linalg.norm(embedding - known_emb))
-                if dist < best_dist:
-                    best_dist = dist
+                known_norm = float(np.linalg.norm(known_emb))
+                if norm < 1e-8 or known_norm < 1e-8:
+                    continue
+                # Cosine similarity (SFace's matching metric — the
+                # OpenCV demo thresholds cosine similarity at 0.363;
+                # L2 distance is a different, much stricter gate on
+                # normalized embeddings).
+                sim = float(np.dot(embedding, known_emb) / (norm * known_norm))
+                if sim > best_sim:
+                    best_sim = sim
                     best_name = name
 
-        # Convert distance to confidence (closer = more confident)
-        # SFace cosine distance: <0.363 = same person (recommended)
-        if best_dist < _RECOGNITION_THRESHOLD:
-            confidence = max(0.0, 1.0 - best_dist / _RECOGNITION_THRESHOLD)
+        # Convert similarity to confidence (higher = more confident)
+        if best_sim >= _RECOGNITION_THRESHOLD:
+            confidence = float(
+                min(1.0, (best_sim - _RECOGNITION_THRESHOLD)
+                    / (1.0 - _RECOGNITION_THRESHOLD))
+            )
             return best_name, confidence
         return None, 0.0
 
@@ -291,6 +306,12 @@ class FaceRecognizer:
         if known.name not in self._known_faces:
             self._known_faces[known.name] = []
         self._known_faces[known.name].append(known)
+        if len(self._known_faces[known.name]) > _MAX_EMBEDDINGS_PER_NAME:
+            # Keep the most recent embeddings — the newest capture is
+            # the most representative of the person's current look.
+            self._known_faces[known.name] = self._known_faces[known.name][
+                -_MAX_EMBEDDINGS_PER_NAME:
+            ]
 
         self._save_known_faces()
         logger.info(f"Registered face for '{known.name}'")

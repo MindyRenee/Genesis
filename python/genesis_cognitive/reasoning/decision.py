@@ -425,6 +425,10 @@ class DecisionEngine:
         )
 
         self._decisions.append(result)
+        # Bound the history — decide() runs every turn in a
+        # long-running daemon; only recent decisions are serialized.
+        if len(self._decisions) > 500:
+            del self._decisions[: len(self._decisions) - 500]
         if overridden:
             self._overrides += 1
         if inhibition_applied:

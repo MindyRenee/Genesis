@@ -708,16 +708,16 @@ class QuestionHandler:
                     or f"tell me about {creator_name}" in lower
                 )
         if creator_hit:
-            content = self._self_composer.compose_creator_description(
+            fragments = self._self_composer.creator_fragments(
                 self._self_model, self._network, emotion
             )
             return Thought(
-                content=content,
+                content="my creator",
                 intent="self_report",
                 emotion=emotion.label,
                 self_reflection=True,
                 confidence=0.85,
-                metadata={"field": "creator"},
+                metadata={"field": "creator", "self_fragments": fragments},
             )
 
         # Questions about the user — "who am I?", "do you know me?",
@@ -735,22 +735,28 @@ class QuestionHandler:
             )
         if user_hit:
             content = ""
+            user_fragments: list[tuple[str, str]] = []
             if user_name:
                 thought = self._composer.compose_about(user_name, emotion, depth=2)
                 if thought and thought.confidence > 0.3:
                     content = thought.content
             if not content:
+                # Relationship notes arrive as clause fragments so the
+                # language engine frames them rather than emitting the
+                # raw notes verbatim.
                 notes = list(self._self_model.relationship_notes)
-                content = (
-                    "; ".join(notes[-3:]) if notes else "still learning who you are"
-                )
+                if notes:
+                    user_fragments = [("clause", n) for n in notes[-3:]]
+                else:
+                    user_fragments = [("pred", "am still learning who you are")]
+                content = "who you are"
             return Thought(
                 content=content,
                 intent="self_report",
                 emotion=emotion.label,
                 self_reflection=True,
                 confidence=0.8,
-                metadata={"field": "user"},
+                metadata={"field": "user", "self_fragments": user_fragments},
             )
 
         # Personal fact lookup — map personal questions to concepts

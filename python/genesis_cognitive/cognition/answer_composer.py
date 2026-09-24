@@ -181,10 +181,8 @@ class AnswerComposer:
             content = f"{display} is {definition}"
         elif aliases:
             content = f"{display} is also known as {', '.join(aliases)}"
-        elif knowledge:
-            content = display
         else:
-            content = f"{display} is something I'm still learning about"
+            content = display
 
         # If we have nothing but the in-network existence note, ask for help.
         if not definition and not aliases and not knowledge:

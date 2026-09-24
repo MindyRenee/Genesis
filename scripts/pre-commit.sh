@@ -53,7 +53,7 @@ else
 fi
 
 if python3 -m pyflakes --version >/dev/null 2>&1; then
-    if ! pyflakes_out="$(python3 -m pyflakes $PY_DEPS evals/*.py scripts/*.py 2>&1)"; then
+    if ! pyflakes_out="$(python3 -m pyflakes $PY_DEPS scripts/*.py 2>&1)"; then
         echo "❌ pyflakes found issues."
         echo "$pyflakes_out"
         exit 1

@@ -3040,7 +3040,7 @@ impl NeurochemicalVector {
         //
         // The direct CRH→CORT coupling in the matrix is set to 0.0
         // (replaced by this cascade). Cortisol's negative feedback to
-        // CRH (-0.20) remains in the matrix for the fast pathway.
+        // CRH (-0.10) remains in the matrix for the fast pathway.
         let maturation = crate::state::sanitize::finite_clamp(params.maturation_level, 0.0, 1.0);
         let crh_eff = self.effective_levels[NeurochemicalId::CRH as usize];
         let cort_eff = self.effective_levels[NeurochemicalId::Cortisol as usize];
@@ -3102,7 +3102,7 @@ impl NeurochemicalVector {
         // Step 3b: Cortisol negative feedback to CRH
         // High cortisol inhibits hypothalamic CRH neurons, shutting
         // off the stressor signal. This is already present in the
-        // coupling matrix as CORT→CRH = -0.20, which propagates
+        // coupling matrix as CORT→CRH = -0.10, which propagates
         // through the velocity system. The strong ACTH negative
         // feedback above is the primary long-loop brake; adding a
         // direct CRH suppression here proved too strong and drove

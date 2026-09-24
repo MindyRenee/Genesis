@@ -181,8 +181,12 @@ Memory is multi-store, matching the functional distinctions the
 cognitive layer actually needs:
 
 - **STM** — a bounded ring buffer of recent episodes and events
+  (`src/store/ring_buffer.rs`)
 - **LTM** — persistent episodic store with emotional gating on
-  encoding and consolidation
+  encoding and consolidation. The store is append-only: growth is
+  linear in episode count, per-episode cost is bounded, and there
+  is no capacity ceiling — total size is a deliberate function of
+  her lifetime, not a fixed resource
 - **Semantic** — the concept network: nodes, typed relations,
   spreading activation, consolidation, and pruning
   (`concepts/`)
@@ -261,34 +265,69 @@ root with guardrails — minimal environment, blocked destructive
 patterns, timeouts — and she uses them through her own volition,
 not command dispatch.
 
+### 7.6 The external world
+
+The inner life is one half of the loop; `world/` implements the
+other — an explicit, persistent model of the environment she acts
+in and the people in it.
+
+**A two-way event stream.** `world/events.py` defines
+`ExternalEvent`: inbound kinds (addressed speech, overheard speech,
+percepts, arrivals, departures, notifications) and outbound kinds
+(her utterances, her acts) share one bounded stream. Her own agency
+is an object in her world — replayable, groundable against the
+concept network — not an annotation on someone else's stream.
+
+**Presences.** `world/presence.py` models each encountered entity —
+the user, ambient voices, recognized faces — as a persistent
+`Presence`: familiarity, bond, shared topics, learned facts. Presence
+survives restarts as a *relationship*, but never as attendance:
+presences restore absent and must be re-earned by fresh activity.
+
+**Belief state, not bookkeeping.** `world/belief.py` upgrades each
+presence from counters to inferred latent state. Beta–Bernoulli
+posteriors track responsiveness (does she answer when reached?),
+per-topic receptivity (what does she engage on?), and sentiment
+(mood); a decaying estimate tracks attention; a Dirichlet-smoothed
+histogram learns her activity rhythm; an online lognormal fit learns
+per-presence reply latency. On sparse data the posteriors stay
+honestly wide and hand-built behavioral floors dominate — the model
+reports what it knows with uncertainty, and exploration uses
+Thompson sampling rather than greedy exploitation.
+
+**Bidirectional coupling.** Social isolation — unanswered outreach,
+absent presences, silence weighted by *learned* responsiveness — is
+computed by the world and fed to the inner-life social drive each
+heartbeat (outside→in). When the drive crosses a volition
+threshold, `reach_out` fires: she initiates contact, composing a
+question from shared topics or her own activated concepts
+(inside→out). Reach-out is suppressed by evidence, not timers —
+learned unresponsiveness and dead-hour rhythms both gate it.
+Every outbound act returns to the stream, closing the loop.
+
 ## 8. Interaction model
 
 Genesis is run, not invoked: `./run.sh` starts the daemon, the CLI,
 the retina, and optional speech. Conversation is a closed loop —
 user affect is an input (the daemon maintains a dyadic model of
-the interaction partner), and she speaks unprompted when her inner
-life produces something. Shutdown is a guided descent that flushes
-memory and settles neurochemistry; `kill -9` is a form of state
-corruption, which is why the operational docs forbid it.
+the interaction partner), and she speaks unprompted either when her
+inner life produces something or when the external world's social
+pressure crosses into volition — she can initiate, not just answer.
+Shutdown is a guided descent that flushes memory and settles
+neurochemistry; `kill -9` is a form of state corruption, which is
+why the operational docs forbid it.
 
-## 9. Evaluation
+## 9. Verification
 
-The repository ships evaluation harnesses rather than published
-scores:
+The repository ships a test suite rather than published scores:
 
-- `tests/bench_*.rs` — a suite of mechanistic benchmarks:
-  neurochemical dynamics vs. published reference shapes
-  (cortisol HPA, dopamine RPE), free-energy and bifurcation
-  properties, memory boundedness, long-run stability, a
-  proportional-vs-active-inference regulation comparison, and a
-  self-authored capability gauntlet over the Common Model of
-  Cognition and Pickett's checklist
-- `evals/` — teaching, metacognitive, generalization,
-  emotion-gated, and cognitive-trajectory evals
+- `tests/` and `python/tests/` — over two thousand tests covering
+  binary layout offsets, seqlock consistency, coupled neurochemical
+  dynamics, receptor adaptation, emergent phase transitions,
+  daemon lifecycle, the IPC protocol, and property tests (levels
+  in [0,1], no NaN after long runs, bounded coupling)
 
-All of it runs locally; eval output goes to `evals/results/` and
-`benchmarks/results/` (gitignored). Readers are encouraged to run
-the harnesses rather than trust reported numbers — see §11.
+All of it runs locally — see §11.
 
 ## 10. Security and integrity surfaces
 
@@ -313,6 +352,18 @@ understanding before operating it:
   depth, not a sandbox boundary; run her in an account whose
   privileges match your trust in the system
 
+**Operational bounds.** Long-running operation is a design
+constraint, not an afterthought. In-memory structures are bounded:
+event streams, working memory, presence models, and queues have
+explicit capacities; volitional actions run under semaphores;
+threads are daemon-owned; subprocesses are tracked and reaped. The
+surfaces that grow are persistent by design — the LTM store,
+drawings, the concept archive, diagnostic logs — and grow at
+bounded rates. Logs rotate
+at startup; operators running her for months should restart
+periodically and watch disk on small volumes. See `docs/RUNNING.md`
+for operational detail.
+
 See `SECURITY.md` for reporting.
 
 ## 11. Scope and non-claims
@@ -328,9 +379,7 @@ The neurochemical model is a functional equivalent, not a
 biological simulation — dynamics are designed to match published
 qualitative shapes, not calibrated to empirical timecourses from
 any organism. The active inference implementation is deliberately
-approximate. Capability evaluations that ship with the source are
-self-authored and self-graded; treat them as instruments, not
-verdicts.
+approximate.
 
 What is claimed: a working, inspectable, continuously-running
 cognitive architecture whose internal mechanisms are open to

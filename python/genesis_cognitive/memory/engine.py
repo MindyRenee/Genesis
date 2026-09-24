@@ -37,7 +37,7 @@ import logging
 import math
 import random
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -74,6 +74,23 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:  # pragma: no cover — import only for type checkers
     from ..concepts import ConceptNetwork
     from ..emotion import EmotionalState
+
+
+def _snapshot[T](fn: Callable[[], Iterable[T]], attempts: int = 8) -> list[T]:
+    """Materialize a collection that other threads may be mutating.
+
+    ``serialize_records`` can run on the autosave/shutdown thread while
+    background consolidation or replay mutates ``_records``; iterating a
+    live dict view raises ``RuntimeError``. Bounded retry yields a
+    consistent point-in-time copy instead. Mirrors the helper in
+    ``persistence.py`` (kept local to avoid a circular import).
+    """
+    for _ in range(attempts - 1):
+        try:
+            return list(fn())
+        except RuntimeError:
+            continue
+    return list(fn())
 
 
 @dataclass(slots=True)
@@ -318,6 +335,9 @@ class MemoryEngine:
         # episode_id → MemoryRecord. Tracks consolidation state that
         # the Rust store doesn't hold.
         self._records: dict[int, MemoryRecord] = {}
+        # Instance RNG — replay sampling must not be steered by (or
+        # perturb) the global random state.
+        self._rng = random.Random()
         # Counters for introspection.
         self.forgotten_count: int = 0
         self.reconsolidation_count: int = 0
@@ -1448,7 +1468,7 @@ class MemoryEngine:
         for _ in range(sample_size):
             if not indices:
                 break
-            pick = random.choices(indices, weights=[weights[i] for i in indices], k=1)[0]
+            pick = self._rng.choices(indices, weights=[weights[i] for i in indices], k=1)[0]
             chosen.add(pick)
             indices.remove(pick)
 
@@ -1957,7 +1977,7 @@ class MemoryEngine:
                     "source_modality": rec.source_tag.modality if rec.source_tag else "text",
                     "source_confidence": rec.source_tag.confidence if rec.source_tag else 0.8,
                 }
-                for rec in self._records.values()
+                for rec in _snapshot(self._records.values)
             ],
             "forgotten_count": self.forgotten_count,
             "reconsolidation_count": self.reconsolidation_count,

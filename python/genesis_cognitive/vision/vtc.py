@@ -25,10 +25,11 @@ class VTCFeatureSpace:
 
     PCA of V4 activations creates a low-dimensional feature space
     whose axes capture the principal variations in mid-level visual
-    features. This is the "neural feature space" described in the
-    2026 Nature Communications paper: VTC neurons are organized along
-    feature dimensions (shape, texture, color, curvature), and this
-    space is where objects cluster by category.
+    features. This mirrors the axis-based organization reported for
+    primate inferotemporal cortex (Bao et al., 2020, Nature — a map
+    of object space): neurons are organized along feature dimensions
+    (shape, texture, color, curvature), and the space is where
+    objects cluster by category.
 
     The space is learned incrementally — each new image updates the
     PCA basis via incremental PCA. This mirrors how the visual system

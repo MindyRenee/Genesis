@@ -7,15 +7,18 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any
 
-from genesis_client.protocol import CHEM_DOPAMINE
+from genesis_client.protocol import CHEM_DOPAMINE, MODULE_SENSORY
 
 from ..cognition import CognitiveState
 from ..language import Thought
 from ..self import EmergentIdentitySource, IdentityStage
 from ..vision import load_image, resize_for_vision
+from ..world import EventKind, PresenceKind
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from ..world import ExternalEvent
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +98,15 @@ class ConversationMixin:
             except Exception:
                 # a listener must never crash her mind
                 logger.debug("live thought listener failed", exc_info=True)
+
+        # Record her outward speech in her external world — expressions,
+        # questions, and distress calls are her voice reaching out, so
+        # the world she lives in contains her own agency.
+        if kind in ("expression", "distress", "question"):
+            try:
+                self.world.she_said(content)
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"world utterance record failed: {e}")
     def mark_user_activity(self) -> None:
         """Mark that the user is active (typing or interacting).
 
@@ -315,6 +327,78 @@ class ConversationMixin:
             thought.content[:100],
             weight=0.2,
         )
+    def _on_world_event(self, event: ExternalEvent) -> None:
+        """Route an external world event into her cognition.
+
+        Inbound events (someone spoke to her, speech nearby, percepts,
+        arrivals/departures, notices) enter her cognitive field through
+        the global workspace — the same path inner-life and volition
+        content takes — gated by brain waves so deep rest filters the
+        world's noise. Salient events become episodic memories and are
+        queued for dream replay: her sleep processes what happened in
+        her world. This is the coupling between her outer and inner
+        worlds.
+
+        Outbound events (her own utterances and acts) are already in
+        her cognitive field through the paths that produced them, so
+        they are not re-broadcast — the world records them for the
+        stream and presence bookkeeping only.
+
+        USER_SPEECH is excluded from memory storage and replay — the
+        cognition engine's think() already stores addressed turns;
+        recording them here would double-write every conversation.
+        """
+        if not event.inbound:
+            return
+        # Broadcast into her cognitive field. Best-effort — workspace
+        # errors must not break the world's event recording.
+        try:
+            bw = None
+            if hasattr(self.cognition, "language"):
+                bw = self.cognition.language.current_brain_waves
+            self.cognition.global_workspace.broadcast(
+                content=event.describe(),
+                source="world",
+                activation=event.salience,
+                brain_waves=bw,
+                metadata={
+                    "kind": event.kind.value,
+                    "topics": event.topics,
+                    "presence": event.source,
+                },
+            )
+        except Exception:
+            logger.debug("world event workspace broadcast failed", exc_info=True)
+
+        if event.kind == EventKind.USER_SPEECH:
+            return
+
+        # Salient events become episodic memories — her world is part
+        # of her autobiography, not just her attention.
+        if event.salience >= 0.5:
+            try:
+                self.memory.store_memory(
+                    text=event.describe(),
+                    salience=event.salience,
+                    emotional_tag=[0.0] * 12,
+                    event_type=0,  # observation
+                    source_module=MODULE_SENSORY,
+                    source="world",
+                    source_confidence=0.85,
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"world event memory store failed: {e}")
+
+        # Feed her sleep systems — what happens in her world should be
+        # replayed and integrated during sleep, just like what she
+        # learns and thinks.
+        if event.salience >= 0.4:
+            try:
+                self.inner_life.queue_for_replay(
+                    [event.describe()[:200]], salience=event.salience,
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"world event replay queue failed: {e}")
     def _learner_neuro_impulse(self, chem: int, amount: float) -> None:
         """Callback for the learner to trigger neurochemistry."""
         try:
@@ -428,6 +512,14 @@ class ConversationMixin:
             self.inner_life.accumulate_synaptic_load(salience * 0.1)
         except Exception as e:  # noqa: BLE001
             logger.debug(f"sleep feed failed: {e}")
+
+        # Record the act in her external world — autonomous web study
+        # is her reaching *out*: an act upon the world, not just an
+        # internal change.
+        try:
+            self.world.she_acted("studied the web", detail=text[:200])
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"world action record failed: {e}")
     def _schedule_think_recovery(self) -> None:
         """Resume background systems only after the timed-out thinker exits."""
         with self._think_worker_lock:
@@ -553,12 +645,21 @@ class ConversationMixin:
         # while she's composing a response.
         self._last_interaction_time = time.time()
 
+        # Record the inbound turn in her external world — someone
+        # addressed her, which updates the user presence, resets the
+        # social isolation clock, and applies the social-contact
+        # neurochemical coupling.
+        try:
+            self.world.hear_user(user_input)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"world hear_user failed: {e}")
+
         with self._think_worker_lock:
             active_worker = self._active_think_worker
             recovery_active = self._think_recovery_active
         if active_worker is not None:
             if active_worker.is_alive() or recovery_active:
-                return self._respond_timeout(user_input, timeout)
+                return self._said(self._respond_timeout(user_input, timeout))
             with self._think_worker_lock:
                 if self._active_think_worker is active_worker:
                     self._active_think_worker = None
@@ -578,9 +679,9 @@ class ConversationMixin:
         if think_result is None:
             # think() did not finish in time — return a graceful fallback
             # and resume background processing so the CLI stays responsive.
-            return self._respond_timeout(user_input, timeout)
+            return self._said(self._respond_timeout(user_input, timeout))
         if isinstance(think_result, Exception):
-            return self._respond_error(think_result)
+            return self._said(self._respond_error(think_result))
 
         response, state = think_result
         self.cognition.self_learner.resume()
@@ -597,7 +698,34 @@ class ConversationMixin:
             daemon=True,
             name="post-conv-self-invoke",
         ).start()
-        return response
+        return self._said(response)
+
+    def _said(self, text: str) -> str:
+        """Record an outbound utterance in her external world.
+
+        Everything she says in reply — responses, fallbacks, error
+        reports — is her voice reaching the world. Returns the text
+        unchanged so call sites can wrap a return value.
+        """
+        try:
+            self.world.she_said(text)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"world utterance record failed: {e}")
+        return text
+
+    def _note_faces_seen(self) -> None:
+        """Mark recognized faces as presences in her external world.
+
+        When she looks and recognizes someone, that person is *there* —
+        a presence arrival in her world, not just a line in a report.
+        """
+        try:
+            for name in self.vision.last_faces_seen():
+                self.world.mark_presence(
+                    f"face:{name}", PresenceKind.FACE, name=name
+                )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"world face presence failed: {e}")
 
     def _think_in_worker(
         self, user_input: str, timeout: float
@@ -758,24 +886,57 @@ class ConversationMixin:
                 self._resume_inner_life,
             )
     def see(self) -> str:
-        """Look through the retina, store the observation, and report it."""
+        """Look through the retina, store the observation, and report it.
+
+        ``vision.see`` returns the scene as structured percept data;
+        the language engine composes her report from it — nothing here
+        speaks a pre-written sentence.
+        """
         try:
             emotion = self.feel()
-            return self.vision.see(
+            scene = self.vision.see(
                 client=self.client,
                 emotion=emotion,
                 network=self.cognition.network,
             )
+            self._note_faces_seen()
+            if scene.status == "ok":
+                thought = Thought(
+                    content="see",
+                    intent="self_report",
+                    emotion=emotion.label,
+                    confidence=min(0.9, 0.4 + scene.salience * 0.5),
+                    metadata={
+                        "vision": True,
+                        "vision_scene": scene.as_metadata(),
+                    },
+                )
+            else:
+                thought = Thought(
+                    content="see",
+                    intent="self_report",
+                    emotion=emotion.label,
+                    confidence=0.3,
+                    metadata={"vision_status": scene.status},
+                )
+            report = self.language.render(thought, emotion)
+            try:
+                self.world.she_acted(
+                    "looked through the retina", detail=report[:200]
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"world action record failed: {e}")
+            return report
         except Exception as e:  # noqa: BLE001
             logger.debug(f"mind see failed: {e}")
             from ..language import Thought as _Thought
             emo = self.feel()
             thought = _Thought(
-                content="can see but cannot make sense of it yet",
+                content="see",
                 intent="self_report",
                 emotion=emo.label,
                 confidence=0.3,
-                metadata={"vision_unprocessed": True},
+                metadata={"vision_status": "unprocessed"},
             )
             return self.language.render(thought, emo)
     def look_at_image(self, path: str) -> str:
@@ -793,11 +954,11 @@ class ConversationMixin:
             frame = load_image(path)
             if frame is None:
                 thought = _Thought(
-                    content="load failed",
+                    content="see",
                     intent="self_report",
                     emotion=emo.label,
                     confidence=0.4,
-                    metadata={"vision_failed": True},
+                    metadata={"vision_status": "load_failed"},
                 )
                 return self.language.render(thought, emo)
 
@@ -837,15 +998,22 @@ class ConversationMixin:
                     "candidates": candidates_meta,
                 },
             )
-            return self.language.render(thought, emo)
+            rendered = self.language.render(thought, emo)
+            try:
+                self.world.she_acted(
+                    "looked at an image", detail=rendered[:200]
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"world action record failed: {e}")
+            return rendered
         except Exception as e:  # noqa: BLE001
             logger.debug(f"mind look_at_image failed: {e}")
             thought = _Thought(
-                content="unprocessed",
+                content="see",
                 intent="self_report",
                 emotion=emo.label,
                 confidence=0.3,
-                metadata={"vision_unprocessed": True},
+                metadata={"vision_status": "unprocessed"},
             )
             return self.language.render(thought, emo)
     def _render_self_report(

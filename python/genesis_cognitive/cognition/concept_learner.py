@@ -237,7 +237,8 @@ class ConceptLearner:
         for topic in perception.topics:
             concept = self._network.get_concept(topic)
             if concept:
-                concept.activation = min(1.0, concept.activation + 0.4)
+                concept.activation = min(1.0, (concept.activation or 0.0) + 0.4)
+                self._network._mark_active(topic)
 
         context_columns: set[str] = set()
         if perception.is_about_genesis or perception.is_about_code:

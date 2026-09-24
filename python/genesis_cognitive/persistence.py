@@ -41,6 +41,7 @@ import os
 import tempfile
 import zlib
 from collections import deque
+from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING, Any
 
 try:
@@ -121,6 +122,34 @@ if TYPE_CHECKING:
     )
 
 
+def _snapshot[T](
+    src: Callable[[], Iterable[T]] | Iterable[T], attempts: int = 8
+) -> list[T]:
+    """Materialize a collection that other threads may be mutating.
+
+    Autosave and shutdown serialization run concurrently with
+    background workers (volition actions, autonomous learning, the
+    think-worker) that mutate these collections. Iterating a live dict
+    view raises ``RuntimeError`` ("dictionary changed size during
+    iteration"); iterating a live list yields a torn snapshot. Retry
+    the materialization — each attempt is a single fast C-level pass —
+    so the save either gets a consistent copy or, after ``attempts``
+    failures, surfaces the error to the caller's existing save-failed
+    path rather than crashing the thread.
+
+    ``src`` may be a collection (iterated directly) or a callable that
+    produces a fresh view each attempt — pass the bound method form
+    (``d.items``/``d.values``) for dicts so each retry re-views the
+    current dict.
+    """
+    for _ in range(attempts - 1):
+        try:
+            return list(src() if callable(src) else src)
+        except RuntimeError:
+            continue
+    return list(src() if callable(src) else src)
+
+
 def save_state(
     data_dir: str,
     network: ConceptNetwork,
@@ -152,6 +181,7 @@ def save_state(
     cognitive_trajectory: CognitiveTrajectoryModel | None = None,
     dream_synthesis: Any = None,
     inner_life_state: dict[str, Any] | None = None,
+    world_state: dict[str, Any] | None = None,
 ) -> None:
     """Save Genesis's cognitive state to disk.
 
@@ -179,6 +209,8 @@ def save_state(
         memory_records: Python-side memory metadata (consolidation
             state, forgetting, source tags) from
             :meth:`MemoryEngine.serialize_records`.
+        world_state: Her external world (presences, recent events,
+            social clock) from :meth:`OuterWorld.to_dict`.
     """
     state: dict[str, Any] = {
         "version": 2,
@@ -214,6 +246,7 @@ def save_state(
         cognitive_trajectory=cognitive_trajectory,
         dream_synthesis=dream_synthesis.to_dict() if dream_synthesis is not None else None,
         inner_life_state=inner_life_state,
+        world_state=world_state,
     )
 
     _atomic_write_state(data_dir, state)
@@ -225,7 +258,11 @@ def _atomic_write_state(data_dir: str, state: dict[str, Any]) -> None:
     Uses gzip compression when ``_USE_GZIP`` is True to reduce file size
     from ~12 MB to ~1-2 MB, cutting disk write time and CPU overhead.
     """
-    os.makedirs(data_dir, exist_ok=True)
+    # Owner-only: the data dir holds the IPC socket (the daemon's
+    # unauthenticated control channel) and the full cognitive state.
+    # mode= only applies when we create the directory — existing
+    # directories keep their permissions.
+    os.makedirs(data_dir, mode=0o700, exist_ok=True)
     path = os.path.join(data_dir, "cognitive_state.json")
 
     # Serialize with orjson (6x faster) or stdlib fallback
@@ -313,6 +350,7 @@ def _add_optional_state(
     cognitive_trajectory: CognitiveTrajectoryModel | None = None,
     dream_synthesis: Any = None,
     inner_life_state: dict[str, Any] | None = None,
+    world_state: dict[str, Any] | None = None,
 ) -> None:
     """Add optional state fields to the state dict."""
     if predictive_coding is not None:
@@ -363,6 +401,8 @@ def _add_optional_state(
         state["dream_synthesis"] = dream_synthesis
     if inner_life_state is not None:
         state["inner_life_state"] = inner_life_state
+    if world_state is not None:
+        state["world_state"] = world_state
 
 
 def load_state(data_dir: str) -> dict[str, Any] | None:
@@ -575,7 +615,10 @@ def _restore_concepts(
         if new_id in network._concepts:
             existing = network._concepts[new_id]
             existing.aliases |= set(c_data.get("aliases", []))
-            existing.activation = max(existing.activation, c_data.get("activation") or 0.0)
+            existing.activation = max(
+                existing.activation or 0.0, c_data.get("activation") or 0.0
+            )
+            network._mark_active(new_id)
             existing.confidence = max(existing.confidence, confidence)
             existing.columns |= set(c_data.get("columns", []))
             existing.properties.update(c_data.get("properties", {}))
@@ -825,6 +868,10 @@ def restore_narrative(narrative: NarrativeEngine, data: dict[str, Any]) -> None:
             narrative._temporal_links.append(link)
             narrative._links_out.setdefault(source, []).append(link)
             narrative._links_in.setdefault(target, []).append(link)
+
+    # Enforce the narrative's growth caps — a save written before the
+    # caps existed (or by a busier run) can exceed them.
+    narrative._enforce_bounds()
 
 
 def _restore_chapters(narrative: NarrativeEngine, data: dict[str, Any]) -> None:
@@ -1251,15 +1298,15 @@ def restore_self_improvement(engine: SelfImprovementEngine, data: dict[str, Any]
 def _serialize_network(network: ConceptNetwork) -> dict[str, Any]:
     """Serialize a concept network to a dict."""
     concepts = []
-    for _cid, concept in list(network._concepts.items()):
+    for _cid, concept in _snapshot(network._concepts.items):
         concepts.append(
             {
                 "id": concept.id,
-                "aliases": list(concept.aliases),
+                "aliases": _snapshot(concept.aliases),
                 "activation": concept.activation if concept.activation is not None else 0.0,
                 "confidence": concept.confidence if concept.confidence is not None else 0.5,
                 "origin": concept.origin,
-                "columns": list(concept.columns) if concept.columns else [],
+                "columns": _snapshot(concept.columns) if concept.columns else [],
                 "created_at": concept.created_at,
                 "review_count": concept.review_count,
                 "last_reviewed": concept.last_reviewed,
@@ -1273,7 +1320,7 @@ def _serialize_network(network: ConceptNetwork) -> dict[str, Any]:
 
     edges = []
     seen_edge_keys: set[tuple[str, str, str]] = set()
-    for edge in network._edges:
+    for edge in _snapshot(network._edges):
         key = (edge.source, edge.target, edge.relation.value)
         if key in seen_edge_keys:
             continue  # skip duplicate edges
@@ -1308,10 +1355,12 @@ def _serialize_reflection(reflection: ReflectionEngine) -> dict[str, Any]:
                 "action": i.action,
                 "timestamp": i.timestamp,
             }
-            for i in reflection.insights
+            for i in _snapshot(reflection.insights)
         ],
-        "mood_history": [list(m) for m in reflection._mood_history],
-        "response_patterns": list(reflection._response_patterns)[-50:],
+        "mood_history": [
+            list(m) for m in _snapshot(reflection._mood_history)
+        ],
+        "response_patterns": _snapshot(reflection._response_patterns)[-50:],
         "metacognitive_model": reflection.metacognitive_model.to_dict(),
     }
 
@@ -1327,7 +1376,7 @@ def _serialize_narrative(narrative: NarrativeEngine) -> dict[str, Any]:
     continuity (causing ID collisions with restored events).
     """
     chapters = []
-    for ch in narrative.chapters:
+    for ch in _snapshot(narrative.chapters):
         chapters.append(
             {
                 "title": ch.title,
@@ -1345,13 +1394,13 @@ def _serialize_narrative(narrative: NarrativeEngine) -> dict[str, Any]:
                         "chapter": ev.chapter,
                         "reinterpretation": getattr(ev, "reinterpretation", ""),
                     }
-                    for ev in ch.events
+                    for ev in _snapshot(ch.events)
                 ],
             }
         )
 
     personality_snapshots = []
-    for ts, traits in narrative._personality_snapshots:
+    for ts, traits in _snapshot(narrative._personality_snapshots):
         personality_snapshots.append(
             {
                 "timestamp": ts,
@@ -1373,7 +1422,7 @@ def _serialize_narrative(narrative: NarrativeEngine) -> dict[str, Any]:
             "reached": m.reached,
             "reached_at": m.reached_at,
         }
-        for m in narrative.life_script.milestones
+        for m in _snapshot(narrative.life_script.milestones)
     ]
 
     # Autobiographical memory hierarchy (Conway, 2005).
@@ -1382,11 +1431,11 @@ def _serialize_narrative(narrative: NarrativeEngine) -> dict[str, Any]:
             {
                 "label": node.label,
                 "event_id": node.event_id,
-                "children": list(node.children),
+                "children": _snapshot(node.children),
             }
             for node in nodes
         ]
-        for level, nodes in narrative._hierarchy.items()
+        for level, nodes in _snapshot(narrative._hierarchy.items)
     }
 
     # Temporal / causal links between narrative entries.
@@ -1397,7 +1446,7 @@ def _serialize_narrative(narrative: NarrativeEngine) -> dict[str, Any]:
             "link_type": link.link_type.value,
             "weight": link.weight,
         }
-        for link in narrative._temporal_links
+        for link in _snapshot(narrative._temporal_links)
     ]
 
     return {
@@ -1423,7 +1472,10 @@ def _serialize_self_model(self_model: SelfModel) -> dict[str, Any]:
             "agreeableness": p.agreeableness,
             "neuroticism": p.neuroticism,
         },
-        "self_knowledge": [{"key": k, "value": v} for k, v in self_model.self_knowledge.items()],
+        "self_knowledge": [
+            {"key": k, "value": v}
+            for k, v in _snapshot(self_model.self_knowledge.items)
+        ],
     }
 
 
@@ -1435,12 +1487,17 @@ def _serialize_predictive_coding(
 ) -> dict[str, Any]:
     """Serialize predictive coding layer to a dict."""
     return {
-        "topic_transitions": {k: dict(v) for k, v in predictive_coding._topic_transitions.items()},
+        "topic_transitions": {
+            k: dict(v)
+            for k, v in _snapshot(predictive_coding._topic_transitions.items)
+        },
         "intent_transitions": {
-            k: dict(v) for k, v in predictive_coding._intent_transitions.items()
+            k: dict(v)
+            for k, v in _snapshot(predictive_coding._intent_transitions.items)
         },
         "concept_cooccurrence": {
-            k: dict(v) for k, v in predictive_coding._concept_cooccurrence.items()
+            k: dict(v)
+            for k, v in _snapshot(predictive_coding._concept_cooccurrence.items)
         },
         "surprise_ema": predictive_coding._surprise_ema,
         "accuracy_ema": predictive_coding._accuracy_ema,
@@ -1460,19 +1517,19 @@ def _serialize_theory_of_mind(theory_of_mind: TheoryOfMind) -> dict[str, Any]:
                     "confidence": b.confidence,
                     "timestamp": b.timestamp,
                 }
-                for b in m.beliefs.values()
+                for b in _snapshot(m.beliefs.values)
             ],
-            "intentions": list(m.intentions),
-            "knowledge": {k: v.value for k, v in m.knowledge.items()},
+            "intentions": _snapshot(m.intentions),
+            "knowledge": {k: v.value for k, v in _snapshot(m.knowledge.items)},
             "emotional_state": m.emotional_state,
             "emotional_valence": m.emotional_valence,
             "expertise_level": m.expertise_level,
             "name": m.name,
             "interaction_count": m.interaction_count,
-            "asked_about": list(m.asked_about),
-            "demonstrated_knowledge": list(m.demonstrated_knowledge),
+            "asked_about": _snapshot(m.asked_about),
+            "demonstrated_knowledge": _snapshot(m.demonstrated_knowledge),
         },
-        "concept_history": dict(theory_of_mind._concept_history),
+        "concept_history": dict(_snapshot(theory_of_mind._concept_history.items)),
     }
 
 
@@ -1493,7 +1550,7 @@ def _serialize_procedural_memory(
                 "failure_count": s.failure_count,
                 "created_at": s.created_at,
             }
-            for s in procedural_memory._skills.values()
+            for s in _snapshot(procedural_memory._skills.values)
         ],
         "skills_learned": procedural_memory.skills_learned,
         "habits_formed": procedural_memory.habits_formed,
@@ -1515,7 +1572,7 @@ def _serialize_spaced_repetition(
                 "last_review": r.last_review if r.last_review is not None else 0.0,
                 "ease_factor": r.ease_factor if r.ease_factor is not None else 2.5,
             }
-            for r in spaced_repetition._records.values()
+            for r in _snapshot(spaced_repetition._records.values)
         ],
     }
 
@@ -1523,7 +1580,7 @@ def _serialize_spaced_repetition(
 def _serialize_td_learner(td_learner: TDLearner) -> dict[str, Any]:
     """Serialize TD learner to a dict."""
     return {
-        "weights": dict(td_learner._weights),
+        "weights": dict(_snapshot(td_learner._weights.items)),
         "history": [
             {
                 "state": list(t.state),
@@ -1532,14 +1589,14 @@ def _serialize_td_learner(td_learner: TDLearner) -> dict[str, Any]:
                 "rpe": t.rpe,
                 "timestamp": t.timestamp,
             }
-            for t in td_learner._history
+            for t in _snapshot(td_learner._history)
         ],
         "last_rpe": td_learner._last_rpe,
         "total_updates": td_learner.total_updates,
         "total_positive_rpe": td_learner.total_positive_rpe,
         "total_negative_rpe": td_learner.total_negative_rpe,
         "lam": td_learner.lam,
-        "traces": dict(td_learner._traces),
+        "traces": dict(_snapshot(td_learner._traces.items)),
     }
 
 
@@ -1559,7 +1616,7 @@ def _serialize_emotional_memory(
                 "last_retrieved": m.last_retrieved,
                 "retrieval_count": m.retrieval_count,
             }
-            for m in emotional_memory._memories.values()
+            for m in _snapshot(emotional_memory._memories.values)
         ],
         "conditioning_count": emotional_memory.conditioning_count,
         "extinction_count": emotional_memory.extinction_count,
@@ -1570,7 +1627,7 @@ def _serialize_attractor(attractor: AttractorNetwork) -> dict[str, Any]:
     """Serialize attractor network to a dict."""
     return {
         "size": attractor._size,
-        "weights": [list(row) for row in attractor._weights],
+        "weights": [list(row) for row in _snapshot(attractor._weights)],
         "patterns": [
             {
                 "id": p.id,
@@ -1578,7 +1635,7 @@ def _serialize_attractor(attractor: AttractorNetwork) -> dict[str, Any]:
                 "timestamp": p.timestamp,
                 "retrieval_count": p.retrieval_count,
             }
-            for p in attractor._patterns.values()
+            for p in _snapshot(attractor._patterns.values)
         ],
         "retrieval_count": attractor._retrieval_count,
         "storage_count": attractor._storage_count,
@@ -1599,7 +1656,7 @@ def _serialize_error_monitor(error_monitor: ErrorMonitor) -> dict[str, Any]:
                 "timestamp": e.timestamp,
                 "context": e.context,
             }
-            for e in error_monitor._errors
+            for e in _snapshot(error_monitor._errors)
         ],
         "caution_decay_rate": error_monitor.caution_decay_rate,
         "max_caution": error_monitor.max_caution,
@@ -1625,7 +1682,7 @@ def _serialize_emergent_identity(
                 "name": s.name,
                 "description": s.description,
                 "weight": s.weight,
-                "observations": list(s.observations),
+                "observations": _snapshot(s.observations),
             }
             for s in sources
         ],
@@ -1663,7 +1720,7 @@ def _serialize_allostatic_load(
             "allostatic_load": s.allostatic_load,
             "acute_stress": s.acute_stress,
             "is_chronic": s.is_chronic,
-            "stress_history": list(s.stress_history),
+            "stress_history": _snapshot(s.stress_history),
         },
         "tick_count": allostatic_load._tick_count,
         "elevated_stress_duration": allostatic_load._elevated_stress_duration,
@@ -1684,17 +1741,17 @@ def _serialize_self_directed_learner(
         "total_conversation_facts": learner._total_conversation_facts,
         "total_corrections": learner._total_corrections,
         "total_definitions_synthesized": learner._total_definitions_synthesized,
-        "studied_concepts": dict(learner._studied_concepts),
+        "studied_concepts": dict(_snapshot(learner._studied_concepts.items)),
         "last_inference_time": learner._last_inference_time,
         "learning_log": [
             {
                 "event_type": e.event_type,
                 "description": e.description,
-                "concepts_involved": list(e.concepts_involved),
+                "concepts_involved": _snapshot(e.concepts_involved),
                 "confidence": e.confidence,
                 "timestamp": e.timestamp,
             }
-            for e in learner._learning_log
+            for e in _snapshot(learner._learning_log)
         ],
     }
 

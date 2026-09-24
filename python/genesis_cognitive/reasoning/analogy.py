@@ -331,6 +331,10 @@ class AnalogyEngine:
             )
             self._insights.append(inf)
             added += 1
+        # Bound the history — this runs every sleep cycle in a
+        # long-running daemon and to_dict serializes the whole list.
+        if len(self._insights) > 500:
+            del self._insights[: len(self._insights) - 500]
         return added
 
     def discover_and_accept(
@@ -890,7 +894,9 @@ class AnalogyEngine:
         insights_raw = data.get("insights", [])
         if not isinstance(insights_raw, list):
             return
-        for item in insights_raw:
+        # Trim to the cap — a save written before the bound existed can
+        # hold more; keep the most recent.
+        for item in insights_raw[-500:]:
             if not isinstance(item, dict):
                 continue
             relation_str = item.get("relation", "related_to")

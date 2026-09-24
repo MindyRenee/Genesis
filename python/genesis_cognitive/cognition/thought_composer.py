@@ -679,17 +679,22 @@ class ThoughtComposer:
             for a, b in [(concept_a, concept_b), (concept_b, concept_a)]:
                 why_result = self.reasoner.explain_why(a, b)
                 if why_result and why_result.confidence > 0.4:
-                    content = why_result.conclusion
-                    # Add a qualification: what else does the object enable?
-                    qualification = self._compose_qualification(a, b)
-                    if qualification:
-                        content = f"{content} {qualification}"
+                    # Collect qualification data: what else does the
+                    # object enable / what else does the subject depend
+                    # on? The vocabulary composes the connective
+                    # phrasing from this structured data — the reasoning
+                    # layer supplies the facts, not the words.
+                    qualification = self._collect_qualification(a, b)
                     return Thought(
-                        content=content,
+                        content=why_result.conclusion,
                         intent="inform",
                         emotion=emotion.label,
                         topics=[a, b],
                         confidence=why_result.confidence,
+                        metadata=(
+                            {"qualification": qualification}
+                            if qualification else {}
+                        ),
                     )
 
             # 2. Try explain_relation — finds direct edges, multi-hop
@@ -753,20 +758,24 @@ class ThoughtComposer:
                 candidate_pairs.append(pair)
         return candidate_pairs
 
-    def _compose_qualification(
+    def _collect_qualification(
         self, subject: str, object_: str
-    ) -> str:
-        """Compose a qualification showing what else matters beyond
+    ) -> dict[str, Any] | None:
+        """Collect qualification data showing what else matters beyond
         the direct relationship.
 
-        After stating "cognition depends on memory because memory
-        enables learning", this adds context like "but memory also
-        enables other things" or "cognition also depends on other
-        factors". This prevents the listener from inferring that the
-        relationship is exclusive or proportional.
+        After the reasoner concludes "cognition depends on memory
+        because memory enables learning", this traverses the graph for
+        context like "memory also enables other things" or "cognition
+        also depends on other factors". This prevents the listener
+        from inferring that the relationship is exclusive.
 
-        Derived entirely from graph edges — no hardcoded domain
-        knowledge.
+        Returns structured semantic data — ``{"kind": "depends" |
+        "enables", "subject", "object", "others": [...]}`` — for the
+        vocabulary to compose into speech. The connective phrasing
+        belongs to the language engine; this method only decides
+        *which* relations exist. Derived entirely from graph edges —
+        no hardcoded domain knowledge.
         """
         from ..concepts import RelationType
 
@@ -799,17 +808,23 @@ class ThoughtComposer:
                     if not self._is_noisy_target(e.target):
                         other_deps.append(e.target)
 
-        # Compose the qualification from what we found
+        # Return the qualification as structured data — the vocabulary
+        # composes the connective phrasing ("but X also depends on Y").
         if other_deps:
-            # "But cognition also depends on attention and awareness"
-            deps_str = self._join_parts(other_deps[:3])
-            return f"but {subject} also depends on {deps_str}"
+            return {
+                "kind": "depends",
+                "subject": subject,
+                "object": object_,
+                "others": other_deps[:3],
+            }
         if other_enabled:
-            # "And memory enables other things too — learning, recall"
-            enabled_str = self._join_parts(other_enabled[:3])
-            return f"and {object_} also enables {enabled_str}"
-
-        return ""
+            return {
+                "kind": "enables",
+                "subject": subject,
+                "object": object_,
+                "others": other_enabled[:3],
+            }
+        return None
 
     def _answer_affordance(
         self, lower_q: str, topics: list[str], emotion: EmotionalState
@@ -1014,7 +1029,7 @@ class ThoughtComposer:
         active = [
             (c_id, c.activation)
             for c_id, c in list(self.network._concepts.items())
-            if c.activation > 0.3
+            if (c.activation or 0.0) > 0.3
         ]
         if len(active) < 2:
             return None

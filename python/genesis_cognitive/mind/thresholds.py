@@ -49,6 +49,11 @@ WARN_VALENCE = -0.4     # severe negative valence
 #   be elevated from a previous session.
 AUTO_SLEEP_ADENOSINE = 0.75
 AUTO_WAKE_ADENOSINE = 0.20
+# Cycle-boundary wake: spontaneous waking happens at ultradian cycle
+# transitions (post-REM), not strictly when pressure hits the floor.
+# When a full N1→REM cycle completes, a relaxed pressure threshold
+# applies — high residual pressure still means another cycle.
+AUTO_WAKE_CYCLE_ADENOSINE = 0.40
 AUTO_SLEEP_MIN_AWAKE = 300.0  # 5 minutes
 # Drowsiness threshold — below the sleep threshold. When adenosine
 # crosses this level, she announces she's getting sleepy before
@@ -65,5 +70,51 @@ DROWSINESS_ADENOSINE = 0.55
 # about what to say next, or composing a follow-up. Shorter thresholds
 # cause her to nod off while the user is still engaged.
 AUTO_SLEEP_MIN_IDLE = 180.0
+
+# Wake stabilization (flip-flop latch). After waking, the daemon's
+# sleep-wake switch can drift back toward a sleep phase under residual
+# adenosine before orexinergic wake drive consolidates — the dynamics
+# documented in orexin-deficiency state instability (low transition
+# thresholds in both directions). During this window, a daemon-side
+# sleep phase at moderate pressure is treated as an unlatched switch,
+# not a reason to sleep: the mind reinforces the wake cascade instead.
+# Genuine exhaustion (high adenosine) or circadian drive (melatonin)
+# still override.
+WAKE_STABILIZATION_WINDOW = 900.0  # 15 minutes
+WAKE_RESCUE_ADENOSINE = 0.60  # above this, sleep anyway
+WAKE_RESCUE_MELATONIN = 0.30  # above this, circadian drive wins
+WAKE_REINFORCE_INTERVAL = 60.0  # minimum seconds between impulses
+
+# Voluntary sleep-urge floor. The self_sleep urge integrates
+# adenosine as a drive signal, but deciding to sleep should require
+# pressure near the drowsy boundary (DROWSINESS_ADENOSINE = 0.55,
+# daemon Drowsy enter ≈ 0.50 blended). Below this floor, residual
+# post-wake pressure produces grogginess that fades — not a renewed
+# decision to sleep. Without the floor, moderate residual pressure
+# (~0.28) re-crosses the urge threshold in under a minute of
+# undampened integration, recreating the narcolepsy-like brief-wake
+# phenotype the stabilization window exists to prevent.
+SLEEP_URGE_ADENOSINE_FLOOR = 0.45
+
+# ─── Commitment-boundary parameters ──────────────────────────────
+#
+# The mind's two adenosine-driven transitions (drowsiness announce,
+# auto-sleep) run through CommitmentBoundary digitizers instead of
+# bare threshold comparisons. Two noise margins apply:
+#
+# CONFIRM_S — the sustained-crossing window. The heartbeat samples
+# adenosine ~once per second; requiring the signal to hold above
+# threshold for a continuous window means a lone transient spike
+# cannot commit her. (The flytrap's two-trigger rule, in the time
+# domain.)
+#
+# EXIT — the release level, below the enter threshold. The gap is
+# the hysteresis deadband: once committed, the boundary holds until
+# pressure clearly falls, so flicker around the threshold cannot
+# re-arm or oscillate the transition.
+DROWSINESS_CONFIRM_S = 30.0
+DROWSINESS_EXIT = 0.45  # re-arm only when pressure clearly clears
+AUTO_SLEEP_CONFIRM_S = 60.0
+AUTO_SLEEP_EXIT = 0.65  # ~2× the daemon's hysteresis margin
 
 

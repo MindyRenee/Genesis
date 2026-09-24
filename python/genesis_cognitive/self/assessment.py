@@ -124,6 +124,11 @@ class SelfAssessmentEngine:
         self.profile = CapabilityProfile()
         self._answer_history: deque[AnswerAssessment] = deque(maxlen=200)
         self._topic_confidence: dict[str, float] = {}
+        # Caps for unbounded collections. Topics come from arbitrary
+        # user input, so known_gaps and _topic_confidence grow forever
+        # in a long-running daemon without a bound.
+        self._max_known_gaps = 1000
+        self._max_topic_confidence = 2000
 
     # ═══════════════════════════════════════════════════════════════
     # 1. Knowledge verification
@@ -155,6 +160,11 @@ class SelfAssessmentEngine:
 
         # Track confidence over time
         self._topic_confidence[topic] = assessment.confidence
+        # Bound the cache — evict the oldest entry (dicts are
+        # insertion-ordered) when full. It's only a cache; eviction
+        # just costs a re-assessment.
+        if len(self._topic_confidence) > self._max_topic_confidence:
+            self._topic_confidence.pop(next(iter(self._topic_confidence)))
 
         # If she knows it well, mark as confident topic
         if assessment.confidence > 0.6:
@@ -193,7 +203,7 @@ class SelfAssessmentEngine:
         if concept is None:
             assessment.gaps.append(f"No concept for '{topic}' in network")
             assessment.confidence = 0.0
-            self.profile.known_gaps.add(topic)
+            self.remember_gap(topic)
             return assessment
 
         assessment.concept_exists = True
@@ -614,7 +624,7 @@ class SelfAssessmentEngine:
         else:
             self.profile.question_type_stats[question_type]["failure"] += 1
             if topic:
-                self.profile.known_gaps.add(topic.lower())
+                self.remember_gap(topic.lower())
 
     def get_capability_summary(self) -> str:
         """Get a human-readable summary of her capabilities.
@@ -714,6 +724,24 @@ class SelfAssessmentEngine:
         for topic in topics:
             t = topic.lower().strip()
             self._topic_confidence.pop(t, None)
+
+    def remember_gap(self, topic: str) -> None:
+        """Record a topic she doesn't know, with a bound on the set.
+
+        Topics come from arbitrary user input, so ``known_gaps`` would
+        grow without bound in a long-running daemon. When the set is
+        full, an arbitrary existing gap is evicted — the gaps that
+        matter recur in conversation and are re-added.
+        """
+        topic = topic.lower().strip()
+        if not topic:
+            return
+        if (
+            topic not in self.profile.known_gaps
+            and len(self.profile.known_gaps) >= self._max_known_gaps
+        ):
+            self.profile.known_gaps.pop()
+        self.profile.known_gaps.add(topic)
 
     def reconcile_gaps(self, concepts: list[str]) -> None:
         """Reconcile known_gaps with the current network state.

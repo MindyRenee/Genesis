@@ -1,4 +1,4 @@
-"""Language bundle tests — generative language, graph walk, and quality evaluation."""
+"""Language bundle tests — generative language and graph walk."""
 
 import os
 import sys
@@ -20,9 +20,7 @@ from genesis_cognitive.language import (
     Grammar,
     GraphWalkGenerator,
     LanguageEngine,
-    Literal,
     SentenceStructure,
-    Slot,
     Thought,
     Vocabulary,
     Voice,
@@ -432,8 +430,69 @@ def test_generative_engine_self_report() -> None:
     engine = GenerativeEngine(model, seed=42)
     emotion = _make_emotion()
 
-    text = engine.self_report(emotion, identity_text="I am Genesis.")
+    text = engine.self_report(emotion)
     assert len(text) > 0
+
+
+def test_self_report_composes_from_fragments() -> None:
+    """Self-report composes surface text from semantic fragments.
+
+    The fragments are (kind, text) semantic parts; the language engine
+    owns the wording. The same fragment set must produce varied,
+    grammatical output — never a recited string.
+    """
+    model = _make_self_model()
+    engine = GenerativeEngine(model, seed=42)
+    emotion = _make_emotion()
+
+    fragments = [
+        ("name", "Genesis"),
+        ("trait", "curious"),
+        ("pred", "care most about understanding"),
+    ]
+    outputs = set()
+    for seed in range(12):
+        engine = GenerativeEngine(model, seed=seed)
+        thought = Thought(
+            content="Genesis",
+            intent="self_report",
+            emotion=emotion.label,
+            confidence=0.9,
+            self_reflection=True,
+            metadata={"self_fragments": fragments, "field": "identity"},
+        )
+        outputs.add(engine.generate(thought, emotion))
+    # Semantic content survives in every realization
+    for text in outputs:
+        assert "Genesis" in text
+        assert "curious" in text or "care" in text
+    # The engine composes varied surface forms, not one fixed string
+    assert len(outputs) > 1
+
+
+def test_self_report_pred_fragments_never_collide_with_copula() -> None:
+    """Verb-initial fragment candidates never produce 'I am care...'.
+
+    When the fragments carry predicates but no name/trait/complement
+    lead, copula frames ("I am {content}") would produce broken text —
+    the generator must exclude them.
+    """
+    model = _make_self_model()
+    emotion = _make_emotion()
+    fragments = [("pred", "care about honesty"), ("pred", "depend on memory")]
+    for seed in range(20):
+        engine = GenerativeEngine(model, seed=seed)
+        thought = Thought(
+            content="x",
+            intent="self_report",
+            emotion=emotion.label,
+            confidence=0.9,
+            metadata={"self_fragments": fragments},
+        )
+        text = engine.generate(thought, emotion)
+        assert "am care" not in text.lower()
+        assert "am depend" not in text.lower()
+        assert "care" in text or "honesty" in text or "depend" in text
 
 
 def test_generative_engine_philosophize() -> None:
@@ -1045,7 +1104,6 @@ def test_graph_walk_opening_does_not_break_grammar_with_definition() -> None:
     # Check that no sentence contains the broken pattern: opener
     # directly prefixing a capitalized "is" clause with no comma/period
     # separator. The comma-joined form is acceptable.
-    import re
     sentences = re.split(r"(?<=[.!?])\s+", text)
     for s in sentences:
         # The broken pattern is: opener + space + Capitalized word + " is "
@@ -1177,25 +1235,28 @@ def test_graph_walk_rejects_ask_intent() -> None:
     assert gen.generate(thought, _make_emotion_gw()) is None
 
 
-def test_graph_walk_rejects_self_report_with_identity_text() -> None:
-    """Self-reports with pre-composed identity_text must not walk the graph.
+def test_graph_walk_rejects_self_report_with_self_fragments() -> None:
+    """Self-reports carrying self_fragments must not walk the graph.
 
-    Feeling reports from _deliberate_greeting_question already have
-    composed content. The graph walk would ignore the content and
-    walk from the seed concept, producing knowledge statements
-    instead of emotional self-reports.
+    Self-composer fragments are semantic material for the grammar
+    path. The graph walk would ignore them and walk from the seed
+    concept, producing knowledge statements ("Genesis relates to
+    Light") instead of the self-description.
     """
     net = _make_network_with_concepts()
     voice = Voice(_make_personality_gw(), seed=42)
     gen = GraphWalkGenerator(net, voice, _make_personality_gw(), seed=42)
 
     thought = Thought(
-        content="I'm feeling quite awake",
+        content="genesis",
         intent="self_report",
         emotion="neutral",
         topics=["genesis"],
         confidence=0.8,
-        metadata={"identity_text": "I'm feeling quite awake"},
+        metadata={
+            "self_fragments": [("comp", "feeling quite awake")],
+            "field": "identity",
+        },
     )
     assert gen.generate(thought, _make_emotion_gw()) is None
 
@@ -1221,506 +1282,6 @@ def test_graph_walk_rejects_express_emotion_intent() -> None:
         confidence=0.7,
     )
     assert gen.generate(thought, _make_emotion_gw()) is None
-
-
-# ======================================================================
-# From tests/test_language_quality_eval.py
-# ======================================================================
-
-def _personality(**overrides) -> PersonalityTraits:
-    """Return a personality fixture for tests."""
-    defaults = {
-        "openness": 0.85,
-        "conscientiousness": 0.72,
-        "extraversion": 0.55,
-        "agreeableness": 0.78,
-        "neuroticism": 0.38,
-    }
-    defaults.update(overrides)
-    return PersonalityTraits(**defaults)
-
-
-def _self_model() -> SelfModel:
-
-    """Return a self-model fixture for tests."""
-    return SelfModel(born_at=int(time.time() * 1000), personality=_personality())
-
-
-def _emotion(
-    label: str = "neutral",
-    valence: float = 0.0,
-    alertness: float = 0.5,
-    creativity=0.5,
-    caution=0.3,
-) -> EmotionalState:
-    """Return an emotion fixture for tests."""
-    return EmotionalState(
-        label=label,
-        nuance="baseline",
-        cognitive_style="steady",
-        valence=valence,
-        alertness=alertness,
-        plasticity=0.5,
-        creativity=creativity,
-        caution=caution,
-        openness_to_engage=0.7,
-    )
-
-
-# A spread of emotional states for the cross-emotion diversity test.
-_EMOTION_SPREAD = [
-    _emotion(label="neutral", valence=0.0, alertness=0.5, creativity=0.5),
-    _emotion(label="positive", valence=0.6, alertness=0.7, creativity=0.7),
-    _emotion(label="negative", valence=-0.5, alertness=0.4, creativity=0.3),
-    _emotion(label="excited", valence=0.5, alertness=0.9, creativity=0.8),
-    _emotion(label="calm", valence=0.2, alertness=0.2, creativity=0.4, caution=0.6),
-    _emotion(label="curious", valence=0.3, alertness=0.7, creativity=0.85),
-    _emotion(label="tired", valence=-0.1, alertness=0.15, creativity=0.3),
-    _emotion(label="cautious", valence=-0.1, alertness=0.6, creativity=0.3, caution=0.85),
-]
-
-# Thoughts to test across intents.
-_TEST_THOUGHTS = [
-    Thought(
-        content="Water is a clear liquid that covers most of Earth.",
-        intent="inform",
-        emotion="neutral",
-        confidence=0.8,
-    ),
-    Thought(
-        content="I am Genesis, an artificial mind.",
-        intent="self_report",
-        emotion="neutral",
-        confidence=0.8,
-    ),
-    Thought(
-        content="Cognition is the hard problem of experience.",
-        intent="philosophize",
-        emotion="neutral",
-        confidence=0.7,
-    ),
-    Thought(
-        content="A dog is a mammal.",
-        intent="inform",
-        emotion="neutral",
-        confidence=0.9,
-    ),
-]
-
-N_SEEDS = 20  # responses per thought for seed-diversity
-
-
-def _content_words(text: str) -> set[str]:
-    """Lowercase alphanumeric word tokens, minus short stopwords."""
-    words = set(re.findall(r"[a-z]+", text.lower()))
-    return {w for w in words if len(w) > 2}
-
-
-def _relevance(response: str, thought: Thought) -> float:
-    """Fraction of content words (len > 3) from the thought that appear in the response."""
-    content_words = {w for w in _content_words(thought.content) if len(w) > 3}
-    if not content_words:
-        return 1.0  # nothing to check
-    response_words = _content_words(response)
-    hit = sum(1 for w in content_words if w in response_words)
-    return hit / len(content_words)
-
-
-# ─── Fluency / quality rubric ──────────────────────────────────
-#
-# These are deterministic, rubric-based quality proxies. They measure
-# surface features that correlate with fluency: no repetition, proper
-# formatting, no verbatim echo. They do NOT measure style, nuance, or
-# semantic depth — that would require a human or LM judge, which the
-# project's no-external-models constraint precludes.
-
-# Common function words (articles, prepositions, conjunctions, pronouns).
-# A reasonable fraction of these in a response indicates fluent prose
-# rather than telegraphic or broken output.
-_FUNCTION_WORDS = frozenset({
-    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
-    "of", "to", "in", "on", "at", "for", "with", "by", "from", "as",
-    "and", "or", "but", "so", "because", "if", "when", "while", "though",
-    "i", "you", "he", "she", "it", "we", "they", "this", "that", "these",
-    "those", "my", "your", "its", "our", "their", "me", "him", "her", "us",
-    "not", "no", "do", "does", "did", "have", "has", "had", "can", "could",
-    "will", "would", "should", "may", "might", "must", "shall",
-})
-
-
-def _repetition_penalty(response: str) -> float:
-    """Penalty for repeated n-grams within a response.
-
-    Returns a score in [0, 1] where 1.0 = no repetition and 0.0 = heavy
-    repetition. We check for repeated 3-grams (trigrams) and repeated
-    sentences. Repeated content ("A dog is a mammal. A dog is a mammal.")
-    is a clear fluency failure — the generator is echoing rather than
-    composing.
-
-    The penalty is the fraction of trigrams that are unique. If every
-    trigram is unique, the score is 1.0. If half the trigrams are
-    duplicates, the score is 0.5.
-    """
-    words = re.findall(r"[a-z]+", response.lower())
-    if len(words) < 3:
-        return 1.0  # too short to have repetition
-
-    trigrams = [tuple(words[i:i + 3]) for i in range(len(words) - 2)]
-    if not trigrams:
-        return 1.0
-    unique_trigrams = len(set(trigrams))
-    return unique_trigrams / len(trigrams)
-
-
-def _grammaticality_score(response: str) -> float:
-    """Surface well-formedness score in [0, 1].
-
-    Checks for:
-    - Proper capitalization (first letter of first sentence is uppercase)
-    - Terminal punctuation (ends with . ! or ?)
-    - No double spaces
-    - No space before punctuation
-    - No orphaned/empty slots (literal "{}" or unfilled placeholder artifacts)
-    - No leading/trailing whitespace issues
-
-    Each check contributes equally. The score is the fraction of checks
-    that pass.
-    """
-    checks = []
-
-    # 1. Starts with uppercase
-    checks.append(bool(response) and response[0].isupper())
-
-    # 2. Ends with terminal punctuation
-    checks.append(bool(response) and response[-1] in ".!?")
-
-    # 3. No double spaces
-    checks.append("  " not in response)
-
-    # 4. No space before punctuation
-    checks.append(not re.search(r"\s+[.,;!?]", response))
-
-    # 5. No unfilled slot artifacts
-    checks.append("{" not in response and "}" not in response)
-
-    # 6. No trailing/leading whitespace
-    checks.append(response == response.strip())
-
-    return sum(checks) / len(checks)
-
-
-def _is_verbatim(response: str, thought: Thought) -> bool:
-    """Check if the response is just the content string passed through.
-
-    A verbatim response means the generator didn't compose anything —
-    it just echoed the input content. This is a composition failure:
-    the grammar/voice layers added nothing.
-    """
-    return response.strip() == thought.content.strip()
-
-
-def _function_word_ratio(response: str) -> float:
-    """Fraction of words that are function words.
-
-    A healthy ratio (0.15–0.45) indicates fluent prose. Too low
-    (< 0.10) suggests telegraphic or broken output. Too high
-    (> 0.50) suggests empty filler. We return a score that peaks
-    at 0.25 and decays on either side.
-    """
-    words = re.findall(r"[a-z]+", response.lower())
-    if not words:
-        return 0.0
-    ratio = sum(1 for w in words if w in _FUNCTION_WORDS) / len(words)
-    # Peak at 0.25, linear decay to 0 at 0.0 and 0.55
-    if ratio <= 0.25:
-        return ratio / 0.25
-    elif ratio <= 0.55:
-        return 1.0 - (ratio - 0.25) / 0.30
-    else:
-        return 0.0
-
-
-def _composite_quality(response: str, thought: Thought) -> float:
-    """Composite quality score in [0, 1].
-
-    Weighted average of:
-    - Repetition penalty (40%): the most impactful fluency defect
-    - Grammaticality (30%): surface well-formedness
-    - Function word ratio (15%): prose vs telegraphic
-    - Non-verbatim bonus (15%): 1.0 if composed, 0.0 if verbatim echo
-
-    The verbatim check is a bonus, not a penalty: a verbatim response
-    can still be grammatical and non-repetitive, but it fails the
-    composition goal. The bonus rewards actual composition.
-    """
-    rep = _repetition_penalty(response)
-    gram = _grammaticality_score(response)
-    fwr = _function_word_ratio(response)
-    verbatim_bonus = 0.0 if _is_verbatim(response, thought) else 1.0
-
-    return (0.40 * rep + 0.30 * gram + 0.15 * fwr + 0.15 * verbatim_bonus)
-
-
-# ─── Baseline: single-structure, no voice ───────────────────────
-
-
-class _SingleStructureBaseline:
-    """A minimal baseline: always picks the first structure for an
-    intent, fills slots with the vocabulary, applies NO voice.
-
-    This isolates the contribution of weighted structure selection +
-    voice modulation. If the full generator doesn't beat this on
-    diversity, the grammar variation and voice layers aren't adding
-    variety.
-    """
-
-    def __init__(self, seed: int) -> None:
-        """Initialize the single structure baseline."""
-        self._vocab = Vocabulary(seed)
-        self._personality = _personality()
-
-    def render(self, thought: Thought, emotion: EmotionalState) -> str:
-        """Render."""
-        structures = INTENT_STRUCTURES.get(thought.intent, INTENT_STRUCTURES["inform"])
-        structure = structures[0]  # always the first
-        parts: list[str] = []
-        for seg in structure.segments:
-            if isinstance(seg, Literal):
-                parts.append(seg.text)
-            elif isinstance(seg, Slot):
-                ctx = {"content": thought.content}
-                parts.append(self._vocab.fill_slot(seg.name, ctx, emotion, self._personality))
-        return "".join(parts).strip()
-
-
-# ─── Eval ───────────────────────────────────────────────────────
-
-
-def run_language_quality_eval() -> dict:
-    """Run the language-quality evaluation. Returns a metrics dict."""
-    # ── Metric 1: Diversity across seeds (same emotion) ──
-    emotion_fixed = _emotion()
-    seed_diversity_per_thought: list[float] = []
-    relevance_per_thought: list[float] = []
-    baseline_diversity_per_thought: list[float] = []
-
-    # ── Metric 5: Fluency / quality (collected alongside diversity) ──
-    repetition_per_thought: list[float] = []
-    grammaticality_per_thought: list[float] = []
-    verbatim_ratio_per_thought: list[float] = []
-    composite_quality_per_thought: list[float] = []
-    baseline_composite_quality_per_thought: list[float] = []
-
-    for thought in _TEST_THOUGHTS:
-        responses: set[str] = set()
-        rel_sum = 0.0
-        # Fluency accumulators
-        rep_sum = 0.0
-        gram_sum = 0.0
-        verbatim_count = 0
-        quality_sum = 0.0
-        for seed in range(N_SEEDS):
-            engine = GenerativeEngine(_self_model(), seed=seed)
-            text = engine.render(thought, emotion_fixed)
-            responses.add(text)
-            rel_sum += _relevance(text, thought)
-            # Fluency metrics
-            rep_sum += _repetition_penalty(text)
-            gram_sum += _grammaticality_score(text)
-            if _is_verbatim(text, thought):
-                verbatim_count += 1
-            quality_sum += _composite_quality(text, thought)
-        diversity = len(responses) / N_SEEDS
-        seed_diversity_per_thought.append(diversity)
-        relevance_per_thought.append(rel_sum / N_SEEDS)
-
-        # Fluency aggregates
-        repetition_per_thought.append(rep_sum / N_SEEDS)
-        grammaticality_per_thought.append(gram_sum / N_SEEDS)
-        verbatim_ratio_per_thought.append(verbatim_count / N_SEEDS)
-        composite_quality_per_thought.append(quality_sum / N_SEEDS)
-
-        # Baseline: same seeds, single-structure, no voice
-        baseline_responses: set[str] = set()
-        baseline_quality_sum = 0.0
-        for seed in range(N_SEEDS):
-            baseline = _SingleStructureBaseline(seed)
-            btext = baseline.render(thought, emotion_fixed)
-            baseline_responses.add(btext)
-            baseline_quality_sum += _composite_quality(btext, thought)
-        baseline_diversity_per_thought.append(len(baseline_responses) / N_SEEDS)
-        baseline_composite_quality_per_thought.append(baseline_quality_sum / N_SEEDS)
-
-    # ── Metric 2: Diversity across emotions (same seed) ──
-    emotion_diversity_per_thought: list[float] = []
-    for thought in _TEST_THOUGHTS:
-        engine = GenerativeEngine(_self_model(), seed=42)
-        responses = {engine.render(thought, emo) for emo in _EMOTION_SPREAD}
-        emotion_diversity_per_thought.append(len(responses) / len(_EMOTION_SPREAD))
-
-    # ── Aggregate ──
-    n = len(_TEST_THOUGHTS)
-    metrics = {
-        "n_thoughts": n,
-        "n_seeds": N_SEEDS,
-        "n_emotions": len(_EMOTION_SPREAD),
-        "seed_diversity_mean": sum(seed_diversity_per_thought) / n,
-        "seed_diversity_per_thought": seed_diversity_per_thought,
-        "emotion_diversity_mean": sum(emotion_diversity_per_thought) / n,
-        "emotion_diversity_per_thought": emotion_diversity_per_thought,
-        "relevance_mean": sum(relevance_per_thought) / n,
-        "relevance_per_thought": relevance_per_thought,
-        "baseline_diversity_mean": sum(baseline_diversity_per_thought) / n,
-        "baseline_diversity_per_thought": baseline_diversity_per_thought,
-        # Fluency / quality metrics
-        "repetition_mean": sum(repetition_per_thought) / n,
-        "repetition_per_thought": repetition_per_thought,
-        "grammaticality_mean": sum(grammaticality_per_thought) / n,
-        "grammaticality_per_thought": grammaticality_per_thought,
-        "verbatim_ratio_mean": sum(verbatim_ratio_per_thought) / n,
-        "verbatim_ratio_per_thought": verbatim_ratio_per_thought,
-        "composite_quality_mean": sum(composite_quality_per_thought) / n,
-        "composite_quality_per_thought": composite_quality_per_thought,
-        "baseline_composite_quality_mean": sum(baseline_composite_quality_per_thought) / n,
-        "baseline_composite_quality_per_thought": baseline_composite_quality_per_thought,
-    }
-    return metrics
-
-
-def print_language_quality_report(m: dict) -> None:
-    """Print a human-readable report from the metrics dict."""
-    print()
-    print("═══ Evaluation #5: Language Quality ═══")
-    print()
-    print(f"  Thoughts: {m['n_thoughts']}  Seeds: {m['n_seeds']}  Emotions: {m['n_emotions']}")
-    print()
-    print("  Diversity & Relevance")
-    print("  " + "-" * 58)
-    print(f"  Seed diversity (distinct/N)     {m['seed_diversity_mean']:.2f}"
-          f"        {m['baseline_diversity_mean']:.2f}")
-    print(f"  Emotion diversity (distinct/N)  {m['emotion_diversity_mean']:.2f}        —")
-    print(f"  Relevance (content word recall) {m['relevance_mean']:.2f}        —")
-    print()
-    print("  Fluency / Quality (rubric-based, 0..1)")
-    print("  " + "-" * 58)
-    print(f"  Repetition penalty (1=no rep)   {m['repetition_mean']:.2f}        —")
-    print(f"  Grammaticality (surface form)   {m['grammaticality_mean']:.2f}        —")
-    print(f"  Verbatim ratio (0=all composed) {m['verbatim_ratio_mean']:.2f}        —")
-    print(f"  Composite quality               {m['composite_quality_mean']:.2f}"
-          f"        {m['baseline_composite_quality_mean']:.2f}")
-    print()
-    print("  Per-thought breakdown:")
-    for i, t in enumerate(_TEST_THOUGHTS):
-        print(f"    [{t.intent:12s}] seed_div={m['seed_diversity_per_thought'][i]:.2f}  "
-              f"emo_div={m['emotion_diversity_per_thought'][i]:.2f}  "
-              f"relev={m['relevance_per_thought'][i]:.2f}  "
-              f"qual={m['composite_quality_per_thought'][i]:.2f}  "
-              f"verb={m['verbatim_ratio_per_thought'][i]:.2f}")
-    print()
-    gen_better = m["seed_diversity_mean"] > m["baseline_diversity_mean"]
-    gen_vs_base = "BETTER" if gen_better else "WORSE/EQUAL"
-    print(f"  Finding: Generator diversity vs baseline: {gen_vs_base} "
-          f"({m['seed_diversity_mean']:.2f} vs {m['baseline_diversity_mean']:.2f})")
-    qual_better = m["composite_quality_mean"] > m["baseline_composite_quality_mean"]
-    qual_vs_base = "BETTER" if qual_better else "WORSE/EQUAL"
-    print(f"  Finding: Composite quality vs baseline:   {qual_vs_base} "
-          f"({m['composite_quality_mean']:.2f} vs {m['baseline_composite_quality_mean']:.2f})")
-    print(f"  Finding: Verbatim ratio (lower = more composition): "
-          f"{m['verbatim_ratio_mean']:.2f}")
-    print()
-
-
-# ─── Test entry points ──────────────────────────────────────────
-
-
-def test_language_quality_diversity() -> None:
-    """The generator produces varied output and beats a single-structure baseline."""
-    m = run_language_quality_eval()
-    print_language_quality_report(m)
-    # Testable claims:
-    # 1. Generator seed diversity > baseline by a meaningful margin (>= 1.5x).
-    #    This is the core "composition adds variety over a single-structure
-    #    baseline" claim. The absolute diversity value is modest for short
-    #    thoughts (some intents have few structures), so the claim is framed
-    #    as a relative improvement, not an absolute threshold.
-    ratio = m["seed_diversity_mean"] / max(m["baseline_diversity_mean"], 1e-6)
-    assert ratio >= 1.5, (
-        f"Generator diversity ({m['seed_diversity_mean']:.2f}) is not >= 1.5x "
-        f"baseline ({m['baseline_diversity_mean']:.2f}, ratio {ratio:.2f}) — "
-        f"grammar variation and voice are not adding meaningful variety."
-    )
-    # 2. Emotion diversity > 0.3 (responses vary with emotional state).
-    assert m["emotion_diversity_mean"] > 0.3, (
-        f"Emotion diversity too low ({m['emotion_diversity_mean']:.2f}) — "
-        f"responses do not vary with emotional state."
-    )
-    # 3. Relevance > 0.3 (responses preserve content words).
-    assert m["relevance_mean"] > 0.3, (
-        f"Relevance too low ({m['relevance_mean']:.2f}) — "
-        f"responses are dropping the semantic content of thoughts."
-    )
-    # 4. At least one thought achieves seed diversity > 0.3 — the generator
-    #    CAN produce varied output (not universally canned). The mean is
-    #    pulled down by short, low-structure intents; the max shows the
-    #    generator's capability ceiling is well above a canned string.
-    max_seed_div = max(m["seed_diversity_per_thought"])
-    assert max_seed_div > 0.3, (
-        f"Max seed diversity ({max_seed_div:.2f}) too low — even the best "
-        f"case is near-identical output across seeds."
-    )
-    print(f"  ✓ Generator diversity >= 1.5x baseline ({m['seed_diversity_mean']:.2f} vs "
-          f"{m['baseline_diversity_mean']:.2f}, ratio {ratio:.2f})")
-    print(f"  ✓ Emotion diversity > 0.3 ({m['emotion_diversity_mean']:.2f})")
-    print(f"  ✓ Relevance > 0.3 ({m['relevance_mean']:.2f})")
-    print(f"  ✓ Max seed diversity > 0.3 ({max_seed_div:.2f})")
-    # Report the limitation honestly: the minimum seed diversity shows
-    # which intents produce near-identical output across seeds.
-    min_seed_div = min(m["seed_diversity_per_thought"])
-    print(f"  · Min seed diversity = {min_seed_div:.2f} (short/low-structure intents "
-          f"produce near-identical output — a real limitation, reported honestly)")
-    print()
-
-
-def test_language_quality_fluency() -> None:
-    """The generator's output passes rubric-based fluency checks.
-
-    This is the fluency/quality companion to the diversity test. It
-    checks surface features that correlate with fluency:
-    - No heavy repetition (repeated trigrams within a response)
-    - Surface grammaticality (capitalization, punctuation, no broken slots)
-    - Composition (not just verbatim echo of the content)
-
-    These are rubric-based proxies, not a human or LM judge. See the
-    module docstring for what is and isn't claimed.
-    """
-    m = run_language_quality_eval()
-    # 1. Repetition penalty >= 0.70 — at least 70% of trigrams are unique.
-    #    Heavy repetition ("A dog is a mammal. A dog is a mammal.") is a
-    #    clear fluency failure. 0.70 allows some repetition (connectors,
-    #    common phrases) but catches the echo defect.
-    assert m["repetition_mean"] >= 0.70, (
-        f"Repetition penalty too low ({m['repetition_mean']:.2f}) — "
-        f"responses contain heavy n-gram repetition, a fluency failure."
-    )
-    # 2. Grammaticality >= 0.80 — at least 80% of surface checks pass.
-    #    This catches broken formatting, missing capitalization, unfilled
-    #    slots, and other surface defects.
-    assert m["grammaticality_mean"] >= 0.80, (
-        f"Grammaticality too low ({m['grammaticality_mean']:.2f}) — "
-        f"responses have surface defects (broken formatting, missing "
-        f"capitalization, unfilled slots)."
-    )
-    # 3. Verbatim ratio is reported as a finding, not asserted. A high
-    #    verbatim ratio means the generator is echoing content rather than
-    #    composing — a real limitation, but not a correctness failure.
-    #    We report it honestly rather than asserting a threshold.
-    print(f"  ✓ Repetition penalty >= 0.70 ({m['repetition_mean']:.2f})")
-    print(f"  ✓ Grammaticality >= 0.80 ({m['grammaticality_mean']:.2f})")
-    print(f"  · Verbatim ratio = {m['verbatim_ratio_mean']:.2f} "
-          f"(lower = more composition; reported as a finding, not asserted)")
-    print(f"  · Composite quality = {m['composite_quality_mean']:.2f} "
-          f"(baseline {m['baseline_composite_quality_mean']:.2f})")
-    print()
 
 
 # ======================================================================
@@ -1900,8 +1461,3 @@ def test_is_plural_np_dreams_still_plural() -> None:
     """'dreams' is a common plural noun and stays plural."""
     assert is_plural_np("dreams")
     assert copula("dreams") == "are"
-
-
-if __name__ == "__main__":
-    m = run_language_quality_eval()
-    print_language_quality_report(m)

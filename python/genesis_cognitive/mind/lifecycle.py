@@ -353,8 +353,10 @@ class LifecycleMixin:
                     logger.debug(f"growth snapshot failed: {e}")
                 if self._save_state():
                     logger.debug("Autosaved cognitive state")
+                    self._autosave_failures = 0
                 else:
                     logger.warning("Autosave failed — state not persisted")
+                    self._autosave_failures += 1
 
                 # Sync the daemon's mmap state to disk so the
                 # neurochemical levels, emergent phase, and active
@@ -380,6 +382,7 @@ class LifecycleMixin:
                     self._archive_dormant_concepts()
             except Exception as e:  # noqa: BLE001
                 # autosave failure shouldn't crash the thread
+                self._autosave_failures += 1
                 logger.warning(f"autosave failed: {e}")
     def _archive_dormant_concepts(self) -> None:
         """Archive dormant concepts from working memory to long-term storage.
@@ -424,7 +427,7 @@ class LifecycleMixin:
                 for cid, concept in network._concepts.items():
                     if concept.origin in _PROTECTED:
                         continue
-                    if concept.activation >= _DEAD_THRESHOLD:
+                    if (concept.activation or 0.0) >= _DEAD_THRESHOLD:
                         continue
                     if concept.review_count > 0:
                         continue
@@ -801,6 +804,7 @@ class LifecycleMixin:
                 lambda t, p: t.load_from_dict(p),
             ),
             ("memory_records", self.memory, lambda t, p: t.restore_records(p)),
+            ("world_state", self.world, lambda t, p: t.restore_from_dict(p)),
         )
         for key, target, restore in restorations:
             if key in data:
@@ -963,6 +967,7 @@ class LifecycleMixin:
                     "dream_count": self.inner_life.dream_count,
                     "lucid_dream_count": self.inner_life.lucid_dream_count,
                 },
+                world_state=self.world.to_dict(),
             )
             if not self.user_profile.save():
                 return False

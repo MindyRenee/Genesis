@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import tempfile
+import weakref
 from collections import Counter
 from dataclasses import dataclass, field
 from enum import Enum
@@ -1809,15 +1810,21 @@ def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 # change. Without this cache, _compute_semantic_intent_probabilities
 # recomputes ~30 _mean_word_vector calls per turn — each doing a
 # dict lookup + np.mean — for data that's identical every time.
-# The cache is keyed by id(embeddings) so a new EmbeddingStore
-# (e.g. after reload) gets a fresh cache.
-_intent_prototype_cache: dict[int, dict[Intent, list[np.ndarray]]] = {}
+# The cache is weakly keyed on the EmbeddingStore itself: id() keys
+# would leak stale entries and could be recycled by a new store after
+# the old one is collected — returning vectors computed against the
+# wrong embedding space.
+_intent_prototype_cache: weakref.WeakKeyDictionary[
+    object, dict[Intent, list[np.ndarray]]
+] = weakref.WeakKeyDictionary()
 
 
 def _get_prototype_vectors(embeddings) -> dict[Intent, list[np.ndarray]]:
     """Get cached prototype vectors for the given embedding store."""
-    key = id(embeddings)
-    cached = _intent_prototype_cache.get(key)
+    try:
+        cached = _intent_prototype_cache.get(embeddings)
+    except TypeError:
+        cached = None
     if cached is not None:
         return cached
     vectors: dict[Intent, list[np.ndarray]] = {}
@@ -1829,7 +1836,10 @@ def _get_prototype_vectors(embeddings) -> dict[Intent, list[np.ndarray]]:
                 vecs.append(v)
         if vecs:
             vectors[intent] = vecs
-    _intent_prototype_cache[key] = vectors
+    try:
+        _intent_prototype_cache[embeddings] = vectors
+    except TypeError:
+        pass  # duck-typed stores that can't be weak-referenced just skip caching
     return vectors
 
 

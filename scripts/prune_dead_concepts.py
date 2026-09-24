@@ -445,7 +445,7 @@ def main() -> int:
         "--data-dir",
         default=os.path.join(
             os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share")),
-            "genesis",
+            "genesis-public",
         ),
         help=(
             "Path to the data directory "

@@ -16,7 +16,7 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,14 @@ class UserProfile:
     emotional_history: list[tuple[float, str, float]] = field(default_factory=list)
     interaction_count: int = 0
     data_path: Path | None = None
+
+    # User-stated data accumulates over years of conversation — bound
+    # each structure so the profile file cannot grow without limit.
+    # Eviction is oldest-first (dicts preserve insertion order).
+    _MAX_GOALS: ClassVar[int] = 100
+    _MAX_FACTS: ClassVar[int] = 500
+    _MAX_PREF_CATEGORIES: ClassVar[int] = 100
+    _MAX_PREF_VALUES: ClassVar[int] = 25
 
     def __post_init__(self) -> None:
         """Convert a list-based recent_topics field into a bounded deque."""
@@ -57,8 +65,12 @@ class UserProfile:
         if not value:
             return
         if category not in self.preferences:
+            if len(self.preferences) >= self._MAX_PREF_CATEGORIES:
+                self.preferences.pop(next(iter(self.preferences)))
             self.preferences[category] = []
         if value not in self.preferences[category]:
+            if len(self.preferences[category]) >= self._MAX_PREF_VALUES:
+                self.preferences[category].pop(0)
             self.preferences[category].append(value)
             self.save()
 
@@ -71,6 +83,8 @@ class UserProfile:
         key = key.lower().strip()
         value = value.strip()
         if key and value and self.facts.get(key) != value:
+            if key not in self.facts and len(self.facts) >= self._MAX_FACTS:
+                self.facts.pop(next(iter(self.facts)))
             self.facts[key] = value
             self.save()
 
@@ -82,6 +96,8 @@ class UserProfile:
         """Record a goal and persist immediately."""
         goal = goal.strip()
         if goal and goal not in self.goals:
+            if len(self.goals) >= self._MAX_GOALS:
+                self.goals.pop(0)
             self.goals.append(goal)
             self.save()
 
@@ -178,7 +194,7 @@ class UserProfile:
         if self.data_path is None:
             return True
         try:
-            self.data_path.parent.mkdir(parents=True, exist_ok=True)
+            self.data_path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
             data_bytes = json.dumps(self.to_dict(), indent=2, default=list).encode("utf-8")
             tmp_path = self.data_path.with_suffix(self.data_path.suffix + ".tmp")
             with open(tmp_path, "wb") as f:

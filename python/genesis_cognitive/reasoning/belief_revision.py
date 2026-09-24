@@ -24,16 +24,16 @@ critical assessments and applies them to the network:
 3. **Structure learning (Bayesian Model Reduction)**: edges whose
    weight falls below a threshold after repeated disconfirmation are
    pruned. This is structure learning in the active inference sense
-   (Friston et al., 2021; Nature Communications, 2026) — not just
-   updating parameters, but revising the structure of the world model
-   itself when evidence no longer supports it.
+   (Friston et al., 2016 — Bayesian model reduction prunes model
+   parameters that evidence does not support) — not just updating
+   parameters, but revising the structure of the world model itself
+   when evidence no longer supports it.
 
 4. **Non-destructive contradiction management**: when a contradiction
    is found, both edges are preserved but their weights are
    downgraded. The system retains the competing claims with reduced
-   confidence rather than destroying knowledge. This matches the
-   2026 epistemic integrity literature (Kumiho, arXiv 2026) which
-   emphasizes preserving revision history.
+   confidence rather than destroying knowledge, so a retraction can
+   be re-evaluated if later evidence reverses the verdict.
 
 ## Integration
 

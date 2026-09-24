@@ -92,15 +92,22 @@ class SpontaneousThought:
         pre-written templates). If no metadata is present, falls back
         to `content`.
         """
-        if self.metadata and self.metadata.get("knowledge") is not None:
+        meta = self.metadata
+        if meta is not None and (
+            meta.get("knowledge") is not None or meta.get("self_fragments")
+        ):
             from ..language import Thought as _Thought
             thought = _Thought(
                 content=self.content,
-                intent="reflect" if self.is_dream else "inform",
+                intent=(
+                    "reflect" if self.is_dream
+                    else "self_report" if meta.get("self_fragments")
+                    else "inform"
+                ),
                 emotion=getattr(emotion, "label", "neutral"),
-                topics=[self.metadata.get("topic", "")] if self.metadata.get("topic") else [],
+                topics=[meta.get("topic", "")] if meta.get("topic") else [],
                 confidence=0.6,
-                metadata=self.metadata,
+                metadata=meta,
             )
             return language_engine.render(thought, emotion)
         return self.content

@@ -337,7 +337,7 @@ class Explorer:
                 origin="exploration",
                 properties={"source": filename, "type": "link"},
             )
-            rels_added += 0  # just adding the concept
+            concepts_added += 1
 
         return concepts_added, rels_added
 

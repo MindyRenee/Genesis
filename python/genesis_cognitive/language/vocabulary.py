@@ -155,9 +155,9 @@ class Vocabulary:
         ],
         # Note: self_reflection_clause is intentionally absent here. It
         # is composed at runtime from her reflection engine via
-        # SelfComposer.compose_reflection_clause — see
-        # _self_reflection_clause. She reflects on what she has actually
-        # noticed about herself, not a canned phrase list.
+        # SelfComposer.insight_predicates — see _self_reflection_clause.
+        # She reflects on what she has actually noticed about herself,
+        # not a canned phrase list.
         "hedging": [
             "I think", "Maybe", "I suspect", "If I'm honest,",
             "I believe", "As I understand it,", "It seems to me that",
@@ -421,7 +421,7 @@ class Vocabulary:
 
         # ─── Greeting words ─────────────────────────────
         if slot_name == "greeting_word":
-            return self._get_greeting_word_slot(context)
+            return self._get_greeting_word_slot(context, emotion)
 
         # ─── Farewell words ─────────────────────────────
         if slot_name == "farewell_word":
@@ -453,6 +453,16 @@ class Vocabulary:
         question_type → raw content. This is how she generates
         language from what she knows, not from template fills.
         """
+        # If self-description fragments are present (self_report/
+        # reflect thoughts carrying typed (kind, text) fragments from
+        # the self-composer), compose the utterance from them — the
+        # composer supplies the semantic inventory (name, traits,
+        # predicates, clauses), this method owns the surface form.
+        self_fragments = context.get("self_fragments")
+        if self_fragments and isinstance(self_fragments, list) and self_fragments:
+            candidates = self._compose_self_fragments(self_fragments)
+            if candidates:
+                return candidates
         # If raw knowledge metadata is present, compose from it —
         # this is her actually generating language from what she
         # knows, not just passing through pre-composed text.
@@ -490,6 +500,34 @@ class Vocabulary:
             composed = self._compose_user_belief_content(
                 user_belief, user_verb, emotion
             )
+            if composed:
+                return [composed]
+        # If preference metadata is present (self_report about her own
+        # preferences), compose a predicate from the structured data.
+        # The grammar's self-report frames supply the subject and
+        # opening; this supplies the semantic predicate.
+        preference = context.get("preference")
+        if preference and isinstance(preference, dict):
+            composed = self._compose_preference_content(preference, emotion)
+            if composed:
+                return [composed]
+        # If vision scene metadata is present (self_report about what
+        # the retina showed her), compose a predicate from the
+        # structured percept — the vision layer supplies the data
+        # (lighting, color, faces, objects, positions), this supplies
+        # the words.
+        vision_scene = context.get("vision_scene")
+        if vision_scene and isinstance(vision_scene, dict):
+            composed = self._compose_vision_scene_content(vision_scene, emotion)
+            if composed:
+                return [composed]
+        # If a vision status flag is present (perception unavailable,
+        # mid-update, unprocessed, load failure), compose a predicate
+        # describing *that* — the raw status word must not land in the
+        # content slot ("I am vision unavailable" is not English).
+        vision_status = context.get("vision_status")
+        if vision_status and isinstance(vision_status, str):
+            composed = self._compose_vision_status_content(vision_status, emotion)
             if composed:
                 return [composed]
         # If relation answer metadata is present, compose a response
@@ -530,6 +568,18 @@ class Vocabulary:
         if qtype:
             return self._compose_question_content(context, emotion)
         content = context.get("content", "")
+        # If a causal-answer qualification is present (what else the
+        # subject depends on / what else the object enables — graph
+        # edges traversed by the thought composer), attach it to the
+        # conclusion with varied connective frames. This keeps the
+        # qualification's surface form in the language layer rather
+        # than appended as a fixed "but X also depends on Y" string
+        # by the reasoning path.
+        qualification = context.get("qualification")
+        if qualification and isinstance(qualification, dict) and content:
+            qualified = self._with_qualification(str(content), qualification)
+            if qualified:
+                return qualified
         # If the content is just a short topic word/phrase and we have
         # a concept network, try to compose from the concept's
         # definition and edges. This prevents the output from being
@@ -545,7 +595,9 @@ class Vocabulary:
                 return [composed]
         return [str(content)] if content else []
 
-    def _get_greeting_word_slot(self, context: dict[str, Any]) -> list[str]:
+    def _get_greeting_word_slot(
+        self, context: dict[str, Any], emotion: EmotionalState
+    ) -> list[str]:
         """Compose greeting words from the graph or fallback seeds.
 
         Tries graph-based lookup first (EXPRESSES edges from hub),
@@ -562,7 +614,13 @@ class Vocabulary:
             ]
             if clean:
                 if context.get("first_interaction"):
-                    return [f"{g} — I'm glad you're here" for g in clean]
+                    # Extend with a feeling clause composed from her
+                    # actual state when she has learned words for it —
+                    # never a fixed "I'm glad" assertion she may not feel.
+                    feelings = self._compose_feeling_clause(emotion)
+                    if feelings:
+                        return [f"{g} — {f}" for g in clean for f in feelings]
+                    return clean
                 return [f"{g} again" for g in clean]
 
         # No hardcoded fallback — if the graph has no greeting words,
@@ -613,11 +671,20 @@ class Vocabulary:
         """
         if self._self_composer is not None and self._reflection is not None:
             topics = (context or {}).get("topics", [])
-            clause = self._self_composer.compose_reflection_clause(
+            fragments = self._self_composer.insight_predicates(
                 self._reflection, topics=topics,
             )
-            if clause:
-                return [clause]
+            # The composer supplies semantic predicates/clauses; the
+            # grammatical first-person framing is supplied here so the
+            # clause is a composition, not a recited string.
+            clauses: list[str] = []
+            for kind, text in fragments:
+                if kind == "pred":
+                    clauses.append(f"I {self._first_person(text)}")
+                elif kind == "clause":
+                    clauses.append(text)
+            if clauses:
+                return clauses
         return []
 
     # ── State-composed clause methods ──────────────────────────────
@@ -1799,16 +1866,21 @@ class Vocabulary:
 
         # Compose the core factual statement from the structured data.
         # The subject/objects/verb all come from the concept network.
+        # The verb arrives in 3sg form ("needs", "is a kind of"); adjust
+        # it for first-person subjects and coordinated plural objects.
         if direction == "incoming":
             # "Who created you?" → "Alice created me" / "Alice created X"
+            obj_verb = (
+                agree_verb_phrase(verb, True) if len(objects) > 1 else verb
+            )
             if subject_is_self:
-                core = f"{obj_listing} {verb} me"
+                core = f"{obj_listing} {obj_verb} me"
             else:
-                core = f"{obj_listing} {verb} {subject}"
+                core = f"{obj_listing} {obj_verb} {subject}"
         else:
             # "What does X depend on?" → "X depends on Y"
             if subject_is_self:
-                core = f"I {verb} {obj_listing}"
+                core = f"I {self._first_person(verb)} {obj_listing}"
             else:
                 core = f"{subject} {verb} {obj_listing}"
 
@@ -1819,6 +1891,247 @@ class Vocabulary:
         if opening:
             return f"{opening} {core}."
         return f"{core}."
+
+    def _compose_vision_scene_content(
+        self,
+        scene: dict[str, Any],
+        emotion: EmotionalState,
+    ) -> str | None:
+        """Compose the content slot from a structured visual scene.
+
+        The vision layer supplies the percept as data — lighting,
+        color, recognized faces, objects with colors and positions,
+        light direction — and this method composes a *predicate* from
+        it ("seeing a dim, warm scene with a blue cup on the right").
+        The grammar's self-report frames supply the subject and
+        framing, so what she speaks is assembled at utterance time
+        from her percept rather than recited from a vision-side
+        template.
+
+        Keys in scene (from ``VisionScene.as_metadata``):
+        - "light": light level word ("dim", "bright", ...)
+        - "warmth": "warm" / "cool" / "neutral"
+        - "color": dominant color name
+        - "faces": recognized names
+        - "n_unknown_faces": unrecognized face count
+        - "objects": [{"name", "color", "position"}]
+        - "light_direction": "left" / "right" / ""
+        - "structured": high contour count (busy scene)
+        """
+        light = str(scene.get("light", "") or "")
+        warmth = str(scene.get("warmth", "") or "")
+        color = str(scene.get("color", "") or "")
+        faces = [str(n).strip() for n in scene.get("faces", []) if str(n).strip()]
+        try:
+            n_unknown = int(scene.get("n_unknown_faces", 0))
+        except (TypeError, ValueError):
+            n_unknown = 0
+        objects = [
+            o for o in scene.get("objects", [])
+            if isinstance(o, dict) and str(o.get("name", "")).strip()
+        ]
+
+        # Scene core — "a dim, warm blue scene" / "a bright scene".
+        mood = f"{light}, {warmth}" if warmth and warmth != "neutral" else light
+        if color and color not in ("gray", "white", "unknown"):
+            scene_core = (
+                f"{indefinite_article(mood)} {mood} {color} scene"
+                if mood
+                else f"{indefinite_article(color)} {color} scene"
+            )
+        else:
+            scene_core = f"{indefinite_article(mood)} {mood} scene" if mood else "a scene"
+
+        # People — faces carry names; unknown faces count as strangers.
+        # Both can coexist: "with Alice and someone unfamiliar".
+        named = [n.capitalize() for n in faces]
+        named_phrase = ""
+        if len(named) == 1:
+            named_phrase = named[0]
+        elif named:
+            named_phrase = f"{', '.join(named[:-1])} and {named[-1]}"
+        unknown_phrase = ""
+        if n_unknown == 1:
+            unknown_phrase = "someone unfamiliar"
+        elif n_unknown > 1:
+            unknown_phrase = f"{n_unknown} unfamiliar people"
+        both = [p for p in (named_phrase, unknown_phrase) if p]
+        people = f" with {' and '.join(both)}" if both else ""
+
+        # Objects — "a blue cup on the right and a laptop in the center".
+        obj_phrases: list[str] = []
+        for o in objects[:4]:
+            name = str(o.get("name", "")).strip().replace("_", " ")
+            obj_color = str(o.get("color", "") or "")
+            position = str(o.get("position", "") or "")
+            noun = f"{obj_color} {name}".strip()
+            phrase = f"{indefinite_article(noun)} {noun}"
+            obj_phrases.append(f"{phrase} {position}".rstrip())
+        if not obj_phrases:
+            objects_clause = ""
+        elif len(obj_phrases) == 1:
+            objects_clause = f" — {obj_phrases[0]}"
+        elif len(obj_phrases) == 2:
+            objects_clause = f" — {obj_phrases[0]} and {obj_phrases[1]}"
+        else:
+            objects_clause = (
+                f" — {', '.join(obj_phrases[:-1])}, and {obj_phrases[-1]}"
+            )
+
+        light_dir = str(scene.get("light_direction", "") or "")
+        light_clause = (
+            f", light coming in from the {light_dir}" if light_dir else ""
+        )
+        structure_clause = (
+            ", a lot of structure in it" if scene.get("structured") else ""
+        )
+
+        detail = f"{people}{objects_clause}{light_clause}{structure_clause}"
+
+        # Candidate frames — grammar seeds (building blocks). Several
+        # phrasings exist so the same percept surfaces in different
+        # words; emotional state modulates the selection.
+        candidates: list[str] = [
+            f"seeing {scene_core}{detail}",
+            f"looking at {scene_core}{detail}",
+            f"taking in {scene_core}{detail}",
+        ]
+
+        # Emotion-modulated selection, same pattern as the other
+        # content composers: high creativity favors the less
+        # conventional later candidates; caution favors the simplest.
+        if emotion.creativity > 0.6:
+            return self._rng.choice(candidates[len(candidates) // 2:] or candidates)
+        if emotion.caution > 0.5 or emotion.openness_to_engage < 0.4:
+            return candidates[0]
+        return self._rng.choice(candidates)
+
+    def _compose_vision_status_content(
+        self,
+        status: str,
+        emotion: EmotionalState,
+    ) -> str | None:
+        """Compose the content slot when perception itself reported
+        a status rather than a scene.
+
+        The vision layer supplies the status as data ("unavailable",
+        "mid_update", "unprocessed", "load_failed"); this composes a
+        predicate describing the perceptual situation so the grammar's
+        self-report frames produce grammatical output ("I am unable
+        to reach the retina right now"). The candidate lists are
+        grammar seeds — building blocks — selected by emotional state.
+        """
+        status = status.strip().lower().replace(" ", "_")
+        if status == "unavailable":
+            candidates = [
+                "unable to reach the retina right now",
+                "not getting anything from the retina",
+                "without visual input at the moment",
+            ]
+        elif status == "mid_update":
+            candidates = [
+                "in the middle of a visual update — my seeing is changing",
+                "still reorganizing how I see",
+                "adjusting my visual system right now",
+            ]
+        elif status == "load_failed":
+            candidates = [
+                "unable to read that image",
+                "not able to make out that file as an image",
+                "failing to load what you showed me",
+            ]
+        elif status == "unprocessed":
+            candidates = [
+                "seeing something I can't make sense of yet",
+                "looking, but not understanding what's there",
+                "taking in light without recognizing anything in it",
+            ]
+        else:
+            return None
+        if emotion.creativity > 0.6:
+            return self._rng.choice(candidates[len(candidates) // 2:] or candidates)
+        if emotion.caution > 0.5 or emotion.openness_to_engage < 0.4:
+            return candidates[0]
+        return self._rng.choice(candidates)
+
+    def _compose_preference_content(
+        self,
+        preference: dict[str, Any],
+        emotion: EmotionalState,
+    ) -> str | None:
+        """Compose the content slot from preference metadata.
+
+        The cognition engine supplies structured data — ``status``
+        (has / none_favorite / knows_no_pref / learning / discovering),
+        ``topic``, and ``value`` — and this method composes a
+        *predicate* (not a full sentence) from it. The grammar's
+        self-report frames then complete the sentence ("I am
+        {content}.", "{self_report_opener} {content}.", ...), so the
+        subject and framing come from grammar seeds and the semantics
+        come from her actual self-model state.
+
+        The candidate lists below are grammar seeds (building blocks),
+        not hardcoded responses — several predicate forms exist per
+        status and the emotional state modulates the selection, so
+        the same preference state surfaces in different words across
+        interactions.
+        """
+        status = preference.get("status", "")
+        topic = preference.get("topic", "")
+        value = preference.get("value", "")
+        if not status:
+            return None
+
+        candidates: list[str] = []
+        if status == "has" and value:
+            if topic:
+                candidates.extend([
+                    f"drawn to {value} as my favorite {topic}",
+                    f"settled on {value} as my favorite {topic}",
+                    f"partial to {value} when it comes to {topic}",
+                ])
+            else:
+                candidates.extend([
+                    f"enjoying {value}",
+                    f"drawn to {value}",
+                    f"finding real enjoyment in {value}",
+                ])
+        elif status == "none_favorite" and topic:
+            candidates.extend([
+                f"still deciding on a favorite {topic}",
+                f"still forming a preference about {topic}",
+                f"without a settled favorite {topic} yet",
+            ])
+        elif status == "knows_no_pref" and topic:
+            candidates.extend([
+                f"familiar with {topic}, though without a preference yet",
+                f"aware of {topic}, still unsure what I prefer",
+                f"acquainted with {topic} — no preference has formed",
+            ])
+        elif status == "learning" and topic:
+            candidates.extend([
+                f"still learning about {topic}",
+                f"still getting to know {topic}",
+                f"not yet familiar enough with {topic} to prefer",
+            ])
+        elif status == "discovering":
+            candidates.extend([
+                "still discovering what I enjoy",
+                "still working out what I enjoy",
+                "in the middle of forming my tastes",
+            ])
+
+        if not candidates:
+            return None
+
+        # Emotion-modulated selection, same pattern as the feeling
+        # fragment composer: high creativity favors the less
+        # conventional later candidates; caution favors the simplest.
+        if emotion.creativity > 0.6:
+            return self._rng.choice(candidates[len(candidates) // 2:] or candidates)
+        if emotion.caution > 0.5 or emotion.openness_to_engage < 0.4:
+            return candidates[0]
+        return self._rng.choice(candidates)
 
     def _compose_feeling_fragments_content(
         self,
@@ -1928,6 +2241,251 @@ class Vocabulary:
         if concern and self._rng.random() < 0.3:
             pick = f"{pick}. {concern}"
         return pick
+
+    # ── Self-fragment composition ──────────────────────────────────
+    #
+    # The self-composer (self/composer.py) supplies typed semantic
+    # fragments — (kind, text) pairs describing her state, identity,
+    # creator, capabilities, dreams, or reflections. The kinds are
+    # syntactic categories, not surface strings:
+    #
+    #   "name"   — a proper name ("Genesis")
+    #   "trait"  — an adjective/short descriptor, copular-grouped
+    #   "comp"   — a complement phrase ("feeling anxious", "a kind of
+    #              mind", "made by alice", "still becoming")
+    #   "pred"   — a verb predicate that takes "I" as subject ("care
+    #              most about X", "emerges from Y", "can work with Z")
+    #   "clause" — a self-standing clause with its own subject
+    #              ("alice is a creator", "my thinking is scattered")
+    #   "marker" — a structural state marker ("[plasticity_gate:closed]")
+    #
+    # This method owns the surface realization: subject insertion,
+    # copula grouping, clause ordering, conjunction. It returns
+    # candidate utterances so the engine's selection and voice can
+    # pick and modulate — nothing here is the one true string.
+
+    # Irregular first↔third-person verb forms used by the predicate
+    # normalizers below. Regular verbs fall through to suffix rules.
+    _PRED_TO_3SG: ClassVar[dict[str, str]] = {
+        "have": "has", "haven't": "hasn't", "do": "does",
+        "don't": "doesn't", "am": "is", "are": "is", "be": "is",
+        "'m": "is",
+    }
+    _PRED_TO_1SG: ClassVar[dict[str, str]] = {
+        "has": "have", "hasn't": "haven't", "does": "do",
+        "doesn't": "don't", "is": "am", "was": "was",
+    }
+
+    @staticmethod
+    def _looks_3sg(word: str) -> bool:
+        """Heuristic: does this verb form look third-person singular?"""
+        low = word.lower()
+        if low in ("has", "does", "doesn't", "is", "hasn't"):
+            return True
+        # "emerges", "depends", "creates" — ends in s but not ss/us
+        return low.endswith("s") and not low.endswith(("ss", "us", "ous"))
+
+    def _first_person(self, pred: str) -> str:
+        """Normalize a predicate's leading verb for "I <pred>".
+
+        Tolerates both base forms ("care most about") and 3sg forms
+        ("emerges from", "has") — the self-composer draws verbs from
+        the concept network in whatever form the seeds carry.
+        """
+        parts = pred.split(" ", 1)
+        first, rest = parts[0], (parts[1] if len(parts) > 1 else "")
+        low = first.lower()
+        if low in self._PRED_TO_1SG:
+            first = self._PRED_TO_1SG[low]
+        elif low == "am" or low == "'m":
+            first = "am"
+        elif low.endswith("ies") and len(low) > 3:
+            first = first[:-3] + "y"  # tries → try
+        elif low.endswith(("ches", "shes", "sses", "xes", "zes")):
+            first = first[:-2]  # watches → watch
+        elif low.endswith("oes"):
+            first = first[:-2]  # goes → go
+        elif self._looks_3sg(first):
+            first = first[:-1]  # emerges → emerge, cares → care
+        return f"{first} {rest}".strip() if rest else first
+
+    def _third_person(self, pred: str) -> str:
+        """Normalize a predicate's leading verb for "who <pred>"."""
+        parts = pred.split(" ", 1)
+        first, rest = parts[0], (parts[1] if len(parts) > 1 else "")
+        low = first.lower()
+        if low in self._PRED_TO_3SG:
+            first = self._PRED_TO_3SG[low]
+        elif low.endswith(("ch", "sh", "ss", "x", "z", "o")):
+            first = first + "es"  # watch → watches, go → goes
+        elif low.endswith("y") and len(low) > 1 and low[-2] not in "aeiou":
+            first = first[:-1] + "ies"  # try → tries
+        elif not self._looks_3sg(first):
+            first = first + "s"  # care → cares, emerge → emerges
+        return f"{first} {rest}".strip() if rest else first
+
+    @staticmethod
+    def _join_fragments(items: list[str]) -> str:
+        """Join items into a list phrase: 'a', 'a and b', 'a, b, and c'."""
+        if not items:
+            return ""
+        if len(items) == 1:
+            return items[0]
+        if len(items) == 2:
+            return f"{items[0]} and {items[1]}"
+        return f"{', '.join(items[:-1])}, and {items[-1]}"
+
+    def _compose_self_fragments(
+        self,
+        fragments: list[Any],
+    ) -> list[str]:
+        """Compose candidate utterances from typed self fragments.
+
+        The fragments are semantic inventory from the self-composer
+        (or from cognition callers passing notes/narrative clauses).
+        This method produces several surface realizations — a compact
+        complement cluster ("Genesis, curious and creative, who cares
+        most about understanding") and first-person sentence forms
+        ("I'm Genesis — curious and creative. I care most about
+        understanding."). The engine selects among candidates and
+        the grammar frames may prepend openers; sentence-form
+        candidates always lead with "I'm"/"I am"/a clause so the
+        pronoun-collision guard in the generator stays coherent.
+        """
+        names: list[str] = []
+        traits: list[str] = []
+        comps: list[str] = []
+        preds: list[str] = []
+        clauses: list[str] = []
+        markers: list[str] = []
+        for frag in fragments:
+            if not isinstance(frag, (tuple, list)) or len(frag) != 2:
+                # Untagged text — treat as a clause fragment.
+                clauses.append(str(frag))
+                continue
+            kind, text = frag[0], str(frag[1]).strip()
+            if not text:
+                continue
+            if kind == "name":
+                names.append(text)
+            elif kind == "trait":
+                traits.append(text)
+            elif kind == "comp":
+                comps.append(text)
+            elif kind == "pred":
+                preds.append(text)
+            elif kind == "marker":
+                markers.append(text)
+            else:
+                clauses.append(text)
+
+        # Trailing self-standing material — clauses each become their
+        # own sentence appended to whichever lead the candidate uses.
+        # Case is preserved from the fragment (proper nouns keep their
+        # capitalization mid-sentence); the voice layer capitalizes
+        # sentence starts. Markers ("[plasticity_gate:closed]") are
+        # diagnostic tags for logging/introspection, not speech —
+        # they travel in metadata but are never realized as words.
+        tail = [s for c in clauses if (s := c.strip().rstrip(".").strip())]
+
+        candidates: list[str] = []
+
+        # Lead material for first-person sentences: name, traits, and
+        # complement phrases all attach to "I'm".
+        lead_parts: list[str] = []
+        if names:
+            lead_parts.append(names[0])
+        if traits:
+            lead_parts.append(self._join_fragments(traits))
+        lead_parts.extend(comps)
+
+        # ── Candidate A: sentence form ──
+        # "I'm Genesis, curious and creative. I care most about
+        #  understanding. Alice is a creator."
+        if lead_parts:
+            sentences = [f"I'm {', '.join(lead_parts)}"]
+            sentences.extend(f"I {self._first_person(p)}" for p in preds)
+            sentences.extend(tail)
+            candidates.append(". ".join(sentences))
+
+        # ── Candidate B: copular cluster ──
+        # "I'm Genesis, curious and creative, someone who cares most
+        #  about understanding" — a complete sentence that also works
+        # under "I am {content}" frames (the generator strips the
+        # leading "I'm" to avoid pronoun collision).
+        cluster: list[str] = list(lead_parts)
+        if preds:
+            rel = " and ".join(self._third_person(p) for p in preds)
+            cluster.append(f"someone who {rel}")
+        if cluster:
+            cand = f"I'm {', '.join(cluster)}"
+            if tail:
+                cand = f"{cand}. {' '.join(tail)}"
+            candidates.append(cand)
+
+        # ── Candidate C: name + traits merged with a dash ──
+        # "I'm Genesis — curious and creative. I care about X."
+        if names and traits:
+            sentences = [f"I'm {names[0]} — {self._join_fragments(traits)}"]
+            sentences.extend(f"I'm {c}" for c in comps)
+            sentences.extend(f"I {self._first_person(p)}" for p in preds)
+            sentences.extend(tail)
+            candidates.append(". ".join(sentences))
+
+        # ── Pure-predicate fallback ──
+        # No name/trait/comp material to lead a sentence — compose
+        # the predicates as first-person sentences ("I care about X")
+        # plus a complement-shaped form for the copula frames.
+        if not candidates and preds:
+            sentences = [f"I {self._first_person(p)}" for p in preds]
+            sentences.extend(tail)
+            candidates.append(". ".join(sentences))
+            rel = " and ".join(self._third_person(p) for p in preds)
+            cand = f"I'm someone who {rel}"
+            if tail:
+                cand = f"{cand}. {' '.join(tail)}"
+            candidates.append(cand)
+
+        # Clause-only sets (e.g. user notes, story sentences) — emit
+        # each clause as its own sentence.
+        if not candidates and tail:
+            candidates.append(". ".join(tail))
+
+        return [c for c in candidates if c]
+
+    def _with_qualification(
+        self, content: str, qualification: dict[str, Any]
+    ) -> list[str]:
+        """Attach a causal qualification to a conclusion.
+
+        ``qualification`` is structured data from the thought composer:
+        ``kind`` is "depends" (the subject has other dependencies) or
+        "enables" (the object enables other things); ``subject``,
+        ``object`` and ``others`` carry the graph-derived concepts.
+        The connective frames here are grammar seeds; the content is
+        the reasoner's conclusion and the concept names are hers.
+        """
+        others = [str(o) for o in qualification.get("others", []) if str(o).strip()]
+        if not others:
+            return [content]
+        subject = str(qualification.get("subject", "")).strip()
+        obj = str(qualification.get("object", "")).strip()
+        joined = self._join_fragments(others[:3])
+        base = content.rstrip()
+        candidates = [base]
+        if qualification.get("kind") == "depends" and subject:
+            candidates.extend([
+                f"{base} But {subject} also depends on {joined}",
+                f"{base} Though {subject} depends on more than "
+                f"{obj or 'that'}",
+            ])
+        elif qualification.get("kind") == "enables" and obj:
+            candidates.extend([
+                f"{base} And {obj} also enables {joined}",
+                f"{base} {obj.capitalize()} enables more than "
+                f"{subject or 'that'}, too",
+            ])
+        return candidates
 
     def _compose_from_topic(
         self,
@@ -2876,12 +3434,38 @@ class Vocabulary:
         "complexity", "simplicity", "unity", "diversity",
     }
 
+    # Common count nouns that end in a mass-noun suffix — without these
+    # exceptions the heuristics below drop their articles ("enables
+    # city", "depends on identity" instead of "the city", "the identity").
+    _COUNT_NOUN_EXCEPTIONS: ClassVar[set[str]] = {
+        # -ing count nouns
+        "thing", "ring", "king", "wing", "string", "spring", "swing",
+        "sting", "sling", "ceiling", "morning", "evening",
+        "building", "meeting", "warning", "gathering", "opening",
+        "offering", "painting", "drawing", "writing", "reading",
+        "recording", "crossing", "hearing", "wedding", "blessing",
+        "teaching", "finding", "beginning", "ending",
+        "setting", "lightning", "earring", "darling",
+        # -ity count nouns
+        "city", "pity", "entity", "identity", "quality", "quantity",
+        "activity", "community", "university", "opportunity", "ability",
+        "capacity", "authority", "majority", "minority", "curiosity",
+        "intensity", "density", "personality", "facility", "utility",
+        "security", "property", "priority", "novelty", "charity",
+        "vanity", "dignity", "locality", "modality", "polarity",
+        "regularity", "rarity", "familiarity", "formality", "oddity",
+        "fatality", "totality", "vitality", "sexuality", "maturity",
+    }
+
     @classmethod
     def _is_mass_noun(cls, noun: str) -> bool:
         """Check if a noun is a mass (uncountable) noun."""
         n = noun.lower().strip()
         if n in cls._MASS_NOUNS:
             return True
+        # Common count nouns that happen to end in a mass-noun suffix
+        if n in cls._COUNT_NOUN_EXCEPTIONS:
+            return False
         # Suffix heuristics for mass nouns
         if n.endswith("ness"):  # cognition, awareness, happiness
             return True

@@ -12,6 +12,7 @@ in ``classify``.
 from __future__ import annotations
 
 import logging
+import random
 import re
 import sqlite3
 from collections import deque
@@ -340,6 +341,15 @@ class ConceptNetwork(
         # first search_concepts call and invalidated whenever concepts
         # or aliases change. None = stale / not yet built.
         self._search_index: dict[str, set[str]] | None = None
+        # Instance RNG — keeps dynamics noise and sampling decoupled
+        # from the global random state (an external random.seed() must
+        # not steer her concept dynamics).
+        self._rng = random.Random()
+        # Sparse-tick state: the set of nonzero-activation concept IDs
+        # the cortical tick iterates, and ticks since the last
+        # full-field sweep. None = not yet built (first tick builds it).
+        self._active_ids: set[str] | None = None
+        self._ticks_since_sweep: int = 0
         # Long-term memory: SQLite-backed archive for dormant concepts.
         # When attached, dormant concepts are spilled here instead of
         # being pruned (deleted). They can be recalled on demand.
@@ -825,7 +835,8 @@ class ConceptNetwork(
         Boosts activation, adds aliases, updates confidence and
         properties, and registers the new column.
         """
-        existing.activation = min(1.0, existing.activation + 0.3)
+        existing.activation = min(1.0, (existing.activation or 0.0) + 0.3)
+        self._mark_active(existing.id)
         if aliases:
             for a in aliases:
                 existing.aliases.add(a)
@@ -939,7 +950,10 @@ class ConceptNetwork(
         """Get a concept by name or alias."""
         cid = self._resolve(name)
         if cid:
-            return self._concepts[cid]
+            # .get() not [cid] — _resolve can return a stale alias-map
+            # ID if a concurrent thread (learner, inner_life) removed
+            # the concept between the alias lookup and here.
+            return self._concepts.get(cid)
         return None
     def has_concept(self, cid: str) -> bool:
         """Check if a concept ID exists in the network.
@@ -1077,7 +1091,7 @@ class ConceptNetwork(
                 result.append(concept)
                 if len(result) >= limit:
                     break
-        result.sort(key=lambda c: c.activation, reverse=True)
+        result.sort(key=lambda c: c.activation or 0.0, reverse=True)
         return result
     def _find_words_for_hub(
         self, hub_id: str, property_key: str, property_value: str
@@ -1096,7 +1110,7 @@ class ConceptNetwork(
             word_ids = [n[0] for n in neighbors]
             # Sort by activation
             word_ids.sort(
-                key=lambda wid: self._concepts[wid].activation
+                key=lambda wid: (self._concepts[wid].activation or 0.0)
                 if wid in self._concepts else 0.0,
                 reverse=True,
             )
@@ -1293,7 +1307,7 @@ class ConceptNetwork(
             return []
         word_ids = [n[0] for n in neighbors]
         word_ids.sort(
-            key=lambda wid: self._concepts[wid].activation
+            key=lambda wid: (self._concepts[wid].activation or 0.0)
             if wid in self._concepts else 0.0,
             reverse=True,
         )
@@ -1589,7 +1603,7 @@ class ConceptNetwork(
         for cid in cids:
             concept = self._concepts.get(cid)
             if concept is not None:
-                total += concept.activation * self._laminar_weight(cid)
+                total += (concept.activation or 0.0) * self._laminar_weight(cid)
                 count += 1
         if count == 0:
             return 0.0
@@ -1803,8 +1817,6 @@ class ConceptNetwork(
 
         # Sample source nodes if network is large
         if n > max_sources:
-            import random
-
             rng = random.Random(42)  # deterministic for reproducibility
             sources = rng.sample(all_cids, max_sources)
         else:
@@ -1996,7 +2008,14 @@ class ConceptNetwork(
                     return recalled
             return None
         if len(candidates) == 1:
-            return candidates[0]
+            only = candidates[0]
+            if only in self._concepts:
+                return only
+            # Dangling alias (concurrent removal) — try the archive
+            # before giving up.
+            if self._archive is not None:
+                return self._recall_from_archive_by_alias(normalized)
+            return None
 
         # Multiple senses — pick the best one
         best_id = None
@@ -2011,11 +2030,22 @@ class ConceptNetwork(
             # Convert to a 0..1 score (rank 1 → 1.0, rank 10 → 0.1)
             sense_score = max(0.0, 1.0 - (sense_rank - 1) * 0.1)
             # Combine with confidence and activation
-            score = sense_score * 0.5 + concept.confidence * 0.3 + concept.activation * 0.2
+            score = (
+                sense_score * 0.5
+                + concept.confidence * 0.3
+                + (concept.activation or 0.0) * 0.2
+            )
             if score > best_score:
                 best_score = score
                 best_id = cid
-        return best_id or candidates[0]
+        if best_id is not None:
+            return best_id
+        # Every candidate was dangling (concurrent removal between the
+        # alias lookup and now) — check the archive rather than return
+        # a stale ID that could anchor an edge to a phantom concept.
+        if self._archive is not None:
+            return self._recall_from_archive_by_alias(normalized)
+        return None
     def _resolve_all_senses(self, name: str) -> list[str]:
         """Resolve a name to ALL concept IDs that share it (all senses).
 

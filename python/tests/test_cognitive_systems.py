@@ -895,6 +895,217 @@ def test_gw_clear() -> None:
     assert gw.is_empty
 
 
+# ═══════════════════════════════════════════════════════════════════
+# GlobalWorkspace — recurrence, pending buffer, coalition ignition
+# ═══════════════════════════════════════════════════════════════════
+
+
+def test_gw_below_threshold_goes_pending() -> None:
+    """Failed broadcasts enter the pending pool, not the workspace."""
+    gw = GlobalWorkspace(ignition_threshold=0.7)
+    result = gw.broadcast("x", "src1", 0.6)
+    assert result is False
+    assert gw.is_empty
+    assert gw.pending_count == 1
+    assert gw.broadcast_count == 0
+
+
+def test_gw_coalition_ignition() -> None:
+    """A pending item co-ignites when coherent content arrives."""
+    gw = GlobalWorkspace(ignition_threshold=0.7)
+    module = _MockModule()
+    gw.register_module(module)
+    gw.broadcast("x", "src1", 0.6, metadata={"topics": ["alpha"]})
+    result = gw.broadcast("y", "src2", 0.8, metadata={"topics": ["alpha"]})
+    assert result is True
+    # Coherent excitation pulled the pending item over threshold
+    assert gw.pending_count == 0
+    assert len(gw.items) == 2
+    assert gw.broadcast_count == 2
+    assert len(module.received) == 2
+
+
+def test_gw_incoherent_pending_stays_subliminal() -> None:
+    """Pending items with disjoint topics are suppressed, not ignited."""
+    gw = GlobalWorkspace(ignition_threshold=0.7)
+    gw.broadcast("x", "src1", 0.6, metadata={"topics": ["alpha"]})
+    result = gw.broadcast("y", "src2", 0.8, metadata={"topics": ["beta"]})
+    assert result is True
+    assert len(gw.items) == 1
+    assert gw.pending_count == 1
+    assert gw.broadcast_count == 1
+
+
+def test_gw_pending_expires() -> None:
+    """Pending items expire after the pending TTL."""
+    gw = GlobalWorkspace(ignition_threshold=0.7, pending_ttl_s=60.0)
+    gw.broadcast("x", "src1", 0.6)
+    assert gw.pending_count == 1
+    for p in gw._pending:
+        p.timestamp -= 61_000
+    gw.tick()
+    assert gw.pending_count == 0
+
+
+def test_gw_drain_subliminal() -> None:
+    """Expired pending items are drainable, not silently lost."""
+    gw = GlobalWorkspace(ignition_threshold=0.7, pending_ttl_s=60.0)
+    gw.broadcast("x", "src1", 0.6, metadata={"topics": ["alpha"]})
+    for p in gw._pending:
+        p.timestamp -= 61_000
+    gw.tick()
+    drained = gw.drain_subliminal()
+    assert len(drained) == 1
+    assert drained[0].content == "x"
+    assert gw.drain_subliminal() == []
+
+
+def test_gw_recurrent_ignition_tagged() -> None:
+    """Coalition-ignited items carry ignition=recurrent in metadata."""
+    gw = GlobalWorkspace(ignition_threshold=0.7)
+    gw.broadcast("x", "s1", 0.6, metadata={"topics": ["alpha"]})
+    gw.broadcast("y", "s2", 0.8, metadata={"topics": ["alpha"]})
+    tagged = [
+        i for i in gw.items
+        if i.metadata.get("ignition") == "recurrent"
+    ]
+    assert len(tagged) == 1
+    assert tagged[0].content == "x"
+
+
+def test_damasio_recurrent_trigger_salience() -> None:
+    """Recurrent ignitions register as more salient to the core self."""
+    from genesis_cognitive.self.damasio import DamasioSelfHierarchy
+
+    recurrent = WorkspaceItem(
+        content="emerged",
+        source="inner_life",
+        activation=0.8,
+        metadata={"topics": ["alpha"], "ignition": "recurrent"},
+    )
+    ordinary = WorkspaceItem(
+        content="driven",
+        source="perception",
+        activation=0.8,
+        metadata={"topics": ["alpha"]},
+    )
+    d1 = DamasioSelfHierarchy()
+    d2 = DamasioSelfHierarchy()
+    d1.receive_broadcast(recurrent)
+    d2.receive_broadcast(ordinary)
+    e1 = d1.update(arousal=0.8, valence=0.4)
+    e2 = d2.update(arousal=0.8, valence=0.4)
+    assert e1 is not None and e2 is not None
+    assert e1.salience > e2.salience
+
+
+def test_gw_tick_coherent_items_sustain() -> None:
+    """Coherent items resist decay better than incoherent ones."""
+    coherent = GlobalWorkspace(ignition_threshold=0.7, decay_rate=0.4)
+    coherent.broadcast("a", "src1", 0.75, metadata={"topics": ["t"]})
+    coherent.broadcast("b", "src2", 0.72, metadata={"topics": ["t"]})
+    incoherent = GlobalWorkspace(ignition_threshold=0.7, decay_rate=0.4)
+    incoherent.broadcast("a", "src1", 0.75, metadata={"topics": ["t"]})
+    incoherent.broadcast("b", "src2", 0.72, metadata={"topics": ["u"]})
+    coherent.tick()
+    incoherent.tick()
+    # After one tick both incoherent items still exist, but the weaker
+    # member has been suppressed well below its coherent counterpart.
+    coherent_b = next(i for i in coherent.items if i.content == "b")
+    incoherent_b = next(i for i in incoherent.items if i.content == "b")
+    assert coherent_b.activation > incoherent_b.activation
+    # Competition continues between ticks: the incoherent weak item
+    # decays out while the coherent pair mutually sustains.
+    coherent.tick()
+    incoherent.tick()
+    assert len(coherent.items) == 2
+    assert [i.content for i in incoherent.items] == ["a"]
+
+
+def test_gw_on_ignition_fires() -> None:
+    """on_ignition fires once per fresh ignition, not on refresh."""
+    gw = GlobalWorkspace(ignition_threshold=0.7)
+    events: list[tuple[str, bool]] = []
+    gw.on_ignition = lambda item, recurrent: events.append(
+        (item.content, recurrent)
+    )
+    gw.broadcast("a", "s1", 0.9)
+    assert events == [("a", False)]
+    gw.broadcast("a", "s1", 0.9)  # refresh — sustained attention
+    assert len(events) == 1
+
+
+def test_gw_on_ignition_coalition_flag() -> None:
+    """Coalition ignition fires the hook with via_recurrent=True."""
+    gw = GlobalWorkspace(ignition_threshold=0.7)
+    gw.broadcast("x", "s1", 0.6, metadata={"topics": ["alpha"]})
+    events: list[tuple[str, bool]] = []
+    gw.on_ignition = lambda item, recurrent: events.append(
+        (item.content, recurrent)
+    )
+    gw.broadcast("y", "s2", 0.8, metadata={"topics": ["alpha"]})
+    assert ("y", False) in events
+    assert ("x", True) in events
+
+
+def test_gw_on_ignition_not_subliminal() -> None:
+    """Failed broadcasts don't fire the hook."""
+    gw = GlobalWorkspace(ignition_threshold=0.7)
+    events: list[object] = []
+    gw.on_ignition = lambda item, recurrent: events.append(item)
+    gw.broadcast("x", "s1", 0.5)
+    assert events == []
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Safeguard urge — defensive drive dynamics
+# ═══════════════════════════════════════════════════════════════════
+
+
+def test_safeguard_urge_registered() -> None:
+    """The safeguard urge ships in the default urge set."""
+    from genesis_cognitive.config import MindConfig
+
+    urges = {u.name: u for u in MindConfig().volition.urges}
+    assert "safeguard" in urges
+    sg = urges["safeguard"]
+    assert "daemon_lost" in sg.stimuli
+    assert "save_failure" in sg.stimuli
+    # Defensive drives out-compete appetitive ones: lower threshold,
+    # stronger stimulus weights than the appetitive urges.
+    learn = urges["learn"]
+    assert sg.threshold <= learn.threshold
+    assert max(sg.stimuli.values()) > max(learn.stimuli.values())
+
+
+def test_safeguard_urge_dynamics() -> None:
+    """Safeguard fires under sustained threat, not on a transient."""
+    from genesis_cognitive.config import MindConfig
+    from genesis_cognitive.volition import Urge
+
+    cfg = next(u for u in MindConfig().volition.urges if u.name == "safeguard")
+    urge = Urge(
+        name=cfg.name,
+        threshold=cfg.threshold,
+        growth=cfg.growth,
+        decay=cfg.decay,
+        cooldown=cfg.cooldown,
+        stimuli=dict(cfg.stimuli),
+    )
+    # A 1-second connectivity flap must not fire it.
+    urge.tick({"daemon_lost": 1.0 / 30.0}, 1.0)
+    assert not urge.is_ready()
+    # A sustained daemon loss ramps the signal to 1.0 over 30s and
+    # crosses the threshold well before a minute is out.
+    fired_at = None
+    for t in range(2, 90):
+        urge.tick({"daemon_lost": min(1.0, t / 30.0)}, 1.0)
+        if urge.is_ready():
+            fired_at = t
+            break
+    assert fired_at is not None and fired_at < 60
+
+
 def test_gw_registered_modules_property() -> None:
     """registered_modules property returns a copy of the module list."""
     gw = GlobalWorkspace()
@@ -974,9 +1185,10 @@ def test_gw_integration_no_topics_neutral() -> None:
     gw.broadcast("b", "src2", 0.8)
     # No topics → coherence = 0.5 (neutral)
     # diversity = 1.0 (2 distinct sources / 2 items)
-    # activation = 0.8
-    # integration = 0.5 * 1.0 * 0.8 = 0.4
-    assert gw.integration == pytest.approx(0.4)
+    # activation = mean settled activation (settle adjusts levels)
+    # integration = 0.5 * 1.0 * mean_activation
+    mean_activation = sum(i.activation for i in gw.items) / len(gw.items)
+    assert gw.integration == pytest.approx(0.5 * mean_activation)
 
 
 # ═══════════════════════════════════════════════════════════════════

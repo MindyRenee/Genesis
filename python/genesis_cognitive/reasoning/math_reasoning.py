@@ -501,14 +501,20 @@ def evaluate(node: Any, env: dict[str, float] | None = None) -> float | int:
                 raise EvalError("Division by zero")
             return left / right
         if node.op == "^":
-            return left**right
+            try:
+                return left**right
+            except (OverflowError, ValueError, ZeroDivisionError) as e:
+                raise EvalError(f"Cannot evaluate power: {e}") from e
         raise EvalError(f"Unknown operator: {node.op}")
 
     if isinstance(node, FuncCall):
         if node.name not in _BUILTIN_FUNCTIONS:
             raise EvalError(f"Unknown function: {node.name}")
         args = [evaluate(a, env) for a in node.args]
-        return _BUILTIN_FUNCTIONS[node.name](*args)
+        try:
+            return _BUILTIN_FUNCTIONS[node.name](*args)
+        except (ValueError, OverflowError, ZeroDivisionError) as e:
+            raise EvalError(f"Cannot evaluate {node.name}: {e}") from e
 
     raise EvalError(f"Cannot evaluate node type: {type(node).__name__}")
 

@@ -343,8 +343,11 @@ class CriticalThinkingEngine:
             notes=notes,
         )
 
-        # Track stats.
+        # Track stats. Bound the list — assessments accumulate every
+        # reasoning cycle in a long-running daemon.
         self._assessments.append(assessment)
+        if len(self._assessments) > 500:
+            del self._assessments[: len(self._assessments) - 500]
         if assessment.is_downgraded:
             self._downgraded_count += 1
         if recommendation == AssessmentRecommendation.REJECT:

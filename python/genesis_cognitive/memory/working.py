@@ -707,7 +707,9 @@ class WorkingMemory:
             capacity: Maximum number of active concepts to retain
                 (Cowan's K, default 4).
         """
-        self.attention_decay = attention_decay  # per turn
+        # Clamp to [0, 0.95] — _decay_attention divides by
+        # (1 - attention_decay), so a decay ≥ 1.0 is a crash.
+        self.attention_decay = max(0.0, min(0.95, attention_decay))  # per turn
         self.max_turns = max_turns
         self.capacity = max(1, capacity)  # Cowan's K (3-5 items)
 

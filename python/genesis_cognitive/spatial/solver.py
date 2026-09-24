@@ -99,8 +99,8 @@ class SpatialSolution:
     hypotheses: list[SpatialHypothesis] = field(default_factory=list)
     scenes: list[Scene] = field(default_factory=list)
     nodes_explored: int = 0  # candidates evaluated — the cost of finding
-    # All prediction sets from the top-k verified hypotheses (ARC
-    # convention allows multiple guesses). predictions == guesses[0].
+    # All prediction sets from the top-k verified hypotheses (multiple
+    # guesses are kept when several hypotheses verify). predictions == guesses[0].
     guesses: list[list[Grid]] = field(default_factory=list)
     # describe() of every rule verified on all training pairs — when
     # the test guess misses, these are the proven counterexamples
@@ -333,7 +333,7 @@ class SpatialReasoner:
             time_budget: wall-clock seconds before the search stops and
                 returns the best near-miss found so far.
             num_guesses: how many verified hypotheses to keep as
-                alternative prediction sets (ARC allows 2 guesses).
+                alternative prediction sets (typically 2).
             exclude_rules: describe() strings of rules already proven
                 wrong on this task (counterexample pruning). Excluded
                 rules can't be selected as solutions or near-misses, so

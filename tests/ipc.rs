@@ -282,7 +282,7 @@ fn test_set_zone_applies_despite_stale_override() {
     // core state. Previously SET_ZONE was gated on that byte being 0
     // and never cleared it, so once it latched to 1 every future
     // SET_ZONE was silently ignored — freezing the zone at Idle and
-    // desyncing the conscious mind (e.g. its sleep state) from the
+    // desyncing the cognitive mind (e.g. its sleep state) from the
     // daemon. An explicit SET_ZONE must always apply.
     let mut sys = IpcTestSystem::new("setzone_stale_override");
 
@@ -545,7 +545,7 @@ fn test_update_module_status() {
         "motor should have a heartbeat timestamp"
     );
 
-    // The active_count should reflect the conscious modules we registered
+    // The active_count should reflect the cognitive modules we registered
     // (plus any others that were already alive)
     assert!(
         state.manifest.active_count >= 2,
@@ -1067,7 +1067,7 @@ fn test_get_body_state() {
         dram_activity: 0.5, // active memory traffic
         cache_miss_rate: 0.03,
         branch_miss_rate: 0.02,
-        // Empty — the daemon sends structured fields; the conscious
+        // Empty — the daemon sends structured fields; the cognitive
         // mind's language engine composes the description.
         description: String::new(),
     };
@@ -1085,7 +1085,7 @@ fn test_get_body_state() {
     assert_eq!(resp.num_cores, 2);
     assert!(!resp.distressed);
     // Autonomic and thermoregulatory fields must round-trip through
-    // the wire — the conscious mind's affect inference reads
+    // the wire — the cognitive mind's affect inference reads
     // autonomic_rate/thermoregulatory_effort, so a serialization
     // regression that drops them would silently break her self-model.
     assert!(
@@ -1098,7 +1098,7 @@ fn test_get_body_state() {
         "thermoregulatory_effort should be 0.3, got {}",
         resp.thermoregulatory_effort
     );
-    // Voltage fields must round-trip — the conscious mind reads
+    // Voltage fields must round-trip — the cognitive mind reads
     // supply_voltage for energy reserve health (CRH impulse when
     // critically low) and core_voltage for CPU electrical state.
     assert!(
@@ -1111,7 +1111,7 @@ fn test_get_body_state() {
         "supply_voltage should be 12.6 (full battery), got {}",
         resp.supply_voltage
     );
-    // Silicon fields must round-trip — the conscious mind reads
+    // Silicon fields must round-trip — the cognitive mind reads
     // them for electron-level interoception (RAPL domain activity,
     // microarchitectural prediction errors).
     assert!(
@@ -1153,7 +1153,7 @@ fn test_get_body_state() {
         dram_activity: 0.3,
         cache_miss_rate: 0.02,
         branch_miss_rate: 0.01,
-        // Empty — the daemon sends structured fields; the conscious
+        // Empty — the daemon sends structured fields; the cognitive
         // mind's language engine composes the description.
         description: String::new(),
     };
@@ -1214,7 +1214,7 @@ fn test_get_body_state() {
         dram_activity: 0.9, // heavy memory traffic
         cache_miss_rate: 0.4, // silicon being surprised
         branch_miss_rate: 0.2,
-        // Empty — the conscious mind's language engine composes the
+        // Empty — the cognitive mind's language engine composes the
         // description from the structured fields, not the daemon.
         description: String::new(),
     };
@@ -1226,7 +1226,7 @@ fn test_get_body_state() {
     assert!(!resp3.on_ac_power);
     // stress_load = 1.5 (overloaded) must survive the wire intact.
     // The interoceptor produces [0,2] and the IPC serialization must
-    // not clamp to [0,1] — otherwise the conscious mind never sees
+    // not clamp to [0,1] — otherwise the cognitive mind never sees
     // the "severely overloaded" signal that triggers distress.
     assert!(
         (resp3.stress_load - 1.5).abs() < 0.01,
@@ -1235,7 +1235,7 @@ fn test_get_body_state() {
     );
     // Distressed autonomic state must round-trip — high autonomic
     // rate and high thermoregulatory effort are the physiological
-    // stress signals the conscious mind reads for distress inference.
+    // stress signals the cognitive mind reads for distress inference.
     assert!(
         (resp3.autonomic_rate - 8.0).abs() < 0.01,
         "autonomic_rate should be 8.0 (high autonomic rate), got {}",
@@ -1248,7 +1248,7 @@ fn test_get_body_state() {
     );
     // Distressed voltage state: Vcore maxed under thermal stress,
     // battery critically low (10.2V < 10.8V threshold). These must
-    // round-trip — the conscious mind reads supply_voltage for the
+    // round-trip — the cognitive mind reads supply_voltage for the
     // survival stress signal (CRH impulse when critically low).
     assert!(
         (resp3.core_voltage - 1.30).abs() < 0.01,
@@ -1260,14 +1260,14 @@ fn test_get_body_state() {
         "supply_voltage should be 10.2 (critically low battery), got {}",
         resp3.supply_voltage
     );
-    // The daemon sends an empty description — the conscious mind's
+    // The daemon sends an empty description — the cognitive mind's
     // language engine composes the actual words from the structured
     // fields above, using her concept network. The IPC layer must
     // faithfully transmit the empty string, not inject content.
     assert!(
         resp3.description.is_empty(),
         "description should be empty (daemon sends structured fields, \
-        conscious mind composes words), got: {:?}",
+        cognitive mind composes words), got: {:?}",
         resp3.description
     );
 }
@@ -1275,7 +1275,7 @@ fn test_get_body_state() {
 #[test]
 fn test_get_lobe_telemetry() {
     // Per-lobe telemetry round-trips: the daemon publishes one
-    // record per process in her tree (daemon/conscious/retina),
+    // record per process in her tree (daemon/cognitive/retina),
     // each carrying its CPU/I/O share and miss ratios.
     use genesis::daemon::interoception::{
         Subsystem, SubsystemTelemetry, publish_subsystem_telemetry,
@@ -1312,7 +1312,7 @@ fn test_get_lobe_telemetry() {
     ]);
 
     // A module section is appended after the lobes: non-Stopped
-    // manifest entries reported by the conscious mind. Set one
+    // manifest entries reported by the cognitive mind. Set one
     // module running with a self-reported activity share.
     let mut mclient = sys.client();
     let mut mod_req = vec![4u8, 2u8]; // language, Running

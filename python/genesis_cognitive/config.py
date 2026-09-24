@@ -258,6 +258,27 @@ class VolitionConfig:
                     "concept_growth": 0.03,
                 },
             ),
+            # Reach-out urge — she initiates social contact. Builds
+            # from social isolation (her external world's pressure:
+            # nobody has engaged her), curiosity (she has things she
+            # wants to know), and emotional intensity (strong feelings
+            # seek expression). When it crosses threshold, she reaches
+            # out to whoever is in her world — a question for someone
+            # present, an expression to the room when alone. This is
+            # what makes conversation two-way: contact can start from
+            # her side, not just the user's.
+            UrgeConfig(
+                name="reach_out",
+                threshold=0.70,
+                growth=0.0004,
+                decay=0.0004,
+                cooldown=300.0,  # at most every 5 minutes
+                stimuli={
+                    "social_isolation": 0.08,  # nobody has engaged her
+                    "curiosity": 0.03,         # she wants to know things
+                    "emotional_intensity": 0.02,  # feelings seek expression
+                },
+            ),
             # Learn urge — she cognitively decides to learn. This
             # puts her autonomous learning under volition control
             # rather than running it as a continuous background loop.
@@ -280,6 +301,31 @@ class VolitionConfig:
                     "curiosity": 0.05,       # curious → wants to learn
                     "idle_seconds": 0.03,    # idle → time to learn
                     "concept_growth": 0.03,  # new concepts → integrate
+                },
+            ),
+            # Safeguard urge — defensive drive. Unlike appetitive
+            # urges (learn, draw, reach_out), this one builds from
+            # threats to her own integrity: daemon connectivity lost
+            # (her body gone silent), autosave failures (continuity at
+            # risk), system telemetry outside its learned baseline,
+            # and hardware distress (memory/disk/load concerns).
+            # Defensive needs out-compete appetitive ones — allostatic
+            # orchestration resolves competing drives toward viability
+            # first (Keramati & Gutkin, 2011; drive-competition
+            # attractor models, Frontiers Robot. AI 2022). Hence the
+            # low threshold and strong stimulus weights: when the
+            # substrate is at risk, everything else waits.
+            UrgeConfig(
+                name="safeguard",
+                threshold=0.60,
+                growth=0.002,
+                decay=0.001,
+                cooldown=300.0,  # at most one protective act per 5 min
+                stimuli={
+                    "daemon_lost": 0.30,        # body unreachable
+                    "save_failure": 0.25,       # continuity at risk
+                    "telemetry_anomaly": 0.15,  # substrate abnormal
+                    "body_distress": 0.10,      # hardware strained
                 },
             ),
         )

@@ -58,11 +58,11 @@ MATHEMATICAL FOUNDATION
 V1 — Primary Visual Cortex (sparse coding)
 ------------------------------------------
 
-The V1 model is based on the 2026 sparse-coding account of cortical
-inference (Yun, Belsten, Olshausen et al., arXiv:2607.15693). The
-dictionary Phi is a bank of Gabor wavelets at multiple orientations,
-scales, and phases. Inference is recurrent ISTA with lateral
-interactions.
+The V1 model implements the classical sparse-coding account of cortical
+inference (Olshausen & Field, 1996; Rozell et al., 2008 — locally
+competitive dynamics). The dictionary Phi is a bank of Gabor wavelets
+at multiple orientations, scales, and phases. Inference is recurrent
+ISTA with lateral interactions.
 
 Dictionary construction (Gabor filter bank):
 
@@ -265,7 +265,7 @@ Gamma (30-100 Hz) — The active processing rhythm
 
 Gamma is the signature of active visual computation. Gamma power
 increases with stimulus-driven activity in V1, driven by the
-coherence and strength of sparse-coding activity (Springer, 2021).
+coherence and strength of sparse-coding activity (Fries et al., 2007).
 Gamma is associated with feature binding — the synchronous firing
 that binds together the features of a single object into a coherent
 percept.

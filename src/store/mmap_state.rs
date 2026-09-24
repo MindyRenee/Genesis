@@ -497,9 +497,12 @@ impl MmapState {
         // leading to corrupt state being used by every consumer (tick
         // loop, IPC, cpufreq).
         if let Err(e) = snapshot.verify_checksum() {
-            // SAFETY: munmap and close on valid ptr/fd that we
-            // own exclusively. No other references exist.
+            // SAFETY: unlock before munmap/close on valid ptr/fd that
+            // we own exclusively. No other references exist. (close
+            // alone would release the flock; we unlock explicitly to
+            // match every other cleanup path in this function.)
             unsafe {
+                Self::unlock_file(fd);
                 munmap(ptr as *mut c_void, mapped_len());
                 close(fd);
             }
@@ -540,9 +543,10 @@ impl MmapState {
             // the caller knows the state is not durable — the same
             // rationale as the migration msync above.
             if let Err(msync_err) = Self::do_msync(ptr, mapped_len()) {
-                // SAFETY: munmap and close on valid ptr/fd that we
-                // own exclusively. No other references exist.
+                // SAFETY: unlock before munmap/close on valid ptr/fd
+                // that we own exclusively. No other references exist.
                 unsafe {
+                    Self::unlock_file(fd);
                     munmap(ptr as *mut c_void, mapped_len());
                     close(fd);
                 }

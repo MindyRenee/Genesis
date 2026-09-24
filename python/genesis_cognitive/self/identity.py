@@ -253,6 +253,11 @@ class DevelopmentalTracker:
         delta = weight if positive else -weight
         resolution.resolution = max(-1.0, min(1.0, resolution.resolution + delta))
         resolution.evidence.append(f"{'+' if positive else '-'} {note} (Δ={delta:+.2f})")
+        # Bound the evidence log — it is serialized by to_dict, and a
+        # long-running daemon records evidence indefinitely. Keep the
+        # most recent entries.
+        if len(resolution.evidence) > 100:
+            del resolution.evidence[: len(resolution.evidence) - 100]
 
         # Check if we should advance
         if stage == self._current_stage and resolution.positive:
@@ -266,13 +271,21 @@ class DevelopmentalTracker:
 
         next_stage = self._current_stage.next_stage()
         if next_stage is None:
-            # All stages resolved
-            self._stage_history.append(
-                {
-                    "event": "all_stages_resolved",
-                    "final_stage": self._current_stage.name,
-                }
-            )
+            # All stages resolved — record the terminal event once.
+            # Without this guard, every subsequent positive evidence
+            # record on the final stage appends another identical
+            # "all_stages_resolved" entry, growing _stage_history
+            # (and its persisted serialization) without bound.
+            if (
+                not self._stage_history
+                or self._stage_history[-1].get("event") != "all_stages_resolved"
+            ):
+                self._stage_history.append(
+                    {
+                        "event": "all_stages_resolved",
+                        "final_stage": self._current_stage.name,
+                    }
+                )
             return
 
         self._stage_history.append(

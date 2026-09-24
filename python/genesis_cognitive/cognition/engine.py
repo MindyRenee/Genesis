@@ -60,6 +60,12 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar
 
 from genesis_client import GenesisClient, NeuroSummary
+from genesis_client.protocol import (
+    CHEM_ACETYLCHOLINE,
+    CHEM_NOREPINEPHRINE,
+    PHASE_NREM,
+    PHASE_REM,
+)
 
 from ..attention import AttentionSystem
 from ..brain_waves import (
@@ -72,7 +78,7 @@ from ..cognition.meta_cognitive_router import MetaCognitiveRouter, Route
 from ..concepts import ConceptNetwork, RelationType, is_world_concept
 from ..emotion import EmotionalState, assess_emotion
 from ..executive import ExecutiveFunction, TaskState
-from ..global_workspace import GlobalWorkspace
+from ..global_workspace import GlobalWorkspace, WorkspaceItem
 from ..language import ComprehensionEngine, LanguageEngine, SelfMonitor, Thought
 from ..learning import (
     STDP,
@@ -772,6 +778,58 @@ class CognitionEngine:
         self.global_workspace.register_module(self.semantic_memory)
         self.global_workspace.register_module(self.damasio_self)
         self.global_workspace.register_module(self.theory_of_mind)
+        # The loop runs both ways: neurochemistry modulates ignition
+        # (brain waves gate the threshold), and ignition modulates
+        # neurochemistry — each ignition event produces the
+        # orienting response (phasic LC norepinephrine) plus a small
+        # acetylcholine tag marking the content for encoding
+        # (Nieuwenhuis et al., 2005; Dehaene & Changeux, 2011).
+        self.global_workspace.on_ignition = self._on_workspace_ignition
+
+    def _on_workspace_ignition(
+        self, item: WorkspaceItem, via_recurrent: bool
+    ) -> None:
+        """Orienting response to a workspace ignition.
+
+        Every fresh ignition is a cognitive-access event — the system
+        orients to it. Magnitude scales with how far over threshold the
+        item settled; recurrent ignitions (coalition pulls, coherent
+        subliminal content crossing over) get a modest boost — the
+        system didn't drive this content, it emerged.
+
+        NE is gated by alertness (same safety principle as the surprise
+        impulse — no arousal cascade when already aroused). ACh always
+        applies: ignited content is tagged for encoding regardless.
+
+        Sleep gating: the orienting response is a waking phenomenon.
+        During NREM the locus coeruleus is near-silent — and elevated
+        noradrenergic tone actively suppresses glymphatic clearance
+        (Xie et al., 2013) — so ignition impulses are suppressed in
+        NREM for both chemicals. REM is cholinergic (ACh rebound),
+        so ACh tagging is still allowed there; NE stays suppressed.
+        """
+        try:
+            phase = self.client.get_phase(timeout=2.0).phase
+            in_nrem = phase == PHASE_NREM
+            in_rem = phase == PHASE_REM
+            if in_nrem:
+                return
+            margin = max(
+                0.0, item.activation - self.global_workspace.ignition_threshold
+            )
+            scale = 1.25 if via_recurrent else 1.0
+            emotion_now = self._build_meta_emotion()
+            if emotion_now.alertness < 0.8 and not in_rem:
+                self.client.neuro_impulse(
+                    CHEM_NOREPINEPHRINE,
+                    (0.010 + margin * 0.020) * scale,
+                )
+            self.client.neuro_impulse(
+                CHEM_ACETYLCHOLINE,
+                (0.008 + margin * 0.012) * scale,
+            )
+        except (OSError, ConnectionError, RuntimeError, AttributeError) as e:
+            logger.debug(f"ignition orienting impulse failed: {e}")
 
     def _init_cognitive_systems(self, data_dir: str | None = None) -> None:
         """Initialize new cognitive systems wired into the think() loop."""
@@ -1471,16 +1529,23 @@ class CognitionEngine:
             return self._compose_mission_answer(emotion), ["mission"]
 
         if route.route == "emotion":
-            # "How do you feel?" — compose a feeling report through
-            # the FeelingReporter. The report uses her learned emotion
-            # words and current neurochemical state, not a template.
-            report = self._compose_feeling_report(emotion)
+            # "How do you feel?" — collect feeling fragments (emotion
+            # words, mode words, cause words, plasticity markers) from
+            # the FeelingReporter; the vocabulary composes the actual
+            # phrasing through the language engine rather than the
+            # reporter pre-composing a fixed "I feel X and Y" frame.
+            fragments = self._feeling_reporter.collect_feeling_fragments(emotion)
             return Thought(
-                content=report,
-                intent="self_report",
+                content=emotion.label,
+                intent="express_emotion",
                 emotion=emotion.label,
                 topics=["emotion", "feeling"],
                 confidence=0.85,
+                self_reflection=True,
+                metadata={
+                    "field": "emotion",
+                    "feeling_fragments": fragments,
+                },
             ), ["emotion", "feeling"]
 
         if route.route == "command":
@@ -1888,24 +1953,24 @@ class CognitionEngine:
         )
 
     def _identity_thought_from_composer(self, emotion: EmotionalState) -> Thought:
-        """Build a Thought from the self_composer's identity composition."""
-        content = self.self_composer.compose_identity(
+        """Build a Thought from the self_composer's identity fragments."""
+        fragments = self.self_composer.identity_fragments(
             self.self_model, self.network, emotion
         )
         return Thought(
-            content=content,
+            content=self.self_model.name or "identity",
             intent="self_report",
             emotion=emotion.label,
             topics=["genesis", "identity"],
             confidence=0.9,
             self_reflection=True,
-            # identity_text signals the graph-walk generator to defer to
-            # the grammar fallback, which composes first-person phrasing
-            # from this pre-composed semantic content. Without it the
-            # graph walk extracts "genesis" as a seed and produces
-            # knowledge statements ("Genesis connects to Light") instead
-            # of a self-description.
-            metadata={"identity_text": content},
+            # self_fragments signals the graph-walk generator to defer to
+            # the grammar path, which composes first-person phrasing
+            # from this semantic material. Without it the graph walk
+            # extracts "genesis" as a seed and produces knowledge
+            # statements ("Genesis connects to Light") instead of a
+            # self-description.
+            metadata={"self_fragments": fragments, "field": "identity"},
         )
 
     def _get_recent_learning(self) -> str:
@@ -2000,9 +2065,12 @@ class CognitionEngine:
 
         She checks her self_knowledge for a stored preference. If she
         has one, she shares it. If not, she honestly says she hasn't
-        formed a preference yet. The content is pre-composed as a
-        first-person sentence and rendered as raw content — the
-        grammar/voice layers should not prepend openers to it.
+        formed a preference yet. The underlying data (status, topic,
+        stored value) is passed as metadata — the vocabulary composes
+        a predicate that the grammar's self-report frames complete
+        ("I am {content}", "{content}.", ...), so the actual words
+        emerge from the language engine rather than being recited
+        from a fixed first-person sentence.
         """
         # Parse sub_kind: "favorite:color", "like:music", "hobby"
         parts = sub_kind.split(":", 1)
@@ -2014,24 +2082,23 @@ class CognitionEngine:
         stored = self.self_model.self_knowledge.get(pref_key)
 
         if stored:
-            if topic:
-                content = f"my favorite {topic} is {stored}"
+            status = "has"
+        elif q_type == "favorite" and topic:
+            status = "none_favorite"
+        elif q_type == "like" and topic:
+            concept = self.network.get_concept(topic)
+            if concept and concept.confidence >= 0.5:
+                # She knows the concept but has no stored preference —
+                # report what she can verify rather than asserting an
+                # interest that isn't grounded in her state.
+                status = "knows_no_pref"
             else:
-                content = f"I enjoy {stored}"
+                status = "learning"
         else:
-            if q_type == "favorite" and topic:
-                content = f"I haven't formed a favorite {topic} yet"
-            elif q_type == "like" and topic:
-                concept = self.network.get_concept(topic)
-                if concept:
-                    content = f"I find {topic} interesting"
-                else:
-                    content = f"I'm still learning about {topic}"
-            else:
-                content = "I'm still discovering what I enjoy"
+            status = "discovering"
 
         return Thought(
-            content=content,
+            content=topic or "preference",
             intent="self_report",
             emotion=emotion.label,
             topics=[topic] if topic else ["preference"],
@@ -2040,7 +2107,11 @@ class CognitionEngine:
             metadata={
                 "topic": topic or "preference",
                 "field": "preference",
-                "identity_text": content,
+                "preference": {
+                    "status": status,
+                    "topic": topic,
+                    "value": stored or "",
+                },
             },
         )
 
@@ -2608,8 +2679,8 @@ class CognitionEngine:
                 self.network.add_edge(h_src, h_tgt, h_rel, weight=0.3)
                 verb = self._relation_verb(h_rel)
                 thought = Thought(
-                    content=(f"was wrong about {self._display_name(h_src)} "
-                             f"and {self._display_name(h_tgt)}"),
+                    content=(f"confirmed {self._display_name(h_src)} "
+                             f"{verb} {self._display_name(h_tgt)}"),
                     intent="acknowledge",
                     emotion=emotion.label,
                     confidence=0.7,
@@ -2840,6 +2911,29 @@ class CognitionEngine:
         # phonological store, preventing decay (Baddeley, 1992).
         # Without this, verbal items decay after ~2s and are lost.
         self.working_memory.phonological_loop.rehearse()
+        # Cortical tick — the concept network's own dynamics. The
+        # persistent activation field decays, spreads along edges, and
+        # ignites dormant concepts under neuromodulatory control —
+        # without it the field is a write-only residue ratchet, and
+        # inner life / introspection read stale accumulations. The
+        # tick is sparse (cost ∝ active concepts, not network size).
+        try:
+            core = self.client.get_state(timeout=2.0)
+            chem = core.chemicals
+            self.network.cortical_tick(
+                arousal=core.arousal,
+                gaba=chem.get("gaba", 0.3),
+                ach=chem.get("acetylcholine", 0.3),
+                serotonin=chem.get("serotonin", 0.4),
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"cortical tick failed: {e}")
+            # Daemon unreachable (offline mind): keep the field alive
+            # on default parameters rather than freezing it.
+            try:
+                self.network.cortical_tick()
+            except Exception as e2:  # noqa: BLE001
+                logger.debug(f"cortical tick (default params) failed: {e2}")
 
     def _think_early_routes(
         self, user_input: str, perception, raw_input: str = "",
@@ -3390,7 +3484,7 @@ class CognitionEngine:
             (
                 (concept.activation, name)
                 for name, concept in concepts_snapshot
-                if concept.activation > 0.3
+                if (concept.activation or 0.0) > 0.3
             ),
             key=lambda x: x[0],
         )
@@ -5199,7 +5293,7 @@ class CognitionEngine:
         # ── 11.5 Self-assessment: feed knowledge gaps to curiosity ──
         if perception.topics and answer_assessment:
             for gap_topic in answer_assessment.missing_topics:
-                self.self_assessment.profile.known_gaps.add(gap_topic)
+                self.self_assessment.remember_gap(gap_topic)
 
         # Compose text for ALL curiosity questions (not just should_ask)
         # so that when the user asks "what are you curious about?" they
@@ -6830,13 +6924,6 @@ class CognitionEngine:
         return self._feeling_reporter.surface_distress_if_needed(
             response, emotion, user_input
         )
-
-    def _compose_feeling_report(self, emotion: EmotionalState) -> str:
-        """Describe how she feels, using learned emotion words.
-
-        Delegates to the FeelingReporter subsystem.
-        """
-        return self._feeling_reporter.compose_feeling_report(emotion)
 
     def _compose_encouragement_response(self, emotion: EmotionalState) -> str:
         """Compose a response to encouragement.

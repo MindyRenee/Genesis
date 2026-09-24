@@ -283,6 +283,16 @@ class NarrativeEngine:
         self._links_out: dict[str, list[TemporalLink]] = {}
         self._links_in: dict[str, list[TemporalLink]] = {}
 
+        # Bounded growth — events, chapters, links, and snapshots are
+        # serialized in full on every save; without caps the state file
+        # grows forever in a long-running daemon. Eviction drops the
+        # oldest raw detail while the distilled story survives (chapter
+        # summaries, the personality drift baseline, hierarchy labels).
+        self._max_events = 2000
+        self._max_chapters = 300
+        self._max_temporal_links = 4000
+        self._max_snapshots = 500
+
         # Record initial personality
         self._personality_snapshots.append(
             (
@@ -357,6 +367,8 @@ class NarrativeEngine:
         # Add to the autobiographical hierarchy as an event-specific node.
         self.add_to_hierarchy(event, AutobiographicalLevel.EVENT_SPECIFIC)
 
+        self._enforce_bounds()
+
         # Check if this event should start a new chapter
         # (check after appending so the event count includes this one)
         self._check_chapter_transition(event, emotion)
@@ -387,6 +399,7 @@ class NarrativeEngine:
         )
         self.chapters.append(chapter)
         self._current_chapter = chapter
+        self._enforce_bounds()
 
     def _check_chapter_transition(self, event: LifeEvent, emotion: EmotionalState) -> None:
         """Check if this event should start a new chapter."""
@@ -459,6 +472,7 @@ class NarrativeEngine:
                 ),
             )
         )
+        self._enforce_bounds()
 
     def get_personality_drift(self) -> dict[str, float]:
         """How much has personality drifted from baseline?"""
@@ -484,9 +498,9 @@ class NarrativeEngine:
 
         Returns a compact structural summary (name, uptime, chapters,
         events, drift, values, concept counts). This is semantic data,
-        NOT composed speech. Downstream callers pass it as
-        ``identity_text`` metadata to the language engine, which
-        composes the actual prose — no pre-written template
+        NOT composed speech. Downstream callers pass its segments as
+        ``self_fragments`` clause metadata to the language engine,
+        which composes the actual prose — no pre-written template
         substitution.
         """
         uptime_s = (int(time.time() * 1000) - self._born_at) / 1000
@@ -751,6 +765,7 @@ class NarrativeEngine:
         self._temporal_links.append(link)
         self._links_out.setdefault(source, []).append(link)
         self._links_in.setdefault(target, []).append(link)
+        self._enforce_bounds()
         return link
 
     def trace_causal_chain(self, event_id: str) -> list[str]:
@@ -789,3 +804,91 @@ class NarrativeEngine:
     def temporal_link_count(self) -> int:
         """Total temporal/causal links recorded."""
         return len(self._temporal_links)
+
+    # ─── Bounded growth ──────────────────────────────────────────
+
+    def _enforce_bounds(self) -> None:
+        """Evict the oldest narrative detail when structures exceed caps.
+
+        All four structures are serialized in full each save, so caps
+        keep both memory and the state file bounded. Eviction order:
+        chapters first (their events go with them), then events,
+        then temporal links. The personality snapshot cap is enforced
+        in ``snapshot_personality`` because it must preserve index 0 —
+        the drift baseline.
+        """
+        # Chapters — never evict the current chapter.
+        while len(self.chapters) > self._max_chapters:
+            idx = next(
+                (i for i, ch in enumerate(self.chapters)
+                 if ch is not self._current_chapter),
+                None,
+            )
+            if idx is None:
+                break
+            chapter = self.chapters.pop(idx)
+            # The chapter's LIFETIME_PERIOD hierarchy node references
+            # it by label — remove the matching node so it doesn't
+            # dangle.
+            self._hierarchy[AutobiographicalLevel.LIFETIME_PERIOD] = [
+                n for n in self._hierarchy[AutobiographicalLevel.LIFETIME_PERIOD]
+                if n.label != chapter.title
+            ]
+            self._drop_events({e.id for e in chapter.events})
+
+        # Events — drop the oldest globally.
+        if len(self.events) > self._max_events:
+            excess = len(self.events) - self._max_events
+            self._drop_events({e.id for e in self.events[:excess]})
+
+        # Temporal links — drop the oldest.
+        if len(self._temporal_links) > self._max_temporal_links:
+            excess = len(self._temporal_links) - self._max_temporal_links
+            del self._temporal_links[:excess]
+            self._rebuild_link_index()
+
+        # Personality snapshots — keep the baseline (index 0, the
+        # drift reference) plus the most recent.
+        if len(self._personality_snapshots) > self._max_snapshots:
+            keep = self._max_snapshots - 1
+            self._personality_snapshots = [
+                self._personality_snapshots[0],
+                *self._personality_snapshots[-keep:],
+            ]
+
+    def _drop_events(self, evicted_ids: set[str]) -> None:
+        """Remove events by id, cleaning every dependent structure.
+
+        ``self.events`` is the flat index; chapters hold the canonical
+        copies (they are what gets serialized). Hierarchy
+        EVENT_SPECIFIC nodes and temporal links referencing evicted
+        ids would dangle, so they are pruned too.
+        """
+        if not evicted_ids:
+            return
+        self.events = [e for e in self.events if e.id not in evicted_ids]
+        for ch in self.chapters:
+            if ch.events:
+                ch.events = [e for e in ch.events if e.id not in evicted_ids]
+        for eid in evicted_ids:
+            self._event_to_label.pop(eid, None)
+        self._hierarchy[AutobiographicalLevel.EVENT_SPECIFIC] = [
+            n for n in self._hierarchy[AutobiographicalLevel.EVENT_SPECIFIC]
+            if n.event_id not in evicted_ids
+        ]
+        kept = [
+            link for link in self._temporal_links
+            if link.source_id not in evicted_ids
+            and link.target_id not in evicted_ids
+        ]
+        if len(kept) != len(self._temporal_links):
+            self._temporal_links = kept
+            self._rebuild_link_index()
+
+    def _rebuild_link_index(self) -> None:
+        """Rebuild the source/target link lookup after link removal."""
+        self._links_out = {}
+        self._links_in = {}
+        for link in self._temporal_links:
+            self._links_out.setdefault(link.source_id, []).append(link)
+            self._links_in.setdefault(link.target_id, []).append(link)

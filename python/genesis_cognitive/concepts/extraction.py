@@ -137,6 +137,31 @@ class ExtractionMixin:
                 classified.append(("cap_init", w, pos))
             else:
                 classified.append(("noun", w, pos))
+
+        # Finite verb forms are phrase boundaries: "the cat sat on the
+        # mat" must yield "cat" and "mat", not "cat sat". A lowercase
+        # token that deconjugates to a different verb base is verbal in
+        # predicate position — followed by a function word, an "of"
+        # connector, or the end of the text. Participles before nouns
+        # stay ("the hidden meaning", "a broken heart"), and -ing forms
+        # stay because gerunds are legitimate concept heads ("running
+        # water"). -s forms break only before a function word since
+        # they may be plural nouns ("trade talks").
+        # Lazy import: language/__init__ cascades back to this package.
+        from ..language.morphology import is_verb_form
+        for i in range(len(classified)):
+            role, w, pos = classified[i]
+            if role != "noun":
+                continue
+            wl = w.lower()
+            base = is_verb_form(wl)
+            if base is None or base == wl:
+                continue
+            if wl.endswith("ing"):
+                continue
+            nxt = classified[i + 1][0] if i + 1 < len(classified) else "end"
+            if nxt in ("stop", "of") or (nxt == "end" and not wl.endswith("s")):
+                classified[i] = ("stop", w, pos)
         return classified
     def _build_noun_phrases(
         self,

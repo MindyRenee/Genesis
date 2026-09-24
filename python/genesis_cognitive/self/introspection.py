@@ -399,7 +399,7 @@ class IntrospectionEngine:
         # dysregulated. If she has regulation concepts, she's likely in
         # homeostasis (the regulator keeps her there).
         stress_concept = self.network.get_concept("stress")
-        if stress_concept and stress_concept.activation > 0.5:
+        if stress_concept and (stress_concept.activation or 0.0) > 0.5:
             discoveries["regulation_state"] = (
                 "potentially dysregulated — stress concepts are active"
             )
@@ -479,7 +479,7 @@ class IntrospectionEngine:
         if reasoning_concept:
             discoveries["reasoning_confidence"] = reasoning_concept.confidence
             # High activation suggests recent use
-            if reasoning_concept.activation > 0.3:
+            if (reasoning_concept.activation or 0.0) > 0.3:
                 discoveries["most_used_strategy"] = "active — she reasons frequently"
             else:
                 discoveries["most_used_strategy"] = "available — she reasons when needed"

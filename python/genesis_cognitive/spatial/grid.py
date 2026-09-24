@@ -1,6 +1,6 @@
 """Discrete grid — the perceptual substrate for spatial reasoning.
 
-ARC-style tasks and most spatial problems reduce to the same primitive:
+Grid-transformation tasks and most spatial problems reduce to the same primitive:
 a bounded 2-D field of discrete cells. This module provides the
 immutable ``Grid`` type and the geometric/colorimetric operations that
 the perceptual layer (``scene.py``) and the transformation DSL
@@ -8,7 +8,7 @@ the perceptual layer (``scene.py``) and the transformation DSL
 
 A grid is a tuple of tuples of ints — hashable, immutable, and cheap
 to compare. Cell values are arbitrary symbols; nothing here assumes
-the ARC 0-9 color palette, though 0 is conventionally background.
+a 0-9 color palette, though 0 is conventionally background.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ class Grid:
 
     @classmethod
     def from_lists(cls, rows: list[list[int]]) -> Grid:
-        """Build a grid from nested lists (e.g. ARC JSON task data)."""
+        """Build a grid from nested lists (e.g. JSON task data)."""
         return cls(tuple(tuple(int(c) for c in row) for row in rows))
 
     @classmethod

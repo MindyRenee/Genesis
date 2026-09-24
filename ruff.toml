@@ -3,7 +3,7 @@
 #
 # Note: Python source files are configured in python/pyproject.toml,
 # which takes precedence for files under python/. This file configures
-# scripts and other root-level files (evals/, scripts/*.py) with the
+# scripts and other root-level files (scripts/*.py) with the
 # SAME rule set so they are not silently linted under ruff defaults.
 
 target-version = "py312"

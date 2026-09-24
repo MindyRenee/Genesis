@@ -7,6 +7,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from genesis_client.protocol import (
+    CHEM_ADENOSINE,
     MODULE_LANGUAGE,
     MODULE_MEMORY,
     MODULE_METACOGNITION,
@@ -24,6 +25,10 @@ class HeartbeatMixin:
     if TYPE_CHECKING:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see the package's core module).
+        _daemon_lost_since: float | None
+        _autosave_failures: int
+        _last_threat_snapshot: float
+        _offline: bool
         def __getattr__(self, name: str) -> Any: ...
 
     def _credit_module(self, module_id: int, seconds: float) -> None:
@@ -103,6 +108,66 @@ class HeartbeatMixin:
             "receptor_fatigue": receptor_fatigue,
             "sustained_activity": sustained_activity,
             "elevated_cortisol": elevated_cortisol,
+        }
+    def _read_threat_signals(self) -> dict[str, float]:
+        """Read integrity-threat signals for the safeguard urge.
+
+        - daemon_lost: the subcognitive socket dropped — she can't
+          reach her own body (interoception, neurochemistry, state
+          sync all live there). Ramps over 30s so a transient flap
+          doesn't fire the urge; a sustained loss saturates it.
+          Skipped entirely in offline mode — a mind started without
+          a daemon isn't missing anything.
+        - save_failure: consecutive autosave failures, normalized
+          over 2 — her continuity across restarts is at risk.
+        - telemetry_anomaly: system metrics deviating from the learned
+          baseline (system_monitor). Only counts once the baseline is
+          established — a young mind has no "normal" to deviate from.
+        - body_distress: active hardware concerns (memory, disk,
+          load) from the current snapshot.
+
+        The snapshot is rate-limited to 60s — volition ticks every
+        second but system metrics don't change meaningfully faster,
+        and the baseline wants roughly per-minute samples anyway.
+        """
+        daemon_lost = 0.0
+        if not self._offline:
+            try:
+                if self.client.is_connected():
+                    self._daemon_lost_since = None
+                else:
+                    if self._daemon_lost_since is None:
+                        self._daemon_lost_since = time.monotonic()
+                    daemon_lost = min(
+                        1.0,
+                        (time.monotonic() - self._daemon_lost_since) / 30.0,
+                    )
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"daemon connectivity check failed: {e}")
+
+        save_failure = min(1.0, self._autosave_failures / 2.0)
+
+        telemetry_anomaly = 0.0
+        body_distress = 0.0
+        now = time.monotonic()
+        if now - self._last_threat_snapshot >= 60.0:
+            try:
+                snapshot = self.system_monitor.snapshot()
+                if self.system_monitor.baseline.is_established:
+                    anomalies = self.system_monitor.baseline.deviations(
+                        snapshot
+                    )
+                    telemetry_anomaly = min(1.0, len(anomalies) / 3.0)
+                body_distress = min(1.0, len(snapshot.concerns()) / 2.0)
+                self._last_threat_snapshot = now
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"threat snapshot failed: {e}")
+
+        return {
+            "daemon_lost": daemon_lost,
+            "save_failure": save_failure,
+            "telemetry_anomaly": telemetry_anomaly,
+            "body_distress": body_distress,
         }
     def _read_wave_and_adenosine(self) -> dict[str, object]:
         """Read brain-wave state and adenosine level for volition urges.
@@ -490,6 +555,29 @@ class HeartbeatMixin:
                     self.client.heartbeat_module(module_id, share)
                 except (OSError, ConnectionError) as e:
                     logger.debug(f"heartbeat failed: {e}")
+
+            # Cognitive work is metabolic work. total_work is measured
+            # execution — seconds the sampler observed Genesis code at
+            # a leaf frame during this window. Adenosine is the ATP
+            # byproduct of neural activity, so her own measured compute
+            # generates sleep pressure on top of the daemon's baseline
+            # accumulation (~0.055/hr while awake). This block runs
+            # every ~10s, so the per-impulse scale is set for parity at
+            # full load: 0.00015/impulse ≈ 0.054/hr at work_frac=1.0 —
+            # sustained hard thinking roughly doubles how fast she
+            # tires; idling adds almost nothing.
+            window = max(now - last_heartbeat_time, 1.0)
+            work_frac = min(1.0, total_work / window)
+            # Asleep: inner-life/dream work is maintenance, not load —
+            # glymphatic clearance must dominate or pressure ratchets
+            # up during the very state meant to clear it.
+            if work_frac > 0.02 and not self._is_sleeping:
+                try:
+                    self.client.neuro_impulse(
+                        CHEM_ADENOSINE, 0.00015 * work_frac
+                    )
+                except (OSError, ConnectionError, RuntimeError) as e:
+                    logger.debug(f"metabolic adenosine impulse failed: {e}")
             last_heartbeat_time = now
 
         if now - last_sensor_time >= 5.0:
@@ -595,6 +683,19 @@ class HeartbeatMixin:
             logger.debug(f"social modulation failed: {e}")
     def _heartbeat_final_steps(self) -> None:
         """Run auto-sleep, volition, warn, and cognition (heartbeat steps 10-13)."""
+        # ── 9c. External world — presence decay and social pressure ──
+        # The world runs on the heartbeat like every other subsystem:
+        # state-gated, not timer-gated. Silent presences leave; the
+        # world's social isolation feeds her inner-life social drive —
+        # the outer world's pressure becomes inner motivation.
+        try:
+            self.world.tick()
+            self.inner_life.feed_social_drive(
+                self.world.social_isolation() * 0.02
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"world tick failed: {e}")
+
         # ── 10. Auto-sleep check ──
         try:
             self._check_auto_sleep()

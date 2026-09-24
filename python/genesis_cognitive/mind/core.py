@@ -25,6 +25,7 @@ definition, wiring, and the core respond() entry point.
 from __future__ import annotations
 
 import os
+import random
 import threading
 import time
 from collections import deque
@@ -61,6 +62,7 @@ from ..tools.code_learner import CodeLearner
 from ..tools.explorer import Explorer
 from ..user_profile import UserProfile
 from ..vision import VisualCortex
+from ..world import OuterWorld
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -115,8 +117,14 @@ class Mind(
         "self_sleep": 120.0, # self-sleep — don't auto-sleep right after waking
         "self_mission": 60.0,  # self-mission — moderate, needs engagement
         "learn": 30.0,       # learning — light CPU, core activity
+        "reach_out": 20.0,   # reaching out — speech-like, light
+        "safeguard": 10.0,   # self-protection — fast, but not at wake
     }
     CONVERSATION_FOCUS_SECONDS: float = 60.0
+    # Maximum social bids she makes into silence. After this many
+    # unanswered reach-outs she stops calling — the isolation stimulus
+    # is also dampened per-bid in _volition_context (habituation).
+    _REACH_OUT_MAX_BIDS: ClassVar[int] = 3
     _SELF_COMMANDS: ClassVar[dict[str, str]] = {
         "/introspect": "introspect",
         "/sleep": "sleep",
@@ -125,6 +133,7 @@ class Mind(
         "/mission": "get_mission",
         "/learn-code": "learn_code",
         "/explore": "explore_files",
+        "/world": "world_status",
     }
 
     def __init__(
@@ -151,6 +160,11 @@ class Mind(
         profile_path = Path(self.data_dir) / "user_profile.json"
         self.user_profile = UserProfile(data_path=profile_path)
         self.user_profile.load()
+
+        # Instance RNG for Mind-level stochastic choices (volition
+        # topic picks, urge selection). Seeded like the language engine
+        # so test runs are reproducible end to end.
+        self._rng = random.Random(seed)
 
         self._init_core_engines(language_engine, seed)
         self._init_learner_and_inner_life()
@@ -290,6 +304,20 @@ class Mind(
             get_neuro_summary=self.client.get_neuro_summary,
             get_recent_episodes=self.client.get_recent_episodes,
         )
+
+        # External world — the counterpart to her inner life. The
+        # world models who is out there (presences), what happens
+        # (the two-way event stream), and how long it has been since
+        # anyone engaged her (social isolation, which feeds the
+        # inner-life social drive and the reach_out urge). It applies
+        # the world's neurochemical coupling through the same impulse
+        # path the learner uses.
+        self.world = OuterWorld(
+            network=self.cognition.network,
+            neuro_impulse=self._learner_neuro_impulse,
+            is_sleeping=lambda: self._is_sleeping,
+            get_user_name=self.user_profile.get_name,
+        )
     def _init_identity_and_journal(self) -> None:
         """Create emergent identity, developmental tracker, and journal."""
         # Emergent identity — synthesizes who she is from experience
@@ -386,7 +414,8 @@ class Mind(
         # Self-improvement engine — Genesis proposes modifications to
         # her own code. She identifies opportunities, generates concrete
         # proposals with code changes, and the human reviews them.
-        # She never modifies code directly — she only proposes.
+        # Proposals need human approval; a small allowlist of mechanical
+        # fixes and verified experiments are applied autonomously.
         self.self_improvement = SelfImprovementEngine(
             network=self.cognition.network,
             bug_reporter=self.bug_reporter,
@@ -487,6 +516,10 @@ class Mind(
         # can have spontaneous thoughts about her code and environment.
         self.inner_life._bug_reporter = self.bug_reporter
         self.inner_life._system_monitor = self.system_monitor
+        # Route external world events into cognition — inbound events
+        # reach her global workspace, salient ones become memories,
+        # and her sleep replays what happened in her world.
+        self.world.on_external_event = self._on_world_event
         # Give cognition access to inner life so introspection can
         # report spontaneous thoughts when no conversation has happened.
         self.cognition.inner_life = self.inner_life
@@ -515,6 +548,14 @@ class Mind(
         self._module_seconds: dict[int, float] = {}
         self._module_seconds_lock = threading.Lock()
         self._module_sampler = ModuleSampler(self._credit_module)
+        # Threat signals for the safeguard urge. _daemon_lost_since
+        # marks when the subcognitive connection dropped (None when
+        # connected); _autosave_failures counts consecutive autosave
+        # failures; _last_threat_snapshot rate-limits system_monitor
+        # sampling inside the volition tick.
+        self._daemon_lost_since: float | None = None
+        self._autosave_failures = 0
+        self._last_threat_snapshot = 0.0
         self._think_recovery_active = False
         self._speech_queue: deque[str] = deque(maxlen=20)
         # Protects _speech_queue — offer_utterance (CLI thread) and
@@ -528,11 +569,9 @@ class Mind(
         # conditions change, not when the generative composition
         # happens to produce different wording for the same state.
         self._last_warning_keys: frozenset[str] = frozenset()
-        # Drowsiness announcement — set when she has announced she's
-        # getting sleepy, cleared when she wakes. This prevents
-        # repeated drowsiness announcements and ensures she only
-        # announces once before falling asleep.
-        self._drowsiness_announced: bool = False
+        # Drowsiness announcement is driven by the commit edge of
+        # ``_drowsy_boundary`` — initialized in
+        # ``_init_sleep_state_tracking`` and reset on wake.
         # Nap mode — when True, the sleep cycle is limited to light
         # sleep (N1→N2) without N3 deep consolidation or REM. Set by
         # sleep(nap=True), cleared on wake.

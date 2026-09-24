@@ -82,6 +82,7 @@ import py_compile
 import re
 import subprocess
 import time
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -325,8 +326,13 @@ class SelfImprovementEngine:
     3. Tracks human feedback to improve future proposals
     4. Persists proposals across sessions
 
-    She never modifies code directly — she only proposes. The human
-    decides whether to apply each change.
+    Most changes require human review: proposals describe the exact
+    code change and wait for acceptance. Two narrow paths modify code
+    without review: allowlisted mechanical fixes (``apply_autonomous_fixes``)
+    and verified heuristic experiments (``HeuristicExperiment``) — both
+    restricted to own-source files outside the protected core, and both
+    validated by py_compile + import + the test suite with automatic
+    revert on failure.
     """
 
     def __init__(
@@ -343,6 +349,19 @@ class SelfImprovementEngine:
         self._proposals: list[Proposal] = []
         self._next_id = 1
         self._feedback_history: list[FeedbackRecord] = []
+
+        # Persistent title memory for dedup. Proposals are evicted
+        # under the cap below, but their titles must stay remembered
+        # or an evicted rejected/applied proposal gets re-proposed —
+        # the exact duplicate noise the dedup exists to prevent.
+        self._known_titles: OrderedDict[str, None] = OrderedDict()
+
+        # Bounds for long-running state — all three lists are fully
+        # serialized by to_dict and would otherwise grow forever.
+        self._max_proposals = 500
+        self._max_known_titles = 2000
+        self._max_feedback = 500
+        self._max_experiments = 500
 
         # Category success rates — learned from feedback
         # Maps category → (accepted_count, total_count)
@@ -405,9 +424,9 @@ class SelfImprovementEngine:
         # prevents the proposal list from filling up with repeated
         # "Add docstring to X()" entries across generation cycles —
         # including ones that were already accepted and applied.
-        existing_titles = {
-            p.title for p in self._proposals
-        }
+        # _known_titles survives proposal eviction so a title is
+        # never re-proposed just because its proposal aged out.
+        existing_titles = set(self._known_titles)
         # Also dedup within this batch (don't add two identical
         # proposals in the same generation cycle).
         seen_in_batch: set[str] = set()
@@ -421,9 +440,58 @@ class SelfImprovementEngine:
             proposal.id = self._next_id
             self._next_id += 1
             self._proposals.append(proposal)
+            self._remember_title(proposal.title)
             stored.append(proposal)
+        self._enforce_proposal_cap()
 
         return stored
+
+    def _remember_title(self, title: str) -> None:
+        """Remember a proposal title for dedup, LRU-bounded."""
+        self._known_titles[title] = None
+        self._known_titles.move_to_end(title)
+        while len(self._known_titles) > self._max_known_titles:
+            self._known_titles.popitem(last=False)
+
+    def _enforce_proposal_cap(self) -> None:
+        """Bound ``_proposals`` — it is fully serialized by to_dict.
+
+        Evicts the oldest terminal proposal first (rejected/applied/
+        withdrawn — kept only as audit trail), then accepted, and as
+        a last resort the oldest pending proposal. Pending proposals
+        represent unreviewed work, so they are only dropped when the
+        queue is entirely unreviewed and already over the cap.
+        """
+        while len(self._proposals) > self._max_proposals:
+            idx = next(
+                (
+                    i
+                    for i, p in enumerate(self._proposals)
+                    if p.status
+                    in (
+                        ProposalStatus.REJECTED,
+                        ProposalStatus.APPLIED,
+                        ProposalStatus.WITHDRAWN,
+                    )
+                ),
+                None,
+            )
+            if idx is None:
+                idx = next(
+                    (
+                        i
+                        for i, p in enumerate(self._proposals)
+                        if p.status == ProposalStatus.ACCEPTED
+                    ),
+                    0,  # all pending — drop the oldest
+                )
+            dropped = self._proposals.pop(idx)
+            logger.info(
+                "Self-improvement: evicted proposal #%d (%s, %s) "
+                "under the %d-proposal cap",
+                dropped.id, dropped.status.value, dropped.title,
+                self._max_proposals,
+            )
 
     def get_pending_proposals(self) -> list[Proposal]:
         """Get all proposals awaiting human review."""
@@ -776,8 +844,9 @@ class SelfImprovementEngine:
 
         lines = source.split("\n")
 
-        # The except line is at bug.line, the pass line is the next line
-        if bug.line > len(lines) or bug.line >= len(lines):
+        # The except line is at bug.line - 1, the pass line is the next
+        # line. bug.line < 1 would silently index from the end of file.
+        if bug.line < 1 or bug.line >= len(lines):
             return None
 
         except_line = lines[bug.line - 1]
@@ -1185,7 +1254,7 @@ class SelfImprovementEngine:
         # Get recent bug reports. Use a high max_files to ensure we
         # reach Genesis's own source — when scanning from the project
         # root, rglob returns files in filesystem order, and the first
-        # 100 may be evals/Rust files before reaching python/genesis_cognitive/.
+        # 100 may be scripts/Rust files before reaching python/genesis_cognitive/.
         try:
             scan_result = self.bug_reporter.scan(
                 max_files=500, include_tests=False
@@ -2435,6 +2504,9 @@ class SelfImprovementEngine:
             feedback=feedback,
         )
         self._feedback_history.append(record)
+        # Bound — serialized in full by to_dict.
+        if len(self._feedback_history) > self._max_feedback:
+            del self._feedback_history[: len(self._feedback_history) - self._max_feedback]
 
         # Update category statistics
         cat = proposal.category.value
@@ -2452,8 +2524,7 @@ class SelfImprovementEngine:
             )
         else:
             logger.info(
-                f"Proposal #{proposal.id} rejected: '{feedback}'. "
-                f"I'll learn from this feedback."
+                f"Proposal #{proposal.id} rejected: '{feedback}'."
             )
 
     def _category_confidence(self, category: ProposalCategory) -> float:
@@ -2471,6 +2542,20 @@ class SelfImprovementEngine:
         rate = accepted_n / total
         # Scale: 0% success → 0.5 confidence, ~71%+ success → 1.0
         return min(1.0, 0.5 + rate * 0.7)
+
+    def record_experiment(self, record: ExperimentRecord) -> None:
+        """Append an experiment record, bounding the audit log.
+
+        ``_experiment_history`` is serialized in full by to_dict, so
+        it must stay bounded even though experiments are capped at
+        ``_MAX_PER_DAY`` — over months of operation the log would
+        otherwise grow without limit.
+        """
+        self._experiment_history.append(record)
+        if len(self._experiment_history) > self._max_experiments:
+            del self._experiment_history[
+                : len(self._experiment_history) - self._max_experiments
+            ]
 
     # ─── Persistence ────────────────────────────────────────────
 
@@ -2514,10 +2599,18 @@ class SelfImprovementEngine:
                 ", ".join(f"#{p.id} ({p.file_path})" for p in stale),
             )
         self._proposals = kept
+        self._enforce_proposal_cap()
         self._next_id = data.get("next_id", 1)
+
+        # Rebuild the title dedup memory from the restored proposals so
+        # their titles are never re-proposed.
+        self._known_titles.clear()
+        for p in self._proposals:
+            self._remember_title(p.title)
+
         self._feedback_history = [
             FeedbackRecord.from_dict(f) for f in data.get("feedback_history", [])
-        ]
+        ][-self._max_feedback:]
         self._category_stats = {
             cat: tuple(stats)
             for cat, stats in data.get("category_stats", {}).items()
@@ -2532,7 +2625,7 @@ class SelfImprovementEngine:
         self._experiment_history = [
             ExperimentRecord.from_dict(e)
             for e in data.get("experiments", [])
-        ]
+        ][-self._max_experiments:]
 
 
 # ─── Verified self-improvement (workstream D) ──────────────────────
@@ -2762,7 +2855,7 @@ class HeuristicExperiment:
                 status="reverted",
                 reason="verification gate failed (tests failed)",
             )
-            self.engine._experiment_history.append(record)
+            self.engine.record_experiment(record)
             return record
 
         # All checks passed — keep the change
@@ -2770,7 +2863,7 @@ class HeuristicExperiment:
             file_path=file_path, description=description,
             status="applied", reason="all verification checks passed",
         )
-        self.engine._experiment_history.append(record)
+        self.engine.record_experiment(record)
         logger.info(
             f"Heuristic experiment applied: {description} in {file_path}"
         )

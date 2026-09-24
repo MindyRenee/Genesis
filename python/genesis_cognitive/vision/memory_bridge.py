@@ -23,6 +23,12 @@ logger = logging.getLogger(__name__)
 _DATA_DIR = default_data_dir() / "visual_cortex"
 _MTL_FILE = _DATA_DIR / "memory_bridge.npz"
 
+#: Bound on retained training examples. Ridge refits run over all
+#: examples on every association, and save() serializes all of them —
+#: without a cap, a long-running mind's memory-bridge file grows
+#: without bound. The most recent examples are kept.
+_MAX_EXAMPLES = 500
+
 @dataclass
 class TrainingExample:
     """A single visual teaching example."""
@@ -45,8 +51,9 @@ class MemoryBridge:
     matrix of concept embeddings and V is the matrix of VTC vectors.
 
     This mirrors how the MTL rapidly encodes new associations —
-    concept cells in the hippocampus can form from a single exposure
-    (2026 Nature Communications, one-shot perceptual learning).
+    human medial-temporal neurons can form selective responses from
+    a single exposure (single-trial encoding; Rutishauser et al.,
+    2006).
 
     Associations form naturally: when Genesis reads a Wikipedia article
     about "tree" and sees the article's lead image, the VTC vector from
@@ -77,7 +84,9 @@ class MemoryBridge:
         # Maps VTC vectors to concept embedding space
         self.W: np.ndarray | None = None
 
-        # Training examples
+        # Training examples — bounded: every image-in-context appends
+        # one, and save() serializes them all, so an unbounded list
+        # would grow the state file and the O(n) refit forever.
         self._examples: list[TrainingExample] = []
 
         # Concept embedding cache (updated when W is refit)
@@ -108,6 +117,16 @@ class MemoryBridge:
             correct=True,
         ))
         self._concept_embeddings[concept_name] = concept_embedding.copy()
+        if len(self._examples) > _MAX_EXAMPLES:
+            # Evict the oldest examples and drop embedding entries for
+            # concepts that no longer have any example — the embedding
+            # map must stay consistent with the example set because
+            # _refit() indexes it per example.
+            del self._examples[: len(self._examples) - _MAX_EXAMPLES]
+            live = {ex.concept_name for ex in self._examples}
+            for name in list(self._concept_embeddings):
+                if name not in live:
+                    del self._concept_embeddings[name]
         self._refit()
 
     def recognize(self, vtc_vector: np.ndarray) -> tuple[str | None, float]:
@@ -177,7 +196,15 @@ class MemoryBridge:
         Uses ridge regression: W = Eᵀ V (Vᵀ V + λI)⁻¹
         where E = concept embeddings, V = VTC vectors.
         """
-        positive = [ex for ex in self._examples if ex.correct]
+        # Skip examples whose concept embedding isn't available this
+        # session — embeddings aren't persisted (W is retrained from
+        # examples on load), so a restored example can name a concept
+        # whose embedding hasn't been re-learned yet. Indexing it
+        # directly would KeyError.
+        positive = [
+            ex for ex in self._examples
+            if ex.correct and ex.concept_name in self._concept_embeddings
+        ]
         if not positive:
             return
 
@@ -271,7 +298,7 @@ class MemoryBridge:
                     timestamp=ex["timestamp"],
                     correct=ex.get("correct", True),
                 )
-                for ex in data.get("examples", [])
+                for ex in data.get("examples", [])[-_MAX_EXAMPLES:]
             ]
             return True
         except Exception as e:  # noqa: BLE001

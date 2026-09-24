@@ -225,7 +225,7 @@ def perceive(
     Args:
         grid: the raw grid to perceive.
         background: cell value treated as empty space. Defaults to the
-            grid's most common color — the conventional ARC background
+            grid's most common color — the conventional background
             assumption — but callers can override it when the output
             grid's background differs (e.g. recolored tasks).
         diagonal: use 8-connectivity for object extraction instead of

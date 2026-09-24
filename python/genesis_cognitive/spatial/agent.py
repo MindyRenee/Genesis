@@ -67,7 +67,7 @@ class EpisodeResult:
 
 
 def frame_to_grid(frame: Any) -> Grid:
-    """Convert an ARC-AGI-3 frame to a Grid.
+    """Convert an environment frame to a Grid.
 
     Frames arrive as a *list of layers* (each a 2-D array); the final
     layer is the composed scene. A bare 2-D array is accepted too.

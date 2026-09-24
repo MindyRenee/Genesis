@@ -964,7 +964,24 @@ impl IpcServer {
         // Remove stale socket
         let _ = std::fs::remove_file(&server.socket_path);
 
-        let listener = match UnixListener::bind(&server.socket_path) {
+        // Bind under a restrictive umask so the socket file is created
+        // owner-only (srwx------). The IPC protocol has no
+        // authentication and no peer-credential check — filesystem
+        // permissions are the entire access control. Without this the
+        // socket inherits the process umask (typically world-accessible),
+        // giving any local user a control channel into the daemon:
+        // SHUTDOWN, NEURO_IMPULSE, STORE_EPISODE, GET_STATE, and every
+        // other command would be reachable by any process on the host.
+        //
+        // SAFETY: umask is process-global; we restore it immediately
+        // after bind. The window is a few microseconds and the direction
+        // is only toward *more* restrictive permissions for any
+        // concurrently-created file, never less.
+        let old_umask = unsafe { libc::umask(0o077) };
+        let bind_result = UnixListener::bind(&server.socket_path);
+        unsafe { libc::umask(old_umask) };
+
+        let listener = match bind_result {
             Ok(l) => l,
             Err(e) => {
                 eprintln!("[ipc] failed to bind socket: {e}");
@@ -1083,6 +1100,16 @@ impl IpcServer {
             // The LTM guard is scoped to the handler call — holding it
             // across write_message would serialize LTM access against
             // this client's socket latency.
+            //
+            // SHUTDOWN is handled here, not delegated to the handler:
+            // default_handler acks it with `[1]`, but only the server
+            // can set the shutdown flag — delegating would ack a
+            // shutdown that never happens.
+            if cmd == cmd::SHUTDOWN {
+                let _ = write_message(&mut stream, cmd::SHUTDOWN, &[1]);
+                shutdown_flag.store(true, std::sync::atomic::Ordering::Relaxed);
+                return;
+            }
             let response = {
                 let mut guard = ltm.access();
                 handler(mmap, stm, &mut guard, cmd, &payload)
