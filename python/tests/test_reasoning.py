@@ -265,15 +265,16 @@ def test_hypothesis_consistent_path_higher_confidence() -> None:
     net = ConceptNetwork()
     for c in ("a", "b", "c"):
         net.add_concept(c)
-    net.add_edge("a", "b", RelationType.CAUSES)
-    net.add_edge("b", "c", RelationType.CAUSES)
+    net.add_edge("a", "b", RelationType.CAUSES, weight=1.0)
+    net.add_edge("b", "c", RelationType.CAUSES, weight=1.0)
 
     reasoner = ReasoningEngine(net)
     results = reasoner.reason_about("a")
     hypotheses = [r for r in results if r.reasoning_type == ReasoningType.HYPOTHESIS]
     assert len(hypotheses) > 0
-    # Consistent path → base_conf = 0.3 + 0.15 * 1 = 0.45
-    assert hypotheses[0].confidence >= 0.44
+    # Consistent path with full-weight edges →
+    # base_conf = 0.2 + 0.4 * 0.75 (score) + 0.15 (consistency) = 0.65
+    assert hypotheses[0].confidence >= 0.6
 
 
 def test_hypothesis_max_five() -> None:
