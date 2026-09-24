@@ -7,6 +7,7 @@ __pycache__/
 .venv*/
 genesis_data/
 python/genesis_data/
+.genesis-data-dir
 python/voices/
 launch/
 paper/*.pdf
