@@ -50,8 +50,11 @@ verbs, narrative structures) are fine. The final words she speaks are
 not — those must be generated, not recited.
 
 ## Toolchain
-- Rust stable, edition 2024
-- Build: `cargo build` / `cargo build --release`
+- Rust stable, edition 2024 (rust-version 1.85+)
+- Build: `cargo build` / `cargo build --release`. Requires libclang
+  and kernel V4L2 headers — `v4l2-sys-mit` runs `bindgen` against
+  `<linux/videodev2.h>` at build time (Debian/Ubuntu:
+  `sudo apt install libclang-dev linux-libc-dev`).
 - Test: `cargo test`
 - Run examples: `cargo run --example <name>`
 - Python 3.12, dependencies pinned in `python/requirements.txt`
