@@ -7,7 +7,7 @@
 
 Genesis is a long-running program, not a function. A Rust daemon —
 the *subcognitive layer* — owns a memory-mapped core state and runs a
-10 Hz loop integrating neurochemical dynamics, memory consolidation,
+5 Hz loop integrating neurochemical dynamics, memory consolidation,
 and a generative model that predicts the system's own next state. A
 Python *cognitive layer* handles perception, reasoning, language,
 introspection, and self-modeling. The two share a checksummed,
@@ -77,7 +77,7 @@ The measured record for these claims is in [DEVLOG.md](DEVLOG.md).
 
 ### Two layers
 
-**Subcognitive (Rust daemon).** The 10 Hz owner of the core state:
+**Subcognitive (Rust daemon).** The 5 Hz owner of the core state:
 neurochemical dynamics, short→long-term memory consolidation, the
 active-inference generative model, replay-sequence synthesis during
 sleep, and interoception — hardware sensors (CPU temperature, load,

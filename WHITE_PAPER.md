@@ -12,7 +12,7 @@ semantic graph the system builds itself — through inference, study,
 conversation, and definitions synthesized from first principles.
 
 The architecture pairs a Rust daemon — the *subcognitive layer* —
-running a 10 Hz loop that manages neurochemistry, memory
+running a 5 Hz loop that manages neurochemistry, memory
 consolidation, and dream synthesis, with a Python *cognitive layer*
 that handles perception, reasoning, language, introspection, and
 self-modeling. The two communicate through a memory-mapped
@@ -104,7 +104,7 @@ integrity framework in `README.md`).
 └───────────────▲──────────────────────────────▲──────────────┘
                 │ mmap state (read/write)       │ Unix socket IPC
 ┌───────────────▼──────────────────────────────▼──────────────┐
-│              Subcognitive layer (Rust daemon, 10 Hz)        │
+│              Subcognitive layer (Rust daemon, 5 Hz)         │
 │  neurochemistry · consolidation · dreams · interoception    │
 │  active inference · association · dyadic model · cpufreq    │
 └─────────────────────────────────────────────────────────────┘
@@ -139,9 +139,9 @@ Readers use a seqlock for lock-free reads; writers go through the
 daemon. The checksum is the integrity boundary: a corrupted state
 is detected, not trusted.
 
-### 3.2 The 10 Hz tick
+### 3.2 The 5 Hz tick
 
-The daemon's tick loop is the heartbeat. Every 100 ms it advances
+The daemon's tick loop is the heartbeat. Every 200 ms it advances
 neurochemical dynamics, runs interoception, performs memory
 consolidation, evaluates active inference, and emits dream content
 when the system is asleep. Cognition is not synchronous with this
