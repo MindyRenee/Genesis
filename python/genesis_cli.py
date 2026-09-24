@@ -2452,7 +2452,7 @@ def _setup_ambient_listener(
     if listener.available:
         if listener.start():
             print(
-                '[genesis] Ambient listening ON — say "genesis" to address its',
+                '[genesis] Ambient listening ON — say "genesis" to address it',
                 file=sys.stderr,
             )
             print(

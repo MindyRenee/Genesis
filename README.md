@@ -37,7 +37,7 @@ This project exists to demonstrate that in the open.
 
 The full architectural description is in [WHITE_PAPER.md](WHITE_PAPER.md).
 
-[![First boot](https://asciinema.org/a/jIr3t0Ax2W43uSJz.svg)](https://asciinema.org/a/jIr3t0Ax2W43uSJz)
+[![First boot](https://asciinema.org/a/TABFwLwo9fCWOW5J.svg)](https://asciinema.org/a/TABFwLwo9fCWOW5J)
 
 ---
 
