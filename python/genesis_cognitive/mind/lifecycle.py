@@ -768,6 +768,7 @@ class LifecycleMixin:
             restore_self_directed_learner,
             restore_self_improvement,
             restore_spaced_repetition,
+            restore_task_competence,
             restore_td_learner,
             restore_theory_of_mind,
         )
@@ -777,6 +778,7 @@ class LifecycleMixin:
             ("predictive_coding", self.cognition.predictive_coding, restore_predictive_coding),
             ("theory_of_mind", self.cognition.theory_of_mind, restore_theory_of_mind),
             ("procedural_memory", self.cognition.procedural_memory, restore_procedural_memory),
+            ("task_competence", self.cognition.task_competence, restore_task_competence),
             ("spaced_repetition", self.cognition.spaced_repetition, restore_spaced_repetition),
             ("td_learner", self.cognition.td_learner, restore_td_learner),
             ("emotional_memory", self.memory.emotional_memory, restore_emotional_memory),
@@ -942,6 +944,7 @@ class LifecycleMixin:
                 predictive_coding=self.cognition.predictive_coding,
                 theory_of_mind=self.cognition.theory_of_mind,
                 procedural_memory=self.cognition.procedural_memory,
+                task_competence=self.cognition.task_competence,
                 spaced_repetition=self.cognition.spaced_repetition,
                 td_learner=self.cognition.td_learner,
                 emotional_memory=self.memory.emotional_memory,

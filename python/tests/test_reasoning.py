@@ -2180,6 +2180,53 @@ def test_problem_solver_achieve_finds_causes() -> None:
     assert any(step.operator == "goal_check" for step in solution.steps)
 
 
+def test_problem_solver_achieve_ignores_downstream_effects() -> None:
+    """ACHIEVE is not verified by knowing what the goal causes.
+
+    "fire CAUSES heat" is a consequence of the goal, not a means to
+    it — the solver must not claim a route from downstream edges.
+    """
+    net = ConceptNetwork()
+    net.add_concept("flame")
+    net.add_concept("warmth")
+    net.add_edge("flame", "warmth", RelationType.CAUSES)
+    solver = ProblemSolver(net)
+    solution = solver.solve("flame", GoalType.ACHIEVE)
+    # Only downstream causal knowledge exists → no route → unverified.
+    assert not solution.verified
+    assert any(
+        rel == "causes" for step in solution.steps for rel, _t, _w in step.knowledge
+    )
+
+
+def test_problem_solver_achieve_verified_by_enabler() -> None:
+    """ACHIEVE is verified when a means (enabler) to the goal is known."""
+    net = ConceptNetwork()
+    net.add_concept("spark")
+    net.add_concept("flame")
+    net.add_edge("spark", "flame", RelationType.ENABLES)
+    solver = ProblemSolver(net)
+    solution = solver.solve("flame", GoalType.ACHIEVE)
+    assert solution.verified
+
+
+def test_problem_solver_depends_on_points_at_requirement() -> None:
+    """DEPENDS_ON X→Y means X depends on Y — prereqs are outgoing."""
+    net = ConceptNetwork()
+    net.add_concept("task")
+    net.add_concept("tool")
+    net.add_concept("incidental")
+    net.add_edge("task", "tool", RelationType.DEPENDS_ON)
+    net.add_edge("incidental", "task", RelationType.DEPENDS_ON)
+    solver = ProblemSolver(net)
+    solution = solver.solve("task", GoalType.UNDERSTAND)
+    # 'task' depends on 'tool' → 'tool' is the prerequisite subproblem.
+    sub_goals = [s.problem.goal for s in solution.sub_solutions]
+    assert "tool" in sub_goals
+    # 'incidental' depends on 'task' — it is a dependent, not a prereq.
+    assert "incidental" not in sub_goals
+
+
 def test_problem_solver_explain_finds_causes() -> None:
     """EXPLAIN goal finds causes of the target."""
     net = _build_problem_network()
@@ -2300,8 +2347,8 @@ def test_problem_solver_subsolution_tree() -> None:
     net.add_concept("prereq2")
     # goal DEPENDS_ON prereq1, prereq1 DEPENDS_ON prereq2.
     # None have definitions, so all are "un-understood" → subproblems spawn.
-    net.add_edge("prereq1", "goal", RelationType.DEPENDS_ON)
-    net.add_edge("prereq2", "prereq1", RelationType.DEPENDS_ON)
+    net.add_edge("goal", "prereq1", RelationType.DEPENDS_ON)
+    net.add_edge("prereq1", "prereq2", RelationType.DEPENDS_ON)
     # Give prereq2 some properties so the recursion bottoms out.
     net.add_edge("prereq2", "foundational", RelationType.HAS_PROPERTY)
     net.add_edge("prereq2", "prereq1", RelationType.ENABLES)
