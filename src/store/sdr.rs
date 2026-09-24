@@ -321,7 +321,7 @@ pub fn episode_id_to_code(id: u64) -> [u8; LOGHD_N / 2] {
 /// Extract digit `i` from a packed code.
 pub fn code_digit(code: &[u8; LOGHD_N / 2], i: usize) -> u8 {
     let byte_idx = i / 2;
-    if i.is_multiple_of(2) {
+    if i % 2 == 0 {
         (code[byte_idx] >> 4) & 0x0F
     } else {
         code[byte_idx] & 0x0F
