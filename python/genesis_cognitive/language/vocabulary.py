@@ -2463,7 +2463,7 @@ class Vocabulary:
         "enables" (the object enables other things); ``subject``,
         ``object`` and ``others`` carry the graph-derived concepts.
         The connective frames here are grammar seeds; the content is
-        the reasoner's conclusion and the concept names are hers.
+        the reasoner's conclusion and the concept names are its.
         """
         others = [str(o) for o in qualification.get("others", []) if str(o).strip()]
         if not others:

@@ -445,11 +445,11 @@ def main() -> int:
         "--data-dir",
         default=os.path.join(
             os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share")),
-            "genesis-public",
+            "genesis",
         ),
         help=(
             "Path to the data directory "
-            "(default: ${XDG_DATA_HOME:-~/.local/share}/genesis-public, same as run.sh)."
+            "(default: ${XDG_DATA_HOME:-~/.local/share}/genesis, same as run.sh)."
         ),
     )
     parser.add_argument(

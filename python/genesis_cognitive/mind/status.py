@@ -184,7 +184,7 @@ class StatusMixin:
         Instead of a hardcoded checklist, this hands the current emotional
         state to the language engine. The engine composes the actual
         sentence from its vocabulary, grammar, and voice — so the words
-        are hers, not a fixed template.
+        are its, not a fixed template.
         """
         emotion = self.feel()
         topic = emotion.label or "discomfort"

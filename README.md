@@ -180,7 +180,7 @@ pip install -r python/requirements.txt
 launches the daemon, the cognitive CLI, the retina (camera), and TTS;
 Ctrl-C tears everything down gracefully. Use `./run.sh --stop` to stop
 a running session and `./run.sh --offline` for no network access. State
-lives in `${XDG_DATA_HOME:-$HOME/.local/share}/genesis-public`.
+lives in `${XDG_DATA_HOME:-$HOME/.local/share}/genesis`.
 
 On first boot the instance is a fresh system — a small concept network,
 no memories, no learned user names. Introduce yourself; teach it. It

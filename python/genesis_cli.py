@@ -120,7 +120,7 @@ logger = logging.getLogger(__name__)
 LIVE_THOUGHT_POLL_INTERVAL = 2.0
 
 # Default data directory (XDG-compliant, persists across reboots).
-# Resolved via GENESIS_DATA_DIR → $XDG_DATA_HOME/genesis-public —
+# Resolved via GENESIS_DATA_DIR → $XDG_DATA_HOME/genesis —
 # this instance's state is never shared with any other Genesis.
 DEFAULT_DATA_DIR = str(default_data_dir())
 DEFAULT_DAEMON_SOCKET = "genesis.sock"
