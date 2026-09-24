@@ -2,9 +2,11 @@
 name = "genesis"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 authors = ["Mindy Beatty"]
 description = "A machine-native cognitive architecture with coupled neurochemical dynamics and active inference"
 license-file = "LICENSE"
+repository = "https://github.com/MindyRenee/Genesis"
 
 [dependencies]
 flate2 = "1.1.9"
