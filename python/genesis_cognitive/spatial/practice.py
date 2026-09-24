@@ -22,6 +22,7 @@ Protocol — no teaching, no correction:
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -29,6 +30,7 @@ from .grid import Grid
 from .solver import SpatialReasoner
 
 _PROGRESS_FILE = "spatial_practice.json"
+logger = logging.getLogger(__name__)
 
 
 def _g(rows: list[list[int]]) -> Grid:
@@ -322,6 +324,16 @@ class SpatialPractice:
             elif sol.failure is not None:
                 failure = sol.failure.describe()
         self._save()
+        try:
+            # The held-out test is the external verifier: only its
+            # outcome decides whether a train-verified rule becomes a
+            # reusable skill.
+            reasoner.record_task_outcome(
+                sol, success=solved, score=score,
+                examples=list(task["train"]),
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug("task competence update failed: %s", e)
 
         return PracticeAttempt(
             task=name,

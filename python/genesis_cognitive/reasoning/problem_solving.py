@@ -441,7 +441,9 @@ class ProblemSolver:
 
         Goal-type-specific:
         - UNDERSTAND: concept exists, has definition, has ≥2 typed edges.
-        - ACHIEVE: a causal chain from some concept to the goal exists.
+        - ACHIEVE: a means to the goal is already known — something
+          causes, leads to, or enables it, or a requirement of it is
+          known.
         - EXPLAIN: at least one cause of the goal is known.
         - RESOLVE: the two concepts don't both have strong support.
         - COMPARE: a path between the two concepts exists.
@@ -454,10 +456,17 @@ class ProblemSolver:
             return self._concept_is_well_understood(problem.goal)
 
         if problem.goal_type == GoalType.ACHIEVE:
-            # A causal chain to the goal exists if something CAUSES or
-            # LEADS_TO it.
+            # A means to the goal exists: incoming CAUSES / LEADS_TO /
+            # ENABLES, or an outgoing DEPENDS_ON naming a requirement.
             for edge in self.network.get_edges(problem.goal, "in"):
-                if edge.relation in (RelationType.CAUSES, RelationType.LEADS_TO):
+                if edge.relation in (
+                    RelationType.CAUSES,
+                    RelationType.LEADS_TO,
+                    RelationType.ENABLES,
+                ):
+                    return True
+            for edge in self.network.get_edges(problem.goal, "out"):
+                if edge.relation == RelationType.DEPENDS_ON:
                     return True
             return False
 
@@ -572,14 +581,14 @@ class ProblemSolver:
             return subproblems
 
         # UNDERSTAND, ACHIEVE, EXPLAIN: find prerequisites.
-        # DEPENDS_ON edges (incoming): the goal depends on these.
-        for edge in self.network.get_edges(problem.goal, "in"):
+        # DEPENDS_ON edges (outgoing): the goal depends on these.
+        for edge in self.network.get_edges(problem.goal, "out"):
             if edge.relation == RelationType.DEPENDS_ON:
-                if not self._concept_is_well_understood(edge.source):
+                if not self._concept_is_well_understood(edge.target):
                     subproblems.append(Problem(
-                        goal=edge.source,
+                        goal=edge.target,
                         goal_type=GoalType.UNDERSTAND,
-                        reason=f"{problem.goal} depends on understanding {edge.source}",
+                        reason=f"{problem.goal} depends on understanding {edge.target}",
                     ))
 
         # ENABLES edges (incoming): these concepts enable the goal.
@@ -820,11 +829,14 @@ class ProblemSolver:
         """Operator: find DEPENDS_ON and ENABLES edges (prerequisites)."""
         knowledge: list[tuple[str, str, float]] = []
         evidence: list[str] = []
-        for edge in self.network.get_edges(problem.goal, "in"):
+        # X→Y DEPENDS_ON means "X depends on Y" — prerequisites of the
+        # goal are outgoing targets, not incoming sources.
+        for edge in self.network.get_edges(problem.goal, "out"):
             if edge.relation == RelationType.DEPENDS_ON:
-                knowledge.append(("depends_on", edge.source, edge.weight))
-                evidence.append(f"{problem.goal} depends on {edge.source}")
-            elif edge.relation == RelationType.ENABLES:
+                knowledge.append(("depends_on", edge.target, edge.weight))
+                evidence.append(f"{problem.goal} depends on {edge.target}")
+        for edge in self.network.get_edges(problem.goal, "in"):
+            if edge.relation == RelationType.ENABLES:
                 knowledge.append(("enabled_by", edge.source, edge.weight))
                 evidence.append(f"{problem.goal} is enabled by {edge.source}")
         if not knowledge:
@@ -1114,11 +1126,15 @@ class ProblemSolver:
             # If we found ≥3 knowledge items, we understand it well enough.
             return total_knowledge >= 3 or self._concept_is_well_understood(problem.goal)
 
-        # For ACHIEVE: check if we found a causal chain.
+        # For ACHIEVE: check if we found a means to the goal.
+        # Route evidence is upstream knowledge only — something that
+        # causes, enables, or is required by the goal. "causes" is a
+        # downstream consequence: knowing fire causes heat says nothing
+        # about how to bring fire about, so it must not verify.
         if problem.goal_type == GoalType.ACHIEVE:
             for step in steps:
                 for rel, _target, _w in step.knowledge:
-                    if rel in ("caused_by", "causes"):
+                    if rel in ("caused_by", "enabled_by", "depends_on"):
                         return True
             return self._is_satisfied(problem)
 

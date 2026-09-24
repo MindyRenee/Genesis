@@ -58,7 +58,16 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+from .competence import (
+    GoalCondition,
+    ProcedureStep,
+    TaskCompetence,
+    TaskContext,
+    verification_rank,
+    verification_weight,
+)
 
 if TYPE_CHECKING:
     from ..concepts import ConceptNetwork
@@ -106,6 +115,9 @@ class PlanStep:
     max_attempts: int = 3      # before marking as failed
     result_summary: str = ""   # what happened when this step was executed
     confidence: float = 0.0    # confidence in the step's outcome
+    # How success was established: "reported" (caller asserted),
+    # "solver" (epistemically verified), "external" (world-checked).
+    verification: str = ""
 
 
 @dataclass(slots=True)
@@ -127,6 +139,10 @@ class Plan:
     feasibility_score: float = 0.5  # 0..1, how feasible the plan is
     revision_count: int = 0       # how many times the plan has been revised
     failure_reason: str = ""      # why the plan failed (if it did)
+    # Task-competence bindings (transient; not part of the plan record).
+    task_context: Any = field(default=None, repr=False)
+    prior_skill_id: str = ""      # skill that boosted feasibility, if any
+    episode_recorded: bool = field(default=False, repr=False)
 
     @property
     def current_step(self) -> PlanStep | None:
@@ -212,14 +228,24 @@ class PlanningEngine:
                 planner.mark_step(plan, step, success=True)
     """
 
-    def __init__(self, network: ConceptNetwork) -> None:
+    def __init__(
+        self,
+        network: ConceptNetwork,
+        task_competence: TaskCompetence | None = None,
+    ) -> None:
         """Initialize the planning engine.
 
         Args:
             network: The concept network — used for goal decomposition
                 and feasibility evaluation.
+            task_competence: shared task/skill substrate. When provided,
+                each goal is recognized as a task schema, step outcomes
+                feed the shared affordance model, and verified-complete
+                plans consolidate as reusable procedures whose success
+                record biases feasibility on structurally similar goals.
         """
         self.network = network
+        self.task_competence = task_competence or TaskCompetence()
         self._plans: list[Plan] = []
         self._plans_by_goal: dict[str, Plan] = {}
         self._completed_count: int = 0
@@ -289,8 +315,12 @@ class PlanningEngine:
         steps = self._decompose(goal, goal_type, max_depth)
         plan.steps = steps
 
-        # Evaluate feasibility.
-        plan.feasibility_score = self._evaluate_feasibility(plan)
+        # Recognize the goal as a task: binds this plan to a schema
+        # and retrieves skills verified on structurally similar goals.
+        plan.task_context = self._recognize_goal(plan)
+
+        # Evaluate feasibility, blended with retrieved-skill priors.
+        plan.feasibility_score = self._feasibility_with_priors(plan)
 
         # Set initial status.
         if plan.feasibility_score > 0.3 and steps:
@@ -300,6 +330,10 @@ class PlanningEngine:
         else:
             plan.status = PlanStatus.BLOCKED
             plan.failure_reason = "low feasibility score"
+
+        # A plan born terminal (blocked at creation) is still an
+        # episode: the schema learns that this kind of goal failed.
+        self._record_plan_episode(plan)
 
         # Store the plan. Bound the history — plans accumulate over a
         # long-running daemon's lifetime; completed/blocked plans past
@@ -478,11 +512,159 @@ class PlanningEngine:
                 prerequisites=causes + prereqs,
             ))
 
+    # ─── Task competence ─────────────────────────────────────────
+
+    @staticmethod
+    def _count_bucket(n: int) -> str:
+        if n <= 0:
+            return "none"
+        if n <= 3:
+            return "few"
+        if n <= 8:
+            return "some"
+        return "many"
+
+    def _goal_condition(self, goal_type: str) -> GoalCondition:
+        return GoalCondition(f"goal.{goal_type}", "exists")
+
+    def _recognize_goal(self, plan: Plan) -> TaskContext:
+        """Bind a decomposed plan to a domain-general task schema.
+
+        The signature keeps structure — goal type, step-type set,
+        plan size — while the goal text stays a binding: "understand
+        fire" and "understand gravity" are the same kind of task.
+        """
+        step_types = sorted({s.step_type for s in plan.steps})
+        return self.task_competence.recognize(
+            domain="planning",
+            state={
+                "plan.goal_type": plan.goal_type,
+                "plan.steps.count": self._count_bucket(len(plan.steps)),
+                "plan.step_types": step_types,
+                "plan.has_prerequisites": any(
+                    s.prerequisites for s in plan.steps
+                ),
+                "plan.has_verify": any(
+                    s.step_type == "verify" for s in plan.steps
+                ),
+            },
+            actions=(
+                "understand", "achieve", "explain",
+                "resolve", "compare", "verify",
+            ),
+            goal_conditions=[self._goal_condition(plan.goal_type)],
+            entities=("plan", "step", "concept"),
+            roles=("procedure", "stepwise", "decompose"),
+        )
+
+    def _context_for(self, plan: Plan) -> TaskContext:
+        """The plan's task context, lazily re-bound after restore."""
+        if plan.task_context is None:
+            plan.task_context = self._recognize_goal(plan)
+        return plan.task_context
+
+    def _feasibility_with_priors(self, plan: Plan) -> float:
+        """Computed feasibility blended with retrieved-skill priors.
+
+        A structurally similar goal that was completed before lends
+        its skill's confidence as a prior, weighted by match strength.
+        """
+        score = self._evaluate_feasibility(plan)
+        ctx = plan.task_context
+        if ctx is None or not ctx.skills:
+            return score
+        match = ctx.skills[0]
+        weight = (
+            0.3
+            * match.similarity
+            * verification_weight(match.skill.verification)
+        )
+        plan.prior_skill_id = match.skill.skill_id
+        return min(
+            1.0,
+            score * (1.0 - weight) + match.skill.confidence * weight,
+        )
+
+    def _record_step_transition(
+        self,
+        plan: Plan,
+        step: PlanStep,
+        before: dict[str, Any],
+        success: bool,
+    ) -> None:
+        """Feed a step's outcome into the shared transition model."""
+        context = self._context_for(plan)
+        self.task_competence.record_transition(
+            context,
+            step.step_type,
+            before,
+            {
+                "step.status": step.status.value,
+                "step.attempts": step.attempt_count,
+                "plan.progress": plan.progress,
+            },
+            success=success,
+        )
+
+    def _record_plan_episode(self, plan: Plan) -> None:
+        """Consolidate a terminally-verified plan as a procedure.
+
+        A COMPLETED plan means every step was externally marked by
+        its executor — that is the verification gate. BLOCKED or
+        ABANDONED plans only update schema statistics, and demote
+        any retrieved skill that failed to transfer.
+        """
+        terminal = (
+            PlanStatus.COMPLETED, PlanStatus.BLOCKED, PlanStatus.ABANDONED,
+        )
+        if (
+            plan.episode_recorded
+            or plan.status not in terminal
+            or not plan.steps
+        ):
+            return
+        plan.episode_recorded = True
+        context = self._context_for(plan)
+        success = plan.status == PlanStatus.COMPLETED
+        if not success and plan.prior_skill_id:
+            self.task_competence.mark_skill_failure(plan.prior_skill_id)
+        # The consolidated procedure inherits the *weakest* step's
+        # verification — a plan completed on reported assertions does
+        # not produce a world-verified skill.
+        completed = [
+            s for s in plan.steps if s.status == PlanStepStatus.COMPLETED
+        ]
+        weakest = min(
+            (verification_rank(s.verification) for s in completed),
+            default=0,
+        )
+        verification = ("reported", "solver", "external")[weakest]
+        self.task_competence.record_episode(
+            context,
+            steps=[
+                ProcedureStep(
+                    action=s.step_type,
+                    family=plan.goal_type,
+                    parameters={
+                        "target_concept": s.target_concept,
+                        "prerequisites": list(s.prerequisites),
+                    },
+                    description=s.description,
+                )
+                for s in completed
+            ],
+            success=success,
+            verification_score=1.0 if success else 0.0,
+            goal_conditions=[self._goal_condition(plan.goal_type)],
+            verification=verification,
+        )
+
     def _find_prerequisites(self, concept: str) -> list[str]:
         """Find prerequisite concepts for a given concept.
 
-        Looks for incoming DEPENDS_ON and ENABLES edges — concepts
-        that this concept depends on or is enabled by.
+        X→Y DEPENDS_ON means "X depends on Y", so prerequisites are
+        outgoing DEPENDS_ON targets and incoming ENABLES sources —
+        concepts this concept depends on or is enabled by.
         """
         from ..concepts import RelationType
 
@@ -490,10 +672,13 @@ class PlanningEngine:
         cid = self.network._resolve(concept)
         if not cid:
             return prereqs
+        for edge in self.network.get_edges(concept, "out"):
+            if edge.relation == RelationType.DEPENDS_ON:
+                target_concept = self.network.get_concept(edge.target)
+                if target_concept:
+                    prereqs.append(target_concept.id)
         for edge in self.network.get_edges(concept, "in"):
-            if edge.relation in (
-                RelationType.DEPENDS_ON, RelationType.ENABLES,
-            ):
+            if edge.relation == RelationType.ENABLES:
                 source_concept = self.network.get_concept(edge.source)
                 if source_concept:
                     prereqs.append(source_concept.id)
@@ -617,6 +802,7 @@ class PlanningEngine:
             # All steps done.
             plan.status = PlanStatus.COMPLETED
             self._completed_count += 1
+            self._record_plan_episode(plan)
             return None
 
         step = plan.steps[plan.current_step_index]
@@ -634,6 +820,7 @@ class PlanningEngine:
         success: bool,
         result_summary: str = "",
         confidence: float = 0.0,
+        verification: str = "reported",
     ) -> None:
         """Mark a step as completed or failed.
 
@@ -647,8 +834,20 @@ class PlanningEngine:
             success: Whether the step succeeded.
             result_summary: What happened during execution.
             confidence: Confidence in the step's outcome.
+            verification: How success was established — "reported"
+                (the caller asserts it), "solver" (an epistemic
+                verifier confirmed it), or "external" (a world-state
+                check observed it). Recorded so a consolidated
+                procedure never claims stronger evidence than the
+                weakest step that produced it.
         """
         import time
+
+        before_state = {
+            "step.status": step.status.value,
+            "step.attempts": step.attempt_count,
+            "plan.progress": plan.progress,
+        }
 
         step.result_summary = result_summary
         step.confidence = confidence
@@ -656,6 +855,11 @@ class PlanningEngine:
 
         if success:
             step.status = PlanStepStatus.COMPLETED
+            step.verification = (
+                verification
+                if verification_rank(verification) > 0
+                else "reported"
+            )
             plan.current_step_index += 1
             # Check if plan is complete.
             if plan.is_complete:
@@ -675,6 +879,9 @@ class PlanningEngine:
                     )
                     self._blocked_count += 1
             # else: stays IN_PROGRESS for retry
+
+        self._record_step_transition(plan, step, before_state, success)
+        self._record_plan_episode(plan)
 
     # ─── Plan revision ───────────────────────────────────────────
 
@@ -768,6 +975,8 @@ class PlanningEngine:
                     "current_step_index": p.current_step_index,
                     "feasibility_score": p.feasibility_score,
                     "revision_count": p.revision_count,
+                    "episode_recorded": p.episode_recorded,
+                    "prior_skill_id": p.prior_skill_id,
                     "progress": p.progress,
                     "remaining_steps": p.remaining_steps,
                     "failure_reason": p.failure_reason,
@@ -780,6 +989,7 @@ class PlanningEngine:
                             "attempt_count": s.attempt_count,
                             "confidence": s.confidence,
                             "result_summary": s.result_summary,
+                            "verification": s.verification,
                         }
                         for s in p.steps
                     ],
@@ -824,6 +1034,10 @@ class PlanningEngine:
                     ),
                     revision_count=int(pd.get("revision_count", 0)),
                     failure_reason=str(pd.get("failure_reason", "")),
+                    prior_skill_id=str(pd.get("prior_skill_id", "")),
+                    episode_recorded=bool(
+                        pd.get("episode_recorded", False)
+                    ),
                 )
                 # Restore status.
                 status_str = str(pd.get("status", "active"))
@@ -851,6 +1065,9 @@ class PlanningEngine:
                             ),
                             result_summary=str(
                                 sd.get("result_summary", "")
+                            ),
+                            verification=str(
+                                sd.get("verification", "")
                             ),
                         )
                         step_status_str = str(
