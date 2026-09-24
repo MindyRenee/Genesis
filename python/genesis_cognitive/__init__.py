@@ -102,7 +102,6 @@ from .executive import (
     TaskState,
 )
 from .global_workspace import GlobalWorkspace, WorkspaceItem, WorkspaceModule
-from .journal import Journal, JournalEntry
 from .language import (
     ComprehensionEngine,
     ComprehensionResult,
@@ -355,8 +354,6 @@ __all__ = [
     "Insight",
     "IntegratedPerception",
     "Intent",
-    "Journal",
-    "JournalEntry",
     "KComplex",
     "KnowledgeLevel",
     "LanguageEngine",

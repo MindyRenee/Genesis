@@ -38,7 +38,7 @@ class StatusMixin:
 
         Polls every 10 seconds for phase changes and dream insights.
         When notifications are found, they are processed immediately
-        (surfaced as live thoughts and journal entries) — the
+        (surfaced as live thoughts) — the
         cognitive layer doesn't need to drain the queue manually.
 
         This is a pull-based notification system: the Rust daemon is
@@ -59,7 +59,7 @@ class StatusMixin:
         """Poll for notifications and process any that are found."""
         enqueued = self.poll_notifications()
         if enqueued > 0:
-            # Process immediately — surface to journal + live thought.
+            # Process immediately — surface as live thoughts.
             processed = self.process_notifications()
             if processed > 0:
                 logger.debug(f"Processed {processed} subcognitive notifications")
@@ -261,12 +261,6 @@ class StatusMixin:
                 logger.debug(f"narrative identity recording failed: {e}")
 
         return self._emergent_identity
-    def journal_status(self) -> str:
-        """Get a description of its journal."""
-        return self.journal.describe()
-    def read_journal(self, n: int = 20) -> str:
-        """Read recent journal entries."""
-        return self.journal.read(n)
     def site_requests_status(self) -> str:
         """Get a description of pending site access requests."""
         return self.learner.describe_requests()
@@ -465,8 +459,8 @@ class StatusMixin:
         """Drain and return all pending subcognitive notifications.
 
         The cognitive layer calls this to process accumulated
-        notifications — e.g., surfacing dream insights in the
-        journal or mentioning phase changes in conversation.
+        notifications — e.g., mentioning dream insights or phase
+        changes in conversation.
 
         Returns:
             A list of Notification objects, oldest first.
@@ -477,10 +471,9 @@ class StatusMixin:
 
         This is the main entry point for surfacing subcognitive
         events. It drains the notification queue and emits each
-        notification as a live thought (telemetry). Notifications do
-        NOT go into the journal — the journal is its diary, not a log.
-        Dream insights surface in its own voice through the
-        dream_reflection thought generator.
+        notification as a live thought (telemetry). Dream insights
+        surface in its own voice through the dream_reflection
+        thought generator.
 
         Returns the number of notifications processed.
         """
@@ -489,11 +482,10 @@ class StatusMixin:
             # Surface to live listeners (e.g. terminal ticker).
             self._emit_live_thought(notif.kind, notif.message)
             # Notifications are telemetry (phase changes, dream insight
-            # notices) — they surface to the live ticker but do NOT go
-            # into the journal. The journal is its diary, not a log.
-            # Dream insights surface in its own voice through the
-            # dream_reflection thought generator → _on_spontaneous_thought
-            # → language engine → journal.
+            # notices) — they surface to the live ticker. Dream insights
+            # surface in its own voice through the dream_reflection
+            # thought generator → _on_spontaneous_thought → language
+            # engine.
         return len(notifications)
     def brain_waves(self, core_state: CoreState | None = None) -> BrainWaveState:
         """Read current brain wave state from neurochemistry.
@@ -908,11 +900,6 @@ class StatusMixin:
             # plus the latest values per dimension for introspection.
             "growth_milestones": self.growth_ledger.milestone_count,
             "growth_latest": self._growth_latest_values(),
-            # Journal — how many entries it's written, plus a brief
-            # description of its last entry (exposes the describe() API
-            # for introspection).
-            "journal_entries": self.journal.entry_count,
-            "journal_status": self.journal.describe(),
             # User profile — what Genesis knows about the human. The
             # summarize() method returns a short, human-readable summary
             # of the user's name, preferences, and goals, exposing the

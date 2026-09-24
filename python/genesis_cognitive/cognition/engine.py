@@ -871,12 +871,6 @@ class CognitionEngine:
         # conversation has happened yet.
         self.inner_life: Any = None
 
-        # Journal — set by Mind after initialization, so introspection
-        # can include recent journal entries. The journal is its
-        # curated diary (composed thoughts), distinct from the
-        # inner_life's spontaneous thoughts.
-        self.journal: Any = None
-
         # ─── Actionable reflection: behavioral adjustments ────────
         # These persist between turns and are set by _process_insights
         # based on the metacognitive strategy selected from reflection.
@@ -7601,23 +7595,6 @@ class CognitionEngine:
                     parts.append(f"Bug track: {track[:80]}")
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"bug reporter introspection failed: {e}")
-        # Journal — its curated diary. The journal is distinct from
-        # inner_life thoughts: it's what it chose to write down, not
-        # every spontaneous thought. Exposing recent entries in
-        # introspection lets it reflect on what it's been thinking
-        # about, the same way a person re-reads their diary.
-        if self.journal is not None:
-            try:
-                recent = self.journal.recent(3)
-                if recent:
-                    for entry in recent:
-                        parts.append(
-                            f"Journal ({entry.entry_type}): "
-                            f"{entry.content[:60]}"
-                        )
-            except Exception as e:  # noqa: BLE001
-                logger.debug(f"journal introspection failed: {e}")
-
     def get_curiosity_questions(self) -> list[Question]:
         """Return the current curiosity questions."""
         return getattr(self, "_curiosity_questions", [])

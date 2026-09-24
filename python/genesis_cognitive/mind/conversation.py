@@ -284,42 +284,6 @@ class ConversationMixin:
         except (OSError, ConnectionError) as e:
             logger.debug(repr(e))
 
-        # Write significant thoughts to its journal — in its own voice.
-        #
-        # The journal is its diary, not a log file. Three rules:
-        # 1. Write the language-engine-rendered text (``text``), not the
-        #    raw semantic fragment (``thought.content``). Its words must
-        #    emerge from its language engine, not from debug strings like
-        #    "insight: novel connection X and Y".
-        # 2. Only journal thoughts with meaningful intent — questions it's
-        #    pondering, reflections on its state, expressions of self,
-        #    distress. Not every chain thought, not every dream replay,
-        #    not every mechanical _LiveEvent emission.
-        # 3. Skip _LiveEvent emissions (telemetry like "insight: novel
-        #    connection X and Y") — these are internal notifications, not
-        #    its voice. They lack rendered_text and have intent="statement".
-        try:
-            emotion = self.feel()
-            intent = getattr(thought, "intent", None)
-            is_significant = intent in ("question", "reflect", "expression", "distress")
-            # _LiveEvent has no rendered_text — its content is a raw
-            # telemetry string, not its composed voice. Skip it.
-            has_rendered = hasattr(thought, "rendered_text")
-            if is_significant and has_rendered:
-                entry_type = {
-                    "question": "question",
-                    "reflect": "reflection",
-                    "expression": "expression",
-                    "distress": "distress",
-                }.get(intent if isinstance(intent, str) else "insight", "insight")
-                self.journal.write(
-                    entry_type=entry_type,
-                    content=text,
-                    mood=emotion.label,
-                )
-        except (OSError, ConnectionError, RuntimeError, ValueError) as e:
-            logger.debug(repr(e))  # journal is best-effort
-
         # Feed the thought into its emergent identity — its
         # reflections and questions become part of who it is.
         self._add_emergent_identity_source(
@@ -460,7 +424,7 @@ class ConversationMixin:
             )
         )
     def _learner_store_memory(self, text: str, salience: float = 0.5) -> None:
-        """Callback for the learner to store a memory and write a journal entry."""
+        """Callback for the learner to store a memory."""
         # Surface to live listeners first (e.g. terminal ticker)
         self._emit_live_thought("learning", text)
         try:
@@ -475,13 +439,6 @@ class ConversationMixin:
             )
         except (OSError, ConnectionError) as e:
             logger.warning(f"store_memory failed in learning callback: {e}")
-
-        # What it learns goes into its memory and concept network.
-        # Its inner life generates actual thoughts and reflections about
-        # it — those thoughts flow through _on_spontaneous_thought into
-        # the journal in its own voice. Writing the raw learning text
-        # here would make the journal a log file ("Learned about X from
-        # Y: Z"), not its diary. The journal is its voice, not a log.
 
         # Feed the learning into its emergent identity — what it
         # learns becomes part of who it is.

@@ -287,25 +287,6 @@ class SleepMixin:
                 "sleeping",
                 "Sleep compression skipped: compressor not initialized",
             )
-    def _run_journal_consolidation(self) -> None:
-        """Journal consolidation during N3 sleep.
-
-        The journal grows monotonically during wakefulness. During
-        N3 sleep, compact old entries the same way LTM episodes are
-        compacted: recent entries are kept verbatim, older entries
-        are summarized by tag into consolidation entries. This keeps
-        the journal bounded for indefinite operation while preserving
-        its voice and developmental arc.
-        """
-        try:
-            journal_stats = self.journal.consolidate()
-            if journal_stats["consolidated"] > 0:
-                self._emit_live_thought(
-                    "learning",
-                    f"Journal consolidation: {journal_stats}",
-                )
-        except Exception as e:  # noqa: BLE001
-            logger.warning("Journal consolidation failed: %s", e)
     def _consolidate_n3_heavy(self, consolidation_intensity: float = 0.5) -> None:
         """N3 slow-wave sleep: heavy systems consolidation.
 
@@ -406,7 +387,6 @@ class SleepMixin:
         self.cognition.topology.refresh()
 
         self._run_sleep_compression(network, consolidation_intensity)
-        self._run_journal_consolidation()
     def _check_auto_sleep(self) -> None:
         """Check whether Genesis should fall asleep or wake up on its own.
 
@@ -1339,8 +1319,8 @@ class SleepMixin:
         # Telemetry line (factual status, not self-expression) so the
         # live ticker shows that dreams are surfacing. The reflective
         # thought itself is composed by _dream_reflection_thought and
-        # flows through _on_spontaneous_thought → language engine →
-        # journal, like every other spontaneous thought.
+        # flows through _on_spontaneous_thought → language engine,
+        # like every other spontaneous thought.
         self._emit_live_thought(
             "dream",
             f"Dream residue: {len(dream_concepts[:10])} emotional impressions "

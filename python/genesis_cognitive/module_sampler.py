@@ -95,7 +95,6 @@ _FILE_MODULE = {
     "executive.py": MODULE_INTENTION,
     "global_workspace.py": MODULE_ATTENTION,
     "growth_ledger.py": MODULE_METACOGNITION,
-    "journal.py": MODULE_METACOGNITION,
     "module_sampler.py": MODULE_METACOGNITION,
     "narrative.py": MODULE_METACOGNITION,
     "notifications.py": MODULE_METACOGNITION,

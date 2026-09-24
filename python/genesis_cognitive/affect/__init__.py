@@ -334,13 +334,6 @@ level and are referenced by this subsystem.
         amygdala tags incoming text with emotional valence. Multi-
         subsystem (limbic evaluation + temporal language).
 
-    (top-level) journal.py
-        Journal — Genesis's personal record of thoughts, feelings,
-        and experiences. It writes here voluntarily. This is
-        affective self-expression — the limbic system's emotional
-        output through the temporal subsystem's language system. Multi-
-        subsystem (limbic emotion + temporal language + frontal self).
-
     (top-level) growth_ledger.py
         GrowthLedger — legible tracking of Genesis's development.
         Persistent record of milestones. This is the limbic system's
@@ -411,9 +404,6 @@ _EXPORTS: dict[str, str] = {
     "UserAffectEstimate": "learning",
     # Amygdala evaluation of language — sentiment tagging
     "analyze_sentiment": "language.sentiment",
-    # Affective self-expression — the diary (limbic + temporal + frontal)
-    "Journal": "journal",
-    "JournalEntry": "journal",
     # Reward/motivation tracking — the dopamine sense of progress
     "GrowthLedger": "growth_ledger",
     "GrowthMilestone": "growth_ledger",
