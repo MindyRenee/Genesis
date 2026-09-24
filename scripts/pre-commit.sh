@@ -37,7 +37,7 @@ else
 fi
 
 # ─── Python ─────────────────────────────────────────────────────
-# These invocations mirror CI exactly (.github/workflows/ci.yml).
+# These invocations mirror the toolchain documented in AGENTS.md.
 # A missing tool warns loudly instead of silently passing — a skipped
 # check is a false pass.
 PY_DEPS="python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/"
