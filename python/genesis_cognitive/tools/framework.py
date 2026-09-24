@@ -87,6 +87,16 @@ class ToolRegistry:
         )
         self.register(
             Tool(
+                "analyze_python",
+                "Structural analysis of a Python file: symbols, call "
+                "edges, per-function cyclomatic complexity, imports, "
+                "and optional impact analysis for a named symbol. "
+                "Read-only.",
+                analyze_python_file,
+            )
+        )
+        self.register(
+            Tool(
                 "write_file",
                 "Write content to a file, creating it and parent dirs if needed.",
                 write_file,
@@ -230,6 +240,65 @@ def compile_python_file(path: str, project_root: str = ".") -> ToolResult:
         return ToolResult(success=True, output=f"Compiled {path} successfully.")
     except py_compile.PyCompileError as e:
         return ToolResult(success=False, error=str(e))
+
+
+def analyze_python_file(
+    path: str,
+    project_root: str = ".",
+    symbol: str | None = None,
+) -> ToolResult:
+    """Structurally analyze a Python file without executing it.
+
+    Returns a JSON-safe summary in ``data["analysis"]``: scoped
+    symbols, call edges, cyclomatic complexity, imports. When
+    ``symbol`` is given, ``data["impact"]`` reports the transitive
+    dependents — the change-propagation surface.
+    """
+    from .code_analysis import (
+        analyze_python_source,
+        impact_of,
+        summarize,
+    )
+
+    safe = _safe_path(path, project_root)
+    if safe is None:
+        return ToolResult(success=False, error=f"Path is outside project root: {path}")
+    if not safe.is_file():
+        return ToolResult(success=False, error=f"File not found: {path}")
+    if safe.suffix.lower() != ".py":
+        return ToolResult(success=False, error=f"Not a Python file: {path}")
+    try:
+        source = safe.read_text(encoding="utf-8")
+    except OSError as e:
+        return ToolResult(success=False, error=f"Could not read {path}: {e}")
+    try:
+        analysis = analyze_python_source(source, str(safe))
+    except SyntaxError as e:
+        return ToolResult(success=False, error=f"Syntax error in {path}: {e}")
+
+    data: dict[str, Any] = {"analysis": summarize(analysis)}
+    if symbol:
+        data["impact"] = impact_of(analysis, symbol)
+    summary = data["analysis"]
+    counts = summary.get("symbol_counts", {})
+    output = (
+        f"{path}: {summary['lines']} lines, "
+        f"{counts.get('function', 0)} functions, "
+        f"{counts.get('method', 0)} methods, "
+        f"{counts.get('class', 0)} classes, "
+        f"{summary['call_edge_count']} call edges, "
+        f"max complexity {summary['max_complexity']}"
+    )
+    if symbol and isinstance(data.get("impact"), dict):
+        imp = data["impact"]
+        if imp.get("found"):
+            output += (
+                f" | {imp['symbol']}: {imp['fan_in']} direct dependents, "
+                f"{len(imp.get('transitive_dependents', []))} transitive"
+            )
+        else:
+            output += f" | symbol not found: {symbol}"
+    return ToolResult(success=True, output=output, data=data)
 
 
 def run_pytest(target: str, project_root: str = ".") -> ToolResult:

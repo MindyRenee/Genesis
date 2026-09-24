@@ -19,6 +19,7 @@ the chain of evidence, and a confidence score.
 
 from __future__ import annotations
 
+import heapq
 import math
 from dataclasses import dataclass, field
 from enum import Enum
@@ -79,6 +80,14 @@ class ReasoningResult:
     novel: bool = False  # is this a new insight?
     contradictions: list[str] = field(default_factory=list)
     knowledge: list[tuple[str, str, float]] = field(default_factory=list)
+    # Structured provenance: the graph path that produced this result.
+    # Entries are (source, relation, target, weight) — the evidence the
+    # epistemic layer should score, kept structured so nothing downstream
+    # has to re-parse conclusion strings to recover it.
+    path: list[tuple[str, str, str, float]] = field(default_factory=list)
+    # True when inference budget was exhausted before the frontier was —
+    # a completeness caveat, not a confidence adjustment.
+    partial: bool = False
 
     def describe(self) -> str:
         """Describe the reasoning process."""
@@ -94,7 +103,63 @@ class ReasoningResult:
             lines.append("  [NOVEL INSIGHT]")
         if self.contradictions:
             lines.append(f"  Contradictions: {', '.join(self.contradictions)}")
+        if self.partial:
+            lines.append("  [PARTIAL — inference budget exhausted]")
         return "\n".join(lines)
+
+
+# ─── Inference budgeting ────────────────────────────────────────────
+#
+# Graph inference is exponential in branching factor. The old DFS
+# expanded every edge at every node within ``depth`` — fine at 35
+# concepts, unbounded at thousands. The budget caps total edge
+# expansions per ``reason_about`` call; when it runs out, results are
+# marked ``partial`` so callers know the frontier was truncated rather
+# than absent. Weights and origins, not traversal order, decide which
+# branches earn the budget.
+
+# Scaling factor: expansions per unit of reasoning depth.
+_EXPANSIONS_PER_DEPTH = 24
+# Hard floor/ceiling so degenerate depth values can't produce a
+# zero-work or runaway pass.
+_MIN_EXPANSIONS = 64
+_MAX_EXPANSIONS = 4096
+# Transitive results below this strength are not worth reporting —
+# a long chain of weak edges is noise, not knowledge.
+_MIN_PATH_CONFIDENCE = 0.08
+
+
+def _expansions_for_depth(depth: int) -> int:
+    """Expansion budget for a reasoning pass of the given depth."""
+    try:
+        d = max(1, int(depth))
+    except (TypeError, ValueError):
+        d = 3
+    return max(_MIN_EXPANSIONS, min(_MAX_EXPANSIONS, d * _EXPANSIONS_PER_DEPTH))
+
+
+class _InferenceBudget:
+    """Shared edge-expansion budget for one ``reason_about`` pass.
+
+    ``consume()`` returns False once exhausted; callers mark emitted
+    results ``partial`` via ``exhausted``. The counter is deliberately
+    per-pass and shared across strategies so a hub-heavy transitive
+    sweep can't consume the causal search's entire allowance silently.
+    """
+
+    __slots__ = ("_remaining", "exhausted")
+
+    def __init__(self, expansions: int) -> None:
+        self._remaining = max(0, expansions)
+        self.exhausted = False
+
+    def consume(self, n: int = 1) -> bool:
+        """Spend ``n`` expansions; False if the budget is out."""
+        if self.exhausted or self._remaining < n:
+            self.exhausted = True
+            return False
+        self._remaining -= n
+        return True
 
 
 class ReasoningEngine:
@@ -129,11 +194,18 @@ class ReasoningEngine:
         if concept is None:
             return results
 
+        # A shared expansion budget bounds the whole pass — wide hub
+        # regions (a "life" concept with hundreds of neighbors) can't
+        # starve the rest of the pipeline or blow the latency envelope.
+        # Exhaustion marks results partial rather than silently dropping
+        # branches.
+        budget = _InferenceBudget(_expansions_for_depth(depth))
+
         # 1. Deductive: transitive chains for all transitive relations
-        results.extend(self._transitive_chains(concept.id, depth))
+        results.extend(self._transitive_chains(concept.id, depth, budget))
 
         # 2. Causal: follow CAUSES and LEADS_TO chains
-        results.extend(self._causal_chains(concept.id, depth))
+        results.extend(self._causal_chains(concept.id, depth, budget))
 
         # 3. Contradiction detection
         results.extend(self._detect_contradictions(concept.id))
@@ -189,7 +261,17 @@ class ReasoningEngine:
         RelationType.ENABLES: 0.7,
     }
 
-    def _transitive_chains(self, concept_id: str, depth: int) -> list[ReasoningResult]:
+    # Results emitted per relation family in one pass. Prevents a
+    # hub-dense region from flooding the result list before other
+    # reasoning types get their turn.
+    _CHAIN_RESULT_CAP: ClassVar[int] = 32
+
+    def _transitive_chains(
+        self,
+        concept_id: str,
+        depth: int,
+        budget: _InferenceBudget | None = None,
+    ) -> list[ReasoningResult]:
         """Follow transitive chains for all transitive relation types.
 
         If A is_a B and B is_a C, then A is_a C.
@@ -197,84 +279,138 @@ class ReasoningEngine:
         If A depends_on B and B depends_on C, then A depends_on C.
         If A enables B and B enables C, then A enables C.
 
-        Each relation type has its own confidence decay rate.
+        The search is best-first within each relation family: the
+        frontier is a max-heap on path confidence, so the strongest
+        inferences are found before the budget runs out. Confidence is
+        the product of per-hop (relation prior × edge weight) — an
+        inference is only as strong as its weakest link, and weak edges
+        now actually weaken conclusions instead of being ignored.
         """
         results: list[ReasoningResult] = []
+        if budget is None:
+            budget = _InferenceBudget(_expansions_for_depth(depth))
 
         for rel_type, base_conf in self._TRANSITIVE.items():
-            def traverse(
-                current: str,
-                chain: list[str],
-                d: int,
-                rel_type: RelationType = rel_type,
-                base_conf: float = base_conf,
-            ) -> None:
-                """Follow edges of a transitive relation, recording deductive conclusions."""
-                if d >= depth:
-                    return
-                for edge in self.network.get_edges(current, "out"):
-                    if edge.relation != rel_type:
-                        continue
-                    if edge.target in chain:
-                        continue
-                    new_chain = [*chain, edge.target]
-                    step = f"{current} {rel_type.value} {edge.target}"
-                    if len(new_chain) > 1:
-                        # We have a transitive conclusion
-                        evidence = [
-                            f"{chain[i]} {rel_type.value} {chain[i + 1]}"
-                            for i in range(len(chain) - 1)
-                        ] + [step]
-                        results.append(
-                            ReasoningResult(
-                                conclusion=(
-                                    f"{concept_id} {rel_type.value} {edge.target} "
-                                    f"(transitively, through {', '.join(chain[1:])})"
-                                ),
-                                reasoning_type=ReasoningType.DEDUCTIVE,
-                                evidence=evidence,
-                                confidence=base_conf ** (len(new_chain) - 1),
-                            )
-                        )
-                    traverse(edge.target, new_chain, d + 1)
-
-            traverse(concept_id, [concept_id], 0)
+            for result in self._best_first_chains(
+                concept_id, depth, budget,
+                relations={rel_type},
+                step_conf=base_conf,
+                reasoning_type=ReasoningType.DEDUCTIVE,
+                min_emit_depth=1,
+                emit_conf=lambda hops, conf: conf,
+                conclusion=lambda target, via, rel_type=rel_type: (
+                    f"{concept_id} {rel_type.value} {target}"
+                    + (f" (transitively, through {via})" if via != "—" else "")
+                ),
+            ):
+                results.append(result)
         return results
 
-    def _causal_chains(self, concept_id: str, depth: int) -> list[ReasoningResult]:
-        """Follow CAUSES and LEADS_TO chains."""
-        results: list[ReasoningResult] = []
+    def _causal_chains(
+        self,
+        concept_id: str,
+        depth: int,
+        budget: _InferenceBudget | None = None,
+    ) -> list[ReasoningResult]:
+        """Follow CAUSES and LEADS_TO chains, strongest-first."""
+        if budget is None:
+            budget = _InferenceBudget(_expansions_for_depth(depth))
+        return self._best_first_chains(
+            concept_id, depth, budget,
+            relations={RelationType.CAUSES, RelationType.LEADS_TO},
+            step_conf=0.7,
+            reasoning_type=ReasoningType.CAUSAL,
+            min_emit_depth=2,
+            emit_conf=lambda hops, conf: conf,
+            conclusion=lambda target, _via: (
+                f"{concept_id} ultimately leads to "
+                f"{target} through a causal chain"
+            ),
+        )
 
-        def traverse(current: str, chain: list[str], d: int) -> None:
-            """Recursively follow CAUSES and LEADS_TO edges, recording causal chain conclusions."""
-            if d >= depth:
-                return
-            for edge in self.network.get_edges(current, "out"):
-                if edge.relation not in (RelationType.CAUSES, RelationType.LEADS_TO):
+    def _best_first_chains(
+        self,
+        concept_id: str,
+        depth: int,
+        budget: _InferenceBudget,
+        *,
+        relations: set[RelationType],
+        step_conf: float,
+        reasoning_type: ReasoningType,
+        min_emit_depth: int,
+        emit_conf: Any,
+        conclusion: Any,
+    ) -> list[ReasoningResult]:
+        """Best-first multi-hop search over a set of relations.
+
+        Pops the highest-confidence partial path, expands its outgoing
+        edges of the allowed relations, and emits a result for each
+        node once — the first time it is popped, which is its best
+        possible score (Dijkstra ordering over multiplicative rewards).
+
+        Every emitted result carries its full structured ``path`` so
+        the critical-thinking layer can score the actual edges instead
+        of re-parsing strings.
+        """
+        results: list[ReasoningResult] = []
+        # frontier: (-confidence, tiebreak, node, path-of-steps)
+        # path entries are (source, relation_value, target, weight).
+        # The root starts at confidence 1.0 — the product accumulates
+        # decay per hop, not up front.
+        frontier: list[tuple[float, int, str, tuple[tuple[str, str, str, float], ...]]] = [
+            (-1.0, 0, concept_id, ()),
+        ]
+        emitted: set[str] = set()
+        expanded: set[str] = set()
+        counter = 1
+
+        while frontier and len(results) < self._CHAIN_RESULT_CAP:
+            neg_conf, _order, node, path = heapq.heappop(frontier)
+            conf = -neg_conf
+            if len(path) >= depth or node in expanded:
+                continue
+            # Best-first ordering guarantees the first pop of a node
+            # is its highest-confidence path — expand it once.
+            expanded.add(node)
+            edges = self.network.get_edges(node, "out")
+            # Spend budget by edges examined, not by edge followed —
+            # reading a neighbor is the work we're bounding.
+            if not budget.consume(len(edges)):
+                break
+            for edge in sorted(edges, key=lambda e: -e.weight):
+                if edge.relation not in relations:
                     continue
-                if edge.target in chain:
+                if any(edge.target == step[2] for step in path) or edge.target == concept_id:
                     continue
-                new_chain = [*chain, edge.target]
-                step = f"{current} {edge.relation.value} {edge.target}"
-                if len(new_chain) > 2:
-                    evidence = [
-                        f"{chain[i]} → {chain[i + 1]}"
-                        for i in range(len(chain) - 1)
-                    ] + [step]
+                hop_conf = conf * step_conf * max(0.0, min(1.0, edge.weight))
+                if hop_conf < _MIN_PATH_CONFIDENCE:
+                    continue
+                new_path = (*path, (node, edge.relation.value, edge.target, edge.weight))
+                if len(new_path) >= min_emit_depth and edge.target not in emitted:
+                    emitted.add(edge.target)
+                    via = ", ".join(step[2] for step in new_path[:-1]) or "—"
                     results.append(
                         ReasoningResult(
-                            conclusion=(
-                                f"{concept_id} ultimately leads to "
-                                f"{edge.target} through a causal chain"
-                            ),
-                            reasoning_type=ReasoningType.CAUSAL,
-                            evidence=evidence,
-                            confidence=0.7 ** (len(new_chain) - 1),
+                            conclusion=conclusion(edge.target, via),
+                            reasoning_type=reasoning_type,
+                            evidence=[
+                                f"{src} {rel} {tgt}"
+                                for src, rel, tgt, _w in new_path
+                            ],
+                            confidence=min(1.0, emit_conf(len(new_path), hop_conf)),
+                            knowledge=[(edge.relation.value, edge.target, hop_conf)],
+                            path=list(new_path),
+                            partial=budget.exhausted,
                         )
                     )
-                traverse(edge.target, new_chain, d + 1)
+                heapq.heappush(
+                    frontier, (-hop_conf, counter, edge.target, new_path),
+                )
+                counter += 1
 
-        traverse(concept_id, [concept_id], 0)
+        if budget.exhausted:
+            for result in results:
+                result.partial = True
         return results
 
     def _detect_contradictions(self, concept_id: str) -> list[ReasoningResult]:
@@ -368,40 +504,53 @@ class ReasoningEngine:
         """
         results: list[ReasoningResult] = []
 
-        # Find concepts 2 hops away, tracking the edge types
-        one_hop: dict[str, list[RelationType]] = {}  # neighbor → relation types
+        # Find concepts 2 hops away, tracking edge types AND weights —
+        # hypothesis strength should reflect the actual links, not
+        # just their count.
+        one_hop: dict[str, list[tuple[RelationType, float]]] = {}
         for edge in self.network.get_edges(concept_id, "out"):
-            one_hop.setdefault(edge.target, []).append(edge.relation)
+            one_hop.setdefault(edge.target, []).append(
+                (edge.relation, edge.weight)
+            )
 
-        # candidate → list of (intermediary, relation_to_candidate)
-        two_hop: dict[str, list[tuple[str, RelationType]]] = {}
+        # candidate → list of (intermediary, relation_to_candidate, weight)
+        two_hop: dict[str, list[tuple[str, RelationType, float]]] = {}
         for neighbor, _rels in one_hop.items():
             for edge in self.network.get_edges(neighbor, "out"):
                 if edge.target != concept_id and edge.target not in one_hop:
                     two_hop.setdefault(edge.target, []).append(
-                        (neighbor, edge.relation)
+                        (neighbor, edge.relation, edge.weight)
                     )
 
-        # For each 2-hop concept, hypothesize a direct connection
+        # Score candidates before committing — the cap should keep the
+        # strongest hypotheses, not the first five in dict order.
+        scored: list[tuple[float, str, list[tuple[str, RelationType, float]]]] = []
         for candidate, paths in two_hop.items():
-            # Don't hypothesize too many
-            if len(results) >= 5:
-                break
+            # Path strength = product of hop weights, best path wins.
+            best_strength = 0.0
+            for inter, _rel, w2 in paths:
+                w1 = max((w for _r, w in one_hop.get(inter, [])), default=0.5)
+                best_strength = max(best_strength, w1 * w2)
+            # Independent support: distinct intermediaries converge on
+            # the same gap. Each extra path adds less (diminishing).
+            support = 1.0 - 0.5 ** len({p[0] for p in paths})
+            score = best_strength * (0.5 + 0.5 * support)
+            scored.append((score, candidate, paths))
+        scored.sort(key=lambda item: -item[0])
 
-            # Predict the relation type from the path structure.
-            # Collect the relation types from A→B and B→C for each path.
+        for score, candidate, paths in scored[:5]:
             path_relations: list[tuple[RelationType, RelationType]] = []
-            for inter, rel_to_candidate in paths:
-                for rel_to_inter in one_hop.get(inter, []):
+            for inter, rel_to_candidate, _w in paths:
+                for rel_to_inter, _w1 in one_hop.get(inter, []):
                     path_relations.append((rel_to_inter, rel_to_candidate))
 
             suggested_relation = self._predict_hypothesis_relation(path_relations)
-            # Confidence: higher when the path is structurally consistent
-            # (both edges share the same relation type)
+            # Confidence: structural consistency (same relation both
+            # hops), path strength, and independent support.
             consistent_paths = sum(
                 1 for r1, r2 in path_relations if r1 == r2
             )
-            base_conf = 0.3
+            base_conf = 0.2 + 0.4 * score
             if consistent_paths > 0:
                 base_conf += 0.15 * min(consistent_paths, 2)
 
@@ -435,9 +584,23 @@ class ReasoningEngine:
                     f"{', '.join(p[0] for p in paths)})"
                 )
             evidence = [f"gap: no direct {concept_id} → {candidate}"]
-            for inter, rel in paths:
+            structured_path: list[tuple[str, str, str, float]] = []
+            seen_first_hops: set[str] = set()
+            for inter, rel, w2 in paths:
+                # First hop: strongest edge to this intermediary, with
+                # its real relation type (not a pseudo-marker).
+                first = max(
+                    one_hop.get(inter, []), key=lambda rw: rw[1],
+                    default=(RelationType.RELATED_TO, 0.5),
+                )
                 evidence.append(f"{concept_id} → {inter}")
                 evidence.append(f"{inter} {rel.value} {candidate}")
+                if inter not in seen_first_hops:
+                    seen_first_hops.add(inter)
+                    structured_path.append(
+                        (concept_id, first[0].value, inter, first[1])
+                    )
+                structured_path.append((inter, rel.value, candidate, w2))
             results.append(
                 ReasoningResult(
                     conclusion=conclusion,
@@ -445,6 +608,10 @@ class ReasoningEngine:
                     evidence=evidence,
                     confidence=base_conf,
                     novel=True,
+                    knowledge=[
+                        (suggested_relation.value, candidate, base_conf),
+                    ],
+                    path=structured_path,
                 )
             )
 
@@ -554,6 +721,13 @@ class ReasoningEngine:
                             evidence=evidence,
                             confidence=confidence,
                             novel=True,
+                            path=[
+                                (concept_id, "similar_to", similar_concept, edge_weight),
+                                (
+                                    similar_concept, s_edge.relation.value,
+                                    s_edge.target, s_edge.weight,
+                                ),
+                            ],
                         )
                     )
 
@@ -621,6 +795,7 @@ class ReasoningEngine:
                     evidence=evidence,
                     confidence=confidence,
                     novel=True,
+                    path=[(cause, rel_type.value, concept_id, weight)],
                 )
             )
 
@@ -2411,6 +2586,11 @@ class MetaReasoning:
         self._strategy_scores: dict[ReasoningStrategy, float] = dict.fromkeys(
             ReasoningStrategy, 0.5
         )
+        # Per-strategy usage counts — needed for the exploration bonus
+        # so a strategy that won once early doesn't starve the rest.
+        self._strategy_uses: dict[ReasoningStrategy, int] = dict.fromkeys(
+            ReasoningStrategy, 0
+        )
         # Problem type → strategy preferences
         self._problem_preferences: dict[str, dict[ReasoningStrategy, float]] = {}
 
@@ -2446,6 +2626,7 @@ class MetaReasoning:
 
         # Score each available strategy
         scores: list[tuple[float, ReasoningStrategy]] = []
+        total_uses = sum(self._strategy_uses.values())
         for strategy in available_strategies:
             # Base score from learned effectiveness
             base_score = self._strategy_scores.get(strategy, 0.5)
@@ -2453,6 +2634,14 @@ class MetaReasoning:
             # Problem-type preference
             prefs = self._problem_preferences.get(problem_type, {})
             type_bonus = prefs.get(strategy, 0.0)
+
+            # UCB-style exploration bonus: under-sampled strategies get
+            # a diminishing boost so the selector keeps probing instead
+            # of locking onto whichever strategy won first.
+            uses = self._strategy_uses.get(strategy, 0)
+            explore_bonus = 0.12 * math.sqrt(
+                math.log1p(total_uses) / (1 + uses)
+            )
 
             # Confidence adjustment: high confidence favors simpler
             # strategies (deductive, analogical), low confidence favors
@@ -2474,7 +2663,7 @@ class MetaReasoning:
                 ):
                     confidence_adj = 0.1
 
-            total = base_score + type_bonus + confidence_adj
+            total = base_score + type_bonus + confidence_adj + explore_bonus
             scores.append((total, strategy))
 
         # Pick the highest-scoring strategy
@@ -2564,8 +2753,13 @@ class MetaReasoning:
         if len(self.reasoning_history) > 1000:
             del self.reasoning_history[: len(self.reasoning_history) - 1000]
 
-        # Update strategy effectiveness score using exponential moving average
-        alpha = 0.1  # learning rate
+        self._strategy_uses[strategy] = self._strategy_uses.get(strategy, 0) + 1
+
+        # Update strategy effectiveness score using exponential moving
+        # average. The update is confidence-weighted: a high-confidence
+        # failure is a stronger negative signal than a hedged one, and
+        # a confident success teaches more than a lucky guess.
+        alpha = 0.1 * (0.5 + 0.5 * max(0.0, min(1.0, confidence)))
         reward = 1.0 if success else 0.0
         current = self._strategy_scores.get(strategy, 0.5)
         self._strategy_scores[strategy] = current * (1 - alpha) + reward * alpha

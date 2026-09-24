@@ -45,7 +45,7 @@ class CodeToolHandler:
     # Action words that trigger tool dispatch. Substring matching is
     # intentional — "test" matches "test", "tests", and "pytest".
     _ACTION_WORDS: tuple[str, ...] = (
-        "compile", "test", "read", "show", "check",
+        "compile", "test", "read", "show", "check", "analyze", "impact",
     )
 
     def __init__(
@@ -169,6 +169,27 @@ class CodeToolHandler:
         match = re.search(r"\b([\w./-]+\.py)\b", text)
         return match.group(1) if match else None
 
+    @staticmethod
+    def _extract_symbol(text: str, path: str) -> str | None:
+        """Find an optional symbol name in an analyze/impact request.
+
+        Matches "impact of X", "analyze X in file.py", or a bare
+        CamelCase / dotted identifier that isn't the file path itself.
+        """
+        match = re.search(
+            r"(?:impact\s+(?:of|on)|analyze)\s+([A-Za-z_][\w.]*)\b",
+            text,
+        )
+        if match and not match.group(1).endswith(".py"):
+            return match.group(1)
+        stem = os.path.basename(path).removesuffix(".py")
+        for token in re.findall(r"\b[A-Za-z_][\w.]*\b", text):
+            if token.endswith(".py") or token == stem:
+                continue
+            if "." in token or token[:1].isupper():
+                return token
+        return None
+
     def _resolve_project_path(self, path: str) -> str | None:
         """Resolve a file path against the project root.
 
@@ -209,6 +230,25 @@ class CodeToolHandler:
                 outputs.append(
                     f"The tests for {path} did not pass. {result.error or result.output}"
                 )
+        if "analyze" in action or "impact" in action:
+            resolved = self._resolve_project_path(path)
+            if resolved is not None:
+                result = self._tools.run(
+                    "analyze_python",
+                    path=resolved,
+                    symbol=self._extract_symbol(action, path),
+                )
+                outputs.append(result.output or result.error)
+            else:
+                meta_emotion = self._build_meta_emotion()
+                thought = Thought(
+                    content=f"cannot find {path}",
+                    intent="self_report",
+                    emotion=meta_emotion.label,
+                    confidence=0.3,
+                    metadata={"file_not_found": path},
+                )
+                outputs.append(self._language.render(thought, meta_emotion))
         if "compile" in action or "check" in action or "read" in action or "show" in action:
             resolved = self._resolve_project_path(path)
             if resolved is not None:

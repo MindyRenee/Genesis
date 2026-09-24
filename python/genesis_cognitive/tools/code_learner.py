@@ -28,14 +28,16 @@ import time
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..concepts import RelationType
+from .code_analysis import FileAnalysis, analyze_python_tree
 
 __all__ = [
     "CodeLearner",
     "CodeLearningResult",
     "CodeSpacedRepetition",
+    "FileAnalysis",
     "FileLearningResult",
 ]
 
@@ -494,9 +496,14 @@ class CodeLearner:
                 classes += 1
                 self._add_python_class(node, module_concept, module_name)
 
-        # Imports and calls across the whole tree
+        # Imports and calls across the whole tree. The analyzer keeps
+        # lexical scope, so calls made by methods land on the method
+        # concept and calls made by nested helpers land on the named
+        # callable that actually contains them.
         self._add_python_imports(tree, module_concept)
-        self._add_python_calls(tree, module_concept, module_name)
+        analysis = analyze_python_tree(tree, rel)
+        self._enrich_python_symbols(analysis, module_name)
+        self._add_python_call_edges(analysis, module_name)
 
         concepts_added = self.network.size - concepts_before
         relationships_added = self.network.edge_count - edges_before
@@ -955,47 +962,78 @@ class CodeLearner:
                             origin="observed",
                         )
 
-    def _add_python_calls(
-        self,
-        tree: ast.Module,
-        module_concept: str,
-        module_name: str,
+    def _enrich_python_symbols(
+        self, analysis: FileAnalysis, module_name: str,
     ) -> None:
-        """Add function-call relationships from an AST.
+        """Attach structural facts (complexity, params, raises) to the
+        concepts the learner already created.
 
-        Only top-level calls within each function/method body are
-        attributed to that function to avoid an explosion of edges.
+        The analyzer is the source of truth for scope — concept ids
+        follow the existing naming convention: ``python:mod.fn`` for
+        module functions, ``python:Class.meth`` for methods.
         """
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        for sym in analysis.symbols:
+            concept_id = self._symbol_concept_id(sym, module_name)
+            if concept_id is None:
                 continue
-            # Determine the owner concept for this function/method
-            owner = self._owner_concept(node, module_name)
+            concept = self.network.get_concept(concept_id)
+            if concept is None:
+                continue
+            props = concept.properties
+            props["qualified"] = sym.qualified
+            if sym.kind in ("function", "method"):
+                props["complexity"] = sym.complexity
+                props["params"] = sym.params
+                if sym.returns:
+                    props["returns"] = sym.returns
+                if sym.raises:
+                    props["raises"] = sym.raises
+            if sym.end_line > sym.line:
+                props["span"] = sym.end_line - sym.line + 1
+
+    def _symbol_concept_id(
+        self, sym: Any, module_name: str,
+    ) -> str | None:
+        """Map an analyzed symbol to the learner's concept id."""
+        parts = sym.qualified.split(".")
+        if sym.kind == "module":
+            return None
+        if sym.kind == "class":
+            return f"python:{sym.name}"
+        if sym.kind == "method" and len(parts) >= 2:
+            return f"python:{parts[-2]}.{parts[-1]}"
+        if sym.kind == "function":
+            # Nested functions don't get their own concept — they fold
+            # into the enclosing callable.
+            if len(parts) > 2:
+                return None
+            return f"python:{module_name}.{sym.name}"
+        return None
+
+    def _add_python_call_edges(
+        self, analysis: FileAnalysis, module_name: str,
+    ) -> None:
+        """Add CALLS edges from the scoped analysis.
+
+        Callers resolve to real concept ids via _symbol_concept_id —
+        so a method's calls land on ``python:Class.method``, not on a
+        module-level namesake, and nested helpers attribute their calls
+        to the named callable that contains them.
+        """
+        symbol_by_qual = {s.qualified: s for s in analysis.symbols}
+        for edge in analysis.call_edges:
+            owner_sym = symbol_by_qual.get(edge.caller)
+            if owner_sym is None:
+                continue
+            owner = self._symbol_concept_id(owner_sym, module_name)
             if owner is None:
                 continue
-            for child in ast.walk(node):
-                if isinstance(child, ast.Call):
-                    callee = self._name_from_node(child.func)
-                    if callee and callee not in {"print", "len", "range", "str", "int"}:
-                        self.network.add_edge(
-                            owner,
-                            f"python:{callee}",
-                            _REL_CALLS,
-                            origin="observed",
-                        )
-
-    def _owner_concept(
-        self,
-        node: ast.FunctionDef | ast.AsyncFunctionDef,
-        module_name: str,
-    ) -> str | None:
-        """Resolve the concept name for a function/method node.
-
-        We can't easily recover the enclosing class from ``ast.walk``,
-        so we attribute calls to the module-level function concept.
-        Methods are handled by their ``python:Class.method`` naming.
-        """
-        return f"python:{module_name}.{node.name}"
+            self.network.add_edge(
+                owner,
+                f"python:{edge.callee}",
+                _REL_CALLS,
+                origin="observed",
+            )
 
     @staticmethod
     def _name_from_node(node: ast.expr) -> str | None:
