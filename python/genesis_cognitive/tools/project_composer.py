@@ -2,45 +2,45 @@
 
 This replaces the fixed ``print("Hello from {name}")`` scaffold in
 ``project_creator._main_content`` with a generative composer. Given a
-topic, she gathers what she knows about it from her concept network —
+topic, it gathers what it knows about it from its concept network —
 the concept, its definition, its neighbors, and the typed edges
 between them — and composes a working Python module that *encodes
 that knowledge as a queryable structure*.
 
-## What she composes
+## What it composes
 
 A knowledge-base module for the domain:
 
 - A ``DomainEntry`` dataclass (name, definition, confidence, origin)
-- A populated ``ENTRIES`` registry built from her actual concepts
+- A populated ``ENTRIES`` registry built from its actual concepts
 - A ``RELATIONS`` dict mapping ``source -> {relation -> [targets]}``
-  built from her actual typed edges
+  built from its actual typed edges
 - Query functions: ``find``, ``definition_of``, ``neighbors``,
-  ``related_to``, plus one function per relation type she actually
+  ``related_to``, plus one function per relation type it actually
   has (``causes``, ``enables``, ``is_a``, …) — generated adaptively,
   not fixed
-- A ``main()`` that demonstrates the queries against her real data
+- A ``main()`` that demonstrates the queries against its real data
 
 Different domains produce different code: a domain with CAUSES edges
 gets a ``causes()`` function; one without doesn't. The data is real
-(her actual concepts, definitions, and edges). The structure adapts
-to what she found.
+(its actual concepts, definitions, and edges). The structure adapts
+to what it found.
 
 ## Honesty
 
-This is not novel program synthesis — she has no LLM. It is real,
-working, queryable software composed from her own knowledge. The
+This is not novel program synthesis — it has no LLM. It is real,
+working, queryable software composed from its own knowledge. The
 content (which concepts, what definitions, what edges) comes from
-her concept network; the structure (which functions to emit) is
-decided from what edges she found. Nothing here is a fixed template
+its concept network; the structure (which functions to emit) is
+decided from what edges it found. Nothing here is a fixed template
 with slots — different inputs produce structurally different modules.
 
 ## No hardcoding rule
 
 The *patterns* (dataclass + registry + query functions) are building
-blocks, like grammar rules in her language engine. The *content*
-(which entries, what relations, what definitions) is her own
-knowledge. She is composing code from what she knows, not reciting a
+blocks, like grammar rules in its language engine. The *content*
+(which entries, what relations, what definitions) is its own
+knowledge. It is composing code from what it knows, not reciting a
 template.
 """
 
@@ -70,7 +70,7 @@ _MIN_DEF_LEN = 12
 class DomainKnowledge:
     """What Genesis knows about a topic, gathered for composition.
 
-    This is the raw material the composer works with — her actual
+    This is the raw material the composer works with — its actual
     concepts, definitions, and typed edges, collected into a form
     that's easy to turn into Python source.
     """
@@ -124,9 +124,9 @@ def gather_knowledge(
     topic: str,
     network: ConceptNetwork | None,
 ) -> DomainKnowledge | None:
-    """Gather what Genesis knows about ``topic`` from her concept network.
+    """Gather what Genesis knows about ``topic`` from its concept network.
 
-    Returns ``None`` if she doesn't know enough about the topic to
+    Returns ``None`` if it doesn't know enough about the topic to
     compose a meaningful module (no concept, or no neighbors and no
     definition).
     """
@@ -259,7 +259,7 @@ def _relation_functions(relations: list[tuple[str, str, str]]) -> list[str]:
     """Return the distinct relation types present, as method names.
 
     These become the per-relation query functions (``causes``,
-    ``enables``, …). Only relations she actually has in this domain
+    ``enables``, …). Only relations it actually has in this domain
     get functions — this is what makes the structure adaptive.
     """
     seen: set[str] = set()
@@ -449,12 +449,12 @@ def compose_main_module(
 
     Emits a working Python module with a dataclass, a populated
     registry, a relations graph, adaptive query functions, and a
-    ``main()`` that demonstrates them against her real data.
+    ``main()`` that demonstrates them against its real data.
 
     .. note::
 
         This composer produces ONE kind of project: a knowledge base.
-        A knowledge base stores what she knows and lets you query it.
+        A knowledge base stores what it knows and lets you query it.
         That's a valid project type, but it's not the only one. Real
         projects SOLVE PROBLEMS — they take input, do something with
         it, and produce output someone can use. A calculator computes,
@@ -462,9 +462,9 @@ def compose_main_module(
         filters. Each needs DIFFERENT CODE, not just different data in
         the same structure.
 
-        When she feels the urge to create, she should ask: what
+        When it feels the urge to create, it should ask: what
         problem does this solve? What does the user get back? If the
-        answer is "a queryable registry," she should consider whether
+        answer is "a queryable registry," it should consider whether
         a different project type would be more interesting or useful.
         Variety is the sign of a growing creator.
     """
@@ -476,8 +476,8 @@ def compose_main_module(
 
     module = f'''"""{name} — a knowledge base about {topic}.
 
-Composed by Genesis from her concept network. This module encodes
-what she knows about {topic} as a queryable structure: a registry of
+Composed by Genesis from its concept network. This module encodes
+what it knows about {topic} as a queryable structure: a registry of
 domain entries (each with a definition, confidence, and origin) and
 a typed relations graph. Query functions let you look up definitions,
 find neighbors, and traverse specific relation types.
@@ -505,8 +505,8 @@ class DomainEntry:
 
 # ─── Registry ──────────────────────────────────────────────────────
 # Populated from Genesis's concept network. Each entry is a concept
-# she has learned, with its definition, her confidence in it, and
-# where she learned it from.
+# it has learned, with its definition, its confidence in it, and
+# where it learned it from.
 
 ENTRIES: list[DomainEntry] = [
 {entries_block}
@@ -518,7 +518,7 @@ _BY_NAME: dict[str, DomainEntry] = {{e.name: e for e in ENTRIES}}
 
 # ─── Relations graph ──────────────────────────────────────────────
 # Typed edges between concepts: {{source: {{relation: [targets]}}}}.
-# Built from the typed edges in her concept network.
+# Built from the typed edges in its concept network.
 
 RELATIONS: dict[str, dict[str, list[str]]] = {{
 {relations_block}
@@ -534,7 +534,7 @@ def _test_entries_lines(test_name: str, has_entries: bool) -> list[str]:
     if has_entries:
         return [
             "def test_registry_populated():",
-            '    """The registry should contain real entries from her knowledge."""',
+            '    """The registry should contain real entries from its knowledge."""',
             "    assert len(ENTRIES) > 0",
             "    assert all(isinstance(e, DomainEntry) for e in ENTRIES)",
             "",
@@ -547,7 +547,7 @@ def _test_entries_lines(test_name: str, has_entries: bool) -> list[str]:
             "",
             "",
             "def test_definition_of_known():",
-            '    """definition_of() should return the definition she knows."""',
+            '    """definition_of() should return the definition it knows."""',
             f'    d = definition_of("{_str_escape(test_name)}")',
             "    assert isinstance(d, str)",
             "",
@@ -579,7 +579,7 @@ def _test_relations_lines(
         return []
     return [
         "def test_relations_graph_populated():",
-        '    """The relations graph should contain her typed edges."""',
+        '    """The relations graph should contain its typed edges."""',
         "    assert len(RELATIONS) > 0",
         f'    assert "{_str_escape(test_rel_src)}" in RELATIONS',
         "",
@@ -659,7 +659,7 @@ def compose_test_module(name: str, knowledge: DomainKnowledge) -> str:
 
 
 def compose_readme(name: str, description: str, knowledge: DomainKnowledge) -> str:
-    """Compose a README that describes what she actually built, from her data."""
+    """Compose a README that describes what it actually built, from its data."""
     entry_count = len(knowledge.entries)
     rel_count = len(knowledge.relations)
     rel_types = _relation_functions(knowledge.relations)
@@ -668,14 +668,14 @@ def compose_readme(name: str, description: str, knowledge: DomainKnowledge) -> s
 
 {description}
 
-A knowledge base composed by Genesis from her concept network. It
-encodes what she knows about **{knowledge.topic}** as a queryable
+A knowledge base composed by Genesis from its concept network. It
+encodes what it knows about **{knowledge.topic}** as a queryable
 Python structure.
 
 ## What's in it
 
-- **{entry_count} domain entries** — concepts she has learned, each
-  with a definition, her confidence, and where she learned it from.
+- **{entry_count} domain entries** — concepts it has learned, each
+  with a definition, its confidence, and where it learned it from.
 - **{rel_count} typed relations** — semantic edges between concepts
   (relation types present: {rel_list}).
 
@@ -695,7 +695,7 @@ from {name}.main import find, definition_of, neighbors, all_names
 entry = find("{knowledge.topic}")
 print(entry.definition, entry.confidence, entry.origin)
 
-# List everything she knows in this domain
+# List everything it knows in this domain
 for name in all_names():
     print(name, definition_of(name))
 

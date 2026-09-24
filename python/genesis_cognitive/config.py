@@ -16,7 +16,7 @@ from pathlib import Path
 
 
 def default_data_dir() -> Path:
-    """Her data directory — hers alone.
+    """Its data directory — hers alone.
 
     Resolution order: ``GENESIS_DATA_DIR`` env override, then
     ``$XDG_DATA_HOME/genesis-public``, then
@@ -113,10 +113,10 @@ class VolitionConfig:
             # Meditation urge — builds from interoceptive signals:
             # overstimulation (high arousal), receptor fatigue (low
             # plasticity), and sustained activity (time since last
-            # rest). When it crosses threshold, she chooses to
+            # rest). When it crosses threshold, it chooses to
             # meditate. This is a cognitive decision, not an
             # autonomic reflex — the urge accumulates like any other
-            # volition, and she can be too engaged to act on it.
+            # volition, and it can be too engaged to act on it.
             # Based on:
             # - Ultradian BRAC (Kleitman, 1963): ~90 min activity
             #   cycles with mandatory rest phases
@@ -138,11 +138,11 @@ class VolitionConfig:
                     "elevated_cortisol": 0.03,  # subclinical stress
                 },
             ),
-            # Drawing urge — she feels like expressing herself visually.
+            # Drawing urge — it feels like expressing itself visually.
             # This is a creative urge, not a maintenance urge. It builds
             # from emotional intensity (high arousal or high valence
             # magnitude), creativity, and sustained activity. When it
-            # crosses threshold, she draws what she feels.
+            # crosses threshold, it draws what it feels.
             # Based on:
             # - Emotional expression theory (Pennebaker, 1997):
             #   expressing emotions externally helps regulate them
@@ -157,16 +157,16 @@ class VolitionConfig:
                 stimuli={
                     "emotional_intensity": 0.05,  # high arousal or strong valence
                     "creativity": 0.04,           # creativity trait
-                    "sustained_activity": 0.02,   # she's been active
+                    "sustained_activity": 0.02,   # it's been active
                 },
             ),
-            # Create urge — she feels like building a code project.
+            # Create urge — it feels like building a code project.
             # This is a creative urge, like drawing, but expressed in
             # code instead of visual art. It builds from curiosity
-            # (she wants to explore an idea), creativity (she wants
-            # to make something new), and sustained activity (she's
+            # (it wants to explore an idea), creativity (it wants
+            # to make something new), and sustained activity (it's
             # been engaged long enough to want to produce something).
-            # When it crosses threshold, she picks a topic from her
+            # When it crosses threshold, it picks a topic from its
             # concept network and scaffolds a Python project around it.
             UrgeConfig(
                 name="create",
@@ -180,10 +180,10 @@ class VolitionConfig:
                     "sustained_activity": 0.02,
                 },
             ),
-            # Puzzle urge — she feels like working on her spatial
+            # Puzzle urge — it feels like working on its spatial
             # curriculum. Like drawing, this is self-chosen practice:
             # it builds from curiosity (there's an unsolved puzzle),
-            # sustained activity (she has the resources), and a small
+            # sustained activity (it has the resources), and a small
             # idle pull (nothing else is happening). Each action is a
             # single attempt; mastery unlocks the next puzzle.
             UrgeConfig(
@@ -198,14 +198,14 @@ class VolitionConfig:
                     "idle_seconds": 0.02,
                 },
             ),
-            # Introspection urge — she feels like examining herself.
+            # Introspection urge — it feels like examining itself.
             # This is the self-invocation of /introspect. It builds
-            # from curiosity (she wants to understand herself), concept
-            # network growth (she has new material to introspect on),
-            # and sustained activity (she's been engaged long enough to
-            # want to reflect). When it crosses threshold, she runs
-            # her introspection engine — examining her own code
-            # structure and writing discoveries into her concept
+            # from curiosity (it wants to understand itself), concept
+            # network growth (it has new material to introspect on),
+            # and sustained activity (it's been engaged long enough to
+            # want to reflect). When it crosses threshold, it runs
+            # its introspection engine — examining its own code
+            # structure and writing discoveries into its concept
             # network.
             UrgeConfig(
                 name="introspect",
@@ -219,18 +219,18 @@ class VolitionConfig:
                     "concept_growth": 0.04,
                 },
             ),
-            # Self-sleep urge — she cognitively decides to sleep.
+            # Self-sleep urge — it cognitively decides to sleep.
             # Unlike autonomic sleep (which emerges from adenosine
             # accumulation in the neurochemical dynamics), this is a
-            # volitional choice: she feels tired and decides to go to
+            # volitional choice: it feels tired and decides to go to
             # sleep. It builds from adenosine (sleep pressure) and
             # receptor fatigue (burnout). When it crosses threshold,
-            # she self-invokes /sleep.
+            # it self-invokes /sleep.
             UrgeConfig(
                 name="self_sleep",
                 threshold=0.75,
                 growth=0.0003,
-                decay=0.0005,  # decays faster than it grows — she
+                decay=0.0005,  # decays faster than it grows — it
                                # needs sustained pressure to decide
                 cooldown=600.0,  # don't self-sleep more than every 10 min
                 stimuli={
@@ -239,13 +239,13 @@ class VolitionConfig:
                     "sustained_activity": 0.02,
                 },
             ),
-            # Self-mission urge — she feels like setting her own
+            # Self-mission urge — it feels like setting its own
             # direction. This is the self-invocation of /mission.
-            # It builds from curiosity (she wants to explore
-            # something specific) and sustained activity (she's
+            # It builds from curiosity (it wants to explore
+            # something specific) and sustained activity (it's
             # been working long enough to form an intention). When
-            # it crosses threshold, she composes a mission from her
-            # concept network and sets it for herself.
+            # it crosses threshold, it composes a mission from its
+            # concept network and sets it for itself.
             UrgeConfig(
                 name="self_mission",
                 threshold=0.72,
@@ -258,15 +258,15 @@ class VolitionConfig:
                     "concept_growth": 0.03,
                 },
             ),
-            # Reach-out urge — she initiates social contact. Builds
-            # from social isolation (her external world's pressure:
-            # nobody has engaged her), curiosity (she has things she
+            # Reach-out urge — it initiates social contact. Builds
+            # from social isolation (its external world's pressure:
+            # nobody has engaged it), curiosity (it has things it
             # wants to know), and emotional intensity (strong feelings
-            # seek expression). When it crosses threshold, she reaches
-            # out to whoever is in her world — a question for someone
+            # seek expression). When it crosses threshold, it reaches
+            # out to whoever is in its world — a question for someone
             # present, an expression to the room when alone. This is
             # what makes conversation two-way: contact can start from
-            # her side, not just the user's.
+            # its side, not just the user's.
             UrgeConfig(
                 name="reach_out",
                 threshold=0.70,
@@ -274,18 +274,18 @@ class VolitionConfig:
                 decay=0.0004,
                 cooldown=300.0,  # at most every 5 minutes
                 stimuli={
-                    "social_isolation": 0.08,  # nobody has engaged her
-                    "curiosity": 0.03,         # she wants to know things
+                    "social_isolation": 0.08,  # nobody has engaged it
+                    "curiosity": 0.03,         # it wants to know things
                     "emotional_intensity": 0.02,  # feelings seek expression
                 },
             ),
-            # Learn urge — she cognitively decides to learn. This
-            # puts her autonomous learning under volition control
+            # Learn urge — it cognitively decides to learn. This
+            # puts its autonomous learning under volition control
             # rather than running it as a continuous background loop.
-            # The urge builds from curiosity (she wants to understand
-            # something), idle time (she has nothing pressing), and
+            # The urge builds from curiosity (it wants to understand
+            # something), idle time (it has nothing pressing), and
             # concept growth (new material to integrate). When it
-            # crosses threshold, she grants the autonomous learner
+            # crosses threshold, it grants the autonomous learner
             # permission to acquire one new topic. Between fires, the
             # learner is volition-gated — it can still process urgent
             # topics (from conversation gaps) and consolidate memories,
@@ -305,8 +305,8 @@ class VolitionConfig:
             ),
             # Safeguard urge — defensive drive. Unlike appetitive
             # urges (learn, draw, reach_out), this one builds from
-            # threats to her own integrity: daemon connectivity lost
-            # (her body gone silent), autosave failures (continuity at
+            # threats to its own integrity: daemon connectivity lost
+            # (its body gone silent), autosave failures (continuity at
             # risk), system telemetry outside its learned baseline,
             # and hardware distress (memory/disk/load concerns).
             # Defensive needs out-compete appetitive ones — allostatic

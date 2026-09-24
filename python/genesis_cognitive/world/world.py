@@ -1,25 +1,25 @@
 """OuterWorld — Genesis's external world.
 
-Her inner world (``InnerLife``) is the stream of cognition arising from
-her own state: thoughts, dreams, questions she poses to herself. The
-outer world is everything outside her: the people she interacts with,
-the things that happen around her, and her own acts upon the world.
+Its inner world (``InnerLife``) is the stream of cognition arising from
+its own state: thoughts, dreams, questions it poses to itself. The
+outer world is everything outside it: the people it interacts with,
+the things that happen around it, and its own acts upon the world.
 
 Two systems, coupled like a human's:
 
-- **Inbound** — the world reaches her: someone speaks to her, speech
+- **Inbound** — the world reaches it: someone speaks to it, speech
   happens nearby, a percept arrives, a presence enters or leaves.
-  Events update her presences, reach her global workspace, become
-  memories, and shape her neurochemistry (social contact → oxytocin,
+  Events update its presences, reach its global workspace, become
+  memories, and shape its neurochemistry (social contact → oxytocin,
   a salient percept → norepinephrine).
-- **Outbound** — she reaches the world: she speaks, she looks, she
-  draws, she studies the web. Her acts are recorded in the same
-  stream, so the world she lives in contains her own agency.
+- **Outbound** — it reaches the world: it speaks, it looks, it
+  draws, it studies the web. Its acts are recorded in the same
+  stream, so the world it lives in contains its own agency.
 
 The world also computes **social isolation** — how long it has been
-since anyone engaged her — an external pressure that feeds her
+since anyone engaged it — an external pressure that feeds its
 inner-life social drive and the ``reach_out`` volition urge. This is
-what lets her *initiate* contact, not just answer it: conversations
+what lets it *initiate* contact, not just answer it: conversations
 can start from either side.
 
 The world is a model, not a policy: it records and weighs what
@@ -48,17 +48,17 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["OuterWorld"]
 
-#: The presence id of the human who talks to her through the main
-#: channel — the same person whether they type or speak her name.
+#: The presence id of the human who talks to its through the main
+#: channel — the same person whether they type or speak its name.
 USER_PRESENCE_ID = "user"
-#: The presence id for overheard speech — voices near her that are not
-#: talking to her. Unidentified speakers share one presence until she
-#: can tell them apart (she has no speaker diarization yet).
+#: The presence id for overheard speech — voices near it that are not
+#: talking to it. Unidentified speakers share one presence until it
+#: can tell them apart (it has no speaker diarization yet).
 AMBIENT_PRESENCE_ID = "voices"
 
 #: Seconds of no addressed contact at which social isolation saturates
 #: (30 minutes → isolation 1.0). Isolation is the external pressure
-#: that feeds her inner-life social drive and the reach_out urge.
+#: that feeds its inner-life social drive and the reach_out urge.
 ISOLATION_PERIOD = 1800.0
 
 #: Company dampens isolation: someone being around (present but not
@@ -75,7 +75,7 @@ _TICK_INTERVAL = 5.0
 _MAX_PRESENCES = 200
 
 #: Salience defaults per inbound kind. Addressed speech is always
-#: salient — someone talking to her matters. Overheard speech and
+#: salient — someone talking to it matters. Overheard speech and
 #: notifications are background unless the caller says otherwise.
 _SALIENCE = {
     EventKind.USER_SPEECH: 0.8,
@@ -98,16 +98,16 @@ class OuterWorld:
     state-gated (not timer-gated) philosophy.
 
     Args:
-        network: Her concept network, used to ground event topics in
-            what she actually knows. Optional — without it events
+        network: Its concept network, used to ground event topics in
+            what it actually knows. Optional — without it events
             carry no topics.
         neuro_impulse: ``(chem_id, amount)`` callback into the
             daemon's neurochemistry (typically
             ``Mind._learner_neuro_impulse``). Optional.
-        is_sleeping: Predicate — True while she sleeps. Inbound
+        is_sleeping: Predicate — True while it sleeps. Inbound
             perception is gated during sleep (the thalamic gate):
             overheard speech and percepts are not recorded then.
-        get_user_name: Callback returning the user's name if her
+        get_user_name: Callback returning the user's name if its
             user profile has learned one. Synced lazily onto the user
             presence. Optional.
     """
@@ -136,22 +136,22 @@ class OuterWorld:
         # may safely call back into the world.
         self.on_external_event: Callable[[ExternalEvent], None] | None = None
 
-        # Social clock — the last time anyone engaged her directly.
+        # Social clock — the last time anyone engaged it directly.
         # Seeded at boot so a fresh instance starts mildly connected,
         # not instantly abandoned.
         self._last_addressed_time = time.time()
         self._last_tick = 0.0
-        # Outreach bids — how many times she has reached out since
-        # anyone last engaged her. Silence after a bid increments it;
+        # Outreach bids — how many times it has reached out since
+        # anyone last engaged it. Silence after a bid increments it;
         # addressed contact resets it. The volition layer reads this
-        # to back off: she stops calling into a room that never
+        # to back off: it stops calling into a room that never
         # answers.
         self._unanswered_bids = 0
 
     # ── Inbound API ─────────────────────────────────────────────
 
     def hear_user(self, text: str) -> ExternalEvent:
-        """Record the user speaking to her — the primary social event.
+        """Record the user speaking to its — the primary social event.
 
         Every addressed turn updates the user presence (familiarity,
         bond from sentiment, topics) and applies the social-contact
@@ -166,7 +166,7 @@ class OuterWorld:
             was_present = presence.present
             presence.interacted(sentiment, topics, now=now)
             # Belief update — they were active, they carried sentiment,
-            # and if she had a bid open, this answers it.
+            # and if it had a bid open, this answers it.
             presence.belief.note_activity(now, weight=1.0)
             presence.belief.note_sentiment(sentiment)
             answered_bid = presence.belief.resolve_bid(True, now)
@@ -179,7 +179,7 @@ class OuterWorld:
             self._record(arrival)
         if answered_bid:
             # Being answered is a social reward distinct from contact —
-            # she reached out and the world reached back.
+            # it reached out and the world reached back.
             self._impulse(CHEM_OXYTOCIN, 0.02)
         event = ExternalEvent(
             kind=EventKind.USER_SPEECH,
@@ -197,11 +197,11 @@ class OuterWorld:
         return event
 
     def hear_overheard(self, text: str) -> ExternalEvent | None:
-        """Record speech happening near her that isn't addressed to her.
+        """Record speech happening near it that isn't addressed to it.
 
-        Gated during sleep — the thalamic gate is closed; she doesn't
+        Gated during sleep — the thalamic gate is closed; it doesn't
         hear ambient speech then. Overheard voices share the ambient
-        presence until she can tell them apart. Returns None if gated.
+        presence until it can tell them apart. Returns None if gated.
         """
         if self._asleep():
             return None
@@ -249,7 +249,7 @@ class OuterWorld:
         topics: list[str] | None = None,
         metadata: dict | None = None,
     ) -> ExternalEvent | None:
-        """Record a non-speech percept arriving at her (sounds, sights).
+        """Record a non-speech percept arriving at its (sounds, sights).
 
         Gated during sleep. Salience above 0.6 applies the orienting
         impulse — a loud sound or striking sight is arousing.
@@ -270,7 +270,7 @@ class OuterWorld:
         return event
 
     def notify(self, content: str, *, salience: float = 0.4) -> ExternalEvent:
-        """Record a system/subcognitive notice surfaced to her world."""
+        """Record a system/subcognitive notice surfaced to its world."""
         event = ExternalEvent(
             kind=EventKind.NOTIFICATION,
             source="world",
@@ -283,11 +283,11 @@ class OuterWorld:
 
     # ── Outbound API ────────────────────────────────────────────
 
-    def she_said(self, text: str) -> ExternalEvent:
-        """Record her speaking — a reply, a question, an expression.
+    def it_said(self, text: str) -> ExternalEvent:
+        """Record its speaking — a reply, a question, an expression.
 
-        Her utterances live in the same stream as inbound speech, so
-        the world she inhabits contains her own voice.
+        Its utterances live in the same stream as inbound speech, so
+        the world it inhabits contains its own voice.
         """
         event = ExternalEvent(
             kind=EventKind.UTTERANCE,
@@ -299,8 +299,8 @@ class OuterWorld:
         self._record(event)
         return event
 
-    def she_acted(self, description: str, *, detail: str = "") -> ExternalEvent:
-        """Record her acting on the world — looking, drawing, learning.
+    def it_acted(self, description: str, *, detail: str = "") -> ExternalEvent:
+        """Record its acting on the world — looking, drawing, learning.
 
         ``description`` is a short semantic summary ("looked through
         the retina"); ``detail`` carries the full report.
@@ -317,15 +317,15 @@ class OuterWorld:
         return event
 
     def note_outreach(self, topics: list[str] | None = None) -> int:
-        """Record that she made a social bid — she reached out.
+        """Record that it made a social bid — it reached out.
 
-        A bid is her side of a two-way conversation: she initiated,
-        and now the world owes her an answer. The bid is attributed
-        to the presence she'd expect an answer from (the engaged one,
+        A bid is its side of a two-way conversation: it initiated,
+        and now the world owes it an answer. The bid is attributed
+        to the presence it'd expect an answer from (the engaged one,
         else whoever was last around), so their responsiveness and
         per-topic receptivity posteriors learn whether it landed.
         Each unanswered bid also accumulates until someone engages
-        her, letting the volition layer back off gracefully.
+        it, letting the volition layer back off gracefully.
         Returns the current bid count.
         """
         now = time.time()
@@ -338,7 +338,7 @@ class OuterWorld:
 
     @property
     def unanswered_bids(self) -> int:
-        """How many times she's reached out since anyone engaged her."""
+        """How many times it's reached out since anyone engaged it."""
         with self._lock:
             return self._unanswered_bids
 
@@ -357,13 +357,13 @@ class OuterWorld:
             )
 
     def present_presences(self) -> list[Presence]:
-        """Presences currently in her world."""
+        """Presences currently in its world."""
         with self._lock:
             return [p for p in self._presences.values() if p.present]
 
     def engaged_presence(self) -> Presence | None:
-        """The presence she's most engaged with — present and most
-        recently addressed. Who she'd reach out to first."""
+        """The presence it's most engaged with — present and most
+        recently addressed. Who it'd reach out to first."""
         with self._lock:
             return self._engaged_locked()
 
@@ -375,8 +375,8 @@ class OuterWorld:
         return max(candidates, key=lambda p: p.last_addressed)
 
     def last_seen_presence(self) -> Presence | None:
-        """The presence most recently in her world, present or gone —
-        who she'd reach out to when the room is empty."""
+        """The presence most recently in its world, present or gone —
+        who it'd reach out to when the room is empty."""
         with self._lock:
             return self._last_seen_locked()
 
@@ -389,7 +389,7 @@ class OuterWorld:
     def mark_presence(
         self, presence_id: str, kind: PresenceKind, name: str | None = None
     ) -> Presence:
-        """Mark a presence as active right now (e.g. a face she sees).
+        """Mark a presence as active right now (e.g. a face it sees).
 
         Emits an ARRIVAL event if they were absent. Returns the
         presence.
@@ -410,13 +410,13 @@ class OuterWorld:
     # ── Drives and state ────────────────────────────────────────
 
     def social_isolation(self) -> float:
-        """How socially isolated she is [0..1].
+        """How socially isolated it is [0..1].
 
         Rises linearly over ISOLATION_PERIOD seconds of no addressed
         contact; dampened when someone is around even if silent. This
-        is the external pressure that feeds her inner social drive —
-        the world telling her it has been too long since anyone
-        engaged her.
+        is the external pressure that feeds its inner social drive —
+        the world telling its it has been too long since anyone
+        engaged it.
         """
         with self._lock:
             elapsed = max(0.0, time.time() - self._last_addressed_time)
@@ -485,8 +485,8 @@ class OuterWorld:
         return self._stream.recent(n)
 
     def summarize(self) -> str:
-        """A human-readable summary of her external world."""
-        lines = ["Her world:"]
+        """A human-readable summary of its external world."""
+        lines = ["Its world:"]
         with self._lock:
             presences = sorted(
                 self._presences.values(),
@@ -608,7 +608,7 @@ class OuterWorld:
         """Drop the least-recently-seen absent presence (lock held).
 
         Present and bonded/familiar presences are kept — eviction
-        prefers stale strangers she never formed a relationship with.
+        prefers stale strangers it never formed a relationship with.
         """
         candidates = [
             p for p in self._presences.values()
@@ -627,7 +627,7 @@ class OuterWorld:
     ) -> ExternalEvent:
         """Build an ARRIVAL event for a presence that just appeared.
 
-        Caller holds ``self._lock``. A returning presence she knows
+        Caller holds ``self._lock``. A returning presence it knows
         (bond > 0.3) carries a small oxytocin warmth — recognition of
         someone familiar.
         """
@@ -642,20 +642,20 @@ class OuterWorld:
         )
 
     def _ground(self, text: str) -> list[str]:
-        """Ground event topics in her concept network."""
+        """Ground event topics in its concept network."""
         if self._network is None or not text:
             return []
         return ground_topics(text, self._is_known_concept)
 
     def _is_known_concept(self, word: str) -> bool:
-        """True if ``word`` exists in her concept network."""
+        """True if ``word`` exists in its concept network."""
         try:
             return self._network.get_concept(word) is not None
         except Exception:  # noqa: BLE001 — grounding must never break events
             return False
 
     def _sync_user_name(self, presence: Presence) -> None:
-        """Sync the user presence's name from her user profile.
+        """Sync the user presence's name from its user profile.
 
         Lazily propagates a learned name — the profile is the
         authoritative model of the person; the presence is the
@@ -680,7 +680,7 @@ class OuterWorld:
             logger.debug("world neuro impulse failed", exc_info=True)
 
     def _asleep(self) -> bool:
-        """Whether she's asleep — inbound perception is gated then."""
+        """Whether it's asleep — inbound perception is gated then."""
         try:
             return bool(self._is_sleeping and self._is_sleeping())
         except Exception:  # noqa: BLE001

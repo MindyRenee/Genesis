@@ -8,12 +8,12 @@ together. This enables three things the symbolic graph cannot do alone:
    "tree" even though no word matches exactly. The input text shares
    semantic features with the tree concept.
 
-2. **Generalization** — she knows "joy" and encounters "elation."
+2. **Generalization** — it knows "joy" and encounters "elation."
    They share many neighbors in the concept network, so their vectors
-   are close. She can reason about elation by analogy to joy, even
+   are close. It can reason about elation by analogy to joy, even
    with no explicit graph edge.
 
-3. **Discovery** — during sleep, she scans the latent space for nearby
+3. **Discovery** — during sleep, it scans the latent space for nearby
    concepts that lack a graph edge and proposes new SIMILAR_TO
    relationships. This is where generalization becomes knowledge.
 

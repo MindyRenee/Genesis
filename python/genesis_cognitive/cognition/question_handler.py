@@ -77,7 +77,7 @@ class QuestionHandler:
     All answers are composed from concept-network edges, thought
     composer output, theory-of-mind beliefs, or episodic memory —
     never from hardcoded template strings. When Genesis doesn't know
-    the answer, she says so honestly through the language engine.
+    the answer, it says so honestly through the language engine.
     """
 
     def __init__(
@@ -232,10 +232,10 @@ class QuestionHandler:
             return self._enrich_with_memory(
                 result, perception, memory, retrieve_episode
             )
-        # Web search — when she can't answer from her own knowledge,
-        # she searches the web and expresses what she finds. This is
-        # her on-demand gateway to the wider web: in conversation, for
-        # fun, to learn. She composes her own words from the summary,
+        # Web search — when it can't answer from its own knowledge,
+        # it searches the web and expresses what it finds. This is
+        # its on-demand gateway to the wider web: in conversation, for
+        # fun, to learn. It composes its own words from the summary,
         # never reciting the page verbatim.
         result = self.question_web_search(perception, emotion)
         if result is not None:
@@ -282,7 +282,7 @@ class QuestionHandler:
         subject, verb, is_negative, question_word = parsed
 
         # A negated question asks about an absence ("why doesn't X
-        # affect Y?"), which her edges cannot enumerate — decline so
+        # affect Y?"), which its edges cannot enumerate — decline so
         # downstream handlers can respond honestly rather than
         # affirming the negated claim.
         if is_negative:
@@ -575,7 +575,7 @@ class QuestionHandler:
         and returns its definition and edges as structured data. The
         answer itself is composed by the vocabulary from ``knowledge``
         metadata — the tool's formatted summary text is for tool-use
-        contexts, not for her voice.
+        contexts, not for its voice.
         """
         if perception.question_type != QuestionType.WHAT:
             return None
@@ -590,7 +590,7 @@ class QuestionHandler:
         edge_facts = result.data.get("edge_facts") or []
         definition = result.data.get("definition") or ""
         if not edge_facts and not definition:
-            # The concept exists but she knows nothing about it — let
+            # The concept exists but it knows nothing about it — let
             # the composer or the honest fallback answer instead.
             return None
 
@@ -614,17 +614,17 @@ class QuestionHandler:
     def question_web_search(
         self, perception: Perception, emotion: EmotionalState
     ) -> Thought | None:
-        """Search the web when she can't answer from her own knowledge.
+        """Search the web when it can't answer from its own knowledge.
 
-        This is her on-demand gateway to the wider web. When the
+        This is its on-demand gateway to the wider web. When the
         concept network, reasoning, and tool lookup all fail to
-        answer a question, she searches the web, reads the top
-        result, and expresses what she found in her own words.
+        answer a question, it searches the web, reads the top
+        result, and expresses what it found in its own words.
 
-        She never recites the page verbatim — the vocabulary composes
-        her expression from a trimmed summary, with hedging that
-        reflects she just looked it up. The content passes through
-        her language engine, not through a template.
+        It never recites the page verbatim — the vocabulary composes
+        its expression from a trimmed summary, with hedging that
+        reflects it just looked it up. The content passes through
+        its language engine, not through a template.
 
         Returns None if there are no topics, the search fails, or
         the fetch returns no usable content — falling through to the
@@ -721,7 +721,7 @@ class QuestionHandler:
             )
 
         # Questions about the user — "who am I?", "do you know me?",
-        # or the learned user name — compose from what she knows about
+        # or the learned user name — compose from what it knows about
         # this person, not from a creator template.
         user_name = (
             self._self_model.self_knowledge.get("user_name", "")
@@ -785,7 +785,7 @@ class QuestionHandler:
         """Try the thought composer and reasoning results to answer the question."""
         from ..reasoning import ReasoningType
 
-        # 1. Try the thought composer — compose from what she knows
+        # 1. Try the thought composer — compose from what it knows
         if perception.topics:
             topics = self._resolve_topics(perception.topics, perception.raw_text)
             qtype_str = self._map_question_type(perception.question_type)
@@ -920,7 +920,7 @@ class QuestionHandler:
 
         This handles questions that explicitly reference the past
         ("do you remember...", "did we talk about...", "what did I tell
-        you..."). For those, the retrieved episode IS the answer — she
+        you..."). For those, the retrieved episode IS the answer — it
         recalls what was said before.
 
         For ordinary questions that happen to have relevant memories,
@@ -942,8 +942,8 @@ class QuestionHandler:
 
         ep_text = self._clean_episode_text(ep)
         if ep_text is None:
-            # The memory is too long or noisy to quote directly. She
-            # knows she encountered this before but can't articulate it
+            # The memory is too long or noisy to quote directly. It
+            # knows it encountered this before but can't articulate it
             # cleanly — express that honestly through reasoning.
             return Thought(
                 content="memory",
@@ -981,10 +981,10 @@ class QuestionHandler:
         should enrich the concept-network-backed answer — not pre-empt
         it. This attaches a cleaned, highly-relevant episode to the
         thought's ``memory`` metadata so the vocabulary can compose it
-        alongside the concept-network knowledge she already has.
+        alongside the concept-network knowledge it already has.
 
         Only the single most-relevant episode is considered, and only
-        when it is both salient (she cared about it when she learned
+        when it is both salient (it cared about it when it learned
         it) and closely matching (low hamming distance). This prevents
         unrelated or noisy memories from leaking into responses.
         """

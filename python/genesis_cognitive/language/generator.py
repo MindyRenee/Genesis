@@ -10,15 +10,15 @@ it into natural language using:
 
 The result is text that is uniquely Genesis's — not retrieved from
 a pre-trained model, not filled into a template, but *composed*
-from her internal state.
+from its internal state.
 
 # Why this matters
 
 A template says: "I feel {emotion}." Always the same structure.
 An LLM says: whatever its training data suggests. Someone else's voice.
 
-A generator says: here's a thought. Here's how she feels. Here's who
-she is. Let's compose something that expresses all three.
+A generator says: here's a thought. Here's how it feels. Here's who
+it is. Let's compose something that expresses all three.
 
 The output varies because the inputs vary. Same intent, different
 emotion → different rhythm, different word choice, different hedging.
@@ -212,7 +212,7 @@ class GenerativeEngine(LanguageEngine):
 
         Returns the ProsodyPattern from the last generate() call, or
         None if no generation has occurred. Useful for introspection:
-        Genesis can observe her own rhythmic and emphasis patterns.
+        Genesis can observe its own rhythmic and emphasis patterns.
         """
         return self._last_prosody
 
@@ -273,8 +273,8 @@ class GenerativeEngine(LanguageEngine):
         """Wire the self-composer and reflection engine into the vocabulary.
 
         When wired, the ``self_reflection_clause`` grammar slot is
-        composed from her most recent reflection insight (a genuine
-        product of her metacognition) instead of reciting a canned
+        composed from its most recent reflection insight (a genuine
+        product of its metacognition) instead of reciting a canned
         phrase. Called after construction, once the cognition engine
         (which owns the reflection engine) has been initialized.
         """
@@ -454,7 +454,7 @@ class GenerativeEngine(LanguageEngine):
         # express_emotion now goes through grammar composition too:
         # the feeling fragments (emotion words, mode words) are passed
         # as metadata, and the vocabulary composes the content slot from
-        # them using varied grammatical structures. This gives her the
+        # them using varied grammatical structures. This gives it the
         # freedom to express the same state in different ways rather
         # than always saying "I feel X and Y."
         #
@@ -691,7 +691,7 @@ class GenerativeEngine(LanguageEngine):
             # graph traversal. The vocabulary composes the connective
             # phrasing; the reasoning layer supplies only the facts.
             "qualification": thought.metadata.get("qualification"),
-            # Her name — so the intro_clause slot can compose
+            # Its name — so the intro_clause slot can compose
             # "I'm <name>" from the self-model rather than a hardcoded
             # string. The name is a seed (building block), not a
             # hardcoded response.
@@ -713,7 +713,7 @@ class GenerativeEngine(LanguageEngine):
             # composed statement alongside concept-network knowledge.
             "memory": thought.metadata.get("memory"),
             # User belief metadata — lets the vocabulary compose a
-            # response from what she knows about the user (preferences,
+            # response from what it knows about the user (preferences,
             # beliefs, etc.) without dumping raw profile data.
             "user_belief": thought.metadata.get("user_belief"),
             "user_verb": thought.metadata.get("user_verb"),
@@ -723,7 +723,7 @@ class GenerativeEngine(LanguageEngine):
             # instead of the handler building the words itself.
             "relation_answer": thought.metadata.get("relation_answer"),
             # Self-improvement metadata — lets the vocabulary compose a
-            # response from her proposals, experiments, or growth data
+            # response from its proposals, experiments, or growth data
             # instead of reciting the raw admin summary.
             "self_improvement_kind": thought.metadata.get("self_improvement_kind"),
             "self_improvement_data": thought.metadata.get("self_improvement_data"),
@@ -740,19 +740,19 @@ class GenerativeEngine(LanguageEngine):
             # (status/topic/value) instead of reciting a pre-composed
             # first-person sentence.
             "preference": thought.metadata.get("preference"),
-            # Web search metadata — when she looked something up online,
-            # the vocabulary composes her expression of what she found
+            # Web search metadata — when it looked something up online,
+            # the vocabulary composes its expression of what it found
             # from the summary, not by reciting the page verbatim.
             "web_summary": thought.metadata.get("web_summary"),
             "web_source": thought.metadata.get("web_source"),
             # Vision scene metadata — the retina feed's structured
             # percept (lighting, color, faces, objects, positions).
-            # The vocabulary composes her report from the data; the
-            # vision module itself never writes her words.
+            # The vocabulary composes its report from the data; the
+            # vision module itself never writes its words.
             "vision_scene": thought.metadata.get("vision_scene"),
             # Vision status — when perception itself failed or is
             # unavailable ("unavailable", "mid_update", "unprocessed",
-            # "load_failed"), the vocabulary composes her report of
+            # "load_failed"), the vocabulary composes its report of
             # *that* instead of leaving a raw status word in the slot.
             "vision_status": thought.metadata.get("vision_status"),
         }
@@ -840,7 +840,7 @@ class GenerativeEngine(LanguageEngine):
                 prev_literal = seg.text
             elif isinstance(seg, Slot):
                 # Last emitted words — feeds n-gram fluency shaping so
-                # slot fills prefer transitions she's observed. Two
+                # slot fills prefer transitions it's observed. Two
                 # words of context enable trigram shaping; one word
                 # falls back to bigram.
                 prev_word = ""
@@ -1023,7 +1023,7 @@ class GenerativeEngine(LanguageEngine):
         if thought.metadata.get("user_belief") is not None:
             n = min(n, 1)
 
-        # Same for preference answers — one fact about her own
+        # Same for preference answers — one fact about its own
         # preference state, one sentence.
         if thought.metadata.get("preference") is not None:
             n = min(n, 1)

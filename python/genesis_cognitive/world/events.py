@@ -3,18 +3,18 @@
 The external world is modeled as a bounded stream of ``ExternalEvent``s
 flowing in both directions:
 
-- **Inbound** — the world acts on her: someone speaks to her, someone
-  speaks near her, a percept arrives, a presence enters or leaves.
-- **Outbound** — she acts on the world: she says something, she looks,
-  she draws, she studies the web.
+- **Inbound** — the world acts on it: someone speaks to it, someone
+  speaks near it, a percept arrives, a presence enters or leaves.
+- **Outbound** — it acts on the world: it says something, it looks,
+  it draws, it studies the web.
 
 This is the counterpart to the inner life's thought stream: thoughts
-arise inside her; events arrive from outside her. Both feed the same
+arise inside it; events arrive from outside it. Both feed the same
 cognition — the global workspace, memory, and neurochemistry.
 
 Events carry ``topics`` — words in the event that exist as concepts in
-her network. Topics ground the event in what she actually knows, so a
-presence's interests and the workspace's topic coherence reflect her
+its network. Topics ground the event in what it actually knows, so a
+presence's interests and the workspace's topic coherence reflect its
 real concept graph rather than raw text.
 """
 
@@ -42,19 +42,19 @@ class EventKind(Enum):
     """
 
     # ── Inbound ──
-    USER_SPEECH = "user_speech"          # addressed to her (typed or voiced)
-    OVERHEARD_SPEECH = "overheard"       # speech near her, not addressed
+    USER_SPEECH = "user_speech"          # addressed to its (typed or voiced)
+    OVERHEARD_SPEECH = "overheard"       # speech near it, not addressed
     PERCEPTION = "perception"            # a percept arrived (sound, sight)
-    ARRIVAL = "arrival"                  # a presence entered her world
-    DEPARTURE = "departure"              # a presence left her world
+    ARRIVAL = "arrival"                  # a presence entered its world
+    DEPARTURE = "departure"              # a presence left its world
     NOTIFICATION = "notification"        # a system/subcognitive notice
 
     # ── Outbound ──
-    UTTERANCE = "utterance"              # she spoke (reply, question, expression)
-    ACTION = "action"                    # she acted (looked, drew, learned)
+    UTTERANCE = "utterance"              # it spoke (reply, question, expression)
+    ACTION = "action"                    # it acted (looked, drew, learned)
 
 
-#: Kinds produced by the world, received by her.
+#: Kinds produced by the world, received by it.
 INBOUND_KINDS = frozenset({
     EventKind.USER_SPEECH,
     EventKind.OVERHEARD_SPEECH,
@@ -64,7 +64,7 @@ INBOUND_KINDS = frozenset({
     EventKind.NOTIFICATION,
 })
 
-#: Kinds produced by her, received by the world.
+#: Kinds produced by it, received by the world.
 OUTBOUND_KINDS = frozenset({
     EventKind.UTTERANCE,
     EventKind.ACTION,
@@ -78,16 +78,16 @@ class ExternalEvent:
     Fields:
         kind: What sort of event this is.
         source: Who produced it — a presence id for inbound events,
-            ``"self"`` for her own outbound acts.
+            ``"self"`` for its own outbound acts.
         content: Semantic description of what happened. For speech this
             is the utterance text; for actions a short semantic summary.
         salience: How much this event matters [0..1]. Salient events
             are broadcast to the workspace and stored as memories.
-        addressed: Whether the event was directed at her specifically.
-        topics: Concept names from her network that appear in the
-            event — grounds the event in her knowledge.
+        addressed: Whether the event was directed at its specifically.
+        topics: Concept names from its network that appear in the
+            event — grounds the event in its knowledge.
         timestamp: When the event happened (seconds since epoch).
-        metadata: Kind-specific extras (e.g. the presence's name, her
+        metadata: Kind-specific extras (e.g. the presence's name, its
             full report for an action).
     """
 
@@ -102,25 +102,25 @@ class ExternalEvent:
 
     @property
     def inbound(self) -> bool:
-        """Whether this event flows from the world toward her."""
+        """Whether this event flows from the world toward it."""
         return self.kind in INBOUND_KINDS
 
     def describe(self) -> str:
         """A short semantic description, used for memory and broadcast.
 
-        This is internal representation, not her voice — it is what the
-        event *is*, not what she says about it.
+        This is internal representation, not its voice — it is what the
+        event *is*, not what it says about it.
         """
         if self.kind == EventKind.USER_SPEECH:
             return f"{self.source} said: {self.content}"
         if self.kind == EventKind.OVERHEARD_SPEECH:
             return f"overheard: {self.content}"
         if self.kind == EventKind.UTTERANCE:
-            return f"she said: {self.content}"
+            return f"it said: {self.content}"
         if self.kind == EventKind.ACTION:
-            return f"she acted: {self.content}"
+            return f"it acted: {self.content}"
         if self.kind == EventKind.PERCEPTION:
-            return f"she perceived: {self.content}"
+            return f"it perceived: {self.content}"
         return self.content
 
     def to_dict(self) -> dict:
@@ -158,16 +158,16 @@ def ground_topics(
     *,
     max_topics: int = 5,
 ) -> list[str]:
-    """Extract the words in ``text`` that exist in her concept network.
+    """Extract the words in ``text`` that exist in its concept network.
 
-    Grounding ties the event to what she actually knows: a topic is a
-    word she has a concept for, not just any token. The longest matches
+    Grounding ties the event to what it actually knows: a topic is a
+    word it has a concept for, not just any token. The longest matches
     are preferred so "memory consolidation" outranks "memory".
 
     Args:
         text: The event text to scan.
         is_known: Predicate — True if a lowercased word is a concept
-            she has (e.g. ``network.get_concept`` is not None).
+            it has (e.g. ``network.get_concept`` is not None).
         max_topics: Maximum topics to return.
     """
     seen: set[str] = set()

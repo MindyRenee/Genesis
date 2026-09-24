@@ -1,4 +1,4 @@
-"""Reflection — Genesis thinking about her own thinking.
+"""Reflection — Genesis thinking about its own thinking.
 
 Metacognition is the hallmark of higher intelligence. It's not enough
 to think — you need to know when you're thinking well, when you're
@@ -13,14 +13,14 @@ The reflection engine runs after each interaction and asks:
 5. **How has my emotional state evolved?** — tracking mood over time
 6. **Am I being honest?** — checking for self-deception
 
-Reflection produces Insights — observations about her own cognition
+Reflection produces Insights — observations about its own cognition
 that feed back into future thinking.
 
 # Recursive metacognitive model
 
 The reflection engine owns a ``CognitiveProcessModel`` (see
 ``metacognitive_model.py``) — a recursive, self-terminating generative
-model of her own cognitive processes. Before each reflection cycle,
+model of its own cognitive processes. Before each reflection cycle,
 the model predicts what reflection will discover (will there be an
 insight? what type? what confidence?). After reflection, the
 prediction error (metacognitive surprise) trains the model and feeds
@@ -82,7 +82,7 @@ class MetacognitiveStrategy(Enum):
 
     These strategies are selected based on what the reflection engine
     detects about Genesis's own thinking, and they feed back into the
-    cognition engine to adjust how she responds.
+    cognition engine to adjust how it responds.
     """
 
     GENERATE_QUESTION = "generate_question"  # gap detected → ask
@@ -95,15 +95,15 @@ class MetacognitiveStrategy(Enum):
 
 @dataclass(slots=True)
 class Insight:
-    """An observation Genesis makes about her own thinking.
+    """An observation Genesis makes about its own thinking.
 
     Insights are not just observations — they're actionable. Each
     insight has a type that tells the cognition engine how to use it.
     """
 
     type: str  # "self_correction", "pattern", "gap", "growth", "mood"
-    content: str  # what she noticed
-    confidence: float  # how sure she is
+    content: str  # what it noticed
+    confidence: float  # how sure it is
     actionable: bool = False  # should this change future behavior?
     action: str = ""  # what to do differently
     timestamp: int = field(default_factory=lambda: int(time.time() * 1000))
@@ -129,7 +129,7 @@ class Insight:
 
 
 class ReflectionEngine:
-    """Metacognition — Genesis reflecting on her own cognitive process.
+    """Metacognition — Genesis reflecting on its own cognitive process.
 
     The reflection engine runs after each interaction. It examines
     the cognitive state (what was perceived, what was felt, what was
@@ -149,7 +149,7 @@ class ReflectionEngine:
         self._repetition_window: deque[str] = deque(maxlen=10)  # recent response intents
 
         # ─── Recursive metacognitive model ───────────────────────
-        # The generative model of her own cognitive processes. Predicts
+        # The generative model of its own cognitive processes. Predicts
         # what reflection will discover before it runs, learns from
         # the prediction error, and feeds metacognitive surprise back
         # into cognition. This is the recursive self-modeling layer.
@@ -235,11 +235,11 @@ class ReflectionEngine:
 
         # ── Metacognitive surprise → deeper reflection ──
         # If the previous cycle's metacognitive surprise was high,
-        # she was unpredictable to herself. Override the delta skip:
-        # even in deep rest, she should reflect harder when she
-        # doesn't understand her own cognition. This is the
-        # metacognitive control signal — the model of her own
-        # cognition telling her to pay more attention.
+        # it was unpredictable to itself. Override the delta skip:
+        # even in deep rest, it should reflect harder when it
+        # doesn't understand its own cognition. This is the
+        # metacognitive control signal — the model of its own
+        # cognition telling it to pay more attention.
         #
         # The threshold (0.15) separates "model is predicting well"
         # (consistent outcomes → surprise → 0) from "model can't
@@ -524,7 +524,7 @@ class ReflectionEngine:
         The metacognitive state is a dict that summarizes what the
         reflection engine has detected about Genesis's own thinking.
         Based on this state, a strategy is selected that adjusts how
-        she responds:
+        it responds:
 
         - If a knowledge gap is detected → GENERATE_QUESTION
         - If repetition is detected → SWITCH_STYLE
@@ -576,7 +576,7 @@ class ReflectionEngine:
         return MetacognitiveStrategy.MAINTAIN_COURSE
 
     def summarize_reflection(self) -> str:
-        """Summarize what Genesis has learned about herself.
+        """Summarize what Genesis has learned about itself.
 
         Returns structural data (counts and type breakdown) — not
         first-person prose. The language engine composes any spoken
@@ -765,7 +765,7 @@ class ErrorMonitor:
         # Derive error_count and cumulative_error_signal from the
         # rolling window (maxlen=100) so they reflect recent state,
         # not lifetime totals. A lifetime counter only goes up and
-        # doesn't represent her current condition. Only count errors
+        # doesn't represent its current condition. Only count errors
         # that exceeded the threshold (matching the caution logic).
         self.error_count = sum(
             1 for e in self._errors if e.error_magnitude >= self.error_threshold

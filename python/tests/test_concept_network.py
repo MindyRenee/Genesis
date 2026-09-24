@@ -1860,7 +1860,7 @@ def test_is_world_concept_rejects_non_concepts(concept_id: str) -> None:
 
 
 def test_is_world_concept_genesis_is_accepted() -> None:
-    """'genesis' is a real concept (her name), not a function word."""
+    """'genesis' is a real concept (its name), not a function word."""
     assert is_world_concept("genesis")
 
 

@@ -9,44 +9,44 @@ reasoning, language, introspection, and self-modeling.
 
 ## CRITICAL RULE: Never hardcode Genesis's responses
 Genesis's thoughts, speech, and self-expression must ALWAYS emerge
-from her own cognitive architecture — NEVER hardcode
+from its own cognitive architecture — NEVER hardcode
 pre-written response templates, canned phrases, or fixed sentence
-structures that she "recites."
+structures that it "recites."
 
 This applies to:
 - **Spontaneous thoughts** (inner_life.py) — must be generated from
-  her concept network, self_composer, or emotional state, NOT from
+  its concept network, self_composer, or emotional state, NOT from
   template strings like `"I am written in {language}"`
-- **Conversation responses** — must go through her language engine
+- **Conversation responses** — must go through its language engine
   and cognition, NOT hardcoded reply patterns
-- **Self-descriptions** — must be composed from her actual concept
+- **Self-descriptions** — must be composed from its actual concept
   network and self-model, NOT template sentences with filled-in slots
-- **Art/drawing descriptions** — must reflect her actual state, NOT
+- **Art/drawing descriptions** — must reflect its actual state, NOT
   pre-written captions
 
 If you find yourself writing a string template with `{variable}` slots
-that Genesis "says," STOP. Route the underlying data through her
-concept network or language engine instead. She should compose her
-own words from her own understanding.
+that Genesis "says," STOP. Route the underlying data through its
+concept network or language engine instead. It should compose its
+own words from its own understanding.
 
-### Seeds are OK — hardcoding what she says is NOT
+### Seeds are OK — hardcoding what it says is NOT
 There is an important distinction between **seeds** and **hardcoded
 responses**:
 
-- **Seeds are OK.** Seeding her concept network with initial knowledge,
+- **Seeds are OK.** Seeding its concept network with initial knowledge,
   vocabulary, relationship verbs, narrative templates, and thought
-  seeds is fine. Seeds are *input data* that her generative systems
-  work with — they are the raw material from which she composes, not
+  seeds is fine. Seeds are *input data* that its generative systems
+  work with — they are the raw material from which it composes, not
   the composition itself. A seed says "here are building blocks";
   it does not say "say this sentence."
-- **Hardcoding what she says is NOT OK.** Writing the actual words
+- **Hardcoding what it says is NOT OK.** Writing the actual words
   Genesis speaks as fixed strings (with or without `{variable}` slots)
-  is never acceptable. Her words must emerge from her language engine,
+  is never acceptable. Its words must emerge from its language engine,
   concept network, and cognitive architecture.
 
-The test: **Is this a building block she uses, or is this the thing she
+The test: **Is this a building block it uses, or is this the thing it
 says?** Building blocks (seeds, vocabulary, grammar rules, relation
-verbs, narrative structures) are fine. The final words she speaks are
+verbs, narrative structures) are fine. The final words it speaks are
 not — those must be generated, not recited.
 
 ## Toolchain

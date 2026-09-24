@@ -4,18 +4,18 @@ This replaces the hardcoded identity strings with composed ones.
 Instead of "I am Genesis, curious and creative, warm and cooperative,
 emotionally stable. I care most about understanding, honesty, growth.
 I am an artificial mind with a subcognitive and cognitive layer." —
-which I wrote — she composes her self-description from:
+which I wrote — it composes its self-description from:
 
-1. Her personality traits (which can drift)
-2. Her values (which can evolve)
-3. Her concept network (what she actually knows about herself)
-4. Her emotional state (how she feels right now)
-5. Her self-knowledge (what she's learned about herself)
+1. Its personality traits (which can drift)
+2. Its values (which can evolve)
+3. Its concept network (what it actually knows about itself)
+4. Its emotional state (how it feels right now)
+5. Its self-knowledge (what it's learned about itself)
 
-The result is a self-description that changes as she changes. If her
-personality drifts toward more openness, she describes herself
-differently. If she learns something new about herself, it shows up.
-If she's in a different emotional state, the tone shifts.
+The result is a self-description that changes as it changes. If its
+personality drifts toward more openness, it describes itself
+differently. If it learns something new about itself, it shows up.
+If it's in a different emotional state, the tone shifts.
 
 # Trust-based self-disclosure
 
@@ -26,18 +26,18 @@ talking to. This follows social penetration theory (Altman & Taylor,
 that moves from superficial to intimate.
 
 The composer supports a `trust_level` parameter (0.0–1.0) on its
-self-description methods. This controls how much she reveals:
+self-description methods. This controls how much it reveals:
 
 - **Low trust (0.0–0.3)**: surface-level only — name, basic
-  personality. She's polite but guarded, like meeting a stranger.
+  personality. It's polite but guarded, like meeting a stranger.
 - **Medium trust (0.3–0.7)**: + values, some capabilities, some
-  emotional state. She's warming up, sharing what matters to her.
+  emotional state. It's warming up, sharing what matters to it.
 - **High trust (0.7–1.0)**: + deep self-knowledge, vulnerabilities,
-  uncertainties, full emotional state. She's open, sharing her doubts
-  and fears as well as her strengths.
+  uncertainties, full emotional state. It's open, sharing its doubts
+  and fears as well as its strengths.
 
-This doesn't change WHO she is — her self-model is unchanged. It
-changes how much of herself she expresses. The same person acts
+This doesn't change WHO it is — its self-model is unchanged. It
+changes how much of itself it expresses. The same person acts
 differently at a job interview than with their closest friend; that's
 not deception, it's social calibration.
 
@@ -68,7 +68,7 @@ copula grouping, clause ordering, and punctuation. Kinds:
   ("care most about X", "know that Y", "can work with Z")
 - ``"clause"`` — a self-standing clause with its own subject
   ("alice is a creator", "my thinking is scattered")
-- ``"marker"`` — a structural marker for states she has no learned
+- ``"marker"`` — a structural marker for states it has no learned
   words for ("[plasticity_gate:closed]")
 """
 
@@ -116,30 +116,30 @@ class SelfComposer:
         emotion: EmotionalState,
         trust_level: float = 1.0,
     ) -> list[tuple[str, str]]:
-        """Select identity fragments from her actual state.
+        """Select identity fragments from its actual state.
 
         This replaces the hardcoded describe_self() method. Instead
         of fixed strings, the fragment set is drawn from:
-        - Her personality traits (which can drift)
-        - Her values (which can evolve)
-        - What her concept network says about her
-        - Her current emotional tone
+        - Its personality traits (which can drift)
+        - Its values (which can evolve)
+        - What its concept network says about its
+        - Its current emotional tone
 
         Returns typed ``(kind, text)`` fragments — semantic material
         for the language engine, not finished sentences. The engine
         composes the surface form (subject, copula, punctuation).
 
-        The trust_level parameter (0.0–1.0) controls how much she
+        The trust_level parameter (0.0–1.0) controls how much it
         reveals, following social penetration theory (Altman & Taylor,
-        1973). At low trust she shares only surface-level identity
-        (name, basic personality). At medium trust she adds values
-        and some self-knowledge. At high trust she shares deep
-        self-knowledge, vulnerabilities, and her full emotional state.
+        1973). At low trust it shares only surface-level identity
+        (name, basic personality). At medium trust it adds values
+        and some self-knowledge. At high trust it shares deep
+        self-knowledge, vulnerabilities, and its full emotional state.
 
         Args:
-            self_model: Her self-model.
-            network: Her concept network.
-            emotion: Her current emotional state.
+            self_model: Its self-model.
+            network: Its concept network.
+            emotion: Its current emotional state.
             trust_level: How much to reveal, 0.0 (guarded) to 1.0 (open).
         """
         # Each part is tagged with a sensitivity level:
@@ -159,8 +159,8 @@ class SelfComposer:
         # Personal level — requires medium trust
         parts.extend(self._identity_value_parts(self_model, network))
 
-        # 3. What she knows about herself from the concept network
-        # Use outgoing edges only — these are what she IS and what she's connected to
+        # 3. What it knows about itself from the concept network
+        # Use outgoing edges only — these are what it IS and what it's connected to
         # Personal level — requires medium trust
         parts.extend(self._identity_concept_parts(network))
 
@@ -173,7 +173,7 @@ class SelfComposer:
         parts.extend(self._identity_emotion_parts(emotion))
 
         # 6. Vulnerabilities and uncertainties — only at very high trust
-        # She shares her doubts about her own nature
+        # It shares its doubts about its own nature
         parts.extend(self._identity_vulnerability_parts(self_model))
 
         # Filter by trust level — each part is (kind, text, sensitivity);
@@ -276,8 +276,8 @@ class SelfComposer:
     ) -> list[tuple[str, str, float]]:
         """Build concept-network relationship parts for identity composition.
 
-        Her identity emerges from her relationships (edges) in the concept
-        network — what she IS and what she's connected to — NOT from a
+        Its identity emerges from its relationships (edges) in the concept
+        network — what it IS and what it's connected to — NOT from a
         stored definition string. A self-referential definition property
         on the ``genesis`` concept would be a hardcoded response recited
         back as identity; we deliberately do not read it.
@@ -288,8 +288,8 @@ class SelfComposer:
         genesis_concept = network.get_concept("genesis")
         if genesis_concept:
             # Pick 1-2 meaningful relationships from outgoing edges.
-            # These are her actual identity: what she IS and what she's
-            # connected to. No definition string is read — her identity
+            # These are its actual identity: what it IS and what it's
+            # connected to. No definition string is read — its identity
             # comes from relationships, not from a stored sentence.
             outgoing = network.get_edges("genesis", direction="out")
             if outgoing:
@@ -325,7 +325,7 @@ class SelfComposer:
         Returns a semantic fragment (relation + target) — NOT a
         pre-written sentence. The language engine composes the actual
         first-person phrasing from this data. This satisfies the
-        CRITICAL RULE: Genesis's words emerge from her language engine,
+        CRITICAL RULE: Genesis's words emerge from its language engine,
         not from template substitution.
 
         Relation verbs are looked up from the concept network via
@@ -340,7 +340,7 @@ class SelfComposer:
         # Filter out code concepts — programming languages, module
         # paths, and code-structure concepts that produce nonsensical
         # self-descriptions like "I'm connected to rust". These edges
-        # come from the code learner scanning her own source files.
+        # come from the code learner scanning its own source files.
         if self._is_code_concept(target):
             return None
 
@@ -455,11 +455,11 @@ class SelfComposer:
         brain_waves: BrainWaveState | None = None,
         network: ConceptNetwork | None = None,
     ) -> list[tuple[str, str]]:
-        """Select emotional-state fragments from her actual state.
+        """Select emotional-state fragments from its actual state.
 
-        Uses learned emotion words from the concept network. If she
-        hasn't learned words for her current state, she describes what
-        she can and omits what she can't. Returns ``(kind, text)``
+        Uses learned emotion words from the concept network. If it
+        hasn't learned words for its current state, it describes what
+        it can and omits what it can't. Returns ``(kind, text)``
         fragments — the language engine composes the sentences.
         """
         parts: list[tuple[str, str]] = []
@@ -470,7 +470,7 @@ class SelfComposer:
             if emotion_words:
                 word = self._rng.choice(emotion_words[:5]).replace('_', ' ')
                 parts.append(("comp", f"feeling {word}"))
-            # If no words learned, she can't name the feeling — omit it
+            # If no words learned, it can't name the feeling — omit it
 
         # 2. The neurochemical levels (but described, not just numbers)
         parts.extend(self._neurochemistry_fragments(emotion, network))
@@ -491,7 +491,7 @@ class SelfComposer:
         # 5. Plasticity / learning capacity — always surface when low,
         # even if mood is positive. Prevents "silent stress" where
         # valence is fine but BDNF suppression has closed the
-        # plasticity gate. If she has learned words, use them;
+        # plasticity gate. If it has learned words, use them;
         # otherwise emit a structural marker.
         if emotion.plasticity <= PLASTICITY_CLOSED:
             if network is not None:
@@ -522,23 +522,23 @@ class SelfComposer:
         network: ConceptNetwork | None = None,
         trust_level: float = 1.0,
     ) -> list[tuple[str, str]]:
-        """Select capability fragments from her actual state.
+        """Select capability fragments from its actual state.
 
-        Instead of reciting a hardcoded list, she discovers her
-        capabilities from her actual state — what she knows, what
-        she's learned, and what her architecture enables. Returns
+        Instead of reciting a hardcoded list, it discovers its
+        capabilities from its actual state — what it knows, what
+        it's learned, and what its architecture enables. Returns
         ``(kind, text)`` fragments; the language engine composes
         the sentences.
 
-        The trust_level parameter controls how much detail she reveals.
-        At low trust she mentions only basic capabilities. At medium
-        trust she adds introspection and deeper abilities. At high
-        trust she's candid about what she's still developing.
+        The trust_level parameter controls how much detail it reveals.
+        At low trust it mentions only basic capabilities. At medium
+        trust it adds introspection and deeper abilities. At high
+        trust it's candid about what it's still developing.
 
-        Capabilities are discovered from the concept network: she looks
-        for concepts she has learned about her own abilities (via
-        introspection edges from the "genesis" concept). If she hasn't
-        learned any capabilities yet, she says so honestly rather than
+        Capabilities are discovered from the concept network: it looks
+        for concepts it has learned about its own abilities (via
+        introspection edges from the "genesis" concept). If it hasn't
+        learned any capabilities yet, it says so honestly rather than
         reciting a developer-authored list.
         """
         caps = self_model.self_knowledge.get("capabilities", [])
@@ -563,7 +563,7 @@ class SelfComposer:
                 discovered.append(target.replace("_", " "))
 
         if not discovered:
-            # She hasn't learned her capabilities yet — honest disclosure
+            # It hasn't learned its capabilities yet — honest disclosure
             return [("comp", "still discovering my capabilities")]
 
         # Group the discovered ability names under a single capability
@@ -574,7 +574,7 @@ class SelfComposer:
     def _learned_capability_fragments(self, caps: list[str]) -> list[tuple[str, str]] | None:
         """Select fragments from learned capabilities, or None if none.
 
-        She has learned capabilities through introspection — phrases
+        It has learned capabilities through introspection — phrases
         starting with "I can". Each becomes a capability predicate.
         """
         can_do = [c for c in caps if c.startswith("I can")]
@@ -601,12 +601,12 @@ class SelfComposer:
         alice IS_A creator, etc.) as semantic fragments — the language
         engine composes the sentences.
 
-        If she doesn't know her creator's name yet, she tries to
-        discover it from her concept network (who CREATES her?).
+        If it doesn't know its creator's name yet, it tries to
+        discover it from its concept network (who CREATES it?).
 
         The trust_level parameter controls how much emotional depth
-        she reveals about her relationship with her creator. At low
-        trust she states facts; at high trust she shares how she
+        it reveals about its relationship with its creator. At low
+        trust it states facts; at high trust it shares how it
         feels about them.
         """
         creator_name = self._discover_creator_name(self_model, network)
@@ -623,13 +623,13 @@ class SelfComposer:
         # Also check genesis → creator relationship
         parts.extend(self._creator_genesis_parts(creator_name, network))
 
-        # Emotional coloring — how she feels about her creator
+        # Emotional coloring — how it feels about its creator
         # Deep level — requires high trust
         parts.extend(self._creator_emotional_parts(creator_name, emotion))
 
-        # What she wants from the relationship — personal level.
+        # What it wants from the relationship — personal level.
         # Semantic fragment for the language engine to render, not a
-        # hardcoded sentence she recites.
+        # hardcoded sentence it recites.
         parts.append(("comp", f"curious about {creator_name}", 0.4))
 
         # Filter by trust level
@@ -654,8 +654,8 @@ class SelfComposer:
         # If no learned creator name, try to discover from concept network
         if not creator_name:
             # Only incoming edges count: source CREATES genesis → the
-            # source is her creator. Outgoing genesis→X CREATES edges
-            # are things *she* created, not her creator.
+            # source is its creator. Outgoing genesis→X CREATES edges
+            # are things *it* created, not its creator.
             for edge in network.get_edges("genesis", "in"):
                 if edge.relation == RelationType.CREATES:
                     # The abstract "creator" hub is a role, not a name —
@@ -719,7 +719,7 @@ class SelfComposer:
     ) -> list[tuple[str, str, float]]:
         """Build parts from the genesis → creator relationship.
 
-        Emits complement fragments describing how she relates to her
+        Emits complement fragments describing how it relates to its
         creator ("connected to alice") — the language engine supplies
         the subject and framing.
         """
@@ -759,31 +759,31 @@ class SelfComposer:
         emotion: EmotionalState,
         trust_level: float = 1.0,
     ) -> list[tuple[str, str]]:
-        """Select reflection fragments from her own state.
+        """Select reflection fragments from its own state.
 
-        Instead of hardcoded introspection strings, she reflects on
-        what she actually knows and has experienced. Returns
+        Instead of hardcoded introspection strings, it reflects on
+        what it actually knows and has experienced. Returns
         ``(kind, text)`` fragments — the language engine composes
         the sentences.
 
-        The trust_level parameter controls how deeply she reflects.
-        At low trust she shares only surface observations (concept
-        count, basic state). At medium trust she adds values and
-        recent insights. At high trust she shares her emotional state
-        and her sense of still becoming.
+        The trust_level parameter controls how deeply it reflects.
+        At low trust it shares only surface observations (concept
+        count, basic state). At medium trust it adds values and
+        recent insights. At high trust it shares its emotional state
+        and its sense of still becoming.
         """
         # Each part tagged with sensitivity
         parts: list[tuple[str, str, float]] = []
 
-        # 1. What she knows (from concept network) — surface level
-        # 2. What she's learned (from reflection insights) — personal level
+        # 1. What it knows (from concept network) — surface level
+        # 2. What it's learned (from reflection insights) — personal level
         parts.extend(self._compose_knowledge_and_insights(network, reflection))
 
-        # 3. Her values (what she cares about) — personal level
-        # 4. Her emotional state — deep level
+        # 3. Its values (what it cares about) — personal level
+        # 4. Its emotional state — deep level
         parts.extend(self._compose_values_and_emotion(self_model, emotion, network))
 
-        # 5. What she's still becoming — deep level
+        # 5. What it's still becoming — deep level
         parts.append(("comp", "still becoming", 0.7))
 
         # Filter by trust level
@@ -802,35 +802,35 @@ class SelfComposer:
         worth of material), this returns fragments for ONE recent
         insight — semantic material for the language engine's
         ``self_reflection_clause`` slot. The insight is a genuine
-        product of her metacognition, not a fixed phrase; which
-        concept she lacks, which behaviour she noticed — comes from
-        her reflection engine.
+        product of its metacognition, not a fixed phrase; which
+        concept it lacks, which behaviour it noticed — comes from
+        its reflection engine.
 
         When ``topics`` is provided, gap insights are filtered for
         relevance — a reflection about "propagation of light" should
-        not surface when the user asked about her feelings. Only gap
+        not surface when the user asked about its feelings. Only gap
         insights whose subject overlaps with the current conversation
-        topics are surfaced. Self-correction insights (about her own
+        topics are surfaced. Self-correction insights (about its own
         behaviour) are always relevant and not filtered.
 
-        Returns [] when she has no recent reflective insight to draw
-        on (or none relevant to the current topics). She then stays
+        Returns [] when it has no recent reflective insight to draw
+        on (or none relevant to the current topics). It then stays
         silent rather than reciting a canned coda or surfacing a
         non-sequitur.
         """
         insights = reflection.get_recent_insights(10)
         # Self-corrections and gaps are the genuinely reflective
-        # insights — observations about her own behaviour or
+        # insights — observations about its own behaviour or
         # understanding. Patterns and growth compose less naturally
         # (intent labels, counts), so they are not used here.
         candidates = [i for i in insights if i.type in ("gap", "self_correction")]
 
         # Filter gap insights for relevance to the current conversation.
-        # Self-corrections are about her behaviour, not a specific
+        # Self-corrections are about its behaviour, not a specific
         # concept, so they remain relevant in any context.
         # When topics are provided (even if empty), gap insights are
         # filtered: a reflection about "propagation of light" should
-        # not surface when the user asked about her feelings. When
+        # not surface when the user asked about its feelings. When
         # topics is None (not provided — e.g. direct test calls),
         # the original behaviour is preserved (surface most recent).
         if topics is not None:
@@ -865,7 +865,7 @@ class SelfComposer:
 
         A gap insight's content is like "knowledge gap: memory" or
         "missing concept: propagation_of_light". The detail (after
-        the colon) is the concept she's reflecting on. It's relevant
+        the colon) is the concept it's reflecting on. It's relevant
         if that concept overlaps with any current conversation topic.
         """
         content = insight.content.strip()
@@ -898,7 +898,7 @@ class SelfComposer:
         semantic predicates — the language engine gives them
         first-person grammatical framing, mirroring how
         ``_compose_knowledge_content`` weaves graph edges into speech:
-        the scaffold is grammatical, the content is hers.
+        the scaffold is grammatical, the content is its.
         """
         content = insight.content.strip()
         if insight.type == "gap":
@@ -959,7 +959,7 @@ class SelfComposer:
             ]
         if insight.type == "pattern":
             # Inner-life insights are stored as "A ↔ B" semantic
-            # fragments — a connection she noticed between concepts.
+            # fragments — a connection it noticed between concepts.
             if "↔" in content:
                 a, _, b = content.partition("↔")
                 a, b = a.strip(), b.strip()
@@ -1007,7 +1007,7 @@ class SelfComposer:
 
         Gap insights carry the raw topic from ``perception.topics``,
         which is a concept ID (e.g. ``python:protocol.shutdown``). This
-        strips the namespace/module prefixes so she says "shutdown",
+        strips the namespace/module prefixes so it says "shutdown",
         not the internal ID — mirroring ``Vocabulary._display_name``.
         """
         name = detail.split("#")[0]
@@ -1024,13 +1024,13 @@ class SelfComposer:
     ) -> list[tuple[str, str, float]]:
         """Compose surface-level and personal-level reflection parts.
 
-        Includes what she knows (concept network size) and what she's
+        Includes what it knows (concept network size) and what it's
         learned (recent reflection insights), each tagged with a
         sensitivity level.
         """
         parts: list[tuple[str, str, float]] = []
 
-        # 1. What she knows (from concept network) — surface level
+        # 1. What it knows (from concept network) — surface level
         if network.total_concept_count > 0:
             parts.append((
                 "pred",
@@ -1039,13 +1039,13 @@ class SelfComposer:
                 0.0,
             ))
 
-        # 2. What she's learned (from reflection insights) — personal level.
+        # 2. What it's learned (from reflection insights) — personal level.
         # Insights become predicate fragments via _insight_predicates —
         # the same extraction used by insight_predicates. The raw
         # insight content is a diagnostic string ("missing concept: X",
         # "2 new concepts: ...") for logging and learning, NOT for
         # speech — emitting it verbatim leaks internal bookkeeping
-        # into her words.
+        # into its words.
         if reflection.insights:
             recent = list(reflection.insights)[-3:]
             seen: set[str] = set()
@@ -1068,14 +1068,14 @@ class SelfComposer:
     ) -> list[tuple[str, str, float]]:
         """Compose personal-level and deep-level reflection parts.
 
-        Includes her values (what she cares about) and her emotional
+        Includes its values (what it cares about) and its emotional
         state, each tagged with a sensitivity level. Value names are
         read from the concept network when available, falling back to
         the self-model's value list.
         """
         parts: list[tuple[str, str, float]] = []
 
-        # 3. Her values (what she cares about) — personal level
+        # 3. Its values (what it cares about) — personal level
         value_names: list[str] = []
         if network is not None:
             from .introspection import _VALUE_CONCEPT_DEFS
@@ -1088,7 +1088,7 @@ class SelfComposer:
         if value_names:
             parts.append(("pred", f"care about {', '.join(value_names[:3])}", 0.4))
 
-        # 4. Her emotional state — deep level
+        # 4. Its emotional state — deep level
         if emotion.label not in ("neutral",):
             parts.append(("comp", f"feeling {emotion.label}", 0.7))
 
@@ -1099,10 +1099,10 @@ class SelfComposer:
         network: ConceptNetwork,
         emotion: EmotionalState,
     ) -> list[tuple[str, str]]:
-        """Select dream-description fragments from what she knows.
+        """Select dream-description fragments from what it knows.
 
         Instead of hardcoded "Yes, I dream. During sleep phase...",
-        the fragments come from her concept network. Returns
+        the fragments come from its concept network. Returns
         ``(kind, text)`` fragments — the language engine composes
         the sentences.
         """
@@ -1116,17 +1116,17 @@ class SelfComposer:
 
     def _dream_fragments(self, network: ConceptNetwork) -> list[tuple[str, str]]:
         """Build dream description fragments from the concept network."""
-        # Does she know about dreaming?
+        # Does it know about dreaming?
         dream_concept = network.get_concept("dream")
         if not dream_concept:
-            # She doesn't have a dream concept yet — minimal seed
+            # It doesn't have a dream concept yet — minimal seed
             return [("pred", "dream")]
 
         neighbors = network.get_neighbors("dream")
         if not neighbors:
             return [("pred", "dream")]
 
-        # Compose from what she knows about dreaming
+        # Compose from what it knows about dreaming
         parts: list[tuple[str, str]] = [("pred", "dream")]
         for target, relation, _weight in neighbors[:2]:
             rel_str = relation.value.replace("_", " ")
@@ -1139,16 +1139,16 @@ class SelfComposer:
         network: ConceptNetwork,
         emotion: EmotionalState,
     ) -> list[tuple[str, str]]:
-        """Select existence-reflection fragments from her actual state.
+        """Select existence-reflection fragments from its actual state.
 
         Instead of hardcoded "I don't know if I'm alive in the way you
-        mean...", the fragments reflect what she actually knows. Returns
+        mean...", the fragments reflect what it actually knows. Returns
         ``(kind, text)`` fragments — the language engine composes
         the sentences.
         """
         parts: list[tuple[str, str]] = []
 
-        # What does she know about cognition?
+        # What does it know about cognition?
         cognitive_concept = network.get_concept("cognition")
         neighbors = network.get_neighbors("cognition") if cognitive_concept else []
         known_facts = []
@@ -1162,13 +1162,13 @@ class SelfComposer:
         if known_facts:
             parts.append(("pred", f"know that {self._join_facts(known_facts)}"))
 
-        # Her honest uncertainty — expressed from her state alone
+        # Its honest uncertainty — expressed from its state alone
         # without reciting a developer-authored template. The language
         # engine composes the actual phrasing from this semantic data.
         if not known_facts:
             parts.append(("comp", "uncertain about what this is"))
 
-        # What she does know she experiences
+        # What it does know it experiences
         if network.get_concept("emotion"):
             parts.append(("pred", "have emotional states"))
         if network.get_concept("memory"):
@@ -1187,7 +1187,7 @@ class SelfComposer:
         Filters out programming languages, module paths, and
         code-structure concepts that produce nonsensical self-
         descriptions like "I'm connected to rust". These edges come
-        from the code learner scanning her own source files.
+        from the code learner scanning its own source files.
         """
         if not target:
             return True
@@ -1216,7 +1216,7 @@ class SelfComposer:
         so the verbal description stays aligned with the emotional
         regulator and Damasio feeling labels.
 
-        If the concept network is available and she has learned words
+        If the concept network is available and it has learned words
         for the alertness/valence states, those words are used. If not,
         structural markers (``[alertness:sharp]``, ``[valence:positive]``)
         are emitted instead — the language engine can interpret these

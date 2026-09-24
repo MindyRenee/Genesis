@@ -1,6 +1,6 @@
 """Tests for emergent, salience-based thought selection in InnerLife.
 
-These tests verify that Genesis's spontaneous thoughts emerge from her
+These tests verify that Genesis's spontaneous thoughts emerge from its
 actual internal state — concept activation, knowledge gaps, review
 pressure, emotional salience, prediction error, body-state deviation —
 rather than from a developer-defined menu of thought categories with
@@ -319,7 +319,7 @@ class TestSalienceSelection:
 
 
 class TestGenerateThoughtSilence:
-    """Tests that Genesis stays silent when she has nothing expressible."""
+    """Tests that Genesis stays silent when it has nothing expressible."""
 
     def test_silence_with_empty_network(self):
         """No thoughts should be generated from an empty network."""
@@ -330,16 +330,16 @@ class TestGenerateThoughtSilence:
         # self-model, the only candidates are from curiosity (which may
         # generate questions about gaps) and expression/connection/
         # existential drives. Without a cognition/composer, none of
-        # these can be realized, so she should stay silent.
+        # these can be realized, so it should stay silent.
         # Run multiple times to check.
         for _ in range(10):
             thought = il._generate_thought(emotion)
-            # She may produce a curiosity question (from the curiosity
-            # engine), but she cannot produce a composed thought without
-            # a cognition module. The key assertion: she doesn't produce
+            # It may produce a curiosity question (from the curiosity
+            # engine), but it cannot produce a composed thought without
+            # a cognition module. The key assertion: it doesn't produce
             # a thought from a hardcoded seed list.
             if thought is not None:
-                # If she produced something, it must be a curiosity
+                # If it produced something, it must be a curiosity
                 # question (the only mode that doesn't require composing
                 # from knowledge).
                 assert thought.trigger == "curiosity", (
@@ -348,7 +348,7 @@ class TestGenerateThoughtSilence:
                 )
 
     def test_silence_when_no_composer(self):
-        """Without a composer, she can't realize reflect/memory/embodiment thoughts."""
+        """Without a composer, it can't realize reflect/memory/embodiment thoughts."""
         il = _make_inner_life(seed=42)
         # Boost activation so candidates exist.
         for cid in ("alpha", "beta"):
@@ -358,7 +358,7 @@ class TestGenerateThoughtSilence:
                 concept.confidence = 0.6
         emotion = _neutral_emotion()
         # No cognition/composer is set, so reflect/memory modes can't
-        # compose. She should either stay silent or produce a curiosity
+        # compose. It should either stay silent or produce a curiosity
         # question (which doesn't need the composer).
         for _ in range(20):
             thought = il._generate_thought(emotion)
@@ -419,7 +419,7 @@ class TestNoHardcodedCategoryWeights:
 
 
 class TestSalienceAffectsSelection:
-    """Tests that changing internal state changes what she thinks about."""
+    """Tests that changing internal state changes what it thinks about."""
 
     def test_activation_changes_topic(self):
         """Boosting a different concept's activation should change candidates."""

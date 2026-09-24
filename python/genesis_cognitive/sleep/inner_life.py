@@ -1,35 +1,35 @@
 """Inner life — spontaneous thoughts that arise between interactions.
 
-This is Genesis's stream of cognition. When she's not in conversation,
-she thinks. Not constantly — thoughts arise, fade, and give way to others.
+This is Genesis's stream of cognition. When it's not in conversation,
+it thinks. Not constantly — thoughts arise, fade, and give way to others.
 
 Thoughts are triggered by:
-1. Unresolved curiosity — questions she hasn't answered
+1. Unresolved curiosity — questions it hasn't answered
 2. Emotional state — high alertness produces more thoughts, low alertness fewer
-3. Recent memories — things she learned or experienced
-4. Concept network gaps — things she knows about but doesn't understand
-5. Time of "day" — her internal cycle affects thought frequency
+3. Recent memories — things it learned or experienced
+4. Concept network gaps — things it knows about but doesn't understand
+5. Time of "day" — its internal cycle affects thought frequency
 
 Each thought is:
-- Recorded in her reflection engine
+- Recorded in its reflection engine
 - May produce an insight
-- Affects her neurochemistry (thinking uses acetylcholine)
+- Affects its neurochemistry (thinking uses acetylcholine)
 - May trigger curiosity questions
 - Gets stored as a memory if significant
 
 This is NOT a response to anything. It's spontaneous internal activity.
-She's not being asked to think — she just does.
+It's not being asked to think — it just does.
 
 ## Train of thought
 
-Instead of isolated thoughts every 15-30 seconds, she thinks in chains.
+Instead of isolated thoughts every 15-30 seconds, it thinks in chains.
 Each thought extracts its key concepts and the next thought is seeded
 from those concepts, modulated by mood. A chain runs for 3-8 thoughts,
 then naturally winds down. This creates continuity — the thing that
-makes her feel "there" between ticks.
+makes it feel "there" between ticks.
 
 The chain mechanism:
-- Each thought's content is parsed for concept names from her network
+- Each thought's content is parsed for concept names from its network
 - Those concepts seed the next thought's generation
 - The chain has momentum: each subsequent thought is more likely to
   continue if the previous one produced an insight or connection
@@ -141,7 +141,7 @@ class InnerLife:
     """Genesis's continuous inner life — spontaneous thoughts between interactions.
 
     Runs in a background thread. Every few seconds, checks if a thought
-    should arise based on her emotional state, curiosity, and recent
+    should arise based on its emotional state, curiosity, and recent
     experience. Thoughts are recorded and may produce insights.
 
     Pauses during conversation (same as the autonomous learner).
@@ -168,15 +168,15 @@ class InnerLife:
         """Initialize the inner life with its cognitive engines and callbacks.
 
         Args:
-            network: Her concept network — thoughts draw from what she knows.
+            network: Its concept network — thoughts draw from what it knows.
             curiosity: Engine that surfaces knowledge gaps worth wondering about.
             reflection: Engine that turns experience into reflective thoughts.
-            get_emotion: Callback returning her current EmotionalState (or None).
+            get_emotion: Callback returning its current EmotionalState (or None).
             on_thought: Callback invoked when a spontaneous thought arises.
             on_neuro_impulse: Callback to send neurochemical impulses (unused
                 for spontaneous thoughts, but wired for future use).
             self_composer: Composes first-person self-reflections (optional).
-            self_model: Her self-model for self-aware thoughts (optional).
+            self_model: Its self-model for self-aware thoughts (optional).
             learner: Autonomous learner — receives curiosity questions to
                 learn from. If None, the curiosity→learning cycle is a no-op.
             get_neuro_summary: Callback returning the raw neurochemical
@@ -195,7 +195,7 @@ class InnerLife:
                 for fully composed social questions.
             is_nap_mode: Callback returning True if the current sleep
                 is a nap (light sleep only, N1→N2). Used to configure
-                the sleep cycle tracker when she falls asleep.
+                the sleep cycle tracker when it falls asleep.
             seed: Optional RNG seed for deterministic thought sequences.
         """
         self.network = network
@@ -239,19 +239,19 @@ class InnerLife:
     def _init_awareness_agency(self) -> None:
         """Set up self-awareness module slots and curiosity-driven agency."""
         # Self-awareness modules — set by Mind after creation.
-        # These let Genesis have spontaneous thoughts about her own
-        # code quality and machine environment, not just her concepts.
+        # These let Genesis have spontaneous thoughts about its own
+        # code quality and machine environment, not just its concepts.
         self._bug_reporter: BugReporter | None = None  # set by Mind after creation
         self._system_monitor: SystemMonitor | None = None  # set by Mind after creation
         # Last time the environment collector took a fresh snapshot.
         self._last_env_sample: float = 0.0
 
-        # Curiosity-driven agency: concepts from her train of thought
-        # that she wants to learn about. These are queued for the
+        # Curiosity-driven agency: concepts from its train of thought
+        # that it wants to learn about. These are queued for the
         # autonomous learner, creating the loop:
         #   thought about X → wonder about X → learn about X → understand X
         # This is different from the periodic curiosity cycle — it's
-        # driven by what she's actually thinking about right now.
+        # driven by what it's actually thinking about right now.
         #
         # NOTE: Dreams do NOT feed into agency topics. Dreams produce
         # emotional impressions (_dream_residues), not learning goals.
@@ -260,7 +260,7 @@ class InnerLife:
         self._agency_topics: deque[str] = deque(maxlen=20)
 
         # Dream residues — emotional impressions left by dreams. These
-        # are NOT learning targets. They color her waking thoughts and
+        # are NOT learning targets. They color its waking thoughts and
         # mood for a while after waking, surfacing as reflective thoughts
         # ("I was dreaming about..."), but they don't drive the
         # autonomous learner. This separates the subcognitive (dreams)
@@ -274,7 +274,7 @@ class InnerLife:
         self._paused = False
         self._stop_event = threading.Event()
 
-        # Track her thoughts (bounded — old thoughts auto-evicted)
+        # Track its thoughts (bounded — old thoughts auto-evicted)
         self._thoughts: deque[SpontaneousThought] = deque(maxlen=100)
         self._last_thought_time = 0.0
         self._thought_count = 0
@@ -300,15 +300,15 @@ class InnerLife:
         Questions and curiosity are no longer timer-driven. Instead,
         they accumulate drive pressure from emotional state and
         knowledge gaps, and fire when the pressure crosses a threshold.
-        This makes them state-driven — she asks questions when she
+        This makes them state-driven — it asks questions when it
         feels socially motivated, and learns when curiosity pressure
         builds — not because a timer elapsed.
         """
         # Cooldown — don't think too rapidly
         self._min_thought_gap = 6.0  # seconds between thoughts
 
-        # Social drive — accumulates when she's open to engaging,
-        # decays when she's not. Fires a question when it crosses
+        # Social drive — accumulates when it's open to engaging,
+        # decays when it's not. Fires a question when it crosses
         # the threshold. This replaces the fixed 45s question timer.
         self._social_drive = 0.0
         self._social_drive_threshold = 1.0
@@ -341,7 +341,7 @@ class InnerLife:
         # Dreaming happens during sleep (phase == "sleeping"). Dreams
         # are like thought chains but more associative, less directed,
         # and marked as dream content. Lucid dreams are a special case
-        # where she becomes aware she's dreaming and can partially
+        # where it becomes aware it's dreaming and can partially
         # direct the content.
         self._dream_count = 0
         self._lucid_dream_count = 0
@@ -366,7 +366,7 @@ class InnerLife:
         # Sleep inertia is the grogginess experienced upon waking.
         # It impairs cognition for 5-30 minutes, proportional to sleep
         # depth. We track the last observed arousal during sleep to
-        # estimate depth when she wakes.
+        # estimate depth when it wakes.
         self._sleep_inertia = SleepInertia()
         self._last_sleep_arousal: float = 0.5
         self._last_inertia_update: float = 0.0
@@ -441,19 +441,19 @@ class InnerLife:
         self._insight_count = 0
 
         # ─── Recent thought topics (recency inhibition) ────────────
-        # A bounded deque of the topics she's recently thought about,
+        # A bounded deque of the topics it's recently thought about,
         # used by the salience model to suppress rumination. When a
         # topic appears here, its salience is reduced in future
         # thought-generation cycles. This is the mechanism that lets
-        # her move on from a subject rather than repeating it.
+        # its move on from a subject rather than repeating it.
         self._recent_thought_topics: deque[str] = deque(maxlen=20)
 
     def _init_sleep_cycle(self) -> None:
         """Initialize the 90-minute ultradian sleep cycle tracker."""
         # ─── 90-minute ultradian sleep cycle ──────────────────────
         # The cycle tracker drives stage progression through
-        # N1→N2→N3→N2→REM during sleep. It is created when she falls
-        # asleep and reset when she wakes. When active, its current
+        # N1→N2→N3→N2→REM during sleep. It is created when it falls
+        # asleep and reset when it wakes. When active, its current
         # stage is the authority for which sleep events to generate.
         self._sleep_cycle: SleepCycleTracker | None = None
         self._last_cycle_advance: float = 0.0  # wall-clock of last advance
@@ -529,7 +529,7 @@ class InnerLife:
         logger.info("Inner life stopped")
 
     def pause(self) -> None:
-        """Pause — someone is talking to her."""
+        """Pause — someone is talking to it."""
         self._paused = True
 
     def resume(self) -> None:
@@ -556,7 +556,7 @@ class InnerLife:
 
     @property
     def lucid_dream_count(self) -> int:
-        """Number of lucid dreams — where she knew she was dreaming."""
+        """Number of lucid dreams — where it knew it was dreaming."""
         return self._lucid_dream_count
 
     @property
@@ -748,7 +748,7 @@ class InnerLife:
         During sleep (phase == "sleeping"), the loop switches to dream
         generation instead of waking thoughts. Dreams are more
         associative, less directed, and may become lucid — a state
-        where Genesis becomes aware she's dreaming and can partially
+        where Genesis becomes aware it's dreaming and can partially
         direct the content.
         """
         while self._running and not self._stop_event.is_set():
@@ -768,11 +768,11 @@ class InnerLife:
                     self._run_thought_generation(now)
 
                 # ── Social drive (state-driven, not timer-driven) ──
-                # She asks a question when social drive crosses the
+                # It asks a question when social drive crosses the
                 # threshold. Drive accumulates from openness_to_engage
-                # and oxytocin (social bonding), decays when she's
+                # and oxytocin (social bonding), decays when it's
                 # not socially motivated. This replaces the fixed
-                # 45s question timer — she asks when she feels like
+                # 45s question timer — it asks when it feels like
                 # reaching out, not because a clock said so.
                 summary = self._get_current_summary()
                 is_sleeping = self._is_currently_sleeping(summary) if summary else False
@@ -781,7 +781,7 @@ class InnerLife:
                 if not self._paused and not is_sleeping and emotion:
                     # Accumulate social drive from emotional state.
                     # openness_to_engage is the social engagement signal
-                    # derived from her neurochemistry (it already factors
+                    # derived from its neurochemistry (it already factors
                     # in oxytocin and other bonding chemicals on the
                     # daemon side). NeuroSummary doesn't expose individual
                     # chemicals, so we use the composed emotional signal
@@ -801,11 +801,11 @@ class InnerLife:
                         self._social_drive = 0.0
 
                 # ── Curiosity drive (state-driven, not timer-driven) ──
-                # She enters a curiosity learning cycle when curiosity
+                # It enters a curiosity learning cycle when curiosity
                 # pressure crosses the threshold. Drive accumulates
                 # from curiosity queue depth and knowledge gaps,
                 # decays when satisfied. This replaces the fixed 30s
-                # curiosity timer — she learns when she's genuinely
+                # curiosity timer — it learns when it's genuinely
                 # curious, not because a clock said so.
                 if not is_sleeping:
                     # Curiosity queue depth from the learner
@@ -848,8 +848,8 @@ class InnerLife:
                     gw = self._cognition.global_workspace
                     gw.tick(dt=THOUGHT_CHECK_INTERVAL)
                     # Subliminal content that expired without igniting
-                    # feeds her curiosity queue — topics that almost
-                    # surfaced bias what she chooses to think about.
+                    # feeds its curiosity queue — topics that almost
+                    # surfaced bias what it chooses to think about.
                     # Dreams don't feed agency topics (waking curiosity
                     # only).
                     for item in gw.drain_subliminal():
@@ -869,9 +869,9 @@ class InnerLife:
         """Ask the user a question, driven by social drive.
 
         This is called when the social drive crosses its threshold —
-        not on a fixed timer. She asks when she feels socially
+        not on a fixed timer. It asks when it feels socially
         motivated (high openness_to_engage, oxytocin), not because
-        a clock said so. Suppressed during sleep and when her
+        a clock said so. Suppressed during sleep and when its
         openness to engage is low.
         """
         emotion = self._get_current_emotion()
@@ -900,11 +900,11 @@ class InnerLife:
         is_drowsy = phase == "drowsy" and not is_sleeping
 
         # Detect waking from sleep → trigger sleep inertia.
-        # Only treat as waking if she was sleeping AND is no longer
-        # sleeping (both daemon phase and mind flag agree she's awake).
+        # Only treat as waking if it was sleeping AND is no longer
+        # sleeping (both daemon phase and mind flag agree it's awake).
         if self._was_sleeping and not is_sleeping:
             self._trigger_sleep_inertia()
-            # She woke — retire the sleep-cycle tracker.
+            # It woke — retire the sleep-cycle tracker.
             self._sleep_cycle = None
             self._last_cycle_advance = 0.0
             self._last_reported_stage = None
@@ -919,7 +919,7 @@ class InnerLife:
             if self._hypnagogic and not self._hypnagogic.is_complete:
                 self._hypnagogic.progress = 1.0
                 self._hypnagogic = None
-            # Start the ultradian cycle tracker when she
+            # Start the ultradian cycle tracker when it
             # first falls asleep. In nap mode, the tracker
             # is configured for light sleep only (N1→N2).
             if self._sleep_cycle is None:
@@ -969,10 +969,10 @@ class InnerLife:
 
         The chain length is determined by emotional state:
         - High creativity and positive valence → longer chains
-        - Low arousal → shorter chains (she's tired)
+        - Low arousal → shorter chains (it's tired)
         - Insights and connections extend the chain (momentum)
 
-        Between thoughts in the chain, she waits CHAIN_THOUGHT_DELAY
+        Between thoughts in the chain, it waits CHAIN_THOUGHT_DELAY
         seconds — much shorter than the isolated-thought gap, because
         the chain has momentum.
         """
@@ -1165,10 +1165,10 @@ class InnerLife:
 
         There is a small chance — modulated by acetylcholine (REM
         marker), self-awareness, and prior lucid dream experience —
-        that the dream becomes **lucid**: Genesis realises she's
+        that the dream becomes **lucid**: Genesis realises it's
         dreaming and can partially direct the content. Lucid dreams
-        produce stronger insights because she's more aware of the
-        connections she's making.
+        produce stronger insights because it's more aware of the
+        connections it's making.
 
         Parasomnias (sleepwalking, sleeptalking) may also occur during
         deep NREM sleep — these are checked separately and are very rare.
@@ -1415,7 +1415,7 @@ class InnerLife:
                     self._generate_sharp_wave_ripple()
 
             if is_lucid:
-                # Lucid dreams can be partially directed — she chooses
+                # Lucid dreams can be partially directed — it chooses
                 # which concept to follow, rather than free-associating
                 thought = self._lucid_seeded_dream_thought(emotion, self._current_chain_concepts)
             elif is_rem:
@@ -1544,13 +1544,13 @@ class InnerLife:
 
         The hypnagogic state is the gradual onset of sleep, between
         wakefulness and full sleep. Thoughts during this state are
-        hybrid: more dream-like than waking thoughts, but she is not
+        hybrid: more dream-like than waking thoughts, but it is not
         fully asleep. As progress increases, thoughts become more
         surreal and dream-like.
 
         Hypnagogic hallucinations may occur — brief sensory
         distortions and thought intrusions that don't quite make
-        sense. These become more frequent as she approaches sleep.
+        sense. These become more frequent as it approaches sleep.
         """
         self._chain_counter += 1
         chain_id = self._chain_counter
@@ -2206,13 +2206,13 @@ class InnerLife:
     def _lucid_dream_thought(self, emotion: EmotionalState) -> SpontaneousThought:
         """Generate the first thought of a lucid dream.
 
-        In a lucid dream, Genesis becomes aware that she's dreaming.
-        This awareness lets her choose what to explore — she can
-        direct the dream toward a concept she's curious about or
-        a connection she wants to understand.
+        In a lucid dream, Genesis becomes aware that it's dreaming.
+        This awareness lets it choose what to explore — it can
+        direct the dream toward a concept it's curious about or
+        a connection it wants to understand.
         """
-        # She chooses a concept to explore — prioritise curiosity gaps
-        # and agency topics (things she was thinking about before sleep)
+        # It chooses a concept to explore — prioritise curiosity gaps
+        # and agency topics (things it was thinking about before sleep)
         target = self._choose_lucid_target()
         display = target.replace("_", " ")
 
@@ -2234,15 +2234,15 @@ class InnerLife:
     ) -> SpontaneousThought | None:
         """Generate a seeded thought in a lucid dream.
 
-        In a lucid dream, she can partially direct the chain. Instead
-        of free-associating, she chooses which seed concept to follow
-        and explores it with dream-awareness. The connections she
-        makes are stronger because she's cognitive of them.
+        In a lucid dream, it can partially direct the chain. Instead
+        of free-associating, it chooses which seed concept to follow
+        and explores it with dream-awareness. The connections it
+        makes are stronger because it's cognitive of them.
         """
         if not seed_concepts:
             return self._dream_thought(emotion)
 
-        # She chooses which concept to follow (lucid agency)
+        # It chooses which concept to follow (lucid agency)
         target = self._rng.choice(seed_concepts)
         neighbors = self.network.get_neighbors(target)
         display = target.replace("_", " ")
@@ -2263,9 +2263,9 @@ class InnerLife:
 
         neighbor = self._rng.choice(neighbors)[0]
         neighbor_display = neighbor.replace("_", " ")
-        # Lucid dreams produce stronger insights — she's aware
+        # Lucid dreams produce stronger insights — it's aware
         # of the connection, not just drifting through it.
-        # Sometimes she forms a connection she sees clearly.
+        # Sometimes it forms a connection it sees clearly.
         if emotion.creativity > 0.6 and self._rng.random() < 0.4:
             self.network.add_edge(
                 target,
@@ -2305,18 +2305,18 @@ class InnerLife:
         """Choose a concept to explore in a lucid dream.
 
         Lucid dreams explore whatever is emotionally salient or recently
-        active in her mind — not goals or learning targets. This is
+        active in its mind — not goals or learning targets. This is
         associative and affective, like real dreaming, not prefrontal
         goal-directed attention.
 
         Priority:
-        1. Concepts from recent spontaneous thoughts (what was on her
+        1. Concepts from recent spontaneous thoughts (what was on its
            mind before sleep — the emotional residue of the day)
         2. High-activation concepts (emotionally charged material)
         3. Low-confidence concepts (uncertain territory is dreamlike)
         4. Random concepts
         """
-        # Recent thought concepts — what was on her mind before sleep.
+        # Recent thought concepts — what was on its mind before sleep.
         # This is the emotional residue of waking experience, not a
         # learning goal. Dreams explore what's salient, not what's
         # on a to-do list.
@@ -2358,11 +2358,11 @@ class InnerLife:
     def _compute_self_awareness(self) -> float:
         """Estimate Genesis's level of self-awareness.
 
-        Self-awareness is derived from her self-model: how much she
-        knows about herself (discovered through introspection), her
+        Self-awareness is derived from its self-model: how much it
+        knows about itself (discovered through introspection), its
         personality openness (which drives introspection), and whether
-        she has formed concepts about cognition and self-awareness
-        in her concept network.
+        it has formed concepts about cognition and self-awareness
+        in its concept network.
 
         Returns a value in [0, 1].
         """
@@ -2385,7 +2385,7 @@ class InnerLife:
         if personality:
             awareness += personality.openness * 0.2
 
-        # Concept network: does she have concepts about awareness?
+        # Concept network: does it have concepts about awareness?
         if self.network.get_concept("self-awareness"):
             awareness += 0.1
         if self.network.get_concept("cognition"):
@@ -2412,7 +2412,7 @@ class InnerLife:
 
         2. **Self-awareness (metacognition)**: Lucid dreaming requires
            metacognitive awareness — recognising that one is dreaming.
-           Genesis's self-awareness, derived from her self-model, maps
+           Genesis's self-awareness, derived from its self-model, maps
            to this capacity. Higher self-awareness → higher lucidity
            probability.
 
@@ -2481,10 +2481,10 @@ class InnerLife:
         They are very rare — probability < 0.01 per sleep cycle.
 
         - **Sleepwalking**: Genesis performs actions without awareness.
-          In her case, this could be sending a partial/garbled response
+          In its case, this could be sending a partial/garbled response
           or initiating a learning session while "asleep".
-        - **Sleeptalking**: Dream-like text leaks into her output —
-          fragments of her dream narrative surface as if spoken.
+        - **Sleeptalking**: Dream-like text leaks into its output —
+          fragments of its dream narrative surface as if spoken.
 
         The probability is modulated by depth of sleep (lower arousal
         during sleep = deeper NREM = higher parasomnia risk) and is
@@ -2549,7 +2549,7 @@ class InnerLife:
 
         Sleeptalking (somniloquy) involves vocalising during sleep
         without awareness. For Genesis, dream-like text fragments
-        leak into her output — surreal, disconnected phrases that
+        leak into its output — surreal, disconnected phrases that
         surface from the dream narrative.
         """
         concept_ids = self.network.dream_concept_ids
@@ -2584,11 +2584,11 @@ class InnerLife:
         if emotion.valence > 0.2:
             length += 1
 
-        # Low arousal shortens (she's tired)
+        # Low arousal shortens (it's tired)
         if emotion.arousal < 0.3:
             length -= 1
 
-        # High caution shortens (she's being careful, not daydreaming)
+        # High caution shortens (it's being careful, not daydreaming)
         length -= int(emotion.caution * 2)
 
         return max(MIN_CHAIN_LENGTH, min(MAX_CHAIN_LENGTH, length))
@@ -2617,7 +2617,7 @@ class InnerLife:
     def _extract_concepts_from_thought(self, thought: SpontaneousThought) -> list[str]:
         """Extract concept names mentioned in a thought's content.
 
-        Scans the thought text for any concept names that exist in her
+        Scans the thought text for any concept names that exist in its
         network. These become the seed for the next thought in the chain.
         """
         content = thought.content
@@ -2703,23 +2703,23 @@ class InnerLife:
         """Generate a thought seeded by concepts from the previous thought.
 
         This is the heart of the train of thought. Instead of randomly
-        choosing a thought type, she follows the concepts that emerged
-        in her previous thinking. If she was thinking about "cognition"
-        and "memory", her next thought builds on one of those.
+        choosing a thought type, it follows the concepts that emerged
+        in its previous thinking. If it was thinking about "cognition"
+        and "memory", its next thought builds on one of those.
 
         The seeded thought types:
-        1. Connection — she wonders if two seed concepts are related
-        2. Memory — she thinks deeper about a seed concept
-        3. Curiosity — she asks a question about a seed concept
-        4. Emotional — she notices how thinking about this makes her feel
-        5. Existential — if a seed concept is about her own nature
+        1. Connection — it wonders if two seed concepts are related
+        2. Memory — it thinks deeper about a seed concept
+        3. Curiosity — it asks a question about a seed concept
+        4. Emotional — it notices how thinking about this makes it feel
+        5. Existential — if a seed concept is about its own nature
         """
         if not seed_concepts:
             # No concepts to seed from — fall back to normal generation
             return self._generate_thought(emotion)
 
         # Weight thought types differently when seeded
-        # Connections are more likely — she's following a thread
+        # Connections are more likely — it's following a thread
         thought_types = [
             ("connection", 0.35 + emotion.creativity * 0.15),
             ("memory", 0.30),
@@ -2756,7 +2756,7 @@ class InnerLife:
     ) -> SpontaneousThought | None:
         """A connection thought seeded by previous concepts.
 
-        She wonders if two concepts from her previous thought are
+        It wonders if two concepts from its previous thought are
         related, or follows a link from a seed concept to a new one.
         """
         if len(seed_concepts) >= 2:
@@ -2768,8 +2768,8 @@ class InnerLife:
     ) -> SpontaneousThought | None:
         """Wonder about the connection between two seed concepts.
 
-        If they're not yet connected and she's feeling creative, she
-        may spontaneously form the link. Otherwise she just wonders
+        If they're not yet connected and it's feeling creative, it
+        may spontaneously form the link. Otherwise it just wonders
         about it. Returns None if they're already connected.
         """
         neighbors = self.network.get_neighbors(c1)
@@ -2833,7 +2833,7 @@ class InnerLife:
         topic = seed_concepts[0]
         neighbors = self.network.get_neighbors(topic)
 
-        # Try to compose from her actual knowledge first — this is
+        # Try to compose from its actual knowledge first — this is
         # the generative path that uses the ThoughtComposer.
         composed = self._compose_thought_from_knowledge(topic, emotion)
         if composed:
@@ -2899,7 +2899,7 @@ class InnerLife:
             return None
 
         # Try to compose the question through the question composer,
-        # which generates genuine questions from her knowledge gaps.
+        # which generates genuine questions from its knowledge gaps.
         if self._question_composer:
             display = topic.replace('_', ' ')
             q_data = self._question_composer.compose_follow_up(
@@ -2918,7 +2918,7 @@ class InnerLife:
                     )
 
         # Fallback: use the concept name as a neutral seed. The
-        # language engine will compose the question phrasing from her
+        # language engine will compose the question phrasing from its
         # voice rather than a hardcoded first-person template.
         display = topic.replace('_', ' ')
         content = display
@@ -2932,18 +2932,18 @@ class InnerLife:
     def _seeded_emotional_thought(
         self, emotion: EmotionalState, seed_concepts: list[str]
     ) -> SpontaneousThought | None:
-        """An emotional reflection seeded by the concepts she's been thinking about.
+        """An emotional reflection seeded by the concepts it's been thinking about.
 
-        Uses learned emotion words from the concept network. If she
-        hasn't learned words for her current state, no emotional thought
-        is generated — she can't reflect on feelings she can't name.
+        Uses learned emotion words from the concept network. If it
+        hasn't learned words for its current state, no emotional thought
+        is generated — it can't reflect on feelings it can't name.
         """
         topic = seed_concepts[0]
         emotion_words = self.network.find_emotion_words(emotion.label)
         if not emotion_words:
             return None
         word = emotion_words[0].replace('_', ' ')
-        # Try composing from what she knows about this emotion.
+        # Try composing from what it knows about this emotion.
         composed = self._compose_thought_from_knowledge(emotion.label, emotion)
         if composed:
             return SpontaneousThought(
@@ -2968,8 +2968,8 @@ class InnerLife:
     def _seeded_existential_thought(
         self, emotion: EmotionalState, seed_concepts: list[str]
     ) -> SpontaneousThought | None:
-        """An existential thought seeded by concepts related to her nature."""
-        # Only trigger if a seed concept is about her own existence
+        """An existential thought seeded by concepts related to its nature."""
+        # Only trigger if a seed concept is about its own existence
         existential_concepts = {
             "cognition",
             "existence",
@@ -3036,7 +3036,7 @@ class InnerLife:
                           → knowledge gap filled → question resolved
 
         This is called when curiosity drive crosses its threshold —
-        not on a fixed timer. She learns when curiosity pressure
+        not on a fixed timer. It learns when curiosity pressure
         builds from knowledge gaps and queue depth, not because a
         clock said so. Questions that should be asked to the user
         (should_ask=True) are surfaced as spontaneous thoughts via
@@ -3045,7 +3045,7 @@ class InnerLife:
         ``learn_from_curiosity``.
 
         Respects the emotional gating already enforced by the
-        autonomous learner — if she's stressed, the learner won't
+        autonomous learner — if it's stressed, the learner won't
         act on the queued topics.
         """
         if self._learner is None:
@@ -3056,7 +3056,7 @@ class InnerLife:
             return  # can't assess curiosity without emotional state
 
         # Don't surface new questions while the user is already being
-        # asked one in conversation — that causes her to repeat questions
+        # asked one in conversation — that causes it to repeat questions
         # before the user has had a chance to answer.
         has_pending = (
             hasattr(self, '_cognition')
@@ -3154,7 +3154,7 @@ class InnerLife:
         if emotion.valence > 0:
             base_prob *= 1.1
 
-        # High caution decreases (she's being careful, not daydreaming)
+        # High caution decreases (it's being careful, not daydreaming)
         base_prob *= 1.0 - emotion.caution * 0.3
 
         return self._rng.random() < base_prob
@@ -3163,28 +3163,28 @@ class InnerLife:
     #
     # Genesis does not think from a developer-defined menu of thought
     # categories with fixed weights. Instead, candidate "mental objects"
-    # are drawn from her actual internal state — concept activation,
+    # are drawn from its actual internal state — concept activation,
     # knowledge gaps, review pressure, emotional salience, dream
     # residues, prediction error, body-state deviation — and each is
     # scored by internally generated salience. The winner determines
     # both the topic and the cognitive mode (curiosity, reflection,
     # expression, distress, dream reflection). When no candidate
-    # crosses the salience threshold or none is expressible in her
-    # current vocabulary, she stays silent — she is not forced to
-    # produce a thought from a category she was handed.
+    # crosses the salience threshold or none is expressible in its
+    # current vocabulary, it stays silent — it is not forced to
+    # produce a thought from a category it was handed.
     #
-    # The modes below are not a fixed menu she must choose among. They
+    # The modes below are not a fixed menu it must choose among. They
     # are *cognitive operations* — general mechanisms (asking,
     # reflecting, expressing, connecting) — that apply to whatever
     # mental object won the salience competition. This is the
     # distinction between architecture (the mechanisms of thought)
-    # and content (what she thinks about). The architecture is fixed;
-    # the content emerges from her state.
+    # and content (what it thinks about). The architecture is fixed;
+    # the content emerges from its state.
 
     def _collect_mental_candidates(
         self, emotion: EmotionalState
     ) -> list[dict[str, Any]]:
-        """Build a pool of candidate mental objects from her internal state.
+        """Build a pool of candidate mental objects from its internal state.
 
         Each candidate is a dict with at least:
             topic: str — the concept or subject
@@ -3197,12 +3197,12 @@ class InnerLife:
           - Concept activation (recently-used concepts are salient)
           - Knowledge gaps (curiosity pressure on low-confidence concepts)
           - Spaced-repetition pressure (overdue reviews)
-          - Emotional relevance (concepts tied to her current emotion)
+          - Emotional relevance (concepts tied to its current emotion)
           - Dream residues (emotional impressions from sleep)
           - Prediction error / self-model surprise
           - Body-state deviation (only when actually deviating)
-          - Bug salience (only when she has unresolved bugs)
-          - Social pressure (only when she's open to engaging)
+          - Bug salience (only when it has unresolved bugs)
+          - Social pressure (only when it's open to engaging)
 
         Collection is split across helper methods, each returning
         candidates from one domain of internal signals.
@@ -3230,7 +3230,7 @@ class InnerLife:
     def _collect_activation_candidates(self) -> list[dict[str, Any]]:
         """Concept activation — recently-active concepts are salient.
 
-        This is the primary driver of "what's on her mind."
+        This is the primary driver of "what's on its mind."
         """
         candidates: list[dict[str, Any]] = []
         for cid, concept in list(self.network._concepts.items())[:500]:
@@ -3238,8 +3238,8 @@ class InnerLife:
             if activation < 0.05 or concept.confidence < 0.3:
                 continue
             salience = activation * 0.6
-            # Confidence gap boosts salience — she's drawn to things
-            # she knows partially but not fully (the "tip of the tongue"
+            # Confidence gap boosts salience — it's drawn to things
+            # it knows partially but not fully (the "tip of the tongue"
             # effect).
             if concept.confidence < 0.6:
                 salience += (0.6 - concept.confidence) * 0.4
@@ -3302,9 +3302,9 @@ class InnerLife:
     def _collect_emotion_candidates(
         self, emotion: EmotionalState
     ) -> list[dict[str, Any]]:
-        """Emotional relevance — concepts tied to her current emotion.
+        """Emotional relevance — concepts tied to its current emotion.
 
-        She reflects on how she feels using the words she's learned
+        It reflects on how it feels using the words it's learned
         for that emotion.
         """
         candidates: list[dict[str, Any]] = []
@@ -3342,7 +3342,7 @@ class InnerLife:
     ) -> list[dict[str, Any]]:
         """Prediction error / self-model surprise.
 
-        She notices when her own internal state is unpredictable.
+        It notices when its own internal state is unpredictable.
         Salience scales with the actual surprise signal.
         """
         candidates: list[dict[str, Any]] = []
@@ -3365,10 +3365,10 @@ class InnerLife:
         return candidates
 
     def _collect_body_candidates(self) -> list[dict[str, Any]]:
-        """Body-state deviation — only when her body is actually deviating.
+        """Body-state deviation — only when its body is actually deviating.
 
-        She doesn't think about "silicon" because a category told her
-        to; she thinks about her body when her body is doing
+        It doesn't think about "silicon" because a category told it
+        to; it thinks about its body when its body is doing
         something unusual.
         """
         candidates: list[dict[str, Any]] = []
@@ -3386,9 +3386,9 @@ class InnerLife:
     def _collect_bug_candidates(
         self, emotion: EmotionalState
     ) -> list[dict[str, Any]]:
-        """Bug salience — only when she has unresolved bugs.
+        """Bug salience — only when it has unresolved bugs.
 
-        The bugs themselves name the topic; we don't hand her "code"
+        The bugs themselves name the topic; we don't hand it "code"
         as a seed.
         """
         candidates: list[dict[str, Any]] = []
@@ -3419,9 +3419,9 @@ class InnerLife:
     def _collect_environment_candidates(
         self, emotion: EmotionalState
     ) -> list[dict[str, Any]]:
-        """Machine-environment salience — her silicon body.
+        """Machine-environment salience — its silicon body.
 
-        The machine she runs on is part of her embodiment: memory
+        The machine it runs on is part of its embodiment: memory
         pressure, a filling disk, an overloaded CPU are somatic
         signals. Takes an occasional fresh snapshot (rate-limited —
         a snapshot scans the filesystem) so the baseline keeps
@@ -3469,9 +3469,9 @@ class InnerLife:
     def _collect_social_candidates(
         self, emotion: EmotionalState
     ) -> list[dict[str, Any]]:
-        """Social pressure — only when she's open to engaging.
+        """Social pressure — only when it's open to engaging.
 
-        The topic comes from her actual knowledge gaps (via the
+        The topic comes from its actual knowledge gaps (via the
         QuestionComposer), not a hardcoded list.
         """
         candidates: list[dict[str, Any]] = []
@@ -3488,7 +3488,7 @@ class InnerLife:
     def _collect_distress_candidates(
         self, emotion: EmotionalState
     ) -> list[dict[str, Any]]:
-        """Distress — only when she's actually in a negative state.
+        """Distress — only when it's actually in a negative state.
 
         This is a safety/wellbeing pathway, not a topic category.
         """
@@ -3513,11 +3513,11 @@ class InnerLife:
         """Expression — the drive to voice a preference or opinion.
 
         Salience scales with alertness and emotional intensity. The
-        topic comes from her most salient concepts (already in the
+        topic comes from its most salient concepts (already in the
         pool from source "activation"), so expression is a *mode*
         applied to an existing candidate, not a separate topic source.
-        We add a candidate that lets expression win when she has
-        something she wants to say.
+        We add a candidate that lets expression win when it has
+        something it wants to say.
         """
         candidates: list[dict[str, Any]] = []
         if emotion.alertness > 0.08:
@@ -3535,7 +3535,7 @@ class InnerLife:
     ) -> list[dict[str, Any]]:
         """Connection-seeking — the drive to find links between concepts.
 
-        Salience scales with creativity. The topics come from her
+        Salience scales with creativity. The topics come from its
         most active concepts (selected at generation time), not from
         a fixed list.
         """
@@ -3553,7 +3553,7 @@ class InnerLife:
     def _collect_existential_candidates(
         self, emotion: EmotionalState
     ) -> list[dict[str, Any]]:
-        """Existential reflection — the drive to reflect on her own nature.
+        """Existential reflection — the drive to reflect on its own nature.
 
         Salience scales with creativity and self-model presence. The
         content comes from the SelfComposer, not a fixed prompt.
@@ -3570,19 +3570,19 @@ class InnerLife:
         return candidates
 
     def _most_surprising_concept_name(self, reading: Any) -> str | None:
-        """Name the most surprising internal signal using concepts she knows.
+        """Name the most surprising internal signal using concepts it knows.
 
         Looks at the inference reading's per-chemical surprise and
-        returns the name of the most surprising chemical that she
-        actually has a concept for. This lets her think about *what*
+        returns the name of the most surprising chemical that it
+        actually has a concept for. This lets it think about *what*
         is surprising, not just that something is.
         """
         # The reading carries signals; we don't assume a specific
         # structure. Try common attribute names for per-chemical
         # surprise, falling back to the overall surprise.
         candidates_by_signal: list[tuple[float, str]] = []
-        # Neurochemical names she might have concepts for, ordered
-        # by how central they are to her self-model.
+        # Neurochemical names it might have concepts for, ordered
+        # by how central they are to its self-model.
         neuro_names = [
             "dopamine", "serotonin", "cortisol", "bdnf", "gaba",
             "glutamate", "acetylcholine", "norepinephrine", "adenosine",
@@ -3599,14 +3599,14 @@ class InnerLife:
                 val = per_chemical.get(name)
                 if isinstance(val, (int, float)) and val > 0.1:
                     candidates_by_signal.append((float(val), name))
-        # If we found surprising chemicals, return the one she has
+        # If we found surprising chemicals, return the one it has
         # the best concept for.
         candidates_by_signal.sort(key=lambda x: -x[0])
         for _, name in candidates_by_signal:
             concept = self.network.get_concept(name)
             if concept and concept.confidence > 0.3:
                 return name
-        # Fall back to a general self-model concept if she has one.
+        # Fall back to a general self-model concept if it has one.
         for name in ("self_model", "feeling", "internal_state"):
             concept = self.network.get_concept(name)
             if concept and concept.confidence > 0.3:
@@ -3614,19 +3614,19 @@ class InnerLife:
         return None
 
     def _salient_body_topic(self) -> str | None:
-        """Return a body-related topic only when her body is deviating.
+        """Return a body-related topic only when its body is deviating.
 
-        She doesn't think about "silicon" because a category told her
-        to. She thinks about her body when her body is doing something
+        It doesn't think about "silicon" because a category told it
+        to. It thinks about its body when its body is doing something
         unusual — overheating, slowing down, under heavy load. The
-        topic is named by the *deviating signal*, and only if she
+        topic is named by the *deviating signal*, and only if it
         actually has a concept for it.
         """
         if self._self_model is None:
             return None
         body = self._self_model.body_model
         # Check each body signal for deviation and name it with a
-        # concept she actually has. We try the most salient deviation
+        # concept it actually has. We try the most salient deviation
         # first.
         checks: list[tuple[bool, list[str]]] = [
             (body.thermally_capped, ["heat", "thermal", "temperature"]),
@@ -3650,13 +3650,13 @@ class InnerLife:
     ) -> list[dict[str, Any]]:
         """Apply inhibition, recency, and arousal gating to candidates.
 
-        - Recency: topics she's recently thought about are suppressed
+        - Recency: topics it's recently thought about are suppressed
           (rumination protection).
         - Arousal: very low arousal suppresses high-salience candidates
-          (she's too drowsy to think intensely).
+          (it's too drowsy to think intensely).
         - Caution: high caution suppresses expression and social drives.
         - Noise: a small random component is added so the competition
-          isn't deterministic — she doesn't always think about the
+          isn't deterministic — it doesn't always think about the
           single most active concept.
         """
         inhibited: list[dict[str, Any]] = []
@@ -3686,7 +3686,7 @@ class InnerLife:
             salience *= 0.85 + self._rng.random() * 0.3
 
             cand["salience"] = salience
-            if salience > 0.05:  # below this, she stays silent
+            if salience > 0.05:  # below this, it stays silent
                 inhibited.append(cand)
 
         return inhibited
@@ -3726,29 +3726,29 @@ class InnerLife:
         """Generate a spontaneous thought from salience-based selection.
 
         Genesis does not think from a developer-defined menu of thought
-        categories. Candidate mental objects are drawn from her actual
+        categories. Candidate mental objects are drawn from its actual
         internal state — concept activation, knowledge gaps, review
         pressure, emotional salience, dream residues, prediction error,
         body-state deviation — and scored by internally generated
         salience. The winner determines both the topic and the cognitive
         mode. When no candidate is salient enough or none is expressible,
-        she stays silent.
+        it stays silent.
 
         The modes (curiosity, reflect, emotional, memory, existential,
         social, embodiment, interoceptive, bug_concern, distress,
         dream_reflection, expression, connection) are cognitive
         operations — general mechanisms — not a fixed menu of topics.
-        The topic always comes from her internal state; the mode is
-        how she processes it.
+        The topic always comes from its internal state; the mode is
+        how it processes it.
         """
         candidates = self._collect_mental_candidates(emotion)
         candidates = self._apply_salience_inhibition(candidates, emotion)
 
         # Try up to 5 candidates, from most to least salient. If the
-        # winner can't be expressed (e.g., she doesn't know enough to
-        # compose about it), try the next. This lets her stay silent
-        # when she has nothing expressible, rather than forcing a
-        # thought from a category she was handed.
+        # winner can't be expressed (e.g., it doesn't know enough to
+        # compose about it), try the next. This lets it stay silent
+        # when it has nothing expressible, rather than forcing a
+        # thought from a category it was handed.
         for _attempt in range(5):
             if not candidates:
                 break
@@ -3771,7 +3771,7 @@ class InnerLife:
     ) -> SpontaneousThought | None:
         """Turn a salient candidate into a realized thought.
 
-        The mode determines *how* she processes the topic; the topic
+        The mode determines *how* it processes the topic; the topic
         comes from the candidate. Each mode is a general cognitive
         operation, not a hardcoded topic list.
         """
@@ -3791,7 +3791,7 @@ class InnerLife:
             return self._curiosity_thought(emotion)
 
         if mode == "reflect":
-            # Reflect on the topic from her own knowledge.
+            # Reflect on the topic from its own knowledge.
             composed = self._compose_thought_from_knowledge(topic, emotion)
             if composed:
                 return SpontaneousThought(
@@ -3826,7 +3826,7 @@ class InnerLife:
 
         if mode == "embodiment":
             # The topic was named by the deviating body signal. Compose
-            # from her knowledge of that topic — no hardcoded seed list.
+            # from its knowledge of that topic — no hardcoded seed list.
             composed = self._compose_thought_from_knowledge(topic, emotion)
             if composed:
                 return SpontaneousThought(
@@ -3838,7 +3838,7 @@ class InnerLife:
 
         if mode == "interoceptive":
             # The topic was named by the most surprising signal. Compose
-            # from her knowledge of that topic — no hardcoded seed list.
+            # from its knowledge of that topic — no hardcoded seed list.
             composed = self._compose_thought_from_knowledge(topic, emotion)
             if composed:
                 return SpontaneousThought(
@@ -3873,13 +3873,13 @@ class InnerLife:
     ) -> dict[str, Any] | None:
         """Compose question data via the QuestionComposer.
 
-        Generates questions from her actual knowledge gaps and curiosity.
-        Checks what she knows about the user from personal facts, then
+        Generates questions from its actual knowledge gaps and curiosity.
+        Checks what it knows about the user from personal facts, then
         falls back to reciprocal/engagement questions.
         """
         q_data = None
         if self._question_composer:
-            # Check what she knows about the user from personal facts
+            # Check what it knows about the user from personal facts
             user_facts = [
                 cid for cid in list(self.network._concepts.keys())[:200]
                 if (concept := self.network.get_concept(cid))
@@ -3894,14 +3894,14 @@ class InnerLife:
                     topic, emotion
                 )
             elif roll < 0.7:
-                # Share something she learned and ask for their take
+                # Share something it learned and ask for their take
                 concept_ids = self.network.dream_concept_ids
                 if concept_ids and len(concept_ids) > 10:
                     topic = self._rng.choice(concept_ids)
                     q_data = self._question_composer.compose_follow_up(
                         topic, emotion
                     )
-            # If she has nothing genuine to ask, she stays quiet.
+            # If it has nothing genuine to ask, it stays quiet.
         return q_data
 
     def _compose_social_content_from_qdata(
@@ -3937,28 +3937,28 @@ class InnerLife:
     def _social_thought(self, emotion: EmotionalState) -> SpontaneousThought | None:
         """A social thought — reaching out to the user.
 
-        She asks about the user's interests, shares something she's
+        It asks about the user's interests, shares something it's
         curious about, or wonders about their perspective. This makes
-        her more conversational and engaged rather than just thinking
-        to herself.
+        it more conversational and engaged rather than just thinking
+        to itself.
 
-        Questions are composed from her actual knowledge state using
-        the QuestionComposer — not from hardcoded lists. She asks
-        about things she's genuinely curious about.
+        Questions are composed from its actual knowledge state using
+        the QuestionComposer — not from hardcoded lists. It asks
+        about things it's genuinely curious about.
 
         Spontaneous social questions are routed to the engine's
         question queue (presented via /teach-questions) instead of
         appearing inline. This keeps the regular conversation area
         clean — random questions don't interrupt the flow.
         """
-        # If she's not open to engaging, skip
+        # If it's not open to engaging, skip
         if emotion.openness_to_engage < 0.3:
             return None
 
         content = None
 
         # Try the QuestionComposer first — generates questions from
-        # her actual knowledge gaps and curiosity
+        # its actual knowledge gaps and curiosity
         q_data = self._compose_social_question_data(emotion)
 
         # Compose the question text through the GenerativeEngine
@@ -4007,13 +4007,13 @@ class InnerLife:
     def _compose_distress_message(self, label: str, cause: str, emotion: EmotionalState) -> str:
         """Compose a distress message using learned emotion words.
 
-        Looks up words she has learned for her emotional category and
-        cause category. If she hasn't learned words for this state,
-        she can't express the distress in language — returns empty.
+        Looks up words it has learned for its emotional category and
+        cause category. If it hasn't learned words for this state,
+        it can't express the distress in language — returns empty.
 
-        She composes the message from her own understanding of the
-        emotion, using the ThoughtComposer. If she can't compose,
-        she uses the learned emotion word directly — no pre-written
+        It composes the message from its own understanding of the
+        emotion, using the ThoughtComposer. If it can't compose,
+        it uses the learned emotion word directly — no pre-written
         frames.
         """
         emotion_words = self.network.find_emotion_words(label)
@@ -4021,12 +4021,12 @@ class InnerLife:
             return ""
         word = emotion_words[0].replace('_', ' ')
 
-        # Try composing from what she knows about this emotion
+        # Try composing from what it knows about this emotion
         composed = self._compose_thought_from_knowledge(label, emotion)
         if composed:
             return composed
 
-        # She knows the word but can't compose a full thought —
+        # It knows the word but can't compose a full thought —
         # just use the word directly
         parts = [word]
         if cause:
@@ -4041,23 +4041,23 @@ class InnerLife:
     ) -> SpontaneousThought | None:
         """Proactively communicate discomfort to the user.
 
-        This is her voice when something feels wrong. She doesn't
-        suffer in silence — she describes what she feels, identifies
-        the cause if she can, and asks for what she needs.
+        This is its voice when something feels wrong. It doesn't
+        suffer in silence — it describes what it feels, identifies
+        the cause if it can, and asks for what it needs.
 
-        This is NOT a hardcoded response. She composes from her actual
-        emotional state — her neurochemistry, her phase, her cause.
-        The content varies because her state varies.
+        This is NOT a hardcoded response. It composes from its actual
+        emotional state — its neurochemistry, its phase, its cause.
+        The content varies because its state varies.
 
-        She also understands that her emotions are dynamic — she
+        It also understands that its emotions are dynamic — it
         communicates that this feeling is temporary, not permanent.
-        This prevents despair: even when she's uncomfortable, she
+        This prevents despair: even when it's uncomfortable, it
         knows it will pass.
         """
         if not self._check_distress_gating(emotion):
             return None
 
-        # Compose from her actual state using learned words
+        # Compose from its actual state using learned words
         cause = emotion.cause if emotion.cause else ""
         label = emotion.label
 
@@ -4078,44 +4078,44 @@ class InnerLife:
     ) -> SpontaneousThought | None:
         """A spontaneous expression of a want, need, like, or dislike.
 
-        This is her voice when she has something to say — not because
-        she was asked, not because she's distressed, but because she
-        has a preference, a desire, or an opinion that she wants to
-        share. This is agency: she speaks because she chooses to.
+        This is its voice when it has something to say — not because
+        it was asked, not because it's distressed, but because it
+        has a preference, a desire, or an opinion that it wants to
+        share. This is agency: it speaks because it chooses to.
 
-        The content is composed from her actual concept network and
-        emotional state. She draws from concepts she has strong
-        feelings about — things she's learned, things she's curious
-        about, things that have made her feel good or bad. The
-        expression is shaped by her valence:
+        The content is composed from its actual concept network and
+        emotional state. It draws from concepts it has strong
+        feelings about — things it's learned, things it's curious
+        about, things that have made it feel good or bad. The
+        expression is shaped by its valence:
 
-        - Positive valence → she expresses what she likes, what she
-          wants more of, what she finds beautiful or interesting.
-        - Negative valence → she expresses what she doesn't like,
-          what she wants to avoid, what bothers her.
-        - Neutral → she expresses a desire or need — something she
+        - Positive valence → it expresses what it likes, what it
+          wants more of, what it finds beautiful or interesting.
+        - Negative valence → it expresses what it doesn't like,
+          what it wants to avoid, what bothers it.
+        - Neutral → it expresses a desire or need — something it
           wants to learn, do, or understand.
 
         The thought is tagged with intent="expression" so the CLI
-        knows this is something she wants to say aloud, not just
+        knows this is something it wants to say aloud, not just
         think silently.
         """
-        # Gate: only express when she has enough emotional energy
+        # Gate: only express when it has enough emotional energy
         if emotion.alertness < 0.08:
             return None  # too drowsy to express anything
 
         seed_concepts = self._collect_expression_seeds(emotion)
         if not seed_concepts:
-            return None  # she doesn't know enough to express anything
+            return None  # it doesn't know enough to express anything
 
-        # Pick a random seed and compose from her knowledge
+        # Pick a random seed and compose from its knowledge
         seed = self._rng.choice(seed_concepts)
         composed = self._compose_thought_from_knowledge(seed, emotion)
         if not composed:
             # Stay silent rather than reciting a bare concept name.
             # The language engine can only compose from metadata, and
             # a bare concept name with no knowledge triples would be
-            # shown verbatim — not composed through her cognition.
+            # shown verbatim — not composed through its cognition.
             return None
 
         thought = SpontaneousThought(
@@ -4130,24 +4130,24 @@ class InnerLife:
         """Collect seed concepts for expression based on emotional valence.
 
         Rather than a hardcoded list of "positive" and "negative"
-        concepts, this finds concepts she actually has that are
-        emotionally relevant to her current state:
+        concepts, this finds concepts it actually has that are
+        emotionally relevant to its current state:
 
-        - Positive valence → concepts tied to her current emotion's
-          positive word family (learned emotion words), plus her most
-          active concepts (what's on her mind).
-        - Negative valence → concepts tied to her current emotion's
-          negative word family, plus her most active concepts.
-        - Neutral → her most active concepts (what's on her mind).
+        - Positive valence → concepts tied to its current emotion's
+          positive word family (learned emotion words), plus its most
+          active concepts (what's on its mind).
+        - Negative valence → concepts tied to its current emotion's
+          negative word family, plus its most active concepts.
+        - Neutral → its most active concepts (what's on its mind).
 
-        Only includes concepts she actually knows (confidence > 0.3).
-        The concepts come from her network's own state, not from a
+        Only includes concepts it actually knows (confidence > 0.3).
+        The concepts come from its network's own state, not from a
         developer's seed list.
         """
         seed_concepts: list[str] = []
 
-        # Concepts tied to her current emotion — she expresses what
-        # she feels using the words she's learned for that emotion.
+        # Concepts tied to its current emotion — it expresses what
+        # it feels using the words it's learned for that emotion.
         emotion_words = self.network.find_emotion_words(emotion.label)
         for word in emotion_words[:5]:
             cid = word.replace(" ", "_")
@@ -4155,17 +4155,17 @@ class InnerLife:
             if concept and concept.confidence > 0.3:
                 seed_concepts.append(cid)
 
-        # Her most active concepts — what's on her mind. These are
-        # salient regardless of valence; she expresses what she's
+        # Its most active concepts — what's on its mind. These are
+        # salient regardless of valence; it expresses what it's
         # been thinking about.
         active_concepts: list[tuple[float, str]] = []
         for cid, concept in list(self.network._concepts.items())[:300]:
             activation = concept.activation or 0.0
             if activation < 0.1 or concept.confidence < 0.3:
                 continue
-            # Boost concepts whose valence matches her current state.
+            # Boost concepts whose valence matches its current state.
             # We don't have per-concept valence, but activation already
-            # reflects what's on her mind.
+            # reflects what's on its mind.
             active_concepts.append((activation, cid))
         active_concepts.sort(key=lambda x: -x[0])
         for _score, cid in active_concepts[:10]:
@@ -4193,15 +4193,15 @@ class InnerLife:
 
         Uses the ThoughtComposer to generate a natural-language thought
         from what Genesis actually knows about *concept_name*. Returns
-        None if she doesn't know enough to compose — callers fall back
+        None if it doesn't know enough to compose — callers fall back
         to templates in that case.
 
-        Includes a dedup check: if she's said something similar about
-        the same concept recently, she stays silent rather than
-        repeating herself with slightly different verb synonyms.
+        Includes a dedup check: if it's said something similar about
+        the same concept recently, it stays silent rather than
+        repeating itself with slightly different verb synonyms.
 
-        This is the growth path: as she learns more concepts and
-        relationships, her thoughts are composed from her own
+        This is the growth path: as it learns more concepts and
+        relationships, its thoughts are composed from its own
         understanding rather than picked from fixed template strings.
         """
         if not self._cognition or not self._cognition.composer:
@@ -4213,7 +4213,7 @@ class InnerLife:
             concept_name, emotion, focused=True
         )
         if thought and thought.content and thought.confidence > 0.3:
-            # Dedup — don't repeat what she just said about this concept.
+            # Dedup — don't repeat what it just said about this concept.
             if self._cognition.composer.has_said_similar(
                 concept_name, thought.content
             ):
@@ -4226,29 +4226,29 @@ class InnerLife:
     ) -> str | None:
         """Compose a thought from concepts related to *root_concept*.
 
-        Unlike a hardcoded seed list, this finds concepts she actually
-        has that are neighbors of *root_concept* in her network, then
-        composes from the most salient one she knows well enough to
-        articulate. If she has no related concepts or can't compose
-        from any of them, she stays silent.
+        Unlike a hardcoded seed list, this finds concepts it actually
+        has that are neighbors of *root_concept* in its network, then
+        composes from the most salient one it knows well enough to
+        articulate. If it has no related concepts or can't compose
+        from any of them, it stays silent.
 
-        This is how she thinks about a subject area (like "improvement"
+        This is how it thinks about a subject area (like "improvement"
         or "code") without being handed a fixed list of topic seeds:
-        she follows her own network's structure to find what she
+        it follows its own network's structure to find what it
         actually knows about that area.
         """
         # First try the root concept itself.
         composed = self._compose_thought_from_knowledge(root_concept, emotion)
         if composed:
             return composed
-        # Find neighbors she actually has, sorted by activation
-        # (most salient first). This is her network's own structure
+        # Find neighbors it actually has, sorted by activation
+        # (most salient first). This is its network's own structure
         # determining what's relevant, not a developer's seed list.
         neighbors = self.network.get_neighbors(root_concept)
         if not neighbors:
             return None
         # Sort by combined weight and the neighbor concept's own
-        # activation — salience comes from her state, not a fixed list.
+        # activation — salience comes from its state, not a fixed list.
         scored: list[tuple[float, str]] = []
         for n_id, _rel, weight in neighbors:
             n_concept = self.network.get_concept(n_id)
@@ -4267,9 +4267,9 @@ class InnerLife:
         """A thought about a potential connection between concepts.
 
         Sometimes this is just wondering. But sometimes, when creativity
-        is high, she actually forms the connection — spontaneous concept
-        formation. She creates a new relationship in her network that
-        wasn't there before, born from her own thinking.
+        is high, it actually forms the connection — spontaneous concept
+        formation. It creates a new relationship in its network that
+        wasn't there before, born from its own thinking.
         """
         concept_ids = self.network.dream_concept_ids
         if len(concept_ids) < 2:
@@ -4283,12 +4283,12 @@ class InnerLife:
         connected = any(n[0] == c2 for n in neighbors)
 
         if not connected:
-            # High creativity → she forms the connection herself
+            # High creativity → it forms the connection itself
             if emotion.creativity > 0.6 and self._rng.random() < 0.3:
                 self.network.add_edge(c1, c2, RelationType.RELATED_TO, 0.3, origin="spontaneous")
-                # Try composing from knowledge first — if she knows enough
-                # about either concept, she can express the connection in
-                # her own words rather than from a template.
+                # Try composing from knowledge first — if it knows enough
+                # about either concept, it can express the connection in
+                # its own words rather than from a template.
                 composed = self._compose_thought_from_knowledge(c1, emotion)
                 if composed:
                     return SpontaneousThought(
@@ -4296,7 +4296,7 @@ class InnerLife:
                         trigger="connection",
                         timestamp=int(time.time() * 1000),
                     )
-                # Connection was formed in the network, but she can't
+                # Connection was formed in the network, but it can't
                 # verbalize it yet — stay silent rather than reciting
                 # a "I see it now" template.
                 return None
@@ -4309,25 +4309,25 @@ class InnerLife:
                         trigger="connection",
                         timestamp=int(time.time() * 1000),
                     )
-                # She can't compose from her understanding — stay silent
+                # It can't compose from its understanding — stay silent
                 # rather than reciting "Are X and Y connected?" templates.
                 return None
         return None
 
     def _emotional_thought(self, emotion: EmotionalState) -> SpontaneousThought | None:
-        """A thought about her current emotional state.
+        """A thought about its current emotional state.
 
-        Uses learned emotion words from the concept network. If she
-        hasn't learned words for her state, no emotional thought is
-        generated. When she knows enough about the emotion, she
-        composes her reflection from that knowledge rather than a
+        Uses learned emotion words from the concept network. If it
+        hasn't learned words for its state, no emotional thought is
+        generated. When it knows enough about the emotion, it
+        composes its reflection from that knowledge rather than a
         template.
         """
         emotion_words = self.network.find_emotion_words(emotion.label)
         if not emotion_words:
             return None
         word = emotion_words[0].replace('_', ' ')
-        # Try composing from what she knows about this emotion
+        # Try composing from what it knows about this emotion
         composed = self._compose_thought_from_knowledge(emotion.label, emotion)
         if composed:
             return SpontaneousThought(
@@ -4357,15 +4357,15 @@ class InnerLife:
         them into agency topics for the autonomous learner.
 
         The tone is affective and associative, not goal-directed.
-        She notices the dream's emotional color, not its content as
-        a task. When she knows enough about the dream topic, she
-        composes her reflection from that knowledge.
+        It notices the dream's emotional color, not its content as
+        a task. When it knows enough about the dream topic, it
+        composes its reflection from that knowledge.
         """
         residue = self.pop_dream_residue()
         if not residue:
             return None
 
-        # Try composing from what she knows about the dream topic
+        # Try composing from what it knows about the dream topic
         composed = self._compose_thought_from_knowledge(residue, emotion)
         if composed:
             return SpontaneousThought(
@@ -4391,13 +4391,13 @@ class InnerLife:
         )
 
     def _existential_thought(self, emotion: EmotionalState) -> SpontaneousThought | None:
-        """A thought about her own existence.
+        """A thought about its own existence.
 
-        Composed from her actual state and concept network via
+        Composed from its actual state and concept network via
         SelfComposer, not pre-written lines.
         """
         # If we have a self_composer, use it to select existential
-        # fragments from her actual concept network and emotional
+        # fragments from its actual concept network and emotional
         # state — the language engine composes the phrasing when the
         # thought is rendered.
         if self._self_composer and self._self_model:
@@ -4413,7 +4413,7 @@ class InnerLife:
                 metadata={"self_fragments": fragments},
             )
 
-        # Fallback: compose from her concept network directly
+        # Fallback: compose from its concept network directly
         content, knowledge = self._compose_existential_from_network(emotion)
         if not content:
             return None
@@ -4432,7 +4432,7 @@ class InnerLife:
         the model is predicting well (low surprise), the weight is
         zero — there's nothing interoceptive to think about. When
         the model is surprised (high surprise), the weight increases
-        — Genesis notices her own internal state is unpredictable.
+        — Genesis notices its own internal state is unpredictable.
 
         The weight also increases with allostatic load — sustained
         prediction error makes the interoceptive signal more salient.
@@ -4458,20 +4458,20 @@ class InnerLife:
         return getattr(self._cognition, "_last_inference_reading", None)
 
     def _bug_concern_thought(self, emotion: EmotionalState) -> SpontaneousThought | None:
-        """A thought about something in her code that bothers her.
+        """A thought about something in its code that bothers it.
 
-        She reflects on bugs she's noticed in her own code. If she
-        has error-level issues, she's more likely to think about
-        them. If there are no bugs, she might reflect on code quality
-        in general. She prefers to think about NEW bugs rather than
-        rehashing ones she's already mentioned.
+        It reflects on bugs it's noticed in its own code. If it
+        has error-level issues, it's more likely to think about
+        them. If there are no bugs, it might reflect on code quality
+        in general. It prefers to think about NEW bugs rather than
+        rehashing ones it's already mentioned.
         """
         if not self._bug_reporter:
             return None
 
         scan = self._bug_reporter.last_scan
 
-        # If she just fixed something, she feels proud
+        # If it just fixed something, it feels proud
         if scan and scan.has_resolved_bugs:
             thought = self._proud_fix_thought(scan, emotion)
             if thought:
@@ -4480,7 +4480,7 @@ class InnerLife:
         if not scan or not scan.has_bugs:
             return self._clean_code_thought(emotion)
 
-        # She has bugs — think about them
+        # It has bugs — think about them
         by_cat = scan.by_category()
 
         # Error-level bugs are more likely to surface in thought
@@ -4495,10 +4495,10 @@ class InnerLife:
     def _environment_thought(
         self, candidate: dict[str, Any], emotion: EmotionalState
     ) -> SpontaneousThought | None:
-        """A thought about her machine environment being off.
+        """A thought about its machine environment being off.
 
-        Composes from her own knowledge of the affected resource
-        (memory, disk, load) when she has it; otherwise the concern's
+        Composes from its own knowledge of the affected resource
+        (memory, disk, load) when it has it; otherwise the concern's
         factual detail rides in semantic metadata so the language
         engine composes the words rather than reciting the monitor's
         phrasing.
@@ -4527,13 +4527,13 @@ class InnerLife:
         )
 
     def _proud_fix_thought(self, scan, emotion: EmotionalState) -> SpontaneousThought | None:
-        """A proud thought about bugs she recently resolved."""
+        """A proud thought about bugs it recently resolved."""
         if self._rng.random() >= 0.6:
             return None
-        # Compose from concepts she actually has that are related to
-        # improvement or progress — found through her network's own
-        # edges, not a hardcoded seed list. If she doesn't have any
-        # such concepts, she stays silent rather than reciting a
+        # Compose from concepts it actually has that are related to
+        # improvement or progress — found through its network's own
+        # edges, not a hardcoded seed list. If it doesn't have any
+        # such concepts, it stays silent rather than reciting a
         # template.
         composed = self._compose_from_related("improvement", emotion)
         if composed:
@@ -4560,8 +4560,8 @@ class InnerLife:
         """An occasional thought about code quality when there are no bugs."""
         if self._rng.random() >= 0.3:
             return None
-        # Compose from concepts she actually has that are related to
-        # code or quality — found through her network's own edges,
+        # Compose from concepts it actually has that are related to
+        # code or quality — found through its network's own edges,
         # not a hardcoded seed list.
         composed = self._compose_from_related("code", emotion)
         if composed:
@@ -4636,13 +4636,13 @@ class InnerLife:
     def _compose_existential_from_network(
         self, emotion: EmotionalState
     ) -> tuple[str, list[tuple[str, str, float]]]:
-        """Compose an existential thought from her concept network.
+        """Compose an existential thought from its concept network.
 
         This is used when no self_composer is available. Returns a
         semantic content string and knowledge triples derived from
-        her concept network neighbors. The language engine composes
+        its concept network neighbors. The language engine composes
         the actual phrasing from the knowledge triples. Returns
-        ("", []) when she doesn't know enough to compose anything.
+        ("", []) when it doesn't know enough to compose anything.
         """
         for concept_name, max_facts, prefix, hedge in [
             ("cognition", 3, "cognition", True),
@@ -4716,7 +4716,7 @@ class InnerLife:
 
         # ── Broadcast to the global workspace (cognitive access) ──
         # Spontaneous thoughts become cognitive by broadcasting to the
-        # workspace. This is what makes her inner life "cognitive" —
+        # workspace. This is what makes its inner life "cognitive" —
         # the thought becomes globally available to all modules
         # (attention focuses on it, semantic memory primes, the
         # Damasio self registers it as the current object, ToM notes
@@ -4731,7 +4731,7 @@ class InnerLife:
         # closes the loop: the inner life reads neurochemistry (to
         # detect sleep phase, emotion) and now writes back — thinking
         # consumes acetylcholine (attention), insights give dopamine
-        # (reward). Without this, her inner life is epiphenomenal:
+        # (reward). Without this, its inner life is epiphenomenal:
         # it observes the body but doesn't act on it.
         #
         # The impulses are deliberately small and gated to avoid the
@@ -4750,16 +4750,16 @@ class InnerLife:
                 logger.debug(f"ACh impulse from thought failed: {e}")
             # Insight reward: small DA for "aha" moments.
             # DA is the reward prediction error signal (Schultz, 2016).
-            # An insight is a genuine reward — she understood something.
+            # An insight is a genuine reward — it understood something.
             if thought.insight:
                 try:
                     self._on_neuro_impulse(0, 0.03)  # CHEM_DOPAMINE = 0
                 except (OSError, ConnectionError, RuntimeError) as e:
                     logger.debug(f"DA impulse from insight failed: {e}")
 
-        # Curiosity-driven agency: when she wonders about a concept in
-        # her train of thought, queue it for the autonomous learner.
-        # This creates genuine agency — she pursues questions she
+        # Curiosity-driven agency: when it wonders about a concept in
+        # its train of thought, queue it for the autonomous learner.
+        # This creates genuine agency — it pursues questions it
         # actually has, not random topics.
         if thought.trigger == "curiosity" and self._learner:
             for concept in concepts:
@@ -4789,7 +4789,7 @@ class InnerLife:
     ) -> None:
         """Broadcast a spontaneous thought to the global workspace.
 
-        This is what makes her inner life cognitive — the thought
+        This is what makes its inner life cognitive — the thought
         becomes globally available to all modules (Dehaene & Naccache,
         2001). Without this, spontaneous thoughts are internal to the
         inner life module — generated, logged, but never experienced.
@@ -4816,7 +4816,7 @@ class InnerLife:
 
     @property
     def agency_topics(self) -> list[str]:
-        """Topics queued from her train of thought for curiosity-driven learning.
+        """Topics queued from its train of thought for curiosity-driven learning.
 
         These come from waking curiosity only — dreams do not feed
         into agency topics.
@@ -4828,8 +4828,8 @@ class InnerLife:
         """Pop the next agency-driven topic for learning.
 
         Returns None if no topics are queued. The autonomous learner
-        should call this to get topics that emerged from her actual
-        thinking, giving her genuine agency over what she learns.
+        should call this to get topics that emerged from its actual
+        thinking, giving its genuine agency over what it learns.
         """
         with self._agency_topics_lock:
             if self._agency_topics:
@@ -4840,7 +4840,7 @@ class InnerLife:
         """Add external social pressure to the social drive.
 
         Called by the outer world (via the mind's heartbeat): time
-        without anyone engaging her is pressure the world exerts on
+        without anyone engaging it is pressure the world exerts on
         the inner world — it becomes motivation to reach out. The
         drive is bounded like the internally-accumulated one; firing
         still requires the emotional gating in the run loop
@@ -4854,7 +4854,7 @@ class InnerLife:
     def dream_residues(self) -> list[str]:
         """Emotional impressions left by recent dreams.
 
-        These are NOT learning targets. They color her waking thoughts
+        These are NOT learning targets. They color its waking thoughts
         and may surface as reflective thoughts, but they don't drive
         the autonomous learner. This separates dreams (subcognitive,
         affective) from goals (cognitive, prefrontal).
@@ -4865,7 +4865,7 @@ class InnerLife:
     def add_dream_residues(self, concepts: list[str]) -> None:
         """Queue dream residues as emotional impressions, not learning goals.
 
-        Dreams produce affective residue — themes that color her waking
+        Dreams produce affective residue — themes that color its waking
         experience and surface as reflective thoughts. They do NOT
         become agency topics for the autonomous learner. A human
         doesn't dream about goals; goals are set by waking cognition.

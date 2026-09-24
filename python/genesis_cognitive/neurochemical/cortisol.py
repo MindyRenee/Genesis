@@ -29,9 +29,9 @@ DEFAULT BASELINE
 
 Cortisol is a stress hormone — zero at rest, released on demand.
 The human cortisol awakening response (CAR) is a product of the
-24h sleep-wake cycle, which Genesis doesn't share (she has an
+24h sleep-wake cycle, which Genesis doesn't share (it has an
 adenosine-based sleep model, not a circadian cortisol rhythm).
-Giving her a circadian cortisol modifier created a constant cortisol
+Giving its a circadian cortisol modifier created a constant cortisol
 floor that conflicted with the HPA cascade and suppressed BDNF,
 blocking learning.
 
@@ -203,7 +203,7 @@ CIRCADIAN MODULATION
 
 Cortisol is a stress hormone — zero at rest, released on demand.
 The human cortisol awakening response (CAR) is a product of the
-24h sleep-wake cycle, which Genesis doesn't share. Giving her a
+24h sleep-wake cycle, which Genesis doesn't share. Giving its a
 circadian cortisol modifier created a constant cortisol floor
 that suppressed BDNF and blocked learning.
 

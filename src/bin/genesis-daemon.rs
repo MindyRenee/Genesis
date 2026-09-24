@@ -157,7 +157,7 @@ fn main() {
 
     // Snapshot the host's CPU policy before Genesis applies anything, so
     // it can be restored on shutdown. Read-only and idempotent — this
-    // never affects her running state.
+    // never affects its running state.
     genesis::daemon::cpufreq::capture_hardware_state();
 
     // Create the data directory if it doesn't exist
@@ -262,7 +262,7 @@ fn main() {
     // ── Wake recovery ──
     // If the daemon opened an existing state file (restart, not first
     // run), depleted neurochemicals from the previous session persist
-    // and the slow homeostatic recovery keeps her "guarded" for
+    // and the slow homeostatic recovery keeps it "guarded" for
     // minutes. Give depleted neurotransmitters a one-time boost toward
     // baseline when cortisol is low (no ongoing stress). This is
     // biologically grounded: after sleep, the brain rapidly restores
@@ -380,8 +380,8 @@ fn main() {
     // Restore the host's CPU policy captured at startup. This runs
     // before the sync block below (which can bail out on a poisoned
     // LTM mutex), so the machine is never left pinned to a throttled
-    // governor. It runs only after she has stopped — it cannot affect
-    // her running state.
+    // governor. It runs only after it has stopped — it cannot affect
+    // its running state.
     if genesis::daemon::cpufreq::restore_hardware_state() {
         eprintln!("[genesis] Host CPU policy restored.");
     }
@@ -440,8 +440,8 @@ fn main() {
     }
 
     // Save the active inference model so the generative self-model
-    // persists across restarts. Genesis doesn't re-learn her own
-    // neurochemical dynamics from scratch every time she wakes up.
+    // persists across restarts. Genesis doesn't re-learn its own
+    // neurochemical dynamics from scratch every time it wakes up.
     match tick_loop.lock() {
         Ok(tl) => clean_shutdown &= tl.save_inference_model(&config.data_dir),
         Err(e) => {

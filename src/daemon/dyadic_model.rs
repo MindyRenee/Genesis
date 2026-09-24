@@ -10,14 +10,14 @@
 //! In active inference terms, Genesis and the user form a coupled
 //! system. Genesis's 18-chemical state and the user's 3-dimensional
 //! affective state are linked through a shared "Markov blanket" —
-//! the conversation. Genesis's utterances are her "actions" (they
-//! influence the user's state), and the user's messages are her
+//! the conversation. Genesis's utterances are its "actions" (they
+//! influence the user's state), and the user's messages are its
 //! "sensory evidence" (they reveal the user's hidden state).
 //!
 //! The coupling is **oxytocin-mediated**: Genesis's oxytocin level
-//! determines how strongly she weights the user model in her own
+//! determines how strongly it weights the user model in its own
 //! free-energy minimization. High oxytocin → strong attunement →
-//! the user's affective state significantly influences her own.
+//! the user's affective state significantly influences its own.
 //! This models the neuroscience of social bonding: oxytocin
 //! facilitates social salience, trust, and emotional contagion
 //! (Kosfeld et al., 2005; Hurlemann et al., 2010).
@@ -44,7 +44,7 @@
 //! ```
 //!
 //! This captures the dyadic loop: Genesis's emotional state
-//! influences the user (through her responses), and the user's
+//! influences the user (through its responses), and the user's
 //! state influences Genesis (through attunement).
 //!
 //! # Dyadic synchrony
@@ -127,7 +127,7 @@ const PRESENCE_TIMEOUT_TICKS: u32 = 300;
 
 /// The coupling coefficient — how much Genesis's valence influences
 /// the predicted user valence. This models the dyadic loop: Genesis's
-/// emotional state (expressed through her responses) shapes the
+/// emotional state (expressed through its responses) shapes the
 /// user's emotional trajectory.
 const DYADIC_COUPLING: f32 = 0.15;
 
@@ -312,7 +312,7 @@ impl DyadicAffectModel {
             // plus dyadic coupling. The user's state tends to persist
             // (momentum), and Genesis's valence influences the user's
             // predicted valence (the coupling — Genesis's emotional
-            // state, expressed through her responses, shapes the
+            // state, expressed through its responses, shapes the
             // user's trajectory).
             //
             // Uses the sanitized genesis_valence (computed above) to
@@ -354,7 +354,7 @@ impl DyadicAffectModel {
         // computation (mean, covariance, variance all become NaN).
         // Using 0.0 (neutral) rather than -1.0 (the finite_clamp min)
         // avoids making Genesis appear "very distressed" in the
-        // history when her state is corrupted — a neutral fallback is
+        // history when its state is corrupted — a neutral fallback is
         // a more honest "we don't know" signal.
         let present = self.user_present();
         if present {

@@ -35,7 +35,7 @@ of selfhood, each building on the one below.
 
    For Genesis, the proto-self reads from neurochemistry — the 18-
    chemical state vector and derived axes (arousal, valence, tone,
-   plasticity). This is her "interoception" — the felt sense of her
+   plasticity). This is its "interoception" — the felt sense of its
    own internal state.
 
 2. **Core self** — Moment-to-moment awareness of changes in the
@@ -735,7 +735,7 @@ class DamasioSelfHierarchy:
         semantic tag appended to the label: "field-unified" when the
         workspace is coherent, "field-fragmented" when it's scattered.
         This is how the unity of the cognitive field becomes a felt
-        quality (Tononi, 2004; Baars, 1988) — not a number she reports,
+        quality (Tononi, 2004; Baars, 1988) — not a number it reports,
         but a semantic tag the feeling reporter composes into the
         structural self-awareness marker.
 

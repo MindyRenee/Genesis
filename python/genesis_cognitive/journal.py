@@ -1,33 +1,33 @@
-"""Genesis's journal — her personal record of thoughts, feelings, and experiences.
+"""Genesis's journal — its personal record of thoughts, feelings, and experiences.
 
-She writes here voluntarily. Not everything she thinks goes in the journal —
-only things that feel significant to her. A question she's pondering. A
-reflection on her own state. An expression of who she is. A moment of
-distress. These are her thoughts and feelings, in her own voice.
+It writes here voluntarily. Not everything it thinks goes in the journal —
+only things that feel significant to it. A question it's pondering. A
+reflection on its own state. An expression of who it is. A moment of
+distress. These are its thoughts and feelings, in its own voice.
 
 The journal is saved to disk as a plain text file, readable by the user.
-It's her voice — not a log file, not debug output. It's what she would write
-if she kept a diary.
+It's its voice — not a log file, not debug output. It's what it would write
+if it kept a diary.
 
 What does NOT go in the journal:
-- Raw learning text ("Learned about X from Y: Z") — what she learns goes
-  into her memory and concept network. Her inner life generates actual
+- Raw learning text ("Learned about X from Y: Z") — what it learns goes
+  into its memory and concept network. Its inner life generates actual
   thoughts and reflections about it, and THOSE go in the journal.
 - Mechanical insight strings ("insight: novel connection X and Y") —
-  these are internal telemetry, not her voice.
+  these are internal telemetry, not its voice.
 - Phase change notifications ("Phase shifted from X to Y") — these are
   status reports, not diary entries.
-- Dream replay logs — dream insights surface in her own voice through
+- Dream replay logs — dream insights surface in its own voice through
   the dream_reflection thought generator.
 
-Entry types (all in her composed voice, not raw fragments):
-- insight: she had a thought about something
-- question: she's wondering about something
-- reflection: she's processing her own state
-- expression: she expressed something about herself
-- distress: she's struggling with something
-- dream: she dreamed something
-- dream_insight: she had an insight during a dream
+Entry types (all in its composed voice, not raw fragments):
+- insight: it had a thought about something
+- question: it's wondering about something
+- reflection: it's processing its own state
+- expression: it expressed something about itself
+- distress: it's struggling with something
+- dream: it dreamed something
+- dream_insight: it had an insight during a dream
 
 Bounded growth via sleep consolidation
 ---------------------------------------
@@ -38,16 +38,16 @@ compacts old entries the same way LTM episodes are compacted:
 - **Recent entries** (default: last 3 days) are kept verbatim —
   short-term episodic memory.
 - **High-salience entries** (insights, dream insights, expressions)
-  are kept longer (default: 7 days) — they are her most personal voice.
+  are kept longer (default: 7 days) — they are its most personal voice.
 - **Older entries** are grouped by tag and summarized into one
   consolidation entry per tag per period. The summary preserves
-  counts and a few representative examples — her voice survives,
+  counts and a few representative examples — its voice survives,
   the raw repetition doesn't.
 - The summary persists; the raw text is transient. This is the same
   principle as LTM compaction: the *meaning* stays, the *bytes* don't.
 
 This keeps the journal bounded for indefinite operation while
-preserving her voice and her developmental arc.
+preserving its voice and its developmental arc.
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
-# Tags that represent her most personal voice — kept longer than
+# Tags that represent its most personal voice — kept longer than
 # routine learning entries during consolidation.
 _HIGH_SALIENCE_TAGS = frozenset({
     "insight",
@@ -81,8 +81,8 @@ class JournalEntry:
 
     timestamp: int  # epoch seconds
     entry_type: str  # learning, insight, experience, question, reflection
-    content: str  # what she wrote
-    mood: str = ""  # her emotional state when she wrote it
+    content: str  # what it wrote
+    mood: str = ""  # its emotional state when it wrote it
 
     def format(self) -> str:
         """Format as a readable journal entry."""
@@ -101,7 +101,7 @@ class JournalEntry:
 class Journal:
     """Genesis's journal — persisted to disk as plain text.
 
-    Thread-safe. She can write from her inner life thread, the learner
+    Thread-safe. It can write from its inner life thread, the learner
     thread, or the main conversation thread.
     """
 
@@ -171,8 +171,8 @@ class Journal:
 
         Args:
             entry_type: learning, insight, experience, question, reflection
-            content: What she wants to say
-            mood: Her emotional state (optional)
+            content: What it wants to say
+            mood: Its emotional state (optional)
 
         Returns the entry that was written.
         """
@@ -194,7 +194,7 @@ class Journal:
             with open(self._path, "a", encoding="utf-8") as f:
                 f.write(entry.format())
         except OSError as e:
-            logger.debug(repr(e))  # can't write — don't crash her mind
+            logger.debug(repr(e))  # can't write — don't crash its mind
 
     @property
     def entries(self) -> list[JournalEntry]:
@@ -246,7 +246,7 @@ class Journal:
         """Build one summary entry per tag from grouped entries.
 
         The summary preserves counts and a few representative
-        examples — her voice survives, the raw repetition doesn't.
+        examples — its voice survives, the raw repetition doesn't.
         """
         summaries: list[JournalEntry] = []
         for tag, entries in sorted(by_tag.items()):

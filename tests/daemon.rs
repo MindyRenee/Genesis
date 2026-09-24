@@ -602,7 +602,7 @@ fn test_advance_neuro_circadian_phase_tracks_dt() {
     // The circadian phase must advance at exactly dt/86400 per
     // advance_neuro call — the contract the cognitive mind relies on
     // when it passes real elapsed time as dt. If this rate were
-    // wrong, her "day" would not be 24 hours and melatonin would
+    // wrong, its "day" would not be 24 hours and melatonin would
     // peak at arbitrary times of day.
     let sys = TestSystem::new("advance_dt", 16, 64);
     let mut tick_loop = TickLoop::new();

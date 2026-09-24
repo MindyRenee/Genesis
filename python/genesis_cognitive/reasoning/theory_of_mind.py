@@ -12,7 +12,7 @@ what we want, and might feel differently from how we feel.
 For Genesis, theory of mind models the *user's* mental state:
 
 1. **Beliefs** — what the user thinks is true. Updated when the user
-   states facts or corrections. Genesis can detect when her beliefs
+   states facts or corrections. Genesis can detect when its beliefs
    diverge from the user's (false belief tracking, Wimmer & Perner,
    1983).
 
@@ -102,7 +102,7 @@ class UserBelief:
     """A belief the user holds.
 
     Tracks what the user thinks is true, with a confidence level.
-    Genesis can detect when her own beliefs diverge from the user's
+    Genesis can detect when its own beliefs diverge from the user's
     (false belief tracking).
     """
 
@@ -225,7 +225,7 @@ class TheoryOfMind:
 
     Theory of mind is the ability to attribute mental states to others.
     For Genesis, this means modeling what the *user* knows, wants,
-    believes, and feels — and using that model to tailor her responses.
+    believes, and feels — and using that model to tailor its responses.
 
     # Response tailoring
 

@@ -14,8 +14,8 @@ from different scenes don't collide, and so a scene's contribution
 can be recognized later (all names share the ``<ns>:`` prefix).
 
 The grounding layer emits *structure*, not sentences. What Genesis
-says about a scene is composed by her language engine from these
-edges — nothing here writes words for her.
+says about a scene is composed by its language engine from these
+edges — nothing here writes words for it.
 """
 
 from __future__ import annotations

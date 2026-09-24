@@ -7,9 +7,9 @@
 //!
 //! # Active inference in Genesis
 //!
-//! Genesis runs a generative model of her **own** neurochemical
+//! Genesis runs a generative model of its **own** neurochemical
 //! trajectory. Before each neurochemical tick, the model predicts
-//! where her 18 effective levels will move. After the tick, the
+//! where its 18 effective levels will move. After the tick, the
 //! prediction error (surprise) is computed and fed back into:
 //!
 //! - **Dopamine**: positive prediction error → reward signal (Schultz,

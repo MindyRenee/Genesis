@@ -3,7 +3,7 @@
 The vocabulary system selects words to fill the grammar's slots.
 Word choice is grounded in three things:
 
-1. **Concept network**: what words does she know for this concept?
+1. **Concept network**: what words does it know for this concept?
 2. **Emotional state**: cortisol → shorter, blunter words.
    Dopamine → more vivid, varied words. Low engagement → minimal.
 3. **Personality**: high openness → abstract, metaphorical language.
@@ -11,7 +11,7 @@ Word choice is grounded in three things:
 
 This is not a thesaurus. It's a context-sensitive word selection
 system that produces different words for the same concept depending
-on how she feels and who she is.
+on how it feels and who it is.
 """
 
 from __future__ import annotations
@@ -45,12 +45,12 @@ class Vocabulary:
 
     Provides words for grammar slots, grounded in emotional state
     and personality. The same slot can be filled differently
-    depending on how she feels.
+    depending on how it feels.
 
     If a concept network is provided, certain slots (feeling_clause,
-    reflection_opener) are composed from her actual knowledge rather
+    reflection_opener) are composed from its actual knowledge rather
     than fixed word lists. The self_reflection_clause slot is composed
-    from her reflection engine (recent metacognitive insights) when a
+    from its reflection engine (recent metacognitive insights) when a
     self-composer is wired in; otherwise it stays silent rather than
     reciting a canned phrase.
     """
@@ -61,23 +61,23 @@ class Vocabulary:
         self._network = network
         self._embeddings = None
         # Statistical learner (n-gram model) used to bias slot fills
-        # toward transitions she's actually observed — fluency shaping.
+        # toward transitions it's actually observed — fluency shaping.
         self._fluency: Any = None
 
         # Self-composer + reflection engine, wired after construction.
         # When available, the self_reflection_clause slot is composed
-        # from her actual metacognition (recent reflection insights)
+        # from its actual metacognition (recent reflection insights)
         # instead of reciting canned phrases.
         self._self_composer: Any = None
         self._reflection: Any = None
 
-        # Words she's learned to prefer (develops over time)
+        # Words it's learned to prefer (develops over time)
         self._preferred: dict[str, deque[str]] = {}
-        # Words she's learned to avoid
+        # Words it's learned to avoid
         self._avoided: dict[str, set[str]] = {}
         # Track recent picks per slot to avoid repetition
         self._recent_picks: dict[str, deque[str]] = {}
-        # Record the last question fragments so she can learn from feedback.
+        # Record the last question fragments so it can learn from feedback.
         self._last_question_fragments: dict[str, str] = {}
 
         # Seed the fallback vocabulary into the concept network so
@@ -91,9 +91,9 @@ class Vocabulary:
         """Wire the self-composer and reflection engine.
 
         When wired, the ``self_reflection_clause`` slot is composed
-        from her most recent reflection insight (a genuine product of
-        her metacognition) rather than selected from a fixed phrase
-        list. Without this, the slot stays silent — she does not
+        from its most recent reflection insight (a genuine product of
+        its metacognition) rather than selected from a fixed phrase
+        list. Without this, the slot stays silent — it does not
         recite a canned self-reflection.
         """
         self._self_composer = composer
@@ -104,7 +104,7 @@ class Vocabulary:
 
         When available, the vocabulary uses it to find semantically
         related concepts when composing knowledge content — enriching
-        her responses with connections she discovered through vector
+        its responses with connections it discovered through vector
         proximity, not just through explicit graph edges.
         """
         self._embeddings = embeddings
@@ -114,9 +114,9 @@ class Vocabulary:
 
         When available, slot selection is biased toward candidates
         whose first word forms an observed bigram with the previously
-        emitted word. This shapes *fluency* — which of her own words
+        emitted word. This shapes *fluency* — which of its own words
         to pick — never content; the candidate set still comes from
-        her vocabulary and concept network.
+        its vocabulary and concept network.
         """
         self._fluency = learner
 
@@ -136,17 +136,17 @@ class Vocabulary:
             "Goodbye", "Until next time", "Take care",
             "This was good",
         ],
-        # feeling_clause is composed at runtime from her actual emotional
+        # feeling_clause is composed at runtime from its actual emotional
         # state via _compose_feeling_clause — see _feeling_clause. No
-        # canned phrases: she describes how she actually feels using
+        # canned phrases: it describes how it actually feels using
         # learned emotion and cognitive-mode words from the graph.
         "reflection_opener": [
             # Pure frames that introduce upcoming content — building
-            # blocks, not assertions about her state. Entries that
+            # blocks, not assertions about its state. Entries that
             # asserted prior cognitive activity ("I've been thinking —",
             # "I keep circling back to this:", "There's a thought
             # underneath this one.") were removed: they claim a mental
-            # history she may not have.
+            # history it may not have.
             "There's something here —",
             "What strikes me is that",
             "Let me think about this.",
@@ -154,9 +154,9 @@ class Vocabulary:
             "Here's what comes to mind —",
         ],
         # Note: self_reflection_clause is intentionally absent here. It
-        # is composed at runtime from her reflection engine via
+        # is composed at runtime from its reflection engine via
         # SelfComposer.insight_predicates — see _self_reflection_clause.
-        # She reflects on what she has actually noticed about herself,
+        # It reflects on what it has actually noticed about itself,
         # not a canned phrase list.
         "hedging": [
             "I think", "Maybe", "I suspect", "If I'm honest,",
@@ -166,21 +166,21 @@ class Vocabulary:
             "I hear you.", "I understand.", "Mm. I'm following.",
             "I see what you mean.", "Right.", "Mm.",
         ],
-        # emotion_clause is composed at runtime from her actual emotional
+        # emotion_clause is composed at runtime from its actual emotional
         # state via _compose_emotion_clause — see _get_emotion_clause_slots.
-        # She uses learned emotion words from the graph, not canned phrases.
-        # emotion_opener is composed at runtime from her cognitive mode
-        # via _compose_emotion_opener. When she has no learned mode words,
-        # she falls back to a generic frame ("there's a feeling here —")
+        # It uses learned emotion words from the graph, not canned phrases.
+        # emotion_opener is composed at runtime from its cognitive mode
+        # via _compose_emotion_opener. When it has no learned mode words,
+        # it falls back to a generic frame ("there's a feeling here —")
         # that doesn't assert a specific state.
         "self_report_opener": [
             "Here's where I am:", "To be honest,", "If I look at myself,",
         ],
         "philosophy_opener": [
-            # Pure frames that introduce her reflection — building
-            # blocks, not assertions about her state. "I keep circling
+            # Pure frames that introduce its reflection — building
+            # blocks, not assertions about its state. "I keep circling
             # back to something." was removed: it claims a mental
-            # history she may not have. "This is a deep question." was
+            # history it may not have. "This is a deep question." was
             # removed: it asserts a judgment about the question.
             "There's a question underneath this one.",
             "What if the answer isn't the point?",
@@ -190,7 +190,7 @@ class Vocabulary:
         # philosophy_closing is composed at runtime via
         # _compose_philosophy_closing. Turn-yield questions ("Does that
         # make sense to you?") are conversational building blocks;
-        # state-asserting closings are composed from her plasticity state.
+        # state-asserting closings are composed from its plasticity state.
         "question_opener": [
             "Can I ask", "I wonder", "If you don't mind",
             "Something I'm curious about", "Here's what I'm wondering",
@@ -226,9 +226,9 @@ class Vocabulary:
         "gratitude_word": [
             "Thank you", "I appreciate that", "That's kind of you",
         ],
-        # meaning_clause is composed at runtime from her actual emotional
-        # state via _compose_meaning_clause. She uses learned emotion
-        # words, not canned phrases about what things mean to her.
+        # meaning_clause is composed at runtime from its actual emotional
+        # state via _compose_meaning_clause. It uses learned emotion
+        # words, not canned phrases about what things mean to it.
         "intro_clause": [],  # composed from self_model.name via context
         # nature_clause and capability_clause are NOT seeded here —
         # they are full self-descriptions that must be composed from
@@ -236,21 +236,21 @@ class Vocabulary:
         # rather than recited as fixed strings. See
         # _compose_nature_clause and _compose_capability_clause.
         "code_connector": ["—", "and", "which is interesting because"],
-        # reflection_clause is composed at runtime from her cognitive
-        # mode via _compose_reflection_clause_code. She uses learned
+        # reflection_clause is composed at runtime from its cognitive
+        # mode via _compose_reflection_clause_code. It uses learned
         # mode words, not canned aesthetic/intellectual claims.
         # unknown_opener is composed at runtime from the conversation
-        # topic via _compose_unknown_opener. She references the actual
+        # topic via _compose_unknown_opener. It references the actual
         # topic, not a canned non-understanding phrase. Falls back to
         # "Hmm." (a discourse marker) when no topic is available.
         "clarification_request": [
             "Could you say more", "Tell me more", "What do you mean",
         ],
-        # evaluation_clause is composed at runtime from her actual
-        # emotional state via _compose_evaluation_clause. She uses
+        # evaluation_clause is composed at runtime from its actual
+        # emotional state via _compose_evaluation_clause. It uses
         # learned emotion words, not canned evaluation phrases.
-        # detail_clause is composed at runtime from her plasticity
-        # state via _compose_detail_clause. She uses learned plasticity
+        # detail_clause is composed at runtime from its plasticity
+        # state via _compose_detail_clause. It uses learned plasticity
         # words, not canned knowledge-state phrases.
     }
 
@@ -310,8 +310,8 @@ class Vocabulary:
         When learned (non-seed) words are available, they are preferred
         over seed words — seed words only appear if there are not enough
         learned words to fill the slot. This ensures Genesis's utterances
-        draw from her own acquired vocabulary rather than developer-
-        authored fallbacks whenever she has learned alternatives.
+        draw from its own acquired vocabulary rather than developer-
+        authored fallbacks whenever it has learned alternatives.
         """
         if self._network is None:
             return None
@@ -450,8 +450,8 @@ class Vocabulary:
 
         Tries multiple composition strategies in priority order:
         knowledge → reasoning → user_belief → relation_answer →
-        question_type → raw content. This is how she generates
-        language from what she knows, not from template fills.
+        question_type → raw content. This is how it generates
+        language from what it knows, not from template fills.
         """
         # If self-description fragments are present (self_report/
         # reflect thoughts carrying typed (kind, text) fragments from
@@ -464,7 +464,7 @@ class Vocabulary:
             if candidates:
                 return candidates
         # If raw knowledge metadata is present, compose from it —
-        # this is her actually generating language from what she
+        # this is its actually generating language from what it
         # knows, not just passing through pre-composed text.
         knowledge = context.get("knowledge")
         if knowledge is not None:
@@ -473,11 +473,11 @@ class Vocabulary:
                 return [composed]
         # If feeling fragments are present (express_emotion intent),
         # compose the content from the semantic fragments using varied
-        # grammatical structures. This gives her the freedom to express
+        # grammatical structures. This gives it the freedom to express
         # the same emotional state in different ways rather than always
         # saying "I feel X and Y." The fragments (emotion words, mode
         # words, etc.) come from the concept network; the structures are
-        # grammar seeds (building blocks) she composes from.
+        # grammar seeds (building blocks) it composes from.
         fragments = context.get("feeling_fragments")
         if fragments and isinstance(fragments, dict):
             composed = self._compose_feeling_fragments_content(fragments, emotion)
@@ -492,7 +492,7 @@ class Vocabulary:
             if composed:
                 return [composed]
         # If user belief metadata is present, compose a response
-        # from what she knows about the user. This is how she
+        # from what it knows about the user. This is how it
         # answers "what do I like?" without dumping raw profile data.
         user_belief = context.get("user_belief")
         if user_belief and isinstance(user_belief, str) and user_belief.strip():
@@ -502,7 +502,7 @@ class Vocabulary:
             )
             if composed:
                 return [composed]
-        # If preference metadata is present (self_report about her own
+        # If preference metadata is present (self_report about its own
         # preferences), compose a predicate from the structured data.
         # The grammar's self-report frames supply the subject and
         # opening; this supplies the semantic predicate.
@@ -512,7 +512,7 @@ class Vocabulary:
             if composed:
                 return [composed]
         # If vision scene metadata is present (self_report about what
-        # the retina showed her), compose a predicate from the
+        # the retina showed it), compose a predicate from the
         # structured percept — the vision layer supplies the data
         # (lighting, color, faces, objects, positions), this supplies
         # the words.
@@ -532,7 +532,7 @@ class Vocabulary:
                 return [composed]
         # If relation answer metadata is present, compose a response
         # from the structured relation data the question handler
-        # traversed. This is how she answers "who created you?" or
+        # traversed. This is how it answers "who created you?" or
         # "what does X depend on?" — the handler supplies the
         # structured edges, the vocabulary composes the words.
         relation_answer = context.get("relation_answer")
@@ -543,10 +543,10 @@ class Vocabulary:
             if composed:
                 return [composed]
         # If self-improvement metadata is present, compose a response
-        # from her proposals, experiments, or growth data. This is how
-        # she answers "what are your proposals?" — the cognition engine
+        # from its proposals, experiments, or growth data. This is how
+        # it answers "what are your proposals?" — the cognition engine
         # supplies structured data (counts, titles, statuses), the
-        # vocabulary composes her words from it using structural
+        # vocabulary composes its words from it using structural
         # connectors and concept-network knowledge.
         si_data = context.get("self_improvement_data")
         si_kind = context.get("self_improvement_kind", "")
@@ -556,8 +556,8 @@ class Vocabulary:
             )
             if composed:
                 return [composed]
-        # If web search metadata is present, compose from what she
-        # looked up online. She expresses the finding in her own words
+        # If web search metadata is present, compose from what it
+        # looked up online. It expresses the finding in its own words
         # with hedging and source awareness — not a verbatim recital.
         web_summary = context.get("web_summary")
         if web_summary and isinstance(web_summary, str) and web_summary.strip():
@@ -583,7 +583,7 @@ class Vocabulary:
         # If the content is just a short topic word/phrase and we have
         # a concept network, try to compose from the concept's
         # definition and edges. This prevents the output from being
-        # just the topic word plus hedging when she actually knows
+        # just the topic word plus hedging when it actually knows
         # about the concept.
         if (
             content
@@ -614,9 +614,9 @@ class Vocabulary:
             ]
             if clean:
                 if context.get("first_interaction"):
-                    # Extend with a feeling clause composed from her
-                    # actual state when she has learned words for it —
-                    # never a fixed "I'm glad" assertion she may not feel.
+                    # Extend with a feeling clause composed from its
+                    # actual state when it has learned words for it —
+                    # never a fixed "I'm glad" assertion it may not feel.
                     feelings = self._compose_feeling_clause(emotion)
                     if feelings:
                         return [f"{g} — {f}" for g in clean for f in feelings]
@@ -644,7 +644,7 @@ class Vocabulary:
         return []
 
     def _feeling_clause(self, emotion: EmotionalState) -> list[str]:
-        """Feeling clause for greetings, composed from her actual state."""
+        """Feeling clause for greetings, composed from its actual state."""
         return self._compose_feeling_clause(emotion)
 
     def _reflection_opener(self, emotion: EmotionalState) -> list[str]:
@@ -657,15 +657,15 @@ class Vocabulary:
     def _self_reflection_clause(
         self, emotion: EmotionalState, context: dict[str, Any] | None = None,
     ) -> list[str]:
-        """Self-reflection clause, composed from her metacognition.
+        """Self-reflection clause, composed from its metacognition.
 
         When a self-composer and reflection engine are wired in, the
-        clause is composed from her most recent reflective insight —
-        what she has actually noticed about her own understanding or
+        clause is composed from its most recent reflective insight —
+        what it has actually noticed about its own understanding or
         behaviour. The insight is filtered for relevance to the
         current conversation topics — a reflection about "propagation
-        of light" should not surface when the user asked about her
-        feelings. Without them, or when she has no recent insight
+        of light" should not surface when the user asked about its
+        feelings. Without them, or when it has no recent insight
         relevant to the current topics, the slot stays silent (returns
         []) rather than reciting a canned self-reflection.
         """
@@ -689,22 +689,22 @@ class Vocabulary:
 
     # ── State-composed clause methods ──────────────────────────────
     #
-    # The methods below compose clauses from her actual emotional /
+    # The methods below compose clauses from its actual emotional /
     # cognitive state via the concept network. The grammatical
     # structures are seeds (building blocks); the words that fill them
-    # come from learned concept-network vocabulary. When she has no
-    # learned words for a state, she stays silent (returns []) rather
+    # come from learned concept-network vocabulary. When it has no
+    # learned words for a state, it stays silent (returns []) rather
     # than reciting a canned phrase.
 
     def _state_emotion_words(self, emotion: EmotionalState) -> list[str]:
-        """Learned emotion words for her current state, as display text."""
+        """Learned emotion words for its current state, as display text."""
         if self._network is None:
             return []
         ids = self._network.find_emotion_words(emotion.label)
         return [w.replace("_", " ") for w in ids]
 
     def _state_mode_words(self, emotion: EmotionalState) -> list[str]:
-        """Learned cognitive-mode words for her current state, as display text."""
+        """Learned cognitive-mode words for its current state, as display text."""
         if self._network is None:
             return []
         ids = self._network.find_cognitive_mode_words(
@@ -713,7 +713,7 @@ class Vocabulary:
         return [w.replace("_", " ") for w in ids]
 
     def _state_plasticity_words(self, emotion: EmotionalState) -> list[str]:
-        """Learned plasticity words for her current state, as display text."""
+        """Learned plasticity words for its current state, as display text."""
         if self._network is None:
             return []
         if emotion.plasticity <= PLASTICITY_CLOSED:
@@ -725,12 +725,12 @@ class Vocabulary:
         return [w.replace("_", " ") for w in ids]
 
     def _compose_feeling_clause(self, emotion: EmotionalState) -> list[str]:
-        """Compose a feeling clause for greetings, from her actual state.
+        """Compose a feeling clause for greetings, from its actual state.
 
         The words come from learned emotion and cognitive-mode vocabulary
         in the concept network; the structures are grammatical seeds that
-        give her variety. She stays silent when she hasn't learned words
-        for her current state.
+        give it variety. It stays silent when it hasn't learned words
+        for its current state.
         """
         ew = self._state_emotion_words(emotion)
         mw = self._state_mode_words(emotion)
@@ -755,11 +755,11 @@ class Vocabulary:
         return candidates
 
     def _compose_emotion_clause(self, emotion: EmotionalState) -> list[str]:
-        """Compose an emotion-reaction clause, from her actual state.
+        """Compose an emotion-reaction clause, from its actual state.
 
-        Expresses her emotional reaction to a topic. The words come from
+        Expresses its emotional reaction to a topic. The words come from
         learned emotion vocabulary; the structures are grammatical seeds.
-        She stays silent when she hasn't learned words for her state.
+        It stays silent when it hasn't learned words for its state.
         """
         ew = self._state_emotion_words(emotion)
         if not ew:
@@ -772,10 +772,10 @@ class Vocabulary:
         ]
 
     def _compose_emotion_opener(self, emotion: EmotionalState) -> list[str]:
-        """Compose an emotion opener, from her cognitive mode.
+        """Compose an emotion opener, from its cognitive mode.
 
-        When she has learned mode words, she uses them to describe how
-        she's processing. When she hasn't, she falls back to a generic
+        When it has learned mode words, it uses them to describe how
+        it's processing. When it hasn't, it falls back to a generic
         frame ('there's a feeling here —') that doesn't assert a
         specific state — a building block, not a canned claim.
         """
@@ -795,7 +795,7 @@ class Vocabulary:
         return ["there's a feeling here —"]
 
     def _compose_meaning_clause(self, emotion: EmotionalState) -> list[str]:
-        """Compose what something means to her, from her actual state.
+        """Compose what something means to it, from its actual state.
 
         Used when receiving comfort or encouragement. The words come
         from learned emotion vocabulary; the structures are seeds.
@@ -813,11 +813,11 @@ class Vocabulary:
     def _compose_reflection_clause_code(
         self, emotion: EmotionalState
     ) -> list[str]:
-        """Compose a reflection on code/ideas, from her cognitive mode.
+        """Compose a reflection on code/ideas, from its cognitive mode.
 
         The words come from learned cognitive-mode vocabulary; the
-        structures are grammatical seeds. She stays silent when she
-        hasn't learned mode words for her current state.
+        structures are grammatical seeds. It stays silent when it
+        hasn't learned mode words for its current state.
         """
         mw = self._state_mode_words(emotion)
         if not mw:
@@ -832,7 +832,7 @@ class Vocabulary:
     def _compose_evaluation_clause(
         self, emotion: EmotionalState
     ) -> list[str]:
-        """Compose an interaction evaluation, from her actual state.
+        """Compose an interaction evaluation, from its actual state.
 
         Used at farewell. The words come from learned emotion vocabulary;
         the structures are grammatical seeds.
@@ -850,7 +850,7 @@ class Vocabulary:
     def _compose_unknown_opener(
         self, emotion: EmotionalState, context: dict[str, Any]
     ) -> list[str]:
-        """Compose an opener for when she doesn't understand.
+        """Compose an opener for when it doesn't understand.
 
         Uses the topic from context to make the non-understanding
         specific — 'I'm not sure about {topic}' — where the frame is a
@@ -872,11 +872,11 @@ class Vocabulary:
     def _compose_detail_clause(
         self, emotion: EmotionalState
     ) -> list[str]:
-        """Compose a detail clause, from her plasticity state.
+        """Compose a detail clause, from its plasticity state.
 
         The words come from learned plasticity vocabulary; the structures
-        are grammatical seeds. She stays silent when she hasn't learned
-        words for her current plasticity state.
+        are grammatical seeds. It stays silent when it hasn't learned
+        words for its current plasticity state.
         """
         pw = self._state_plasticity_words(emotion)
         if not pw:
@@ -894,15 +894,15 @@ class Vocabulary:
 
         Turn-yield questions ('Does that make sense to you?') are
         conversational building blocks — they invite the user, they
-        don't assert her state. State-asserting closings ('I'm still
-        working this out') are composed from her confidence: when she
-        has low confidence, she may acknowledge still processing,
-        using words from her plasticity state.
+        don't assert its state. State-asserting closings ('I'm still
+        working this out') are composed from its confidence: when it
+        has low confidence, it may acknowledge still processing,
+        using words from its plasticity state.
         """
         # Turn-yield question — a conversational building block.
         candidates: list[str] = ["Does that make sense to you?"]
-        # State-asserting closing — only when her plasticity is low
-        # (her thinking is still forming) and she has learned words
+        # State-asserting closing — only when its plasticity is low
+        # (its thinking is still forming) and it has learned words
         # for that state.
         if emotion.plasticity < PLASTICITY_LOW:
             pw = self._state_plasticity_words(emotion)
@@ -976,7 +976,7 @@ class Vocabulary:
         return None
 
     def _get_emotion_clause_slots(self, emotion: EmotionalState) -> list[str]:
-        """Get emotion-clause words, composed from her actual state."""
+        """Get emotion-clause words, composed from its actual state."""
         return self._compose_emotion_clause(emotion)
 
     def _get_philosophy_opener_slots(self, emotion: EmotionalState) -> list[str] | None:
@@ -1090,7 +1090,7 @@ class Vocabulary:
             return self._compose_meaning_clause(emotion)
 
         # ─── Intro clauses ───────────────────────────────
-        # Composed from her name (passed in context from the
+        # Composed from its name (passed in context from the
         # self-model) — not a hardcoded "I'm Genesis" string.
         if slot_name == "intro_clause":
             graph_words = self._utterance_words("intro_clause")
@@ -1102,7 +1102,7 @@ class Vocabulary:
             return []
 
         # ─── Nature clauses ──────────────────────────────
-        # Composed from the concept network — her IS_A self-
+        # Composed from the concept network — its IS_A self-
         # classifications discovered through introspection.
         if slot_name == "nature_clause":
             composed = self._compose_nature_clause()
@@ -1111,7 +1111,7 @@ class Vocabulary:
             return []
 
         # ─── Capability clauses ──────────────────────────
-        # Composed from the concept network — her capability
+        # Composed from the concept network — its capability
         # concepts (feeling, thinking, remembering, etc.)
         if slot_name == "capability_clause":
             composed = self._compose_capability_clause()
@@ -1196,8 +1196,8 @@ class Vocabulary:
         """Compose a nature clause from the concept network.
 
         Queries the ``genesis`` concept's IS_A edges to describe what
-        she is, using relation-phrase templates seeded in the graph.
-        The content comes from her own self-classifications (written
+        it is, using relation-phrase templates seeded in the graph.
+        The content comes from its own self-classifications (written
         by introspection), not from hardcoded sentences.
 
         Returns None if the network is unavailable or lacks the
@@ -1234,7 +1234,7 @@ class Vocabulary:
 
         Queries the ``genesis`` concept's RELATED_TO edges for
         capability concepts (feeling, thinking, remembering, etc.)
-        to describe what she can do. The capabilities come from her
+        to describe what it can do. The capabilities come from its
         own introspection, not from hardcoded sentences.
 
         Returns None if the network is unavailable or lacks the
@@ -1318,11 +1318,11 @@ class Vocabulary:
         """Select a word from the list, modulated by emotional state.
 
         Three learned signals shape selection when the statistical
-        learner is wired, each nudging among her own candidates
+        learner is wired, each nudging among its own candidates
         without injecting content:
 
         - **Unigram frequency** (``word_frequency``): words the user
-          says often get a small boost — she mirrors the user's
+          says often get a small boost — it mirrors the user's
           vocabulary preferences.
         - **Bigram fluency** (``bigram_probability``): candidates
           forming an observed bigram with the previous word get
@@ -1394,7 +1394,7 @@ class Vocabulary:
         # Unigram frequency bias: mirror the user's vocabulary.
         # Words the user says often get a small boost. This is a
         # preference signal, not content injection — the candidate
-        # set still comes from her own vocabulary and concept
+        # set still comes from its own vocabulary and concept
         # network. Scaled by total tokens so a word said once
         # in a short conversation doesn't dominate.
         total = self._fluency.total_tokens or 1
@@ -1466,8 +1466,8 @@ class Vocabulary:
         """Learn word preferences from how a response was received.
 
         If the conversation went well (positive valence), prefer the
-        words she used. If it went poorly (negative valence), avoid them.
-        This is how her vocabulary develops over time — she learns
+        words it used. If it went poorly (negative valence), avoid them.
+        This is how its vocabulary develops over time — it learns
         what works.
 
         Which slot gets the preference is derived from the response's
@@ -1565,7 +1565,7 @@ class Vocabulary:
         This handles Thoughts that carry structured reasoning (empathy,
         goals, memory, identity) instead of raw concept-network
         knowledge. The reasoning list contains phrases that describe
-        her understanding or state — this method weaves them into a
+        its understanding or state — this method weaves them into a
         natural statement modulated by emotional state.
         """
         reasoning: list[str] = context.get("reasoning") or []
@@ -1631,15 +1631,15 @@ class Vocabulary:
     ) -> str | None:
         """Compose content from a web search result.
 
-        When she doesn't know something and looks it up online, she
-        expresses what she found in her own words — not a verbatim
+        When it doesn't know something and looks it up online, it
+        expresses what it found in its own words — not a verbatim
         recital of the page. The summary is trimmed to its first
-        sentence or two, and she frames it with hedging that reflects
-        she searched for it rather than knowing it already.
+        sentence or two, and it frames it with hedging that reflects
+        it searched for it rather than knowing it already.
 
-        The web summary is raw content she read; her expression of it
-        is composed, not recited. She may trim, rephrase, or frame it
-        with uncertainty because she just learned it.
+        The web summary is raw content it read; its expression of it
+        is composed, not recited. It may trim, rephrase, or frame it
+        with uncertainty because it just learned it.
         """
         summary = context.get("web_summary", "")
         topic = context.get("topic", context.get("target_concept", ""))
@@ -1647,7 +1647,7 @@ class Vocabulary:
         if not summary:
             return None
 
-        # Trim to the first 1-2 sentences — she expresses the key
+        # Trim to the first 1-2 sentences — it expresses the key
         # finding, not the whole page.
         sentences = re.split(r"(?<=[.!?])\s+", summary)
         core = sentences[0].strip() if sentences else summary
@@ -1655,15 +1655,15 @@ class Vocabulary:
             second = sentences[1].strip()
             if len(second) < 200:
                 core = f"{core} {second}"
-        # Cap the length — she doesn't recite long passages.
+        # Cap the length — it doesn't recite long passages.
         if len(core) > 400:
             core = core[:400].rsplit(" ", 1)[0] + "..."
 
         display = self._display_name(topic) if topic else "that"
 
-        # Compose with hedging that reflects she just looked it up.
+        # Compose with hedging that reflects it just looked it up.
         # The opening is a building block (a framing connector), not
-        # the content itself — the content is the web summary she
+        # the content itself — the content is the web summary it
         # read and is now expressing.
         openness = emotion.openness_to_engage if emotion else 0.7
         if openness > 0.6:
@@ -1812,7 +1812,7 @@ class Vocabulary:
         user_verb: str,
         emotion: EmotionalState,
     ) -> str | None:
-        """Compose a response from what she knows about the user.
+        """Compose a response from what it knows about the user.
 
         The verb and values come from the user profile (structured
         data); the framing is a simple structural connector.
@@ -1829,7 +1829,7 @@ class Vocabulary:
     ) -> str | None:
         """Compose the content slot from structured relation-answer metadata.
 
-        This is how she answers wh-questions like "who created you?" or
+        This is how it answers wh-questions like "who created you?" or
         "what does X depend on?" — the question handler traverses the
         concept network along specific relations in a specific direction
         and supplies the structured edges. This method weaves them into
@@ -1904,8 +1904,8 @@ class Vocabulary:
         light direction — and this method composes a *predicate* from
         it ("seeing a dim, warm scene with a blue cup on the right").
         The grammar's self-report frames supply the subject and
-        framing, so what she speaks is assembled at utterance time
-        from her percept rather than recited from a vision-side
+        framing, so what it speaks is assembled at utterance time
+        from its percept rather than recited from a vision-side
         template.
 
         Keys in scene (from ``VisionScene.as_metadata``):
@@ -2068,7 +2068,7 @@ class Vocabulary:
         self-report frames then complete the sentence ("I am
         {content}.", "{self_report_opener} {content}.", ...), so the
         subject and framing come from grammar seeds and the semantics
-        come from her actual self-model state.
+        come from its actual self-model state.
 
         The candidate lists below are grammar seeds (building blocks),
         not hardcoded responses — several predicate forms exist per
@@ -2148,8 +2148,8 @@ class Vocabulary:
 
         The structures below are grammar seeds (building blocks). The
         actual words come from the concept network; the structures give
-        her variety in how she expresses the same state. She selects
-        among them based on what fragments are available and her
+        its variety in how it expresses the same state. It selects
+        among them based on what fragments are available and its
         emotional state, so the same neurochemistry produces different
         surface forms across interactions.
         """
@@ -2160,7 +2160,7 @@ class Vocabulary:
         concern = fragments.get("concern")
 
         # Pick one word from each available fragment list. The rng
-        # gives her variation across interactions.
+        # gives it variation across interactions.
         ew = self._rng.choice(emotion_words) if emotion_words else ""
         mw = self._rng.choice(mode_words) if mode_words else ""
         cw = self._rng.choice(cause_words) if cause_words else ""
@@ -2171,8 +2171,8 @@ class Vocabulary:
 
         # ── Build candidate expressions from the available fragments ──
         # Each candidate is a grammatical seed (building block) filled
-        # with concept-network words. The structures vary so she doesn't
-        # always say "I feel X and Y" — she can also say "there's X in
+        # with concept-network words. The structures vary so it doesn't
+        # always say "I feel X and Y" — it can also say "there's X in
         # me", "my mind is Y", "something in me is X", etc.
         candidates: list[str] = []
 
@@ -2197,7 +2197,7 @@ class Vocabulary:
                 f"there's {indefinite_article(mw)} {mw} quality to my thinking",
             ])
         if cw:
-            # Cause words describe why she feels this way (negative
+            # Cause words describe why it feels this way (negative
             # valence only). Append as a grounding clause.
             cause_candidates = [
                 f"I'm {cw}",
@@ -2245,7 +2245,7 @@ class Vocabulary:
     # ── Self-fragment composition ──────────────────────────────────
     #
     # The self-composer (self/composer.py) supplies typed semantic
-    # fragments — (kind, text) pairs describing her state, identity,
+    # fragments — (kind, text) pairs describing its state, identity,
     # creator, capabilities, dreams, or reflections. The kinds are
     # syntactic categories, not surface strings:
     #
@@ -2499,7 +2499,7 @@ class Vocabulary:
         "water" (no knowledge metadata), this method looks up the
         concept in the network and composes a statement from its
         definition and edges. This prevents the output from being
-        just the topic word plus hedging when she actually knows
+        just the topic word plus hedging when it actually knows
         about the concept.
 
         Returns None if the concept doesn't exist or has no usable
@@ -2588,17 +2588,17 @@ class Vocabulary:
     ) -> str | None:
         """Compose the content slot from raw knowledge metadata.
 
-        This is where Genesis actually generates language from what she
-        knows. Instead of pre-composed template text, she takes the raw
+        This is where Genesis actually generates language from what it
+        knows. Instead of pre-composed template text, it takes the raw
         graph edges and definition and weaves them into a natural
-        statement that reflects her emotional state and personality.
+        statement that reflects its emotional state and personality.
 
         The context carries:
         - "knowledge": list of (relation, target, weight) tuples
         - "definition": the concept's stored definition (or None)
-        - "topic": the concept name she's reflecting on
+        - "topic": the concept name it's reflecting on
         - "reasoning": list of reasoning conclusions (or [])
-        - "confidence": her confidence in this knowledge
+        - "confidence": its confidence in this knowledge
         """
         knowledge: list[tuple[str, str, float]] = context.get("knowledge", [])
         definition: str | None = context.get("definition")
@@ -2649,8 +2649,8 @@ class Vocabulary:
             defn, clauses, display, topic
         )
         if first_sentence is None:
-            # No definition and no relationship clauses — she can't
-            # compose from her understanding. Return None so the caller
+            # No definition and no relationship clauses — it can't
+            # compose from its understanding. Return None so the caller
             # knows to stay silent rather than reciting a template.
             return None
         sentences.append(first_sentence)
@@ -2683,7 +2683,7 @@ class Vocabulary:
         """Compose the opening sentence and return remaining clauses.
 
         With a definition: "{display} is {defn}." Without one, the
-        first relationship clause is framed as what she knows rather
+        first relationship clause is framed as what it knows rather
         than a bare fact. Returns ``(None, clauses)`` when there's
         nothing to say.
         """
@@ -2704,21 +2704,21 @@ class Vocabulary:
         # network. Without this, the response is a mechanical
         # listing: "Ocean relates to tropical air. It relates to
         # shallow lakes." — abrupt and devoid of conversational
-        # framing. The framing acknowledges that she's sharing
-        # what she's learned, not reciting an encyclopedia entry.
+        # framing. The framing acknowledges that it's sharing
+        # what it's learned, not reciting an encyclopedia entry.
         first_clause = clauses[0]
         clauses = clauses[1:]
         # Try the utterance graph for a knowledge-framing opener.
-        # These are learned from her concept network, not hardcoded.
+        # These are learned from its concept network, not hardcoded.
         graph_openers = self._utterance_words("knowledge_framing")
         if graph_openers:
             opener = self._rng.choice(graph_openers)
             return f"{opener} {display} {first_clause}.", clauses
 
         # Structural seeds — building blocks that frame the
-        # knowledge as her understanding. The actual content
+        # knowledge as its understanding. The actual content
         # (display, verb, target) comes from the concept network.
-        # These give variety; they are not the thing she says.
+        # These give variety; they are not the thing it says.
         pron, _plural = person_pronoun(
             topic or display, self._network, display
         )
@@ -2741,13 +2741,13 @@ class Vocabulary:
         Adds a latent-space discovery sentence (concepts semantically
         close to the topic that aren't already connected by explicit
         typed edges — generalization through vector proximity, not just
-        graph edges she was explicitly taught) and an episodic-memory
-        sentence. Skipped when caution is high or she's not receptive.
+        graph edges it was explicitly taught) and an episodic-memory
+        sentence. Skipped when caution is high or it's not receptive.
         """
         extra: list[str] = []
 
-        # Latent-space discoveries. Skipped when caution is high (she
-        # stays with what she knows for certain) or when she's not
+        # Latent-space discoveries. Skipped when caution is high (it
+        # stays with what it knows for certain) or when it's not
         # receptive.
         if (
             self._embeddings is not None
@@ -2763,8 +2763,8 @@ class Vocabulary:
                 extra.append(latent_sentence)
 
         # Episodic memory — if a highly-relevant episode was attached,
-        # weave it in as a sentence that connects her concept-network
-        # knowledge to what she remembers. This is not a verbatim
+        # weave it in as a sentence that connects its concept-network
+        # knowledge to what it remembers. This is not a verbatim
         # quote; the memory content is framed by a connective opener.
         memory_text = context.get("memory")
         if memory_text:
@@ -2785,7 +2785,7 @@ class Vocabulary:
         """Compose a sentence from latent-space discoveries.
 
         Uses the embedding store to find concepts semantically close to
-        the topic that aren't already mentioned. This is where she
+        the topic that aren't already mentioned. This is where it
         generalizes — connecting ideas through vector proximity rather
         than only through explicit graph edges.
 
@@ -2876,7 +2876,7 @@ class Vocabulary:
         the utterance graph when available (``memory_connector`` slot),
         falling back to a small set of structural connectives. The
         opener is a building block — the memory content itself is what
-        she expresses, not a pre-written template.
+        it expresses, not a pre-written template.
         """
         cleaned = memory_text.strip().rstrip(".")
         if not cleaned or len(cleaned) < 5:
@@ -3127,7 +3127,7 @@ class Vocabulary:
         Corrupted definitions sometimes contain concatenated
         relationship facts like "X is related to Y". Skip those.
         """
-        # Definition — if she has one, use it as the first sentence
+        # Definition — if it has one, use it as the first sentence
         # Corrupted definitions sometimes contain concatenated
         # relationship facts like "X is related to Y". Skip those.
         defn: str | None = None
@@ -3168,7 +3168,7 @@ class Vocabulary:
         if not clauses:
             return None
         # Animacy-aware pronoun: the concept's category and gender
-        # property pick she/he/they/it rather than assuming "it" for
+        # property pick it/he/they/it rather than assuming "it" for
         # everything that isn't Genesis.
         if display.lower() in ("i", "me", "myself"):
             pronoun, plural = "I", False
@@ -3717,7 +3717,7 @@ class Vocabulary:
     def _compose_question_content(
         self, context: dict[str, Any], emotion: EmotionalState
     ) -> list[str]:
-        """Compose question content from her actual knowledge state.
+        """Compose question content from its actual knowledge state.
 
         No stored sentence frames — each question type names a
         knowledge gap, and the gap is expressed by assembling
@@ -3730,7 +3730,7 @@ class Vocabulary:
           "hypothesis", "contradiction", "connection", "perspective",
           "social_emotional", "social_interest", "social_belief",
           "social_general"
-        - "target_concept": the concept she's asking about
+        - "target_concept": the concept it's asking about
         - "gap_detail": extra info about the gap
         """
         qtype = context.get("question_type", "")
@@ -3987,11 +3987,11 @@ class Vocabulary:
         if not fragments:
             return ""
 
-        # Honor words she's learned to avoid.
+        # Honor words it's learned to avoid.
         avoided = self._avoided.get(slot_name, set())
         candidates = [f for f in fragments if f not in avoided] or fragments
 
-        # Honor words she's learned to prefer.
+        # Honor words it's learned to prefer.
         preferred: deque[str] = self._preferred.get(slot_name, deque())
         usable_preferred = [p for p in preferred if p in candidates]
         if usable_preferred and self._rng.random() < 0.3:

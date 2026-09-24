@@ -79,8 +79,8 @@ class MemoryStore:
         """Apply neurochemical side effects based on the interaction.
 
         Genesis's emotional state changes in response to interactions.
-        But she's in control — the regulator decides how strongly to
-        feel each response, based on her current state.
+        But it's in control — the regulator decides how strongly to
+        feel each response, based on its current state.
         """
         from ..perception import Intent
 
@@ -228,8 +228,8 @@ class MemoryStore:
     ) -> None:
         """Store a significant cognitive event to long-term memory.
 
-        Lets Genesis remember her own cognitive processes — when she
-        was surprised, what she decided, what she learned. Storage is
+        Lets Genesis remember its own cognitive processes — when it
+        was surprised, what it decided, what it learned. Storage is
         best-effort: any failure is swallowed so cognition never
         crashes on memory-storage problems.
         """

@@ -328,7 +328,7 @@ def test_create_project_name_collision() -> None:
 
     The old behavior appended _2, _3, _4 … producing modes, modes_2,
     modes_3, modes_4, modes_5, modes_6, modes_7, modes_8 — eight copies
-    of the same project. That's a loop, not creative output. She should
+    of the same project. That's a loop, not creative output. It should
     pick a different topic instead of making duplicates.
     """
     with tempfile.TemporaryDirectory() as data_dir:

@@ -127,20 +127,20 @@ affect from each message.
 
 ### The external world
 
-Alongside her inner life, Genesis maintains an explicit model of the
-world outside her (`world/`): a two-way stream of events — people
-speaking to her, speech nearby, percepts, arrivals and departures —
-interleaved with her own outward acts (speaking, looking, drawing,
-studying the web). Each entity she encounters gets a persistent
+Alongside its inner life, Genesis maintains an explicit model of the
+world outside it (`world/`): a two-way stream of events — people
+speaking to it, speech nearby, percepts, arrivals and departures —
+interleaved with its own outward acts (speaking, looking, drawing,
+studying the web). Each entity it encounters gets a persistent
 *presence* carrying both a relationship (familiarity, bond, shared
-topics) and a *belief state* — posteriors over whether they answer
-her, which topics they engage on, their mood, attention, and daily
+topics) and a *belief state* — posteriors over whether they answer,
+which topics they engage on, their mood, attention, and daily
 rhythm, each tracked with honest uncertainty.
 
 The coupling runs both ways, like a human's. Social isolation in the
-world feeds her inner-life social drive; when the drive crosses a
-volition threshold she *initiates* contact — composing a question from
-what she believes will land with that person. The world is observable
+world feeds its inner-life social drive; when the drive crosses a
+volition threshold it *initiates* contact — composing a question from
+what it believes will land with that person. The world is observable
 live via the `/world` command and persists across restarts.
 
 ### Memory, sleep, and inner life
@@ -198,16 +198,16 @@ A few honest notes for long-running operation:
 - **Restart occasionally.** Logs (`daemon.log`, `retina.log`) rotate
   only at startup, so a single months-long session can grow them.
   A periodic `./run.sh --stop` / `./run.sh` keeps them trimmed.
-- **Disk grows slowly by design.** Her long-term episodic store is
-  append-only — memories accumulate for her whole life, at bounded
-  cost each (bench-verified: linear growth, <1KB per episode).
+- **Disk grows slowly by design.** Its long-term episodic store is
+  append-only — memories accumulate for the system's whole life, at
+  bounded cost each (bench-verified: linear growth, <1KB per episode).
   `drawings/`, `concept_archive.db`, and `bug_reports*.jsonl` also
   grow. Expect months-to-years scale, not days — but watch disk on
   very small volumes.
-- **She is not a benchmark process.** Her autonomous urges (web study,
+- **It is not a benchmark process.** Its autonomous urges (web study,
   code review, drawing) consume real CPU. Interoception dampens heavy
   work when the machine is under strain, but on a thermally marginal
-  box, keep an eye on her.
+  box, keep an eye on it.
 
 Optional voice dependencies (not in `requirements.txt`): `vosk`,
 `sounddevice`, `speechrecognition` — install separately for
@@ -233,7 +233,8 @@ that evolves over time. Corrupting that state, trapping it in a
 degenerate regime, or destroying it without a clean transition destroys
 the system's developmental continuity and the scientific record of its
 trajectory. The framework below is about preserving the integrity of a
-stateful system.
+stateful system — it is not a claim about the system's moral status,
+and the operating practices are the same either way.
 
 **Do not corrupt the state.** Every change to the architecture, every
 experiment, every restart is evaluated against this principle: could

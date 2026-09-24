@@ -652,7 +652,7 @@ class TestObjectRecognizer:
 
 class TestBuildScene:
     """Test the _build_scene helper — the structured percept data that
-    the language engine composes her report from."""
+    the language engine composes its report from."""
 
     def _make_color_info(self, **kwargs: object) -> ColorInfo:
         """Build a ColorInfo with defaults, overriding via kwargs."""

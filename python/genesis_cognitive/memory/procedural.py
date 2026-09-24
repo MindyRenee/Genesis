@@ -58,8 +58,8 @@ outcome-driven.
 A skill stores a **strategy** — the cognitive approach that worked
 well for a given intent — not the words of any particular response.
 This respects the architectural rule that Genesis's words must always
-emerge from her language engine, never be recited from storage. A
-habit biases *how* she deliberates (faster, more confident, predisposed
+emerge from its language engine, never be recited from storage. A
+habit biases *how* it deliberates (faster, more confident, predisposed
 to a practiced emotional tone); it does not replace deliberation with
 a canned string. This mirrors real procedural memory: knowing *how* to
 greet someone does not mean saying the exact same words every time —
@@ -116,7 +116,7 @@ class SkillStrategy:
     the *shape* of a good response (which cognitive route, what
     emotional tone, how confident, how long) without capturing the
     words themselves. This respects the architectural principle that
-    Genesis's words must always emerge from her language engine.
+    Genesis's words must always emerge from its language engine.
 
     The rolling statistics (avg_confidence, success_rate) are updated
     via exponential moving average, so recent performance matters more
@@ -241,7 +241,7 @@ class Skill:
     The skill stores a :class:`SkillStrategy` — the *approach* that
     worked well — not the words of any particular response. This
     respects the architectural rule that Genesis's words must always
-    emerge from her language engine, never be recited from storage.
+    emerge from its language engine, never be recited from storage.
 
     Attributes:
         name: Human-readable skill name (e.g., "respond_to_question").
@@ -379,7 +379,7 @@ class ProceduralMemory:
         Skills store *strategies*, not words. A habit biases
         deliberation (faster, more confident, predisposed to a
         practiced tone) but never replaces it with a canned response.
-        Genesis's words always emerge from her language engine.
+        Genesis's words always emerge from its language engine.
     """
 
     def __init__(self) -> None:

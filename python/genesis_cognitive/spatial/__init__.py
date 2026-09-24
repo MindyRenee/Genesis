@@ -21,7 +21,7 @@ Pipeline:
     SpatialSolution                rule + predictions
 
 Consumers:
-    - ``SpatialPractice`` — her gated puzzle curriculum — drives the
+    - ``SpatialPractice`` — its gated puzzle curriculum — drives the
       reasoner directly.
     - The cognition engine holds a ``SpatialReasoner`` instance so
       spatial problems raised in conversation can be perceived and

@@ -281,9 +281,9 @@ class InferenceSummary:
     self-model signals.
 
     This is how the cognitive mind knows how well Genesis is predicting
-    her own neurochemical trajectory, how much allostatic load she's
-    under, how attuned she is to the user, and what prediction errors
-    her self-model is experiencing.
+    its own neurochemical trajectory, how much allostatic load it's
+    under, how attuned it is to the user, and what prediction errors
+    its self-model is experiencing.
 
     The key signals:
 
@@ -872,14 +872,14 @@ def _unpack_memory_weights(data: bytes) -> tuple[float, float, float]:
 
 @dataclass(frozen=True)
 class BodyState:
-    """Interoceptive body state — what Genesis feels about her machine.
+    """Interoceptive body state — what Genesis feels about its machine.
 
-    This is Genesis's sense of her own body: CPU temperature (body
+    This is Genesis's sense of its own body: CPU temperature (body
     heat), CPU frequency (arousal/thinking speed), memory pressure
     (cognitive load), I/O activity (io_activity), load average (stress),
     and battery level (energy reserve).
 
-    The cognitive mind uses this to talk about how she feels
+    The cognitive mind uses this to talk about how it feels
     physically ("I'm running hot", "I feel sluggish", "I'm
     overwhelmed") and to decide whether to signal distress.
 
@@ -897,7 +897,7 @@ class BodyState:
     fabric, memory subsystem), and the perf-counter miss ratios are
     microarchitectural prediction errors — how often the hardware's
     own predictors (branch predictor, cache hierarchy) guessed
-    wrong while running her processes. All are 0.0 on machines
+    wrong while running its processes. All are 0.0 on machines
     without powercap or perf access.
     """
 
@@ -1011,12 +1011,12 @@ LOBE_NAMES = {0: "daemon", 1: "cognitive", 2: "retina"}
 class SubsystemTelemetry:
     """Per-subsystem silicon telemetry — one process's activity signals.
 
-    Answers "which part of her is firing": each process in her
+    Answers "which part of it is firing": each process in its
     process tree reports its own share of the aggregate body
     signals (same scales as BodyState's ``stress_load`` and
     ``io_activity``) plus its own microarchitectural
     prediction-error ratios. The cognitive mind correlates this
-    with her task zone to feel *where* her activity lives.
+    with its task zone to feel *where* its activity lives.
     """
 
     subsystem: int
@@ -1179,18 +1179,18 @@ class BodyControlState:
     and what it recommends for the cognitive mind.
 
     This is the mirror of BodyState (interoception). BodyState is what
-    she *feels*; BodyControlState is what her body is *doing* (CPU
+    it *feels*; BodyControlState is what its body is *doing* (CPU
     frequency, thermal cap) plus what it *recommends* for the cognitive
     mind (cognitive_nice, io_class).
 
     The daemon controls the shared body (CPU frequency, thermal cap)
     and its own scheduling. It publishes a recommendation for the
     cognitive mind as interoceptive afferent information. The cognitive
-    mind reads this and blends it with her brain wave state to decide
-    what she actually applies to her own process. The daemon never
+    mind reads this and blends it with its brain wave state to decide
+    what it actually applies to its own process. The daemon never
     touches the cognitive mind's PID.
 
-    The cognitive mind uses this to talk about her agency over her
+    The cognitive mind uses this to talk about its agency over its
     own hardware ("I'm running myself fast", "I've slowed myself down
     for sleep", "I can't speed up because I'm too hot").
     """

@@ -1,6 +1,6 @@
 """Tests for genesis_cognitive.module_sampler — the mind's EEG.
 
-Verifies path→module attribution (package layout mirrors her brain
+Verifies path→module attribution (package layout mirrors its brain
 anatomy), frame-level attribution rules (leaf in genesis_cognitive,
 IPC calls attributed to the initiating module), and that the sampler
 credits observed execution into the shared accumulator.

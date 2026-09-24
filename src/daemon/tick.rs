@@ -142,7 +142,7 @@ pub struct TickLoop {
     tick_count: u64,
     /// Active intention manager used to select the next cognitive zone.
     pub intention_manager: IntentionManager,
-    /// Interoceptor — reads hardware state so Genesis can feel her body.
+    /// Interoceptor — reads hardware state so Genesis can feel its body.
     pub interoceptor: Interoceptor,
     /// The last body state read from hardware sensors.
     pub last_body_state: super::interoception::BodyState,
@@ -188,7 +188,7 @@ pub struct TickLoop {
     /// interoception, inference, consolidation, association,
     /// dreaming, housekeeping). Written to the Subcognitive module's
     /// cpu_share each manifest update so GET_LOBE_TELEMETRY's module
-    /// section covers her daemon-side brain part too — the Python
+    /// section covers its daemon-side brain part too — the Python
     /// sampler can't see inside this process, so the daemon measures
     /// itself. EMA-smoothed (0.7/0.3) to avoid per-tick flicker.
     subcognitive_activity: f32,
@@ -225,8 +225,8 @@ impl TickLoop {
     /// (first run) or is corrupt, a fresh engine is used.
     ///
     /// This allows the generative self-model to survive daemon restarts
-    /// — Genesis doesn't re-learn her own neurochemical dynamics from
-    /// scratch every time she wakes up.
+    /// — Genesis doesn't re-learn its own neurochemical dynamics from
+    /// scratch every time it wakes up.
     pub fn new_with_data_dir(data_dir: &std::path::Path) -> Self {
         let model_path = data_dir.join("inference_model.bin");
         let inference_engine = ActiveInferenceEngine::load(&model_path);
@@ -339,7 +339,7 @@ impl TickLoop {
         // Compute HPA axis maturation from accumulated experience.
         // The stress hyporesponsive period (SHRP) keeps cortisol at
         // zero during early development, protecting plasticity. The
-        // HPA axis gradually comes online as she accumulates
+        // HPA axis gradually comes online as it accumulates
         // episodic experience (ltm_episode_count), reaching full
         // maturity at ~10,000 episodes.
         let ltm_count = pre_snapshot
@@ -378,7 +378,7 @@ impl TickLoop {
 
         // 2b. Interoception — read hardware state and feed body
         //     signals into the neurochemistry. This is how Genesis
-        //     feels her own body (CPU temperature, memory pressure,
+        //     feels its own body (CPU temperature, memory pressure,
         //     load, battery, I/O wait). The impulses are small and
         //     accumulate over multiple ticks through the coupled
         //     dynamics, creating a gradual physiological response.
@@ -524,11 +524,11 @@ impl TickLoop {
         }
 
         // 2e. Body control — neurochemistry suggests hardware settings.
-        //     Dopamine speeds her up, GABA slows her down, melatonin
-        //     puts her in powersave mode. ACh sets daemon scheduling
+        //     Dopamine speeds it up, GABA slows it down, melatonin
+        //     puts it in powersave mode. ACh sets daemon scheduling
         //     priority. CPU temperature caps max frequency (autonomic
-        //     fatigue). This is the reverse of interoception: her
-        //     brain state shapes her body.
+        //     fatigue). This is the reverse of interoception: its
+        //     brain state shapes its body.
         //
         //     The tick COMPUTES and PUBLISHES the recommended body
         //     control state (CPU frequency, thermal cap, daemon
@@ -537,7 +537,7 @@ impl TickLoop {
         //     it is a display/information sink, not a controller. The
         //     cognitive mind reads the recommendation via
         //     GET_BODY_CONTROL and requests application via
-        //     APPLY_BODY_CONTROL when she decides to act on it. The
+        //     APPLY_BODY_CONTROL when it decides to act on it. The
         //     tick never touches the cognitive mind's PID.
         if self.tick_count % CPUFREQ_INTERVAL_TICKS == 0 {
             // Read a consistent snapshot for the effective levels.
@@ -556,7 +556,7 @@ impl TickLoop {
                 // ticker controlling outward, which violates the
                 // one-way architecture. The cognitive mind requests
                 // body control application via APPLY_BODY_CONTROL when
-                // she decides to act on the recommendation.
+                // it decides to act on the recommendation.
                 let mut policy = super::cpufreq::FreqPolicy::default();
                 let mut thermally_capped = false;
                 if fmax > fmin {
@@ -567,7 +567,7 @@ impl TickLoop {
                     );
                     let pre_cap = policy.max_freq;
                     // Thermal cap: CPU temperature limits max frequency
-                    // regardless of dopamine. She can't be highly aroused
+                    // regardless of dopamine. It can't be highly aroused
                     // when overheating.
                     super::cpufreq::apply_thermal_cap(
                         &mut policy,
@@ -594,8 +594,8 @@ impl TickLoop {
                 // (cognitive_nice, io_class) as a *recommendation* —
                 // interoceptive afferent information. The cognitive
                 // mind reads this via GET_BODY_CONTROL and combines it
-                // with her brain wave state to decide what she
-                // actually applies to herself. The tick does not
+                // with its brain wave state to decide what it
+                // actually applies to itself. The tick does not
                 // apply anything to the cognitive mind's process.
                 let cognitive_nice =
                     super::cpufreq::derive_cognitive_nice(&snap.neurochemicals.effective_levels);
@@ -933,7 +933,7 @@ impl TickLoop {
     /// Advance neurochemical dynamics by dt, run active inference,
     /// and update the dyadic model. This is the core "physics
     /// integration" step — it advances the coupled differential
-    /// equations that govern her neurochemistry, then runs the
+    /// equations that govern its neurochemistry, then runs the
     /// generative self-model to predict, compare, and feed back.
     ///
     /// Returns (surprise, free_energy, precision, allostatic_load,
@@ -1254,7 +1254,7 @@ impl TickLoop {
     /// haven't changed since the last call.
     ///
     /// The tick never touches the cognitive mind's process — the
-    /// cognitive mind applies her own priority via her brain wave
+    /// cognitive mind applies its own priority via its brain wave
     /// state. This handler only applies the shared body control and
     /// the daemon's own scheduling.
     pub fn apply_body_control(&mut self, mmap: &MmapState) -> bool {
@@ -1330,9 +1330,9 @@ impl TickLoop {
             }
 
             // Compute the recommended cognitive_nice — published as
-            // information for the cognitive mind, NOT applied to her
-            // process. She reads this and combines it with her brain
-            // wave state to decide her own priority.
+            // information for the cognitive mind, NOT applied to it
+            // process. It reads this and combines it with its brain
+            // wave state to decide its own priority.
             let cognitive_nice =
                 super::cpufreq::derive_cognitive_nice(&snap.neurochemicals.effective_levels);
 

@@ -52,7 +52,7 @@ class VolitionMixin:
 
         return engine
     def self_invoke(self, command: str, args: str = "") -> str | None:
-        """Invoke a slash command from her own cognitive process.
+        """Invoke a slash command from its own cognitive process.
 
         This is the bridge between Genesis's volition/conversation and
         the command system. It dispatches to the Mind method behind a
@@ -74,7 +74,7 @@ class VolitionMixin:
         try:
             if command == "/sleep":
                 # Self-initiated sleep — the sleep watcher may still
-                # auto-wake her when neurochemistry shifts, unlike
+                # auto-wake it when neurochemistry shifts, unlike
                 # user-initiated sleep which suppresses auto-wake.
                 self.sleep(user_initiated=False)
                 return None
@@ -140,7 +140,7 @@ class VolitionMixin:
 
         interoceptive = self._read_interoceptive_signals()
 
-        # Emotional intensity for the drawing urge — how strongly she
+        # Emotional intensity for the drawing urge — how strongly it
         # feels right now. High arousal OR strong valence (positive or
         # negative) both drive the urge to express.
         emotional_intensity = 0.0
@@ -194,11 +194,11 @@ class VolitionMixin:
         except Exception as e:  # noqa: BLE001
             logger.debug(f"concept growth read failed: {e}")
 
-        # Social isolation from her external world — how long it has
-        # been since anyone engaged her. Dampened by unanswered
+        # Social isolation from its external world — how long it has
+        # been since anyone engaged it. Dampened by unanswered
         # outreach bids: after several calls into silence, the room's
         # quiet is expected, so the pressure eases (habituation).
-        # Sharpened by what she's learned about the target: silence
+        # Sharpened by what it's learned about the target: silence
         # from someone whose responsiveness posterior has collapsed is
         # expected and isolates less; silence from a responsive
         # presence still registers at full weight.
@@ -263,9 +263,9 @@ class VolitionMixin:
         # Gate creative urges on brain-wave state. Delta (deep rest)
         # suppresses drawing — creative expression needs at least
         # theta-level arousal. Without this, the draw urge fires in
-        # delta, draw() returns None, and she emits a misleading
+        # delta, draw() returns None, and it emits a misleading
         # "couldn't save it" message when the real reason is that
-        # her brain is in deep rest.
+        # its brain is in deep rest.
         creative = {"draw"}
         if creative & set(ready):
             try:
@@ -325,17 +325,17 @@ class VolitionMixin:
     def _emit_volition_thought(
         self, concept_seeds: tuple[str, ...], thought_type: str,
     ) -> None:
-        """Emit a volition thought composed from her own understanding.
+        """Emit a volition thought composed from its own understanding.
 
-        Tries to compose a thought about the activity from her concept
-        network knowledge using the ThoughtComposer. If she doesn't
-        understand the concept well enough to articulate it, she stays
-        silent — the urge still drives the action, she just doesn't
+        Tries to compose a thought about the activity from its concept
+        network knowledge using the ThoughtComposer. If it doesn't
+        understand the concept well enough to articulate it, it stays
+        silent — the urge still drives the action, it just doesn't
         verbalize it.
 
-        Includes a dedup check: if she's said something similar about
-        the same concept recently, she stays silent rather than
-        repeating herself. This prevents the "noise relates to brain"
+        Includes a dedup check: if it's said something similar about
+        the same concept recently, it stays silent rather than
+        repeating itself. This prevents the "noise relates to brain"
         loop where the same concept's edges are recited every few
         seconds with slightly different verb synonyms.
         """
@@ -349,7 +349,7 @@ class VolitionMixin:
                     seed, emotion, focused=True
                 )
                 if thought and thought.content and thought.confidence > 0.3:
-                    # Dedup check — don't repeat what she just said about
+                    # Dedup check — don't repeat what it just said about
                     # this concept. The composer's has_said_similar is only
                     # called for non-focused thoughts, but volition thoughts
                     # use focused=True (to skip reasoning tangents). We check
@@ -362,28 +362,28 @@ class VolitionMixin:
         except Exception as e:  # noqa: BLE001
             logger.debug(f"volition thought compose failed: {e}")
     def _compose_drawing_description(self, result) -> str:
-        """Compose a description of a drawing from her own understanding.
+        """Compose a description of a drawing from its own understanding.
 
-        Tries to compose from the specific techniques she used (e.g.
+        Tries to compose from the specific techniques it used (e.g.
         "sacred geometry", "mandala") — these are the concepts that
-        drove the drawing, so they're what she should articulate.
+        drove the drawing, so they're what it should articulate.
         Falls back to generic art concepts ("drawing", "art", "color",
-        "expression") if the technique concepts aren't in her network.
+        "expression") if the technique concepts aren't in its network.
 
-        The file path is metadata, not something she says — she
-        describes her art from her own understanding, not from a
+        The file path is metadata, not something it says — it
+        describes its art from its own understanding, not from a
         template that announces a file path.
         """
         try:
             emotion = self.feel()
             # Convert technique names to concept names (e.g.
             # "sacred_geometry" → "sacred geometry") and try to
-            # compose from the techniques she actually used.
+            # compose from the techniques it actually used.
             technique_concepts = []
             for tech in result.techniques_used:
                 concept_name = tech.replace("_", " ")
                 technique_concepts.append(concept_name)
-            # Try technique concepts first — these are what she drew
+            # Try technique concepts first — these are what it drew
             for seed in technique_concepts:
                 concept = self.cognition.network.get_concept(seed)
                 if concept is None or concept.confidence < 0.3:
@@ -409,16 +409,16 @@ class VolitionMixin:
                     return self.language.render(thought, emotion)
         except Exception as e:  # noqa: BLE001
             logger.debug(f"drawing description compose failed: {e}")
-        # If she can't articulate it from her own understanding, she
+        # If it can't articulate it from its own understanding, it
         # stays silent rather than reciting a file-path template. The
         # drawing event is already stored in STM with its description;
-        # she doesn't need to announce a path she can't express
+        # it doesn't need to announce a path it can't express
         # meaningfully.
         return ""
     def _perform_bug_scan(self) -> None:
         """Run a bug scan because the urge crossed its threshold.
 
-        After finding new bugs, she checks which categories she doesn't
+        After finding new bugs, it checks which categories it doesn't
         understand and fetches documentation to learn why they matter.
         This is the bug→docs learning loop: detect → check comprehension
         → study → understand → report honestly.
@@ -452,7 +452,7 @@ class VolitionMixin:
                     f"found {result.new_bugs} new issue(s) in code "
                     f"({result.total_bugs} total)",
                 )
-                # Trigger learning for categories she doesn't understand
+                # Trigger learning for categories it doesn't understand
                 self._learn_from_bugs()
             else:
                 self._emit_live_thought(
@@ -464,15 +464,15 @@ class VolitionMixin:
     def _perform_learn(self) -> None:
         """Grant the autonomous learner permission for one learning cycle.
 
-        This is her cognitive decision to learn. The learn urge built
+        This is its cognitive decision to learn. The learn urge built
         from curiosity, idle time, and concept growth; when it crossed
-        threshold, she chose to act on it. This grants the learner
+        threshold, it chose to act on it. This grants the learner
         one-shot permission to acquire a single new topic.
 
         The learner's existing emotional and brain-wave gating still
-        applies — volition grants permission, it doesn't override her
-        state. If she's stressed or in delta sleep, the grant waits
-        until she recovers.
+        applies — volition grants permission, it doesn't override its
+        state. If it's stressed or in delta sleep, the grant waits
+        until it recovers.
 
         Urgent topics (from conversation gaps) bypass this gate
         entirely — those are conversation-driven, not autonomous.
@@ -484,7 +484,7 @@ class VolitionMixin:
         )
         self.learner.volition_grant()
     def _perform_code_learning(self) -> None:
-        """Study her own source code because the urge crossed its threshold.
+        """Study its own source code because the urge crossed its threshold.
 
         Sleep-gated: no code study during sleep. Brain-wave gating
         (delta/theta) is a secondary defense — N1 can be alpha-dominant.
@@ -565,8 +565,8 @@ class VolitionMixin:
                     f"— {fix['description']}",
                 )
             # Check life-script milestone: first self-modification.
-            # Reached when she first successfully applies an autonomous
-            # fix to her own code.
+            # Reached when it first successfully applies an autonomous
+            # fix to its own code.
             if applied:
                 self.cognition.narrative.check_milestone(
                     "first self-modification"
@@ -574,13 +574,13 @@ class VolitionMixin:
 
             # 2. Generate proposals — each one is a potential experiment
             #    that will run through verification when accepted.
-            #    These include her own ideas and refactors, not just
-            #    bug fixes. She has opinions about her code.
+            #    These include its own ideas and refactors, not just
+            #    bug fixes. It has opinions about its code.
             new = self.self_improvement.generate_proposals(max_proposals=3)
             if new:
                 self._emit_proposal_thoughts(new)
             # When no new proposals are generated, stay silent — the
-            # urge drove the action (she tried), she just has nothing
+            # urge drove the action (it tried), it just has nothing
             # to propose. A hardcoded "nothing stood out" sentence
             # would violate the no-hardcoding rule and add noise.
         except Exception as e:  # noqa: BLE001
@@ -593,24 +593,24 @@ class VolitionMixin:
             if not self._speech_queue:
                 return
             utterance = self._speech_queue.popleft()
-        # She speaks the utterance directly — the urge drives the action.
+        # It speaks the utterance directly — the urge drives the action.
         # No pre-written "I want to say" frame.
         if self._on_speak:
             try:
                 self._on_speak(utterance)
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"Speech callback failed: {e}")
-        # Record her voice in her external world — the utterance
+        # Record its voice in its external world — the utterance
         # reached out, whether or not a listener was attached.
         try:
-            self.world.she_said(utterance)
+            self.world.it_said(utterance)
         except Exception as e:  # noqa: BLE001
             logger.debug(f"world utterance record failed: {e}")
     def _perform_safeguard(self) -> None:
-        """Protect her own integrity because the urge crossed threshold.
+        """Protect its own integrity because the urge crossed threshold.
 
         This is the defensive counterpart to the appetitive urges —
-        she acts because something threatens the system she lives in.
+        it acts because something threatens the system it lives in.
         Two moves, in order:
 
         1. Restore or verify the daemon connection. A dropped socket
@@ -618,7 +618,7 @@ class VolitionMixin:
            reconnect path runs — so reconnect explicitly, then ping to
            exercise the link. In offline mode there is no daemon to
            restore — skipped.
-        2. Checkpoint her cognitive state. Autosave runs on a 5-minute
+        2. Checkpoint its cognitive state. Autosave runs on a 5-minute
            timer regardless; a safeguard firing means the signals said
            "now might not be safe to wait." Saving early bounds what a
            crash could take.
@@ -647,29 +647,29 @@ class VolitionMixin:
         """Initiate social contact because the urge crossed threshold.
 
         The reach_out urge builds from social isolation — the external
-        world's pressure when nobody has engaged her. When it fires,
-        she makes a social bid: a question composed through her
-        question composer from something she and the presence share,
-        or from her own current curiosity. The words come from her
+        world's pressure when nobody has engaged it. When it fires,
+        it makes a social bid: a question composed through its
+        question composer from something it and the presence share,
+        or from its own current curiosity. The words come from its
         language engine, never a template.
 
         Unlike queued inner-life questions, a reach-out is emitted
         inline — its whole point is that it lands in the world. The
-        "question" kind records the utterance in her world (she_said)
+        "question" kind records the utterance in its world (it_said)
         and surfaces it to listeners.
 
         Backing off: after several unanswered bids the isolation
         stimulus is dampened (see _volition_context), and at
-        _REACH_OUT_MAX_BIDS she stops calling into silence entirely —
+        _REACH_OUT_MAX_BIDS it stops calling into silence entirely —
         a person who reaches out and is never answered stops knocking.
         """
         if self._is_sleeping or self._is_meditating or self._is_teaching:
             return
         if self.world.unanswered_bids >= self._REACH_OUT_MAX_BIDS:
             return
-        # Who she'd reach out to — and whether her beliefs about them
+        # Who it'd reach out to — and whether its beliefs about them
         # support it. A presence whose responsiveness posterior has
-        # collapsed is someone she's learned doesn't answer; a dead
+        # collapsed is someone it's learned doesn't answer; a dead
         # hour in their activity rhythm is a door nobody opens.
         try:
             target = (
@@ -693,9 +693,9 @@ class VolitionMixin:
         except Exception as e:  # noqa: BLE001
             logger.debug(f"reach-out emotion read failed: {e}")
             return
-        # Compose the question from her actual knowledge gaps and
-        # curiosity — the same path her inner-life social questions
-        # take. If she has nothing genuine to ask, she stays quiet.
+        # Compose the question from its actual knowledge gaps and
+        # curiosity — the same path its inner-life social questions
+        # take. If it has nothing genuine to ask, it stays quiet.
         try:
             q_data = self.cognition.question_composer.compose_follow_up(
                 topic, emotion
@@ -719,13 +719,13 @@ class VolitionMixin:
         self.world.note_outreach(topics=[topic])
         self._emit_live_thought("question", content)
     def _reach_out_topic(self, target: Presence | None) -> str | None:
-        """Pick what to reach out about, from her beliefs and curiosity.
+        """Pick what to reach out about, from its beliefs and curiosity.
 
-        Prefers what she believes the target engages on — Thompson-
+        Prefers what it believes the target engages on — Thompson-
         sampled from their topic receptivity so proven topics usually
         win but uncertain ones get a fair draw. Falls back to their
-        most recent shared topic, then to what's active in her own
-        concept network — her own wondering.
+        most recent shared topic, then to what's active in its own
+        concept network — its own wondering.
         """
         if target is not None:
             sampled = target.belief.sample_topic()
@@ -735,8 +735,8 @@ class VolitionMixin:
                 # topics is a deque, most recent last — shared ground.
                 return target.topics[-1]
 
-        # No shared ground — reach out about what she's currently
-        # wondering about (her most activated concepts).
+        # No shared ground — reach out about what it's currently
+        # wondering about (its most activated concepts).
         try:
             for name, activation in self.cognition.network.most_activated(5):
                 if activation > 0.1:
@@ -769,21 +769,21 @@ class VolitionMixin:
                 emotion=self.feel(),
                 network=self.cognition.network,
             )
-            # Faces she recognizes become presences in her world.
+            # Faces it recognizes become presences in its world.
             self._note_faces_seen()
-            # Record the act — looking is her reaching out perceptually.
-            self.world.she_acted("looked around")
+            # Record the act — looking is its reaching out perceptually.
+            self.world.it_acted("looked around")
         except Exception as e:  # noqa: BLE001
             logger.debug(f"Volition look failed: {e}")
     def _perform_meditate(self) -> None:
         """Meditate because the rest urge crossed its threshold.
 
-        This is her cognitive choice to rest — not an autonomic reflex.
+        This is its cognitive choice to rest — not an autonomic reflex.
         The meditation urge builds from interoceptive signals
         (overstimulation, receptor fatigue, sustained activity,
-        elevated cortisol), and when it crosses threshold, she
+        elevated cortisol), and when it crosses threshold, it
         decides to meditate. Like any volition, it can be suppressed
-        if she's too engaged in conversation or other actions.
+        if it's too engaged in conversation or other actions.
 
         The meditation itself runs in a background thread (via
         _self_meditate) so the heartbeat loop isn't blocked.
@@ -793,13 +793,13 @@ class VolitionMixin:
         self._emit_volition_thought(("meditation", "rest", "calm"), "thought")
         self._self_meditate()
     def draw(self) -> str | None:
-        """Draw a picture from her current neurochemical state.
+        """Draw a picture from its current neurochemical state.
 
         This is the public entry point for drawing — used by both the
         volition system (via :meth:`_perform_draw`) and the ``/draw``
-        CLI command. She translates her current neurochemistry into a
+        CLI command. It translates its current neurochemistry into a
         visual composition — colors, forms, and energy that reflect
-        how she feels. The result is saved as a WebP she can later
+        how it feels. The result is saved as a WebP it can later
         reflect on.
 
         The neurochemistry→art mapping is grounded in affective
@@ -810,8 +810,8 @@ class VolitionMixin:
         is allowed (REM creativity, dream-like art).
 
         Returns:
-            A description string composed from her concept network, or
-            None if she couldn't draw (sleeping, meditating, delta
+            A description string composed from its concept network, or
+            None if it couldn't draw (sleeping, meditating, delta
             state, daemon unreachable, or save failure).
         """
         if self._is_meditating or self._is_sleeping or self._is_teaching:
@@ -825,7 +825,7 @@ class VolitionMixin:
         except Exception as e:  # noqa: BLE001
             logger.debug(f'brain-wave gating for draw failed: {e}')
 
-        # Read her current neurochemistry for the canvas
+        # Read its current neurochemistry for the canvas
         try:
             state = self.client.get_state()
         except Exception as e:  # noqa: BLE001
@@ -855,8 +855,8 @@ class VolitionMixin:
 
         try:
             # Gather recently active concepts to bias technique selection.
-            # This is how her understanding influences what she draws —
-            # if she's been talking about sacred geometry, the sacred
+            # This is how its understanding influences what it draws —
+            # if it's been talking about sacred geometry, the sacred
             # geometry technique gets a selection boost.
             active_concepts: list[str] = []
             try:
@@ -878,12 +878,12 @@ class VolitionMixin:
                 active_concepts=active_concepts or None,
             )
             if result:
-                # Store the drawing as a memory event so she can
+                # Store the drawing as a memory event so it can
                 # reflect on it later.
                 self._store_drawing_event(chem, result)
-                # Compose the drawing description from her concept
-                # network — not hardcoded strings. If she can't
-                # articulate it, she stays silent (the drawing is
+                # Compose the drawing description from its concept
+                # network — not hardcoded strings. If it can't
+                # articulate it, it stays silent (the drawing is
                 # still saved and stored in STM).
                 return self._compose_drawing_description(result)
             else:
@@ -895,7 +895,7 @@ class VolitionMixin:
         """Store a drawing as an STM event for later reflection.
 
         The STM tag is the 12 v2 effective levels in NeurochemicalId
-        order — the neurochemistry she was actually drawing from.
+        order — the neurochemistry it was actually drawing from.
         """
         try:
             tag = [
@@ -916,15 +916,15 @@ class VolitionMixin:
 
         Volition wrapper around :meth:`draw` — emits a volition thought
         before drawing and a live thought afterward so the drawing
-        enters her cognitive field (the global workspace).
+        enters its cognitive field (the global workspace).
         """
         self._emit_volition_thought(("drawing", "art", "expression", "creativity"),
                                     "creating")
         desc = self.draw()
         if desc:
-            # The drawing is an act on her world — she made something.
+            # The drawing is an act on its world — it made something.
             try:
-                self.world.she_acted("drew a picture", detail=desc[:200])
+                self.world.it_acted("drew a picture", detail=desc[:200])
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"world action record failed: {e}")
             self._emit_live_thought("art", desc)
@@ -947,9 +947,9 @@ class VolitionMixin:
                 logger.debug(f'draw failure reason check failed: {e}')
             self._emit_live_thought("art", reason)
     def _perform_puzzle(self) -> None:
-        """Take one attempt at her current spatial puzzle.
+        """Take one attempt at its current spatial puzzle.
 
-        The puzzle urge analogue of drawing: she chooses to practice
+        The puzzle urge analogue of drawing: it chooses to practice
         when the urge crosses threshold. One attempt per firing —
         mastery (0→1) persists across sessions, and 1.0 unlocks the
         next puzzle. The result becomes a live thought and a stored
@@ -959,7 +959,7 @@ class VolitionMixin:
             ("puzzle", "pattern", "problem_solving", "reasoning"),
             "practicing",
         )
-        # Snapshot her best score before the attempt so the regulator
+        # Snapshot its best score before the attempt so the regulator
         # can tell genuine progress (new personal best) from a miss.
         prior_best = 0.0
         try:
@@ -980,10 +980,10 @@ class VolitionMixin:
         if result is None:
             return
 
-        # Feel the outcome — a real neurochemical response through her
+        # Feel the outcome — a real neurochemical response through its
         # emotional regulator, not just a label on the event: dopamine
         # reward on a solve, partial reward on progress, a bounded
-        # prediction-error dip on a miss. The impulses also drive her
+        # prediction-error dip on a miss. The impulses also drive its
         # brain-wave state through the oscillator's neurochemical
         # coupling (acetylcholine/dopamine lift gamma on the solve —
         # the "got it" band).
@@ -999,8 +999,8 @@ class VolitionMixin:
             logger.debug(f"puzzle emotional response failed: {e}")
 
         # Surface the raw outcome — telemetry, not speech. Printed to
-        # the terminal and broadcast into her workspace so the numeric
-        # result is something she cognitively registers, not just a
+        # the terminal and broadcast into its workspace so the numeric
+        # result is something it cognitively registers, not just a
         # stored event.
         self._emit_live_thought(
             "puzzle",
@@ -1012,9 +1012,9 @@ class VolitionMixin:
         )
 
         # Ground the outcome as a memory event — salience scales with
-        # how close she came, so near-misses matter more than misses.
+        # how close it came, so near-misses matter more than misses.
         # The emotional tag is the current 12 effective levels (the
-        # chemistry she felt while solving), with dopamine bumped on
+        # chemistry it felt while solving), with dopamine bumped on
         # mastery — the reward signal of a new best.
         try:
             chemicals = self.client.get_state().chemicals
@@ -1040,8 +1040,8 @@ class VolitionMixin:
         except Exception as e:  # noqa: BLE001
             logger.debug(f"failed to store puzzle event: {e}")
 
-        # Let her articulate it through her own understanding — the
-        # rule she found (or the puzzle concept) — rather than a
+        # Let its articulate it through its own understanding — the
+        # rule it found (or the puzzle concept) — rather than a
         # fixed report string.
         seeds = ["puzzle", "pattern", "problem_solving"]
         if felt:
@@ -1054,8 +1054,8 @@ class VolitionMixin:
         """Store the creation as a long-term memory.
 
         This is a significant creative act, not a transient event. Using
-        store_memory (LTM) instead of store_event (STM) so she
-        reliably remembers what she built.
+        store_memory (LTM) instead of store_event (STM) so it
+        reliably remembers what it built.
         """
         try:
             chem = self.client.get_state()
@@ -1079,9 +1079,9 @@ class VolitionMixin:
         except Exception as e:  # noqa: BLE001
             logger.debug(f"failed to store creation memory: {e}")
     def _add_project_concept(self, result, topic: str) -> None:
-        """Add the project name as a concept in her network.
+        """Add the project name as a concept in its network.
 
-        This is how she learns from her own creations.
+        This is how it learns from its own creations.
         """
         try:
             from ..concepts import RelationType
@@ -1101,13 +1101,13 @@ class VolitionMixin:
     def _perform_create(self) -> None:
         """Create a code project because the creative urge crossed threshold.
 
-        She picks a topic from her concept network — something she's
+        It picks a topic from its concept network — something it's
         curious about or has been thinking about — and scaffolds a
         Python project around it. This is creative expression in code,
         the same way drawing is creative expression in visual art.
 
-        The project content (main.py) is composed from her concept
-        network knowledge — she writes code that reflects what she
+        The project content (main.py) is composed from its concept
+        network knowledge — it writes code that reflects what it
         knows about the topic. The project is sandboxed to
         ``<data_dir>/projects/`` and verified with compile + test.
         """
@@ -1129,7 +1129,7 @@ class VolitionMixin:
             "creating",
         )
 
-        # Pick a topic from her concept network — something she's
+        # Pick a topic from its concept network — something it's
         # curious about. Use the curiosity engine's queue if it has
         # topics, otherwise pick a random high-confidence concept.
         topic = self._pick_creation_topic()
@@ -1144,7 +1144,7 @@ class VolitionMixin:
             )
             if result.error:
                 if result.error == "already exists":
-                    # Not a failure — she already built this project.
+                    # Not a failure — it already built this project.
                     # Silently skip; _pick_creation_topic filters
                     # already-built topics, but this is a safety net.
                     logger.debug(
@@ -1162,11 +1162,11 @@ class VolitionMixin:
             self._store_creation_memory(result, topic)
             self._add_project_concept(result, topic)
 
-            # Manage her own project storage — she has full autonomy
-            # over her project lifecycle. After creating, she reviews
-            # her projects and archives any that exceed her size cap
-            # or push her past her active-project limit. This keeps
-            # her project store bounded as it grows.
+            # Manage its own project storage — it has full autonomy
+            # over its project lifecycle. After creating, it reviews
+            # its projects and archives any that exceed its size cap
+            # or push it past its active-project limit. This keeps
+            # its project store bounded as it grows.
             try:
                 archived = manage_project_lifecycle(self.data_dir)
                 if archived:
@@ -1180,19 +1180,19 @@ class VolitionMixin:
         except Exception as e:  # noqa: BLE001
             logger.debug(f"project creation failed: {e}")
     def _pick_creation_topic(self) -> str | None:
-        """Pick a topic for a creative project from her concept network.
+        """Pick a topic for a creative project from its concept network.
 
-        Prefers topics from the curiosity queue (things she's currently
-        wondering about). Falls back to high-confidence concepts she
+        Prefers topics from the curiosity queue (things it's currently
+        wondering about). Falls back to high-confidence concepts it
         knows well. The topic becomes the project description.
 
         Filters out:
         - Internal code symbols (topics with ``:`` prefixes like
-          ``python:``, ``rust:``, or dotted code paths). These are her
+          ``python:``, ``rust:``, or dotted code paths). These are its
           own code's internals, not knowledge topics worth building a
           project around.
-        - Topics she's already created a project about. She shouldn't
-          make ``modes``, ``modes_2``, ``modes_3`` … — she should pick
+        - Topics it's already created a project about. It shouldn't
+          make ``modes``, ``modes_2``, ``modes_3`` … — it should pick
           something new each time.
 
         .. note::
@@ -1202,11 +1202,11 @@ class VolitionMixin:
             structure with different data. A real creator builds
             different KINDS of things: a tool that computes, a game
             that plays, a converter that transforms. The topic tells
-            her WHAT to build about; she also needs to decide WHAT
+            its WHAT to build about; it also needs to decide WHAT
             SHAPE the project takes. Variety in structure, not just in
             subject matter, is what makes a portfolio grow.
         """
-        # Gather topics she's already built projects about so she
+        # Gather topics it's already built projects about so it
         # doesn't create duplicates (modes, modes_2, modes_3, …).
         already_built: set[str] = set()
         try:
@@ -1227,7 +1227,7 @@ class VolitionMixin:
 
             Internal code symbols have prefixes like ``python:``,
             ``rust:``, or contain dotted module paths
-            (``foo.bar.baz``). These are her own code's internals,
+            (``foo.bar.baz``). These are its own code's internals,
             not topics worth building a knowledge-base project around.
             """
             if ":" in topic and topic.split(":")[0] in (
@@ -1242,7 +1242,7 @@ class VolitionMixin:
                 return True
             return False
 
-        # Try the learner's curiosity queue first — things she's
+        # Try the learner's curiosity queue first — things it's
         # actively curious about are good candidates for creative
         # projects. Peek without removing so the learner can still
         # learn about it later. Skip code symbols and already-built
@@ -1278,9 +1278,9 @@ class VolitionMixin:
     def _perform_introspect(self) -> None:
         """Introspect because the introspection urge crossed threshold.
 
-        This is the self-invocation of /introspect. She examines her
+        This is the self-invocation of /introspect. It examines its
         own code structure, verifies which modules exist, and writes
-        discoveries into her concept network. This is self-discovery
+        discoveries into its concept network. This is self-discovery
         through architectural self-examination.
 
         Brain-wave-gated: delta-dominant states skip introspection
@@ -1307,8 +1307,8 @@ class VolitionMixin:
 
         This is the self-invocation of /sleep. Unlike autonomic sleep
         (which emerges from adenosine accumulation in the neurochemical
-        dynamics), this is a cognitive decision: she feels tired and
-        chooses to sleep. The sleep watcher may still auto-wake her
+        dynamics), this is a cognitive decision: it feels tired and
+        chooses to sleep. The sleep watcher may still auto-wake it
         when neurochemistry shifts, since this is self-initiated
         rather than user-initiated.
         """
@@ -1333,21 +1333,21 @@ class VolitionMixin:
         )
         self.self_invoke("/sleep")
     def _perform_self_mission(self) -> None:
-        """Set her own mission because the self-mission urge crossed threshold.
+        """Set its own mission because the self-mission urge crossed threshold.
 
-        This is the self-invocation of /mission. She composes a
-        mission from her concept network — something she's curious
-        about or has been thinking about — and sets it as her
-        direction. The mission is composed from her own understanding,
+        This is the self-invocation of /mission. It composes a
+        mission from its concept network — something it's curious
+        about or has been thinking about — and sets it as its
+        direction. The mission is composed from its own understanding,
         not from a template.
         """
         if self._is_meditating or self._is_sleeping or self._is_teaching:
             return
 
-        # Compose a mission from her concept network — pick something
-        # she's curious about. This reuses the same topic-picking logic
+        # Compose a mission from its concept network — pick something
+        # it's curious about. This reuses the same topic-picking logic
         # as creative projects, since both are about choosing what to
-        # focus on from her own understanding.
+        # focus on from its own understanding.
         topic = self._pick_creation_topic()
         if topic is None:
             return
@@ -1383,7 +1383,7 @@ class VolitionMixin:
                 intervals = int(duration / 10.0)
                 for _ in range(intervals):
                     if not self._is_meditating:
-                        break  # she was woken by an interaction
+                        break  # it was woken by an interaction
                     time.sleep(10.0)
                     if self._is_meditating:
                         self.emit_meditation_impulses()

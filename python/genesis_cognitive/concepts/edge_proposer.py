@@ -1,12 +1,12 @@
 """Edge proposer — discovers new relationships from embedding proximity.
 
-During sleep, Genesis scans her latent space for pairs of concepts that
+During sleep, Genesis scans its latent space for pairs of concepts that
 are close together in embedding space but have no graph edge between
-them. These are candidate SIMILAR_TO relationships — connections she
+them. These are candidate SIMILAR_TO relationships — connections it
 wasn't explicitly told but can infer from semantic similarity.
 
 This is where generalization happens. The symbolic graph contains only
-what she was taught. The embedding space contains implicit relationships
+what it was taught. The embedding space contains implicit relationships
 from the distributional structure of language. The edge proposer bridges
 the two: it uses the latent space to discover patterns, then writes them
 into the symbolic graph as explicit knowledge.

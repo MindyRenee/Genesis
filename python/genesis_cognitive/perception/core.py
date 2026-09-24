@@ -205,7 +205,7 @@ class Perception:
     sentiment: float  # -1 (negative) to +1 (positive)
     sentiment_label: str  # "positive", "negative", "neutral"
     emotion_word: str  # specific emotion if detected ("sad", "happy", ""), not just polarity
-    is_about_genesis: bool  # is she the subject?
+    is_about_genesis: bool  # is it the subject?
     is_about_user: bool  # is the user the subject?
     is_about_code: bool
     is_about_emotion: bool
@@ -225,7 +225,7 @@ class Perception:
 
 # Emotion words that map to concept network concepts. When the user
 # says "I'm feeling sad", we extract "sad" so the cognition engine
-# can look up what Genesis knows about sadness and compose her
+# can look up what Genesis knows about sadness and compose its
 # empathy from that knowledge — not from hardcoded strings.
 _EMOTION_WORD_MAP = {
     # Negative emotions — sadness
@@ -969,8 +969,8 @@ def _detect_emotion_word(text: str) -> str:
 
     When someone says "I'm feeling sad," we want to extract "sad" —
     not just "negative" — so the cognition engine can look up what
-    Genesis knows about sadness in her concept network and compose
-    her empathy from that knowledge.
+    Genesis knows about sadness in its concept network and compose
+    its empathy from that knowledge.
 
     Returns the canonical concept name (e.g., "sad", "fear", "happy"),
     or "" if no emotion word is found.
@@ -1138,7 +1138,7 @@ def perceive(
     exact word doesn't appear in the text.
 
     If a ConceptNetwork is provided, topic resolution is context-aware:
-    when the user is talking about Genesis herself ("your code", "your
+    when the user is talking about Genesis itself ("your code", "your
     daemon"), topics are resolved to self-relevant concepts (origin="code"
     or "identity") rather than dictionary definitions. This is top-down
     attention — the context biases which concepts win the competition.
@@ -1158,8 +1158,8 @@ def perceive(
 
     If ``brain_waves`` is provided, semantic matching is modulated:
     alpha (filtering/inhibition) raises the match threshold (fewer
-    semantic matches — she filters out weak associations), gamma
-    (enhanced processing) lowers it (more matches — she's more
+    semantic matches — it filters out weak associations), gamma
+    (enhanced processing) lowers it (more matches — it's more
     perceptive of remote associations).
     """
     lower = text.lower().strip()
@@ -1235,17 +1235,17 @@ def _resolve_topics(
     # Only trigger for possessive self-references ("your code", "your
     # daemon", "yourself") or explicit "genesis" mentions — not for
     # bare "you" as a pronoun. "What have you been learning about?"
-    # contains "you" but doesn't refer to her components; running
+    # contains "you" but doesn't refer to its components; running
     # _resolve_self_topics would do a slow trigram scan over 125K+
     # concepts for no benefit, causing think() timeouts.
     is_about_genesis, _, is_about_code, _, _ = context_flags
     # Only trigger self-topic resolution for possessive/reflective
     # references ("your code", "your daemon", "yourself") — not for
-    # mere mention of her name. "Hello Genesis" addresses her; it
-    # doesn't talk about her components. Including "genesis" here
+    # mere mention of its name. "Hello Genesis" addresses it; it
+    # doesn't talk about its components. Including "genesis" here
     # triggered a slow trigram scan over 125K+ concepts on every
-    # input that mentioned her name, causing think() timeouts.
-    # Legitimate self-references about her components ("genesis
+    # input that mentioned its name, causing think() timeouts.
+    # Legitimate self-references about its components ("genesis
     # daemon", "genesis's code") are caught by is_about_code via
     # _CODE_PATTERNS.
     _needs_self_resolution = is_about_code or (
@@ -1425,7 +1425,7 @@ def _classify_intent(lower: str) -> Intent:
     else:
         intent = Intent.STATEMENT
 
-    # Override: if it's a question about herself, it's self-inquiry
+    # Override: if it's a question about itself, it's self-inquiry
     if intent == Intent.QUESTION and _match_any(_SELF_INQUIRY_PATTERNS, lower):
         intent = Intent.SELF_INQUIRY
     return intent
@@ -1511,7 +1511,7 @@ def _augment_topics_with_embeddings(
 def _resolve_self_topics(topics: list[str], network) -> list[str]:
     """Resolve topics to self-relevant concepts (top-down attention).
 
-    When the user is talking about Genesis herself ("your code",
+    When the user is talking about Genesis itself ("your code",
     "your daemon", "what do you know about your source"), resolve
     topics to self-relevant concepts (origin="code" or "identity")
     instead of dictionary definitions. This is what the prefrontal
@@ -1570,7 +1570,7 @@ def _resolve_self_topics(topics: list[str], network) -> list[str]:
         # because "home" is a substring of "homeostasis". The self-topic
         # resolution should only apply to topics that aren't already
         # known concepts — it's for recognizing that "cognition" in
-        # "your cognition" refers to her own CognitionEngine, not for
+        # "your cognition" refers to its own CognitionEngine, not for
         # hijacking known dictionary words.
         if network.get_concept(topic):
             resolved_topics.append(topic)

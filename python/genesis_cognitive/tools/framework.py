@@ -141,7 +141,7 @@ class ToolRegistry:
                 "web_search",
                 "Search the web for a query and return result URLs. "
                 "Read-only. Adult/malware content is blocked. "
-                "Use this when she doesn't know something and wants "
+                "Use this when it doesn't know something and wants "
                 "to look it up — in conversation, for fun, or to learn.",
                 web_search,
             )
@@ -578,7 +578,7 @@ def web_search(query: str, limit: int = 5) -> ToolResult:
 
     The returned ``data["results"]`` is a list of dicts with ``url``
     and ``title`` keys. The ``output`` is a human-readable summary
-    for tool-use contexts; Genesis composes her own words from the
+    for tool-use contexts; Genesis composes its own words from the
     structured data, not by reciting this string.
     """
     from .web_search import search as _search
@@ -611,8 +611,8 @@ def web_fetch(url: str) -> ToolResult:
     The returned ``data`` contains ``url``, ``title``, ``content``
     (the extracted text), and ``related_links`` (outbound links found
     on the page, for curiosity chaining). The ``output`` is a short
-    summary; Genesis learns from ``content`` and composes her own
-    understanding — she does not recite the raw page text.
+    summary; Genesis learns from ``content`` and composes its own
+    understanding — it does not recite the raw page text.
     """
     from .web_search import fetch as _fetch
 

@@ -42,14 +42,14 @@ class ProposalsMixin:
         """Approve a self-improvement proposal and run it as an experiment.
 
         The flow:
-        1. She writes a proposal (an idea for improving her code).
+        1. It writes a proposal (an idea for improving its code).
         2. You review it and approve it with /accept N.
         3. The experiment runs: code is applied, verified with
            py_compile + tests, and automatically reverted
            if anything fails.
         4. If the experiment passes, the proposal is marked APPLIED.
         5. If the experiment fails, the proposal is REJECTED with
-           notes explaining what went wrong. She reads the notes,
+           notes explaining what went wrong. It reads the notes,
            learns, and can rewrite and submit a new proposal.
 
         There is no bypass path. Every code change goes through the
@@ -58,8 +58,8 @@ class ProposalsMixin:
         which are safe mechanical changes that don't need the pipeline.
 
         Rejection is not a dead end — it's a learning opportunity.
-        The feedback notes teach her the correct way so she can fix
-        her approach and try again.
+        The feedback notes teach it the correct way so it can fix
+        its approach and try again.
         """
         proposal = self.self_improvement.get_proposal(proposal_id)
         if proposal is None:
@@ -78,7 +78,7 @@ class ProposalsMixin:
             )
 
         # Run the experiment: apply the code change with full
-        # verification. If it fails, reject with notes so she can
+        # verification. If it fails, reject with notes so it can
         # learn and rewrite.
         try:
             record = self.heuristic_experiment.run_experiment(
@@ -100,7 +100,7 @@ class ProposalsMixin:
                 )
             else:
                 # Experiment failed or was skipped — reject with
-                # notes explaining what went wrong. She reads the
+                # notes explaining what went wrong. It reads the
                 # notes, learns, and can rewrite and submit a new
                 # proposal with the correct approach.
                 notes = self._build_rejection_notes(proposal, record)
@@ -110,7 +110,7 @@ class ProposalsMixin:
                 return self._render_self_report(
                     f"approved proposal {proposal_id}, "
                     f"but the experiment {status}. "
-                    f"Rejected with notes — she can learn and retry.",
+                    f"Rejected with notes — it can learn and retry.",
                     intent="inform",
                     confidence=0.6,
                     metadata={
@@ -129,7 +129,7 @@ class ProposalsMixin:
             return self._render_self_report(
                 f"approved proposal {proposal_id}, "
                 f"but the experiment hit an error. "
-                f"Rejected with notes — she can learn and retry.",
+                f"Rejected with notes — it can learn and retry.",
                 confidence=0.5,
                 metadata={
                     "proposal_id": proposal_id,
@@ -145,10 +145,10 @@ class ProposalsMixin:
         The notes explain:
         - What the proposal tried to do
         - Why the experiment failed
-        - What she should do differently next time
+        - What it should do differently next time
 
         These notes are stored in the proposal's feedback field and
-        recorded in the feedback history so she can learn from them.
+        recorded in the feedback history so it can learn from them.
         """
         notes = f"Proposal: {proposal.title}\n"
         notes += f"File: {proposal.file_path}\n"
@@ -208,7 +208,7 @@ class ProposalsMixin:
         """Reject a self-improvement proposal with teaching feedback.
 
         The feedback should explain why the proposal is rejected and
-        teach the correct way. She reads the feedback, learns from it,
+        teach the correct way. It reads the feedback, learns from it,
         and can rewrite and submit a new proposal with the correct
         approach. Rejection is not a dead end — it's a learning
         opportunity.

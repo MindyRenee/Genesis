@@ -1,7 +1,7 @@
-"""Self-directed learning — Genesis improving her own knowledge.
+"""Self-directed learning — Genesis improving its own knowledge.
 
 Unlike the AutonomousLearner (which fetches from external sources like
-Wikipedia), this module helps Genesis learn from what she *already
+Wikipedia), this module helps Genesis learn from what it *already
 knows* through reasoning, inference, and conversation.
 
 ## The gap this fills
@@ -9,17 +9,17 @@ knows* through reasoning, inference, and conversation.
 Genesis has a concept network with 600+ concepts and 2600+ relationships.
 But many concepts lack definitions, many relationships are missing that
 could be inferred from existing ones, and every conversation with the
-user contains facts she could extract but doesn't.
+user contains facts it could extract but doesn't.
 
 This module provides five learning mechanisms:
 
 1. **Conversation learning** — when the user says "X is a Y" or
    "X means Z", extract the fact and add it to the concept network.
    This is the most direct path to improvement: every conversation
-   makes her smarter.
+   makes it smarter.
 
 2. **Transitive inference** — if A is_a B and B is_a C, infer A is_a C.
-   Same for PART_OF and DEPENDS_ON. This multiplies her knowledge
+   Same for PART_OF and DEPENDS_ON. This multiplies its knowledge
    without any external input.
 
 3. **Definition synthesis** — for concepts that have relationships but
@@ -32,7 +32,7 @@ This module provides five learning mechanisms:
 
 5. **Self-study** — review weak concepts (identified by
    SelfAssessmentEngine), strengthen their edges, and synthesize
-   definitions. This is the "homework" she does on her own.
+   definitions. This is the "homework" it does on its own.
 
 ## How it connects
 
@@ -999,7 +999,7 @@ _OPPOSITE_RELATIONS = frozenset(
 class SelfDirectedLearner:
     """Genesis's self-directed learning engine.
 
-    This module lets Genesis improve her own knowledge through:
+    This module lets Genesis improve its own knowledge through:
     - Extracting facts from conversation
     - Inferring new relationships from existing ones
     - Synthesizing definitions from relationships
@@ -1157,7 +1157,7 @@ class SelfDirectedLearner:
             self._learn_emotion_sentiment(emotion_word, emotion_id, sentiment)
         )
 
-        # 3. Synthesize a definition from what she just learned
+        # 3. Synthesize a definition from what it just learned
         events.extend(
             self._learn_emotion_definition(emotion_word, emotion_id, sentiment)
         )
@@ -1210,7 +1210,7 @@ class SelfDirectedLearner:
 
         If the sentiment is strongly negative, learn that the emotion
         is related to "negative" (or "positive" for positive sentiment).
-        This gives her a basic understanding even without a full definition.
+        This gives it a basic understanding even without a full definition.
         """
         events: list[LearningEvent] = []
         if abs(sentiment) <= 0.2:
@@ -1238,10 +1238,10 @@ class SelfDirectedLearner:
         emotion_id: str | None,
         sentiment: float,
     ) -> list[LearningEvent]:
-        """Synthesize a definition from what she just learned.
+        """Synthesize a definition from what it just learned.
 
         If the emotion concept has no definition, build a basic one
-        from its relationships. This gives her something to say in
+        from its relationships. This gives it something to say in
         empathy even without an explicit definition.
         """
         events: list[LearningEvent] = []
@@ -1691,7 +1691,7 @@ class SelfDirectedLearner:
         - similar_to → SIMILAR_TO edges
         - antonyms → OPPOSITE_OF edges
 
-        This is her primary word reference — no web access required.
+        This is its primary word reference — no web access required.
         Returns True if the concept was enriched, False otherwise.
         Gracefully no-ops when WordNet/NLTK is unavailable.
         """
@@ -2051,7 +2051,7 @@ class SelfDirectedLearner:
                     # Synthesis failed — try WordNet lookup to enrich
                     # the concept with a dictionary definition and
                     # semantic relations (IS_A, PART_OF, SIMILAR_TO,
-                    # OPPOSITE_OF). This is her primary word reference;
+                    # OPPOSITE_OF). This is its primary word reference;
                     # no web access required.
                     enriched = self._enrich_from_wordnet(concept_id, result)
                     if enriched:
@@ -2082,9 +2082,9 @@ class SelfDirectedLearner:
            concept lacks, infer that the weak concept might have it too
         4. Mark as studied
 
-        This is the "homework" Genesis does on her own to improve
-        her understanding of concepts she's weak on. Steps 3-4 are
-        the deepening: she doesn't just review, she actively learns
+        This is the "homework" Genesis does on its own to improve
+        its understanding of concepts it's weak on. Steps 3-4 are
+        the deepening: it doesn't just review, it actively learns
         new things about weak concepts by analogy to their siblings.
         """
         result = InferenceResult()
@@ -2368,7 +2368,7 @@ class SelfDirectedLearner:
 
         Tries exact resolve first, then fuzzy match against edge
         targets (e.g., "six" matches "six legs"). Records a negation
-        event if no edge was found, so she doesn't re-learn it.
+        event if no edge was found, so it doesn't re-learn it.
         """
         for neg_concept in negated:
             neg_id = self.network._resolve(neg_concept)
@@ -3044,7 +3044,7 @@ class SelfDirectedLearner:
     ) -> InferenceResult:
         """Run a full inference cycle.
 
-        This is called after interactions to let Genesis improve her
+        This is called after interactions to let Genesis improve its
         knowledge through all inference mechanisms:
         1. Genus extraction from definitions (deepens the hierarchy)
         2. Transitive inference (closes the hierarchy)

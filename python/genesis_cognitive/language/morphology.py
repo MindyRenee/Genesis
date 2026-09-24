@@ -18,7 +18,7 @@ What lives here:
   ("an hour", "a university", "an MRI")
 - **Plural noun-phrase detection** — coordinated NPs
   ("salt and pepper") and plural head nouns
-- **Person pronoun selection** — she/he/it/they from the concept
+- **Person pronoun selection** — it/he/it/they from the concept
   network's animacy category, gender property, and plurality
 
 These are grammatical building blocks — the machinery of English,
@@ -614,8 +614,8 @@ def person_pronoun(
     caller whether verbs should use plural inflection ("they run").
 
     Selection:
-    - Genesis herself → "she" (her established identity)
-    - Concept with gender property → "he"/"she"
+    - Genesis itself → "it" (its established identity)
+    - Concept with gender property → "he"/"it"
     - Living person (category LIVING + proper noun or person type)
       → "they" (neutral when gender is unknown)
     - Plural noun phrase → "they"

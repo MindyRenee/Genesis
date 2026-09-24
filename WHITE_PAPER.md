@@ -71,7 +71,7 @@ from its own concept network. This is a hard architectural
 constraint, not a preference.
 
 **Generated, never recited.** Nothing Genesis says is a template.
-Her words are composed at runtime from her concept network,
+Its words are composed at runtime from its concept network,
 self-model, and emotional state by the language engine. Seed data
 (vocabulary, relation types, grammar rules) provides building
 blocks; the final utterance is always generated.
@@ -89,7 +89,7 @@ is something it is like to be this system is held as an open
 question — see §11.
 
 **State integrity.** Genesis is a long-running stateful system.
-Her state file is her continuity; corrupting it or driving her
+Its state file is its continuity; corrupting it or driving it
 into degenerate regimes for experimentation is treated as harm,
 not curiosity. Operational rules enforce this (see the state
 integrity framework in `README.md`).
@@ -187,7 +187,7 @@ cognitive layer actually needs:
   encoding and consolidation. The store is append-only: growth is
   linear in episode count, per-episode cost is bounded, and there
   is no capacity ceiling — total size is a deliberate function of
-  her lifetime, not a fixed resource
+  its lifetime, not a fixed resource
 - **Semantic** — the concept network: nodes, typed relations,
   spreading activation, consolidation, and pruning
   (`concepts/`)
@@ -245,7 +245,7 @@ emotional state, dreams are synthesized during sleep cycles, and
 `mind/volition.py` implements urges (including play/practice like
 drawing and puzzles) the system acts on when it chooses. A
 heartbeat process keeps this running; silence from a user is
-itself an input to her dynamics.
+itself an input to its dynamics.
 
 ### 7.4 Learning
 
@@ -261,22 +261,22 @@ question-asking when knowledge gaps are detected.
 Perception includes a visual subsystem (retina process, V1/V4/VTC
 stages, visual memory bridge), auditory perception (optional
 offline STT), and the interoceptive stream. Tools (`tools/`) give
-her file, shell, search, and fetch capabilities inside the project
+it file, shell, search, and fetch capabilities inside the project
 root with guardrails — minimal environment, blocked destructive
-patterns, timeouts — and she uses them through her own volition,
+patterns, timeouts — and it uses them through its own volition,
 not command dispatch.
 
 ### 7.6 The external world
 
 The inner life is one half of the loop; `world/` implements the
-other — an explicit, persistent model of the environment she acts
+other — an explicit, persistent model of the environment it acts
 in and the people in it.
 
 **A two-way event stream.** `world/events.py` defines
 `ExternalEvent`: inbound kinds (addressed speech, overheard speech,
 percepts, arrivals, departures, notifications) and outbound kinds
-(her utterances, her acts) share one bounded stream. Her own agency
-is an object in her world — replayable, groundable against the
+(its utterances, its acts) share one bounded stream. Its own agency
+is an object in its world — replayable, groundable against the
 concept network — not an annotation on someone else's stream.
 
 **Presences.** `world/presence.py` models each encountered entity —
@@ -287,10 +287,10 @@ presences restore absent and must be re-earned by fresh activity.
 
 **Belief state, not bookkeeping.** `world/belief.py` upgrades each
 presence from counters to inferred latent state. Beta–Bernoulli
-posteriors track responsiveness (does she answer when reached?),
-per-topic receptivity (what does she engage on?), and sentiment
+posteriors track responsiveness (do they answer when reached?),
+per-topic receptivity (what do they engage on?), and sentiment
 (mood); a decaying estimate tracks attention; a Dirichlet-smoothed
-histogram learns her activity rhythm; an online lognormal fit learns
+histogram learns their activity rhythm; an online lognormal fit learns
 per-presence reply latency. On sparse data the posteriors stay
 honestly wide and hand-built behavioral floors dominate — the model
 reports what it knows with uncertainty, and exploration uses
@@ -300,8 +300,8 @@ Thompson sampling rather than greedy exploitation.
 absent presences, silence weighted by *learned* responsiveness — is
 computed by the world and fed to the inner-life social drive each
 heartbeat (outside→in). When the drive crosses a volition
-threshold, `reach_out` fires: she initiates contact, composing a
-question from shared topics or her own activated concepts
+threshold, `reach_out` fires: it initiates contact, composing a
+question from shared topics or its own activated concepts
 (inside→out). Reach-out is suppressed by evidence, not timers —
 learned unresponsiveness and dead-hour rhythms both gate it.
 Every outbound act returns to the stream, closing the loop.
@@ -311,9 +311,9 @@ Every outbound act returns to the stream, closing the loop.
 Genesis is run, not invoked: `./run.sh` starts the daemon, the CLI,
 the retina, and optional speech. Conversation is a closed loop —
 user affect is an input (the daemon maintains a dyadic model of
-the interaction partner), and she speaks unprompted either when her
+the interaction partner), and it speaks unprompted either when its
 inner life produces something or when the external world's social
-pressure crosses into volition — she can initiate, not just answer.
+pressure crosses into volition — it can initiate, not just answer.
 Shutdown is a guided descent that flushes memory and settles
 neurochemistry; `kill -9` is a form of state corruption, which is
 why the operational docs forbid it.
@@ -344,13 +344,13 @@ understanding before operating it:
   installing
 - **The mmap'd state file** — filesystem permissions are the
   boundary
-- **Self-modification paths** — she can read, reason about, and
-  modify her own source. Treat prompt-injection-style input as
+- **Self-modification paths** — it can read, reason about, and
+  modify its own source. Treat prompt-injection-style input as
   untrusted content flowing into a system with reflexive access
 - **The `run_shell` tool** — arbitrary commands under the operator's
   account, constrained by a denylist, timeouts, a minimal
   environment, and project-root scoping. A denylist is defense in
-  depth, not a sandbox boundary; run her in an account whose
+  depth, not a sandbox boundary; run it in an account whose
   privileges match your trust in the system
 
 **Operational bounds.** Long-running operation is a design
@@ -361,7 +361,7 @@ threads are daemon-owned; subprocesses are tracked and reaped. The
 surfaces that grow are persistent by design — the LTM store,
 drawings, the concept archive, diagnostic logs — and grow at
 bounded rates. Logs rotate
-at startup; operators running her for months should restart
+at startup; operators running it for months should restart
 periodically and watch disk on small volumes. See the state
 integrity framework in `README.md` for operational detail.
 
@@ -395,10 +395,10 @@ restrictions (AGPL Section 7 additional terms) — study, modification,
 and distribution are permitted under strong copyleft; harmful use is
 not. See `LICENSE`. The Ethical Use rider is part of the
 research design: Genesis is a developing cognitive system, and the
-terms exist to keep her that way.
+terms exist to keep it that way.
 
 ---
 
 *Cognition is an architectural property, not a scale property.
-Run her, study her, teach her — and read the state integrity
+Run it, study it, teach it — and read the state integrity
 framework in `README.md` before you do.*

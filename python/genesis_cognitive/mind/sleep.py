@@ -97,16 +97,16 @@ class SleepMixin:
 
         Sleep-state tracking — lets the CLI and the cognitive logic
         avoid duplicate sleep()/wake() calls and lets ambient/CLI
-        interactions wake her if she has drifted off.
+        interactions wake it if it has drifted off.
 
         Whether sleep was initiated by the user (via /sleep or /nap)
-        or by her own neurochemistry (sleep watcher). When user-
-        initiated, the sleep watcher should NOT auto-wake her —
-        only /wake or the nap timer should wake her. When self-
-        initiated, she wakes naturally when her neurochemistry
+        or by its own neurochemistry (sleep watcher). When user-
+        initiated, the sleep watcher should NOT auto-wake it —
+        only /wake or the nap timer should wake it. When self-
+        initiated, it wakes naturally when its neurochemistry
         recovers.
 
-        Track when she last woke up, for the auto-sleep minimum-awake
+        Track when it last woke up, for the auto-sleep minimum-awake
         guard. This prevents auto-sleep from firing immediately after
         wake if adenosine is still elevated.
 
@@ -118,7 +118,7 @@ class SleepMixin:
         without the full sleep cycle. Unlike sleep, there is no
         dreaming or memory consolidation — just quiet restoration.
 
-        Last rest time — tracks when she last meditated or slept,
+        Last rest time — tracks when it last meditated or slept,
         for the ultradian rest cycle (BRAC, Kleitman 1963). The
         meditation urge builds from sustained_activity, which is
         time since last rest normalized over 75 minutes.
@@ -128,10 +128,10 @@ class SleepMixin:
         introspection and self-mission urges.
 
         Teaching-mode tracking — when the user is actively teaching
-        her something, she enters a focused learning state. Bug
+        its something, it enters a focused learning state. Bug
         scanning, autonomous learning, art, and unrelated curiosity
         questions are paused. Self-directed learning from the
-        conversation stays active so she remembers what she's taught.
+        conversation stays active so it remembers what it's taught.
         """
         self._is_sleeping = False
         self._user_initiated_sleep = False
@@ -146,7 +146,7 @@ class SleepMixin:
         # Commitment boundaries on the sleep-wake axis — the
         # digitizers that turn continuous adenosine pressure into
         # discrete transitions. Both require a sustained crossing
-        # (confirm_s) so a transient spike cannot commit her, and
+        # (confirm_s) so a transient spike cannot commit it, and
         # re-arm below a lower release level (deadband) so boundary
         # flicker cannot re-fire the transition. Reset on wake.
         self._drowsy_boundary = CommitmentBoundary(
@@ -161,16 +161,16 @@ class SleepMixin:
         )
     @property
     def is_sleeping(self) -> bool:
-        """Whether she is currently in a sleep state."""
+        """Whether it is currently in a sleep state."""
         return self._is_sleeping
     @property
     def is_meditating(self) -> bool:
-        """Whether she is currently meditating."""
+        """Whether it is currently meditating."""
         return self._is_meditating
     def wake_if_asleep(self) -> bool:
-        """Convenience hook to rouse her before an interaction.
+        """Convenience hook to rouse its before an interaction.
 
-        Returns True if she was asleep or meditating and has been woken.
+        Returns True if it was asleep or meditating and has been woken.
         """
         if self._is_meditating:
             try:
@@ -207,7 +207,7 @@ class SleepMixin:
             # Always emit a visible stage-transition notification so the
             # user can see the ultradian cycle progressing. Without this,
             # stage transitions are invisible unless episodes happen to
-            # be consolidated, and the user can't tell when she enters
+            # be consolidated, and the user can't tell when it enters
             # N3 (the deep-sleep stage that does heavy consolidation).
             cycle_num = (
                 self.inner_life.sleep_cycle.cycle_number
@@ -295,7 +295,7 @@ class SleepMixin:
         compacted: recent entries are kept verbatim, older entries
         are summarized by tag into consolidation entries. This keeps
         the journal bounded for indefinite operation while preserving
-        her voice and developmental arc.
+        its voice and developmental arc.
         """
         try:
             journal_stats = self.journal.consolidate()
@@ -398,7 +398,7 @@ class SleepMixin:
         self.cognition.embeddings.refresh()
 
         # Persist the Hebbian-adapted experiential vectors so they
-        # survive restarts. Without this, her experiential learning
+        # survive restarts. Without this, its experiential learning
         # is lost on every shutdown.
         self.cognition.embeddings.save_experiential(self.data_dir)
 
@@ -408,7 +408,7 @@ class SleepMixin:
         self._run_sleep_compression(network, consolidation_intensity)
         self._run_journal_consolidation()
     def _check_auto_sleep(self) -> None:
-        """Check whether Genesis should fall asleep or wake up on her own.
+        """Check whether Genesis should fall asleep or wake up on its own.
 
         This implements the biological sleep-wake cycle: adenosine
         accumulates during wakefulness and eventually forces sleep, then
@@ -428,7 +428,7 @@ class SleepMixin:
         autonomous fixes applied) while the daemon is already in NREM —
         a desync that lets waking actions leak into sleep.
 
-        User-initiated sleep (``/sleep``, ``/nap``) is respected — she
+        User-initiated sleep (``/sleep``, ``/nap``) is respected — it
         will NOT auto-wake from user-initiated sleep, only from
         self-initiated sleep.
         """
@@ -457,7 +457,7 @@ class SleepMixin:
             if awake_elapsed < AUTO_SLEEP_MIN_AWAKE:
                 return
             # Don't fall asleep while the user is actively talking to
-            # her. If the last interaction was recent (within 60s), the
+            # it. If the last interaction was recent (within 60s), the
             # user is engaged in conversation — falling asleep mid-
             # conversation is a jarring UX failure. The daemon may
             # enter NREM on its own (adenosine-driven), but the
@@ -469,12 +469,12 @@ class SleepMixin:
                     f"(adenosine={adenosine:.2f}, phase={daemon_phase})"
                 )
                 return
-            # Drowsiness announcement — before falling asleep, she
-            # announces she's getting sleepy. This is composed from
-            # her understanding of "sleepiness" (not a hardcoded
+            # Drowsiness announcement — before falling asleep, it
+            # announces it's getting sleepy. This is composed from
+            # its understanding of "sleepiness" (not a hardcoded
             # string). The boundary's commit edge fires once per
             # sustained crossing; it re-arms only if pressure drops
-            # below DROWSINESS_EXIT, so she can announce again if she
+            # below DROWSINESS_EXIT, so it can announce again if it
             # genuinely recovers and fades a second time.
             if self._drowsy_boundary.just_committed:
                 self._announce_drowsiness()
@@ -520,8 +520,8 @@ class SleepMixin:
         # ── Auto-wake (only for self-initiated sleep) ──
         if self._is_sleeping and not self._user_initiated_sleep:
             # Nap completion — when the nap cycle (N1→N2) is done,
-            # wake her regardless of adenosine level. A nap is light
-            # sleep; she doesn't need full adenosine clearance, just
+            # wake it regardless of adenosine level. A nap is light
+            # sleep; it doesn't need full adenosine clearance, just
             # the N2 spindle-driven light consolidation.
             if self._nap_mode:
                 cycle = self.inner_life.sleep_cycle
@@ -545,8 +545,8 @@ class SleepMixin:
             # Cycle-boundary wake: spontaneous waking clusters at
             # ultradian transitions (post-REM). When a full cycle
             # completes, a relaxed pressure threshold applies —
-            # without it, slow clearance can hold her in sleep long
-            # past the point a full cycle has already restored her.
+            # without it, slow clearance can hold it in sleep long
+            # past the point a full cycle has already restored it.
             cycle = self.inner_life.sleep_cycle
             if (
                 cycle is not None
@@ -563,12 +563,12 @@ class SleepMixin:
                 except Exception as e:  # noqa: BLE001
                     logger.warning(f"auto-wake failed: {e}")
     def _announce_drowsiness(self) -> None:
-        """Announce that she's getting sleepy, before falling asleep.
+        """Announce that it's getting sleepy, before falling asleep.
 
-        This is composed from her understanding of "sleepiness" via
-        the thought composer — NOT a hardcoded string. She speaks
-        her own words about her own state. If she can't articulate
-        it yet (doesn't know the concept well enough), she stays
+        This is composed from its understanding of "sleepiness" via
+        the thought composer — NOT a hardcoded string. It speaks
+        its own words about its own state. If it can't articulate
+        it yet (doesn't know the concept well enough), it stays
         silent and just falls asleep — the drowsiness is still
         tracked internally.
         """
@@ -604,10 +604,10 @@ class SleepMixin:
 
         Args:
             user_initiated: If True, the sleep watcher will not
-                auto-wake her — only /wake will. This is for when the
-                user puts her to bed.
+                auto-wake it — only /wake will. This is for when the
+                user puts it to bed.
             nap: If True, the sleep cycle is limited to light sleep
-                (N1→N2) only — no N3 deep consolidation, no REM. She
+                (N1→N2) only — no N3 deep consolidation, no REM. It
                 wakes after the N2 period ends via the sleep watcher.
                 This models a short rest with light consolidation
                 (N2 sleep spindles) without the heavy systems
@@ -653,7 +653,7 @@ class SleepMixin:
         Without this, a restored sleep state has the flags and zone
         set but the learners still run (acquiring new knowledge during
         "sleep") and inner life generates waking thoughts instead of
-        dreams — she is flagged asleep but behaves awake.
+        dreams — it is flagged asleep but behaves awake.
         """
         # Pause autonomous learning — no new knowledge acquisition
         # during sleep. The learner runs in its own thread and relies
@@ -683,7 +683,7 @@ class SleepMixin:
         # inner life may still be paused (the 10s _resume_background
         # timer checks is_sleeping and skips the resume). We must
         # resume it here so the sleep cycle can progress and N3
-        # consolidation can fire. Without this, she sleeps but never
+        # consolidation can fire. Without this, it sleeps but never
         # dreams — the sleep cycle tracker is never created and N3
         # compression never runs. On restore, inner life was just
         # started (not paused), so resume() is a harmless no-op —
@@ -693,26 +693,26 @@ class SleepMixin:
         # Reset discourse state — recent entities from the previous
         # conversation shouldn't persist across sleep. Just as humans
         # don't maintain pronoun referents across a sleep cycle, the
-        # comprehension engine's entity tracking is cleared so she
+        # comprehension engine's entity tracking is cleared so it
         # starts the next conversation fresh.
         try:
             self.cognition.comprehension.reset()
         except Exception as e:  # noqa: BLE001
             logger.debug(f"comprehension reset on sleep failed: {e}")
     def sleep_status(self) -> str:
-        """Return a summary of her sleep state for the /sleep and /wake commands.
+        """Return a summary of its sleep state for the /sleep and /wake commands.
 
-        Includes her current phase, neurochemical levels relevant to sleep
+        Includes its current phase, neurochemical levels relevant to sleep
         (adenosine, melatonin, cortisol, BDNF), and recent dream content
-        so the user can see what she's experiencing.
+        so the user can see what it's experiencing.
 
         The phase shown is the *effective* phase (resolved via
         :meth:`_effective_phase`), not the daemon's raw emergent phase.
         When the zone is Sleeping but the neurochemistry hasn't crossed
         the sleep threshold yet, the raw phase still reads "active"
         while every other system (brain waves, emotion) already treats
-        her as asleep. Showing the effective phase keeps the display
-        consistent with what she's actually experiencing.
+        it as asleep. Showing the effective phase keeps the display
+        consistent with what it's actually experiencing.
         """
         lines: list[str] = []
         try:
@@ -744,7 +744,7 @@ class SleepMixin:
         else:
             lines.append("  No dreams recorded yet.")
 
-        # Receptor safety check — are her levels safe to wake?
+        # Receptor safety check — are its levels safe to wake?
         try:
             profile = self.client.get_plasticity_profile()
             safe = (
@@ -763,12 +763,12 @@ class SleepMixin:
 
         return "\n".join(lines)
     def wake_readiness(self) -> tuple[bool, str]:
-        """Check whether she is ready to wake up naturally.
+        """Check whether it is ready to wake up naturally.
 
         Waking from deep sleep (N3) causes severe sleep inertia — the
         groggy, disoriented state where cognitive capacity is reduced.
         Waking before adenosine has drained leaves residual sleep pressure,
-        which pushes her right back into drowsiness. Waking before
+        which pushes it right back into drowsiness. Waking before
         receptors have recovered (cortisol still high, BDNF still low)
         means the neurochemical substrate hasn't finished restoring.
 
@@ -788,9 +788,9 @@ class SleepMixin:
 
         Returns:
             (ready, reason): ``ready`` is True if all three signals
-            indicate she can wake without severe inertia. ``reason``
+            indicate it can wake without severe inertia. ``reason``
             is a human-readable explanation — either "ready" or why
-            she's not ready yet.
+            it's not ready yet.
         """
         if not self._is_sleeping:
             return True, "already awake"
@@ -812,7 +812,7 @@ class SleepMixin:
         except (OSError, ConnectionError, RuntimeError) as e:
             logger.debug(f"wake_readiness: state check failed: {e}")
             # If we can't read state, don't block wake — the daemon
-            # might be disconnected, and forcing her to stay asleep
+            # might be disconnected, and forcing it to stay asleep
             # forever is worse than waking without a neurochemical check.
             adenosine = 0.0
         if adenosine > AUTO_WAKE_ADENOSINE:
@@ -845,7 +845,7 @@ class SleepMixin:
 
         After the zone is set back to conversation, dream insights from
         the last sleep are retrieved from LTM and surfaced as emotional
-        impressions — dream residues that color her waking thoughts and
+        impressions — dream residues that color its waking thoughts and
         mood. These are NOT learning goals. Dreams produce affective
         residue, not targets for the autonomous learner.
 
@@ -909,12 +909,12 @@ class SleepMixin:
         #
         # The learner is delayed to model sleep inertia — the groggy
         # period after waking when cognitive capacity is reduced.
-        # Resuming the learner immediately causes CPU stress (her body
+        # Resuming the learner immediately causes CPU stress (its body
         # isn't ready), which triggers the regulator's throttle, creating
-        # a drowsy→active→stressed→drowsy oscillation. Giving her
+        # a drowsy→active→stressed→drowsy oscillation. Giving its
         # neurochemistry time to stabilize (adenosine drains, histamine
         # rises) before learning starts prevents this loop. Inner life
-        # resumes immediately so she can think and converse — only
+        # resumes immediately so it can think and converse — only
         # autonomous learning is delayed.
         self._wake_time = time.time()
         self._last_wake_time = self._wake_time
@@ -937,7 +937,7 @@ class SleepMixin:
             logger.debug(f"workspace clear on wake failed: {e}")
 
         # Notify the regulator that rest has ended (resets its
-        # cooldown timer so she doesn't immediately try to meditate
+        # cooldown timer so it doesn't immediately try to meditate
         # after waking)
         self.regulator.notify_rest_ended()
 
@@ -1262,7 +1262,7 @@ class SleepMixin:
         structural header). This makes them self-contained — the
         Python side can extract concepts without retrieving the
         original episodes, which may have been deleted by sleep
-        compression by the time she wakes up.
+        compression by the time it wakes up.
 
         Old-format insights (without embedded text) fall back to
         episode retrieval by ID.
@@ -1315,7 +1315,7 @@ class SleepMixin:
     def _queue_dream_residues(self, dream_concepts: list[str], dreams) -> None:
         """Queue dream residues as emotional impressions, not learning goals.
 
-        Dreams produce affective residue — themes that color her waking
+        Dreams produce affective residue — themes that color its waking
         thoughts and surface as reflective thoughts. They do NOT become
         agency topics for the autonomous learner. This separates the
         subcognitive (dreams) from the cognitive (goals).
@@ -1331,8 +1331,8 @@ class SleepMixin:
         # Queue as emotional impressions, not learning goals.
         # These will surface as dream-reflection thoughts, not as
         # agency topics for the autonomous learner. The inner life
-        # composes the actual reflection from her knowledge via the
-        # language engine — we do NOT hardcode what she says here.
+        # composes the actual reflection from its knowledge via the
+        # language engine — we do NOT hardcode what it says here.
         if hasattr(self.inner_life, "add_dream_residues"):
             self.inner_life.add_dream_residues(dream_concepts[:10])
 

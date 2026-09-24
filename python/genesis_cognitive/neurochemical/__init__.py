@@ -192,7 +192,7 @@ Mental states emerge from neurochemical dynamics, not manual switches:
     }
 
 Two independent axes:
-    Task zone  (what she's doing): IDLE, CONVERSATION, LEARNING, etc.
+    Task zone  (what it's doing): IDLE, CONVERSATION, LEARNING, etc.
     Mental phase (what state): FLOW, STRESS, DROWSY, SLEEPING, etc.
 
 In Genesis: the daemon computes emergent phases from the
