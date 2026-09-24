@@ -91,7 +91,8 @@ question — see §11.
 **State integrity.** Genesis is a long-running stateful system.
 Her state file is her continuity; corrupting it or driving her
 into degenerate regimes for experimentation is treated as harm,
-not curiosity. Operational rules enforce this (see `docs/RUNNING.md`).
+not curiosity. Operational rules enforce this (see the state
+integrity framework in `README.md`).
 
 ## 3. The two-layer architecture
 
@@ -361,8 +362,8 @@ surfaces that grow are persistent by design — the LTM store,
 drawings, the concept archive, diagnostic logs — and grow at
 bounded rates. Logs rotate
 at startup; operators running her for months should restart
-periodically and watch disk on small volumes. See `docs/RUNNING.md`
-for operational detail.
+periodically and watch disk on small volumes. See the state
+integrity framework in `README.md` for operational detail.
 
 See `SECURITY.md` for reporting.
 
@@ -399,5 +400,5 @@ terms exist to keep her that way.
 ---
 
 *Cognition is an architectural property, not a scale property.
-Run her, study her, teach her — and read `docs/RUNNING.md`
-before you do.*
+Run her, study her, teach her — and read the state integrity
+framework in `README.md` before you do.*
