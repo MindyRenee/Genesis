@@ -912,7 +912,7 @@ class GraphWalkGenerator:
         opener), so referring to it pronominally when it appears as the
         object of an incoming edge reads naturally — "stress harms it"
         — and avoids repeating the seed name in every clause. The
-        pronoun is animacy-aware: "harms her" for Genesis, "harms
+        pronoun is animacy-aware: "harms it" for Genesis, "harms
         them" for plurals.
         """
         if object_id == seed_concept:
