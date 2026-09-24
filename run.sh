@@ -14,6 +14,14 @@ set -m
 
 cd "$(dirname "$0")" || exit 1
 
+# Per-checkout data-dir override: an uncommitted .genesis-data-dir file
+# pins this checkout to its own state directory, so independent
+# checkouts stay fully disconnected without exporting GENESIS_DATA_DIR.
+if [ -z "${GENESIS_DATA_DIR:-}" ] && [ -f .genesis-data-dir ]; then
+    GENESIS_DATA_DIR=$(head -n1 .genesis-data-dir)
+    export GENESIS_DATA_DIR
+fi
+
 DATA_DIR=$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' \
     "${GENESIS_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/genesis}") || exit 1
 
