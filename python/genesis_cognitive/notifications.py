@@ -192,8 +192,7 @@ class NotificationQueue:
         """Drain and return all pending notifications.
 
         The cognitive layer calls this to process accumulated
-        notifications (e.g., surfacing them in the journal or
-        conversation).
+        notifications (e.g., surfacing them in conversation).
 
         Returns:
             A list of notifications, oldest first. May be empty.

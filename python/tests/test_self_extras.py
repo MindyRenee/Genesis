@@ -1,10 +1,9 @@
-"""Self extras — growth ledger, journal, explorer, code learner."""
+"""Self extras — growth ledger, explorer, code learner."""
 
 import logging
 import math
 import os
 import tempfile
-import time
 from collections.abc import Generator
 from pathlib import Path
 
@@ -12,7 +11,6 @@ import pytest
 
 from genesis_cognitive.concepts import ConceptNetwork, RelationType
 from genesis_cognitive.growth_ledger import GrowthLedger, GrowthMilestone
-from genesis_cognitive.journal import Journal, JournalEntry
 from genesis_cognitive.tools.code_learner import (
     CodeLearner,
     CodeLearningResult,
@@ -334,191 +332,6 @@ class TestGrowthIntegration:
         # Narrative should show the negative delta
         narrative = ledger.generate_narrative()
         assert "-0.4" in narrative or "-0.35" in narrative
-
-
-# ======================================================================
-# From tests/test_journal.py
-# ======================================================================
-
-@pytest.fixture
-def journal(tmp_path):
-    """A fresh journal in a temporary directory."""
-    return Journal(data_dir=str(tmp_path))
-
-
-def _make_entry(tag: str, content: str, age_days: float, mood: str = "neutral") -> JournalEntry:
-    """Create a journal entry at a given age in days."""
-    return JournalEntry(
-        timestamp=int(time.time()) - int(age_days * 86400),
-        entry_type=tag,
-        content=content,
-        mood=mood,
-    )
-
-
-class TestJournalBasic:
-    """Tests for basic journal write/read functionality."""
-
-    def test_empty_journal(self, journal):
-        """Test empty journal."""
-        assert journal.entry_count == 0
-        assert "hasn't written" in journal.describe()
-
-    def test_write_and_read(self, journal):
-        """Test write and read."""
-        entry = journal.write("question", "What is cognition?", mood="curious")
-        assert entry.entry_type == "question"
-        assert entry.content == "What is cognition?"
-        assert entry.mood == "curious"
-        assert journal.entry_count == 1
-
-        recent = journal.recent(5)
-        assert len(recent) == 1
-        assert recent[0].content == "What is cognition?"
-
-    def test_persistence(self, tmp_path):
-        """Entries survive journal recreation."""
-        j1 = Journal(data_dir=str(tmp_path))
-        j1.write("insight", "Mind and body are one process")
-        assert j1.entry_count == 1
-
-        j2 = Journal(data_dir=str(tmp_path))
-        assert j2.entry_count == 1
-        assert j2.recent(1)[0].content == "Mind and body are one process"
-
-
-class TestJournalConsolidation:
-    """Tests for sleep consolidation of old journal entries."""
-
-    def test_empty_consolidation(self, journal):
-        """Consolidating an empty journal is a no-op."""
-        result = journal.consolidate()
-        assert result == {"kept": 0, "consolidated": 0, "summaries": 0, "removed": 0}
-
-    def test_recent_entries_kept(self, journal):
-        """Entries within the recent window are kept verbatim."""
-        journal.write("learning", "Learned about recursion")
-        journal.write("question", "What is the self?")
-
-        result = journal.consolidate(recent_days=3)
-        assert result["consolidated"] == 0
-        assert result["kept"] == 2
-        assert journal.entry_count == 2
-
-    def test_old_entries_consolidated(self, journal):
-        """Entries older than the recent window are consolidated."""
-        # Write 10 old learning entries
-        for i in range(10):
-            journal._entries.append(
-                _make_entry("learning", f"Learned concept {i}", age_days=10 + i)
-            )
-        # Write 1 recent entry
-        journal.write("question", "What am I?")
-
-        result = journal.consolidate(recent_days=3, salience_days=7)
-
-        assert result["consolidated"] == 10
-        assert result["kept"] == 1  # only the recent question
-        assert result["summaries"] == 1  # one summary for "learning"
-        # 1 recent + 1 summary = 2 entries
-        assert journal.entry_count == 2
-
-    def test_high_salience_kept_longer(self, journal):
-        """Insights and dreams are kept longer than routine entries."""
-        # Old learning entry (5 days old) — should be consolidated
-        journal._entries.append(
-            _make_entry("learning", "Learned about thermodynamics", age_days=5)
-        )
-        # Old insight (5 days old) — should be kept (within 7-day salience window)
-        journal._entries.append(
-            _make_entry("insight", "Cognition is a strange loop", age_days=5)
-        )
-
-        result = journal.consolidate(recent_days=3, salience_days=7)
-
-        assert result["consolidated"] == 1  # only the learning entry
-        assert result["kept"] == 1  # the insight
-        assert journal.entry_count == 2  # 1 kept + 1 summary
-
-    def test_summary_preserves_counts(self, journal):
-        """The summary entry records how many entries were consolidated."""
-        for i in range(5):
-            journal._entries.append(
-                _make_entry("question", f"Why {i}?", age_days=10)
-            )
-
-        journal.consolidate(recent_days=3)
-        summaries = [e for e in journal.entries if e.entry_type == "summary"]
-        assert len(summaries) == 1
-        assert "5 question entries" in summaries[0].content
-
-    def test_summary_preserves_examples(self, journal):
-        """The summary includes representative examples."""
-        for i in range(10):
-            journal._entries.append(
-                _make_entry("insight", f"Insight number {i}", age_days=20)
-            )
-
-        journal.consolidate(
-            recent_days=3, salience_days=7, max_examples_per_tag=3
-        )
-        summaries = [e for e in journal.entries if e.entry_type == "summary"]
-        assert len(summaries) == 1
-        # Should contain at least one example (truncated with quotes)
-        assert '"' in summaries[0].content
-
-    def test_consolidation_rewrites_file(self, tmp_path):
-        """The journal file on disk is rewritten after consolidation."""
-        j = Journal(data_dir=str(tmp_path))
-        # Write 5 old entries
-        for i in range(5):
-            j._entries.append(
-                _make_entry("learning", f"Old learning {i}", age_days=10)
-            )
-        j._append_to_disk(j._entries[-1])
-
-        # Manually write all entries to disk first
-        with open(j._path, "w") as f:
-            for entry in j._entries:
-                f.write(entry.format())
-
-        j.consolidate(recent_days=3)
-
-        # Recreate journal from disk
-        j2 = Journal(data_dir=str(tmp_path))
-        # Should have 1 summary entry, not 5 learning entries
-        assert j2.entry_count == 1
-        assert j2.entries[0].entry_type == "summary"
-
-    def test_multiple_tags_produce_multiple_summaries(self, journal):
-        """Different tags produce separate summary entries."""
-        for i in range(3):
-            journal._entries.append(
-                _make_entry("learning", f"Learned {i}", age_days=10)
-            )
-        for i in range(3):
-            journal._entries.append(
-                _make_entry("question", f"Why {i}?", age_days=10)
-            )
-
-        result = journal.consolidate(recent_days=3)
-        assert result["summaries"] == 2
-        summaries = [e for e in journal.entries if e.entry_type == "summary"]
-        assert len(summaries) == 2
-
-    def test_consolidation_is_idempotent(self, journal):
-        """Consolidating again immediately doesn't change anything."""
-        for i in range(5):
-            journal._entries.append(
-                _make_entry("learning", f"Old {i}", age_days=10)
-            )
-
-        journal.consolidate(recent_days=3)
-        first_count = journal.entry_count
-
-        result = journal.consolidate(recent_days=3)
-        assert result["consolidated"] == 0
-        assert journal.entry_count == first_count
 
 
 # ======================================================================

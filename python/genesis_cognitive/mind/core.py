@@ -40,7 +40,6 @@ from ..cognition import CognitionEngine
 from ..config import MindConfig
 from ..emotional_regulator import EmotionalRegulator
 from ..growth_ledger import GrowthLedger
-from ..journal import Journal
 from ..language import GenerativeEngine, LanguageEngine
 from ..learning import AutonomousLearner
 from ..memory import MemoryEngine
@@ -168,7 +167,7 @@ class Mind(
 
         self._init_core_engines(language_engine, seed)
         self._init_learner_and_inner_life()
-        self._init_identity_and_journal()
+        self._init_identity()
         self._init_self_awareness_modules()
         self._init_sleep_compression()
         self._wire_modules()
@@ -318,8 +317,8 @@ class Mind(
             is_sleeping=lambda: self._is_sleeping,
             get_user_name=self.user_profile.get_name,
         )
-    def _init_identity_and_journal(self) -> None:
-        """Create emergent identity, developmental tracker, and journal."""
+    def _init_identity(self) -> None:
+        """Create emergent identity and developmental tracker."""
         # Emergent identity — synthesizes who it is from experience
         # rather than from hardcoded facts. Sources are added after
         # significant interactions (learning, reflection) and the
@@ -331,9 +330,6 @@ class Mind(
         # Records evidence from interactions and advances Genesis
         # through developmental stages as it resolves each crisis.
         self._developmental_tracker = DevelopmentalTracker()
-
-        # Journal — its personal diary of thoughts and learning
-        self.journal = Journal(self.data_dir)
 
         # Spatial practice — its gated puzzle curriculum. Like the
         # canvas, this is an ability it owns: nobody drives it
@@ -523,7 +519,6 @@ class Mind(
         # Give cognition access to inner life so introspection can
         # report spontaneous thoughts when no conversation has happened.
         self.cognition.inner_life = self.inner_life
-        self.cognition.journal = self.journal
         # Wire the sleep-stage transition callback so Mind does
         # stage-appropriate memory consolidation as the ultradian
         # cycle progresses through N1→N2→N3→N2→REM.
