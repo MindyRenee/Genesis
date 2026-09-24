@@ -22,6 +22,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from fractions import Fraction
 
+from .delta import perceive_task
 from .grid import Grid
 from .scene import PerceivedObject, _spans_overlap, perceive
 
@@ -2363,33 +2364,75 @@ def _propose_symmetrize(examples: list[Example]) -> list[Transform]:
     "finish the pattern": reflect non-background cells across the
     vertical or horizontal axis, painting only background cells.
     """
+    # The output strictly contains the input: every *non-background*
+    # input cell keeps its value. Background cells are exactly what a
+    # completion task paints — checking them here would reject the
+    # entire task class this rule exists for.
     for inp, out in examples:
         if inp.shape != out.shape:
             return []
+        bg = inp.most_common_color()
         for r, c, v in inp.iter_cells():
-            if v != out.at(r, c):
+            if v != bg and out.at(r, c) != v:
                 return []  # existing cells may not change
 
-    def make(axis: str) -> TransformFn:
-        def apply(g: Grid) -> Grid:
-            bg = g.most_common_color()
-            rows = g.to_lists()
-            for r, c, v in g.iter_cells():
-                if v == bg:
-                    continue
-                if axis == "v":
-                    nr, nc = r, g.width - 1 - c
-                else:
-                    nr, nc = g.height - 1 - r, c
-                if rows[nr][nc] == bg:
-                    rows[nr][nc] = v
-            return Grid.from_lists(rows)
-
-        return apply
-
     return [
-        Transform(f"symmetrize_{a}", make(a), {"axis": a})
-        for a in ("v", "h")
+        Transform(f"symmetrize_{a}", _mk_symmetrize(a), {"axis": a})
+        for a in ("v", "h", "rot180")
+    ]
+
+
+def _mk_symmetrize(axis: str) -> TransformFn:
+    """Paint each non-background cell's image under ``axis`` —
+    only onto background cells. ``axis`` is ``v`` (mirror across the
+    center column), ``h`` (center row), ``rot180`` (center point), or
+    ``diag`` (main diagonal, square grids)."""
+    def apply(g: Grid) -> Grid:
+        bg = g.most_common_color()
+        rows = g.to_lists()
+        for r, c, v in g.iter_cells():
+            if v == bg:
+                continue
+            if axis == "v":
+                nr, nc = r, g.width - 1 - c
+            elif axis == "h":
+                nr, nc = g.height - 1 - r, c
+            elif axis == "diag":
+                nr, nc = c, r
+            else:
+                nr, nc = g.height - 1 - r, g.width - 1 - c
+            if 0 <= nr < g.height and 0 <= nc < g.width and rows[nr][nc] == bg:
+                rows[nr][nc] = v
+        return Grid.from_lists(rows)
+
+    return apply
+
+
+def _propose_delta_completion(examples: list[Example]) -> list[Transform]:
+    """Propose completion transforms from *perceived* delta structure.
+
+    Instead of each rule passing a private gate, the delta layer
+    (``delta.py``) describes what the task did — cells only added — and
+    which geometric relation the added cells bear to the input's
+    existing cells. When every training pair's additions are exactly
+    the input seen through one relation, the matching completion rule
+    is proposed directly.
+    """
+    obs = perceive_task(examples)
+    _REL_TO_AXIS = {
+        "mirror_v": "v",
+        "mirror_h": "h",
+        "rot180": "rot180",
+        "diag": "diag",
+    }
+    return [
+        Transform(
+            f"symmetrize_{axis}",
+            _mk_symmetrize(axis),
+            {"axis": axis, "from": "delta"},
+        )
+        for rel in sorted(obs.added_relations(examples))
+        if (axis := _REL_TO_AXIS.get(rel)) is not None
     ]
 
 
@@ -3394,6 +3437,7 @@ PROPOSERS: tuple[Callable[[list[Example]], list[Transform]], ...] = (
     _propose_periodic_completion,
     _propose_translate_complete,
     _propose_symmetrize,
+    _propose_delta_completion,
     _propose_connect_aligned,
     _propose_select_by_color,
     _propose_mirror_copy,
