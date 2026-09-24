@@ -1,5 +1,6 @@
 [project]
 name = "genesis-cognitive"
+version = "0.2.0"
 requires-python = ">=3.12"
 
 [tool.ruff]
