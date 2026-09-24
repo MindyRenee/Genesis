@@ -15,7 +15,7 @@ set -m
 cd "$(dirname "$0")" || exit 1
 
 DATA_DIR=$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' \
-    "${GENESIS_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/genesis-public}") || exit 1
+    "${GENESIS_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/genesis}") || exit 1
 
 # ─── PID-file helpers ────────────────────────────────────────────────
 # The CLI writes PID files for itself, the daemon, and the retina to
@@ -73,8 +73,8 @@ _matches_pid() {
     # A daemon/CLI started without --data-dir uses the default dir.
     # Only accept the match when this DATA_DIR *is* the default, so a
     # custom-dir instance never claims a default-dir process.
-    local default_dir="$HOME/.local/share/genesis-public"
-    [ -n "${XDG_DATA_HOME:-}" ] && default_dir="$XDG_DATA_HOME/genesis-public"
+    local default_dir="$HOME/.local/share/genesis"
+    [ -n "${XDG_DATA_HOME:-}" ] && default_dir="$XDG_DATA_HOME/genesis"
     [ -n "${GENESIS_DATA_DIR:-}" ] && default_dir="$GENESIS_DATA_DIR"
     if [ "$DATA_DIR" = "$default_dir" ]; then
         return 0

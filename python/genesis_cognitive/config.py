@@ -16,20 +16,17 @@ from pathlib import Path
 
 
 def default_data_dir() -> Path:
-    """Its data directory — hers alone.
+    """Its data directory — its alone.
 
     Resolution order: ``GENESIS_DATA_DIR`` env override, then
-    ``$XDG_DATA_HOME/genesis-public``, then
-    ``~/.local/share/genesis-public``. The ``genesis-public`` name is
-    deliberate: this project must never share state with any other
-    Genesis instance on the machine.
+    ``$XDG_DATA_HOME/genesis``, then ``~/.local/share/genesis``.
     """
     env = os.environ.get("GENESIS_DATA_DIR")
     if env:
         return Path(env)
     xdg = os.environ.get("XDG_DATA_HOME")
     base = Path(xdg) if xdg else Path.home() / ".local" / "share"
-    return base / "genesis-public"
+    return base / "genesis"
 
 
 @dataclass(frozen=True)
