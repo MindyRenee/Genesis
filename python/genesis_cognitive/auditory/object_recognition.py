@@ -195,13 +195,13 @@ class ObjectRecognizer:
         h, w = rgb_frame.shape[:2]
         net = self._get_net()
 
-        # YOLOv5 preprocessing: resize to 640x640, normalize to [0,1],
-        # swap RB (YOLOv5 expects RGB, OpenCV blobFromImage with swapRB
-        # converts BGR→RGB, but our input is already RGB so we pass
-        # swapRB=True to get the channel order the model expects).
+        # YOLOv5 preprocessing: resize to 640x640, normalize to [0,1].
+        # YOLOv5 expects RGB and our input is already RGB, so no
+        # channel swap (swapRB=True would produce BGR — the exact
+        # channel inversion YuNet needs and YOLOv5 doesn't).
         blob = cv2.dnn.blobFromImage(
             rgb_frame, 1.0 / 255.0, (_INPUT_SIZE, _INPUT_SIZE),
-            swapRB=True,
+            swapRB=False,
         )
         net.setInput(blob)
         output = net.forward()

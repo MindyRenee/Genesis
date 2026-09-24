@@ -83,6 +83,11 @@ logger = logging.getLogger(__name__)
 _CANVAS_WIDTH = 640
 _CANVAS_HEIGHT = 480
 
+# Maximum number of drawings retained in the data directory. Older
+# drawings are pruned at save time so a long-running daemon doesn't
+# accumulate unbounded webp files (hygiene.sh warns past 200).
+_MAX_DRAWINGS = 200
+
 # ── All available techniques ──────────────────────────────────────
 # Every technique is always available — she can use whatever she
 # wants, whenever she wants. No unlocking, no progression, no
@@ -484,6 +489,7 @@ class Canvas:
         filename = f"drawing_{int(timestamp)}.webp"
         filepath = self._data_dir / filename
         img.save(str(filepath), format="WEBP", lossless=True, quality=100, method=4)
+        self._prune_drawings()
 
         # Build description
         mood = self._describe_mood(neurochemistry, emotion)
@@ -501,6 +507,21 @@ class Canvas:
             mood=mood,
             techniques_used=sorted(selected),
         )
+
+    def _prune_drawings(self) -> None:
+        """Delete the oldest drawings once the directory exceeds the cap.
+
+        Each drawing is ~50–200 KB, so without rotation the directory
+        grows unboundedly over a long-running daemon's lifetime.
+        """
+        if self._data_dir is None:
+            return
+        try:
+            drawings = sorted(self._data_dir.glob("drawing_*.webp"))
+            for old in drawings[: max(0, len(drawings) - _MAX_DRAWINGS)]:
+                old.unlink(missing_ok=True)
+        except OSError as e:
+            logger.debug(f"drawing prune failed: {e}")
 
     def _render_canvas(
         self,

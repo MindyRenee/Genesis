@@ -243,18 +243,18 @@ class GraphWalkGenerator:
         concept and produce knowledge statements about it (e.g.
         "Content relates to happiness") instead of expressing the
         feeling. This also prevents multiple graph-walk queries
-        during compose_feeling_report, which calls render() once
+        during feeling-fragment collection, which calls render() once
         per emotion/mode/cause word and was causing think() timeouts.
 
-        Self-reports with pre-composed content from the self_composer
-        are already composed text — the graph walk would ignore the
-        content and walk from the seed concept instead, producing
-        knowledge expressions ("learning relates to Light") instead
-        of the actual emotional state or identity description.
-        The `field` metadata key marks thoughts whose content was
-        specifically composed by a self_composer method (emotion,
-        identity, capability, concerns, curiosity, embodiment).
-        The `identity_text` key is a legacy marker for the same thing.
+        Self-reports carrying self-composer fragments defer to the
+        grammar path — the graph walk would ignore the fragments and
+        walk from the seed concept instead, producing knowledge
+        expressions ("learning relates to Light") instead of the
+        actual emotional state or identity description. The `field`
+        and `self_fragments` metadata keys mark thoughts whose
+        semantic material was selected by a self_composer method
+        (emotion, identity, capability, concerns, curiosity,
+        embodiment).
         """
         if thought.intent in ("greet", "farewell", "acknowledge"):
             return True
@@ -267,7 +267,7 @@ class GraphWalkGenerator:
         if (
             thought.intent == "self_report"
             and (
-                thought.metadata.get("identity_text")
+                thought.metadata.get("self_fragments")
                 or thought.metadata.get("field")
             )
         ):
@@ -336,14 +336,10 @@ class GraphWalkGenerator:
             self._flow_built = True
 
         # If the embedding store has toroidal angles, use them
-        if self._embeddings is not None and hasattr(self._embeddings, '_angle_matrix'):
-            if (self._embeddings._angle_matrix is not None
-                    and self._embeddings._angle_matrix.shape[0] > 0
-                    and hasattr(self._embeddings, '_concept_names')):
-                self._flow.set_angles_from_embedding(
-                    self._embeddings._concept_names,
-                    self._embeddings._angle_matrix,
-                )
+        if self._embeddings is not None:
+            angle_data = self._embeddings.get_angle_data()
+            if angle_data is not None:
+                self._flow.set_angles_from_embedding(*angle_data)
                 self._flow_built = True
 
         flow_text = self._flow.generate(thought, emotion)
@@ -709,7 +705,7 @@ class GraphWalkGenerator:
             if topic_set and neighbor.lower() in topic_set:
                 concept = self._network.get_concept(neighbor)
                 if concept is not None:
-                    score += concept.activation * 0.15
+                    score += (concept.activation or 0.0) * 0.15
 
             scored.append((score, edge, neighbor, is_incoming))
 

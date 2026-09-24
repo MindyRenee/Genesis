@@ -105,21 +105,34 @@ class GrowthLedger:
         narrative = ledger.generate_narrative()
     """
 
+    # Periodic snapshots accumulate one row per metric per snapshot for
+    # the daemon's lifetime — bound the ledger so the state file cannot
+    # grow without limit. 5000 ≈ years of daily snapshots; the oldest
+    # are evicted (``_total_recorded`` keeps the lifetime count honest).
+    _MAX_MILESTONES = 5000
+
     def __init__(self) -> None:
         """Initialize the growth ledger."""
         self._milestones: list[GrowthMilestone] = []
         # Track the last recorded value for each (dimension, metric) pair
         self._last_values: dict[tuple[str, str], float] = {}
+        self._total_recorded = 0
+
+    def _append(self, milestone: GrowthMilestone) -> None:
+        self._milestones.append(milestone)
+        self._total_recorded += 1
+        if len(self._milestones) > self._MAX_MILESTONES:
+            del self._milestones[: len(self._milestones) - self._MAX_MILESTONES]
 
     @property
     def milestones(self) -> list[GrowthMilestone]:
-        """All milestones (copy), oldest first."""
+        """Retained milestones (copy), oldest first."""
         return list(self._milestones)
 
     @property
     def milestone_count(self) -> int:
         """Total number of milestones recorded."""
-        return len(self._milestones)
+        return self._total_recorded
 
     def record(
         self,
@@ -158,7 +171,7 @@ class GrowthLedger:
             previous=previous,
             note=note or f"{metric}: {previous} -> {value}",
         )
-        self._milestones.append(milestone)
+        self._append(milestone)
         self._last_values[key] = value
 
         delta = value - previous
@@ -192,7 +205,7 @@ class GrowthLedger:
             previous=previous,
             note=note or f"snapshot: {metric} = {value}",
         )
-        self._milestones.append(milestone)
+        self._append(milestone)
         self._last_values[key] = value
         return milestone
 
@@ -283,7 +296,7 @@ class GrowthLedger:
                     )
 
         # Summary stats
-        total = len(self._milestones)
+        total = self._total_recorded
         dimensions = len(by_dimension)
         parts.append(
             f"\n  Total: {total} milestones across "
@@ -303,7 +316,7 @@ class GrowthLedger:
 
         lines = ["# Growth Ledger", ""]
         lines.append(
-            f"_{len(self._milestones)} milestones recorded_\n"
+            f"_{self._total_recorded} milestones recorded_\n"
         )
 
         # Group by dimension
@@ -343,7 +356,7 @@ class GrowthLedger:
         dimensions = len({m.dimension for m in self._milestones})
         metrics = len({(m.dimension, m.metric) for m in self._milestones})
         return (
-            f"Growth ledger: {len(self._milestones)} milestones, "
+            f"Growth ledger: {self._total_recorded} milestones, "
             f"{dimensions} dimensions, {metrics} metrics"
         )
 
@@ -357,14 +370,20 @@ class GrowthLedger:
                 f"{d}/{m}": v
                 for (d, m), v in self._last_values.items()
             },
+            "total_recorded": self._total_recorded,
         }
 
     def restore_from_dict(self, data: dict[str, Any]) -> None:
         """Restore state from persistence."""
+        # Trim to the cap — a save written before the bound existed can
+        # hold more; keep the most recent.
         self._milestones = [
             GrowthMilestone.from_dict(m)
-            for m in data.get("milestones", [])
+            for m in data.get("milestones", [])[-self._MAX_MILESTONES:]
         ]
+        self._total_recorded = max(
+            int(data.get("total_recorded", 0)), len(self._milestones)
+        )
         self._last_values = {}
         for key_str, value in data.get("last_values", {}).items():
             parts = key_str.split("/", 1)
@@ -375,3 +394,4 @@ class GrowthLedger:
         """Clear all milestones and last values."""
         self._milestones.clear()
         self._last_values.clear()
+        self._total_recorded = 0

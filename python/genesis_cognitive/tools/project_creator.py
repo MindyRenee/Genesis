@@ -119,6 +119,23 @@ def _sanitize_name(name: str) -> str:
     return cleaned
 
 
+_VALID_PROJECT_NAME_RE = re.compile(r"[a-z0-9_]+")
+
+
+def _is_valid_project_name(name: str) -> bool:
+    """True only for names ``_sanitize_name`` could have produced.
+
+    Project names are joined into filesystem paths by archive,
+    restore, delete, and notes functions. Restricting to
+    ``[a-z0-9_]+`` refuses ``..``, ``/``, ``.``, hidden names, and the
+    reserved ``.archive`` directory — a crafted name must never turn
+    ``projects_dir / name`` into a path outside the projects dir
+    (tar + ``shutil.rmtree`` on a traversed path is arbitrary
+    directory deletion).
+    """
+    return bool(_VALID_PROJECT_NAME_RE.fullmatch(name))
+
+
 def _pyproject_content(name: str, description: str) -> str:
     """Generate pyproject.toml content for a new project."""
     return f"""[build-system]
@@ -424,6 +441,9 @@ def archive_project(name: str, data_dir: str) -> bool:
     Returns True on success, False if the project doesn't exist or
     archiving failed.
     """
+    if not _is_valid_project_name(name):
+        logger.debug(f"archive_project: invalid project name {name!r}")
+        return False
     projects_dir = Path(data_dir) / "projects"
     project_path = projects_dir / name
     if not project_path.is_dir():
@@ -473,6 +493,9 @@ def restore_project(name: str, data_dir: str) -> bool:
     Returns True on success, False if no archive exists or extraction
     failed.
     """
+    if not _is_valid_project_name(name):
+        logger.debug(f"restore_project: invalid project name {name!r}")
+        return False
     projects_dir = Path(data_dir) / "projects"
     archive_path = _archive_dir(data_dir) / f"{name}.tar.zst"
     if not archive_path.is_file():
@@ -507,6 +530,9 @@ def delete_archived_project(name: str, data_dir: str) -> bool:
 
     Returns True on success, False if no archive exists.
     """
+    if not _is_valid_project_name(name):
+        logger.debug(f"delete_archived_project: invalid project name {name!r}")
+        return False
     archive_path = _archive_dir(data_dir) / f"{name}.tar.zst"
     if not archive_path.is_file():
         return False
@@ -555,6 +581,9 @@ def leave_project_note(
     Returns:
         True if the note was written, False if the project doesn't exist.
     """
+    if not _is_valid_project_name(project_name):
+        logger.debug(f"leave_project_note: invalid project name {project_name!r}")
+        return False
     project_dir = Path(data_dir) / "projects" / project_name
     if not project_dir.is_dir():
         logger.debug(f"leave_project_note: project '{project_name}' not found")
@@ -588,6 +617,8 @@ def read_project_notes(data_dir: str, project_name: str) -> str | None:
     Returns:
         The notes text, or None.
     """
+    if not _is_valid_project_name(project_name):
+        return None
     notes_file = _notes_path(data_dir, project_name)
     if not notes_file.is_file():
         return None
@@ -628,6 +659,8 @@ def clear_project_notes(data_dir: str, project_name: str) -> bool:
     Returns True if notes were cleared, False if there were no notes
     or the project doesn't exist.
     """
+    if not _is_valid_project_name(project_name):
+        return False
     notes_file = _notes_path(data_dir, project_name)
     if not notes_file.is_file():
         return False

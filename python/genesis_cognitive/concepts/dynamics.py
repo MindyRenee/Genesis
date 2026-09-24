@@ -3,12 +3,52 @@
 from __future__ import annotations
 
 import heapq
-import random
+import math
 from collections import deque
 from typing import TYPE_CHECKING, Any
 
 from .classify import _column_of
 from .types import ConceptCategory, ConceptModality, Edge
+
+# Re-digitization floor for the activation field. Activation below
+# this level can never drive anything — it cannot spread (sources
+# need SPREAD_THRESHOLD = 0.08), cannot enter awareness (the "on her
+# mind" cutoff is 0.1), and cannot participate in ACh focus (0.05).
+# It is accumulated drizzle from decay asymptotes and fan-out
+# residue, not signal. Snapping it to zero each tick is the
+# field-level analog of a logic-level threshold: the analog middle
+# stays graded, but the sub-noise tail is periodically re-committed
+# to a clean 0 instead of accumulating without bound.
+ACTIVATION_NOISE_FLOOR = 0.005
+
+# ─── Sparse-tick parameters ──────────────────────────────────────
+#
+# The tick is event-driven: dynamics run over ``_active_ids`` (the
+# set of nonzero-activation concepts), so cost scales with activity,
+# not network size. The dormant field is not iterated at all —
+# concepts at zero stay zero under decay and cannot spread.
+#
+# SWEEP_INTERVAL_TICKS: every N ticks the whole field is rescanned —
+# sub-floor residue is snapped to zero and ``_active_ids`` is rebuilt.
+# This catches activation writes that bypassed ``_mark_active``
+# (external systems bumping concept.activation directly) and doubles
+# as the field's periodic re-digitization pass.
+#
+# DORMANT_SPARK_COEFF: per-tick ignition probability for a dormant
+# concept is ``noise_amp * DORMANT_SPARK_COEFF``. The number of
+# dormant ignitions is drawn from Poisson(N_dormant * p): spontaneous
+# activation arrives as discrete events, not analog static on the
+# whole field. At ~100K dormant concepts and default noise the rate
+# is a few ignitions per minute; at noise=0 there are none.
+#
+# SPARK_MIN/MAX: ignition magnitude band — enough to survive a few
+# decay ticks and participate in ACh focus (>0.05), occasionally
+# crossing the 0.1 awareness floor so a spark can surface as a
+# spontaneous thought seed.
+SWEEP_INTERVAL_TICKS = 20
+DORMANT_SPARK_COEFF = 2.5e-5
+SPARK_MIN = 0.06
+SPARK_MAX = 0.14
 
 
 class DynamicsMixin:
@@ -16,6 +56,9 @@ class DynamicsMixin:
     if TYPE_CHECKING:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see the package's core module).
+        _active_ids: set[str] | None
+        _ticks_since_sweep: int
+
         def __getattr__(self, name: str) -> Any: ...
 
 
@@ -52,8 +95,10 @@ class DynamicsMixin:
                 continue
             if concept.modality == ConceptModality.MIXED:
                 continue
-            if concept.activation > ACTIVATION_THRESHOLD:
-                modality_active.setdefault(concept.modality, []).append((cid, concept.activation))
+            if (concept.activation or 0.0) > ACTIVATION_THRESHOLD:
+                modality_active.setdefault(concept.modality, []).append(
+                    (cid, concept.activation or 0.0)
+                )
 
         boosts_applied: dict[str, float] = {}
 
@@ -70,9 +115,10 @@ class DynamicsMixin:
             for cid, concept in list(self._concepts.items()):
                 if concept.modality != modality:
                     continue
-                if cid in active_ids or concept.activation >= ACTIVATION_THRESHOLD:
+                activation = concept.activation or 0.0
+                if cid in active_ids or activation >= ACTIVATION_THRESHOLD:
                     continue
-                concept.activation = min(1.0, concept.activation + modality_boost)
+                concept.activation = min(1.0, activation + modality_boost)
 
             boosts_applied[modality.value] = modality_boost
 
@@ -369,6 +415,7 @@ class DynamicsMixin:
         ach: float = 0.3,
         serotonin: float = 0.4,
         noise: float = 0.01,
+        spark_rate: float | None = None,
     ) -> dict[str, float]:
         """Evolve the network's activation state by one tick.
 
@@ -388,16 +435,21 @@ class DynamicsMixin:
            calming down) and arousal (more arousal → slower decay,
            she's alert and things stay in mind).
 
-        3. **Noise**: Small random perturbations are added to each
-           concept's activation. This is spontaneous neural noise —
-           the background chatter of a living brain. It prevents the
-           network from settling into a dead state and allows
-           serendipitous activation of dormant concepts. The noise
-           amplitude is modulated by serotonin (low serotonin →
-           more noise, modeling the noisy, ruminative quality of
-           low-serotonin states).
+        3. **Noise**: Two channels. Graded perturbation applies to the
+           *active* field (fluctuation of live representations). The
+           dormant field ignites sparsely via Poisson events scaled
+           by the same noise amplitude — spontaneous activation
+           arrives as discrete sparks, not analog static on the whole
+           network. Serotonin modulates both (low serotonin →
+           noisier, more ruminative).
 
-        4. **Neurochemical modulation**:
+        4. **Re-digitization**: Activation below
+           ``ACTIVATION_NOISE_FLOOR`` snaps to zero each tick — the
+           sub-noise tail cannot accumulate. Every
+           ``SWEEP_INTERVAL_TICKS`` the whole field is rescanned and
+           the active set rebuilt.
+
+        5. **Neurochemical modulation**:
            - **Arousal** (NE + DA): scales the spread rate. High
              arousal → activation spreads faster and further.
            - **GABA**: scales the decay rate. High GABA → faster
@@ -423,20 +475,42 @@ class DynamicsMixin:
             self._compute_tick_parameters(arousal, gaba, ach, serotonin, noise)
         )
 
+        # Lazy init: the active set is built on first tick (scans the
+        # seeded/loaded field once) and maintained incrementally after.
+        if self._active_ids is None:
+            self._active_ids = {
+                cid
+                for cid, c in self._concepts.items()
+                if (c.activation or 0.0) > 0.0
+            }
+            self._ticks_since_sweep = 0
+
         # ─── 1. Spreading ───────────────────────────────────────
         spread_delta = self._compute_spread_delta(spread_rate)
 
         # ─── 2. Decay + noise + apply spread ────────────────────
         self._apply_decay_noise_spread(decay_rate, noise_amp, spread_delta)
 
-        # ─── 3. ACh focus (winner-take-all) ─────────────────────
+        # ─── 3. Dormant ignition (Poisson sparks) ───────────────
+        self._ignite_dormant(noise_amp, spark_rate)
+
+        # ─── 4. ACh focus (winner-take-all) ─────────────────────
         self._apply_ach_focus(ach_focus)
 
-        # ─── 4. Return what's on her mind ───────────────────────
+        # ─── 5. Periodic full-field sweep ───────────────────────
+        # Rebuilds the active set (catching activation writes that
+        # bypassed _mark_active) and re-digitizes the whole field.
+        self._ticks_since_sweep += 1
+        if self._ticks_since_sweep >= SWEEP_INTERVAL_TICKS:
+            self._rebuild_active_set()
+            self._ticks_since_sweep = 0
+
+        # ─── 6. Return what's on her mind ───────────────────────
         return {
-            cid: c.activation
-            for cid, c in list(self._concepts.items())
-            if c.activation > 0.1
+            cid: concept.activation
+            for cid in self._active_ids
+            if (concept := self._concepts.get(cid)) is not None
+            and (concept.activation or 0.0) > 0.1
         }
     def _compute_tick_parameters(
         self,
@@ -483,8 +557,10 @@ class DynamicsMixin:
         spread_delta: dict[str, float] = {}
         SPREAD_THRESHOLD = 0.08  # concepts below this don't spread
 
-        for cid, concept in list(self._concepts.items()):
-            if concept.activation < SPREAD_THRESHOLD:
+        # Sparse: only the active set can contain spread sources.
+        for cid in list(self._active_ids or ()):
+            concept = self._concepts.get(cid)
+            if concept is None or (concept.activation or 0.0) < SPREAD_THRESHOLD:
                 continue
             edges = self._edge_index.get(cid, [])
             if not edges:
@@ -523,11 +599,27 @@ class DynamicsMixin:
         noise_amp: float,
         spread_delta: dict[str, float],
     ) -> None:
-        """Apply decay, spread, and noise to all concepts in-place."""
+        """Apply decay, spread, and noise to the active field in-place.
+
+        Sparse: only concepts in ``_active_ids`` are iterated —
+        dormant concepts sit at zero and cannot decay further.
+        Spread targets join the set; concepts snapped below the
+        noise floor leave it.
+        """
+        if self._active_ids is None:
+            return  # not built until the first tick
         HUB_DECAY_MULTIPLIER = 0.7
         MOTOR_DECAY_MULTIPLIER = 1.3
 
-        for cid, concept in list(self._concepts.items()):
+        # Newly-spread targets become part of the active field.
+        for cid in spread_delta:
+            self._active_ids.add(cid)
+
+        for cid in list(self._active_ids):
+            concept = self._concepts.get(cid)
+            if concept is None:
+                self._active_ids.discard(cid)
+                continue
             # Guard against None activation from corrupted/old state
             if concept.activation is None:
                 concept.activation = 0.0
@@ -543,32 +635,126 @@ class DynamicsMixin:
             if cid in spread_delta:
                 concept.activation = min(1.0, concept.activation + spread_delta[cid])
 
-            # Noise (Gaussian-like via uniform sum)
-            n = (random.random() + random.random() - 1.0) * noise_amp
+            # Noise (Gaussian-like via uniform sum) — graded
+            # fluctuation applies to the active field; the dormant
+            # field gets discrete ignition events instead.
+            n = (self._rng.random() + self._rng.random() - 1.0) * noise_amp
             concept.activation = max(0.0, min(1.0, concept.activation + n))
+
+            # Re-digitize: sub-floor activation is residue, not
+            # signal — snap it to zero so the tail cannot accumulate
+            # across ticks. The accumulation band above the floor is
+            # untouched, so temporal summation of weak signals still
+            # works.
+            if concept.activation < ACTIVATION_NOISE_FLOOR:
+                concept.activation = 0.0
+                self._active_ids.discard(cid)
+    def _ignite_dormant(
+        self, noise_amp: float, spark_rate: float | None = None
+    ) -> int:
+        """Spontaneously ignite dormant concepts (Poisson process).
+
+        The dormant field doesn't get per-concept Gaussian noise —
+        on a large network that would churn a fifth of all concepts
+        above the noise floor every tick. Instead, ignition arrives
+        as discrete events: the count is drawn from
+        Poisson(N_dormant × noise_amp × DORMANT_SPARK_COEFF), and each
+        event assigns a random dormant concept a spark magnitude in
+        [SPARK_MIN, SPARK_MAX]. Same serendipity function, sparse cost,
+        and the events are the substrate for spontaneous thoughts.
+
+        ``spark_rate`` overrides the per-concept ignition probability
+        (testing/tuning); default derives it from ``noise_amp``.
+
+        Returns the number of ignitions.
+        """
+        if noise_amp <= 0.0 or not self._concepts or self._active_ids is None:
+            return 0
+        n_dormant = len(self._concepts) - len(self._active_ids)
+        if n_dormant <= 0:
+            return 0
+        p_spark = (
+            noise_amp * DORMANT_SPARK_COEFF
+            if spark_rate is None
+            else spark_rate
+        )
+        lam = n_dormant * p_spark
+        # Knuth's algorithm — exact Poisson, cheap at small λ
+        threshold = math.exp(-lam)
+        k, p = 0, 1.0
+        while p > threshold:
+            k += 1
+            p *= self._rng.random()
+        k -= 1
+        if k <= 0:
+            return 0
+        ids = list(self._concepts)
+        sparked = 0
+        for _ in range(k):
+            cid = ids[self._rng.randrange(len(ids))]
+            concept = self._concepts.get(cid)
+            if concept is None or (concept.activation or 0.0) > 0.0:
+                continue  # already active
+            concept.activation = self._rng.uniform(SPARK_MIN, SPARK_MAX)
+            self._active_ids.add(cid)
+            sparked += 1
+        return sparked
+    def _rebuild_active_set(self) -> None:
+        """Rescan the whole field: rebuild ``_active_ids``, snap residue.
+
+        The periodic sweep — catches activation writes that bypassed
+        ``_mark_active`` and re-digitizes sub-floor residue across the
+        entire network. O(N), run every ``SWEEP_INTERVAL_TICKS``.
+        """
+        active: set[str] = set()
+        for cid, concept in self._concepts.items():
+            activation = concept.activation or 0.0
+            if activation >= ACTIVATION_NOISE_FLOOR:
+                active.add(cid)
+            elif activation != 0.0:
+                concept.activation = 0.0
+        self._active_ids = active
+    def _mark_active(self, name: str) -> None:
+        """Register a concept in the sparse-tick active set.
+
+        Called by sites that raise ``concept.activation`` outside the
+        tick loop (attention boosts, learning reinforcement, merge)
+        so the living field sees the write immediately instead of at
+        the next sweep. No-op before the first tick builds the set.
+        """
+        if self._active_ids is None:
+            return
+        cid = name if name in self._concepts else self._resolve(name)
+        concept = self._concepts.get(cid) if cid else None
+        if concept is not None and (concept.activation or 0.0) > 0.0:
+            self._active_ids.add(cid)
     def _apply_ach_focus(self, ach_focus: float) -> None:
         """Apply ACh winner-take-all dynamics: boost top concepts, suppress rest."""
         if ach_focus <= 0.01:
             return
-        # Boost top concepts, suppress the rest
+        # Boost top concepts, suppress the rest — sparse: only the
+        # active set can contain concepts above the 0.05 gate.
         activated = [
-            (cid, c.activation)
-            for cid, c in self._concepts.items()
-            if c.activation > 0.05
+            (cid, concept.activation)
+            for cid in list(self._active_ids or ())
+            if (concept := self._concepts.get(cid)) is not None
+            and concept.activation is not None
+            and concept.activation > 0.05
         ]
         if activated:
             activated.sort(key=lambda x: x[1], reverse=True)
             # Top 20% get boosted
             top_n = max(1, len(activated) // 5)
             top_ids = {cid for cid, _ in activated[:top_n]}
-            for cid, concept in list(self._concepts.items()):
-                if concept.activation is None:
-                    concept.activation = 0.0
+            for cid, _ in activated:
+                concept = self._concepts.get(cid)
+                if concept is None:
+                    continue
                 if cid in top_ids:
                     concept.activation = min(
                         1.0, concept.activation + ach_focus
                     )
-                elif concept.activation > 0.05:
+                else:
                     concept.activation *= (1.0 - ach_focus * 0.5)
     def _compute_effective_inhibition(
         self,
@@ -681,7 +867,7 @@ class DynamicsMixin:
             for cid in list(cids):
                 concept = self._concepts.get(cid)
                 if concept:
-                    total += concept.activation
+                    total += concept.activation or 0.0
                     count += 1
             if count > 0:
                 column_activations[column] = total / count
@@ -723,7 +909,7 @@ class DynamicsMixin:
         # (avoids O(N) scan of the entire concept network).
         column_cids = self._column_index.get(column, set())
         column_concepts = [
-            (cid, self._concepts[cid].activation)
+            (cid, self._concepts[cid].activation or 0.0)
             for cid in column_cids
             if cid in self._concepts
         ]
@@ -755,5 +941,7 @@ class DynamicsMixin:
                 concept.activation *= factor
     def most_activated(self, n: int = 10) -> list[tuple[str, float]]:
         """Return the N most activated concepts."""
-        ranked = heapq.nlargest(n, list(self._concepts.items()), key=lambda x: x[1].activation)
-        return [(cid, c.activation) for cid, c in ranked]
+        ranked = heapq.nlargest(
+            n, list(self._concepts.items()), key=lambda x: x[1].activation or 0.0
+        )
+        return [(cid, c.activation or 0.0) for cid, c in ranked]

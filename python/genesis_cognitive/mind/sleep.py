@@ -23,13 +23,23 @@ from genesis_client.protocol import (
     ZONE_SLEEPING,
 )
 
+from ..commitment import CommitmentBoundary
 from ..sleep import SleepStage
 from .thresholds import (
     AUTO_SLEEP_ADENOSINE,
+    AUTO_SLEEP_CONFIRM_S,
+    AUTO_SLEEP_EXIT,
     AUTO_SLEEP_MIN_AWAKE,
     AUTO_SLEEP_MIN_IDLE,
     AUTO_WAKE_ADENOSINE,
+    AUTO_WAKE_CYCLE_ADENOSINE,
     DROWSINESS_ADENOSINE,
+    DROWSINESS_CONFIRM_S,
+    DROWSINESS_EXIT,
+    WAKE_REINFORCE_INTERVAL,
+    WAKE_RESCUE_ADENOSINE,
+    WAKE_RESCUE_MELATONIN,
+    WAKE_STABILIZATION_WINDOW,
 )
 
 logger = logging.getLogger(__name__)
@@ -126,11 +136,29 @@ class SleepMixin:
         self._is_sleeping = False
         self._user_initiated_sleep = False
         self._last_wake_time: float = time.time()
+        self._last_wake_reinforce: float = 0.0
+        self._sleep_start_cycles: int = 0
         self._is_meditating = False
         self._last_rest_time = time.time()
         self._last_concept_count = 0
         self._is_teaching = False
         self._teaching_topic: str = ""
+        # Commitment boundaries on the sleep-wake axis — the
+        # digitizers that turn continuous adenosine pressure into
+        # discrete transitions. Both require a sustained crossing
+        # (confirm_s) so a transient spike cannot commit her, and
+        # re-arm below a lower release level (deadband) so boundary
+        # flicker cannot re-fire the transition. Reset on wake.
+        self._drowsy_boundary = CommitmentBoundary(
+            enter=DROWSINESS_ADENOSINE,
+            release=DROWSINESS_EXIT,
+            confirm_s=DROWSINESS_CONFIRM_S,
+        )
+        self._sleep_boundary = CommitmentBoundary(
+            enter=AUTO_SLEEP_ADENOSINE,
+            release=AUTO_SLEEP_EXIT,
+            confirm_s=AUTO_SLEEP_CONFIRM_S,
+        )
     @property
     def is_sleeping(self) -> bool:
         """Whether she is currently in a sleep state."""
@@ -415,8 +443,17 @@ class SleepMixin:
 
         # ── Auto-sleep onset ──
         if not self._is_sleeping and not self._is_meditating:
+            now = time.time()
+            # Feed the commitment boundaries before the gates — the
+            # sustained-crossing window must track the physical
+            # signal, not the gate-opened signal. Pressure that held
+            # above threshold while the user was active is genuinely
+            # sustained, not a transient, so the confirm clock keeps
+            # running behind the min-awake and idle gates.
+            self._drowsy_boundary.update(adenosine, now)
+            self._sleep_boundary.update(adenosine, now)
             # Minimum awake time to prevent oscillation at startup.
-            awake_elapsed = time.time() - self._last_wake_time
+            awake_elapsed = now - self._last_wake_time
             if awake_elapsed < AUTO_SLEEP_MIN_AWAKE:
                 return
             # Don't fall asleep while the user is actively talking to
@@ -425,7 +462,7 @@ class SleepMixin:
             # conversation is a jarring UX failure. The daemon may
             # enter NREM on its own (adenosine-driven), but the
             # cognitive mind stays awake until the user goes idle.
-            idle = time.time() - self._last_interaction_time
+            idle = now - self._last_interaction_time
             if idle < AUTO_SLEEP_MIN_IDLE:
                 logger.debug(
                     f"auto-sleep deferred: user active {idle:.1f}s ago "
@@ -435,13 +472,11 @@ class SleepMixin:
             # Drowsiness announcement — before falling asleep, she
             # announces she's getting sleepy. This is composed from
             # her understanding of "sleepiness" (not a hardcoded
-            # string), and only fires once per wake period. The
-            # daemon may also trigger this via its own phase shift.
-            if (
-                adenosine >= DROWSINESS_ADENOSINE
-                and not self._drowsiness_announced
-            ):
-                self._drowsiness_announced: bool = True
+            # string). The boundary's commit edge fires once per
+            # sustained crossing; it re-arms only if pressure drops
+            # below DROWSINESS_EXIT, so she can announce again if she
+            # genuinely recovers and fades a second time.
+            if self._drowsy_boundary.just_committed:
                 self._announce_drowsiness()
             # The daemon may enter NREM/REM before adenosine reaches
             # the mind's threshold — melatonin lowers the daemon's
@@ -450,10 +485,27 @@ class SleepMixin:
             # learner, and autonomous fixes are still active while the
             # subcognitive is already sleeping.
             daemon_sleeping = daemon_phase in ("nrem", "rem")
-            if adenosine >= AUTO_SLEEP_ADENOSINE or daemon_sleeping:
+            # Wake stabilization: within the post-wake window, a
+            # daemon-side sleep phase at moderate pressure is the
+            # flip-flop not yet latched — reinforce the wake state
+            # instead of instantly re-sleeping. Genuine exhaustion or
+            # circadian drive still override.
+            melatonin = core_state.chemicals.get("melatonin", 0.0)
+            if (
+                daemon_sleeping
+                and awake_elapsed < WAKE_STABILIZATION_WINDOW
+                and adenosine < WAKE_RESCUE_ADENOSINE
+                and melatonin < WAKE_RESCUE_MELATONIN
+            ):
+                if now - self._last_wake_reinforce >= WAKE_REINFORCE_INTERVAL:
+                    self._last_wake_reinforce = now
+                    self._reinforce_wake()
+                return
+            if self._sleep_boundary.committed or daemon_sleeping:
                 reason = (
                     f"adenosine={adenosine:.2f} "
-                    f"(threshold={AUTO_SLEEP_ADENOSINE})"
+                    f"(threshold={AUTO_SLEEP_ADENOSINE}, "
+                    f"sustained {AUTO_SLEEP_CONFIRM_S:.0f}s)"
                     if not daemon_sleeping
                     else f"daemon phase={daemon_phase} "
                     f"(adenosine={adenosine:.2f})"
@@ -484,6 +536,27 @@ class SleepMixin:
                 logger.info(
                     f"Auto-wake: adenosine={adenosine:.2f} "
                     f"(threshold={AUTO_WAKE_ADENOSINE}), waking up"
+                )
+                try:
+                    self.wake()
+                except Exception as e:  # noqa: BLE001
+                    logger.warning(f"auto-wake failed: {e}")
+                return
+            # Cycle-boundary wake: spontaneous waking clusters at
+            # ultradian transitions (post-REM). When a full cycle
+            # completes, a relaxed pressure threshold applies —
+            # without it, slow clearance can hold her in sleep long
+            # past the point a full cycle has already restored her.
+            cycle = self.inner_life.sleep_cycle
+            if (
+                cycle is not None
+                and cycle.cycles_completed > self._sleep_start_cycles
+                and adenosine <= AUTO_WAKE_CYCLE_ADENOSINE
+            ):
+                logger.info(
+                    f"Auto-wake: cycle boundary reached "
+                    f"(adenosine={adenosine:.2f}, "
+                    f"threshold={AUTO_WAKE_CYCLE_ADENOSINE}), waking up"
                 )
                 try:
                     self.wake()
@@ -545,6 +618,10 @@ class SleepMixin:
         self._is_sleeping = True
         self._user_initiated_sleep = user_initiated
         self._nap_mode = nap
+        cycle = self.inner_life.sleep_cycle
+        self._sleep_start_cycles = (
+            cycle.cycles_completed if cycle is not None else 0
+        )
         self.client.set_zone(ZONE_SLEEPING)
 
         self._engage_sleep_mechanism()
@@ -808,9 +885,11 @@ class SleepMixin:
             return
         self._is_sleeping = False
         self._user_initiated_sleep = False
-        # Clear the drowsiness flag so she can announce it again
-        # next time she gets sleepy.
-        self._drowsiness_announced = False
+        # Reset the commitment boundaries so the next wake period
+        # announces drowsiness and commits to sleep on fresh
+        # crossings, not stale latched state.
+        self._drowsy_boundary.reset()
+        self._sleep_boundary.reset()
         # Clear nap mode — the next sleep is a full sleep unless
         # explicitly set as a nap again.
         self._nap_mode = False
@@ -896,6 +975,24 @@ class SleepMixin:
         self._learner_neuro_impulse(CHEM_DOPAMINE, 0.05)
         self._learner_neuro_impulse(CHEM_NOREPINEPHRINE, 0.05)
         self._learner_neuro_impulse(CHEM_MELATONIN, -0.10)
+
+    def _reinforce_wake(self) -> None:
+        """Re-latch the sleep-wake flip-flop during the stabilization
+        window after waking.
+
+        Orexin is the wake-state stabilizer: orexinergic neurons fire
+        tonically during wakefulness to keep the mutually inhibitory
+        VLPO/monoaminergic switch latched awake. A single wake-cascade
+        impulse decays within minutes while residual adenosine keeps
+        suppressing orexin, so the daemon's emergent phase can drift
+        back to NREM shortly after waking — brief wake bouts followed
+        by rapid re-sleep. Sustained modest orexin + histamine support
+        during the post-wake window models the tonic orexin tone that
+        normally holds the switch. Bounded by WAKE_REINFORCE_INTERVAL
+        so impulses can't accumulate into an arousal ceiling.
+        """
+        self._learner_neuro_impulse(CHEM_OREXIN, 0.08)
+        self._learner_neuro_impulse(CHEM_HISTAMINE, 0.06)
     def _resume_learners_after_wake(self) -> None:
         """Resume both learners with a delay for sleep inertia.
 

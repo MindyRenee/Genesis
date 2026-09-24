@@ -274,11 +274,12 @@ class ArchivalMixin:
         for cid, concept in self._concepts.items():
             if concept.origin in protected_origins:
                 continue
-            if concept.activation >= activation_threshold:
+            activation = concept.activation or 0.0
+            if activation >= activation_threshold:
                 continue
             if concept.review_count > 0:
                 continue
-            spillable.append((concept.activation, cid))
+            spillable.append((activation, cid))
 
         # Sort by activation ascending (most dormant first)
         spillable.sort(key=lambda x: x[0])

@@ -1027,6 +1027,7 @@ class SelfDirectedLearner:
         # self-assessment as needing study. These are prioritized in
         # self_study() over the automatic weak-concept scan.
         self._study_targets: list[str] = []
+        self._max_study_targets = 200
         # Cache the expensive man-page scan; man pages don't change
         # during a single run.
         self._man_page_genus_cache: list[tuple[str, str, str]] | None = None
@@ -1047,6 +1048,11 @@ class SelfDirectedLearner:
 
         Called by the reflection system when a knowledge gap is detected.
         """
+        # Bound the queue — it drains only when self_study() runs with
+        # the default weak_concepts scan, so an unbounded list could
+        # accumulate if callers queue faster than cycles drain.
+        if len(self._study_targets) >= self._max_study_targets:
+            self._study_targets.pop(0)
         self._study_targets.append(concept)
 
     @property
@@ -1514,8 +1520,17 @@ class SelfDirectedLearner:
         for a, targets in adjacency.items():
             if inferences_made >= max_inferences:
                 break
-            for b in targets:
-                for c in adjacency.get(b, []):
+            # Snapshot targets: newly inferred edges are appended to
+            # adjacency[a] below — iterating the live list would extend
+            # the loop mid-pass and cascade the entire transitive
+            # closure in one call, ignoring the inference budget.
+            # Multi-hop chains belong to the subsequent passes.
+            for b in list(targets):
+                if inferences_made >= max_inferences:
+                    break
+                for c in list(adjacency.get(b, [])):
+                    if inferences_made >= max_inferences:
+                        break
                     if c == a or c == b:
                         continue
 
@@ -2492,11 +2507,12 @@ class SelfDirectedLearner:
         for edge in edges:
             target_lower = edge.target.lower()
             # Match if the negated concept is the target, or the target
-            # starts with the negated concept (e.g., "six" in "six legs").
+            # starts with the negated concept on a word boundary (e.g.,
+            # "six" in "six legs"). A bare startswith would also match
+            # "sixteen" for "six" — unrelated edges wrongly removed.
             if (
                 target_lower == neg_lower
                 or target_lower.startswith(neg_lower + " ")
-                or target_lower.startswith(neg_lower)
             ):
                 self.network.remove_edge(
                     edge.source, edge.target, edge.relation
@@ -3120,9 +3136,8 @@ class SelfDirectedLearner:
         OPPOSITE_OF on the same pair), both edges are downgraded rather
         than removing the weaker one. This preserves competing claims
         with reduced confidence so the system can re-evaluate them as
-        more evidence accumulates. This matches the 2026 epistemic
-        integrity literature which emphasizes preserving revision
-        history rather than destroying knowledge.
+        more evidence accumulates, instead of destroying the revision
+        history.
         """
         seen_pairs: set[frozenset[str]] = set()
         for edge in list(self.network._edges):

@@ -272,6 +272,11 @@ class SystemBaseline:
             name: MetricStats() for name in self._METRIC_NAMES
         }
         self._persist_path = persist_path
+        # Save cadence: once per 10 records. A dedicated counter is
+        # needed — sample count saturates at the deque maxlen, so
+        # `count % 10` stays 0 forever after the window fills and would
+        # save on every single record.
+        self._records_since_save = 0
         if persist_path and persist_path.exists():
             self.load()
 
@@ -283,9 +288,10 @@ class SystemBaseline:
         self._metrics["load_avg_1"].record(snapshot.load_avg[0])
         self._metrics["process_count"].record(float(snapshot.process_count))
         self._metrics["disk_percent"].record(snapshot.disk_percent)
-        # Persist every ~10 samples (roughly every 10 minutes at 1/min)
-        total = min(m.count for m in self._metrics.values())
-        if total > 0 and total % 10 == 0:
+        # Persist every ~10 records (roughly every 10 minutes at 1/min)
+        self._records_since_save += 1
+        if self._records_since_save >= 10:
+            self._records_since_save = 0
             self.save()
 
     def deviations(

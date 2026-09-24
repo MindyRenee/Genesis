@@ -190,7 +190,7 @@ class Journal:
     def _append_to_disk(self, entry: JournalEntry) -> None:
         """Append a single entry to the journal file."""
         try:
-            os.makedirs(self._data_dir, exist_ok=True)
+            os.makedirs(self._data_dir, mode=0o700, exist_ok=True)
             with open(self._path, "a", encoding="utf-8") as f:
                 f.write(entry.format())
         except OSError as e:
@@ -353,9 +353,11 @@ class Journal:
             # Rewrite the journal file
             self._rewrite_to_disk()
 
-            removed = len(to_consolidate) - sum(
-                len(entries) for entries in by_tag.values()
-            )
+            # by_tag partitions to_consolidate exactly, so its total
+            # always equals len(to_consolidate) — the net removal is
+            # consolidated entries minus the summary entries that
+            # replaced them.
+            removed = len(to_consolidate) - len(summaries)
 
             return {
                 "kept": len(kept),
@@ -373,7 +375,7 @@ class Journal:
         temp file + rename so a crash cannot leave a truncated journal.
         """
         try:
-            os.makedirs(self._data_dir, exist_ok=True)
+            os.makedirs(self._data_dir, mode=0o700, exist_ok=True)
             tmp_path = str(self._path) + ".tmp"
             with open(tmp_path, "w", encoding="utf-8") as f:
                 for entry in self._entries:

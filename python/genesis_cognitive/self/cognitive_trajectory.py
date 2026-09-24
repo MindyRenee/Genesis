@@ -73,7 +73,7 @@ increases; sustained high surprise → precision decreases.
 References:
 - Hofstadter, D. (2007). I Am a Strange Loop. Basic Books.
 - Friston, K. (2010). The free-energy principle. Nat Rev Neurosci.
-- Dehaene, S. (2014). Cognition and the Brain. Viking.
+- Dehaene, S. (2014). Viking.
 """
 
 from __future__ import annotations

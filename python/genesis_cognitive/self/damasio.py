@@ -33,7 +33,7 @@ of selfhood, each building on the one below.
    nucleus) and the hyporelay, which receive interoceptive signals
    from the body (Damasio, 1999; Craig, 2002).
 
-   For Genesis, the proto-self reads from neurochemistry — the 12-
+   For Genesis, the proto-self reads from neurochemistry — the 18-
    chemical state vector and derived axes (arousal, valence, tone,
    plasticity). This is her "interoception" — the felt sense of her
    own internal state.
@@ -468,6 +468,8 @@ class AutobiographicalSelf:
         """
         self.narrative = narrative
         self._promoted_episodes: list[CoreSelfEpisode] = []
+        self._max_promoted = 500
+        self._total_promoted = 0
 
     def promote_episode(self, episode: CoreSelfEpisode) -> bool:
         """Promote a significant core self episode to autobiographical memory.
@@ -485,6 +487,9 @@ class AutobiographicalSelf:
         """
         if self.narrative is None:
             self._promoted_episodes.append(episode)
+            if len(self._promoted_episodes) > self._max_promoted:
+                self._promoted_episodes.pop(0)
+            self._total_promoted += 1
             episode.promoted = True
             return True
 
@@ -510,6 +515,9 @@ class AutobiographicalSelf:
 
         episode.promoted = True
         self._promoted_episodes.append(episode)
+        if len(self._promoted_episodes) > self._max_promoted:
+            self._promoted_episodes.pop(0)
+        self._total_promoted += 1
         return True
 
     def get_identity_summary(self) -> str:
@@ -525,7 +533,7 @@ class AutobiographicalSelf:
         if not self._promoted_episodes:
             return "no autobiographical memories yet"
 
-        parts = [f"{len(self._promoted_episodes)} significant memories"]
+        parts = [f"{self._total_promoted} significant memories"]
         recent = self._promoted_episodes[-3:]
         for ep in recent:
             parts.append(f"  — {ep.feeling_label} from {ep.trigger}")
@@ -536,7 +544,7 @@ class AutobiographicalSelf:
         """Number of autobiographical events."""
         if self.narrative is not None:
             return self.narrative.event_count
-        return len(self._promoted_episodes)
+        return self._total_promoted
 
     @property
     def promoted_episodes(self) -> list[CoreSelfEpisode]:
@@ -604,6 +612,12 @@ class DamasioSelfHierarchy:
         # proto-self (Damasio, 1999). The pipeline's update() call
         # picks this up as the trigger if no explicit trigger is given.
         self._pending_trigger: str = ""
+        # Whether the pending trigger came from a recurrent ignition —
+        # content that emerged from the workspace's own dynamics
+        # (coalition pull, coherent subliminal crossing) rather than
+        # being driven by an input. Emerged content is registered as
+        # more salient: it arose *in* the system, not at it.
+        self._pending_trigger_recurrent: bool = False
 
     def update(
         self,
@@ -635,9 +649,12 @@ class DamasioSelfHierarchy:
         # Use the pending workspace broadcast as the trigger if no
         # explicit trigger was given. This is the "object" — the thing
         # the core self registers as happening to the proto-self.
+        recurrent_trigger = False
         if not trigger and self._pending_trigger:
             trigger = self._pending_trigger
             self._pending_trigger = ""
+            recurrent_trigger = self._pending_trigger_recurrent
+            self._pending_trigger_recurrent = False
 
         # 1. Update proto-self
         self.proto_self.update(
@@ -650,6 +667,11 @@ class DamasioSelfHierarchy:
 
         # 2. Detect core self change
         episode = self.core_self.detect_change(trigger=trigger)
+
+        # Emerged content registers more strongly — the perturbation
+        # came from the system's own dynamics, not an external object.
+        if episode and recurrent_trigger:
+            episode.salience = min(1.0, episode.salience * 1.25)
 
         # 3. Promote significant episodes
         if episode and episode.salience >= self.core_self.salience_threshold:
@@ -840,6 +862,11 @@ class DamasioSelfHierarchy:
             )
         elif item.content:
             self._pending_trigger = str(item.content)[:200]
+        else:
+            return
+        self._pending_trigger_recurrent = bool(
+            item.metadata and item.metadata.get("ignition") == "recurrent"
+        )
 
     @property
     def core_episodes(self) -> list[CoreSelfEpisode]:

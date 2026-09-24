@@ -451,6 +451,13 @@ class DreamSynthesisEngine:
                     ),
                 )
                 self._validated_insights.append(insight)
+                # Bound the history — validated insights accumulate
+                # every sleep cycle in a long-running daemon and
+                # to_dict serializes the whole list.
+                if len(self._validated_insights) > 500:
+                    del self._validated_insights[
+                        : len(self._validated_insights) - 500
+                    ]
                 results.append(DreamValidationResult(
                     proposal=proposal,
                     corroborations=corroborations,
@@ -664,7 +671,9 @@ class DreamSynthesisEngine:
     def restore_from_dict(self, data: dict[str, Any]) -> None:
         """Restore state from persistence."""
         self._validated_insights = []
-        for item in data.get("insights", []):
+        # Trim to the cap — a save written before the bound existed can
+        # hold more; keep the most recent.
+        for item in data.get("insights", [])[-500:]:
             relation_str = item.get("relation", "related_to")
             try:
                 relation = RelationType(relation_str)

@@ -1,9 +1,9 @@
 """Vision for Genesis — interprets the retina's shared-memory camera feed.
 
 This module is the bridge between the raw camera feed (retina.py) and
-Genesis's cognitive experience. It produces rich, human-like scene
-descriptions that combine color, objects, faces, lighting, and spatial
-layout — the way a person would describe what they see.
+Genesis's cognitive experience. It produces a structured scene percept
+— color, objects, faces, lighting, and spatial layout as data — that
+the language engine composes her report from.
 
 The pipeline:
 
@@ -22,15 +22,18 @@ The pipeline:
     V1 sparse coding        -> edges, contours, gamma (sublayer)
         |
         v
-    Vision.see()            -> rich scene description
+    Vision.see()            -> VisionScene (structured percept data)
         |                      + memory store
         |                      + concept network learning
         |                      + neurochemical modulation
         |                      + brain wave gamma update
         v
-    "I see Alice sitting at a wooden desk in warm light.
-     There's a blue cup on the right and a laptop in front of her.
-     Light is coming from a window on the left."
+    caller -> language engine -> "I see Alice in warm light; there's
+     a blue cup on the right and a laptop in the center."
+
+The module emits perception, not prose: ``VisionScene`` carries the
+scene's structure as data, and her report is composed downstream by
+the language engine — she doesn't recite a template.
 """
 
 from __future__ import annotations
@@ -38,6 +41,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -46,6 +50,7 @@ from genesis_client.protocol import (
     CHEM_ACETYLCHOLINE,
     CHEM_DOPAMINE,
     CHEM_NOREPINEPHRINE,
+    CHEM_OXYTOCIN,
 )
 
 from ..auditory import DetectedObject, ObjectRecognizer
@@ -60,8 +65,63 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class VisionScene:
+    """The structured content of one glance — perception, not prose.
+
+    This is data: what she actually perceived, as fields the language
+    engine composes her report from. Nothing here is a sentence she
+    recites; ``see()`` hands this to the caller, and the caller routes
+    ``as_metadata()`` through the language engine.
+    """
+
+    # "ok" | "unavailable" | "mid_update" | "unprocessed"
+    status: str = "ok"
+    light_level: str = ""
+    dominant_color: str = ""
+    warmth: str = ""
+    brightness: float = 0.0
+    faces: list[str] = field(default_factory=list)
+    n_unknown_faces: int = 0
+    # Each entry: {"name": ..., "color": ... or "", "position": ...}
+    objects: list[dict[str, str]] = field(default_factory=list)
+    light_direction: str = ""  # "left" / "right" / ""
+    highly_structured: bool = False
+    salience: float = 0.0
+
+    def as_metadata(self) -> dict:
+        """The scene as language-engine metadata (the ``vision_scene`` slot)."""
+        return {
+            "light": self.light_level,
+            "warmth": self.warmth,
+            "color": self.dominant_color,
+            "faces": list(self.faces),
+            "n_unknown_faces": self.n_unknown_faces,
+            "objects": [dict(o) for o in self.objects],
+            "light_direction": self.light_direction,
+            "structured": self.highly_structured,
+            "salience": self.salience,
+        }
+
+    def memory_text(self) -> str:
+        """Compact structural record for episodic memory — data, not speech."""
+        parts = [f"scene | {self.light_level} {self.warmth} {self.dominant_color}".rstrip()]
+        if self.faces or self.n_unknown_faces:
+            named = ",".join(self.faces) or "none"
+            parts.append(f"faces: {named} (+{self.n_unknown_faces} unknown)")
+        if self.objects:
+            objs = ",".join(
+                f"{o['name']}({o['color'] or '-'})@{o['position']}"
+                for o in self.objects
+            )
+            parts.append(f"objects: {objs}")
+        if self.light_direction:
+            parts.append(f"light: {self.light_direction}")
+        return " | ".join(parts)
+
+
 class Vision:
-    """Look through the retina and produce a rich scene description.
+    """Look through the retina and produce a structured scene percept.
 
     Uses the V1Model (V1 sparse-coding model) to extract structured
     visual percepts -- edges, orientations, contours, and gamma power --
@@ -226,8 +286,8 @@ class Vision:
         client=None,
         emotion: EmotionalState | None = None,
         network=None,
-    ) -> str:
-        """Look through the retina and report the scene like a human would.
+    ) -> VisionScene:
+        """Look through the retina and return the structured scene.
 
         This runs the full visual pipeline:
         1. Capture a frame from the retina (shared memory)
@@ -236,15 +296,19 @@ class Vision:
         4. Detect and identify objects (IT cortex)
         5. Detect and identify faces (FFA)
         6. Run V1 sparse coding as a sublayer (edges, gamma)
-        7. Compose a rich scene description
+        7. Package the percept as a VisionScene
         8. Wire into memory, concept network, neurochemistry, brain waves
+
+        The return value is structured percept data, not a sentence —
+        the caller hands ``scene.as_metadata()`` to the language engine,
+        which composes her actual report from it.
         """
         if not self.is_available():
-            return "cannot see anything right now — retina not attached"
+            return VisionScene(status="unavailable")
         try:
             frame = latest_frame(copy=True)
             if frame is None:
-                return "couldn't get a clear view — retina was mid-update"
+                return VisionScene(status="mid_update")
 
             # Convert to RGB.
             if frame.ndim == 3 and frame.shape[2] == 3:
@@ -264,8 +328,8 @@ class Vision:
             # ── V1 sparse coding (sublayer: edges, gamma) ──────────
             field = self._run_v1_sparse_coding(rgb, objects)
 
-            # ── Compose the rich scene description ─────────────────
-            desc = _compose_scene_description(
+            # ── Package the structured scene percept ────────────────
+            scene = _build_scene(
                 color_info, objects, object_colors,
                 face_names, n_unknown_faces, field,
             )
@@ -289,17 +353,19 @@ class Vision:
             if network is not None:
                 _learn_scene(
                     network, color_info.dominant_color,
-                    color_info.light_level, desc, salience, field,
+                    color_info.light_level, salience, field,
                 )
                 if objects:
                     _learn_objects(network, objects, salience)
+
+            scene.salience = salience
 
             # ── Modulate neurochemistry ────────────────────────────
             if client is not None and emotion is not None:
                 self._modulate_vision_chemistry(
                     client, color_info, mean_saturation,
                     salience, changed, field, objects, face_names,
-                    emotion, desc,
+                    emotion, scene,
                 )
 
             # ── Feed V1 gamma to brain waves ───────────────────────
@@ -309,10 +375,10 @@ class Vision:
                 except Exception as e:  # noqa: BLE001
                     logger.debug(f"gamma callback failed: {e}")
 
-            return desc
+            return scene
         except Exception as e:  # noqa: BLE001
             logger.debug(f"vision see failed: {e}")
-            return "can see, but cannot make sense of it yet"
+            return VisionScene(status="unprocessed")
 
     def _compute_salience(
         self,
@@ -352,7 +418,7 @@ class Vision:
         objects: list,
         face_names: list[str],
         emotion,
-        desc: str,
+        scene: VisionScene,
     ) -> None:
         """Send neurochemical impulses based on the visual scene."""
         gamma_val = field.gamma_power if field is not None else 0.0
@@ -362,17 +428,17 @@ class Vision:
         )
         if objects:
             try:
-                client.neuro_impulse(0, 0.03)  # DA — recognition reward
-                client.neuro_impulse(3, 0.02)  # ACh — attentional focus
+                client.neuro_impulse(CHEM_DOPAMINE, 0.03)  # recognition reward
+                client.neuro_impulse(CHEM_ACETYLCHOLINE, 0.02)  # attentional focus
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"neuro impulse for objects failed: {e}")
         if face_names:
             try:
-                client.neuro_impulse(7, 0.03)  # OXY — social bonding
-                client.neuro_impulse(0, 0.02)  # DA — recognition reward
+                client.neuro_impulse(CHEM_OXYTOCIN, 0.03)  # social bonding
+                client.neuro_impulse(CHEM_DOPAMINE, 0.02)  # recognition reward
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"neuro impulse for faces failed: {e}")
-        _store_vision_event(client, emotion, desc, salience)
+        _store_vision_event(client, emotion, scene.memory_text(), salience)
 
 
 def _yuyv_to_rgb(yuyv: np.ndarray) -> np.ndarray:
@@ -416,6 +482,7 @@ class ColorInfo:
         mean_saturation: float,
         warmth: str,
         regions: dict[str, str],
+        region_brightness: dict[str, float] | None = None,
     ) -> None:
         """Initialize color information storage."""
         self.dominant_color = dominant_color
@@ -424,6 +491,9 @@ class ColorInfo:
         self.mean_saturation = mean_saturation
         self.warmth = warmth
         self.regions = regions  # {"left": "blue", "center": "warm wood", ...}
+        # Mean luminance per region — real brightness data, so light
+        # direction is inferred from luminance, not color names.
+        self.region_brightness = region_brightness or {}
 
 
 def _analyze_color_and_light(rgb: np.ndarray) -> ColorInfo:
@@ -468,7 +538,7 @@ def _analyze_color_and_light(rgb: np.ndarray) -> ColorInfo:
     # Spatial color regions — divide the frame into a 3x3 grid and
     # describe the color of each region. Then summarize into
     # left/center/right and top/bottom.
-    regions = _spatial_color_regions(sample, h, w)
+    regions, region_brightness = _spatial_color_regions(sample, h, w)
 
     return ColorInfo(
         dominant_color=dominant_color,
@@ -477,6 +547,7 @@ def _analyze_color_and_light(rgb: np.ndarray) -> ColorInfo:
         mean_saturation=mean_sat,
         warmth=warmth,
         regions=regions,
+        region_brightness=region_brightness,
     )
 
 
@@ -555,15 +626,17 @@ def _color_warmth(hue: np.ndarray, sat: np.ndarray) -> str:
 
 def _spatial_color_regions(
     sample: np.ndarray, h: int, w: int
-) -> dict[str, str]:
+) -> tuple[dict[str, str], dict[str, float]]:
     """Divide the frame into regions and name the color of each.
 
-    Returns a dict with keys like "left", "center", "right", "top", "bottom"
-    mapping to color names. This gives her spatial color awareness —
-    she knows the window is bright on the left, the desk is brown in
-    the center, etc.
+    Returns (color_names, brightness) — dicts keyed by "left",
+    "center", "right", "top", "bottom". Color names give her spatial
+    color awareness (the window is blue on the left, the desk is brown
+    in the center); mean luminance per region is real brightness data
+    for light-direction inference.
     """
     regions: dict[str, str] = {}
+    brightness: dict[str, float] = {}
     sh, sw = sample.shape[:2]
 
     # Left / center / right thirds.
@@ -575,6 +648,7 @@ def _spatial_color_regions(
         strip = sample[:, x_start:x_end].reshape(-1, 3)
         hue, sat, val = _rgb_to_hsv_vec(strip.astype(np.float32) / 255.0)
         regions[name] = _dominant_color_name(hue, sat, val)
+        brightness[name] = float(val.mean())
 
     # Top / bottom halves.
     for name, y_start, y_end in [
@@ -584,8 +658,9 @@ def _spatial_color_regions(
         strip = sample[y_start:y_end, :].reshape(-1, 3)
         hue, sat, val = _rgb_to_hsv_vec(strip.astype(np.float32) / 255.0)
         regions[name] = _dominant_color_name(hue, sat, val)
+        brightness[name] = float(val.mean())
 
-    return regions
+    return regions, brightness
 
 
 def _object_colors(
@@ -623,123 +698,72 @@ def _object_colors(
 # ═══════════════════════════════════════════════════════════════════════
 
 
-def _compose_scene_description(
+def _build_scene(
     color_info: ColorInfo,
     objects: list[DetectedObject],
     object_colors: dict[str, str],
     face_names: list[str],
     n_unknown_faces: int,
     field: VisualField | None = None,
-) -> str:
-    """Compose a rich, human-like description of the scene.
+) -> VisionScene:
+    """Package the percept as structured data for the language engine.
 
-    This is the heart of her visual experience. Instead of "I see a
-    bright gray scene with 47 oriented V1 features," she says things
-    like "I see Alice at a desk in warm light. There's a blue cup on
-    the right and a laptop in the center."
+    Everything the old template description expressed — lighting,
+    color, people, objects with colors and positions, light direction,
+    scene structure — becomes fields on a ``VisionScene``. The words
+    she speaks are composed downstream by her language engine from
+    ``scene.as_metadata()``; nothing here is a sentence she recites.
     """
-    parts: list[str] = []
-
-    # ── Opening: lighting and color mood ─────────────────────
-    light_word = color_info.light_level
-    warmth = color_info.warmth
-    if warmth != "neutral":
-        mood = f"{light_word}, {warmth}"
-    else:
-        mood = light_word
-
-    if color_info.dominant_color in ("gray", "white"):
-        opening = f"a {mood} scene"
-    else:
-        opening = f"a {mood} {color_info.dominant_color} scene"
-    parts.append(opening)
-
-    # ── People ───────────────────────────────────────────────
-    if face_names:
-        # Capitalize names properly (stored lowercase in the recognizer).
-        named = [n.capitalize() for n in face_names]
-        if len(named) == 1:
-            parts.append(f"can see {named[0]}")
-        else:
-            parts.append(f"can see {', '.join(named)}")
-    elif n_unknown_faces == 1:
-        parts.append("someone not recognized")
-    elif n_unknown_faces > 1:
-        parts.append(f"{n_unknown_faces} people not recognized")
-
     # ── Objects with colors and positions ────────────────────
+    # Dedup by name; skip "person" when faces were already
+    # identified (a detected person bounding box duplicates the
+    # face recognition result).
+    obj_entries: list[dict[str, str]] = []
     if objects:
         seen_names: set[str] = set()
-        obj_descs: list[str] = []
         for obj in objects:
             if obj.name in seen_names:
                 continue
             seen_names.add(obj.name)
-            # Skip "person" if we already named faces.
             if obj.name == "person" and (face_names or n_unknown_faces):
                 continue
             color = object_colors.get(obj.name, "")
-            pos = obj.position_description
-            article = "an" if obj.name[0].lower() in "aeiou" else "a"
-            if color and color not in ("gray", "white", "unknown"):
-                obj_descs.append(f"{color} {obj.name} {pos}")
-            else:
-                obj_descs.append(f"{article} {obj.name} {pos}")
-        if obj_descs:
-            if len(obj_descs) == 1:
-                parts.append(f"there's {obj_descs[0]}")
-            elif len(obj_descs) == 2:
-                parts.append(f"there's {obj_descs[0]} and {obj_descs[1]}")
-            else:
-                parts.append(
-                    f"there's {', '.join(obj_descs[:-1])}, and {obj_descs[-1]}"
-                )
+            obj_entries.append({
+                "name": obj.name,
+                "color": color if color not in ("gray", "white", "unknown") else "",
+                "position": obj.position_description,
+            })
 
     # ── Spatial color highlights ─────────────────────────────
-    # If the left/right regions differ significantly, mention it
-    # (e.g., "light is coming from the left").
-    regions = color_info.regions
-    if "left" in regions and "right" in regions:
-        left_bright = _is_brighter_color(regions["left"])
-        right_bright = _is_brighter_color(regions["right"])
-        if left_bright and not right_bright:
-            parts.append("light seems to be coming from the left")
-        elif right_bright and not left_bright:
-            parts.append("light seems to be coming from the right")
+    # If the left/right regions differ meaningfully in mean luminance,
+    # record which side the light seems to come from. The comparison
+    # uses real per-region luminance — comparing color *names* would
+    # call a shadowed yellow wall "brighter" than a sunlit gray one.
+    light_direction = ""
+    rb = color_info.region_brightness
+    if "left" in rb and "right" in rb:
+        diff = rb["left"] - rb["right"]
+        if abs(diff) > 0.08:
+            light_direction = "left" if diff > 0 else "right"
 
-    # ── V1 structural note (sublayer) ────────────────────────
-    if field is not None and field.contour_count() > 0:
-        n_contours = field.contour_count()
-        if n_contours > 5:
-            parts.append("the scene has a lot of structure")
-
-    # ── Compose ──────────────────────────────────────────────
-    desc = ". ".join(parts) + "."
-    # Capitalize the first letter of each sentence, but preserve
-    # proper names (capitalized words) within sentences.
-    sentences = [s.strip() for s in desc.split(". ") if s.strip()]
-    fixed: list[str] = []
-    for s in sentences:
-        if s:
-            # Only capitalize the first character, leave the rest as-is.
-            s = s[0].upper() + s[1:]
-        fixed.append(s)
-    desc = ". ".join(fixed)
-    if not desc.endswith("."):
-        desc += "."
-    return desc
-
-
-def _is_brighter_color(color_name: str) -> bool:
-    """Heuristic: is this color likely brighter than average?"""
-    return color_name in ("white", "yellow", "cyan", "orange", "bright")
+    return VisionScene(
+        status="ok",
+        light_level=color_info.light_level,
+        dominant_color=color_info.dominant_color,
+        warmth=color_info.warmth,
+        brightness=color_info.brightness,
+        faces=list(face_names),
+        n_unknown_faces=n_unknown_faces,
+        objects=obj_entries,
+        light_direction=light_direction,
+        highly_structured=field is not None and field.contour_count() > 5,
+    )
 
 
 def _learn_scene(
     network,
     color: str,
     light: str,
-    desc: str,
     salience: float,
     field: VisualField | None = None,
 ) -> None:

@@ -121,13 +121,12 @@ class FeelingReporter:
     ) -> dict[str, list[str] | str | None]:
         """Collect semantic fragments for the language engine to compose.
 
-        Unlike :meth:`compose_feeling_report_for_speech`, which pre-composes
-        a fixed-frame sentence ("I feel X and Y"), this returns the raw
-        building blocks — emotion words, cognitive-mode words, cause words,
-        plasticity words, and an optional concern hint — as structured data.
-        The vocabulary's content-slot composer then weaves these into varied
-        grammatical structures, giving her freedom to express the same
-        state in different ways rather than always saying "I feel X and Y."
+        Returns the raw building blocks — emotion words, cognitive-mode
+        words, cause words, plasticity words, and an optional concern
+        hint — as structured data. The vocabulary's content-slot composer
+        then weaves these into varied grammatical structures, giving her
+        freedom to express the same state in different ways rather than
+        always saying "I feel X and Y."
 
         Returns a dict with keys:
         - "emotion_words": list of words for the emotion category
@@ -160,85 +159,6 @@ class FeelingReporter:
             "plasticity_words": plasticity_words,
             "concern": concern,
         }
-
-    def compose_feeling_report_for_speech(
-        self, emotion: EmotionalState
-    ) -> str:
-        """Compose a coherent first-person feeling report for speech.
-
-        This is the speech-safe version of :meth:`compose_feeling_report`.
-        It collects the semantic fragments (emotion words, cognitive mode
-        words, cause words, learned plasticity words, concern hints) and
-        composes them into coherent first-person sentences using
-        grammatical connectors — never internal diagnostic tags.
-
-        The fragments are grouped into two clusters:
-        - Feeling cluster (emotion + mode): woven into "I feel X and Y"
-        - State cluster (cause + plasticity + concern): woven into a
-          separate sentence about her current state
-
-        The connectors ("I feel", "and", "—") are grammar seeds (building
-        blocks). The actual words come from the concept network. If she
-        hasn't learned words for her current state, the result may be
-        empty, and the caller should skip the self-report.
-        """
-        semantic, _structural = self._collect_feeling_parts(emotion)
-        if not semantic:
-            return ""
-
-        # Split semantic parts into feeling words and state words.
-        # Feeling words: emotion label + cognitive mode (the "how I feel"
-        # cluster). State words: cause + plasticity + concern (the "what's
-        # happening" cluster), tracked with their kind so we can compose
-        # each type with appropriate grammar.
-        feeling_words: list[str] = []
-        state_items: list[tuple[str, str]] = []  # (kind, text)
-
-        for kind, text in semantic:
-            if kind in ("emotion", "mode"):
-                feeling_words.append(text)
-            else:
-                state_items.append((kind, text))
-
-        sentences: list[str] = []
-
-        # Compose feeling cluster into a first-person sentence.
-        # "I feel X" / "I feel X and Y" / "I feel X, Y, and Z"
-        if feeling_words:
-            if len(feeling_words) == 1:
-                sentences.append(f"I feel {feeling_words[0]}")
-            elif len(feeling_words) == 2:
-                sentences.append(f"I feel {feeling_words[0]} and {feeling_words[1]}")
-            else:
-                joined = ", ".join(feeling_words[:-1])
-                joined += f", and {feeling_words[-1]}"
-                sentences.append(f"I feel {joined}")
-
-        # Compose state cluster into first-person sentences.
-        # Different kinds need different grammatical framing:
-        # - cause words (adjectives): "I'm cautious"
-        # - plasticity words (verb phrases): "I can't absorb"
-        # - concern hints (phrases): standalone, e.g. "dealing with code issues"
-        state_phrases: list[str] = []
-        for kind, text in state_items:
-            if kind == "cause":
-                state_phrases.append(f"I'm {text}")
-            elif kind == "plasticity":
-                # Plasticity words may be verb phrases ("can't absorb")
-                # or noun phrases ("mind closed to new learning"). Use "I"
-                # for verb-like phrases, otherwise use the phrase as-is.
-                if text.startswith(("can't", "can not", "cannot", "don't", "do not")):
-                    state_phrases.append(f"I {text}")
-                else:
-                    state_phrases.append(text)
-            else:
-                # Concern hints are standalone phrases
-                state_phrases.append(text)
-
-        if state_phrases:
-            sentences.extend(state_phrases)
-
-        return ". ".join(sentences) if sentences else ""
 
     # ─── Distress surfacing ──────────────────────────────────────
 
@@ -308,27 +228,7 @@ class FeelingReporter:
         note = self._language.render(note_thought, emotion)
         return f"{response} {note}"
 
-    # ─── Feeling report ──────────────────────────────────────────
-
-    def compose_feeling_report(self, emotion: EmotionalState) -> str:
-        """Describe how she feels, using words learned from the concept network.
-
-        The feeling report is generated from learned emotion-word
-        associations, not from hardcoded strings. She looks up words
-        she has learned for her current emotional category, cognitive
-        mode, and cause category. If she hasn't learned words for a
-        category, she can't describe it — she'll say what she can and
-        omit what she can't.
-
-        This returns semantic content (words and short phrases), not
-        pre-rendered sentences. The caller is responsible for rendering
-        the composed content through the language engine once, so the
-        result is a coherent description rather than a sequence of
-        disconnected rendered sentences.
-        """
-        semantic, structural = self._collect_feeling_parts(emotion)
-        parts = [text for _, text in semantic] + structural
-        return ". ".join(parts) if parts else ""
+    # ─── Feeling fragments ───────────────────────────────────────
 
     def _collect_feeling_parts(
         self, emotion: EmotionalState
@@ -414,10 +314,10 @@ class FeelingReporter:
         she won't claim to be bothered by something she can't explain.
 
         Returns semantic content (a short phrase), NOT a rendered
-        sentence. The caller (compose_feeling_report) collects
-        semantic words and renders the full report once through the
-        language engine. Rendering here would produce disconnected
-        sentences and graph-walk fragments.
+        sentence. The caller (collect_feeling_fragments) collects
+        semantic words and the language engine renders the full report
+        once. Rendering here would produce disconnected sentences and
+        graph-walk fragments.
         """
         hints: list[str] = []
 

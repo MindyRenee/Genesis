@@ -520,6 +520,7 @@ class AttentionSystem:
             base = concept.activation if concept.activation is not None else 0.0
             concept.activation = min(1.0, base + boost)
             self._attention_boosts[target] = boost
+            self.network._mark_active(target)
 
     def _suppress_concept(self, target: str) -> None:
         """Suppress a concept's activation in the network."""

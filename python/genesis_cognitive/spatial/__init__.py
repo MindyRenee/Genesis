@@ -21,7 +21,8 @@ Pipeline:
     SpatialSolution                rule + predictions
 
 Consumers:
-    - ``evals/`` (e.g. an ARC eval) drives the reasoner directly.
+    - ``SpatialPractice`` — her gated puzzle curriculum — drives the
+      reasoner directly.
     - The cognition engine holds a ``SpatialReasoner`` instance so
       spatial problems raised in conversation can be perceived and
       reasoned about, not just talked past.

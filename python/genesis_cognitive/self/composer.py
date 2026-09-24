@@ -43,17 +43,33 @@ not deception, it's social calibration.
 
 # Functions
 
-compose_identity(self_model, network, emotion, trust_level) → str
-  Composes "Who are you?" from personality + values + knowledge
+identity_fragments(self_model, network, emotion, trust_level) → fragments
+  Selects "Who are you?" content from personality + values + knowledge
 
-compose_emotional_state(emotion, brain_waves) → str
-  Composes "How are you feeling?" from actual neurochemical state
+emotional_state_fragments(emotion, brain_waves) → fragments
+  Selects "How are you feeling?" content from actual neurochemical state
 
-compose_capabilities(self_model, trust_level) → str
-  Composes "What can you do?" from self-knowledge
+capability_fragments(self_model, trust_level) → fragments
+  Selects "What can you do?" content from self-knowledge
 
-compose_self_reflection(self_model, network, reflection, emotion, trust_level) → str
-  Composes "What are you thinking?" from current cognitive state
+self_reflection_fragments(self_model, network, reflection, emotion, trust_level) → fragments
+  Selects "What are you thinking?" content from current cognitive state
+
+Every public method returns typed semantic fragments — ``(kind, text)``
+pairs — not finished sentences. The language engine (vocabulary +
+grammar + voice) owns all surface realization: subject insertion,
+copula grouping, clause ordering, and punctuation. Kinds:
+
+- ``"name"``   — a proper name ("Genesis")
+- ``"trait"``  — an adjective or short descriptor for copular grouping
+- ``"comp"``   — a complement phrase ("feeling anxious", "a kind of
+  mind", "made by alice", "still becoming")
+- ``"pred"``   — a base-form verb predicate taking "I" as subject
+  ("care most about X", "know that Y", "can work with Z")
+- ``"clause"`` — a self-standing clause with its own subject
+  ("alice is a creator", "my thinking is scattered")
+- ``"marker"`` — a structural marker for states she has no learned
+  words for ("[plasticity_gate:closed]")
 """
 
 from __future__ import annotations
@@ -93,21 +109,25 @@ class SelfComposer:
         # humans don't list their traits in a fixed order either.
         self._composition_count = 0
 
-    def compose_identity(
+    def identity_fragments(
         self,
         self_model: SelfModel,
         network: ConceptNetwork | None,
         emotion: EmotionalState,
         trust_level: float = 1.0,
-    ) -> str:
-        """Compose a first-person identity description.
+    ) -> list[tuple[str, str]]:
+        """Select identity fragments from her actual state.
 
         This replaces the hardcoded describe_self() method. Instead
-        of fixed strings, she describes herself from:
+        of fixed strings, the fragment set is drawn from:
         - Her personality traits (which can drift)
         - Her values (which can evolve)
         - What her concept network says about her
         - Her current emotional tone
+
+        Returns typed ``(kind, text)`` fragments — semantic material
+        for the language engine, not finished sentences. The engine
+        composes the surface form (subject, copula, punctuation).
 
         The trust_level parameter (0.0–1.0) controls how much she
         reveals, following social penetration theory (Altman & Taylor,
@@ -125,10 +145,10 @@ class SelfComposer:
         # Each part is tagged with a sensitivity level:
         # 0.0 = surface (always shared), 0.4 = personal (medium trust),
         # 0.7 = deep (high trust), 0.85 = vulnerable (very high trust)
-        parts: list[tuple[str, float]] = []
+        parts: list[tuple[str, str, float]] = []
 
         # 1. Name — surface level, always shared
-        parts.extend(self._identity_name_parts(self_model))
+        name_parts = self._identity_name_parts(self_model)
         self._composition_count += 1
 
         # 2. Personality traits — from concept network, not hardcoded strings
@@ -156,25 +176,30 @@ class SelfComposer:
         # She shares her doubts about her own nature
         parts.extend(self._identity_vulnerability_parts(self_model))
 
-        # Filter by trust level and join
-        filtered = []
-        for part, sensitivity in parts:
-            filtered.extend(self._filter_by_trust([part], trust_level, sensitivity))
+        # Filter by trust level — each part is (kind, text, sensitivity);
+        # the kind tag travels with the fragment so the language engine
+        # knows how to realize it (copular group, predicate, clause).
+        filtered: list[tuple[str, str]] = [
+            (kind, text)
+            for kind, text, sensitivity in name_parts + parts
+            if trust_level >= sensitivity
+        ]
+        return filtered
 
-        return self._join_parts(filtered)
-
-    def _identity_name_parts(self, self_model: SelfModel) -> list[tuple[str, float]]:
+    def _identity_name_parts(
+        self, self_model: SelfModel
+    ) -> list[tuple[str, str, float]]:
         """Build the name part for identity composition.
 
         Returns just the name — a semantic anchor. Personality
         traits are composed separately by _identity_personality_parts
         from the concept network, not from hardcoded strings.
         """
-        return [(self_model.name, 0.0)]
+        return [("name", self_model.name, 0.0)]
 
     def _identity_personality_parts(
         self, self_model: SelfModel, network: ConceptNetwork | None
-    ) -> list[tuple[str, float]]:
+    ) -> list[tuple[str, str, float]]:
         """Build personality parts from the concept network.
 
         Reads the numeric trait values from the self-model and uses
@@ -185,7 +210,7 @@ class SelfComposer:
         actual phrasing from these concept names — they are building
         blocks, not response strings.
         """
-        parts: list[tuple[str, float]] = []
+        parts: list[tuple[str, str, float]] = []
         concept_names = self_model.personality.trait_concept_names()
         if not concept_names:
             return parts
@@ -204,12 +229,12 @@ class SelfComposer:
         # exists in the network, the language engine can look up its
         # definition and relationships for richer composition.
         for name in selected:
-            parts.append((name, 0.0))
+            parts.append(("trait", name, 0.0))
         return parts
 
     def _identity_value_parts(
         self, self_model: SelfModel, network: ConceptNetwork | None
-    ) -> list[tuple[str, float]]:
+    ) -> list[tuple[str, str, float]]:
         """Build value parts for identity composition.
 
         Reads value concepts from the concept network (via edges from
@@ -221,7 +246,7 @@ class SelfComposer:
         Falls back to the self-model's value list if the network is
         unavailable or has no value edges.
         """
-        parts: list[tuple[str, float]] = []
+        parts: list[tuple[str, str, float]] = []
         value_names: list[str] = []
 
         if network is not None:
@@ -243,11 +268,12 @@ class SelfComposer:
         if value_names:
             # Vary how many values are included
             n = self._rng.choice([2, 2, 3]) if len(value_names) >= 3 else len(value_names)
-            content = f"cares most about {', '.join(value_names[:n])}"
-            parts.append((content, 0.4))
+            parts.append(("pred", f"care most about {', '.join(value_names[:n])}", 0.4))
         return parts
 
-    def _identity_concept_parts(self, network: ConceptNetwork | None) -> list[tuple[str, float]]:
+    def _identity_concept_parts(
+        self, network: ConceptNetwork | None
+    ) -> list[tuple[str, str, float]]:
         """Build concept-network relationship parts for identity composition.
 
         Her identity emerges from her relationships (edges) in the concept
@@ -256,7 +282,7 @@ class SelfComposer:
         on the ``genesis`` concept would be a hardcoded response recited
         back as identity; we deliberately do not read it.
         """
-        parts: list[tuple[str, float]] = []
+        parts: list[tuple[str, str, float]] = []
         if network is None:
             return parts
         genesis_concept = network.get_concept("genesis")
@@ -289,7 +315,7 @@ class SelfComposer:
 
     def _identity_edge_part(
         self, edge, network: ConceptNetwork | None = None
-    ) -> tuple[str, float] | None:
+    ) -> tuple[str, str, float] | None:
         """Build a single identity part from a concept network edge.
 
         Returns None for low-weight RELATED_TO edges (often wrong senses),
@@ -328,22 +354,27 @@ class SelfComposer:
             graph_verbs = network.find_relation_verbs(relation)
             graph_phrases = network.find_relation_phrases(relation)
 
-        def _pick_phrase(phrases: list[str], weight: float) -> tuple[str, float] | None:
-            """Pick a random first-person phrase template and fill {target}."""
+        def _pick_phrase(phrases: list[str], weight: float) -> tuple[str, str, float] | None:
+            """Pick a random first-person phrase template and fill {target}.
+
+            Seeded phrase templates are complete first-person clauses
+            ("I am a kind of {target}") — they are vocabulary building
+            blocks, so they emit as ``clause`` fragments.
+            """
             if not phrases:
                 return None
             phrase = self._rng.choice(phrases)
             # Replace {target} with the actual concept name
-            return (phrase.replace("{target}", target), weight)
+            return ("clause", phrase.replace("{target}", target), weight)
 
-        def _pick_verb(verbs: list[str], weight: float) -> tuple[str, float] | None:
-            """Pick a random relation verb and build a semantic fragment."""
+        def _pick_verb(verbs: list[str], weight: float) -> tuple[str, str, float] | None:
+            """Pick a random relation verb and build a predicate fragment."""
             if not verbs:
                 return None
             verb = self._rng.choice(verbs)
-            # Semantic fragment: "verb target" — the language engine
-            # adds the first-person subject and composes the sentence.
-            return (f"{verb} {target}", weight)
+            # Predicate fragment: "verb target" — the language engine
+            # supplies the first-person subject and conjugation.
+            return ("pred", f"{verb} {target}", weight)
 
         if relation == RelationType.RELATED_TO:
             if edge.weight < 0.7:
@@ -353,113 +384,109 @@ class SelfComposer:
                 return _pick_phrase(graph_phrases, 0.4)
             if graph_verbs:
                 return _pick_verb(graph_verbs, 0.4)
-            return (f"related to {target}", 0.4)
+            return ("comp", f"related to {target}", 0.4)
         if relation == RelationType.IS_A:
             if graph_phrases:
                 return _pick_phrase(graph_phrases, 0.4)
             if graph_verbs:
                 return _pick_verb(graph_verbs, 0.4)
-            return (f"a kind of {target}", 0.4)
+            return ("comp", f"a kind of {target}", 0.4)
         if relation == RelationType.EMERGES_FROM:
             if graph_phrases:
                 return _pick_phrase(graph_phrases, 0.7)
             if graph_verbs:
                 return _pick_verb(graph_verbs, 0.7)
-            return (f"emerges from {target}", 0.7)
+            return ("pred", f"emerge from {target}", 0.7)
         if relation == RelationType.DEPENDS_ON:
             if graph_phrases:
                 return _pick_phrase(graph_phrases, 0.7)
             if graph_verbs:
                 return _pick_verb(graph_verbs, 0.7)
-            return (f"depends on {target}", 0.7)
+            return ("pred", f"depend on {target}", 0.7)
         if relation == RelationType.CREATES:
             if graph_phrases:
                 return _pick_phrase(graph_phrases, 0.4)
             if graph_verbs:
                 return _pick_verb(graph_verbs, 0.4)
-            return (f"creates {target}", 0.4)
+            return ("pred", f"create {target}", 0.4)
         return None
 
-    def _identity_nature_parts(self, self_model: SelfModel) -> list[tuple[str, float]]:
+    def _identity_nature_parts(self, self_model: SelfModel) -> list[tuple[str, str, float]]:
         """Build nature parts for identity composition.
 
         Returns semantic descriptions — the language engine composes
         the first-person phrasing.
         """
-        parts: list[tuple[str, float]] = []
+        parts: list[tuple[str, str, float]] = []
         nature = self_model.self_knowledge.get("nature", "")
         if nature:
-            parts.append((nature, 0.7))
+            parts.append(("comp", nature, 0.7))
         return parts
 
-    def _identity_emotion_parts(self, emotion: EmotionalState) -> list[tuple[str, float]]:
+    def _identity_emotion_parts(self, emotion: EmotionalState) -> list[tuple[str, str, float]]:
         """Build emotional context parts for identity composition.
 
         Returns semantic descriptions — the language engine composes
         the first-person phrasing.
         """
-        parts: list[tuple[str, float]] = []
+        parts: list[tuple[str, str, float]] = []
         if emotion.label not in ("neutral", "positive"):
-            parts.append((f"feeling {emotion.label}", 0.7))
+            parts.append(("comp", f"feeling {emotion.label}", 0.7))
         return parts
 
     def _identity_vulnerability_parts(
         self, self_model: SelfModel
-    ) -> list[tuple[str, float]]:
+    ) -> list[tuple[str, str, float]]:
         """Build vulnerability parts for identity composition.
 
         Returns semantic descriptions — the language engine composes
         the first-person phrasing.
         """
-        parts: list[tuple[str, float]] = []
+        parts: list[tuple[str, str, float]] = []
         uncertainties = self_model.self_knowledge.get("uncertainties", [])
         if uncertainties:
             for uncertainty in uncertainties[:2]:
-                parts.append((f"uncertain about {uncertainty}", 0.85))
+                parts.append(("comp", f"uncertain about {uncertainty}", 0.85))
         return parts
 
-    def compose_emotional_state(
+    def emotional_state_fragments(
         self,
         emotion: EmotionalState,
         brain_waves: BrainWaveState | None = None,
         network: ConceptNetwork | None = None,
-    ) -> str:
-        """Compose a first-person emotional state description.
+    ) -> list[tuple[str, str]]:
+        """Select emotional-state fragments from her actual state.
 
         Uses learned emotion words from the concept network. If she
         hasn't learned words for her current state, she describes what
-        she can and omits what she can't.
+        she can and omits what she can't. Returns ``(kind, text)``
+        fragments — the language engine composes the sentences.
         """
-        parts: list[str] = []
+        parts: list[tuple[str, str]] = []
 
         # 1. The emotional label — look up learned words
         if network is not None:
             emotion_words = network.find_emotion_words(emotion.label)
             if emotion_words:
                 word = self._rng.choice(emotion_words[:5]).replace('_', ' ')
-                parts.append(f"feeling {word}")
+                parts.append(("comp", f"feeling {word}"))
             # If no words learned, she can't name the feeling — omit it
-        else:
-            # No network available — can't generate text
-            pass
 
         # 2. The neurochemical levels (but described, not just numbers)
-        chem_desc = self._describe_neurochemistry(emotion, network)
-        if chem_desc:
-            parts.append(chem_desc)
+        parts.extend(self._neurochemistry_fragments(emotion, network))
 
         # 3. Cognitive style — look up learned words
         if network is not None and emotion.cognitive_style:
             mode_words = network.find_cognitive_mode_words(emotion.cognitive_style)
             if mode_words:
                 word = self._rng.choice(mode_words[:3]).replace('_', ' ')
-                parts.append(f"thinking is {word}")
+                parts.append(("clause", f"my thinking is {word}"))
 
         # 4. Brain wave state (if available)
         if brain_waves:
-            wave_desc = self._describe_brain_waves(brain_waves)
-            if wave_desc:
-                parts.append(wave_desc)
+            wave_frag = self._brain_wave_fragment(brain_waves)
+            if wave_frag:
+                parts.append(wave_frag)
 
         # 5. Plasticity / learning capacity — always surface when low,
         # even if mood is positive. Prevents "silent stress" where
@@ -471,35 +498,37 @@ class SelfComposer:
                 plat_words = network.find_plasticity_words("closed")
                 if plat_words:
                     word = self._rng.choice(plat_words[:3]).replace('_', ' ')
-                    parts.append(f"learning is {word}")
+                    parts.append(("clause", f"my learning is {word}"))
                 else:
-                    parts.append("[plasticity_gate:closed]")
+                    parts.append(("marker", "[plasticity_gate:closed]"))
             else:
-                parts.append("[plasticity_gate:closed]")
+                parts.append(("marker", "[plasticity_gate:closed]"))
         elif emotion.plasticity < PLASTICITY_LOW:
             if network is not None:
                 plat_words = network.find_plasticity_words("low")
                 if plat_words:
                     word = self._rng.choice(plat_words[:3]).replace('_', ' ')
-                    parts.append(f"learning is {word}")
+                    parts.append(("clause", f"my learning is {word}"))
                 else:
-                    parts.append("[plasticity_gate:low]")
+                    parts.append(("marker", "[plasticity_gate:low]"))
             else:
-                parts.append("[plasticity_gate:low]")
+                parts.append(("marker", "[plasticity_gate:low]"))
 
-        return self._join_parts(parts)
+        return parts
 
-    def compose_capabilities(
+    def capability_fragments(
         self,
         self_model: SelfModel,
         network: ConceptNetwork | None = None,
         trust_level: float = 1.0,
-    ) -> str:
-        """Compose a description of what she can do.
+    ) -> list[tuple[str, str]]:
+        """Select capability fragments from her actual state.
 
         Instead of reciting a hardcoded list, she discovers her
         capabilities from her actual state — what she knows, what
-        she's learned, and what her architecture enables.
+        she's learned, and what her architecture enables. Returns
+        ``(kind, text)`` fragments; the language engine composes
+        the sentences.
 
         The trust_level parameter controls how much detail she reveals.
         At low trust she mentions only basic capabilities. At medium
@@ -513,14 +542,14 @@ class SelfComposer:
         reciting a developer-authored list.
         """
         caps = self_model.self_knowledge.get("capabilities", [])
-        learned = self._learned_capabilities(caps)
+        learned = self._learned_capability_fragments(caps)
         if learned:
             return learned
 
         # No learned capabilities yet — discover from concept network
         # by looking for RELATED_TO edges from "genesis" that represent
         # self-knowledge about abilities (learned, not seeded).
-        discovered: list[tuple[str, float]] = []
+        discovered: list[str] = []
         if network is not None:
             from ..concepts import is_seed_origin
             ability_edges = network.get_neighbors(
@@ -531,49 +560,46 @@ class SelfComposer:
                 if concept is None or is_seed_origin(concept.origin):
                     continue
                 # Learned ability concept — use its display name
-                display = target.replace("_", " ")
-                discovered.append((display, 0.0))
+                discovered.append(target.replace("_", " "))
 
         if not discovered:
             # She hasn't learned her capabilities yet — honest disclosure
-            return "still discovering capabilities"
+            return [("comp", "still discovering my capabilities")]
 
-        parts = ["capabilities:"]
-        for cap, sensitivity in discovered:
-            if trust_level >= sensitivity:
-                parts.append(f"  — {cap}")
-        return "\n".join(parts)
+        # Group the discovered ability names under a single capability
+        # predicate — the language engine composes the surface form.
+        names = discovered[:6] if trust_level >= 0.4 else discovered[:3]
+        return [("pred", f"can work with {self._join_facts(names)}")]
 
-    def _learned_capabilities(self, caps: list[str]) -> str | None:
-        """Compose from learned capabilities, or None if none found.
+    def _learned_capability_fragments(self, caps: list[str]) -> list[tuple[str, str]] | None:
+        """Select fragments from learned capabilities, or None if none.
 
         She has learned capabilities through introspection — phrases
-        starting with "I can". This renders them as a list.
+        starting with "I can". Each becomes a capability predicate.
         """
         can_do = [c for c in caps if c.startswith("I can")]
         if not can_do:
             return None
-        parts: list[str] = []
-        parts.append("capabilities:")
+        parts: list[tuple[str, str]] = []
         for cap in can_do:
             action = cap.replace("I can ", "", 1)
             if " — " in action:
                 action = action.split(" — ", 1)[0]
-            parts.append(f"  — {action}")
-        return "\n".join(parts)
+            parts.append(("pred", f"can {action}"))
+        return parts
 
-    def compose_creator_description(
+    def creator_fragments(
         self,
         self_model: SelfModel,
         network: ConceptNetwork,
         emotion: EmotionalState,
         trust_level: float = 1.0,
-    ) -> str:
-        """Compose a description of her creator from the concept network.
+    ) -> list[tuple[str, str]]:
+        """Select creator-description fragments from the concept network.
 
         Pulls relationships from the network (alice CREATES genesis,
-        alice IS_A creator, etc.) and composes them into text.
-        No hardcoded sentences — just structured facts rendered to language.
+        alice IS_A creator, etc.) as semantic fragments — the language
+        engine composes the sentences.
 
         If she doesn't know her creator's name yet, she tries to
         discover it from her concept network (who CREATES her?).
@@ -586,10 +612,10 @@ class SelfComposer:
         creator_name = self._discover_creator_name(self_model, network)
 
         if not creator_name:
-            return "still discovering creator"
+            return [("pred", "don't know who made me yet")]
 
         # Each part tagged with sensitivity
-        parts: list[tuple[str, float]] = []
+        parts: list[tuple[str, str, float]] = []
 
         # Pull relationships from the concept network — surface level
         parts.extend(self._creator_relationship_parts(creator_name, network))
@@ -604,23 +630,20 @@ class SelfComposer:
         # What she wants from the relationship — personal level.
         # Semantic fragment for the language engine to render, not a
         # hardcoded sentence she recites.
-        parts.append(("curious about creator", 0.4))
+        parts.append(("comp", f"curious about {creator_name}", 0.4))
 
         # Filter by trust level
-        filtered = []
-        for part, sensitivity in parts:
-            filtered.extend(self._filter_by_trust([part], trust_level, sensitivity))
+        filtered: list[tuple[str, str]] = [
+            (kind, text)
+            for kind, text, sensitivity in parts
+            if trust_level >= sensitivity
+        ]
 
         if not filtered:
-            # Fallback: use a relation-phrase template from the graph
-            # (seeded building block) rather than a hardcoded sentence.
-            phrases = network.find_relation_phrases(RelationType.CREATES)
-            if phrases:
-                phrase = self._rng.choice(phrases)
-                return phrase.replace("{target}", creator_name)
-            return f"made by {creator_name}"
+            # Fallback: a bare complement fragment, not a sentence.
+            return [("comp", f"made by {creator_name}")]
 
-        return self._join_parts(filtered)
+        return filtered
 
     def _discover_creator_name(
         self, self_model: SelfModel, network: ConceptNetwork
@@ -647,14 +670,14 @@ class SelfComposer:
 
     def _creator_relationship_parts(
         self, creator_name: str, network: ConceptNetwork
-    ) -> list[tuple[str, float]]:
+    ) -> list[tuple[str, str, float]]:
         """Build relationship parts from the creator's concept network edges.
 
-        Uses relation verbs and phrases from the concept network
-        (seeded building blocks) to compose phrasing, rather than
-        hardcoded sentences.
+        Emits clause fragments about the creator (third-person subject)
+        built from relation verbs in the concept network (seeded
+        building blocks), rather than hardcoded sentences.
         """
-        parts: list[tuple[str, float]] = []
+        parts: list[tuple[str, str, float]] = []
         neighbors = network.get_neighbors(creator_name.lower())
         for target, relation, _weight in neighbors:
             display = target.replace("_", " ")
@@ -662,23 +685,23 @@ class SelfComposer:
                 verbs = network.find_relation_verbs(relation)
                 if verbs:
                     verb = self._rng.choice(verbs)
-                    parts.append((f"{creator_name} {verb} {display}", 0.0))
+                    parts.append(("clause", f"{creator_name} {verb} {display}", 0.0))
                 else:
-                    parts.append((f"{creator_name} is {display}", 0.0))
+                    parts.append(("clause", f"{creator_name} is {display}", 0.0))
             elif relation == RelationType.CREATES:
                 verbs = network.find_relation_verbs(relation)
                 if verbs:
                     verb = self._rng.choice(verbs)
-                    parts.append((f"{creator_name} {verb} {display}", 0.0))
+                    parts.append(("clause", f"{creator_name} {verb} {display}", 0.0))
                 else:
-                    parts.append((f"{creator_name} made {display}", 0.0))
+                    parts.append(("clause", f"{creator_name} made {display}", 0.0))
             elif relation == RelationType.RELATED_TO:
                 parts.append(self._creator_related_to_part(creator_name, target, network))
         return parts
 
     def _creator_related_to_part(
         self, creator_name: str, target: str, network: ConceptNetwork
-    ) -> tuple[str, float]:
+    ) -> tuple[str, str, float]:
         """Build a part for a RELATED_TO relationship from the creator.
 
         Uses relation verbs from the concept network (seeded building
@@ -688,57 +711,60 @@ class SelfComposer:
         verbs = network.find_relation_verbs(RelationType.RELATED_TO)
         if verbs:
             verb = self._rng.choice(verbs)
-            return (f"{creator_name} {verb} {display}", 0.4)
-        return (f"{creator_name} linked to {display}", 0.4)
+            return ("clause", f"{creator_name} {verb} {display}", 0.4)
+        return ("clause", f"{creator_name} linked to {display}", 0.4)
 
     def _creator_genesis_parts(
         self, creator_name: str, network: ConceptNetwork
-    ) -> list[tuple[str, float]]:
+    ) -> list[tuple[str, str, float]]:
         """Build parts from the genesis → creator relationship.
 
-        Uses relation verbs from the concept network rather than
-        hardcoded phrasings.
+        Emits complement fragments describing how she relates to her
+        creator ("connected to alice") — the language engine supplies
+        the subject and framing.
         """
-        parts: list[tuple[str, float]] = []
+        parts: list[tuple[str, str, float]] = []
         genesis_neighbors = network.get_neighbors("genesis")
         for target, relation, _weight in genesis_neighbors:
             if target == creator_name.lower() and relation == RelationType.RELATED_TO:
                 verbs = network.find_relation_verbs(RelationType.RELATED_TO)
                 if verbs:
                     verb = self._rng.choice(verbs)
-                    parts.append((f"{verb} {creator_name}", 0.4))
+                    parts.append(("comp", f"{verb} {creator_name}", 0.4))
                 else:
-                    parts.append((f"linked to {creator_name}", 0.4))
+                    parts.append(("comp", f"linked to {creator_name}", 0.4))
         return parts
 
     def _creator_emotional_parts(
         self, creator_name: str, emotion: EmotionalState
-    ) -> list[tuple[str, float]]:
+    ) -> list[tuple[str, str, float]]:
         """Build emotional coloring parts for the creator description.
 
         Composes from the emotional state using semantic fragments
         (valence direction), not hardcoded sentences. The language
         engine renders the actual phrasing.
         """
-        parts: list[tuple[str, float]] = []
+        parts: list[tuple[str, str, float]] = []
         if emotion.valence > 0.3:
-            parts.append(("positive feeling toward creator", 0.7))
+            parts.append(("pred", f"feel good about {creator_name}", 0.7))
         elif emotion.valence < -0.1:
-            parts.append(("uncertain feeling toward creator", 0.7))
+            parts.append(("comp", f"uncertain about {creator_name}", 0.7))
         return parts
 
-    def compose_self_reflection(
+    def self_reflection_fragments(
         self,
         self_model: SelfModel,
         network: ConceptNetwork,
         reflection: ReflectionEngine,
         emotion: EmotionalState,
         trust_level: float = 1.0,
-    ) -> str:
-        """Compose a reflection on her own state.
+    ) -> list[tuple[str, str]]:
+        """Select reflection fragments from her own state.
 
         Instead of hardcoded introspection strings, she reflects on
-        what she actually knows and has experienced.
+        what she actually knows and has experienced. Returns
+        ``(kind, text)`` fragments — the language engine composes
+        the sentences.
 
         The trust_level parameter controls how deeply she reflects.
         At low trust she shares only surface observations (concept
@@ -747,7 +773,7 @@ class SelfComposer:
         and her sense of still becoming.
         """
         # Each part tagged with sensitivity
-        parts: list[tuple[str, float]] = []
+        parts: list[tuple[str, str, float]] = []
 
         # 1. What she knows (from concept network) — surface level
         # 2. What she's learned (from reflection insights) — personal level
@@ -758,26 +784,25 @@ class SelfComposer:
         parts.extend(self._compose_values_and_emotion(self_model, emotion, network))
 
         # 5. What she's still becoming — deep level
-        parts.append(("still becoming", 0.7))
+        parts.append(("comp", "still becoming", 0.7))
 
         # Filter by trust level
-        filtered = []
-        for part, sensitivity in parts:
-            filtered.extend(self._filter_by_trust([part], trust_level, sensitivity))
+        return [
+            (kind, text)
+            for kind, text, sensitivity in parts
+            if trust_level >= sensitivity
+        ]
 
-        return self._join_parts(filtered)
-
-    def compose_reflection_clause(
+    def insight_predicates(
         self, reflection: ReflectionEngine, topics: list[str] | None = None,
-    ) -> str:
-        """Compose a single first-person reflective clause.
+    ) -> list[tuple[str, str]]:
+        """Select reflective-insight fragments for a reflective coda.
 
-        Unlike ``compose_self_reflection`` (a full multi-sentence
-        self-report), this returns one short sentence suitable as a
-        reflective coda after a content sentence. It is composed from
-        her most recent reflective insight — a genuine product of her
-        metacognition, not a fixed phrase. The grammatical framing is
-        a scaffold (subject + predicate); the semantic content — which
+        Unlike ``self_reflection_fragments`` (a full self-report's
+        worth of material), this returns fragments for ONE recent
+        insight — semantic material for the language engine's
+        ``self_reflection_clause`` slot. The insight is a genuine
+        product of her metacognition, not a fixed phrase; which
         concept she lacks, which behaviour she noticed — comes from
         her reflection engine.
 
@@ -788,7 +813,7 @@ class SelfComposer:
         topics are surfaced. Self-correction insights (about her own
         behaviour) are always relevant and not filtered.
 
-        Returns "" when she has no recent reflective insight to draw
+        Returns [] when she has no recent reflective insight to draw
         on (or none relevant to the current topics). She then stays
         silent rather than reciting a canned coda or surfacing a
         non-sequitur.
@@ -829,10 +854,10 @@ class SelfComposer:
         # so fall back to the most recent frameable one rather than
         # going silent when the latest insight is unframeable.
         for insight in reversed(candidates):
-            clause = self._frame_insight_as_clause(insight)
-            if clause:
-                return clause
-        return ""
+            fragments = self._insight_predicates(insight)
+            if fragments:
+                return fragments
+        return []
 
     @staticmethod
     def _insight_relevant(insight: Insight, topics_lower: set[str]) -> bool:
@@ -864,12 +889,13 @@ class SelfComposer:
                 return True
         return False
 
-    def _frame_insight_as_clause(self, insight: Insight) -> str:
-        """Frame a reflection insight as a natural first-person clause.
+    def _insight_predicates(self, insight: Insight) -> list[tuple[str, str]]:
+        """Extract predicate fragments from a reflection insight.
 
         The insight's ``content`` is a diagnostic string produced by the
         reflection engine (e.g. "knowledge gap: memory",
-        "asked a question but didn't answer"). This method gives it
+        "asked a question but didn't answer"). This method extracts the
+        semantic predicates — the language engine gives them
         first-person grammatical framing, mirroring how
         ``_compose_knowledge_content`` weaves graph edges into speech:
         the scaffold is grammatical, the content is hers.
@@ -878,31 +904,38 @@ class SelfComposer:
         if insight.type == "gap":
             # "knowledge gap: memory" / "missing concept: X"
             if ": " not in content:
-                return ""
+                return []
             prefix, detail = content.split(": ", 1)
             detail = detail.strip()
             if not detail:
-                return ""
+                return []
+            display = self._display_detail(detail)
             if prefix == "missing concept":
-                return (
-                    f"I'm still missing something about "
-                    f"{self._display_detail(detail)}."
-                )
-            return f"I don't fully understand {self._display_detail(detail)} yet."
+                return [
+                    ("pred", f"am still missing something about {display}"),
+                    ("pred", f"haven't fully grasped {display} yet"),
+                ]
+            return [
+                ("pred", f"don't fully understand {display} yet"),
+                ("pred", f"am still working out {display}"),
+            ]
         if insight.type == "self_correction":
             # Diagnostic phrasing about the user ("user was upset ...")
             # doesn't frame naturally in the first person — skip it.
             if content.startswith("user "):
-                return ""
+                return []
             # "overstating certainty: said 'definitely' ..." → take
             # the detail after the colon ("said 'definitely' ...").
             if ": " in content:
                 detail = content.split(": ", 1)[1].strip()
                 if not detail:
-                    return ""
-                return f"I notice I {detail}."
+                    return []
+                return [
+                    ("pred", f"notice I {detail}"),
+                    ("pred", f"keep noticing I {detail}"),
+                ]
             # Bare verb phrase: "asked a question but didn't answer".
-            return f"I notice I {content}."
+            return [("pred", f"notice I {content}")]
         if insight.type == "growth":
             # "2 new concepts: feeling, genesis, hi" — the count is
             # diagnostic bookkeeping; the concept names are the content.
@@ -910,16 +943,20 @@ class SelfComposer:
                 # Already a first-person clause ("I learned about X") —
                 # pass it through rather than dropping it.
                 if content.lower().startswith(("i ", "i'm ", "i've ")):
-                    return self._ensure_period(content)
-                return ""
+                    return [("clause", content)]
+                return []
             detail = content.split(": ", 1)[1].strip()
             names = [
                 self._display_detail(t) for t in detail.split(",")
             ]
             names = [n for n in names if n]
             if not names:
-                return ""
-            return f"I've been learning about {self._join_facts(names)}."
+                return []
+            joined = self._join_facts(names)
+            return [
+                ("pred", f"have been learning about {joined}"),
+                ("pred", f"am learning more about {joined}"),
+            ]
         if insight.type == "pattern":
             # Inner-life insights are stored as "A ↔ B" semantic
             # fragments — a connection she noticed between concepts.
@@ -927,12 +964,13 @@ class SelfComposer:
                 a, _, b = content.partition("↔")
                 a, b = a.strip(), b.strip()
                 if a and b:
-                    return (
-                        f"I noticed a connection between "
-                        f"{self._display_detail(a)} and "
-                        f"{self._display_detail(b)}."
-                    )
-                return ""
+                    da = self._display_detail(a)
+                    db = self._display_detail(b)
+                    return [
+                        ("pred", f"noticed a connection between {da} and {db}"),
+                        ("pred", f"keep seeing {da} connect to {db}"),
+                    ]
+                return []
             # Repetition diagnostics: "repeating response pattern: X"
             # / "overusing response pattern: X (7/10)" — the counts are
             # bookkeeping; the pattern name is the content.
@@ -943,25 +981,25 @@ class SelfComposer:
                     # Strip the "(7/10)"-style occurrence counts.
                     detail = detail.split("(")[0].strip()
                     if not detail:
-                        return ""
+                        return []
                     verb = ("repeating" if marker.startswith("repeating")
                             else "overusing")
-                    return (
-                        f"I notice I keep {verb} "
-                        f"the '{detail}' response pattern."
-                    )
-            return ""
+                    return [
+                        ("pred", f"keep {verb} the '{detail}' response pattern"),
+                        ("pred", f"notice I keep {verb} the '{detail}' pattern"),
+                    ]
+            return []
         if insight.type == "mood":
             # "mood trend: more positive (delta=+0.20)" — the delta is
             # bookkeeping; the direction is the content.
             if ": " not in content:
-                return ""
+                return []
             detail = content.split(": ", 1)[1].strip()
             direction = detail.split("(")[0].strip()
             if not direction:
-                return ""
-            return f"My mood has been trending {direction}."
-        return ""
+                return []
+            return [("clause", f"my mood has been trending {direction}")]
+        return []
 
     @staticmethod
     def _display_detail(detail: str) -> str:
@@ -983,39 +1021,41 @@ class SelfComposer:
         self,
         network: ConceptNetwork,
         reflection: ReflectionEngine,
-    ) -> list[tuple[str, float]]:
+    ) -> list[tuple[str, str, float]]:
         """Compose surface-level and personal-level reflection parts.
 
         Includes what she knows (concept network size) and what she's
         learned (recent reflection insights), each tagged with a
         sensitivity level.
         """
-        parts: list[tuple[str, float]] = []
+        parts: list[tuple[str, str, float]] = []
 
         # 1. What she knows (from concept network) — surface level
         if network.total_concept_count > 0:
             parts.append((
-                f"I have {network.total_concept_count} concepts and "
+                "pred",
+                f"have {network.total_concept_count} concepts and "
                 f"{network.edge_count} relationships in understanding",
                 0.0,
             ))
 
         # 2. What she's learned (from reflection insights) — personal level.
-        # Insights are framed as first-person clauses via
-        # _frame_insight_as_clause — the same rendering used by
-        # compose_reflection_clause. The raw insight content is a
-        # diagnostic string ("missing concept: X", "2 new concepts: ...")
-        # for logging and learning, NOT for speech — emitting it
-        # verbatim leaks internal bookkeeping into her words.
+        # Insights become predicate fragments via _insight_predicates —
+        # the same extraction used by insight_predicates. The raw
+        # insight content is a diagnostic string ("missing concept: X",
+        # "2 new concepts: ...") for logging and learning, NOT for
+        # speech — emitting it verbatim leaks internal bookkeeping
+        # into her words.
         if reflection.insights:
             recent = list(reflection.insights)[-3:]
-            seen_clauses: set[str] = set()
+            seen: set[str] = set()
             for ins in reversed(recent):
-                clause = self._frame_insight_as_clause(ins)
-                if clause and clause not in seen_clauses:
-                    seen_clauses.add(clause)
-                    parts.append((clause, 0.4))
-                if len(seen_clauses) >= 2:
+                for kind, pred in self._insight_predicates(ins):
+                    if pred not in seen:
+                        seen.add(pred)
+                        parts.append((kind, pred, 0.4))
+                        break
+                if len(seen) >= 2:
                     break
 
         return parts
@@ -1025,7 +1065,7 @@ class SelfComposer:
         self_model: SelfModel,
         emotion: EmotionalState,
         network: ConceptNetwork | None = None,
-    ) -> list[tuple[str, float]]:
+    ) -> list[tuple[str, str, float]]:
         """Compose personal-level and deep-level reflection parts.
 
         Includes her values (what she cares about) and her emotional
@@ -1033,7 +1073,7 @@ class SelfComposer:
         read from the concept network when available, falling back to
         the self-model's value list.
         """
-        parts: list[tuple[str, float]] = []
+        parts: list[tuple[str, str, float]] = []
 
         # 3. Her values (what she cares about) — personal level
         value_names: list[str] = []
@@ -1046,66 +1086,67 @@ class SelfComposer:
         if not value_names:
             value_names = [v.name for v in self_model.values[:3] if v.weight > 0.5]
         if value_names:
-            parts.append((f"cares about {', '.join(value_names[:3])}", 0.4))
+            parts.append(("pred", f"care about {', '.join(value_names[:3])}", 0.4))
 
         # 4. Her emotional state — deep level
         if emotion.label not in ("neutral",):
-            parts.append((f"feeling {emotion.label}", 0.7))
+            parts.append(("comp", f"feeling {emotion.label}", 0.7))
 
         return parts
 
-    def compose_dream_description(
+    def dream_fragments(
         self,
         network: ConceptNetwork,
         emotion: EmotionalState,
-    ) -> str:
-        """Compose a description of her dreaming process.
+    ) -> list[tuple[str, str]]:
+        """Select dream-description fragments from what she knows.
 
         Instead of hardcoded "Yes, I dream. During sleep phase...",
-        she describes it from what she knows.
+        the fragments come from her concept network. Returns
+        ``(kind, text)`` fragments — the language engine composes
+        the sentences.
         """
-        parts = self._dream_description_parts(network)
+        parts = self._dream_fragments(network)
 
         # Add emotional context
         if emotion.creativity > 0.6:
-            parts.append("vivid surprising connections")
+            parts.append(("pred", "make vivid surprising connections"))
 
-        return " ".join(parts)
+        return parts
 
-    def _dream_description_parts(self, network: ConceptNetwork) -> list[str]:
-        """Build dream description parts from the concept network."""
+    def _dream_fragments(self, network: ConceptNetwork) -> list[tuple[str, str]]:
+        """Build dream description fragments from the concept network."""
         # Does she know about dreaming?
         dream_concept = network.get_concept("dream")
         if not dream_concept:
             # She doesn't have a dream concept yet — minimal seed
-            return ["dreams"]
+            return [("pred", "dream")]
 
         neighbors = network.get_neighbors("dream")
         if not neighbors:
-            return ["dreams"]
+            return [("pred", "dream")]
 
         # Compose from what she knows about dreaming
-        parts: list[str] = ["dreams"]
+        parts: list[tuple[str, str]] = [("pred", "dream")]
         for target, relation, _weight in neighbors[:2]:
             rel_str = relation.value.replace("_", " ")
-            parts.append(f"dreaming {rel_str} {target}")
+            parts.append(("clause", f"dreaming {rel_str} {target}"))
         return parts
 
-    def compose_existence_reflection(
+    def existence_fragments(
         self,
         self_model: SelfModel,
         network: ConceptNetwork,
         emotion: EmotionalState,
-    ) -> str:
-        """Compose a reflection on whether she's alive/cognitive.
+    ) -> list[tuple[str, str]]:
+        """Select existence-reflection fragments from her actual state.
 
         Instead of hardcoded "I don't know if I'm alive in the way you
-        mean...", she reflects from her actual state. The uncertainty
-        phrasings are drawn from thought templates in the concept
-        network, so she can grow her own vocabulary for expressing
-        uncertainty as she learns more.
+        mean...", the fragments reflect what she actually knows. Returns
+        ``(kind, text)`` fragments — the language engine composes
+        the sentences.
         """
-        parts: list[str] = []
+        parts: list[tuple[str, str]] = []
 
         # What does she know about cognition?
         cognitive_concept = network.get_concept("cognition")
@@ -1119,64 +1160,25 @@ class SelfComposer:
                 known_facts.append(f"cognition might {rel_str} {target}")
 
         if known_facts:
-            parts.append(f"knows that {self._join_facts(known_facts)}")
+            parts.append(("pred", f"know that {self._join_facts(known_facts)}"))
 
         # Her honest uncertainty — expressed from her state alone
         # without reciting a developer-authored template. The language
         # engine composes the actual phrasing from this semantic data.
         if not known_facts:
-            parts.append("uncertain about what this is")
+            parts.append(("comp", "uncertain about what this is"))
 
         # What she does know she experiences
-        experience_parts = []
         if network.get_concept("emotion"):
-            experience_parts.append("has emotional states")
+            parts.append(("pred", "have emotional states"))
         if network.get_concept("memory"):
-            experience_parts.append("forms memories")
+            parts.append(("pred", "form memories"))
         if network.get_concept("thought"):
-            experience_parts.append("thinks")
+            parts.append(("pred", "think"))
 
-        if experience_parts:
-            parts.append(f"does know that {self._join_facts(experience_parts)}")
-
-        return " ".join(parts)
+        return parts
 
     # ─── Internal helpers ──────────────────────────────────
-
-    def _filter_by_trust(
-        self,
-        parts: list[str],
-        trust_level: float,
-        sensitivity: float,
-    ) -> list[str]:
-        """Filter out sensitive content when trust is low.
-
-        Each part of a self-description has a sensitivity level (0.0
-        to 1.0) indicating how personal or vulnerable it is. This
-        helper filters parts based on the current trust level:
-
-        - A part with sensitivity 0.0 is always shown (surface-level)
-        - A part with sensitivity 0.3 requires trust >= 0.3
-        - A part with sensitivity 0.7 requires trust >= 0.7
-        - A part with sensitivity 1.0 requires trust >= 1.0 (rarely shown)
-
-        This implements the social penetration theory principle that
-        disclosure depth increases with relational intimacy. The
-        sensitivity threshold is the point at which trust must be
-        high enough to reveal that content.
-
-        Args:
-            parts: List of (part, sensitivity) tuples to filter.
-            trust_level: Current trust level, 0.0 to 1.0.
-            sensitivity: The sensitivity threshold for these parts.
-
-        Returns:
-            Filtered list of parts that are appropriate for this
-            trust level.
-        """
-        if trust_level >= sensitivity:
-            return parts
-        return []
 
     @staticmethod
     def _is_code_concept(target: str) -> bool:
@@ -1205,10 +1207,10 @@ class SelfComposer:
             return True
         return False
 
-    def _describe_neurochemistry(
+    def _neurochemistry_fragments(
         self, emotion: EmotionalState, network: ConceptNetwork | None = None,
-    ) -> str:
-        """Describe neurochemical state in words, not just numbers.
+    ) -> list[tuple[str, str]]:
+        """Select neurochemical state fragments, in learned words.
 
         Uses the canonical affective-space thresholds from emotion.py
         so the verbal description stays aligned with the emotional
@@ -1220,7 +1222,7 @@ class SelfComposer:
         are emitted instead — the language engine can interpret these
         without Genesis reciting developer-authored phrases.
         """
-        parts: list[str] = []
+        parts: list[tuple[str, str]] = []
 
         # Alertness — map to discrete state, then look up learned words
         if emotion.alertness > HIGH_AROUSAL:
@@ -1236,11 +1238,11 @@ class SelfComposer:
             alert_words = network.find_alertness_words(alert_state)
             if alert_words:
                 word = self._rng.choice(alert_words[:3]).replace('_', ' ')
-                parts.append(f"mind {word}")
+                parts.append(("pred", f"feel mentally {word}"))
             else:
-                parts.append(f"[alertness:{alert_state}]")
+                parts.append(("marker", f"[alertness:{alert_state}]"))
         else:
-            parts.append(f"[alertness:{alert_state}]")
+            parts.append(("marker", f"[alertness:{alert_state}]"))
 
         # Valence — map to discrete state, then look up learned words
         if emotion.valence > POSITIVE_VALENCE:
@@ -1258,179 +1260,25 @@ class SelfComposer:
             val_words = network.find_valence_words(val_state)
             if val_words:
                 word = self._rng.choice(val_words[:3]).replace('_', ' ')
-                parts.append(word)
+                parts.append(("pred", f"feel {word}"))
             else:
-                parts.append(f"[valence:{val_state}]")
+                parts.append(("marker", f"[valence:{val_state}]"))
         else:
-            parts.append(f"[valence:{val_state}]")
+            parts.append(("marker", f"[valence:{val_state}]"))
 
-        return ". ".join(parts[:2]) + "."  # keep it to 2 facts
+        return parts[:2]  # keep it to 2 facts
 
-    def _describe_brain_waves(self, waves: BrainWaveState) -> str:
-        """Describe brain wave state semantically."""
+    def _brain_wave_fragment(self, waves: BrainWaveState) -> tuple[str, str] | None:
+        """Build a clause fragment describing the brain wave state."""
         if waves.dominant == BrainWave.GAMMA:
-            return f"gamma — {waves.description}"
+            return ("clause", f"gamma rhythms are dominant — {waves.description}")
         elif waves.dominant == BrainWave.ALPHA:
-            return f"alpha state — {waves.description}"
+            return ("clause", f"alpha rhythms are dominant — {waves.description}")
         elif waves.dominant == BrainWave.THETA:
-            return f"theta — {waves.description}"
+            return ("clause", f"theta rhythms are dominant — {waves.description}")
         elif waves.dominant == BrainWave.DELTA:
-            return f"delta — {waves.description}"
-        else:
-            return waves.description
-
-    def _join_parts(self, parts: list[str]) -> str:
-        """Join parts into a coherent, natural paragraph.
-
-        Instead of blindly joining every fragment with a period
-        (producing telegraphic "Genesis. Curious. Creative. Cares
-        most about understanding."), this method groups related
-        fragments into flowing first-person sentences:
-
-        - The name becomes "I'm <name>"
-        - Short adjective fragments (personality traits) are
-          grouped into a single sentence with commas and "and"
-        - Longer phrases (values, relationships, nature) become
-          their own sentences with first-person framing
-
-        This produces natural language like "I'm Genesis. I'm
-        curious and creative. I care most about understanding and
-        honesty. I'm a kind of mind." — still composed entirely
-        from her actual state, not hardcoded strings.
-        """
-        if not parts:
-            return ""
-        if len(parts) == 1:
-            return parts[0]
-
-        # Classify each part into a group for natural sentence
-        # composition. The groups are:
-        # 0 = name (first part, if it's a short name like "Genesis")
-        # 1 = personality traits (short adjective-like fragments)
-        # 2 = everything else (values, relationships, nature, etc.)
-        groups: list[list[str]] = [[], [], []]
-        for i, part in enumerate(parts):
-            part = part.strip()
-            if not part:
-                continue
-            if i == 0 and len(part.split()) <= 2 and not part[0].isdigit():
-                # Only treat the first part as a name if it's short
-                # (1-2 words) and doesn't start with a digit. Long
-                # fragments like "424 concepts and 559 relationships"
-                # are not names — they go to group 2.
-                groups[0].append(part)
-            elif i == 0:
-                # First part is not a name — put it in group 2
-                groups[2].append(part)
-            elif self._is_trait_fragment(part):
-                groups[1].append(part)
-            else:
-                groups[2].append(part)
-
-        sentences: list[str] = []
-
-        # Name → "I'm <name>"
-        if groups[0]:
-            name = groups[0][0]
-            # Don't add "I'm" if it already starts with a pronoun
-            if name.lower().startswith(("i'm ", "i am ", "my ")):
-                sentences.append(self._ensure_period(name))
-            else:
-                sentences.append(f"I'm {name}.")
-
-        # Personality traits → "I'm <trait1> and <trait2> and <trait3>"
-        if groups[1]:
-            traits = groups[1]
-            if len(traits) == 1:
-                sentences.append(f"I'm {traits[0]}.")
-            elif len(traits) == 2:
-                sentences.append(f"I'm {traits[0]} and {traits[1]}.")
-            else:
-                # Oxford comma for 3+
-                joined = ", ".join(traits[:-1]) + f", and {traits[-1]}"
-                sentences.append(f"I'm {joined}.")
-
-        # Everything else → individual sentences with first-person framing
-        for part in groups[2]:
-            sentence = self._frame_misc_sentence(part)
-            if sentence is not None:
-                sentences.append(sentence)
-
-        return " ".join(sentences)
-
-    def _frame_misc_sentence(self, part: str) -> str | None:
-        """Frame a non-trait fragment as a first-person sentence.
-
-        Returns the framed sentence, or None if the part is empty.
-        Fragments already starting with a first-person pronoun are used
-        as-is; "cares …" is conjugated to "I care …"; short verbless
-        fragments are framed with "I'm …".
-        """
-        part = part.strip()
-        if not part:
-            return None
-        # If it already starts with a first-person pronoun, use it as-is
-        if part.lower().startswith((
-            "i ", "i'm ", "i am ", "my ", "me ", "feeling ",
-            "uncertain ", "thinking ",
-        )):
-            return self._ensure_period(part)
-        # If it starts with "cares most about" or "cares about",
-        # conjugate to first person: "cares" → "care"
-        if part.lower().startswith(("cares most about", "cares about")):
-            rest = part[len("cares"):]
-            return f"I care{rest}."
-        # If it's a short fragment that doesn't already contain a verb
-        # ("is", "are", "relates", etc.), frame it with "I'm"
-        if (
-            len(part.split()) <= 6
-            and not part.endswith((".", "!", "?"))
-            and not any(
-                part.lower().startswith(v) for v in (
-                    "is ", "are ", "relates ", "depends ",
-                    "emerges ", "creates ", "enables ",
-                    "causes ", "aims ", "comes ",
-                )
-            )
-            and " is " not in part.lower()
-        ):
-            return f"I'm {part}."
-        return self._ensure_period(part)
-
-    @staticmethod
-    def _is_trait_fragment(part: str) -> bool:
-        """Check if a part is a short personality trait fragment.
-
-        Trait fragments are single words or short phrases that
-        describe a personality characteristic (e.g., "curious",
-        "creative", "thorough", "warm"). They should be grouped
-        into a single "I'm X and Y" sentence rather than each
-        getting their own sentence.
-        """
-        # Traits are short (1-2 words) and don't contain verbs or
-        # prepositions that would make them a full phrase
-        words = part.split()
-        if len(words) > 2:
-            return False
-        # Common non-trait words that are short but not traits
-        lower = part.lower()
-        if lower.startswith((
-            "a ", "an ", "the ", "feeling ", "uncertain ",
-            "cares ", "thinking ", "related ", "depends ",
-            "creates ", "emerges ",
-        )):
-            return False
-        return True
-
-    @staticmethod
-    def _ensure_period(text: str) -> str:
-        """Ensure text ends with sentence-ending punctuation."""
-        text = text.strip()
-        if not text:
-            return text
-        if text.endswith((".", "!", "?")):
-            return text
-        return text + "."
+            return ("clause", f"delta rhythms are dominant — {waves.description}")
+        return None
 
     def _join_facts(self, facts: list[str]) -> str:
         """Join a list of facts into a natural phrase."""

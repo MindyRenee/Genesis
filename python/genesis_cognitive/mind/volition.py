@@ -12,6 +12,12 @@ from genesis_client.protocol import CHEM_NAMES, MODULE_METACOGNITION
 from ..canvas import DrawingResult, NeurochemistryInput
 from ..tools.project_creator import create_project, manage_project_lifecycle
 from ..volition import Urge, VolitionEngine
+from .thresholds import (
+    SLEEP_URGE_ADENOSINE_FLOOR,
+    WAKE_RESCUE_ADENOSINE,
+    WAKE_RESCUE_MELATONIN,
+    WAKE_STABILIZATION_WINDOW,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +25,13 @@ logger = logging.getLogger(__name__)
 class VolitionMixin:
     """Mixin for :class:`Mind` — see module docstring."""
     if TYPE_CHECKING:
+        from ..world import Presence
+
         # Attributes and cross-mixin methods are provided by the
         # composed class (see the package's core module).
+        _daemon_lost_since: float | None
+        _autosave_failures: int
+        _offline: bool
         def __getattr__(self, name: str) -> Any: ...
 
 
@@ -154,6 +165,22 @@ class VolitionMixin:
             logger.debug(f"puzzle_pending read failed: {e}")
 
         wave_data = self._read_wave_and_adenosine()
+        threat_data = self._read_threat_signals()
+
+        # Voluntary sleep-pressure shaping. The urge integrates only
+        # pressure above the drowsy-band floor — residual sub-drowsy
+        # adenosine is grogginess that fades, not a reason to sleep.
+        # Within the post-wake stabilization window the excess is
+        # additionally dampened so the urge can only re-form from
+        # genuinely high pressure or after the latch has had time
+        # to hold.
+        adn = wave_data.get("adenosine_level")
+        if isinstance(adn, (int, float)):
+            adn_drive = max(0.0, adn - SLEEP_URGE_ADENOSINE_FLOOR)
+            wake_age = time.time() - self._last_wake_time
+            if wake_age < WAKE_STABILIZATION_WINDOW:
+                adn_drive *= wake_age / WAKE_STABILIZATION_WINDOW
+            wave_data["adenosine_level"] = adn_drive
 
         # Concept network growth for the introspection and self-mission
         # urges — new concepts since the last volition tick. Normalized
@@ -166,6 +193,30 @@ class VolitionMixin:
             self._last_concept_count: int = current_count
         except Exception as e:  # noqa: BLE001
             logger.debug(f"concept growth read failed: {e}")
+
+        # Social isolation from her external world — how long it has
+        # been since anyone engaged her. Dampened by unanswered
+        # outreach bids: after several calls into silence, the room's
+        # quiet is expected, so the pressure eases (habituation).
+        # Sharpened by what she's learned about the target: silence
+        # from someone whose responsiveness posterior has collapsed is
+        # expected and isolates less; silence from a responsive
+        # presence still registers at full weight.
+        social_isolation = 0.0
+        try:
+            social_isolation = self.world.social_isolation() * (
+                1.0 - 0.2 * min(3, self.world.unanswered_bids)
+            )
+            target = (
+                self.world.engaged_presence()
+                or self.world.last_seen_presence()
+            )
+            if target is not None:
+                r = target.belief.responsiveness
+                trust = min(1.0, r.evidence / 8.0)
+                social_isolation *= 1.0 - 0.5 * (1.0 - r.mean) * trust
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"social isolation read failed: {e}")
 
         return {
             "bug_count": bug_count,
@@ -185,7 +236,9 @@ class VolitionMixin:
             "puzzle_pending": puzzle_pending,
             "creativity": creativity,
             **wave_data,
+            **threat_data,
             "concept_growth": concept_growth,
+            "social_isolation": social_isolation,
         }
     def _act_on_volition(self, ready: list[str]) -> None:
         """Run each ready urge action in its own background thread.
@@ -237,6 +290,8 @@ class VolitionMixin:
             "self_mission": self._perform_self_mission,
             "learn": self._perform_learn,
             "puzzle": self._perform_puzzle,
+            "reach_out": self._perform_reach_out,
+            "safeguard": self._perform_safeguard,
         }
         for name in ready:
             fn = performers.get(name)
@@ -545,6 +600,150 @@ class VolitionMixin:
                 self._on_speak(utterance)
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"Speech callback failed: {e}")
+        # Record her voice in her external world — the utterance
+        # reached out, whether or not a listener was attached.
+        try:
+            self.world.she_said(utterance)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"world utterance record failed: {e}")
+    def _perform_safeguard(self) -> None:
+        """Protect her own integrity because the urge crossed threshold.
+
+        This is the defensive counterpart to the appetitive urges —
+        she acts because something threatens the system she lives in.
+        Two moves, in order:
+
+        1. Restore or verify the daemon connection. A dropped socket
+           means the client's ``_ensure_connected`` raises before the
+           reconnect path runs — so reconnect explicitly, then ping to
+           exercise the link. In offline mode there is no daemon to
+           restore — skipped.
+        2. Checkpoint her cognitive state. Autosave runs on a 5-minute
+           timer regardless; a safeguard firing means the signals said
+           "now might not be safe to wait." Saving early bounds what a
+           crash could take.
+        """
+        if not self._offline:
+            try:
+                if not self.client.is_connected():
+                    self.client.connect()
+                self.client.ping(timeout=2.0)
+                self._daemon_lost_since = None
+            except (OSError, ConnectionError, RuntimeError) as e:
+                logger.debug(f"safeguard daemon probe failed: {e}")
+
+        self._emit_volition_thought(
+            ("self", "protection", "memory", "body"),
+            "thinking",
+        )
+        try:
+            if self._save_state():
+                self._autosave_failures = 0
+            else:
+                logger.warning("safeguard save failed")
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"safeguard save failed: {e}")
+    def _perform_reach_out(self) -> None:
+        """Initiate social contact because the urge crossed threshold.
+
+        The reach_out urge builds from social isolation — the external
+        world's pressure when nobody has engaged her. When it fires,
+        she makes a social bid: a question composed through her
+        question composer from something she and the presence share,
+        or from her own current curiosity. The words come from her
+        language engine, never a template.
+
+        Unlike queued inner-life questions, a reach-out is emitted
+        inline — its whole point is that it lands in the world. The
+        "question" kind records the utterance in her world (she_said)
+        and surfaces it to listeners.
+
+        Backing off: after several unanswered bids the isolation
+        stimulus is dampened (see _volition_context), and at
+        _REACH_OUT_MAX_BIDS she stops calling into silence entirely —
+        a person who reaches out and is never answered stops knocking.
+        """
+        if self._is_sleeping or self._is_meditating or self._is_teaching:
+            return
+        if self.world.unanswered_bids >= self._REACH_OUT_MAX_BIDS:
+            return
+        # Who she'd reach out to — and whether her beliefs about them
+        # support it. A presence whose responsiveness posterior has
+        # collapsed is someone she's learned doesn't answer; a dead
+        # hour in their activity rhythm is a door nobody opens.
+        try:
+            target = (
+                self.world.engaged_presence()
+                or self.world.last_seen_presence()
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"reach-out presence lookup failed: {e}")
+            target = None
+        if target is not None:
+            belief = target.belief
+            if belief.unresponsive():
+                return
+            if not target.present and not belief.likely_awake(time.time()):
+                return
+        topic = self._reach_out_topic(target)
+        if topic is None:
+            return
+        try:
+            emotion = self.feel()
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"reach-out emotion read failed: {e}")
+            return
+        # Compose the question from her actual knowledge gaps and
+        # curiosity — the same path her inner-life social questions
+        # take. If she has nothing genuine to ask, she stays quiet.
+        try:
+            q_data = self.cognition.question_composer.compose_follow_up(
+                topic, emotion
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"reach-out question compose failed: {e}")
+            return
+        if not q_data:
+            return
+        try:
+            content = self.cognition.language.compose_question(
+                q_data, emotion
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"reach-out question render failed: {e}")
+            return
+        if not content:
+            return
+        # Commit the bid before speaking — the world counts it whether
+        # or not the listener path succeeds.
+        self.world.note_outreach(topics=[topic])
+        self._emit_live_thought("question", content)
+    def _reach_out_topic(self, target: Presence | None) -> str | None:
+        """Pick what to reach out about, from her beliefs and curiosity.
+
+        Prefers what she believes the target engages on — Thompson-
+        sampled from their topic receptivity so proven topics usually
+        win but uncertain ones get a fair draw. Falls back to their
+        most recent shared topic, then to what's active in her own
+        concept network — her own wondering.
+        """
+        if target is not None:
+            sampled = target.belief.sample_topic()
+            if sampled is not None:
+                return sampled
+            if target.topics:
+                # topics is a deque, most recent last — shared ground.
+                return target.topics[-1]
+
+        # No shared ground — reach out about what she's currently
+        # wondering about (her most activated concepts).
+        try:
+            for name, activation in self.cognition.network.most_activated(5):
+                if activation > 0.1:
+                    return name
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"reach-out network read failed: {e}")
+        return None
     def _perform_look(self) -> None:
         """Look around because the camera is a continuous sense.
 
@@ -570,6 +769,10 @@ class VolitionMixin:
                 emotion=self.feel(),
                 network=self.cognition.network,
             )
+            # Faces she recognizes become presences in her world.
+            self._note_faces_seen()
+            # Record the act — looking is her reaching out perceptually.
+            self.world.she_acted("looked around")
         except Exception as e:  # noqa: BLE001
             logger.debug(f"Volition look failed: {e}")
     def _perform_meditate(self) -> None:
@@ -719,6 +922,11 @@ class VolitionMixin:
                                     "creating")
         desc = self.draw()
         if desc:
+            # The drawing is an act on her world — she made something.
+            try:
+                self.world.she_acted("drew a picture", detail=desc[:200])
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"world action record failed: {e}")
             self._emit_live_thought("art", desc)
         else:
             # draw() returns None for several reasons: sleeping,
@@ -805,13 +1013,23 @@ class VolitionMixin:
 
         # Ground the outcome as a memory event — salience scales with
         # how close she came, so near-misses matter more than misses.
+        # The emotional tag is the current 12 effective levels (the
+        # chemistry she felt while solving), with dopamine bumped on
+        # mastery — the reward signal of a new best.
         try:
+            chemicals = self.client.get_state().chemicals
+            tag = [
+                float(chemicals.get(CHEM_NAMES[i], 0.0))
+                for i in range(12)
+            ]
+            if result.mastered:
+                tag[0] = min(1.0, tag[0] + 0.2)  # dopamine reward
             self.client.store_event(
                 timestamp=int(time.time() * 1000),
                 event_type=1,  # Output
                 source_module=MODULE_METACOGNITION,
                 salience=0.4 + 0.5 * result.score,
-                emotional_tag="reward" if result.mastered else "curious",
+                emotional_tag=tag,
                 text=(
                     f"puzzle:{result.task} score={result.score:.2f} "
                     f"rule={result.rule} attempts={result.total_attempts}"
@@ -1049,11 +1267,10 @@ class VolitionMixin:
                 and name not in already_built
             ]
             if concepts:
-                import random
                 # Weight by confidence — higher confidence = more likely
                 names = [c[0] for c in concepts]
                 weights = [c[1] for c in concepts]
-                return random.choices(names, weights=weights, k=1)[0]
+                return self._rng.choices(names, weights=weights, k=1)[0]
         except Exception as e:  # noqa: BLE001
             logger.debug(f'_pick_creation_topic failed: {e}')
 
@@ -1097,6 +1314,19 @@ class VolitionMixin:
         """
         if self._is_sleeping or self._is_meditating:
             return
+        # Wake stabilization backstop: within the post-wake window,
+        # re-sleeping at moderate pressure is the flip-flop failing to
+        # latch — decline and let the wake state consolidate. Genuine
+        # exhaustion overrides.
+        if time.time() - self._last_wake_time < WAKE_STABILIZATION_WINDOW:
+            try:
+                chemicals = self.client.get_state().chemicals
+                adn = chemicals.get("adenosine", 0.0)
+                mel = chemicals.get("melatonin", 0.0)
+            except (OSError, ConnectionError, RuntimeError):
+                adn, mel = 1.0, 0.0  # unreadable → don't block sleep
+            if adn < WAKE_RESCUE_ADENOSINE and mel < WAKE_RESCUE_MELATONIN:
+                return
         self._emit_volition_thought(
             ("sleep", "rest", "tiredness", "dreaming"),
             "thought",

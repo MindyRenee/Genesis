@@ -621,14 +621,19 @@ class Grammar:
         self,
         intent: str,
         emotion_weight: float = 1.0,
+        pool: list[SentenceStructure] | None = None,
     ) -> SentenceStructure:
         """Select a sentence structure for the given intent.
 
         The selection is weighted by structure.weight, modulated by
         the emotional state. High creativity → more complex structures.
         Low engagement → simpler structures.
+
+        ``pool``, when given, overrides the intent's default structure
+        list — callers use it to exclude frames that don't fit the
+        content's shape (e.g. copula frames for verb-led candidates).
         """
-        structures = self.get_structures(intent)
+        structures = pool if pool is not None else self.get_structures(intent)
         if not structures:
             structures = _INFORM_STRUCTURES
 

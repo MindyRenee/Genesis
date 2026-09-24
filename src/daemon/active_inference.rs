@@ -241,7 +241,10 @@
 use std::path::Path;
 
 use crate::state::InferenceSignals;
-use crate::state::neurochemical::{NEUROCHEMICAL_COUNT, NeurochemicalId, NeurochemicalVector};
+use crate::state::neurochemical::{
+    NEUROCHEMICAL_COUNT, NeurochemicalId, NeurochemicalVector,
+};
+use crate::state::zones::MentalPhase;
 
 /// The dimensionality of the state vector (18 neurochemicals).
 const DIM: usize = NEUROCHEMICAL_COUNT;
@@ -2330,8 +2333,16 @@ pub fn apply_inference_feedback(
     result: &InferenceResult,
     now_ms: u64,
 ) {
-    // Apply neurochemical impulses
+    // Apply neurochemical impulses. During sleep, skip adenosine
+    // impulses: a "rest" policy selected while already in NREM/REM
+    // would pump the same sleep pressure the glymphatic mechanism is
+    // clearing — a self-defeating impulse that stalls clearance.
+    let phase = MentalPhase::from_u8(neuro.emergent_phase);
+    let sleeping = phase == MentalPhase::NREM || phase == MentalPhase::REM;
     for &(chem_id, magnitude) in &result.impulses {
+        if sleeping && chem_id == NeurochemicalId::Adenosine as u8 {
+            continue;
+        }
         let id = crate::state::neurochemical::NeurochemicalId::from_u8(chem_id);
         neuro.apply_impulse_capped(id, magnitude, now_ms);
     }

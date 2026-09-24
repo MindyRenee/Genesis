@@ -655,7 +655,7 @@ class VoiceInput:
 
         chunks: list[bytes] = []
         silence_count = 0
-        speech_started = True
+        speech_started = False
         import time as _time
 
         def callback(indata: Any, frames: int, time_info: object, status: object) -> None:
@@ -670,9 +670,19 @@ class VoiceInput:
             callback=callback,
         ):
             start = _time.time()
+            fed = 0
             while True:
                 _time.sleep(0.05)
                 elapsed = _time.time() - start
+
+                # Feed newly captured audio to the recognizer here, on
+                # this thread — KaldiRecognizer is not thread-safe, so
+                # the audio callback must not call AcceptWaveform. The
+                # callback only buffers; all recognizer calls stay in
+                # this loop.
+                while fed < len(chunks):
+                    recognizer.AcceptWaveform(chunks[fed])
+                    fed += 1
 
                 # Check Vosk partial results for speech detection
                 partial = json.loads(recognizer.PartialResult())

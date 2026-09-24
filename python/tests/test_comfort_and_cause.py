@@ -407,107 +407,76 @@ def test_emotional_state_cause_default_empty() -> None:
 # ─── Plasticity edge: silent stress prevention ────────────────────
 
 
-def test_feeling_report_surfaces_closed_plasticity_with_positive_mood() -> None:
-    """Feeling report surfaces closed plasticity gate even when mood is positive.
+def _make_feeling_reporter():
+    """Construct a FeelingReporter with an empty network for tests."""
+    import random as _random
 
-    This is the 'silent stress' edge case: valence is fine but BDNF
-    suppression has closed the plasticity gate. She must communicate
-    the impairment regardless of mood.
-    """
-    from genesis_cognitive.cognition import CognitionEngine
     from genesis_cognitive.cognition.feeling_reporter import FeelingReporter
     from genesis_cognitive.concepts import ConceptNetwork
 
-    cog = CognitionEngine.__new__(CognitionEngine)
-    cog.network = ConceptNetwork()
-    cog._rng = __import__("random").Random(42)
-    cog._feeling_reporter = FeelingReporter(
-        network=cog.network,
+    return FeelingReporter(
+        network=ConceptNetwork(),
         language=None,  # type: ignore[arg-type]
         composer=None,  # type: ignore[arg-type]
         self_model=None,  # type: ignore[arg-type]
-        rng=cog._rng,
+        rng=_random.Random(42),
         meta_emotion_builder=lambda: EmotionalState(
             label="neutral", cognitive_style="steady",
         ),
     )
 
-    # Positive mood but closed plasticity gate
+
+def test_feeling_parts_surface_closed_plasticity_with_positive_mood() -> None:
+    """Closed plasticity surfaces a structural marker even when mood is positive.
+
+    This is the 'silent stress' edge case: valence is fine but BDNF
+    suppression has closed the plasticity gate. The marker is collected
+    as a structural (diagnostic) fragment regardless of mood — it is
+    metadata for introspection, not spoken text.
+    """
+    reporter = _make_feeling_reporter()
     emotion = EmotionalState(
         label="positive", cognitive_style="steady",
         valence=0.4, alertness=0.6, plasticity=0.08,
     )
-    report = cog._compose_feeling_report(emotion)
-    assert "[plasticity_gate:closed]" in report
+    _semantic, structural = reporter._collect_feeling_parts(emotion)
+    assert "[plasticity_gate:closed]" in structural
 
 
-def test_feeling_report_surfaces_low_plasticity() -> None:
-    """Feeling report surfaces low plasticity with the 'low' marker."""
-    from genesis_cognitive.cognition import CognitionEngine
-    from genesis_cognitive.cognition.feeling_reporter import FeelingReporter
-    from genesis_cognitive.concepts import ConceptNetwork
-
-    cog = CognitionEngine.__new__(CognitionEngine)
-    cog.network = ConceptNetwork()
-    cog._rng = __import__("random").Random(42)
-    cog._feeling_reporter = FeelingReporter(
-        network=cog.network,
-        language=None,  # type: ignore[arg-type]
-        composer=None,  # type: ignore[arg-type]
-        self_model=None,  # type: ignore[arg-type]
-        rng=cog._rng,
-        meta_emotion_builder=lambda: EmotionalState(
-            label="neutral", cognitive_style="steady",
-        ),
-    )
-
+def test_feeling_parts_surface_low_plasticity() -> None:
+    """Low plasticity surfaces the 'low' structural marker."""
+    reporter = _make_feeling_reporter()
     emotion = EmotionalState(
         label="positive", cognitive_style="steady",
         valence=0.3, alertness=0.5, plasticity=0.20,
     )
-    report = cog._compose_feeling_report(emotion)
-    assert "[plasticity_gate:low]" in report
+    _semantic, structural = reporter._collect_feeling_parts(emotion)
+    assert "[plasticity_gate:low]" in structural
 
 
-def test_feeling_report_no_plasticity_marker_when_healthy() -> None:
+def test_feeling_fragments_no_plasticity_marker_when_healthy() -> None:
     """Healthy plasticity does not trigger the marker."""
-    from genesis_cognitive.cognition import CognitionEngine
-    from genesis_cognitive.cognition.feeling_reporter import FeelingReporter
-    from genesis_cognitive.concepts import ConceptNetwork
-
-    cog = CognitionEngine.__new__(CognitionEngine)
-    cog.network = ConceptNetwork()
-    cog._rng = __import__("random").Random(42)
-    cog._feeling_reporter = FeelingReporter(
-        network=cog.network,
-        language=None,  # type: ignore[arg-type]
-        composer=None,  # type: ignore[arg-type]
-        self_model=None,  # type: ignore[arg-type]
-        rng=cog._rng,
-        meta_emotion_builder=lambda: EmotionalState(
-            label="neutral", cognitive_style="steady",
-        ),
-    )
-
+    reporter = _make_feeling_reporter()
     emotion = EmotionalState(
         label="positive", cognitive_style="steady",
         valence=0.3, alertness=0.5, plasticity=0.6,
     )
-    report = cog._compose_feeling_report(emotion)
-    assert "plasticity_gate" not in report
+    _semantic, structural = reporter._collect_feeling_parts(emotion)
+    assert not any("plasticity_gate" in m for m in structural)
 
 
-def test_feeling_report_speech_strips_structural_markers() -> None:
-    """The speech-safe feeling report must not contain structural markers.
+def test_feeling_fragments_never_contain_structural_markers() -> None:
+    """Speech-bound feeling fragments must not contain structural markers.
 
     Structural markers like [plasticity_gate:closed] and
     [self_model:...] are internal diagnostic tags, not words Genesis
-    should speak. The speech-safe version must strip them so they
+    should speak. collect_feeling_fragments returns only semantic
+    material — markers stay in the structural channel so they can
     never leak into her spoken words.
     """
     from genesis_cognitive.cognition.feeling_reporter import FeelingReporter
 
-    # Direct test of the stripper
+    # Direct test of the stripper (still used for /feel diagnostics)
     assert FeelingReporter.strip_structural_markers("[plasticity_gate:closed]") == ""
     assert FeelingReporter.strip_structural_markers(
         "[self_model:self-coherent field-fragmented]"
@@ -517,34 +486,15 @@ def test_feeling_report_speech_strips_structural_markers() -> None:
     assert FeelingReporter.strip_structural_markers("no markers here") == "no markers here"
     assert FeelingReporter.strip_structural_markers("") == ""
 
-    # Integration test: the speech-safe report from compose_feeling_report
-    # with closed plasticity must NOT contain the marker
-    from genesis_cognitive.cognition import CognitionEngine
-    from genesis_cognitive.concepts import ConceptNetwork
-
-    cog = CognitionEngine.__new__(CognitionEngine)
-    cog.network = ConceptNetwork()
-    cog._rng = __import__("random").Random(42)
-    cog._feeling_reporter = FeelingReporter(
-        network=cog.network,
-        language=None,  # type: ignore[arg-type]
-        composer=None,  # type: ignore[arg-type]
-        self_model=None,  # type: ignore[arg-type]
-        rng=cog._rng,
-        meta_emotion_builder=lambda: EmotionalState(
-            label="neutral", cognitive_style="steady",
-        ),
-    )
-
+    # Integration: collected speech fragments exclude the marker
+    reporter = _make_feeling_reporter()
     emotion = EmotionalState(
         label="positive", cognitive_style="steady",
         valence=0.4, alertness=0.6, plasticity=0.08,
     )
-    # Full report HAS the marker (for /feel diagnostics)
-    full_report = cog._compose_feeling_report(emotion)
-    assert "[plasticity_gate:closed]" in full_report
-
-    # Speech-safe report does NOT have the marker
-    speech_report = cog._feeling_reporter.compose_feeling_report_for_speech(emotion)
-    assert "plasticity_gate" not in speech_report
-    assert "[" not in speech_report
+    fragments = reporter.collect_feeling_fragments(emotion)
+    flattened = " ".join(
+        str(v) for v in fragments.values() if v
+    )
+    assert "[" not in flattened
+    assert "plasticity_gate" not in flattened

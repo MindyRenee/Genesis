@@ -63,7 +63,7 @@ from enum import Enum, auto
 from typing import Any, ClassVar
 
 from .figurative import FigurativeLanguageProcessor, IronyDetection, Metaphor
-from .morphology import is_participle, is_verb_form
+from .morphology import deconjugate_verb, is_participle, is_verb_form
 
 __all__ = [
     "ComprehensionEngine",
@@ -1132,7 +1132,7 @@ class ComprehensionEngine:
         "rely": (("on",),),
         "insist": (("on",),),
         "focus": (("on",),),
-        "work": (("on",),),
+        "work": (("on",), ("out",)),
         "act": (("on",),),
         "emerge": (("from",),),
         "stem": (("from",),),
@@ -1149,7 +1149,7 @@ class ComprehensionEngine:
         "connect": (("to",), ("with",)),
         "lead": (("to",),),
         "belong": (("to",),),
-        "point": (("to",),),
+        "point": (("to",), ("out",)),
         "respond": (("to",),),
         "amount": (("to",),),
         "contribute": (("to",),),
@@ -1161,10 +1161,63 @@ class ComprehensionEngine:
         "deal": (("with",),),
         "participate": (("in",),),
         "result": (("in",), ("from",),),
-        "look": (("like",), ("for",)),
-        "give": (("rise", "to"),),
-        "take": (("care", "of"),),
+        "look": (("like",), ("for",), ("up",)),
+        "give": (("rise", "to"), ("back",), ("away",), ("out",), ("up",)),
+        "take": (("care", "of"), ("out",), ("back",), ("off",), ("up",), ("over",), ("away",)),
         "rise": (("to",),),
+        # Separable phrasal verbs — the particle belongs to the verb,
+        # not to a prepositional phrase ("picked up the milk" → object
+        # is "the milk", not "up the milk"). Only particles immediately
+        # following the verb are absorbed, so split orders ("put the
+        # book down") are unaffected.
+        "pick": (("up",),),
+        "put": (("down",), ("on",), ("away",), ("back",), ("off",), ("out",), ("up",)),
+        "bring": (("back",), ("in",), ("up",), ("out",)),
+        "carry": (("out",),),
+        "set": (("down",), ("aside",), ("up",), ("off",)),
+        "throw": (("away",), ("out",),),
+        "hand": (("in",), ("out",), ("over",)),
+        "drop": (("off",),),
+        "write": (("down",),),
+        "clean": (("up",),),
+        "fill": (("in",), ("up",), ("out",)),
+        "turn": (("on",), ("off",), ("up",), ("down",)),
+        "hang": (("up",),),
+        "plug": (("in",),),
+        "lock": (("up",),),
+        "heat": (("up",),),
+        "open": (("up",),),
+        "shut": (("down",), ("off",)),
+        "close": (("down",),),
+        "cover": (("up",),),
+        "mix": (("up",),),
+        "tear": (("up",), ("down",)),
+        "cut": (("off",),),
+        "break": (("down",),),
+        "blow": (("up",),),
+        "burn": (("down",), ("up",)),
+        "dry": (("off",),),
+        "wake": (("up",),),
+        "send": (("back",), ("off",)),
+        "pay": (("back",),),
+        "trade": (("in",),),
+        "show": (("off",),),
+        "check": (("out",),),
+        "figure": (("out",),),
+        "find": (("out",),),
+        "rule": (("out",),),
+        "sort": (("out",),),
+        "try": (("out",),),
+        "leave": (("out",),),
+        "call": (("off",),),
+        "eat": (("up",),),
+        "drink": (("up",),),
+        "fix": (("up",),),
+        "calm": (("down",),),
+        "cool": (("down",),),
+        "hold": (("up",),),
+        "back": (("up",),),
+        "get": (("back",),),
     }
 
     # Determiners that open a noun phrase
@@ -1481,6 +1534,14 @@ class ComprehensionEngine:
         """
         base = is_verb_form(verb) or verb.lower()
         patterns = self._PHRASAL_VERBS.get(base)
+        if patterns is None:
+            # The table is keyed by base verb; deconjugation reaches
+            # bases that are missing from the verb lexicon ("picked"
+            # → "pick" even when "pick" isn't a known verb).
+            for candidate in deconjugate_verb(verb):
+                patterns = self._PHRASAL_VERBS.get(candidate)
+                if patterns is not None:
+                    break
         if not patterns:
             return verb, 0
 

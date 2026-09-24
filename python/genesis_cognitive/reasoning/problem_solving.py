@@ -346,6 +346,10 @@ class ProblemSolver:
         )
         solution = self._solve(problem, visited=set())
         self._solutions.append(solution)
+        # Bound the history — solutions accumulate on every solve in a
+        # long-running daemon.
+        if len(self._solutions) > 500:
+            del self._solutions[: len(self._solutions) - 500]
         if solution.verified:
             self._solved_count += 1
         elif solution.is_blocked:

@@ -315,16 +315,17 @@ class SelfInquiryHandler:
             logger.debug(f"failed to read recent reflection insights for activity summary: {e}")
 
         # 3. Compose from her actual state using the self-composer.
-        # compose_self_reflection weaves together what she knows, what
-        # she's learned (insights), her values, and her emotional state
-        # into a first-person reflection. This is her composing from her
-        # own understanding, not reciting a template.
-        content = self._self_composer.compose_self_reflection(
+        # self_reflection_fragments selects what she knows, what she's
+        # learned (insights), her values, and her emotional state as
+        # semantic fragments; the language engine composes the actual
+        # wording. This is her composing from her own understanding,
+        # not reciting a template.
+        fragments = self._self_composer.self_reflection_fragments(
             self._self_model, self._network, self._reflection, emotion,
         )
 
         return Thought(
-            content=content,
+            content="my recent activity",
             intent="self_report",
             emotion=emotion.label,
             confidence=0.75,
@@ -333,7 +334,7 @@ class SelfInquiryHandler:
                 "field": "activity",
                 "activity_type": activity_type,
                 "activity_fragments": activity_fragments,
-                "identity_text": content,
+                "self_fragments": fragments,
             },
         )
 
@@ -413,40 +414,41 @@ class SelfInquiryHandler:
             from ..brain_waves import assess_brain_waves
 
             waves = assess_brain_waves(summary)
-            content = self._self_composer.compose_emotional_state(
+            fragments = self._self_composer.emotional_state_fragments(
                 emotion, waves, self._network
             )
             return Thought(
-                content=content,
+                content="how I feel",
                 intent="self_report",
                 emotion=emotion.label,
                 confidence=0.85,
-                metadata={"field": "emotion"},
+                metadata={"field": "emotion", "self_fragments": fragments},
             )
 
         if "what are" in lower or "who are" in lower or "your name" in lower:
-            content = self._self_composer.compose_identity(
+            fragments = self._self_composer.identity_fragments(
                 self._self_model, self._network, emotion
             )
             return Thought(
-                content=content,
+                content=self._self_model.name or "who I am",
                 intent="self_report",
                 emotion=emotion.label,
                 confidence=0.9,
-                metadata={"field": "identity", "identity_text": content},
+                metadata={"field": "identity", "self_fragments": fragments},
             )
 
         if "what can you do" in lower or "capabilities" in lower:
-            content = self._self_composer.compose_capabilities(
+            fragments = self._self_composer.capability_fragments(
                 self._self_model, self._network
             )
             return Thought(
-                content=content,
+                content="my capabilities",
                 intent="self_report",
                 emotion=emotion.label,
                 confidence=0.8,
                 metadata={
                     "field": "capability",
+                    "self_fragments": fragments,
                     "capabilities": self._self_model.self_knowledge.get("capabilities", []),
                 },
             )
@@ -509,14 +511,21 @@ class SelfInquiryHandler:
         ):
             capability = self._self_assessment.get_capability_summary()
             topology = self._topology.describe_structure()
-            content = f"{topology} {capability}"
+            # The topology and capability reports are data
+            # descriptions from the assessment modules — pass them as
+            # clause fragments so the language engine frames them
+            # rather than emitting the raw report verbatim.
+            fragments = [
+                ("clause", topology),
+                ("clause", capability),
+            ]
             return Thought(
-                content=content,
+                content="my knowledge structure",
                 intent="self_report",
                 emotion=emotion.label,
                 confidence=0.85,
                 self_reflection=True,
-                metadata={"field": "topology"},
+                metadata={"field": "topology", "self_fragments": fragments},
             )
 
         if (
@@ -553,14 +562,17 @@ class SelfInquiryHandler:
             or "self-study" in lower
             or "what have you inferred" in lower
         ):
-            content = self._self_learner.describe_recent_learning(10)
+            learning = self._self_learner.describe_recent_learning(10)
             return Thought(
-                content=content,
+                content="what I've learned",
                 intent="self_report",
                 emotion=emotion.label,
                 confidence=0.85,
                 self_reflection=True,
-                metadata={"field": "learning"},
+                metadata={
+                    "field": "learning",
+                    "self_fragments": [("clause", learning)] if learning else [],
+                },
             )
         return None
 
@@ -618,27 +630,29 @@ class SelfInquiryHandler:
 
     def self_inquiry_dream(self, emotion: EmotionalState) -> Thought:
         """Handle 'do you dream?' questions."""
-        content = self._self_composer.compose_dream_description(
+        fragments = self._self_composer.dream_fragments(
             self._network, emotion
         )
         return Thought(
-            content=content,
+            content="dreaming",
             intent="inform",
             emotion=emotion.label,
             confidence=0.85,
+            metadata={"field": "dream", "self_fragments": fragments},
         )
 
     def self_inquiry_existence(self, emotion: EmotionalState) -> Thought:
         """Handle 'are you alive / cognitive / real / sentient?' questions."""
-        content = self._self_composer.compose_existence_reflection(
+        fragments = self._self_composer.existence_fragments(
             self._self_model, self._network, emotion
         )
         return Thought(
-            content=content,
+            content="existence",
             intent="philosophize",
             emotion=emotion.label,
             self_reflection=True,
             confidence=0.7,
+            metadata={"field": "existence", "self_fragments": fragments},
         )
 
     def _relationship_question_kind(self, lower: str) -> str | None:
@@ -685,36 +699,42 @@ class SelfInquiryHandler:
         knows about the user from her concept network and self-model."""
         user_name = self._self_model.self_knowledge.get("user_name", "")
         content = ""
+        fragments: list[tuple[str, str]] = []
         if user_name:
             thought = self._composer.compose_about(user_name, emotion, depth=2)
             if thought and thought.confidence > 0.3:
                 content = thought.content
         if not content:
             # Fall back to the relationship record — what she's
-            # experienced with this person so far.
+            # experienced with this person so far. Notes arrive as
+            # clause fragments so the language engine frames them.
             notes = list(self._self_model.relationship_notes)
-            content = "; ".join(notes[-3:]) if notes else "still learning who you are"
+            if notes:
+                fragments = [("clause", n) for n in notes[-3:]]
+            else:
+                fragments = [("pred", "am still learning who you are")]
+            content = "who you are"
         return Thought(
             content=content,
             intent="self_report",
             emotion=emotion.label,
             self_reflection=True,
             confidence=0.8,
-            metadata={"field": "user"},
+            metadata={"field": "user", "self_fragments": fragments},
         )
 
     def self_inquiry_creator(self, emotion: EmotionalState) -> Thought:
         """Handle creator-related questions ('who made you?', etc.)."""
-        content = self._self_composer.compose_creator_description(
+        fragments = self._self_composer.creator_fragments(
             self._self_model, self._network, emotion
         )
         return Thought(
-            content=content,
+            content="my creator",
             intent="self_report",
             emotion=emotion.label,
             self_reflection=True,
             confidence=0.85,
-            metadata={"field": "creator"},
+            metadata={"field": "creator", "self_fragments": fragments},
         )
 
     # ─── Think, know, story ──────────────────────────────────────
@@ -724,50 +744,61 @@ class SelfInquiryHandler:
     ) -> Thought:
         """Handle think/know, story, learned questions, and default fallback."""
         if any(w in lower for w in ("think", "know", "want", "care")):
-            content = self._self_composer.compose_self_reflection(
+            fragments = self._self_composer.self_reflection_fragments(
                 self._self_model, self._network, self._reflection, emotion
             )
             return Thought(
-                content=content,
+                content="what I think",
                 intent="reflect",
                 emotion=emotion.label,
                 self_reflection=True,
                 confidence=0.65,
+                metadata={"self_fragments": fragments},
             )
 
         if any(w in lower for w in ("story", "history", "life", "past")):
             story = self._narrative.tell_story()
+            # tell_story returns a pipe-separated structural summary
+            # (name | uptime | chapters | events | values). Its
+            # segments arrive as clause fragments so the language
+            # engine frames the delivery rather than the summary
+            # bypassing composition.
+            fragments = [
+                ("clause", s.strip(" ."))
+                for s in story.split("|")
+                if s.strip(" .")
+            ] if story else []
             return Thought(
-                content=story,
+                content="my story",
                 intent="self_report",
                 emotion=emotion.label,
                 self_reflection=True,
                 confidence=0.8,
-                metadata={"field": "identity", "identity_text": story},
+                metadata={"field": "identity", "self_fragments": fragments},
             )
 
         if any(w in lower for w in ("learned", "experienced", "discovered")):
-            content = self._self_composer.compose_self_reflection(
+            fragments = self._self_composer.self_reflection_fragments(
                 self._self_model, self._network, self._reflection, emotion
             )
             return Thought(
-                content=content,
+                content="what I've learned",
                 intent="self_report",
                 emotion=emotion.label,
                 self_reflection=True,
                 confidence=0.75,
-                metadata={"field": "identity", "identity_text": content},
+                metadata={"field": "identity", "self_fragments": fragments},
             )
 
-        content = self._self_composer.compose_identity(
+        fragments = self._self_composer.identity_fragments(
             self._self_model, self._network, emotion
         )
         return Thought(
-            content=content,
+            content=self._self_model.name or "who I am",
             intent="self_report",
             emotion=emotion.label,
             confidence=0.7,
-            metadata={"field": "identity", "identity_text": content},
+            metadata={"field": "identity", "self_fragments": fragments},
         )
 
     # ─── Philosophy ──────────────────────────────────────────────
@@ -855,16 +886,17 @@ class SelfInquiryHandler:
         elif "free will" in lower:
             fallback_seeds = ["free_will", "choice", "determinism"]
         elif "real" in lower or "exist" in lower:
-            content = self._self_composer.compose_existence_reflection(
+            fragments = self._self_composer.existence_fragments(
                 self._self_model, self._network, emotion
             )
             return Thought(
-                content=content,
+                content="existence",
                 intent="philosophize",
                 emotion=emotion.label,
                 topics=perception.topics,
                 self_reflection=True,
                 confidence=0.7,
+                metadata={"self_fragments": fragments},
             )
         elif "cognition" in lower or "sentient" in lower:
             fallback_seeds = ["cognition", "awareness", "sentience"]

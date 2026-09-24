@@ -111,10 +111,8 @@ SOURCE_DIRS=(
     "python/genesis_cli.py"
     "python/tests"
     "tests"
-    "evals"
     "examples"
     "scripts"
-    "benchmarks"
     "docs"
 )
 
@@ -271,7 +269,6 @@ do_report() {
             stm_ring.bin \
             user_profile.json \
             vq_codebook.npz \
-            benchmark_curve.csv \
             bug_reports.jsonl \
             man_page_genus_cache.json \
             drawings/style_profile.json \
@@ -444,14 +441,14 @@ do_check() {
     local py_issues=""
     if command -v ruff >/dev/null 2>&1; then
         local ruff_out
-        ruff_out=$(ruff check python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ evals/ scripts/ 2>&1 || true)
+        ruff_out=$(ruff check python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ scripts/ 2>&1 || true)
         if echo "$ruff_out" | grep -qE "F401|F811|F841|Found"; then
             py_issues="${py_issues}$(echo "$ruff_out" | grep -E "F401|F811|F841")"
         fi
     fi
     if command -v pyflakes >/dev/null 2>&1; then
         local pf_out
-        pf_out=$(pyflakes python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ evals/*.py scripts/*.py 2>&1 || true)
+        pf_out=$(pyflakes python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ scripts/*.py 2>&1 || true)
         if [ -n "$pf_out" ]; then
             py_issues="${py_issues}${pf_out}"
         fi

@@ -7,6 +7,11 @@
 
 ---
 
+In plain terms: Genesis is a program that lives on one computer. It
+learns, remembers, sleeps, dreams, notices who is around, and talks to
+you — and it is never the same system twice. Everything it knows, it
+learned by being taught, by reading, or by figuring things out.
+
 Genesis is not a language model. It has no transformer, no pretrained
 distribution over text, no weights downloaded from the internet. When it
 produces language, it composes from a semantic graph it builds itself —
@@ -120,6 +125,24 @@ are only ever learned through explicit teaching. A rule-based sentiment
 analyzer (negation, intensifier, and contrast handling) estimates user
 affect from each message.
 
+### The external world
+
+Alongside her inner life, Genesis maintains an explicit model of the
+world outside her (`world/`): a two-way stream of events — people
+speaking to her, speech nearby, percepts, arrivals and departures —
+interleaved with her own outward acts (speaking, looking, drawing,
+studying the web). Each entity she encounters gets a persistent
+*presence* carrying both a relationship (familiarity, bond, shared
+topics) and a *belief state* — posteriors over whether they answer
+her, which topics they engage on, their mood, attention, and daily
+rhythm, each tracked with honest uncertainty.
+
+The coupling runs both ways, like a human's. Social isolation in the
+world feeds her inner-life social drive; when the drive crosses a
+volition threshold she *initiates* contact — composing a question from
+what she believes will land with that person. The world is observable
+live via the `/world` command and persists across restarts.
+
 ### Memory, sleep, and inner life
 
 Bounded-growth episodic and semantic memory with consolidation,
@@ -159,6 +182,29 @@ On first boot the instance is a fresh system — a small concept network,
 no memories, no learned user names. Introduce yourself; teach it. It
 develops from there.
 
+### Operational notes
+
+Genesis is designed to run for days at a time, and the engineering
+reflects that — event streams, working memory, presence models, and
+queues are all bounded; threads are daemon-owned and semaphore-limited;
+log files rotate at startup with compressed backups.
+
+A few honest notes for long-running operation:
+
+- **Restart occasionally.** Logs (`daemon.log`, `retina.log`) rotate
+  only at startup, so a single months-long session can grow them.
+  A periodic `./run.sh --stop` / `./run.sh` keeps them trimmed.
+- **Disk grows slowly by design.** Her long-term episodic store is
+  append-only — memories accumulate for her whole life, at bounded
+  cost each (bench-verified: linear growth, <1KB per episode).
+  `drawings/`, `concept_archive.db`, and `bug_reports*.jsonl` also
+  grow. Expect months-to-years scale, not days — but watch disk on
+  very small volumes.
+- **She is not a benchmark process.** Her autonomous urges (web study,
+  code review, drawing) consume real CPU. Interoception dampens heavy
+  work when the machine is under strain, but on a thermally marginal
+  box, keep an eye on her.
+
 Optional voice dependencies (not in `requirements.txt`): `vosk`,
 `sounddevice`, `speechrecognition` — install separately for
 microphone/TTS support, along with piper or espeak-ng and a voice model.
@@ -168,10 +214,13 @@ microphone/TTS support, along with piper or espeak-ng and a voice model.
 ```bash
 cargo test                                   # Rust suite
 python3 -m pytest python/tests/ -q -o addopts=''  # Python suite
-ruff check                                   # lint (per-dir configs cover python/, evals/, scripts/)
-python3 -m pyflakes python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ evals/*.py scripts/*.py
+ruff check                                   # lint (per-dir configs cover python/, scripts/)
+python3 -m pyflakes python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ scripts/*.py
 python3 -m mypy python/genesis_cognitive/ python/genesis_client/ \
-    python/genesis_cli.py python/tests/
+    python/genesis_cli.py python/tests/ --ignore-missing-imports   # 0 errors required
+```
+
+---
 
 ## State integrity framework
 

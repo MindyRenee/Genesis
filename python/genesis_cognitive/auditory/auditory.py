@@ -395,10 +395,18 @@ class AuditoryCortex:
         self._recent: deque[SoundEvent] = deque(maxlen=50)
         self._recent_lock = threading.Lock()
 
-        # Event segmentation state
+        # Event segmentation state — aggregated incrementally (sums,
+        # peak, consecutive-block flux) rather than storing every
+        # block's feature dict, so a sustained sound (a fan running
+        # for hours) doesn't grow memory without bound.
         self._in_event = False
         self._event_start = 0.0
-        self._event_features: list[dict[str, float]] = []
+        self._event_count = 0
+        self._event_sums: dict[str, float] = {}
+        self._event_peak_rms = 0.0
+        self._event_flux_sum = 0.0
+        self._event_flux_pairs = 0
+        self._event_last_features: dict[str, float] | None = None
         # Features of the block immediately preceding the event — used
         # to compute onset flux (silence→loud jump) for impact detection.
         self._event_prev_features: dict[str, float] | None = None
@@ -522,14 +530,19 @@ class AuditoryCortex:
                         if not self._in_event:
                             self._in_event = True
                             self._event_start = now
-                            self._event_features = []
+                            self._event_count = 0
+                            self._event_sums = {}
+                            self._event_peak_rms = 0.0
+                            self._event_flux_sum = 0.0
+                            self._event_flux_pairs = 0
+                            self._event_last_features = None
                             # Capture the block immediately before the
                             # event so the classifier can measure onset
                             # flux (the silence→loud jump that marks an
                             # impact). prev_features at this point is the
                             # last block before the event started.
                             self._event_prev_features = prev_features
-                        self._event_features.append(features)
+                        self._accumulate_event_features(features)
                         self._silence_emitted = False
 
                     prev_features = features
@@ -538,42 +551,52 @@ class AuditoryCortex:
             logger.exception(f"Auditory cortex crashed: {e}")
             self._running = False
 
+    def _accumulate_event_features(self, features: dict[str, float]) -> None:
+        """Fold one block's features into the running event aggregates."""
+        self._event_count += 1
+        for key, value in features.items():
+            self._event_sums[key] = self._event_sums.get(key, 0.0) + value
+        self._event_peak_rms = max(self._event_peak_rms, features["rms"])
+        if self._event_last_features is not None:
+            self._event_flux_sum += (
+                abs(features["rms"] - self._event_last_features["rms"])
+                + abs(
+                    features["spectral_centroid"]
+                    - self._event_last_features["spectral_centroid"]
+                )
+                * 0.5
+            )
+            self._event_flux_pairs += 1
+        self._event_last_features = features
+
     def _finalize_event(self) -> None:
         """Classify and emit a completed sound event."""
-        if not self._event_features:
+        if self._event_count == 0:
             self._in_event = False
             return
 
         duration = time.time() - self._event_start
         if duration < _MIN_EVENT_DURATION:
             self._in_event = False
-            self._event_features = []
+            self._event_count = 0
+            self._event_sums = {}
             self._event_prev_features = None
+            self._event_last_features = None
             return
 
         # Aggregate features across the event
-        all_features = self._event_features
+        count = self._event_count
         avg_features = {
-            key: float(np.mean([f[key] for f in all_features]))
-            for key in all_features[0]
+            key: total / count for key, total in self._event_sums.items()
         }
         # Peak RMS for loudness
-        peak_rms = max(f["rms"] for f in all_features)
-        avg_features["rms"] = peak_rms
+        avg_features["rms"] = self._event_peak_rms
 
         # Spectral flux: average change between consecutive blocks
-        if len(all_features) > 1:
-            fluxes = []
-            for i in range(1, len(all_features)):
-                fluxes.append(
-                    abs(all_features[i]["rms"] - all_features[i - 1]["rms"])
-                    + abs(
-                        all_features[i]["spectral_centroid"]
-                        - all_features[i - 1]["spectral_centroid"]
-                    )
-                    * 0.5
-                )
-            avg_features["spectral_flux"] = float(np.mean(fluxes))
+        if self._event_flux_pairs:
+            avg_features["spectral_flux"] = (
+                self._event_flux_sum / self._event_flux_pairs
+            )
         else:
             avg_features["spectral_flux"] = 0.0
 
@@ -582,7 +605,7 @@ class AuditoryCortex:
         )
 
         # Normalize loudness to 0-1 (0.5 RMS is very loud)
-        loudness = min(peak_rms / 0.5, 1.0)
+        loudness = min(self._event_peak_rms / 0.5, 1.0)
         brightness = avg_features["spectral_centroid"]
         # Noisiness tracks spectral flatness (Wiener entropy): 0 = pure
         # tone, 1 = white noise. ZCR alone can't separate tonal from
@@ -611,8 +634,10 @@ class AuditoryCortex:
 
         # Reset event state
         self._in_event = False
-        self._event_features = []
+        self._event_count = 0
+        self._event_sums = {}
         self._event_prev_features = None
+        self._event_last_features = None
 
     def _emit_silence(self, timestamp: float) -> None:
         """Emit a silence event."""

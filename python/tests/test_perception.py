@@ -14,6 +14,8 @@ from genesis_cognitive.auditory import (
     ObjectRecognizer,
 )
 from genesis_cognitive.concepts import ConceptNetwork
+from genesis_cognitive.emotion import EmotionalState
+from genesis_cognitive.language import Vocabulary
 from genesis_cognitive.perception import (
     IntegratedPerception,
     MemoryBridge,
@@ -45,9 +47,10 @@ from genesis_cognitive.perception.core import (
 )
 from genesis_cognitive.perception.vision import (
     ColorInfo,
-    _compose_scene_description,
+    _build_scene,
     _learn_objects,
 )
+from genesis_cognitive.self import PersonalityTraits
 from genesis_cognitive.vision.v1 import _build_summary
 
 logger = logging.getLogger(__name__)
@@ -644,11 +647,12 @@ class TestObjectRecognizer:
             assert objects[i].confidence <= objects[i - 1].confidence
 
 
-# ─── _compose_scene_description ────────────────────────────────────────
+# ─── _build_scene ──────────────────────────────────────────────────────
 
 
-class TestComposeSceneDescription:
-    """Test the _compose_scene_description helper."""
+class TestBuildScene:
+    """Test the _build_scene helper — the structured percept data that
+    the language engine composes her report from."""
 
     def _make_color_info(self, **kwargs: object) -> ColorInfo:
         """Build a ColorInfo with defaults, overriding via kwargs."""
@@ -665,15 +669,20 @@ class TestComposeSceneDescription:
         return ColorInfo(**defaults)  # type: ignore[arg-type]
 
     def test_empty_scene(self) -> None:
-        """No objects or faces should produce a simple scene description."""
-        desc = _compose_scene_description(
+        """No objects or faces should produce a minimal scene."""
+        scene = _build_scene(
             self._make_color_info(), [], {}, [], 0, None,
         )
-        assert "scene" in desc
-        assert len(desc) > 10
+        assert scene.status == "ok"
+        assert scene.objects == []
+        assert scene.faces == []
+        assert scene.light_level == "bright"
+        meta = scene.as_metadata()
+        assert meta["light"] == "bright"
+        assert meta["objects"] == []
 
     def test_single_object(self) -> None:
-        """A single object should appear in the description."""
+        """A single object should appear in the scene data."""
         objects = [
             DetectedObject(
                 name="chair",
@@ -683,14 +692,16 @@ class TestComposeSceneDescription:
                 area_ratio=0.05,
             ),
         ]
-        desc = _compose_scene_description(
+        scene = _build_scene(
             self._make_color_info(), objects, {"chair": "brown"}, [], 0, None,
         )
-        assert "chair" in desc
-        assert "brown" in desc
+        assert len(scene.objects) == 1
+        assert scene.objects[0]["name"] == "chair"
+        assert scene.objects[0]["color"] == "brown"
+        assert scene.objects[0]["position"]
 
-    def test_vowel_object_gets_an(self) -> None:
-        """Objects starting with a vowel should use 'an'."""
+    def test_object_without_color(self) -> None:
+        """Objects with non-informative colors carry an empty color."""
         objects = [
             DetectedObject(
                 name="oven",
@@ -700,10 +711,11 @@ class TestComposeSceneDescription:
                 area_ratio=0.1,
             ),
         ]
-        desc = _compose_scene_description(
+        scene = _build_scene(
             self._make_color_info(), objects, {"oven": "gray"}, [], 0, None,
         )
-        assert "an oven" in desc
+        assert scene.objects[0]["name"] == "oven"
+        assert scene.objects[0]["color"] == ""
 
     def test_person_skipped_when_faces_present(self) -> None:
         """Person objects should be skipped when faces are named."""
@@ -716,15 +728,15 @@ class TestComposeSceneDescription:
                 area_ratio=0.08,
             ),
         ]
-        desc = _compose_scene_description(
+        scene = _build_scene(
             self._make_color_info(), objects, {"person": "gray"},
-            ["Alice"], 0, None,
+            ["alice"], 0, None,
         )
-        assert "Alice" in desc
-        assert "person" not in desc.lower() or "someone" not in desc
+        assert scene.faces == ["alice"]
+        assert scene.objects == []
 
     def test_deduplication(self) -> None:
-        """Duplicate object names should only be described once."""
+        """Duplicate object names should only appear once."""
         objects = [
             DetectedObject(
                 name="chair",
@@ -741,14 +753,13 @@ class TestComposeSceneDescription:
                 area_ratio=0.05,
             ),
         ]
-        desc = _compose_scene_description(
+        scene = _build_scene(
             self._make_color_info(), objects, {"chair": "brown"}, [], 0, None,
         )
-        # "chair" should appear only once in the description
-        assert desc.lower().count("chair") == 1
+        assert len(scene.objects) == 1
 
     def test_multiple_different_objects(self) -> None:
-        """Multiple different objects should each get a description."""
+        """Multiple different objects should each get an entry."""
         objects = [
             DetectedObject(
                 name="laptop",
@@ -765,32 +776,146 @@ class TestComposeSceneDescription:
                 area_ratio=0.02,
             ),
         ]
-        desc = _compose_scene_description(
+        scene = _build_scene(
             self._make_color_info(), objects,
             {"laptop": "gray", "cup": "blue"}, [], 0, None,
         )
-        assert "laptop" in desc
-        assert "cup" in desc
-        assert "blue" in desc
+        names = [o["name"] for o in scene.objects]
+        assert names == ["laptop", "cup"]
+        assert scene.objects[1]["color"] == "blue"
 
     def test_light_direction(self) -> None:
-        """Should mention light direction when one side is brighter."""
-        desc = _compose_scene_description(
+        """A brighter side should record the light direction — judged
+        by measured luminance, not by the region's color name."""
+        scene = _build_scene(
             self._make_color_info(
-                regions={"left": "white", "center": "gray",
+                regions={"left": "gray", "center": "gray",
                          "right": "gray", "top": "gray", "bottom": "gray"},
+                region_brightness={"left": 0.8, "center": 0.4,
+                                   "right": 0.4, "top": 0.5, "bottom": 0.4},
             ),
             [], {}, [], 0, None,
         )
-        assert "left" in desc
+        assert scene.light_direction == "left"
 
-    def test_warmth_in_description(self) -> None:
-        """Warm scenes should mention warmth."""
-        desc = _compose_scene_description(
+    def test_no_light_direction_when_even(self) -> None:
+        """Similar luminance on both sides → no light direction."""
+        scene = _build_scene(
+            self._make_color_info(
+                region_brightness={"left": 0.5, "center": 0.5,
+                                   "right": 0.48, "top": 0.5, "bottom": 0.5},
+            ),
+            [], {}, [], 0, None,
+        )
+        assert scene.light_direction == ""
+
+    def test_bright_color_name_is_not_light_direction(self) -> None:
+        """A yellow region in shadow must not outrank a gray region in
+        sunlight — the name heuristic this replaced got that wrong."""
+        scene = _build_scene(
+            self._make_color_info(
+                regions={"left": "yellow", "center": "gray",
+                         "right": "gray", "top": "gray", "bottom": "gray"},
+                region_brightness={"left": 0.3, "center": 0.5,
+                                   "right": 0.7, "top": 0.5, "bottom": 0.5},
+            ),
+            [], {}, [], 0, None,
+        )
+        assert scene.light_direction == "right"
+
+    def test_warmth_recorded(self) -> None:
+        """Warm scenes should carry the warmth field."""
+        scene = _build_scene(
             self._make_color_info(warmth="warm", dominant_color="orange"),
             [], {}, [], 0, None,
         )
-        assert "warm" in desc
+        assert scene.warmth == "warm"
+        assert scene.dominant_color == "orange"
+
+    def test_memory_text_is_structural(self) -> None:
+        """The episodic-memory record is data, not a spoken sentence."""
+        objects = [
+            DetectedObject(
+                name="cup",
+                confidence=0.7,
+                bbox=(50, 200, 40, 50),
+                center=(0.1, 0.5),
+                area_ratio=0.02,
+            ),
+        ]
+        scene = _build_scene(
+            self._make_color_info(), objects,
+            {"cup": "blue"}, ["alice"], 0, None,
+        )
+        text = scene.memory_text()
+        assert "cup" in text
+        assert "alice" in text
+        assert "blue" in text
+
+    @staticmethod
+    def _language_fixture() -> tuple[Vocabulary, EmotionalState, PersonalityTraits]:
+        vocab = Vocabulary(seed=42)
+        emotion = EmotionalState(
+            label="calm", nuance="baseline", cognitive_style="steady",
+            valence=0.0, alertness=0.5, plasticity=0.5,
+            creativity=0.5, caution=0.3, openness_to_engage=0.7,
+        )
+        personality = PersonalityTraits(
+            openness=0.8, conscientiousness=0.7, extraversion=0.5,
+            agreeableness=0.7, neuroticism=0.3,
+        )
+        return vocab, emotion, personality
+
+    def test_vocabulary_composes_vision_report(self) -> None:
+        """The language engine composes the report from scene metadata —
+        including correct indefinite articles."""
+        vocab, emotion, personality = self._language_fixture()
+        objects = [
+            DetectedObject(
+                name="oven",
+                confidence=0.7,
+                bbox=(100, 100, 200, 200),
+                center=(0.3, 0.3),
+                area_ratio=0.1,
+            ),
+        ]
+        scene = _build_scene(
+            self._make_color_info(), objects, {}, [], 0, None,
+        )
+        content = vocab.fill_slot(
+            "content",
+            {"vision_scene": scene.as_metadata()},
+            emotion, personality,
+        )
+        assert content, "vocabulary should compose content from scene data"
+        assert "an oven" in content, content
+
+    def test_vocabulary_mentions_faces(self) -> None:
+        """Recognized faces should surface in the composed predicate."""
+        vocab, emotion, personality = self._language_fixture()
+        scene = _build_scene(
+            self._make_color_info(), [], {}, ["alice"], 1, None,
+        )
+        content = vocab.fill_slot(
+            "content",
+            {"vision_scene": scene.as_metadata()},
+            emotion, personality,
+        )
+        assert "Alice" in content, content
+        assert "someone" in content or "unfamiliar" in content, content
+
+    def test_vocabulary_composes_vision_status(self) -> None:
+        """A non-ok scene status composes a grammatical predicate, not
+        a raw status word."""
+        vocab, emotion, personality = self._language_fixture()
+        content = vocab.fill_slot(
+            "content",
+            {"vision_status": "unavailable"},
+            emotion, personality,
+        )
+        assert content, "vocabulary should compose a status predicate"
+        assert "vision" not in content, content
+        assert "retina" in content or "visual" in content, content
 
 
 # ─── _learn_objects ────────────────────────────────────────────────────

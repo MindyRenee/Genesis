@@ -302,8 +302,18 @@ class ProsodyGenerator:
         if prosody.rhythm in ("staccato", "rapid") and prosody.pacing > 1.2:
             return words
 
+        # Honor explicit pause positions when the pattern carries them
+        # (e.g. the early-hesitation pause generate() sets at low
+        # arousal). Otherwise compute positions from clause boundaries.
+        if prosody.pause_positions:
+            pause_positions = [
+                p for p in prosody.pause_positions if 0 <= p < len(words) - 1
+            ]
+            if pause_positions:
+                return ProsodyGenerator._insert_pauses(words, pause_positions)
+
         # Compute pause positions at clause boundaries
-        pause_positions: list[int] = []
+        pause_positions = []
         clause_start = 0  # word index where the current clause began
         for i, word in enumerate(words):
             # Reset clause start after sentence-ending punctuation.
@@ -365,8 +375,13 @@ class ProsodyGenerator:
         # Limit to at most 2 pauses per sentence to avoid over-pausing.
         if not pause_positions:
             return words
+        return ProsodyGenerator._insert_pauses(words, pause_positions[:2])
+
+    @staticmethod
+    def _insert_pauses(words: list[str], pause_positions: list[int]) -> list[str]:
+        """Insert "..." pause markers after the given word indices."""
         result: list[str] = []
-        pause_set = set(pause_positions[:2])
+        pause_set = set(pause_positions)
         for i, word in enumerate(words):
             result.append(word)
             if i in pause_set and i < len(words) - 1:

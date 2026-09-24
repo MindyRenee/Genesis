@@ -40,22 +40,38 @@ Key properties:
    process, modeling the global inhibition that prevents multiple
    cognitive contents at once.
 
+5. **Recurrence**: Ignition is not a one-shot threshold crossing. In the
+   brain, cognitive access emerges from recurrent dynamics — feedforward
+   drive triggers the broadcast, then slow feedback (NMDA-like
+   reverberation) sustains the ignited assembly while competing
+   assemblies suppress each other through lateral inhibition
+   (Dehaene & Changeux, 2011; Wang, 2001). The workspace models this
+   with a short recurrent settling phase on each broadcast: candidate
+   and incumbent items mutually excite when topic-coherent and
+   inhibit when incoherent, under divisive global inhibition that
+   enforces the capacity bottleneck. Incumbents receive a self-sustain
+   current, producing hysteresis — an ignited item resists being
+   displaced. Subliminal candidates that fail to ignite persist
+   briefly in a pending buffer and can co-ignite later if
+   coherent content arrives (coalition ignition).
+
 For Genesis, modules are the cognitive subsystems: perception, emotion,
 memory, reasoning, self-model, narrative, etc. When any of these
 produces highly activated information, it enters the workspace and
 becomes available to all others.
 
 References:
-- Baars, B. J. (1988). A Cognitive Theory of Cognition.
-- Dehaene, S., & Naccache, L. (2001). Towards a cognitive neuroscience
-  of cognition. Cognition.
-- Dehaene, S., & Changeux, J.-P. (2011). Experimental and theoretical
-  approaches to cognitive processing. Neuron.
-- Dehaene, S. (2014). Cognition and the Brain.
+- Baars, B. J. (1988). Cambridge University Press.
+- Dehaene, S., & Naccache, L. (2001). Cognition, 79(1-2).
+- Dehaene, S., & Changeux, J.-P. (2011). Neuron, 70(2).
+- Dehaene, S. (2014). Viking Press.
 - Cowan, N. (2001). The magical number 4 in short-term memory.
   Behavioral and Brain Sciences.
-- Sergent, C., et al. (2005). Timing of the brain events underlying
-  access to cognition. Psychological Science.
+- Sergent, C., et al. (2005). Nature Neuroscience, 8(10).
+- Wang, X.-J. (2001). Synaptic reverberation underlying mnemonic
+  persistent activity. Trends in Neurosciences.
+- Wong, K.-F., & Wang, X.-J. (2006). A recurrent network mechanism of
+  time integration in perceptual decisions. J. Neuroscience.
 """
 
 from __future__ import annotations
@@ -63,6 +79,8 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -149,6 +167,15 @@ class GlobalWorkspace:
         ignition_threshold: float = 0.7,
         capacity: int = 4,
         decay_rate: float = 0.05,
+        settle_steps: int = 4,
+        coherence_excitation: float = 0.30,
+        global_inhibition: float = 0.30,
+        sustain: float = 0.35,
+        coupling_rate: float = 0.10,
+        max_coupling_delta: float = 0.15,
+        pending_capacity: int = 8,
+        pending_ttl_s: float = 120.0,
+        pending_influence: float = 0.5,
     ) -> None:
         """Initialize the global workspace.
 
@@ -160,17 +187,67 @@ class GlobalWorkspace:
                 Default 4. When exceeded, weakest items are evicted.
             decay_rate: How much activation decays per tick. Default 0.05.
                 Items that aren't refreshed fade from cognition.
+            settle_steps: Recurrent iterations run on each broadcast to
+                let competition resolve. Default 4 — enough for the
+                coupled activations to approach equilibrium on small
+                competitor sets without measurable latency.
+            coherence_excitation: Strength of topic-coherence coupling
+                during settle. Items sharing topics excite; disjoint
+                items inhibit. Default 0.30.
+            global_inhibition: Divisive inhibition from the total
+                activity of the competitor pool — the soft capacity
+                bottleneck. Default 0.30.
+            sustain: Self-excitation current for items already in the
+                workspace during settle (incumbency advantage /
+                hysteresis). Default 0.35.
+            coupling_rate: Per-tick coupling strength applied between
+                workspace items during tick(). Default 0.10.
+            max_coupling_delta: Absolute cap on one tick's coupling
+                adjustment to a single item. Ticks can carry large dt,
+                so the recurrent step is clamped rather than scaled
+                linearly. Default 0.15.
+            pending_capacity: Maximum size of the pending buffer
+                (below-threshold broadcasts awaiting coalition).
+                Default 8.
+            pending_ttl_s: Wall-clock seconds a pending item survives
+                without being refreshed or ignited. Default 120.
+            pending_influence: Weight at which pending items contribute
+                to couplings on workspace items. Subliminal content is
+                pulled up by coherence but only weakly pushes on
+                cognitive content. Default 0.5.
         """
         self.ignition_threshold = ignition_threshold
         self.capacity = capacity
         self.decay_rate = decay_rate
+        self.settle_steps = settle_steps
+        self.coherence_excitation = coherence_excitation
+        self.global_inhibition = global_inhibition
+        self.sustain = sustain
+        self.coupling_rate = coupling_rate
+        self.max_coupling_delta = max_coupling_delta
+        self.pending_capacity = pending_capacity
+        self.pending_ttl_s = pending_ttl_s
+        self.pending_influence = pending_influence
         self._modules: list[WorkspaceModule] = []
         self._items: list[WorkspaceItem] = []
+        self._pending: list[WorkspaceItem] = []
         self._broadcast_count: int = 0
+        # Optional hook fired once per fresh ignition (candidate or
+        # coalition), after distribution. Signature: (item,
+        # via_recurrent) — via_recurrent is True when ignition owed to
+        # recurrent dynamics (pending co-ignition, or a sub-threshold
+        # input pulled over by coherent support) rather than raw
+        # feedforward drive. Refreshes don't fire it — sustained
+        # attention is not a new ignition.
+        self.on_ignition: Callable[[WorkspaceItem, bool], None] | None = None
+        # Subliminal items that expired from the pending pool without
+        # igniting. Drained via drain_subliminal() — callers can route
+        # them into curiosity or memory rather than letting them vanish.
+        self._expired: deque[WorkspaceItem] = deque(maxlen=20)
         # The workspace is accessed from both the cognition thread
         # (during think()) and the inner life thread (spontaneous
-        # thoughts broadcast + tick). This lock protects _items and
-        # _broadcast_count from concurrent modification.
+        # thoughts broadcast + tick). This lock protects _items,
+        # _pending, and _broadcast_count from concurrent modification.
         self._lock = threading.Lock()
 
     def register_module(self, module: WorkspaceModule) -> None:
@@ -203,8 +280,10 @@ class GlobalWorkspace:
 
         If the item's activation exceeds the ignition threshold, it
         enters the workspace and is distributed to all registered
-        modules. If activation is below threshold, the broadcast fails
-        (the information remains noncognitive/local).
+        modules. If activation is below threshold, the item joins a
+        short-lived pending buffer instead: during subsequent
+        broadcasts it participates in the recurrent competition and
+        can still ignite if coherent content pulls it over threshold.
 
         Args:
             content: The information being broadcast (any type).
@@ -231,35 +310,83 @@ class GlobalWorkspace:
                 effective_threshold += 0.15
             effective_threshold = max(0.3, min(0.95, effective_threshold))
 
-        if activation < effective_threshold:
-            return False
-
+        to_distribute: list[WorkspaceItem] = []
+        ignited = False
+        just_ignited: set[int] = set()
+        recurrent_ignitions: set[int] = set()
         with self._lock:
-            # Check if this is a refresh of an existing item
+            # Refresh fast path — same content+source already in the
+            # workspace updates the incumbent and rebroadcasts.
             for item in self._items:
                 if item.source == source and _content_equal(item.content, content):
                     item.activation = max(item.activation, activation)
                     item.refresh_count += 1
-                    distribute_item = item
+                    to_distribute.append(item)
+                    ignited = True
                     break
             else:
-                # New item — create it
-                item = WorkspaceItem(
+                self._expire_pending()
+                candidate = WorkspaceItem(
                     content=content,
                     source=source,
                     activation=min(1.0, activation),
                     metadata=metadata or {},
                 )
-                # Add to workspace (evict weakest if over capacity)
-                self._items.append(item)
-                self._enforce_capacity()
-                self._broadcast_count += 1
-                distribute_item = item
+                # Recurrent competition among incumbents, the candidate,
+                # and the pending pool. Settled activations decide
+                # co-ignitions and eviction order; the candidate's own
+                # ignition is all-or-none on its input (feedforward
+                # drive) OR on its settled activation (recurrent
+                # support from coherent incumbents).
+                self._settle(candidate, effective_threshold)
+                ignited = (
+                    activation >= effective_threshold
+                    or candidate.activation >= effective_threshold
+                )
+                if ignited:
+                    self._items.append(candidate)
+                    just_ignited.add(id(candidate))
+                    if activation < effective_threshold:
+                        recurrent_ignitions.add(id(candidate))
+                    self._broadcast_count += 1
+                    to_distribute.append(candidate)
+                else:
+                    self._upsert_pending(candidate)
+
+                # Coalition ignition — pending items the settle pulled
+                # over threshold join the workspace and broadcast.
+                still_pending: list[WorkspaceItem] = []
+                for p in self._pending:
+                    if p.activation >= effective_threshold:
+                        self._items.append(p)
+                        just_ignited.add(id(p))
+                        recurrent_ignitions.add(id(p))
+                        self._broadcast_count += 1
+                        to_distribute.append(p)
+                    else:
+                        still_pending.append(p)
+                self._pending = still_pending
+
+                # Tag recurrent ignitions on the item itself so
+                # receivers can treat emerged content differently
+                # from driven content.
+                for item in self._items:
+                    if id(item) in recurrent_ignitions:
+                        item.metadata["ignition"] = "recurrent"
+
+                self._enforce_capacity(just_ignited)
 
         # Distribute outside the lock to avoid holding it while
         # modules process the broadcast (they may be slow).
-        self._distribute(distribute_item)
-        return True
+        for item in to_distribute:
+            self._distribute(item)
+            if id(item) in just_ignited and self.on_ignition is not None:
+                try:
+                    self.on_ignition(item, id(item) in recurrent_ignitions)
+                except Exception as e:  # noqa: BLE001
+                    # The ignition hook must never crash the workspace
+                    logger.debug(f"on_ignition hook failed: {e}")
+        return ignited
 
     def _distribute(self, item: WorkspaceItem) -> None:
         """Distribute an item to all registered modules."""
@@ -270,25 +397,143 @@ class GlobalWorkspace:
                 # A module failing to receive shouldn't crash the workspace
                 logger.debug(repr(e))
 
-    def _enforce_capacity(self) -> None:
-        """Evict weakest items if over capacity (competitive inhibition)."""
+    def _enforce_capacity(self, protected: set[int] | None = None) -> None:
+        """Evict weakest items if over capacity (competitive inhibition).
+
+        Items whose ids are in ``protected`` (fresh ignitions this
+        settle) are only evicted when every unprotected item is gone —
+        a just-ignited broadcast isn't immediately silenced by the
+        bottleneck it triggered.
+        """
         while len(self._items) > self.capacity:
-            # Find the weakest item (lowest activation)
-            weakest_idx = 0
-            weakest_activation = self._items[0].activation
-            for i, item in enumerate(self._items):
-                if item.activation < weakest_activation:
-                    weakest_activation = item.activation
-                    weakest_idx = i
+            pool = [
+                (i, item)
+                for i, item in enumerate(self._items)
+                if protected is None or id(item) not in protected
+            ]
+            if not pool:
+                pool = list(enumerate(self._items))
+            weakest_idx, _ = min(pool, key=lambda pair: pair[1].activation)
             self._items.pop(weakest_idx)
+
+    def _coherence(self, a: WorkspaceItem, b: WorkspaceItem) -> float:
+        """Topic coherence between two items, in [0, 1].
+
+        Jaccard similarity of topic sets. Items without topics are
+        neutral (0.5) — neither excitatory nor inhibitory.
+        """
+        topics_a = {str(t) for t in a.metadata.get("topics", []) if t}
+        topics_b = {str(t) for t in b.metadata.get("topics", []) if t}
+        if not topics_a or not topics_b:
+            return 0.5
+        union = topics_a | topics_b
+        return len(topics_a & topics_b) / len(union) if union else 0.5
+
+    def _settle(
+        self, candidate: WorkspaceItem, effective_threshold: float
+    ) -> None:
+        """Run recurrent competition over incumbents + candidate + pending.
+
+        Each iteration applies, from a synchronous snapshot:
+
+        - coherence coupling: ``coherence_excitation * (2*c_ij - 1) * a_j``
+          — topic-coherent items excite, incoherent items inhibit.
+          Pending items contribute at ``pending_influence`` weight and
+          are excluded from the inhibition pool.
+        - divisive global inhibition: ``global_inhibition`` times the
+          mean of the other workspace competitors — the soft capacity
+          bottleneck (Carandini & Heeger normalization analogue).
+        - sustain: ``sustain * a_i * (1 - a_i)`` — logistic
+          self-excitation for items already in the workspace and for
+          candidates at or above the ignition threshold (an igniting
+          assembly is a driven, self-reinforcing one). Pending items
+          never sustain — subliminal content has no reverberation.
+          This is the hysteresis term: ignited assemblies resist
+          displacement.
+        """
+        competitors = [*self._items, candidate, *self._pending]
+        if len(competitors) < 2:
+            return
+        workspace_ids = {id(item) for item in self._items}
+        sustained = set(workspace_ids)
+        if candidate.activation >= effective_threshold:
+            sustained.add(id(candidate))
+
+        for _ in range(self.settle_steps):
+            activations = [item.activation for item in competitors]
+            deltas: list[float] = []
+            for i, item in enumerate(competitors):
+                exc = 0.0
+                others = 0.0
+                for j, other in enumerate(competitors):
+                    if i == j:
+                        continue
+                    influence = (
+                        1.0
+                        if id(other) in workspace_ids or other is candidate
+                        else self.pending_influence
+                    )
+                    coupling = 2.0 * self._coherence(item, other) - 1.0
+                    exc += coupling * activations[j] * influence
+                    if id(other) in workspace_ids or other is candidate:
+                        others += activations[j]
+                delta = self.coherence_excitation * exc
+                delta -= self.global_inhibition * others / max(1, self.capacity)
+                if id(item) in sustained:
+                    delta += self.sustain * activations[i] * (1.0 - activations[i])
+                deltas.append(delta)
+            for item, delta in zip(competitors, deltas, strict=True):
+                item.activation = max(0.0, min(1.0, item.activation + delta))
+
+    def _expire_pending(self) -> None:
+        """Drop pending items older than the pending TTL.
+
+        Expired items go to the drain buffer — content that was active
+        enough to be broadcast but never ignited is still meaningful
+        (it was almost cognitive). Callers decide what to do with it.
+        """
+        ttl_ms = self.pending_ttl_s * 1000.0
+        expired = [p for p in self._pending if p.age_ms > ttl_ms]
+        self._expired.extend(expired)
+        self._pending = [p for p in self._pending if p.age_ms <= ttl_ms]
+
+    def drain_subliminal(self) -> list[WorkspaceItem]:
+        """Return and clear pending items that expired without igniting.
+
+        These are "almost-thoughts" — content that entered the
+        pending buffer, competed, lost, and timed out. The
+        caller decides their fate (curiosity topics, memory traces).
+        """
+        with self._lock:
+            drained = list(self._expired)
+            self._expired.clear()
+            return drained
+
+    def _upsert_pending(self, candidate: WorkspaceItem) -> None:
+        """Add or refresh a below-threshold candidate in the pending pool."""
+        for p in self._pending:
+            if p.source == candidate.source and _content_equal(
+                p.content, candidate.content
+            ):
+                p.activation = max(p.activation, candidate.activation)
+                p.timestamp = candidate.timestamp
+                return
+        self._pending.append(candidate)
+        while len(self._pending) > self.pending_capacity:
+            weakest = min(self._pending, key=lambda p: p.activation)
+            self._pending.remove(weakest)
 
     def tick(self, dt: float = 1.0) -> list[WorkspaceItem]:
         """Advance workspace dynamics by dt.
 
-        Applies activation decay to all items and removes items that
-        have decayed below a minimum threshold. This models the
-        transient nature of cognitive access — items fade if not
-        refreshed (sustained attention).
+        Applies activation decay to all items, then one step of the
+        recurrent coupling — coherent items mutually sustain, incoherent
+        items suppress each other, and the shared inhibition pool makes
+        crowded workspaces decay faster. Pending items expire by TTL.
+        This models the transient nature of cognitive access — items
+        fade if not refreshed (sustained attention), and competition
+        between items unfolds continuously between broadcasts rather
+        than only at ignition time.
 
         Args:
             dt: Time step.
@@ -297,6 +542,7 @@ class GlobalWorkspace:
             List of items that were evicted due to decay.
         """
         with self._lock:
+            self._expire_pending()
             evicted: list[WorkspaceItem] = []
             surviving: list[WorkspaceItem] = []
 
@@ -306,12 +552,42 @@ class GlobalWorkspace:
                 # factor negative, flipping activation's sign.
                 if item.activation < 0.0:
                     item.activation = 0.0
-                if item.activation < 0.1:
-                    evicted.append(item)
-                else:
-                    surviving.append(item)
+                surviving.append(item)
 
-            self._items = surviving
+            # Recurrent coupling step. Scaled by min(dt, 1): the
+            # coupling is a per-tick competitive event, not continuous
+            # integration, and production ticks carry large dt.
+            if len(surviving) > 1:
+                scale = min(dt, 1.0)
+                activations = [item.activation for item in surviving]
+                for i, item in enumerate(surviving):
+                    coupling = 0.0
+                    others = 0.0
+                    for j, other in enumerate(surviving):
+                        if i == j:
+                            continue
+                        coupling += (
+                            (2.0 * self._coherence(item, other) - 1.0)
+                            * activations[j]
+                        )
+                        others += activations[j]
+                    delta = self.coupling_rate * scale * (
+                        coupling - others / max(1, self.capacity)
+                    )
+                    delta = max(
+                        -self.max_coupling_delta,
+                        min(self.max_coupling_delta, delta),
+                    )
+                    item.activation = max(
+                        0.0, min(1.0, item.activation + delta)
+                    )
+
+            self._items = [
+                item for item in surviving if item.activation >= 0.1
+            ]
+            evicted = [
+                item for item in surviving if item.activation < 0.1
+            ]
             return evicted
 
     @property
@@ -325,6 +601,17 @@ class GlobalWorkspace:
         """Whether the workspace is currently empty (no cognitive content)."""
         with self._lock:
             return len(self._items) == 0
+
+    @property
+    def pending_count(self) -> int:
+        """Items waiting in the pending buffer.
+
+        Subliminal content that failed to ignite but hasn't expired.
+        Not part of the workspace — not cognitive — but available for
+        coalition ignition on subsequent broadcasts.
+        """
+        with self._lock:
+            return len(self._pending)
 
     @property
     def broadcast_count(self) -> int:
@@ -445,6 +732,7 @@ class GlobalWorkspace:
         """Clear all items from the workspace."""
         with self._lock:
             self._items.clear()
+            self._pending.clear()
 
 
 def _content_equal(a: Any, b: Any) -> bool:
