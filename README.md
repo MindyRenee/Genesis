@@ -91,6 +91,37 @@ into functional subsystem packages (`control/`, `association/`,
 a documented view over the top-level modules — a map of the
 architecture, not a duplicate of it.
 
+### Systems engineering
+
+This is engineered for a 4.7 GB machine, not a datacenter, and the
+low-level design reflects it:
+
+- **One page of core state, zero copies.** The 3,288-byte state
+  struct occupies a single OS page under `MAP_SHARED`; the kernel
+  handles paging instead of the process holding heap copies.
+- **Seqlock protocol.** Readers get an owned copy via sequence lock —
+  no Rust reference into the shared mapping is ever created, so no
+  aliasing with concurrent writers — and writer updates appear
+  atomically.
+- **Crash recovery on open.** Magic, schema version, and checksum are
+  verified before use; version migrations are explicit, never silent.
+- **Non-finite sanitization.** Dedicated primitives keep NaN/inf out
+  of the continuous dynamics so a bad value can't poison the loop.
+- **SDR/LogHD memory indexing.** The append-only episodic store is
+  indexed by sparse distributed representations; short-term memory is
+  a fixed-capacity ring buffer. Everything that grows is bounded.
+- **State as introspection surface.** Zones track what's attended vs
+  background; a runtime manifest records which modules are live and
+  what they're doing — the state file is observable, not opaque.
+- **A second generative model in Rust.** The daemon runs a dyadic
+  model of the *user's* affective state alongside its own —
+  co-regulation computed in the subcognitive layer.
+- **Zero-copy perception.** The retina binary feeds camera frames
+  through shared memory; the Python layer reads, never copies.
+
+The daemon is ~28k lines of Rust: two binaries (`genesis-daemon`,
+`retina`), one IPC socket, no external services.
+
 ### The neurochemical model
 
 Eighteen modeled neurochemicals — dopamine, serotonin, norepinephrine,
