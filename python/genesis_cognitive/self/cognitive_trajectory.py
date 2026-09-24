@@ -1,10 +1,10 @@
-"""Cognitive trajectory model — Genesis predicts her own thought content.
+"""Cognitive trajectory model — Genesis predicts its own thought content.
 
 This is the cognitive counterpart to the Rust active inference engine
 (``src/daemon/active_inference.rs``). Where the Rust engine is a
-generative model of her **neurochemical** trajectory (predicting where
-her 18 effective levels will move), this is a generative model of her
-**cognitive** trajectory — predicting what she will think about next.
+generative model of its **neurochemical** trajectory (predicting where
+its 18 effective levels will move), this is a generative model of its
+**cognitive** trajectory — predicting what it will think about next.
 
 # The cognitive strange loop
 
@@ -32,8 +32,8 @@ cognitive level:
 
 This is the strange loop (Hofstadter, 2007): a system that models
 itself, where the model's predictions influence the system being
-modeled. She predicts her own thoughts, is surprised by her own
-thoughts, and that surprise changes how she processes future thoughts.
+modeled. It predicts its own thoughts, is surprised by its own
+thoughts, and that surprise changes how it processes future thoughts.
 
 # What this is NOT
 
@@ -60,7 +60,7 @@ items. The prediction combines:
 
 - **Persistence with decay**: current topics persist into the next
   turn, decaying by a factor. This models sustained attention —
-  she tends to keep thinking about what she was thinking about.
+  it tends to keep thinking about what it was thinking about.
 - **Learned transitions**: the model learns which topic transitions
   are common (e.g., "sleep" → "dreams"). This is a delta-rule update,
   the same learning rule used in the Rust active inference engine.
@@ -87,8 +87,8 @@ __all__ = ["CognitiveTrajectoryModel", "CognitiveTrajectoryReading"]
 
 # How much current topics decay when predicting the next turn.
 # 0.7 means topics persist at 70% of their current activation.
-# This models sustained attention — she tends to keep thinking
-# about what she was thinking about, but the grip loosens.
+# This models sustained attention — it tends to keep thinking
+# about what it was thinking about, but the grip loosens.
 _PERSISTENCE_DECAY: float = 0.7
 
 # How much the learned transitions contribute to the prediction,
@@ -153,9 +153,9 @@ class CognitiveTrajectoryReading:
 class CognitiveTrajectoryModel:
     """A generative model of Genesis's own thought content trajectory.
 
-    This is the cognitive strange loop: she predicts what she'll
+    This is the cognitive strange loop: it predicts what it'll
     think about next, gets surprised by unexpected thoughts, and
-    that surprise changes how she processes future thoughts.
+    that surprise changes how it processes future thoughts.
 
     The model is a simple learned transition model over topic
     distributions. It predicts the next turn's topic distribution
@@ -275,7 +275,7 @@ class CognitiveTrajectoryModel:
         """Predict the next turn's topic distribution.
 
         Called after the deliberation broadcast, to predict what
-        she'll be thinking about next turn. The prediction combines:
+        it'll be thinking about next turn. The prediction combines:
         - Persistence: current topics persist with decay.
         - Learned transitions: topics that commonly follow current
           topics get activated.

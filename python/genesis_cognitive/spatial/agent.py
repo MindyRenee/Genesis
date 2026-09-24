@@ -13,8 +13,8 @@ be tested against hand-built mock environments.
 Policy v2 — agency + navigation:
 
     1. Agency detection: after each action, diff consecutive frames.
-       The object whose cells consistently move when she acts is
-       *her avatar* — self-recognition in a visual field, learned
+       The object whose cells consistently move when it acts is
+       *its avatar* — self-recognition in a visual field, learned
        from contingency rather than told.
     2. Action-effect model: each action gets a learned displacement
        vector (dr, dc) estimated from the avatar's centroid shift.
@@ -27,8 +27,8 @@ Policy v2 — agency + navigation:
        probability epsilon, explore — try untried actions.
 
 On WIN/GAME_OVER the episode resets, but the learned model (avatar
-color, action displacements, object memory) persists — she gets to
-keep what she figured out.
+color, action displacements, object memory) persists — it gets to
+keep what it figured out.
 """
 
 from __future__ import annotations
@@ -114,7 +114,7 @@ class SpatialAgent:
         self.avatar_color: int | None = None
         self._avatar_votes: dict[int, int] = {}
         # Learned hazard model: colors that move on their own (not
-        # caused by her action). Moving things that aren't her are
+        # caused by its action). Moving things that aren't its are
         # almost always things to avoid, not goals — collectibles and
         # exits are static in these environments.
         self._hazard_colors: set[int] = set()
@@ -122,7 +122,7 @@ class SpatialAgent:
         # Per-hazard velocity: last observed (dr, dc) centroid shift.
         # Movers in these environments are usually ballistic (fixed
         # direction per step), so one-step extrapolation predicts
-        # where they'll be when her move lands.
+        # where they'll be when its move lands.
         self._hazard_velocity: dict[int, tuple[float, float]] = {}
         # Reward inference: colors whose objects vanished while the
         # avatar was touching them are pickups — consumable, valuable.
@@ -131,8 +131,8 @@ class SpatialAgent:
         # Stations: objects that change the *avatar's* appearance when
         # touched (key/color/rotation stations in gated games).
         self._station_colors: set[int] = set()
-        # Gated cells: goal positions she has reached but couldn't
-        # collect — the object persisted. They stay locked until her
+        # Gated cells: goal positions it has reached but couldn't
+        # collect — the object persisted. They stay locked until its
         # key state changes.
         self._gated_cells: set[tuple[int, int]] = set()
         self._touch_fail: dict[tuple[int, int], int] = {}
@@ -158,13 +158,13 @@ class SpatialAgent:
         self._station_effects: dict[int, str] = {}
         # Objects already interacted with (cells the avatar has reached).
         self._visited_goals: set[tuple[int, int]] = set()
-        # Interaction novelty (the coach's hint): colors she has never
+        # Interaction novelty (the coach's hint): colors it has never
         # touched are worth touching — consequences can't be learned
         # without contact. This is a prior about *how to explore*,
         # not an answer.
         self._touched_colors: set[int] = set()
-        # Encouragement / grit: after losing a life she gets a short
-        # window of raised exploration — she shakes it off and tries
+        # Encouragement / grit: after losing a life it gets a short
+        # window of raised exploration — it shakes it off and tries
         # something different instead of repeating the fatal path.
         self._grit_steps: int = 0
         # Click memory: cell -> observed frame change. A cell that
@@ -267,7 +267,7 @@ class SpatialAgent:
 
         Compares the previous and current frames: an object whose cells
         were within reach of the avatar and are now gone (or mostly
-        erased) was consumed by her action — a collectible, a step
+        erased) was consumed by its action — a collectible, a step
         refill, a key. That color becomes a preferred goal. If it was
         mislabeled a hazard (its disappearance moved the centroid),
         that gets corrected too.
@@ -336,16 +336,16 @@ class SpatialAgent:
         """Learn gate and station semantics from touch consequences.
 
         - Gate: the avatar reached an object's cells but it didn't
-          vanish — it's locked until her key state changes. Two
+          vanish — it's locked until its key state changes. Two
           failed touches marks the cell gated.
-        - Station: an object the avatar was near when her own color
-          signature changed — it transformed her (key stations). When
+        - Station: an object the avatar was near when its own color
+          signature changed — it transformed its (key stations). When
           gated goals exist, stations become priority targets.
         """
         cur_pos = self._avatar_pos(cur)
         prev_pos = self._avatar_pos(prev)
         if cur_pos is None:
-            # Avatar hidden — remember where she was last seen; if she
+            # Avatar hidden — remember where it was last seen; if it
             # reappears elsewhere, a life was lost on this spot.
             if prev_pos is not None:
                 self._missing_avatar_at = prev_pos
@@ -362,7 +362,7 @@ class SpatialAgent:
         if pos is None:
             return
         # Life-loss detection: the avatar teleported more than one
-        # step (respawn), meaning whatever she was touching killed her.
+        # step (respawn), meaning whatever it was touching killed it.
         if prev_pos is not None and pos is not None:
             jump = abs(pos[0] - prev_pos[0]) + abs(pos[1] - prev_pos[1])
             if jump > 4:
@@ -468,7 +468,7 @@ class SpatialAgent:
                 self._valuable_colors.discard(obj.color)
                 self._station_colors.discard(obj.color)
         # Encouragement: losing a life isn't the end — a short burst
-        # of curiosity follows so she tries a different path.
+        # of curiosity follows so it tries a different path.
         self._grit_steps = 40
 
     # ── Goals ─────────────────────────────────────────────────
@@ -530,14 +530,14 @@ class SpatialAgent:
         # to be consumable (they vanished on touch). Survival-critical
         # in games with step budgets.
         valuable = [g for g in goals if g.color in self._valuable_colors]
-        # When gated goals exist, stations that change her key state
+        # When gated goals exist, stations that change its key state
         # are the way forward — visit them before re-trying gates.
         stations = (
             [g for g in goals if g.color in self._station_colors]
             if self._gated_cells
             else []
         )
-        # The hint: object colors never touched can't teach her
+        # The hint: object colors never touched can't teach it
         # anything until contact — prefer them when nothing is
         # proven-openable or known-valuable.
         untouched = [
@@ -564,8 +564,8 @@ class SpatialAgent:
         """Choose the action whose learned effect closes distance to goal.
 
         Costs add a hazard penalty: landing within ~2 cells of a known
-        moving-hazard color is expensive. She doesn't just avoid making
-        hazards her destination — she avoids walking through them.
+        moving-hazard color is expensive. It doesn't just avoid making
+        hazards its destination — it avoids walking through them.
         """
         pos = self._avatar_pos(grid)
         goal = self._pick_goal(grid)
@@ -622,7 +622,7 @@ class SpatialAgent:
 
         Exploration decays once the self-model is learned — these games
         often have step budgets, and wandering with epsilon=0.3 spends
-        a third of her life exploring what she already knows.
+        a third of its life exploring what it already knows.
         """
         if not action_space:
             raise ValueError("empty action space")

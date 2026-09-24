@@ -49,7 +49,7 @@ class LifecycleMixin:
         """Connect to the subcognitive daemon and initialise.
 
         If there's saved cognitive state in the data dir, load it —
-        this restores her concept network, reflections, and narrative
+        this restores its concept network, reflections, and narrative
         from previous conversations.
         """
         self._start_connect_and_register()
@@ -69,7 +69,7 @@ class LifecycleMixin:
 
         Does NOT set the cognitive zone — that happens in
         _start_set_zone_after_restore, after saved state is loaded,
-        so we know whether she was sleeping.
+        so we know whether it was sleeping.
         """
         self.client.connect()
         self._running = True
@@ -94,9 +94,9 @@ class LifecycleMixin:
     def _start_set_zone_after_restore(self) -> None:
         """Set the cognitive zone based on restored sleep state.
 
-        If she was sleeping when state was saved, restore the Sleeping
-        zone instead of forcing Conversation — otherwise she'd be
-        yanked awake on every restart, losing her place in the
+        If it was sleeping when state was saved, restore the Sleeping
+        zone instead of forcing Conversation — otherwise it'd be
+        yanked awake on every restart, losing its place in the
         ultradian cycle and any pending N3 consolidation.
         """
         if self._is_sleeping:
@@ -171,8 +171,8 @@ class LifecycleMixin:
             logger.debug(f"embeddings warmup failed: {e}")
     def _start_introspect_and_train(self) -> None:
         """Introspect on identity and clear sleep pressure if needed."""
-        # Introspect — discover who she is by examining herself
-        # This writes her identity into the concept network through
+        # Introspect — discover who it is by examining itself
+        # This writes its identity into the concept network through
         # self-examination, not hardcoded facts
         from ..self import IntrospectionEngine
 
@@ -183,23 +183,23 @@ class LifecycleMixin:
             f"introspection took {time.perf_counter() - _intro_t0:.2f}s"
         )
 
-        # If she's restoring from a saved state with high sleep pressure
+        # If it's restoring from a saved state with high sleep pressure
         # (adenosine accumulated from a previous sleep session that was
         # interrupted by a restart), clear it permanently.
         #
         # A restart is biologically equivalent to having slept — the
         # glymphatic system would have cleared adenosine during the
         # offline period. So we directly lower the adenosine baseline
-        # (not just the level) to reflect this. Without this, she starts
+        # (not just the level) to reflect this. Without this, it starts
         # trapped in a drowsy state with adenosine at 0.7+ and the
         # baseline pushing it right back up after every impulse.
         #
         # We also boost wake-promoting chemicals (histamine, orexin) to
-        # stabilize her arousal system, and send a level impulse to
+        # stabilize its arousal system, and send a level impulse to
         # drop the current adenosine immediately.
         #
-        # SKIP this if she was sleeping when state was saved — clearing
-        # adenosine would pull her out of N3 and defeat the purpose of
+        # SKIP this if it was sleeping when state was saved — clearing
+        # adenosine would pull it out of N3 and defeat the purpose of
         # sleep state persistence.
         if self._is_sleeping:
             logger.info(
@@ -237,7 +237,7 @@ class LifecycleMixin:
         self.learner.start()
         # Start inner life — spontaneous thoughts
         self.inner_life.start()
-        # Start emotional self-regulation — she controls her state
+        # Start emotional self-regulation — it controls its state
         self.regulator.start()
     def _start_engage_restored_sleep(self) -> None:
         """Engage the sleep mechanism if restoring a saved sleep state.
@@ -246,16 +246,16 @@ class LifecycleMixin:
         sets the ``_is_sleeping`` flag and the ultradian cycle position,
         and :meth:`_start_set_zone_after_restore` sets the zone to
         Sleeping. But the actual sleep *mechanism* — pausing the
-        learners so she stops acquiring knowledge, and ensuring inner
+        learners so it stops acquiring knowledge, and ensuring inner
         life generates dreams instead of waking thoughts — must be
         engaged *after* the autonomous subsystems are started
         (``_start_autonomous_subsystems``), otherwise the learner
         thread starts after the pause and runs unpaused.
 
-        Without this, a restart during sleep leaves her flagged asleep
+        Without this, a restart during sleep leaves it flagged asleep
         with the zone set to Sleeping, but the learners still running
-        and inner life generating waking thoughts — she behaves awake
-        while every status display says she's asleep. Re-issuing
+        and inner life generating waking thoughts — it behaves awake
+        while every status display says it's asleep. Re-issuing
         ``/sleep`` cannot recover this, because :meth:`sleep` no-ops
         when ``_is_sleeping`` is already True.
         """
@@ -364,7 +364,7 @@ class LifecycleMixin:
                 # this, the mmap is only flushed on graceful daemon
                 # shutdown — a SIGKILL would lose everything since
                 # the last msync. This is especially important during
-                # sleep: if she's in N3 and the process is killed,
+                # sleep: if it's in N3 and the process is killed,
                 # the daemon's nrem phase and neurochemistry need to
                 # be on disk for the sleep state restore to work.
                 try:
@@ -478,11 +478,11 @@ class LifecycleMixin:
 
         # Stop the heartbeat thread BEFORE saving state. The
         # heartbeat calls _check_auto_sleep() every second, which
-        # can auto-wake her if adenosine is low. Without joining the
-        # heartbeat first, there is a race: the heartbeat wakes her
+        # can auto-wake it if adenosine is low. Without joining the
+        # heartbeat first, there is a race: the heartbeat wakes it
         # between /quit and _save_state(), so the saved state says
-        # is_sleeping=False even though she was asleep when the user
-        # quit. Joining the heartbeat ensures her sleep state at the
+        # is_sleeping=False even though it was asleep when the user
+        # quit. Joining the heartbeat ensures its sleep state at the
         # moment of /quit is what gets saved. Join without a timeout:
         # a timed-out writer would still be alive when the archive is
         # closed below.
@@ -873,7 +873,7 @@ class LifecycleMixin:
         """Validate sleep state without mutating the live mind.
 
         This restores the in-memory ``_is_sleeping`` flag and the cycle
-        tracker position so she resumes at the correct point in the
+        tracker position so it resumes at the correct point in the
         ultradian cycle instead of starting over at N1. The actual
         sleep *mechanism* (pausing learners, putting inner life into
         sleep mode) is engaged later in the startup sequence by
@@ -886,7 +886,7 @@ class LifecycleMixin:
 
         # Restore sleep state exactly as saved. The defaults are
         # False (awake) — if the sleep_state fields are missing from
-        # an old save file, she starts awake rather than trapped in
+        # an old save file, it starts awake rather than trapped in
         # user-initiated sleep (which blocks auto-wake).
         is_sleeping = bool(data.get("is_sleeping", False))
         user_initiated_sleep = bool(data.get("user_initiated_sleep", False))
@@ -926,8 +926,8 @@ class LifecycleMixin:
             # daemon's mmap state (core_state.bin) already persists
             # neurochemicals and emergent_phase, but the Python-side
             # sleep flags and ultradian cycle tracker are in-memory
-            # only. Without this, a restart during N3 would lose her
-            # place in the sleep cycle and force her awake.
+            # only. Without this, a restart during N3 would lose its
+            # place in the sleep cycle and force it awake.
             sleep_state = serialize_sleep_state(
                 is_sleeping=self._is_sleeping,
                 user_initiated_sleep=self._user_initiated_sleep,

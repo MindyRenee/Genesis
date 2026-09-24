@@ -3,7 +3,7 @@
 This module implements statistical learning of language patterns from
 the user's input. Genesis tracks word frequencies, n-gram patterns
 (bigrams and trigrams), and builds a simple probabilistic grammar from
-observed patterns. She also adapts to the user's communication style
+observed patterns. It also adapts to the user's communication style
 (formal, casual, technical).
 
 The generative engine can use the learned statistics to match the
@@ -17,7 +17,7 @@ acquisition. Children are sensitive to the statistical structure of
 their input — transitional probabilities between syllables (Saffran,
 Aslin & Newport, 1996), word frequencies, and distributional patterns.
 This module applies the same principle: Genesis learns the statistical
-regularities of the user's language and uses them to adapt her own.
+regularities of the user's language and uses them to adapt its own.
 
 References:
 - Saffran, J. R., Aslin, R. N., & Newport, E. L. (1996). Statistical

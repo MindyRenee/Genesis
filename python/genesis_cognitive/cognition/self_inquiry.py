@@ -1,4 +1,4 @@
-"""Self-inquiry handling — questions Genesis asks about herself.
+"""Self-inquiry handling — questions Genesis asks about itself.
 
 Extracted from CognitionEngine as a focused subsystem. Routes self-
 directed questions (how do you feel, what are you, what do you know,
@@ -14,9 +14,9 @@ Dependencies (passed to ``__init__``):
     - self_model: SelfModel for self-knowledge and body model
     - self_learner: SelfDirectedLearner for describing recent learning
     - self_assessment: SelfAssessmentEngine for capability summaries and weak concepts
-    - topology: NetworkTopology for describing the structure of her mind
+    - topology: NetworkTopology for describing the structure of its mind
     - reflection: ReflectionEngine for self-reflection composition
-    - narrative: NarrativeEngine for telling her life story
+    - narrative: NarrativeEngine for telling its life story
     - client: GenesisClient for neuro summary (brain waves)
     - memory: MemoryEngine for learning user facts
     - feeling_reporter: FeelingReporter for concerns/environment/bug reports
@@ -54,7 +54,7 @@ class SelfInquiryHandler:
 
     All answers are composed from the self composer, concept network,
     emotional state, or self-model — never from hardcoded template
-    strings. When Genesis doesn't have knowledge, she says so honestly.
+    strings. When Genesis doesn't have knowledge, it says so honestly.
     """
 
     def __init__(
@@ -102,9 +102,9 @@ class SelfInquiryHandler:
         emotion: EmotionalState,
         memory: MemoryContext,
     ) -> Thought:
-        """Handle questions about Genesis herself.
+        """Handle questions about Genesis itself.
 
-        Uses the self composer to generate descriptions from her
+        Uses the self composer to generate descriptions from its
         actual state, not hardcoded strings.
         """
         lower = perception.raw_text.lower()
@@ -244,7 +244,7 @@ class SelfInquiryHandler:
     ) -> Thought | None:
         """Handle questions about recent activity — 'what have you been doing?'
 
-        Composes a response from her actual recent mental activity:
+        Composes a response from its actual recent mental activity:
         self-directed learning events, reflection insights, and current
         emotional state. The self-composer weaves these fragments into
         natural language — no hardcoded response templates.
@@ -256,9 +256,9 @@ class SelfInquiryHandler:
         - "what's new?"
         - "what are you working on?"
 
-        These are self-referential questions about her own experience,
-        not concept-network knowledge queries. They need access to her
-        recent activity log, not her semantic graph.
+        These are self-referential questions about its own experience,
+        not concept-network knowledge queries. They need access to its
+        recent activity log, not its semantic graph.
         """
         is_activity_question = (
             any(p in lower for p in (
@@ -285,7 +285,7 @@ class SelfInquiryHandler:
         if not is_activity_question:
             return None
 
-        # Collect semantic fragments from her recent activity.
+        # Collect semantic fragments from its recent activity.
         # These are building blocks (seeds) the self-composer weaves
         # into natural language — not pre-written sentences.
         activity_fragments: list[str] = []
@@ -304,7 +304,7 @@ class SelfInquiryHandler:
         except Exception as e:  # noqa: BLE001
             logger.debug(f"failed to read recent learning events for activity summary: {e}")
 
-        # 2. Recent reflection insights — what she noticed about herself
+        # 2. Recent reflection insights — what it noticed about itself
         try:
             recent_insights = self._reflection.get_recent_insights(3)
             for insight in recent_insights:
@@ -314,11 +314,11 @@ class SelfInquiryHandler:
         except Exception as e:  # noqa: BLE001
             logger.debug(f"failed to read recent reflection insights for activity summary: {e}")
 
-        # 3. Compose from her actual state using the self-composer.
-        # self_reflection_fragments selects what she knows, what she's
-        # learned (insights), her values, and her emotional state as
+        # 3. Compose from its actual state using the self-composer.
+        # self_reflection_fragments selects what it knows, what it's
+        # learned (insights), its values, and its emotional state as
         # semantic fragments; the language engine composes the actual
-        # wording. This is her composing from her own understanding,
+        # wording. This is its composing from its own understanding,
         # not reciting a template.
         fragments = self._self_composer.self_reflection_fragments(
             self._self_model, self._network, self._reflection, emotion,
@@ -346,8 +346,8 @@ class SelfInquiryHandler:
         """Handle existential self-inquiry questions.
 
         Questions like "Do you feel cognitive?", "Are you self-aware?"
-        contain philosophical concepts she has rich knowledge about.
-        Compose a reflection from her concept network rather than
+        contain philosophical concepts it has rich knowledge about.
+        Compose a reflection from its concept network rather than
         just reporting neurochemical state.
         """
         _EXISTENTIAL_CONCEPTS = (
@@ -656,10 +656,10 @@ class SelfInquiryHandler:
         )
 
     def _relationship_question_kind(self, lower: str) -> str | None:
-        """Classify questions about the people in her life.
+        """Classify questions about the people in its life.
 
-        Returns "creator" for questions about who made her, "user" for
-        questions about the person she's talking to, or None.
+        Returns "creator" for questions about who made it, "user" for
+        questions about the person it's talking to, or None.
         """
         if (
             "who made you" in lower
@@ -695,8 +695,8 @@ class SelfInquiryHandler:
         return None
 
     def self_inquiry_user(self, emotion: EmotionalState) -> Thought:
-        """Handle 'who am I?' / 'do you know me?' — compose what she
-        knows about the user from her concept network and self-model."""
+        """Handle 'who am I?' / 'do you know me?' — compose what it
+        knows about the user from its concept network and self-model."""
         user_name = self._self_model.self_knowledge.get("user_name", "")
         content = ""
         fragments: list[tuple[str, str]] = []
@@ -705,7 +705,7 @@ class SelfInquiryHandler:
             if thought and thought.confidence > 0.3:
                 content = thought.content
         if not content:
-            # Fall back to the relationship record — what she's
+            # Fall back to the relationship record — what it's
             # experienced with this person so far. Notes arrive as
             # clause fragments so the language engine frames them.
             notes = list(self._self_model.relationship_notes)
@@ -811,9 +811,9 @@ class SelfInquiryHandler:
     ) -> Thought | None:
         """Handle philosophical questions.
 
-        Uses the thought composer to generate responses from her
-        actual knowledge, not hardcoded strings. Returns None if she
-        can't compose from her understanding — she stays silent rather
+        Uses the thought composer to generate responses from its
+        actual knowledge, not hardcoded strings. Returns None if it
+        can't compose from its understanding — it stays silent rather
         than reciting a pre-written fallback template.
         """
         lower = perception.raw_text.lower()

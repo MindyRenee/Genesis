@@ -1,7 +1,7 @@
 """Persistence — Genesis's memory across restarts.
 
-This module saves and loads Genesis's learned state to disk so she
-remembers what she's learned between conversations.
+This module saves and loads Genesis's learned state to disk so it
+remembers what it's learned between conversations.
 
 # What persists
 
@@ -209,7 +209,7 @@ def save_state(
         memory_records: Python-side memory metadata (consolidation
             state, forgetting, source tags) from
             :meth:`MemoryEngine.serialize_records`.
-        world_state: Her external world (presences, recent events,
+        world_state: Its external world (presences, recent events,
             social clock) from :meth:`OuterWorld.to_dict`.
     """
     state: dict[str, Any] = {
@@ -446,7 +446,7 @@ def _prune_dictionary_concepts(concepts: list[dict[str, Any]]) -> list[dict[str,
 
     Old versions imported the entire WordNet dictionary (100k+ concepts
     with origin "dictionary") which made the network too slow to load
-    and query. Genesis re-adds words she actually encounters with
+    and query. Genesis re-adds words it actually encounters with
     meaningful origins (conversation, learned, curriculum, etc.).
     """
     _PRUNE_ORIGINS = {"dictionary"}
@@ -764,7 +764,7 @@ def restore_reflection(reflection: ReflectionEngine, data: dict[str, Any]) -> No
     reflection._repetition_window = deque(maxlen=10)
 
     # Restore the recursive metacognitive model (generative model of
-    # her own cognitive processes). Backward compatible: v1 save
+    # its own cognitive processes). Backward compatible: v1 save
     # files without this key leave the model at its fresh default.
     meta_data = data.get("metacognitive_model")
     if meta_data is not None:
@@ -1286,8 +1286,8 @@ def restore_self_improvement(engine: SelfImprovementEngine, data: dict[str, Any]
 
     Restores all proposals (with their statuses and feedback),
     the feedback history, and the category success statistics.
-    This allows Genesis to remember what she proposed, what was
-    accepted/rejected, and what she learned from the feedback.
+    This allows Genesis to remember what it proposed, what was
+    accepted/rejected, and what it learned from the feedback.
     """
     engine.restore_from_dict(data)
 
@@ -1767,13 +1767,13 @@ def serialize_sleep_state(
     neurochemical levels and emergent_phase (nrem/rem), but the
     Python-side sleep flags and the ultradian cycle tracker
     (N1→N2→N3→N2→REM position) are in-memory only. Without this,
-    a restart forces her awake (Mind.start sets ZONE_CONVERSATION)
-    and clears adenosine — she loses her place in the sleep cycle
+    a restart forces it awake (Mind.start sets ZONE_CONVERSATION)
+    and clears adenosine — it loses its place in the sleep cycle
     and any N3 consolidation that hadn't fired yet.
 
     Args:
-        is_sleeping: Whether she's currently asleep.
-        user_initiated_sleep: Whether the user put her to bed
+        is_sleeping: Whether it's currently asleep.
+        user_initiated_sleep: Whether the user put it to bed
             (vs. auto-sleep from sleep pressure).
         sleep_cycle: The SleepCycleTracker (or None if awake).
     """

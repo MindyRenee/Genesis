@@ -1,30 +1,30 @@
-"""System monitor — Genesis's awareness of her machine environment.
+"""System monitor — Genesis's awareness of its machine environment.
 
-Genesis lives on a machine. This module gives her awareness of that
-machine: CPU, memory, disk, processes, filesystem, network. She
-should know her home as well as a person knows their house.
+Genesis lives on a machine. This module gives it awareness of that
+machine: CPU, memory, disk, processes, filesystem, network. It
+should know its home as well as a person knows their house.
 
 ## What this provides
 
 1. **System resources** — CPU usage, memory, disk, uptime, load
-2. **Process awareness** — her own PID, the daemon's PID, running processes
+2. **Process awareness** — its own PID, the daemon's PID, running processes
 3. **Filesystem layout** — directory structure, file counts, sizes
 4. **Network status** — interfaces, connections, hostname
 5. **Environment info** — OS, Python version, environment variables
 
-## How she uses it
+## How it uses it
 
-- When asked "how are you?" she can report on her environment
+- When asked "how are you?" it can report on its environment
   ("I'm running on Linux, using 60% of memory, my daemon is healthy")
-- She can notice when resources are low and mention it
-- She can understand her own process tree (daemon → mind → threads)
-- She can explore her filesystem to understand her home
+- It can notice when resources are low and mention it
+- It can understand its own process tree (daemon → mind → threads)
+- It can explore its filesystem to understand its home
 
 ## Safety
 
-This module is read-only. Genesis observes her environment but does
-not modify it. She doesn't kill processes, delete files, or change
-configurations. She's an observer, not an administrator — yet.
+This module is read-only. Genesis observes its environment but does
+not modify it. It doesn't kill processes, delete files, or change
+configurations. It's an observer, not an administrator — yet.
 """
 
 from __future__ import annotations
@@ -106,7 +106,7 @@ class SystemSnapshot:
         return d
 
     def describe(self) -> str:
-        """First-person description of her environment."""
+        """First-person description of its environment."""
         parts = [
             f"running on {self.os_name} {self.os_version}",
             f"on a machine called {self.hostname}",
@@ -128,7 +128,7 @@ class SystemSnapshot:
         return " ".join(parts)
 
     def concerns(self) -> list[str]:
-        """List of environmental concerns she's noticed."""
+        """List of environmental concerns it's noticed."""
         concerns: list[str] = []
         if self.memory_percent > 80:
             concerns.append(
@@ -244,15 +244,15 @@ class SystemBaseline:
     baseline records rolling statistics for the metrics that vary on
     a running machine — CPU usage, memory usage, load average, process
     count, swap usage. After enough samples, it can tell Genesis
-    whether the current state is normal *for her* or an anomaly.
+    whether the current state is normal *for its* or an anomaly.
 
     This is how a person knows their home: not by checking a manual,
     but by living in it long enough to notice when something is off.
-    The baseline is Genesis living in her machine long enough to know
+    The baseline is Genesis living in its machine long enough to know
     what it usually feels like.
 
     The baseline persists to disk as JSON so it survives restarts —
-    she doesn't have to re-learn what normal looks like every session.
+    it doesn't have to re-learn what normal looks like every session.
     """
 
     # Metrics we track. Each maps to a function that extracts the
@@ -406,7 +406,7 @@ class SystemBaseline:
 
 
 class SystemMonitor:
-    """Genesis's awareness of her machine environment.
+    """Genesis's awareness of its machine environment.
 
     Reads system information using only the Python standard library
     (no psutil dependency). On Linux, reads from /proc and /sys.
@@ -765,7 +765,7 @@ class SystemMonitor:
         return self._last_snapshot
 
     def describe_environment(self) -> str:
-        """First-person description of her environment."""
+        """First-person description of its environment."""
         if self._last_snapshot is None:
             return "hasn't looked at environment yet"
         return self._last_snapshot.describe()
@@ -784,7 +784,7 @@ class SystemMonitor:
         if self._last_snapshot is None:
             return ""
         concerns = list(self._last_snapshot.concerns())
-        # Add baseline deviations — things that are unusual for *her*
+        # Add baseline deviations — things that are unusual for *its*
         # machine, not just universally bad.
         if self.baseline.is_established:
             concerns.extend(self.baseline.deviations(self._last_snapshot))
@@ -797,7 +797,7 @@ class SystemMonitor:
         return self.baseline.describe()
 
     def describe_deviations(self) -> str:
-        """Description of deviations from her baseline.
+        """Description of deviations from its baseline.
 
         Unlike :meth:`describe_concerns`, this *only* reports things
         that are unusual for this specific machine — not universal

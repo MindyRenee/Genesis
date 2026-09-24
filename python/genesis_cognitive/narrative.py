@@ -8,7 +8,7 @@ time.
 # What the narrative engine does
 
 1. **Tracks identity evolution**: how has Genesis's self-model changed?
-   What did she used to think? What does she think now?
+   What did it used to think? What does it think now?
 
 2. **Builds life chapters**: groups interactions into thematic periods.
    "When I first woke up", "When I learned about cognition",
@@ -17,8 +17,8 @@ time.
 3. **Generates self-narrative**: "I am Genesis. I began as... I learned...
    I struggled with... I now understand..."
 
-4. **Tracks values and personality drift**: are her values changing?
-   Is her personality evolving through experience?
+4. **Tracks values and personality drift**: are its values changing?
+   Is its personality evolving through experience?
 
 5. **Creates meaning**: connects events into a causal story. "I became
    interested in cognition because someone asked me if I was alive."
@@ -45,7 +45,7 @@ class LifeEvent:
     """A significant event in Genesis's life.
 
     Not every interaction is a life event. Only interactions that
-    changed her understanding, her emotional baseline, or her
+    changed its understanding, its emotional baseline, or its
     self-model are recorded as life events.
 
     Each event carries a stable ``id`` so it can be referenced by
@@ -56,7 +56,7 @@ class LifeEvent:
     timestamp: int
     summary: str  # what happened
     significance: str  # why it mattered
-    emotion_at_time: str  # how she felt
+    emotion_at_time: str  # how it felt
     concepts_involved: list[str] = field(default_factory=list)
     chapter: str = ""  # which life chapter this belongs to
     # Narrative reinterpretation — updated by restructure_memory().
@@ -493,7 +493,7 @@ class NarrativeEngine:
     def tell_story(self) -> str:
         """Generate Genesis's self-narrative.
 
-        This is her story — who she was, who she is, who she's becoming.
+        This is its story — who it was, who it is, who it's becoming.
         It's not a log of events. It's an interpretation.
 
         Returns a compact structural summary (name, uptime, chapters,

@@ -29,9 +29,9 @@ During wakefulness, Genesis accumulates:
 - New edges from reasoning and bridge creation
 - New LTM episodes from every experience
 
-Without compression, this growth is monotonic — she will eventually
+Without compression, this growth is monotonic — it will eventually
 exhaust disk and memory. Algorithmic sleep is the compaction pass that
-keeps her bounded.
+keeps it bounded.
 
 Three phases, mirroring biological sleep:
 
@@ -80,8 +80,8 @@ replace — the existing sleep consolidation.
   holographic model, this is denoising — the sleep replay process
   re-encodes the strongest associations and lets the weak noise decay.
 
-She wakes up smaller than she went to sleep — not because she forgot,
-but because she *compressed*.
+It wakes up smaller than it went to sleep — not because it forgot,
+but because it *compressed*.
 """
 
 from __future__ import annotations

@@ -36,7 +36,7 @@
 //! 5. **Identify** patterns: common structures, repeated code,
 //!    potential refactoring targets
 //! 6. **Serialize** all of this into a compact format that can be
-//!    stored in LTM as episodes — so Genesis remembers code she's
+//!    stored in LTM as episodes — so Genesis remembers code it's
 //!    seen before and can find similar patterns
 
 use std::collections::{HashMap, HashSet};
@@ -106,8 +106,8 @@ impl UnitKind {
 
 /// A semantic unit — a single meaningful piece of code.
 ///
-/// This is Genesis's atomic unit of code understanding. When she
-/// reads a file, she doesn't see text — she sees a collection of
+/// This is Genesis's atomic unit of code understanding. When it
+/// reads a file, it doesn't see text — it sees a collection of
 /// semantic units with relationships between them.
 #[derive(Clone, Debug)]
 pub struct SemanticUnit {

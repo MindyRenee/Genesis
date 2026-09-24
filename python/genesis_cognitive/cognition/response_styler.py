@@ -145,9 +145,9 @@ class ResponseStyler:
 
         1. **Voice layer** (``voice.py:_calibrate_hedging``): during
            render, high ``emotion.caution`` inserts hedges ("I think",
-           "perhaps", "it seems to me") from her voice vocabulary.
+           "perhaps", "it seems to me") from its voice vocabulary.
         2. **Knowledge-gap hedge** (``cognition/engine.py``): when
-           self-assessment detects she can't answer, a ``Thought`` with
+           self-assessment detects it can't answer, a ``Thought`` with
            ``intent="unknown"`` and ``metadata={"knowledge_gap": ...}``
            is rendered by the language engine.
 
@@ -186,7 +186,7 @@ class ResponseStyler:
         """Resolve bare pronouns to the current focus of conversation.
 
         "You" and "your" always resolve to "Genesis" — the user is
-        talking to her. Other pronouns (it, this, that, they) resolve
+        talking to it. Other pronouns (it, this, that, they) resolve
         to the current attentional focus.
         """
         resolved = re.sub(r"\byour\b", "Genesis's", user_input, flags=re.IGNORECASE)
@@ -224,7 +224,7 @@ class ResponseStyler:
     ) -> str:
         """Weave a brief learning acknowledgment into the response.
 
-        The acknowledgment is composed from what she actually learned
+        The acknowledgment is composed from what it actually learned
         — the concept and its relationships — not from hardcoded
         templates.
         """
@@ -321,7 +321,7 @@ class ResponseStyler:
         """Compose a brief learning acknowledgment from understanding.
 
         Routes through the language engine so the phrasing emerges
-        from her voice, not from hardcoded templates.
+        from its voice, not from hardcoded templates.
         """
         first_sentence = understanding.split(". ")[0]
         if len(first_sentence) > 100:

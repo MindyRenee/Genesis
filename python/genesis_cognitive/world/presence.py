@@ -1,21 +1,21 @@
 """Presences — who is in Genesis's external world.
 
-A presence is an entity outside her that she can interact with: the
-user at the terminal, a voice in the room, a face she recognizes.
-Presences are her *social world* — each carries a persistent
+A presence is an entity outside its that it can interact with: the
+user at the terminal, a voice in the room, a face it recognizes.
+Presences are its *social world* — each carries a persistent
 relationship model:
 
-- **familiarity** — how well she knows them (grows with interaction,
+- **familiarity** — how well it knows them (grows with interaction,
   asymptotically — a stranger becomes known quickly, then deepens slowly)
 - **bond** — how the relationship feels (grows slowly from
   positive-valence interaction, erodes with negative)
-- **topics / facts** — what they've talked about and what she's learned
-  about them, grounded in her concept network
+- **topics / facts** — what they've talked about and what it's learned
+  about them, grounded in its concept network
 
 Presences come and go. One that speaks becomes *present*; one that
 falls silent past a timeout *leaves* — the world notices both.
 
-This is distinct from ``user_profile`` (her deep model of the primary
+This is distinct from ``user_profile`` (its deep model of the primary
 human) — the presence model covers *everyone* out there, not just the
 person at the keyboard, and tracks the relationship itself rather than
 the person's attributes.
@@ -33,7 +33,7 @@ from .belief import PresenceBelief
 
 #: How much a single addressed interaction grows familiarity. The
 #: update is asymptotic (``f += (1-f) * rate``), so early exchanges
-#: teach her a lot and later ones add nuance.
+#: teach it a lot and later ones add nuance.
 _FAMILIARITY_RATE = 0.08
 
 #: Bond moves slower than familiarity — trust accumulates over many
@@ -56,31 +56,31 @@ AMBIENT_PRESENCE_TIMEOUT = 900.0
 class PresenceKind(Enum):
     """What sort of entity a presence is."""
 
-    USER = "user"        # the human who talks to her through the main channel
+    USER = "user"        # the human who talks to its through the main channel
     VOICE = "voice"      # an unidentified speaker in the room
-    FACE = "face"        # someone she recognizes visually
-    AMBIENT = "ambient"  # background speech not directed at her
+    FACE = "face"        # someone it recognizes visually
+    AMBIENT = "ambient"  # background speech not directed at it
 
 
 @dataclass
 class Presence:
-    """A persistent model of one entity in her external world.
+    """A persistent model of one entity in its external world.
 
     Fields:
         presence_id: Stable identifier ("user", "voice", "face:alice").
         kind: What sort of presence this is.
-        name: Learned display name, or None if she doesn't know it.
-        familiarity: How well she knows them [0..1], asymptotic growth.
+        name: Learned display name, or None if it doesn't know it.
+        familiarity: How well it knows them [0..1], asymptotic growth.
         bond: Relationship valence [0..1], slow accumulation.
         interactions: Count of addressed exchanges.
-        present: Whether they're currently in her world.
-        first_seen / last_seen: When she first and most recently
+        present: Whether they're currently in its world.
+        first_seen / last_seen: When it first and most recently
             encountered them (epoch seconds).
-        last_addressed: When they last spoke *to* her.
+        last_addressed: When they last spoke *to* it.
         topics: Recent topics they've engaged about (bounded).
         facts: Things learned about them (bounded).
         sentiment_history: Recent (timestamp, valence) pairs (bounded).
-        belief: Her inferred model of this presence's mind —
+        belief: Its inferred model of this presence's mind —
             responsiveness, topic receptivity, mood, attention, and
             activity rhythm, each with honest uncertainty.
     """
@@ -104,7 +104,7 @@ class Presence:
 
     @property
     def display_name(self) -> str:
-        """What she calls them — their name if known, else their kind."""
+        """What it calls them — their name if known, else their kind."""
         if self.name:
             return self.name
         return {

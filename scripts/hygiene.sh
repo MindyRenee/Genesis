@@ -36,7 +36,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT"
 
-# Runtime data directory (where Genesis stores her live state + artifacts).
+# Runtime data directory (where Genesis stores its live state + artifacts).
 # Same resolution as run.sh: XDG_DATA_HOME (or ~/.local/share), with
 # GENESIS_DATA_DIR kept as a manual override.
 RUNTIME_DIR="${GENESIS_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/genesis-public}"

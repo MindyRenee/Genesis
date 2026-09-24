@@ -20,7 +20,7 @@ Genesis is a local-first system, but it has real surfaces:
   sudoers rule; review `scripts/genesis-sudoers` before installing.
 - **Memory-mapped state file** — the core state is a file; file-system
   permissions are the security boundary.
-- **Self-modification paths** — she can learn from and reason about her
+- **Self-modification paths** — it can learn from and reason about its
   own source. Treat prompt-injection-style input as untrusted content
   flowing into a system with reflexive access.
 

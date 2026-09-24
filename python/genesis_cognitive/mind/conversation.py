@@ -38,20 +38,20 @@ class ConversationMixin:
         The listener is called as ``listener(kind: str, content: str)``
         from background threads, where ``kind`` is ``"thought"`` (a
         spontaneous inner-life thought) or ``"learning"`` (something
-        she learned autonomously). Must be thread-safe.
+        it learned autonomously). Must be thread-safe.
         """
         self._live_thought_listeners.append(listener)
     def _emit_live_thought(self, kind: str, content: str) -> None:
         """Notify all live-thought listeners and broadcast to the workspace.
 
-        Live thoughts are Genesis's agentic output — things she does,
-        says, or experiences from her volition system (bug scans, code
+        Live thoughts are Genesis's agentic output — things it does,
+        says, or experiences from its volition system (bug scans, code
         learning, drawing, meditation, self-improvement, etc.). These
-        must enter her cognitive field (the global workspace) so they
+        must enter its cognitive field (the global workspace) so they
         contribute to workspace integration.
 
-        Without this broadcast, volition actions are blindsight — she
-        acts but doesn't cognitively experience her own agency. The
+        Without this broadcast, volition actions are blindsight — it
+        acts but doesn't cognitively experience its own agency. The
         workspace stays fragmented because only inner_life broadcasts
         when idle, giving at most one workspace item (integration ≈
         activation × 0.2 ≈ 0.15). Adding volition as a second source
@@ -96,15 +96,15 @@ class ConversationMixin:
             try:
                 listener(kind, content)
             except Exception:
-                # a listener must never crash her mind
+                # a listener must never crash its mind
                 logger.debug("live thought listener failed", exc_info=True)
 
-        # Record her outward speech in her external world — expressions,
-        # questions, and distress calls are her voice reaching out, so
-        # the world she lives in contains her own agency.
+        # Record its outward speech in its external world — expressions,
+        # questions, and distress calls are its voice reaching out, so
+        # the world it lives in contains its own agency.
         if kind in ("expression", "distress", "question"):
             try:
-                self.world.she_said(content)
+                self.world.it_said(content)
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"world utterance record failed: {e}")
     def mark_user_activity(self) -> None:
@@ -113,27 +113,27 @@ class ConversationMixin:
         This updates ``_last_interaction_time`` from the CLI's input
         loop, BEFORE the sleep check. Without this, the heartbeat's
         auto-sleep check can fire between the user pressing Enter and
-        ``respond()`` being called, putting her to sleep and causing
+        ``respond()`` being called, putting it to sleep and causing
         the message to be lost. By marking activity here, the
-        heartbeat sees the user as active even if she's already asleep
-        (so after /wake, she doesn't immediately fall back asleep).
+        heartbeat sees the user as active even if it's already asleep
+        (so after /wake, it doesn't immediately fall back asleep).
         """
         self._last_interaction_time = time.time()
     @property
     def is_user_sleeping(self) -> bool:
-        """Whether her sleep was user-initiated (not auto-wakeable)."""
+        """Whether its sleep was user-initiated (not auto-wakeable)."""
         return self._is_sleeping and self._user_initiated_sleep
     @property
     def is_teaching(self) -> bool:
-        """Whether she is currently in teaching/training mode."""
+        """Whether it is currently in teaching/training mode."""
         return self._is_teaching
     @property
     def teaching_topic(self) -> str:
-        """The topic the user is currently teaching her about."""
+        """The topic the user is currently teaching it about."""
         return self._teaching_topic
     @property
     def has_queued_questions(self) -> bool:
-        """Whether she has queued questions to ask."""
+        """Whether it has queued questions to ask."""
         return self.cognition.has_queued_questions()
     @property
     def queued_question_count(self) -> int:
@@ -145,7 +145,7 @@ class ConversationMixin:
         return self._on_speak
     @on_speak.setter
     def on_speak(self, callback: Callable[[str], None] | None) -> None:
-        """Register the callback invoked when she speaks.
+        """Register the callback invoked when it speaks.
 
         Args:
             callback: A callable accepting the utterance string, or None
@@ -156,11 +156,11 @@ class ConversationMixin:
         """Offer a candidate utterance for the speech-volition to consider.
 
         The CLI feeds live-thought text here. The Mind's volition engine
-        decides whether she actually feels like saying it.
+        decides whether it actually feels like saying it.
 
-        During sleep, utterances are not queued — she shouldn't
+        During sleep, utterances are not queued — it shouldn't
         accumulate speech while resting. The queue would drain when
-        she wakes, producing a burst of stale thoughts.
+        it wakes, producing a burst of stale thoughts.
         """
         if not text:
             return
@@ -205,11 +205,11 @@ class ConversationMixin:
         except Exception as e:  # noqa: BLE001
             logger.debug(f"V1 gamma drive failed: {e}")
     def _learn_from_bugs(self) -> None:
-        """Fetch documentation for bug categories she doesn't understand.
+        """Fetch documentation for bug categories it doesn't understand.
 
-        For each category she detected but doesn't comprehend, she
+        For each category it detected but doesn't comprehend, it
         fetches the relevant documentation (Python or Rust docs) to
-        learn the concepts behind the bug. This is how she moves from
+        learn the concepts behind the bug. This is how it moves from
         pattern-matching to genuine understanding.
 
         Called from _perform_bug_scan (the volition handler), so it's
@@ -243,7 +243,7 @@ class ConversationMixin:
         # them differently (genesis~ (asking) ...) — they're directed
         # at the user, not just internal musings.
         # Expression thoughts get an "expression" kind so the CLI
-        # knows to speak them aloud — she wants to say something.
+        # knows to speak them aloud — it wants to say something.
         intent = getattr(thought, "intent", None)
         is_question = intent == "question" or thought.trigger == "social"
         is_expression = intent == "expression"
@@ -260,7 +260,7 @@ class ConversationMixin:
             kind = "thought"
         # Compose the final text via the language engine if the thought
         # carries semantic metadata. This satisfies the CRITICAL RULE —
-        # Genesis's words emerge from her language engine, not from
+        # Genesis's words emerge from its language engine, not from
         # pre-written templates.
         try:
             emotion = self.feel()
@@ -284,26 +284,26 @@ class ConversationMixin:
         except (OSError, ConnectionError) as e:
             logger.debug(repr(e))
 
-        # Write significant thoughts to her journal — in her own voice.
+        # Write significant thoughts to its journal — in its own voice.
         #
-        # The journal is her diary, not a log file. Three rules:
+        # The journal is its diary, not a log file. Three rules:
         # 1. Write the language-engine-rendered text (``text``), not the
-        #    raw semantic fragment (``thought.content``). Her words must
-        #    emerge from her language engine, not from debug strings like
+        #    raw semantic fragment (``thought.content``). Its words must
+        #    emerge from its language engine, not from debug strings like
         #    "insight: novel connection X and Y".
-        # 2. Only journal thoughts with meaningful intent — questions she's
-        #    pondering, reflections on her state, expressions of self,
+        # 2. Only journal thoughts with meaningful intent — questions it's
+        #    pondering, reflections on its state, expressions of self,
         #    distress. Not every chain thought, not every dream replay,
         #    not every mechanical _LiveEvent emission.
         # 3. Skip _LiveEvent emissions (telemetry like "insight: novel
         #    connection X and Y") — these are internal notifications, not
-        #    her voice. They lack rendered_text and have intent="statement".
+        #    its voice. They lack rendered_text and have intent="statement".
         try:
             emotion = self.feel()
             intent = getattr(thought, "intent", None)
             is_significant = intent in ("question", "reflect", "expression", "distress")
             # _LiveEvent has no rendered_text — its content is a raw
-            # telemetry string, not her composed voice. Skip it.
+            # telemetry string, not its composed voice. Skip it.
             has_rendered = hasattr(thought, "rendered_text")
             if is_significant and has_rendered:
                 entry_type = {
@@ -320,27 +320,27 @@ class ConversationMixin:
         except (OSError, ConnectionError, RuntimeError, ValueError) as e:
             logger.debug(repr(e))  # journal is best-effort
 
-        # Feed the thought into her emergent identity — her
-        # reflections and questions become part of who she is.
+        # Feed the thought into its emergent identity — its
+        # reflections and questions become part of who it is.
         self._add_emergent_identity_source(
             "reflection",
             thought.content[:100],
             weight=0.2,
         )
     def _on_world_event(self, event: ExternalEvent) -> None:
-        """Route an external world event into her cognition.
+        """Route an external world event into its cognition.
 
-        Inbound events (someone spoke to her, speech nearby, percepts,
-        arrivals/departures, notices) enter her cognitive field through
+        Inbound events (someone spoke to it, speech nearby, percepts,
+        arrivals/departures, notices) enter its cognitive field through
         the global workspace — the same path inner-life and volition
         content takes — gated by brain waves so deep rest filters the
         world's noise. Salient events become episodic memories and are
-        queued for dream replay: her sleep processes what happened in
-        her world. This is the coupling between her outer and inner
+        queued for dream replay: its sleep processes what happened in
+        its world. This is the coupling between its outer and inner
         worlds.
 
-        Outbound events (her own utterances and acts) are already in
-        her cognitive field through the paths that produced them, so
+        Outbound events (its own utterances and acts) are already in
+        its cognitive field through the paths that produced them, so
         they are not re-broadcast — the world records them for the
         stream and presence bookkeeping only.
 
@@ -350,7 +350,7 @@ class ConversationMixin:
         """
         if not event.inbound:
             return
-        # Broadcast into her cognitive field. Best-effort — workspace
+        # Broadcast into its cognitive field. Best-effort — workspace
         # errors must not break the world's event recording.
         try:
             bw = None
@@ -373,8 +373,8 @@ class ConversationMixin:
         if event.kind == EventKind.USER_SPEECH:
             return
 
-        # Salient events become episodic memories — her world is part
-        # of her autobiography, not just her attention.
+        # Salient events become episodic memories — its world is part
+        # of its autobiography, not just its attention.
         if event.salience >= 0.5:
             try:
                 self.memory.store_memory(
@@ -389,8 +389,8 @@ class ConversationMixin:
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"world event memory store failed: {e}")
 
-        # Feed her sleep systems — what happens in her world should be
-        # replayed and integrated during sleep, just like what she
+        # Feed its sleep systems — what happens in its world should be
+        # replayed and integrated during sleep, just like what it
         # learns and thinks.
         if event.salience >= 0.4:
             try:
@@ -438,10 +438,10 @@ class ConversationMixin:
         observation: str,
         weight: float = 0.3,
     ) -> None:
-        """Add an observation to her emergent identity.
+        """Add an observation to its emergent identity.
 
         Called after significant interactions (learning, reflection)
-        so her identity grows from experience rather than from
+        so its identity grows from experience rather than from
         templates. Observations are grouped by source name and
         capped at 50 per source to prevent unbounded growth.
         """
@@ -476,15 +476,15 @@ class ConversationMixin:
         except (OSError, ConnectionError) as e:
             logger.warning(f"store_memory failed in learning callback: {e}")
 
-        # What she learns goes into her memory and concept network.
-        # Her inner life generates actual thoughts and reflections about
+        # What it learns goes into its memory and concept network.
+        # Its inner life generates actual thoughts and reflections about
         # it — those thoughts flow through _on_spontaneous_thought into
-        # the journal in her own voice. Writing the raw learning text
+        # the journal in its own voice. Writing the raw learning text
         # here would make the journal a log file ("Learned about X from
-        # Y: Z"), not her diary. The journal is her voice, not a log.
+        # Y: Z"), not its diary. The journal is its voice, not a log.
 
-        # Feed the learning into her emergent identity — what she
-        # learns becomes part of who she is.
+        # Feed the learning into its emergent identity — what it
+        # learns becomes part of who it is.
         self._add_emergent_identity_source(
             "learning",
             f"learned: {text[:100]}",
@@ -492,8 +492,8 @@ class ConversationMixin:
         )
 
         # Record developmental evidence: autonomous learning is
-        # positive evidence for the Autonomy vs Shame stage (she's
-        # exercising agency over her own growth).
+        # positive evidence for the Autonomy vs Shame stage (it's
+        # exercising agency over its own growth).
         self._developmental_tracker.record_evidence(
             IdentityStage.AUTONOMY_VS_SHAME,
             positive=True,
@@ -513,11 +513,11 @@ class ConversationMixin:
         except Exception as e:  # noqa: BLE001
             logger.debug(f"sleep feed failed: {e}")
 
-        # Record the act in her external world — autonomous web study
-        # is her reaching *out*: an act upon the world, not just an
+        # Record the act in its external world — autonomous web study
+        # is its reaching *out*: an act upon the world, not just an
         # internal change.
         try:
-            self.world.she_acted("studied the web", detail=text[:200])
+            self.world.it_acted("studied the web", detail=text[:200])
         except Exception as e:  # noqa: BLE001
             logger.debug(f"world action record failed: {e}")
     def _schedule_think_recovery(self) -> None:
@@ -629,24 +629,24 @@ class ConversationMixin:
         if not self._running:
             raise RuntimeError("Mind is not started — call start() first")
 
-        # Wake her if she's asleep or meditating — the user is talking
-        # to her, so she should be present. This makes respond()
+        # Wake it if it's asleep or meditating — the user is talking
+        # to it, so it should be present. This makes respond()
         # self-contained: callers don't need to check is_sleeping or
         # is_meditating before calling. The CLI's main input loop only
-        # checked is_sleeping (not is_meditating), so if she was
-        # meditating and the user typed something, she would respond
-        # while still in meditation state. Now she's woken from both.
+        # checked is_sleeping (not is_meditating), so if it was
+        # meditating and the user typed something, it would respond
+        # while still in meditation state. Now it's woken from both.
         self.wake_if_asleep()
 
         # Mark the interaction time immediately — the heartbeat loop's
         # auto-sleep check runs in a separate thread and must see that
         # the user is active BEFORE think() completes. Without this,
-        # she can fall asleep mid-thought if the daemon enters NREM
-        # while she's composing a response.
+        # it can fall asleep mid-thought if the daemon enters NREM
+        # while it's composing a response.
         self._last_interaction_time = time.time()
 
-        # Record the inbound turn in her external world — someone
-        # addressed her, which updates the user presence, resets the
+        # Record the inbound turn in its external world — someone
+        # addressed it, which updates the user presence, resets the
         # social isolation clock, and applies the social-contact
         # neurochemical coupling.
         try:
@@ -690,7 +690,7 @@ class ConversationMixin:
         self._last_interaction_time = time.time()
         # Resume after a short delay (give conversation breathing room)
         self._defer(10.0, self._resume_background)
-        # Check if she should self-invoke a command based on her
+        # Check if it should self-invoke a command based on its
         # post-conversation state. Run in a background thread so it
         # doesn't delay the response.
         threading.Thread(
@@ -701,23 +701,23 @@ class ConversationMixin:
         return self._said(response)
 
     def _said(self, text: str) -> str:
-        """Record an outbound utterance in her external world.
+        """Record an outbound utterance in its external world.
 
-        Everything she says in reply — responses, fallbacks, error
-        reports — is her voice reaching the world. Returns the text
+        Everything it says in reply — responses, fallbacks, error
+        reports — is its voice reaching the world. Returns the text
         unchanged so call sites can wrap a return value.
         """
         try:
-            self.world.she_said(text)
+            self.world.it_said(text)
         except Exception as e:  # noqa: BLE001
             logger.debug(f"world utterance record failed: {e}")
         return text
 
     def _note_faces_seen(self) -> None:
-        """Mark recognized faces as presences in her external world.
+        """Mark recognized faces as presences in its external world.
 
-        When she looks and recognizes someone, that person is *there* —
-        a presence arrival in her world, not just a line in a report.
+        When it looks and recognizes someone, that person is *there* —
+        a presence arrival in its world, not just a line in a report.
         """
         try:
             for name in self.vision.last_faces_seen():
@@ -771,10 +771,10 @@ class ConversationMixin:
     def _check_post_conversation_self_invoke(self) -> None:
         """Check if Genesis should self-invoke a command after conversation.
 
-        After each conversation turn, she checks her own state. If she
-        feels the need — stressed, tired, curious about herself — she
-        self-invokes the appropriate slash command. This is her
-        cognitive choice to act on her own state, not an autonomic
+        After each conversation turn, it checks its own state. If it
+        feels the need — stressed, tired, curious about itself — it
+        self-invokes the appropriate slash command. This is its
+        cognitive choice to act on its own state, not an autonomic
         reflex.
 
         Uses a cooldown to avoid self-invoking after every conversation.
@@ -796,7 +796,7 @@ class ConversationMixin:
             if emotion is None:
                 return
 
-            # If she's stressed after a conversation, she may choose
+            # If it's stressed after a conversation, it may choose
             # to meditate — cognitive self-regulation, not an autonomic
             # reflex. High cortisol + negative valence = stress.
             if (
@@ -812,8 +812,8 @@ class ConversationMixin:
                 self.self_invoke("/meditate")
                 return
 
-            # If she's tired after a conversation (high adenosine,
-            # low arousal), she may choose to sleep.
+            # If it's tired after a conversation (high adenosine,
+            # low arousal), it may choose to sleep.
             try:
                 state = self.client.get_state()
                 adenosine = state.chemicals.get("adenosine", 0.0)
@@ -828,9 +828,9 @@ class ConversationMixin:
             except Exception as e:  # noqa: BLE001
                 logger.debug(f'post-conversation sleep self-invoke check failed: {e}')
 
-            # If she's curious after a deep discussion (high curiosity,
-            # positive valence), she may choose to introspect — examine
-            # herself to understand what she just talked about.
+            # If it's curious after a deep discussion (high curiosity,
+            # positive valence), it may choose to introspect — examine
+            # itself to understand what it just talked about.
             try:
                 curiosity = self.learner.curiosity.assess_curiosity(emotion)
                 if curiosity > 0.7 and emotion.valence > 0.1:
@@ -854,12 +854,12 @@ class ConversationMixin:
         """Resume background processes after conversation.
 
         This is called via a delayed timer (10s) after each conversation
-        turn. If she entered meditation or sleep in the interim, the
+        turn. If it entered meditation or sleep in the interim, the
         meditation/sleep pause takes precedence — do not resume.
 
         If the user is still actively interacting (rapid back-and-forth
-        conversation or teaching), delay resuming inner life — she
-        should focus on what she's being taught, not generate her own
+        conversation or teaching), delay resuming inner life — it
+        should focus on what it's being taught, not generate its own
         thoughts and questions. The learner resumes regardless since
         it has its own drowsy/stress gating.
         """
@@ -873,8 +873,8 @@ class ConversationMixin:
         self.cognition.self_learner.resume()
         self._suppress_volition = False
         # Only resume inner life if the user has gone quiet — if
-        # they're still actively talking to her (teaching, rapid
-        # conversation), she should focus on them, not on her own
+        # they're still actively talking to its (teaching, rapid
+        # conversation), it should focus on them, not on its own
         # thoughts and questions.
         idle = time.time() - self._last_interaction_time
         if idle >= self.CONVERSATION_FOCUS_SECONDS:
@@ -889,7 +889,7 @@ class ConversationMixin:
         """Look through the retina, store the observation, and report it.
 
         ``vision.see`` returns the scene as structured percept data;
-        the language engine composes her report from it — nothing here
+        the language engine composes its report from it — nothing here
         speaks a pre-written sentence.
         """
         try:
@@ -921,7 +921,7 @@ class ConversationMixin:
                 )
             report = self.language.render(thought, emotion)
             try:
-                self.world.she_acted(
+                self.world.it_acted(
                     "looked through the retina", detail=report[:200]
                 )
             except Exception as e:  # noqa: BLE001
@@ -940,12 +940,12 @@ class ConversationMixin:
             )
             return self.language.render(thought, emo)
     def look_at_image(self, path: str) -> str:
-        """Look at an image file and describe what she sees.
+        """Look at an image file and describe what it sees.
 
         Processes the image through the full visual cortex
-        (V1→V4→VTC→MTL) and reports what she recognizes. If she
-        doesn't recognize anything, she describes the visual features
-        she can perceive (color, structure, brightness).
+        (V1→V4→VTC→MTL) and reports what it recognizes. If it
+        doesn't recognize anything, it describes the visual features
+        it can perceive (color, structure, brightness).
         """
         from ..language import Thought as _Thought
         emo = self.feel()
@@ -1000,7 +1000,7 @@ class ConversationMixin:
             )
             rendered = self.language.render(thought, emo)
             try:
-                self.world.she_acted(
+                self.world.it_acted(
                     "looked at an image", detail=rendered[:200]
                 )
             except Exception as e:  # noqa: BLE001
@@ -1027,9 +1027,9 @@ class ConversationMixin:
 
         The ``content`` is a semantic description of what happened, not
         a pre-written sentence Genesis recites — the language engine
-        composes her actual words from it. This is the sanctioned path
+        composes its actual words from it. This is the sanctioned path
         for operational responses (proposal management, etc.) so they
-        never bypass her cognition with hardcoded reply templates.
+        never bypass its cognition with hardcoded reply templates.
         """
         from ..language import Thought as _Thought
         emo = self.feel()
@@ -1046,7 +1046,7 @@ class ConversationMixin:
 
         Pauses bug scanning, autonomous learning, art, and unrelated
         curiosity questions. Self-directed learning from the
-        conversation stays active so she remembers what she's taught.
+        conversation stays active so it remembers what it's taught.
 
         Args:
             topic: Optional topic hint for curiosity filtering.

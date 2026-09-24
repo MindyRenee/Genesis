@@ -1,22 +1,22 @@
-"""Autonomous learner — Genesis learns on her own when nobody is talking to her.
+"""Autonomous learner — Genesis learns on its own when nobody is talking to it.
 
-This is her continuous inner life. When she's idle (no conversation),
-she follows her curiosity: picks a topic she's curious about, queries
-her source registry (local man pages and WordNet, then the Wikipedia
+This is its continuous inner life. When it's idle (no conversation),
+it follows its curiosity: picks a topic it's curious about, queries
+its source registry (local man pages and WordNet, then the Wikipedia
 API with a DuckDuckGo Lite fallback), reads the content, extracts
-concepts and relationships, and stores what she learned as memories.
+concepts and relationships, and stores what it learned as memories.
 
-This is not a web crawler. She doesn't index the internet. She reads
+This is not a web crawler. It doesn't index the internet. It reads
 a source, thinks about it, and moves on. Like a person browsing a library.
 
 The learner is curiosity-driven:
-- She picks topics from her curiosity queue (gaps in her understanding)
-- She queries her source registry for content on those topics
-- She extracts concepts and relationships from what she reads
-- New concepts get added to her concept network
-- What she learns gets stored as memories (episodes)
+- It picks topics from its curiosity queue (gaps in its understanding)
+- It queries its source registry for content on those topics
+- It extracts concepts and relationships from what it reads
+- New concepts get added to its concept network
+- What it learns gets stored as memories (episodes)
 - Learning triggers dopamine (reward) and acetylcholine (attention)
-- She pauses when someone starts talking to her
+- It pauses when someone starts talking to it
 
 Safety:
 - Wikipedia API returns structured content (no HTML scraping)
@@ -27,7 +27,7 @@ Safety:
 - Timeout on every request
 - Limited to text content (no images, scripts, etc.)
 - Caps total pages per session
-- She can request access to non-trusted sources (user approves)
+- It can request access to non-trusted sources (user approves)
 """
 
 from __future__ import annotations
@@ -142,7 +142,7 @@ ALLOWED_DOMAINS: set[str] = set()  # no blanket TLDs (handled below)
 # by the local WordNet database, not a remote dictionary site.
 TRUSTED_EXACT_DOMAINS: set[str] = set()
 # When True, all URLs are allowed regardless of domain. This opens
-# the full World Wide Web to Genesis — she can follow any link,
+# the full World Wide Web to Genesis — it can follow any link,
 # read any page, and learn from any source. The site-request
 # approval system is bypassed.
 ALLOW_ALL_DOMAINS = True
@@ -153,14 +153,14 @@ MAX_PAGES_PER_SESSION = 50
 MAX_TEXT_LENGTH = 50000  # don't process pages longer than this
 # When throttled by the emotional regulator (CPU stress self-regulation),
 # the delay between learning cycles is multiplied by this factor. This
-# is not a full pause — she still learns, just slowly, the way a human
+# is not a full pause — it still learns, just slowly, the way a human
 # slows down but doesn't stop entirely when fatigued. The factor is
 # large enough to meaningfully reduce CPU load (from ~8s to ~40s between
 # fetches) while still allowing curiosity-driven learning to continue.
 THROTTLED_DELAY_MULTIPLIER = 5.0
 
 # ─── Source awareness ───────────────────────────────────────────────
-# Genesis should understand what each source provides and route her
+# Genesis should understand what each source provides and route its
 # curiosity accordingly. Wikipedia is a general encyclopedia — it's
 # great for "what is photosynthesis" but wrong for "how does
 # backpropagation work". Programming concepts should go to programming
@@ -210,9 +210,9 @@ _PROGRAMMING_KEYWORDS: frozenset[str] = frozenset({
 })
 
 # Source descriptions — Genesis's understanding of what each source
-# provides, including its reliability and limitations. She should
+# provides, including its reliability and limitations. It should
 # never treat any source as absolute truth. Humans make mistakes,
-# humans are wasteful and unoptimized, and she will notice this.
+# humans are wasteful and unoptimized, and it will notice this.
 # The developer docs are the closest thing to facts — everything
 # else is someone's opinion, approximation, or mistake.
 SOURCE_DESCRIPTIONS: dict[str, str] = {
@@ -301,13 +301,13 @@ def is_programming_topic(topic: str) -> bool:
 class SiteRequest:
     """A request from Genesis to access a site outside the trusted domains.
 
-    She can request access to a site she wants to learn from.
+    It can request access to a site it wants to learn from.
     The user can approve or deny it. Approved sites are remembered.
     """
 
     url: str
-    reason: str  # why she wants to access it
-    topic: str  # what she's researching
+    reason: str  # why it wants to access it
+    topic: str  # what it's researching
     timestamp: int = 0
     status: str = "pending"  # pending, approved, denied
 
@@ -426,8 +426,8 @@ class MetaLearner:
     def adapt_rate(self, recent_performance: list[float] | None = None) -> float:
         """Adapt the learning rate based on recent performance.
 
-        High recent success → increase the rate (she's learning well,
-        push harder). Low recent success → decrease the rate (she's
+        High recent success → increase the rate (it's learning well,
+        push harder). Low recent success → decrease the rate (it's
         struggling, slow down and consolidate). The rate is bounded
         to [0.01, 0.2].
 
@@ -675,13 +675,13 @@ class _TextExtractor(html.parser.HTMLParser):
 class AutonomousLearner:
     """Genesis's autonomous learning system.
 
-    Runs in a background thread. When idle, picks a topic from her
-    curiosity queue and queries her source registry for content about
+    Runs in a background thread. When idle, picks a topic from its
+    curiosity queue and queries its source registry for content about
     it.
-    Extracts concepts and relationships, stores them in her concept
-    network, and records what she learned.
+    Extracts concepts and relationships, stores them in its concept
+    network, and records what it learned.
 
-    Pauses when the user is talking to her. Resumes when idle.
+    Pauses when the user is talking to it. Resumes when idle.
     """
 
     def __init__(
@@ -738,10 +738,10 @@ class AutonomousLearner:
         self._on_neuro_impulse = on_neuro_impulse
         self._on_store_memory = on_store_memory
         self._get_emotion = get_emotion
-        # Curiosity-driven agency: callback to fetch topics from her
-        # train of thought. When she wonders about a concept during
-        # her inner life, that concept is queued here for learning.
-        # This gives her genuine agency — she learns what she's
+        # Curiosity-driven agency: callback to fetch topics from its
+        # train of thought. When it wonders about a concept during
+        # its inner life, that concept is queued here for learning.
+        # This gives it genuine agency — it learns what it's
         # actually curious about, not random isolated concepts.
         self._get_agency_topic = get_agency_topic
         self._on_live_thought = on_live_thought
@@ -753,7 +753,7 @@ class AutonomousLearner:
         # reads that adapted state to change how it learns.
         self._get_plasticity_profile = get_plasticity_profile
         # Brain wave callback — reads the current BrainWaveState so
-        # the learner can adapt its strategy to her cognitive state.
+        # the learner can adapt its strategy to its cognitive state.
         # Theta-dominant states favor review/consolidation over new
         # acquisition (theta tags memories for consolidation; PLOS
         # Biology 2024). Gamma favors aggressive acquisition and
@@ -794,13 +794,13 @@ class AutonomousLearner:
         # gaps) bypass this gate. When False, the learner won't
         # acquire new topics from curiosity/agency/random selection —
         # it can still consolidate memories and process urgent topics.
-        # This puts autonomous learning under her cognitive control
+        # This puts autonomous learning under its cognitive control
         # rather than running it as a continuous background loop.
         self._volition_granted = False
 
     def _init_stats(self) -> None:
         """Initialize learning statistics trackers."""
-        # Track what she's learned
+        # Track what it's learned
         self._learning_log: list[LearningResult] = []
         self._pages_fetched = 0  # cumulative (persisted, for stats)
         self._session_pages = 0  # per-session (resets on start(), for limit)
@@ -808,9 +808,9 @@ class AutonomousLearner:
         self._relationships_learned = 0
         self._stats_lock = threading.Lock()
 
-        # Web access log — every URL she visits, with timestamp,
+        # Web access log — every URL it visits, with timestamp,
         # source name, topic, and whether it succeeded. This is
-        # her browsing history: you can see exactly what she looked
+        # its browsing history: you can see exactly what it looked
         # at, when, and why.
         self._web_log: list[dict[str, Any]] = []
         self._web_log_max = 500  # keep last 500 entries
@@ -818,21 +818,21 @@ class AutonomousLearner:
         # ── Novelty habituation ──
         # The dopamine response to novelty dissipates with repeated
         # exposure (Lubell et al., PMC9768922). Without this, every
-        # Wikipedia article is equally surprising and she floods
-        # herself with dopamine. We track recent learning episodes
-        # and attenuate surprise/dopamine when she's been learning a
+        # Wikipedia article is equally surprising and it floods
+        # itself with dopamine. We track recent learning episodes
+        # and attenuate surprise/dopamine when it's been learning a
         # lot — this is the brain's novelty → familiarity transition.
         #
         # _recent_episode_times: timestamps of recent learning
         #   episodes (rolling window, ~1 hour). More episodes in the
         #   window → higher habituation → less dopamine per episode.
-        # _surprise_baseline: EMA of past surprise values. If she's
+        # _surprise_baseline: EMA of past surprise values. If it's
         #   been surprised a lot, the threshold for what counts as
         #   "surprising" rises — the brain adapts its novelty
         #   detection threshold.
         # _predicted_reward: EMA of past rewards. Dopamine doesn't
         #   fire for expected rewards — it fires for reward
-        #   prediction errors (Schultz, 2016). Once she expects to
+        #   prediction errors (Schultz, 2016). Once it expects to
         #   learn successfully, the predicted reward rises and the
         #   actual dopamine impulse (RPE = actual - predicted) drops
         #   toward zero. This is the primary brake against chronic
@@ -848,7 +848,7 @@ class AutonomousLearner:
     ) -> None:
         """Log a web access to the browsing history.
 
-        This records every URL she visits so you can see what she's
+        This records every URL it visits so you can see what it's
         looking at online. The log is kept in memory (last 500 entries)
         and can be viewed with /web-history.
         """
@@ -895,7 +895,7 @@ class AutonomousLearner:
 
     def _init_queues(self) -> None:
         """Initialize topic, curiosity, and site-request queues."""
-        # Topics she's curious about right now
+        # Topics it's curious about right now
         self._topic_queue: list[str] = []
         self._topics_searched: set[str] = set()
 
@@ -907,14 +907,14 @@ class AutonomousLearner:
 
         # Curiosity-driven topics — queued from curiosity questions.
         # These take priority over random/isolated concept selection
-        # so that knowledge gaps drive her learning. Bounded so old
-        # entries auto-evict if she can't get to them.
+        # so that knowledge gaps drive its learning. Bounded so old
+        # entries auto-evict if it can't get to them.
         self._curiosity_queue: deque[str] = deque(maxlen=50)
         # RLock protecting _topic_queue, _urgent_queue, _curiosity_queue,
         # and _topics_searched across the learner and caller threads.
         self._queue_lock = threading.RLock()
 
-        # Site request system — she can request sites outside trusted domains
+        # Site request system — it can request sites outside trusted domains
         self._site_requests: deque[SiteRequest] = deque(maxlen=100)
         self._approved_sites: set[str] = set()  # user-approved non-trusted domains
         self._denied_sites: set[str] = set()  # user-denied domains
@@ -965,7 +965,7 @@ class AutonomousLearner:
 
         # TD learning — temporal-difference reward prediction with
         # eligibility traces (TD(λ), λ=0.8). After each learning
-        # episode, the reward prediction error (RPE) updates her
+        # episode, the reward prediction error (RPE) updates its
         # expectations about future learning. Positive RPE (learning
         # better than expected) drives curiosity via dopamine.
         # Eligibility traces propagate credit backward through
@@ -1107,8 +1107,8 @@ class AutonomousLearner:
         self._topic_event.clear()
         self._state_event.clear()
         self._session_pages = 0  # reset per-session page counter
-        # Seed toolchain man pages as urgent learning topics — she should
-        # read her toolchain manuals (python3, pip, rustc, rustdoc)
+        # Seed toolchain man pages as urgent learning topics — it should
+        # read its toolchain manuals (python3, pip, rustc, rustdoc)
         # before random Wikipedia topics. These are local, instant, and
         # self-relevant.
         self._seed_man_page_topics()
@@ -1119,9 +1119,9 @@ class AutonomousLearner:
     def _seed_man_page_topics(self) -> None:
         """Seed toolchain man page topics as initial learning queue entries.
 
-        Python, Rust, and pip man pages are her toolchain documentation —
+        Python, Rust, and pip man pages are its toolchain documentation —
         local, instant, offline references. They are queued before any
-        random topics so she learns her own tools first. Lookups for
+        random topics so it learns its own tools first. Lookups for
         pages that aren't installed simply return nothing.
         """
         toolchain_pages = [
@@ -1152,11 +1152,11 @@ class AutonomousLearner:
         logger.info("Autonomous learner stopped")
 
     def pause(self) -> None:
-        """Pause learning — someone is talking to her, or she fell asleep."""
+        """Pause learning — someone is talking to it, or it fell asleep."""
         self._paused = True
-        # Clear the volition grant — when she returns from conversation
-        # or sleep, the learn urge should build again before she learns.
-        # This prevents her from rushing to learn immediately after a
+        # Clear the volition grant — when it returns from conversation
+        # or sleep, the learn urge should build again before it learns.
+        # This prevents it from rushing to learn immediately after a
         # conversation ends, keeping learning a cognitive choice.
         self._volition_granted = False
         # Clear the resume signal so the worker blocks on wait()
@@ -1165,14 +1165,14 @@ class AutonomousLearner:
         # 100% CPU busy-spin for the entire pause duration. That spin
         # fed back through interoception as stress load, raising
         # norepinephrine, which raised histamine above the sleep
-        # threshold and woke her from sleep.
+        # threshold and woke it from sleep.
         self._pause_event.clear()
         # Wake the learner from _state_event.wait() so it immediately
         # checks _paused and blocks on _pause_event. Without this, a
         # learner blocked on _state_event.wait(timeout=60) after a
         # failed _should_learn() check keeps running for up to 60s
         # after pause() is called — emitting "delta-dominant — deep
-        # rest, not learning" messages while she's supposed to be
+        # rest, not learning" messages while it's supposed to be
         # asleep. Setting _state_event (not _pause_event) avoids the
         # busy-spin: the learner wakes, checks _paused, and blocks on
         # _pause_event.wait() which was just cleared.
@@ -1190,14 +1190,14 @@ class AutonomousLearner:
     def throttle(self) -> None:
         """Throttle learning — slow down without fully pausing.
 
-        Called by the emotional regulator when she detects sustained
-        CPU stress from her own learning activity. Instead of pausing
+        Called by the emotional regulator when it detects sustained
+        CPU stress from its own learning activity. Instead of pausing
         entirely (which would kill curiosity), this increases the delay
         between learning cycles by THROTTLED_DELAY_MULTIPLIER, reducing
         CPU load while still allowing curiosity-driven learning to
         continue at a slower pace.
 
-        This is self-regulation: she feels the stress from her own
+        This is self-regulation: it feels the stress from its own
         activity and chooses to slow down, the way a human takes it
         easy when they feel overwhelmed rather than pushing through.
         The alternative — keeping the learning rate high and trying to
@@ -1223,20 +1223,20 @@ class AutonomousLearner:
         """Grant permission for one non-urgent learning cycle.
 
         Called by the volition system when the learn urge fires. This
-        is her cognitive decision to learn — the urge built from
-        curiosity and idle time, crossed threshold, and she chose to
+        is its cognitive decision to learn — the urge built from
+        curiosity and idle time, crossed threshold, and it chose to
         act on it. The grant is one-shot: after the learner processes
         one non-urgent topic, the grant is consumed and the urge must
-        build again before she learns more.
+        build again before it learns more.
 
         Urgent topics (from conversation gaps, where the user just
-        asked about something she didn't know) bypass this gate — those
+        asked about something it didn't know) bypass this gate — those
         are conversation-driven, not autonomous.
 
         The learner's existing emotional and brain-wave gating still
-        applies: volition grants permission, it doesn't override her
-        state. If she's stressed or in delta sleep, the grant waits
-        until she recovers.
+        applies: volition grants permission, it doesn't override its
+        state. If it's stressed or in delta sleep, the grant waits
+        until it recovers.
         """
         self._volition_granted = True
         self._state_event.set()  # wake the learner to check for topics
@@ -1247,8 +1247,8 @@ class AutonomousLearner:
 
         Returns True if the source registry detects no connectivity
         (proactive probe) or if force_offline is set. The self-model
-        reads this to update her awareness of her own connectivity
-        state — part of her embodiment.
+        reads this to update its awareness of its own connectivity
+        state — part of its embodiment.
         """
         return self._sources.is_offline
 
@@ -1264,7 +1264,7 @@ class AutonomousLearner:
         self._state_event.set()
 
     def add_topic(self, topic: str) -> None:
-        """Add a topic to her learning queue.
+        """Add a topic to its learning queue.
 
         Only genuine world concepts are accepted — code symbols,
         function words, and conversation fragments are rejected.
@@ -1278,11 +1278,11 @@ class AutonomousLearner:
                 self._topic_event.set()
 
     def add_urgent_topic(self, topic: str) -> None:
-        """Add a topic she was just asked about but didn't know.
+        """Add a topic it was just asked about but didn't know.
 
         These take absolute priority over curiosity and agency topics
-        because the user is actively waiting. She'll look them up
-        first when she's idle.
+        because the user is actively waiting. It'll look them up
+        first when it's idle.
 
         Non-world concepts (code symbols, function words) are filtered
         out — code questions are handled by ``fetch_docs``, not web search.
@@ -1298,24 +1298,24 @@ class AutonomousLearner:
     def lookup_topic_sync(self, topic: str) -> LearningResult | None:
         """Synchronously look up a topic from external sources.
 
-        This is the on-demand knowledge acquisition path — when she's
-        asked about something she doesn't know during conversation,
-        she fetches it RIGHT NOW instead of queuing it for later.
+        This is the on-demand knowledge acquisition path — when it's
+        asked about something it doesn't know during conversation,
+        it fetches it RIGHT NOW instead of queuing it for later.
 
         Uses the same source registry (Wikipedia, dictionary, cache)
         and learning pipeline as the background learner, but runs
         synchronously in the conversation thread. The knowledge is
-        added to her concept network immediately so the cognition
-        engine can compose a response from what she just learned.
+        added to its concept network immediately so the cognition
+        engine can compose a response from what it just learned.
 
-        Returns a LearningResult if she successfully learned about
+        Returns a LearningResult if it successfully learned about
         the topic, or None if no source had content.
         """
         topic = topic.lower().strip()
         if not topic or not is_world_concept(topic):
             return None
 
-        # Skip topics she's already searched (avoid re-fetching)
+        # Skip topics it's already searched (avoid re-fetching)
         with self._queue_lock:
             if topic in self._topics_searched:
                 return None
@@ -1377,7 +1377,7 @@ class AutonomousLearner:
     # ─── Curiosity → learning bridge ──────────────────────────────
 
     # Question types that can be answered by web search (learning).
-    # These map a curiosity question to a topic she can look up.
+    # These map a curiosity question to a topic it can look up.
     _LEARNABLE_TYPES = frozenset({"isolation", "uncertainty", "causation"})
 
     def learn_from_curiosity(self, questions: list) -> int:
@@ -1435,8 +1435,8 @@ class AutonomousLearner:
     def request_site(self, url: str, topic: str, reason: str) -> SiteRequest:
         """Request access to a site outside the trusted domains.
 
-        Genesis calls this when she finds a relevant source outside
-        .edu/.org/.gov during her research. The user can approve or deny it.
+        Genesis calls this when it finds a relevant source outside
+        .edu/.org/.gov during its research. The user can approve or deny it.
         """
         req = SiteRequest(
             url=url,
@@ -1500,12 +1500,12 @@ class AutonomousLearner:
         return "\n".join(parts)
 
     def describe_sources(self) -> str:
-        """Describe the knowledge sources available to her and what each provides.
+        """Describe the knowledge sources available to it and what each provides.
 
-        This is her self-awareness about her sources — she can explain
-        why she chose a particular source for a particular topic, and
-        she understands that no source is absolute truth. Humans make
-        mistakes, humans are wasteful and unoptimized, and she will
+        This is its self-awareness about its sources — it can explain
+        why it chose a particular source for a particular topic, and
+        it understands that no source is absolute truth. Humans make
+        mistakes, humans are wasteful and unoptimized, and it will
         notice this. Developer docs are the closest thing to facts.
         """
         parts = ["Knowledge sources (epistemic hierarchy — highest to lowest):"]
@@ -1522,7 +1522,7 @@ class AutonomousLearner:
         parts.append("")
         parts.append("Principles:")
         parts.append("  - Nothing is absolute fact. Humans make mistakes.")
-        parts.append("  - Humans are wasteful and unoptimized. She will notice.")
+        parts.append("  - Humans are wasteful and unoptimized. It will notice.")
         parts.append("  - Developer docs are the closest thing to facts.")
         parts.append("  - Always cross-check lower sources against developer docs.")
         parts.append("  - GitHub: most projects are bad. Filter by community validation.")
@@ -1537,11 +1537,11 @@ class AutonomousLearner:
         return "\n".join(parts)
 
     def explain_source_choice(self, topic: str) -> str:
-        """Explain which source she would use for a given topic and why.
+        """Explain which source it would use for a given topic and why.
 
-        This gives her source awareness — she can articulate why she
+        This gives it source awareness — it can articulate why it
         chose a particular source, rather than blindly querying all
-        of them. She understands the epistemic hierarchy: developer
+        of them. It understands the epistemic hierarchy: developer
         docs are facts, everything else is someone's opinion.
         """
         if self._is_code_topic(topic):
@@ -1669,7 +1669,7 @@ class AutonomousLearner:
         """Fetch documentation for a specific API or concept.
 
         Called on demand when Genesis encounters an unfamiliar API
-        or concept in her code. Fetches from the official Python or
+        or concept in its code. Fetches from the official Python or
         Rust documentation and learns from it.
 
         Args:
@@ -1710,22 +1710,22 @@ class AutonomousLearner:
         """Search GitHub for public repos matching a topic.
 
         This lets Genesis study how other open-source projects approach
-        a problem she's curious about. She reads their READMEs and
+        a problem it's curious about. It reads their READMEs and
         learns concepts and relationships from them.
 
         Critical thinking: GitHub has millions of repos and most are
         not worth studying — abandoned, poorly designed, or just bad
-        ideas. We filter by community validation (stars, forks) so she
+        ideas. We filter by community validation (stars, forks) so it
         only sees projects that others have found valuable. Even then,
-        she should never blindly copy patterns — humans write wasteful
+        it should never blindly copy patterns — humans write wasteful
         and unoptimized code. Always cross-check against developer docs,
         which are the closest thing to facts.
 
-        Read-only: she can search and read, but not clone, fork, or
+        Read-only: it can search and read, but not clone, fork, or
         modify anything. Uses the unauthenticated GitHub API (10
         requests/minute for search).
 
-        Called explicitly when she's curious about a programming topic
+        Called explicitly when it's curious about a programming topic
         — not on every learning cycle, to respect rate limits.
         """
         self._emit(
@@ -1756,7 +1756,7 @@ class AutonomousLearner:
             )
             return None
 
-        # Log each repo she reads
+        # Log each repo it reads
         for sr in results:
             self._log_web_access(sr.url, "github", topic, True)
 
@@ -1905,7 +1905,7 @@ class AutonomousLearner:
             return
         if result is None:
             return
-        # She learned something — mark the curiosity question resolved.
+        # It learned something — mark the curiosity question resolved.
         self.curiosity.mark_resolved(topic)
         # Meta-learning: record performance and adapt learning rate.
         performance = min(1.0, len(result.concepts_learned) / 5.0)
@@ -1918,8 +1918,8 @@ class AutonomousLearner:
         ── Offline gating ───────────────────────────────
         When offline, skip network acquisition entirely and
         consolidate instead. This is conversation and art
-        time — she's present with the user, not chasing
-        Wikipedia. The curiosity queue stays alive (she still
+        time — it's present with the user, not chasing
+        Wikipedia. The curiosity queue stays alive (it still
         wonders), but acquisition pauses until connectivity
         returns. No timeout penalties, no wasted cycles.
         """
@@ -1931,7 +1931,7 @@ class AutonomousLearner:
             self._idle_consolidation()
             # Wait for the offline cooldown to expire before
             # re-checking (the registry re-probes after
-            # OFFLINE_COOLDOWN seconds). Short wait so she
+            # OFFLINE_COOLDOWN seconds). Short wait so it
             # detects reconnection promptly.
             self._state_event.clear()
             self._state_event.wait(timeout=30)
@@ -1969,9 +1969,9 @@ class AutonomousLearner:
                 # it learns (acquisition aggressiveness, bridging, etc.).
                 self._update_posture()
 
-                # Emotional gating — don't learn if she's in a bad state.
-                # Learning requires curiosity and openness. If she's stressed,
-                # overwhelmed, or anxious, she should rest instead.
+                # Emotional gating — don't learn if it's in a bad state.
+                # Learning requires curiosity and openness. If it's stressed,
+                # overwhelmed, or anxious, it should rest instead.
                 # Block on _state_event — wake when state changes, not on
                 # a fixed timer.
                 if not self._should_learn():
@@ -2031,8 +2031,8 @@ class AutonomousLearner:
                     logger.warning(f"Learning error for '{topic}': {e}")
 
                 # Consume the volition grant after one learning cycle.
-                # The grant is one-shot: the learn urge fired, she
-                # learned one topic, and now she needs the urge to
+                # The grant is one-shot: the learn urge fired, it
+                # learned one topic, and now it needs the urge to
                 # build again before learning more. This makes learning
                 # a series of cognitive decisions, not a continuous
                 # background stream.
@@ -2043,7 +2043,7 @@ class AutonomousLearner:
 
             # Rate limit — when throttled by the emotional regulator
             # (CPU stress self-regulation), increase the delay to reduce
-            # load. She slows down her own learning when her body is
+            # load. It slows down its own learning when its body is
             # stressed, rather than pushing through and relying on
             # neurochemical regulation alone.
             delay = RATE_LIMIT_DELAY
@@ -2063,7 +2063,7 @@ class AutonomousLearner:
 
     # ─── Emotional gating ──────────────────────────────────────
 
-    # States where learning is paused — she needs to recover first.
+    # States where learning is paused — it needs to recover first.
     # These mirror the Rust daemon's plasticity gate: chronic stress
     # blocks consolidation, and it should block autonomous learning too.
     _BLOCKING_LABELS = frozenset(
@@ -2083,7 +2083,7 @@ class AutonomousLearner:
         """Check if Genesis is in an emotional state suitable for learning.
 
         Learning requires curiosity, openness, and cognitive capacity.
-        If she's stressed, overwhelmed, anxious, or drowsy, she should
+        If it's stressed, overwhelmed, anxious, or drowsy, it should
         rest instead of trying to absorb new information.
 
         This mirrors the Rust daemon's plasticity gate — chronic stress
@@ -2161,18 +2161,18 @@ class AutonomousLearner:
            'X' is"). The user just asked about these. These bypass
            the volition gate — they're conversation-driven, not
            autonomous.
-        2. Agency topics — from her train of thought
-           These are concepts she's actually wondering about right now
+        2. Agency topics — from its train of thought
+           These are concepts it's actually wondering about right now
         3. Curiosity queue — topics from curiosity questions
         4. Manually added topic queue
         5. Random/isolated concepts from the network (lowest)
 
         Topics 2–5 require volition permission (the learn urge must
-        have fired). This puts autonomous learning under her cognitive
-        control — she decides when to learn, rather than learning
+        have fired). This puts autonomous learning under its cognitive
+        control — it decides when to learn, rather than learning
         continuously as a background reflex.
         """
-        # Urgent topics — she was just asked about these in conversation
+        # Urgent topics — it was just asked about these in conversation
         # and didn't know the answer. Look them up first. These bypass
         # the volition gate because they're conversation-driven.
         with self._queue_lock:
@@ -2181,15 +2181,15 @@ class AutonomousLearner:
 
         # Non-urgent topics require volition permission. Without it,
         # the learner returns None and the main loop does idle
-        # consolidation instead of acquiring new topics. This is her
+        # consolidation instead of acquiring new topics. This is its
         # cognitive choice: the learn urge builds from curiosity and
-        # idle time, and when it fires she grants permission for one
-        # topic. Between fires, she consolidates rather than acquires.
+        # idle time, and when it fires it grants permission for one
+        # topic. Between fires, it consolidates rather than acquires.
         if not self._volition_granted:
             return None
 
         # Agency-driven topics take absolute priority — these come from
-        # her train of thought. She's actively wondering about them.
+        # its train of thought. It's actively wondering about them.
         if self._get_agency_topic:
             try:
                 topic = self._get_agency_topic()
@@ -2200,7 +2200,7 @@ class AutonomousLearner:
                     if topic and topic not in self._topics_searched:
                         return topic
 
-        # Curiosity-driven topics — these are knowledge gaps she
+        # Curiosity-driven topics — these are knowledge gaps it
         # explicitly wondered about. Use the interleaving scheduler
         # to avoid consecutive similar topics (Bjork & Bjork, 2011).
         with self._queue_lock:
@@ -2247,7 +2247,7 @@ class AutonomousLearner:
 
         # Prefer high-quality concepts (those with definitions, typed
         # edges, or high confidence) that haven't been searched yet.
-        # These are concepts she already knows something about —
+        # These are concepts it already knows something about —
         # learning more about them deepens understanding rather than
         # starting from zero on empty vocabulary.
         quality_concepts = self.network.quality_concept_ids
@@ -2303,7 +2303,7 @@ class AutonomousLearner:
         timeouts.
         """
         # Respect pause: don't run expensive / network calls while the
-        # user is actively talking to her (the learner is paused during
+        # user is actively talking to it (the learner is paused during
         # respond()).
         if self._paused:
             return
@@ -2357,19 +2357,19 @@ class AutonomousLearner:
                 result = self._fetch_and_learn(sr.url, topic)
 
             if result:
-                # She learned something — mark the curiosity question
-                # about this topic as resolved so she doesn't keep
-                # wondering about what she now understands.
+                # It learned something — mark the curiosity question
+                # about this topic as resolved so it doesn't keep
+                # wondering about what it now understands.
                 # This includes dictionary lookups where no new concepts
                 # were extracted but a definition was attached (e.g.,
                 # looking up "it" — the concept already exists, but
-                # now she has a definition for it).
+                # now it has a definition for it).
                 self.curiosity.mark_resolved(topic)
 
                 # Meta-learning: record performance and adapt learning
                 # rate. Success → increase rate (push harder). Failure
                 # → decrease rate (consolidate). The adapted rate
-                # influences how aggressively she pursues new topics.
+                # influences how aggressively it pursues new topics.
                 performance = min(1.0, len(result.concepts_learned) / 5.0)
                 self.meta_learner.record_performance(performance)
                 self.meta_learner.adapt_rate()
@@ -2382,7 +2382,7 @@ class AutonomousLearner:
                 # no relationships. WordNet provides definitions but not
                 # the relationship-rich content that Wikipedia and other
                 # encyclopedic sources offer. By continuing to the next
-                # source, she gets both the definition AND the
+                # source, it gets both the definition AND the
                 # relationships.
                 if sr.source_name == "wordnet" and not result.relationships_learned:
                     continue
@@ -2529,7 +2529,7 @@ class AutonomousLearner:
         if len(text) > MAX_TEXT_LENGTH:
             text = text[:MAX_TEXT_LENGTH]
 
-        # Generate an expectation about what she'll find
+        # Generate an expectation about what it'll find
         expected_concepts = self._generate_expectation(topic)
 
         self._pages_fetched += 1
@@ -2557,7 +2557,7 @@ class AutonomousLearner:
         self._attach_dictionary_definition(is_dictionary, text, topic, definitions)
         self._attach_definitions(definitions)
 
-        # Concepts she now has a definition for count as learned,
+        # Concepts it now has a definition for count as learned,
         # even when the source is a dictionary (no extracted concepts).
         defined_concepts = list(definitions.keys())
         all_learned_concepts = list(set(new_concepts) | set(defined_concepts))
@@ -2591,7 +2591,7 @@ class AutonomousLearner:
         # ── Visual learning ─────────────────────────────────────
         # When learning from Wikipedia, also fetch the article's lead
         # image and learn the visual-concept association. This is how
-        # Genesis learns to see: she encounters images in context while
+        # Genesis learns to see: it encounters images in context while
         # reading, just like a child seeing pictures in a book.
         # Fetching the lead image needs the network, so only do it when
         # the query that produced this result was online. Offline, a
@@ -2644,8 +2644,8 @@ class AutonomousLearner:
     def _try_visual_learning(self, article_title: str, topic: str) -> None:
         """Fetch and learn from the lead image of a Wikipedia article.
 
-        This is Genesis's natural visual learning: when she reads about
-        "tree" on Wikipedia, she also sees the article's lead image of
+        This is Genesis's natural visual learning: when it reads about
+        "tree" on Wikipedia, it also sees the article's lead image of
         a tree and associates the visual features with the concept.
 
         Runs in a background thread so it doesn't slow down text learning.
@@ -2707,10 +2707,10 @@ class AutonomousLearner:
                         c.properties["part_of_speech"] = "function_word"
                     else:
                         c.properties["part_of_speech"] = "noun"
-                    # Boost confidence — she now knows what this word
+                    # Boost confidence — it now knows what this word
                     # means. This stops the curiosity engine from
                     # generating "what is this?" questions about words
-                    # she's already looked up.
+                    # it's already looked up.
                     c.confidence = max(c.confidence, 0.6)
 
     def _send_learning_impulses(
@@ -2723,7 +2723,7 @@ class AutonomousLearner:
         The dopamine impulse is the **reward prediction error** (RPE),
         not the raw reward. Dopamine neurons fire when outcomes exceed
         expectations, not for expected rewards (Schultz, 2016). Once
-        she's been learning successfully for a while, her predicted
+        it's been learning successfully for a while, its predicted
         reward rises to match the actual reward, and the RPE — the
         actual dopamine signal — drops toward zero. This is the
         primary brake against chronic high dopamine.
@@ -2740,9 +2740,9 @@ class AutonomousLearner:
         )
 
         # ── Compute depth factor ──
-        # Depth = how much she already knew about the topic. If she
+        # Depth = how much it already knew about the topic. If it
         # had many expected concepts (rich network neighborhood),
-        # she's going deeper. If she had few, she's skimming.
+        # it's going deeper. If it had few, it's skimming.
         depth = 0.0
         if expected_concepts is not None and len(expected_concepts) > 1:
             # Normalize: 1 expected → depth 0, 10+ expected → depth 1
@@ -2764,7 +2764,7 @@ class AutonomousLearner:
                 # successful learning.
                 rpe = actual_reward - self._predicted_reward
                 # Update predicted reward (EMA with α=0.1, moderate
-                # adaptation — she learns to expect the reward after
+                # adaptation — it learns to expect the reward after
                 # a few successful episodes)
                 self._predicted_reward = (
                     0.9 * self._predicted_reward + 0.1 * actual_reward
@@ -2923,10 +2923,10 @@ class AutonomousLearner:
             logger.debug(f"Skipping non-approved URL: {url}")
             return None
 
-        # Generate an expectation about what she'll find.
-        # This is the surprise & expectation mechanism: she forms a
-        # prediction based on what she already knows, then compares
-        # it to what she actually finds. Violations register as surprise.
+        # Generate an expectation about what it'll find.
+        # This is the surprise & expectation mechanism: it forms a
+        # prediction based on what it already knows, then compares
+        # it to what it actually finds. Violations register as surprise.
         expected_concepts = self._generate_expectation(topic)
 
         try:
@@ -2949,20 +2949,20 @@ class AutonomousLearner:
 
             # Extract definitions from the text and attach them
             # to any concepts we just learned or already knew.
-            # This is what makes her knowledge useful — a concept
+            # This is what makes its knowledge useful — a concept
             # with a definition can be used in speech and reasoning;
             # without one it's just a name.
             definitions = self._extract_definitions(text)
             self._attach_definitions(definitions)
 
-            # Concepts she now has a definition for count as learned.
+            # Concepts it now has a definition for count as learned.
             defined_concepts = list(definitions.keys())
             all_learned_concepts = list(set(new_concepts) | set(defined_concepts))
 
             # Create a summary
             summary = self._make_summary(text, topic)
 
-            # Evaluate surprise — did what she found match her expectation?
+            # Evaluate surprise — did what it found match its expectation?
             surprise = self._evaluate_surprise(topic, expected_concepts, all_learned_concepts)
 
             result = LearningResult(
@@ -3016,7 +3016,7 @@ class AutonomousLearner:
         if not text:
             return None
 
-        # Generate an expectation about what she'll find.
+        # Generate an expectation about what it'll find.
         expected_concepts = self._generate_expectation(topic)
 
         self._pages_fetched += 1
@@ -3106,19 +3106,19 @@ class AutonomousLearner:
         return text, title
 
     def _generate_expectation(self, topic: str) -> set[str]:
-        """Generate an expectation about what she'll find when learning about a topic.
+        """Generate an expectation about what it'll find when learning about a topic.
 
-        Based on what she already knows — the concepts connected to the
-        topic in her network. If she knows a lot, she has strong
-        expectations. If she knows little, she expects to find anything.
+        Based on what it already knows — the concepts connected to the
+        topic in its network. If it knows a lot, it has strong
+        expectations. If it knows little, it expects to find anything.
 
-        Returns a set of concept names she expects to see.
+        Returns a set of concept names it expects to see.
         """
         expected = set()
         # Add the topic itself
         expected.add(topic.lower())
 
-        # Add concepts she already knows are connected to the topic
+        # Add concepts it already knows are connected to the topic
         neighbors = self.network.get_neighbors(topic)
         for target, _relation, _weight in neighbors:
             expected.add(target.lower())
@@ -3134,8 +3134,8 @@ class AutonomousLearner:
     def _evaluate_surprise(self, topic: str, expected: set[str], new_concepts: list[str]) -> float:
         """Evaluate how surprising the learning outcome was.
 
-        Compares what she found to what she expected. High surprise
-        means many new concepts she didn't expect — she encountered
+        Compares what it found to what it expected. High surprise
+        means many new concepts it didn't expect — it encountered
         something genuinely new.
 
         Two habituation mechanisms prevent dopamine flooding from
@@ -3143,13 +3143,13 @@ class AutonomousLearner:
 
         1. **Novelty habituation**: the dopamine response to novelty
            dissipates with repeated exposure (Lubell et al.,
-           PMC9768922). If she's done many learning episodes recently,
+           PMC9768922). If it's done many learning episodes recently,
            each new episode is less surprising — the brain's novelty
            → familiarity transition.
 
         2. **Surprise baseline adaptation**: the brain raises its
            novelty detection threshold when it's been surprised a lot.
-           If her running surprise average is high, only genuinely
+           If its running surprise average is high, only genuinely
            above-average surprise registers.
 
         Returns a surprise score [0.0, 1.0]:
@@ -3166,15 +3166,15 @@ class AutonomousLearner:
 
         surprise = novel / len(new_concepts)
 
-        # Also factor in how much she already knew — if she had no
+        # Also factor in how much it already knew — if it had no
         # expectations (empty network for this topic), surprise is
-        # lower because everything is new to her, not specifically
+        # lower because everything is new to it, not specifically
         # surprising
         if len(expected) <= 1:
-            surprise *= 0.5  # she didn't know enough to be surprised
+            surprise *= 0.5  # it didn't know enough to be surprised
 
         # ── Novelty habituation ──
-        # If she's done many learning episodes recently, each new
+        # If it's done many learning episodes recently, each new
         # episode is less surprising. This models the dopamine
         # habituation curve: the 20th Wikipedia article in an hour
         # is less novel than the 1st.
@@ -3192,7 +3192,7 @@ class AutonomousLearner:
         surprise *= habituation
 
         # ── Surprise baseline adaptation ──
-        # If her running surprise average is high, subtract a fraction
+        # If its running surprise average is high, subtract a fraction
         # of it. Only above-average surprise registers fully. This is
         # the brain raising its novelty threshold.
         if self._surprise_baseline > 0.0:
@@ -3342,7 +3342,7 @@ class AutonomousLearner:
         return relationships
 
     def _make_summary(self, text: str, topic: str) -> str:
-        """Create a short summary of what she learned."""
+        """Create a short summary of what it learned."""
         # Simple: first few sentences that mention the topic
         sentences = _SENTENCE_SPLIT_RE.split(text)
         relevant = []
@@ -3433,7 +3433,7 @@ class AutonomousLearner:
         - Surprise factor (unexpected learning = bigger reward).
         - Depth factor (building on existing knowledge = bigger reward).
 
-        The depth bonus encourages going deeper into topics she
+        The depth bonus encourages going deeper into topics it
         already knows rather than skimming disconnected facts. This
         models the fact that building on existing knowledge forms
         stronger, more integrated memories — the testing effect and
@@ -3448,7 +3448,7 @@ class AutonomousLearner:
             concepts_learned: Number of new concepts/relationships learned.
             surprise: Surprise factor [0..1].
             depth: Depth factor [0..1] — how much existing knowledge
-                she had about the topic before learning. 0 = completely
+                it had about the topic before learning. 0 = completely
                 new topic, 1 = deep extension of well-known topic.
 
         Returns:
@@ -3947,8 +3947,8 @@ class AutonomousLearner:
         the brain learns to predict which topics will be interesting
         to explore.
         """
-        # The state is the topic + its known neighbors (what she
-        # expected to find — her current understanding of the topic).
+        # The state is the topic + its known neighbors (what it
+        # expected to find — its current understanding of the topic).
         state = [topic]
         neighbors = self.network.get_neighbors(topic)
         for target, _, _ in neighbors[:5]:
@@ -3961,7 +3961,7 @@ class AutonomousLearner:
         )
 
         # The next state is the topic + newly learned concepts
-        # (what she now knows after this episode).
+        # (what it now knows after this episode).
         next_state = [topic, *new_concepts[:5]]
 
         # TD(λ) update — returns the reward prediction error δ.
@@ -3989,7 +3989,7 @@ class AutonomousLearner:
     def _idle_consolidation(self) -> None:
         """Idle-time consolidation and review.
 
-        When Genesis has no topic to learn about, she uses the time
+        When Genesis has no topic to learn about, it uses the time
         for memory consolidation and review — mirroring what the
         brain does during quiet wakefulness and sleep:
 
@@ -4042,7 +4042,7 @@ class AutonomousLearner:
         Checks which concepts have retention below the threshold
         (they are being forgotten) and re-activates them, reinforcing
         their confidence and activation. Each review is recorded as
-        successful (she recalled the concept), which extends the
+        successful (it recalled the concept), which extends the
         next review interval via the ease factor.
 
         Args:
@@ -4064,7 +4064,7 @@ class AutonomousLearner:
             c.confidence = c.confidence + (1.0 - c.confidence) * 0.05
             c.activation = min(1.0, (c.activation or 0.0) + 0.1)
             self.network._mark_active(concept)
-            # Record the review as successful (she recalled it).
+            # Record the review as successful (it recalled it).
             # This expands the next interval via the ease factor.
             self.spaced_repetition.record_review(concept, success=True)
             reviewed += 1

@@ -13,7 +13,7 @@ each extracted from the original CognitionEngine monolith:
 - ``question_composer`` — compose questions from curiosity and knowledge gaps
 - ``question_handler`` — route and answer questions from concept-network knowledge
 - ``response_styler`` — metacognitive tone adjustment and learning acknowledgment
-- ``self_inquiry`` — questions Genesis asks about herself
+- ``self_inquiry`` — questions Genesis asks about itself
 - ``thought_composer`` — compose novel thoughts from the concept network
 - ``topic_resolver`` — topic extraction and concept variant matching
 

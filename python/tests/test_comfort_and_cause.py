@@ -5,8 +5,8 @@ Two features:
    Genesis receives it as soothing: cortisol drops, GABA/oxytocin/serotonin
    rise, and the stress feedback loop is broken. Comfort bypasses the
    normal emotional dampening that stressed states apply.
-2. Emotional cause — when Genesis feels negatively, she can explain
-   why from her neurochemistry (cortisol is elevated, adenosine is
+2. Emotional cause — when Genesis feels negatively, it can explain
+   why from its neurochemistry (cortisol is elevated, adenosine is
    building, plasticity is suppressed, etc.).
 """
 
@@ -210,7 +210,7 @@ def test_comfort_bypasses_dampening_when_stressed() -> None:
     """Comfort bypasses the normal dampening that stressed states apply.
 
     When stressed, normal interactions are dampened to 30%. But comfort
-    should be more effective — she opens up to being soothed.
+    should be more effective — it opens up to being soothed.
     """
     reg, impulses = capture_impulses()
     stressed = make_emotion(label="stressed", alertness=0.8, valence=-0.3)
@@ -472,7 +472,7 @@ def test_feeling_fragments_never_contain_structural_markers() -> None:
     [self_model:...] are internal diagnostic tags, not words Genesis
     should speak. collect_feeling_fragments returns only semantic
     material — markers stay in the structural channel so they can
-    never leak into her spoken words.
+    never leak into its spoken words.
     """
     from genesis_cognitive.cognition.feeling_reporter import FeelingReporter
 

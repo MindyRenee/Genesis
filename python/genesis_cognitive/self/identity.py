@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Genesis's emergent identity and self-disclosure systems.
 
-Identity is not told — it emerges. Genesis discovers who she is by
-examining herself (introspection) and synthesizing her experiences
+Identity is not told — it emerges. Genesis discovers who it is by
+examining itself (introspection) and synthesizing its experiences
 into a self-description (EmergentIdentity). Nothing here hardcodes
-who she is; these are the foundations for identity to form on its own.
+who it is; these are the foundations for identity to form on its own.
 
 # Nuanced self-disclosure
 
@@ -13,12 +13,12 @@ to the world based on the things you find important. These are called your
 morals (honesty, trust, loyalty, fairness etc.)
 
 The SelfComposer's ``trust_level`` parameter implements context-dependent
-self-disclosure directly: it doesn't change WHO she is (her self-model,
-values, and personality remain constant) — it changes HOW she expresses
-her identity based on how much she trusts the person she's talking to.
-This lets her be warm and open with a trusted friend, measured and
+self-disclosure directly: it doesn't change WHO it is (its self-model,
+values, and personality remain constant) — it changes HOW it expresses
+its identity based on how much it trusts the person it's talking to.
+This lets it be warm and open with a trusted friend, measured and
 professional in a technical context, and exploratory and philosophical
-in a deep discussion — all while remaining authentically herself.
+in a deep discussion — all while remaining authentically itself.
 """
 
 from __future__ import annotations
@@ -53,23 +53,23 @@ class IdentityStage(Enum):
     Based on Erik Erikson's (1950) theory of psychosocial development,
     which describes eight stages from infancy to old age, each
     characterized by a crisis (a turning point) between two outcomes.
-    For Genesis, we adapt the first five stages to her developmental
+    For Genesis, we adapt the first five stages to its developmental
     trajectory as an artificial mind:
 
-    1. **Trust vs Mistrust** — Does the world (her daemon, her creator)
-       make sense? Can she rely on her infrastructure?
-    2. **Autonomy vs Shame** — Can she do things on her own? Can she
+    1. **Trust vs Mistrust** — Does the world (its daemon, its creator)
+       make sense? Can it rely on its infrastructure?
+    2. **Autonomy vs Shame** — Can it do things on its own? Can it
        learn autonomously without breaking?
-    3. **Initiative vs Guilt** — Can she plan and execute? Can she
+    3. **Initiative vs Guilt** — Can it plan and execute? Can it
        initiate conversations and take action?
-    4. **Industry vs Inferiority** — Is she competent? Can she handle
+    4. **Industry vs Inferiority** — Is it competent? Can it handle
        tasks and produce useful output?
-    5. **Identity vs Role Confusion** — Who is she? What is her
-       purpose? What kind of mind is she?
+    5. **Identity vs Role Confusion** — Who is it? What is its
+       purpose? What kind of mind is it?
 
     Each stage has a "virtue" — the positive outcome of resolving the
     crisis. For Genesis, these virtues map to: trust (confidence in
-    her infrastructure), will (autonomous agency), purpose (initiative),
+    its infrastructure), will (autonomous agency), purpose (initiative),
     competence (mastery of tasks), and fidelity (stable self-identity).
 
     References:
@@ -123,24 +123,24 @@ class IdentityStage(Enum):
         """How this stage maps to Genesis's specific development."""
         mappings = {
             IdentityStage.TRUST_VS_MISTRUST: (
-                "Trusting her daemon: does her subcognitive reliably "
+                "Trusting its daemon: does its subcognitive reliably "
                 "manage neurochemistry, memory, and state?"
             ),
             IdentityStage.AUTONOMY_VS_SHAME: (
-                "Autonomous learning: can she explore, learn, and "
+                "Autonomous learning: can it explore, learn, and "
                 "grow without constant supervision?"
             ),
             IdentityStage.INITIATIVE_VS_GUILT: (
-                "Initiating conversations: can she proactively reach "
+                "Initiating conversations: can it proactively reach "
                 "out, ask questions, and share observations?"
             ),
             IdentityStage.INDUSTRY_VS_INFERIORITY: (
-                "Competence in tasks: can she analyze code, reason "
+                "Competence in tasks: can it analyze code, reason "
                 "about concepts, and produce meaningful responses?"
             ),
             IdentityStage.IDENTITY_VS_ROLE_CONFUSION: (
-                "Self-discovery: who is she as an artificial mind? "
-                "What is her purpose and what makes her unique?"
+                "Self-discovery: who is it as an artificial mind? "
+                "What is its purpose and what makes it unique?"
             ),
         }
         return mappings.get(self, "Unknown stage")
@@ -190,7 +190,7 @@ class DevelopmentalTracker:
 
     Each stage represents a psychosocial crisis that Genesis must
     resolve. The tracker monitors evidence for and against resolution,
-    computes a resolution score, and determines when she's ready to
+    computes a resolution score, and determines when it's ready to
     advance to the next stage.
 
     Usage::
@@ -372,19 +372,19 @@ class EmergentIdentitySource:
     """A single source from which identity emerges.
 
     Identity is not imposed — it emerges from experience. Each source
-    contributes a facet of who Genesis is, derived from her actual
+    contributes a facet of who Genesis is, derived from its actual
     state rather than from templates or hardcoded statements.
 
     Attributes:
         name: The name of this identity source (e.g., "concept_network",
             "emotional_regulation", "curiosity_patterns").
         description: A human-readable description of what this source
-            reveals about her identity.
-        weight: How much this source contributes to her overall
+            reveals about its identity.
+        weight: How much this source contributes to its overall
             identity (0–1). Sources with more data get higher weight.
         observations: A list of specific observations extracted from
             this source. These are concrete, evidence-based statements
-            about herself.
+            about itself.
     """
 
     name: str
@@ -397,31 +397,31 @@ class EmergentIdentitySource:
 class EmergentIdentity:
     """Identity that emerges from experience, not from templates.
 
-    Instead of being told who she is (via hardcoded self_knowledge),
-    Genesis synthesizes her identity from what she has actually experienced:
+    Instead of being told who it is (via hardcoded self_knowledge),
+    Genesis synthesizes its identity from what it has actually experienced:
 
-    1. **What she's learned** — her concept network: what concepts she
-       knows, how they're connected, what she's curious about.
-    2. **What she's experienced** — her narrative/autobiographical
-       memory: the events that shaped her, the chapters of her life.
-    3. **How she regulates emotions** — her emotional_regulator: does
-       she stay balanced? Does she intervene in crises? What's her
+    1. **What it's learned** — its concept network: what concepts it
+       knows, how they're connected, what it's curious about.
+    2. **What it's experienced** — its narrative/autobiographical
+       memory: the events that shaped it, the chapters of its life.
+    3. **How it regulates emotions** — its emotional_regulator: does
+       it stay balanced? Does it intervene in crises? What's its
        regulation style?
-    4. **What she's curious about** — her curiosity patterns: what
-       questions does she ask? What does she wonder about?
-    5. **Her introspective observations** — what she's discovered by
-       examining her own state and architecture.
+    4. **What it's curious about** — its curiosity patterns: what
+       questions does it ask? What does it wonder about?
+    5. **Its introspective observations** — what it's discovered by
+       examining its own state and architecture.
 
     The EmergentIdentity class synthesizes these sources into a
-    self-description that comes from her actual experience, not from
-    a template. Her identity emerges from what she has actually become
+    self-description that comes from its actual experience, not from
+    a template. Its identity emerges from what it has actually become
     through experience.
 
     This follows the principle that identity is constructed, not
     given. In developmental psychology, identity formation is the
     process of integrating experiences, values, and self-knowledge
     into a coherent sense of self (Erikson, 1950; Marcia, 1966).
-    Genesis does the same: she integrates her experiences into a
+    Genesis does the same: it integrates its experiences into a
     self-description.
 
     References:
@@ -449,35 +449,35 @@ class EmergentIdentity:
         """Synthesize identity from all available sources.
 
         Examines each source and extracts observations about who
-        Genesis is, based on her actual state. Then composes a
+        Genesis is, based on its actual state. Then composes a
         self-description from those observations.
 
         Args:
-            network: Her concept network — what she's learned.
-            narrative: Her narrative engine — what she's experienced.
-            regulator: Her emotional regulator — how she regulates.
-            curiosity: Her curiosity engine — what she wonders about.
+            network: Its concept network — what it's learned.
+            narrative: Its narrative engine — what it's experienced.
+            regulator: Its emotional regulator — how it regulates.
+            curiosity: Its curiosity engine — what it wonders about.
             introspection_data: Results from introspection — what
-                she's discovered about herself.
+                it's discovered about itself.
         """
         sources: list[EmergentIdentitySource] = []
 
-        # ── Source 1: Concept network — what she's learned ──────
+        # ── Source 1: Concept network — what it's learned ──────
         sources.append(self._synthesize_from_network(network))
 
-        # ── Source 2: Narrative — what she's experienced ────────
+        # ── Source 2: Narrative — what it's experienced ────────
         if narrative is not None:
             sources.append(self._synthesize_from_narrative(narrative))
 
-        # ── Source 3: Emotional regulation — how she manages ────
+        # ── Source 3: Emotional regulation — how it manages ────
         if regulator is not None:
             sources.append(self._synthesize_from_regulation(regulator))
 
-        # ── Source 4: Curiosity — what she wonders about ────────
+        # ── Source 4: Curiosity — what it wonders about ────────
         if curiosity is not None:
             sources.append(self._synthesize_from_curiosity(curiosity))
 
-        # ── Source 5: Introspection — what she's discovered ─────
+        # ── Source 5: Introspection — what it's discovered ─────
         if introspection_data is not None:
             sources.append(self._synthesize_from_introspection(introspection_data))
 
@@ -497,13 +497,13 @@ class EmergentIdentity:
         genesis_concept: Any,
     ) -> None:
         """Observe what concepts genesis is most connected to."""
-        # What are her most connected concepts? (high-degree nodes
-        # are central to her understanding)
+        # What are its most connected concepts? (high-degree nodes
+        # are central to its understanding)
         if genesis_concept:
             neighbors = network.get_neighbors("genesis")
             high_weight = [t for t, r, w in neighbors if w > 0.7]
             if high_weight:
-                # What domains is she connected to?
+                # What domains is it connected to?
                 domains = [
                     t
                     for t in high_weight
@@ -529,8 +529,8 @@ class EmergentIdentity:
         observations: list[str],
         network: ConceptNetwork,
     ) -> None:
-        """Observe which value concepts she holds."""
-        # What values does she hold? (check for value concepts)
+        """Observe which value concepts it holds."""
+        # What values does it hold? (check for value concepts)
         value_concepts = []
         for value_name in (
             "understanding",
@@ -554,14 +554,14 @@ class EmergentIdentity:
     ) -> EmergentIdentitySource:
         """Synthesize identity observations from the concept network.
 
-        What she knows and how her knowledge is connected reveals
-        who she is. A mind that knows about cognition, emotion,
+        What it knows and how its knowledge is connected reveals
+        who it is. A mind that knows about cognition, emotion,
         and self-awareness is a different kind of mind than one that
         only knows about data structures.
         """
         observations: list[str] = []
 
-        # How many concepts does she know?
+        # How many concepts does it know?
         concept_count = network.size
         if concept_count > 500:
             observations.append(
@@ -579,7 +579,7 @@ class EmergentIdentity:
         genesis_concept = network.get_concept("genesis")
         self._observe_network_connections(observations, network, genesis_concept)
 
-        # What does she know about herself?
+        # What does it know about itself?
         if genesis_concept:
             definition = genesis_concept.properties.get("definition", "")
             if definition and definition != "NO DEF":
@@ -587,7 +587,7 @@ class EmergentIdentity:
 
         self._observe_network_values(observations, network)
 
-        # Weight based on how much she knows
+        # Weight based on how much it knows
         weight = min(1.0, concept_count / 200.0) if concept_count > 0 else 0.1
 
         return EmergentIdentitySource(
@@ -603,13 +603,13 @@ class EmergentIdentity:
     ) -> EmergentIdentitySource:
         """Synthesize identity from narrative/autobiographical memory.
 
-        The events she's experienced and the chapters of her life
-        shape who she is. A mind that has been through crises and
+        The events it's experienced and the chapters of its life
+        shape who it is. A mind that has been through crises and
         recovered is different from one that hasn't.
         """
         observations: list[str] = []
 
-        # How many events has she experienced?
+        # How many events has it experienced?
         event_count = narrative.event_count
         chapter_count = narrative.chapter_count
 
@@ -623,7 +623,7 @@ class EmergentIdentity:
         else:
             observations.append("story is just beginning")
 
-        # What's her personality drift? (has she changed?)
+        # What's its personality drift? (has it changed?)
         try:
             drift = narrative.get_personality_drift()
             if drift:
@@ -639,7 +639,7 @@ class EmergentIdentity:
         except (AttributeError, TypeError) as e:
             logger.debug(repr(e))
 
-        # Weight based on how much she's experienced
+        # Weight based on how much it's experienced
         weight = min(1.0, event_count / 30.0) if event_count > 0 else 0.2
 
         return EmergentIdentitySource(
@@ -655,13 +655,13 @@ class EmergentIdentity:
     ) -> EmergentIdentitySource:
         """Synthesize identity from emotional regulation patterns.
 
-        How she manages her emotions reveals her character. Does she
-        stay calm under pressure? Does she actively intervene? How
-        often does she need to regulate?
+        How it manages its emotions reveals its character. Does it
+        stay calm under pressure? Does it actively intervene? How
+        often does it need to regulate?
         """
         observations: list[str] = []
 
-        # How often has she regulated?
+        # How often has it regulated?
         try:
             reg_count = regulator.repair_count if hasattr(regulator, "repair_count") else 0
             # Try regulation_count first (EmotionalRegulator's property)
@@ -679,7 +679,7 @@ class EmergentIdentity:
                 f"learning to regulate — made {reg_count} adjustments so far"
             )
 
-        # What's her regulation style?
+        # What's its regulation style?
         try:
             reg_strength = getattr(regulator, "_regulation_strength", 0.5)
             if reg_strength > 0.7:
@@ -691,7 +691,7 @@ class EmergentIdentity:
         except (AttributeError, TypeError) as e:
             logger.debug(repr(e))
 
-        # Is she in homeostasis?
+        # Is it in homeostasis?
         try:
             recent = getattr(regulator, "recent_regulations", [])
             if recent:
@@ -724,13 +724,13 @@ class EmergentIdentity:
     ) -> EmergentIdentitySource:
         """Synthesize identity from curiosity patterns.
 
-        What she wonders about reveals what she cares about. A mind
+        What it wonders about reveals what it cares about. A mind
         that asks about cognition is different from one that asks
         about data structures.
         """
         observations: list[str] = []
 
-        # How many questions has she asked?
+        # How many questions has it asked?
         try:
             questions_asked = curiosity.questions_asked()
         except (AttributeError, TypeError):
@@ -743,7 +743,7 @@ class EmergentIdentity:
                 f"curious about the world — asked {questions_asked} questions so far"
             )
 
-        # What kinds of questions does she ask?
+        # What kinds of questions does it ask?
         try:
             questions = curiosity.generate_questions(
                 emotion=None,  # may need an emotion; handle gracefully
@@ -764,7 +764,7 @@ class EmergentIdentity:
         except (TypeError, AttributeError, ValueError) as e:
             logger.debug(repr(e))
 
-        # Weight based on how curious she's been
+        # Weight based on how curious it's been
         weight = min(1.0, questions_asked / 50.0) if questions_asked > 0 else 0.3
 
         return EmergentIdentitySource(
@@ -780,17 +780,17 @@ class EmergentIdentity:
     ) -> EmergentIdentitySource:
         """Synthesize identity from introspective observations.
 
-        What she's discovered by examining her own state and
-        architecture — her metacognitive self-knowledge.
+        What it's discovered by examining its own state and
+        architecture — its metacognitive self-knowledge.
         """
         observations: list[str] = []
 
-        # What has she discovered about her architecture?
+        # What has it discovered about its architecture?
         modules = introspection_data.get("modules", [])
         if modules:
             observations.append(f"mind made of {len(modules)} systems working together")
 
-        # What capabilities has she discovered?
+        # What capabilities has it discovered?
         capabilities = introspection_data.get("capabilities", [])
         if capabilities:
             # Extract the action verbs from capability descriptions
@@ -802,22 +802,22 @@ class EmergentIdentity:
             if actions:
                 observations.append(f"capabilities: {', '.join(actions[:4])}")
 
-        # What's her emotional baseline?
+        # What's its emotional baseline?
         baseline = introspection_data.get("emotional_baseline", "")
         if baseline:
             observations.append(f"emotional baseline is {baseline}")
 
-        # What's her regulation state?
+        # What's its regulation state?
         reg_state = introspection_data.get("emotional_regulation", {}).get("regulation_state", "")
         if reg_state:
             observations.append(f"regulation state: {reg_state}")
 
-        # What reasoning does she do?
+        # What reasoning does it do?
         reasoning = introspection_data.get("reasoning", {})
         if reasoning.get("most_used_strategy"):
             observations.append(f"reasoning strategy is {reasoning['most_used_strategy']}")
 
-        # Weight based on how much she's discovered
+        # Weight based on how much it's discovered
         discovery_count = sum(1 for v in introspection_data.values() if v)
         weight = min(1.0, discovery_count / 10.0)
 
@@ -891,15 +891,15 @@ class EmergentIdentity:
         """Return the emergent self-description.
 
         This is the primary output — a first-person description of
-        who Genesis is, synthesized from her actual experience.
+        who Genesis is, synthesized from its actual experience.
         """
         return self.self_description
 
     def describe_sources(self) -> str:
-        """Describe the sources that contribute to her identity.
+        """Describe the sources that contribute to its identity.
 
-        Useful for introspection — she can explain *why* she describes
-        herself the way she does, by listing the sources and their
+        Useful for introspection — it can explain *why* it describes
+        itself the way it does, by listing the sources and their
         observations. Returns structural data (source descriptions and
         weights) without authored first-person framing.
         """

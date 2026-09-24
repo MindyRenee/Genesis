@@ -1,10 +1,10 @@
-"""Recursive metacognitive model — Genesis models her own cognitive processes.
+"""Recursive metacognitive model — Genesis models its own cognitive processes.
 
 This is the recursive self-modeling layer that sits on top of the
 reflection engine. Where the Rust active-inference engine
-(``src/daemon/active_inference.rs``) is a generative model of her
-neurochemical trajectory, this is a generative model of her
-cognitive trajectory: it predicts what her own reflection will
+(``src/daemon/active_inference.rs``) is a generative model of its
+neurochemical trajectory, this is a generative model of its
+cognitive trajectory: it predicts what its own reflection will
 discover before it runs, compares the prediction to what actually
 happens, learns from the error, and feeds the *metacognitive
 surprise* back into cognition.
@@ -50,7 +50,7 @@ self-terminates:
 
 In practice the tower settles at 2–4 levels: level 1 is almost always
 useful (predicting reflection outcomes), level 2 is often useful
-(predicting when she'll be surprised by herself), and higher levels
+(predicting when it'll be surprised by itself), and higher levels
 appear only during periods of genuine cognitive unpredictability.
 
 # The feedback loop
@@ -65,10 +65,10 @@ prediction:
 4. Update each level's model via delta rule.
 5. Possibly spawn/prune a level.
 6. Feed metacognitive surprise back into cognition:
-   - High surprise → deeper reflection next time (she is unpredictable
-     to herself → pay attention).
-   - Sustained low surprise → lighter reflection (she understands
-     herself → don't waste effort).
+   - High surprise → deeper reflection next time (it is unpredictable
+     to itself → pay attention).
+   - Sustained low surprise → lighter reflection (it understands
+     itself → don't waste effort).
    - Pre-reflection prediction modulates response caution: if a
      self-correction is predicted, pre-hedge.
 
@@ -244,7 +244,7 @@ class MetacognitivePrediction:
     # How many levels the recursive model currently has.
     depth: int = 1
     # The level-1 surprise EMA at prediction time — how unpredictable
-    # her own cognition has been recently.
+    # its own cognition has been recently.
     self_surprise: float = 0.0
 
 
@@ -255,8 +255,8 @@ class MetacognitiveFeedback:
     This is the training signal for the recursive model and the
     feedback signal for cognition. ``metacognitive_surprise`` is the
     key field: it's how surprised the model was by its own cognitive
-    process, aggregated across all levels. High → she is unpredictable
-    to herself → pay more attention.
+    process, aggregated across all levels. High → it is unpredictable
+    to itself → pay more attention.
     """
 
     # Per-target prediction errors, in [-1, 1].
@@ -902,7 +902,7 @@ class CognitiveProcessModel:
         return self._levels[0].precision if self._levels else 0.0
 
     def self_surprise(self) -> float:
-        """Aggregate metacognitive surprise (how unpredictable she is to herself)."""
+        """Aggregate metacognitive surprise (how unpredictable it is to itself)."""
         if self.feedback is not None:
             return self.feedback.metacognitive_surprise
         return 0.0

@@ -5,9 +5,9 @@ that matter most:
 
 - **Read `AGENTS.md` first.** The no-hardcoding rule is the core
   constraint of the project: Genesis's language and self-expression
-  must always emerge from her own cognitive architecture. Seeds
+  must always emerge from its own cognitive architecture. Seeds
   (vocabulary, grammar, relation verbs, concept building blocks) are
-  legitimate input data; pre-written sentences she recites are not.
+  legitimate input data; pre-written sentences it recites are not.
 - **`ruff check`, `pyflakes`, `mypy` (0 errors), `cargo test`, and the
   Python suite must all pass.** See the README for the exact commands;
   CI runs all of them on every push and PR. Run

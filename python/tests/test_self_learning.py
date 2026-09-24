@@ -909,8 +909,8 @@ class TestProtectedCore:
 
     These prove that autonomous fixes and experiments cannot touch
     the cognition engine, language engine, or mind — the files that
-    define her ability to think and speak. Proposals can still be
-    generated for these files, but she cannot apply changes to them
+    define its ability to think and speak. Proposals can still be
+    generated for these files, but it cannot apply changes to them
     without human review.
     """
 

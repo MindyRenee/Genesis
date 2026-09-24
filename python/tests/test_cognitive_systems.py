@@ -2339,7 +2339,7 @@ class TestSkillLearning:
         """The critical invariant: a skill must NOT store a response string.
 
         This is the architectural rule: Genesis's words must always
-        emerge from her language engine, never be recited from storage.
+        emerge from its language engine, never be recited from storage.
         The skill stores a *strategy* (how to approach the response),
         not the words of the response.
         """
@@ -2580,7 +2580,7 @@ class TestHabitBias:
         response text. It shapes deliberation, it doesn't replace it.
 
         This is the architectural rule: Genesis's words must always
-        emerge from her language engine, never be recited from storage.
+        emerge from its language engine, never be recited from storage.
         """
         pm.learn_skill("s1", "question", "factual", "curious", initial_strength=0.9)
         bias = pm.get_habit_bias("question")

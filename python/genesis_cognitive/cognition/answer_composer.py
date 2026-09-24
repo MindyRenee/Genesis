@@ -96,7 +96,7 @@ class AnswerComposer:
         concept = self._network.get_concept(target_clean)
         if concept is None:
             # Try stripping location/qualifier suffixes: "community property
-            # in Utah" → "community property". This lets her resolve concepts
+            # in Utah" → "community property". This lets it resolve concepts
             # that were taught without a geographic qualifier.
             stripped = re.sub(
                 r"\s+in\s+\w+(?:\s+\w+)?$", "", target_clean, flags=re.IGNORECASE
@@ -145,7 +145,7 @@ class AnswerComposer:
         The answer is composed by the language engine from semantic
         metadata (knowledge triples + definition), NOT from pre-written
         template strings. This satisfies the CRITICAL RULE: Genesis's
-        words emerge from her language engine, not from hardcoded
+        words emerge from its language engine, not from hardcoded
         phrasings.
 
         Returns a Thought with metadata["knowledge"] so the language

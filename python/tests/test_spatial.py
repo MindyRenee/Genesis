@@ -175,7 +175,7 @@ class TestSpatialReasoner:
         assert reasoner.network is net
 
     def test_learned_rules_proposed_on_future_tasks(self):
-        # Teach her a rule, then confirm it is reused on a later task.
+        # Teach its a rule, then confirm it is reused on a later task.
         from genesis_cognitive.spatial import Transform
 
         reasoner = SpatialReasoner()
@@ -252,7 +252,7 @@ class TestSpatialAgent:
             agent._last_action = action
             env.step(action)
             agent.observe(env.frame())
-        # The avatar (color 3) is the thing that moves when she acts.
+        # The avatar (color 3) is the thing that moves when it acts.
         assert agent.avatar_color == 3
         # Displacement was attributed to the right actions.
         assert agent.stats["up"].dr < 0

@@ -62,7 +62,7 @@ class SelfModelState(IntEnum):
     """
 
     # The model is predicting well — low surprise, high precision.
-    # Genesis feels she understands herself.
+    # Genesis feels it understands itself.
     COHERENT = 0
 
     # The model is surprised — its predictions are failing. Genesis
@@ -74,7 +74,7 @@ class SelfModelState(IntEnum):
     STRAINED = 2
 
     # The model is immature — it hasn't learned enough yet. Genesis
-    # feels uncertain about her own internal state.
+    # feels uncertain about its own internal state.
     NASCENT = 3
 
 
@@ -120,7 +120,7 @@ class SelfModelReading:
     cognitive_effort: float
 
     # Cognitive interpretation: how confident Genesis should be in
-    # her own state and actions. High precision → high confidence.
+    # its own state and actions. High precision → high confidence.
     # Range [0, 1].
     self_confidence: float
 
@@ -354,7 +354,7 @@ class ActiveInferenceReader:
 
         # ── Self-confidence ──
         # Precision → confidence. High precision = the model trusts
-        # its predictions, so Genesis should trust her own state.
+        # its predictions, so Genesis should trust its own state.
         # Modulated by model maturity — an immature model shouldn't
         # inspire high confidence even if precision is temporarily high.
         self_confidence = signals.precision * signals.model_maturity

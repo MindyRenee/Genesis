@@ -1,21 +1,21 @@
-"""Code learner — Genesis reads and understands her own source code.
+"""Code learner — Genesis reads and understands its own source code.
 
-This module gives Genesis the ability to introspect on her own codebase.
-She reads Python files (via the built-in ``ast`` module) and Rust files
+This module gives Genesis the ability to introspect on its own codebase.
+It reads Python files (via the built-in ``ast`` module) and Rust files
 (via a lightweight regex parser — no external dependencies), then adds
-what she finds to her :class:`ConceptNetwork`.
+what it finds to its :class:`ConceptNetwork`.
 
 Each function, class, struct, enum, trait, and module becomes a concept.
 Relationships between them (calls, imports, defines, implements) become
 edges. A summary of each file is stored as a memory via the daemon
-client, so she remembers what she has read.
+client, so it remembers what it has read.
 
 Why this matters
 ----------------
-Genesis is an artificial mind. To grow, she must understand herself.
-Reading her own code is the programming analogue of metacognition:
-she builds a model of her own structure, which lets her reason about
-how she works, where her complexity lives, and how her parts connect.
+Genesis is an artificial mind. To grow, it must understand itself.
+Reading its own code is the programming analogue of metacognition:
+it builds a model of its own structure, which lets it reason about
+how it works, where its complexity lives, and how its parts connect.
 """
 
 from __future__ import annotations
@@ -282,7 +282,7 @@ _SKIP_DIRS: frozenset[str] = frozenset(
 # Skip files larger than this (generated code, vendored blobs).
 _MAX_FILE_BYTES = 100 * 1024
 
-# Confidence for self-code concepts — she should know herself well.
+# Confidence for self-code concepts — it should know itself well.
 _SELF_CONFIDENCE = 0.9
 
 # ─── Semantic relation aliases ─────────────────────────────────────────
@@ -348,7 +348,7 @@ class CodeLearner:
 
         Skips build artifacts (``target/``, ``__pycache__/``), very
         large files, and files already analyzed. Test files are
-        included by default — she should know her own tests.
+        included by default — it should know its own tests.
 
         Returns a summary of what was learned.
         """
@@ -445,8 +445,8 @@ class CodeLearner:
         """Analyze a Python file using the ``ast`` module.
 
         Extracts module-level functions, classes, methods, imports, and
-        function calls. Each becomes a concept (confidence 0.9 — she
-        knows her own code well) with relationships linking them.
+        function calls. Each becomes a concept (confidence 0.9 — it
+        knows its own code well) with relationships linking them.
         """
         path = Path(filepath)
         rel = self._relative(path)

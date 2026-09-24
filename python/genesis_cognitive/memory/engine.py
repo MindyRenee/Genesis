@@ -223,7 +223,7 @@ class SourceTag:
             - "learning": learned from external source (docs, web)
             - "inference": Genesis inferred this (not directly observed)
             - "imagination": hypothetical / imagined
-            - "self_analysis": Genesis analyzed her own code
+            - "self_analysis": Genesis analyzed its own code
         modality: How the memory was received — "text", "visual",
             "auditory", "internal".
         confidence: Confidence in the source attribution [0..1].

@@ -263,8 +263,8 @@ class AmbientListener:
             nonlocal _silence_block_count
             data = indata.tobytes() if hasattr(indata, "tobytes") else bytes(indata)
 
-            # Mute the mic while she is speaking to prevent her from
-            # hearing her own TTS output and looping back.
+            # Mute the mic while it is speaking to prevent it from
+            # hearing its own TTS output and looping back.
             if self._is_speaking is not None and self._is_speaking():
                 return
 

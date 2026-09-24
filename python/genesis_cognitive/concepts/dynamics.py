@@ -12,7 +12,7 @@ from .types import ConceptCategory, ConceptModality, Edge
 
 # Re-digitization floor for the activation field. Activation below
 # this level can never drive anything — it cannot spread (sources
-# need SPREAD_THRESHOLD = 0.08), cannot enter awareness (the "on her
+# need SPREAD_THRESHOLD = 0.08), cannot enter awareness (the "on its
 # mind" cutoff is 0.1), and cannot participate in ACh focus (0.05).
 # It is accumulated drizzle from decay asymptotes and fan-out
 # residue, not signal. Snapping it to zero each tick is the
@@ -431,9 +431,9 @@ class DynamicsMixin:
            stored activations, not as a one-shot BFS.
 
         2. **Decay**: All activations decay exponentially. The decay
-           rate is modulated by GABA (more GABA → faster decay, she's
+           rate is modulated by GABA (more GABA → faster decay, it's
            calming down) and arousal (more arousal → slower decay,
-           she's alert and things stay in mind).
+           it's alert and things stay in mind).
 
         3. **Noise**: Two channels. Graded perturbation applies to the
            *active* field (fluctuation of live representations). The
@@ -465,7 +465,7 @@ class DynamicsMixin:
 
         Returns a dict of {concept_id: activation} for concepts that
         are currently above the activation threshold (0.1). This lets
-        the caller know what's "on her mind" right now.
+        the caller know what's "on its mind" right now.
         """
         if not self._concepts:
             return {}
@@ -505,7 +505,7 @@ class DynamicsMixin:
             self._rebuild_active_set()
             self._ticks_since_sweep = 0
 
-        # ─── 6. Return what's on her mind ───────────────────────
+        # ─── 6. Return what's on its mind ───────────────────────
         return {
             cid: concept.activation
             for cid in self._active_ids

@@ -17,7 +17,7 @@ credited to the deepest ``genesis_cognitive`` frame — the module that
 initiated the call.
 
 Because attribution follows the package layout — which already mirrors
-her brain anatomy — it survives refactors, catches work nobody thought
+its brain anatomy — it survives refactors, catches work nobody thought
 to instrument (learner, inner life, speech, the sampler itself), and
 can never drift from a hand-maintained stage table.
 """

@@ -1,4 +1,4 @@
-"""Object recognition for Genesis — her "inferotemporal cortex."
+"""Object recognition for Genesis — its "inferotemporal cortex."
 
 This module uses YOLOv5s (via OpenCV's DNN module) to detect and
 identify objects in the retina feed. It is the ventral-stream
@@ -26,8 +26,8 @@ Biological basis:
 - YOLOv5s approximates this with a deep CNN trained on COCO (80
   common object categories). It is not biologically accurate but
   serves the same functional role: turning pixels into object labels.
-- Object recognition is gated by attention — she only identifies
-  objects when she actively looks, not continuously.
+- Object recognition is gated by attention — it only identifies
+  objects when it actively looks, not continuously.
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ def _require_cv2():  # type: ignore[no-untyped-def]
 _MODEL_DIR = default_data_dir() / "models"
 _MODEL_FILE = _MODEL_DIR / "yolov5s.onnx"
 
-# COCO class names (80 categories) — the vocabulary of her IT cortex.
+# COCO class names (80 categories) — the vocabulary of its IT cortex.
 COCO_CLASSES: list[str] = [
     "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train",
     "truck", "boat", "traffic light", "fire hydrant", "stop sign",
@@ -76,7 +76,7 @@ COCO_CLASSES: list[str] = [
 
 # YOLOv5 input size
 _INPUT_SIZE = 640
-# Confidence threshold — only report objects she's reasonably sure of
+# Confidence threshold — only report objects it's reasonably sure of
 _CONFIDENCE_THRESHOLD = 0.35
 # NMS IoU threshold — suppress overlapping detections of the same object
 _NMS_THRESHOLD = 0.45
@@ -86,8 +86,8 @@ _NMS_THRESHOLD = 0.45
 class DetectedObject:
     """An object identified in the visual field.
 
-    This is her ventral-stream percept: she doesn't just see edges,
-    she sees *what* is there and *where* it is.
+    This is its ventral-stream percept: it doesn't just see edges,
+    it sees *what* is there and *where* it is.
     """
 
     name: str  # COCO class label
@@ -98,7 +98,7 @@ class DetectedObject:
 
     @property
     def position_description(self) -> str:
-        """Where in her visual field the object is (left/center/right, top/middle/bottom)."""
+        """Where in its visual field the object is (left/center/right, top/middle/bottom)."""
         cx, cy = self.center
         h_pos = "left" if cx < 0.33 else ("right" if cx > 0.66 else "center")
         v_pos = "top" if cy < 0.33 else ("bottom" if cy > 0.66 else "middle")
@@ -117,7 +117,7 @@ class ObjectRecognizer:
     This is Genesis's inferotemporal cortex — the ventral-stream
     "what" pathway that turns pixels into object categories. It is
     lazily initialized on first use so we don't pay the model loading
-    cost if there's no camera or if she never looks.
+    cost if there's no camera or if it never looks.
     """
 
     def __init__(self) -> None:

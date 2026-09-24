@@ -124,7 +124,7 @@ class MetaCognitiveRouter:
         ("self_improvement", "growth", re.compile(r"\byour growth (?:narrative|journey|story)\b")),
         # Emotional / well-being
         ("emotion", "feel", re.compile(r"\bhow (are|do) you feel\b")),
-        # Corrections / feedback on her claims.
+        # Corrections / feedback on its claims.
         (
             "correction",
             "negated_cause",

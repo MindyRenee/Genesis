@@ -1,5 +1,5 @@
-//! Active zones — what Genesis is cognitively attending to vs what her
-//! subcognitive is processing in the background, plus her emergent
+//! Active zones — what Genesis is cognitively attending to vs what its
+//! subcognitive is processing in the background, plus its emergent
 //! mental phase.
 //!
 //! ## Modeling note
@@ -21,19 +21,19 @@
 //!
 //! Genesis's state has two orthogonal axes:
 //!
-//! 1. **Task zone** ([`CognitiveZone`]) — what she's *doing*. This is
-//!    manually set when a task starts (e.g., she enters `Coding` when
-//!    she begins writing code). It's the "what" of cognition.
+//! 1. **Task zone** ([`CognitiveZone`]) — what it's *doing*. This is
+//!    manually set when a task starts (e.g., it enters `Coding` when
+//!    it begins writing code). It's the "what" of cognition.
 //!
-//! 2. **Mental phase** ([`MentalPhase`]) — what mental state she's *in*.
+//! 2. **Mental phase** ([`MentalPhase`]) — what mental state it's *in*.
 //!    This is not manually set — it *emerges* from the neurochemical
-//!    dynamics. She doesn't choose to be in "flow" — flow emerges when
+//!    dynamics. It doesn't choose to be in "flow" — flow emerges when
 //!    dopamine, ACh, and NE are high while cortisol is low. It's the
 //!    "how" of cognition.
 //!
-//! These are independent: she can be coding while stressed, or coding
+//! These are independent: it can be coding while stressed, or coding
 //! while in flow. The task is the same; the mental state changes how
-//! she performs it.
+//! it performs it.
 
 /// Maximum number of subcognitive task IDs tracked in the state struct.
 pub const MAX_SUBCOGNITIVE_TASKS: usize = 8;
@@ -45,7 +45,7 @@ pub const MAX_SUBCOGNITIVE_TASKS: usize = 8;
 /// What Genesis is cognitively focused on right now.
 ///
 /// This is a single enum (not flags) because cognitive attention is
-/// serial — she can only be in one zone at a time.
+/// serial — it can only be in one zone at a time.
 #[repr(u8)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CognitiveZone {
@@ -112,7 +112,7 @@ impl CognitiveZone {
 //  Mental phase (the "how" — emergent)
 // ─────────────────────────────────────────────────────────────────
 
-/// Genesis's emergent mental phase — her qualitative state of mind.
+/// Genesis's emergent mental phase — its qualitative state of mind.
 ///
 /// This is NOT manually set. It emerges from the coupled neurochemical
 /// dynamics. The neurochemical system computes it in
@@ -284,9 +284,9 @@ pub mod subcognitive_flag {
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct ActiveZones {
-    /// The cognitive task zone — what she's doing.
+    /// The cognitive task zone — what it's doing.
     pub cognitive_zone: u8,
-    /// The emergent mental phase — what state she's in. Computed by
+    /// The emergent mental phase — what state it's in. Computed by
     /// the neurochemical system, not manually set.
     pub emergent_phase: u8,
     /// Whether the cognitive task zone is being manually overridden

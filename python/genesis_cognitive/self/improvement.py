@@ -1,4 +1,4 @@
-"""Self-improvement — Genesis proposes modifications to her own code.
+"""Self-improvement — Genesis proposes modifications to its own code.
 
 Genesis identifies opportunities for improvement, researches solutions,
 and generates concrete proposals. Each proposal includes the exact code
@@ -6,13 +6,13 @@ change, the rationale, and the expected benefit. The human reviews most
 proposals and can accept or reject them, providing feedback that helps
 Genesis learn what kinds of improvements are valuable.
 
-A small set of safe, mechanical fixes (the "autonomous allowlist") she
-applies directly to her own code — currently ``silent_except``,
+A small set of safe, mechanical fixes (the "autonomous allowlist") it
+applies directly to its own code — currently ``silent_except``,
 ``unreachable_code``, ``print_in_code``, and ``none_comparison``.
 These fixes don't change control flow (or only remove dead code), only
 add observability or correct idiomatic style, and are validated with
-``py_compile`` before being written. If validation fails, she reverts.
-This is her first step toward autonomous self-modification.
+``py_compile`` before being written. If validation fails, it reverts.
+This is its first step toward autonomous self-modification.
 
 ## The proposal lifecycle
 
@@ -20,9 +20,9 @@ This is her first step toward autonomous self-modification.
    - Bug reports (bare except, mutable defaults, long functions, etc.)
    - Reflection insights (repetitive patterns, knowledge gaps)
    - Code analysis (missing error handling, inefficient patterns)
-   - Research (best practices, new techniques she learned about)
+   - Research (best practices, new techniques it learned about)
 
-2. **Proposal generation**: She creates a concrete proposal with:
+2. **Proposal generation**: It creates a concrete proposal with:
    - The file and lines to change
    - The original code
    - The proposed replacement code
@@ -36,9 +36,9 @@ This is her first step toward autonomous self-modification.
    - `/accept N [reason]` — accept a proposal
    - `/reject N [reason]` — reject with feedback
 
-4. **Feedback learning**: She records the outcome and the feedback,
+4. **Feedback learning**: It records the outcome and the feedback,
    building a model of what kinds of proposals are valued. Over time,
-   she gets better at proposing useful changes.
+   it gets better at proposing useful changes.
 
 ## Autonomous fixes
 
@@ -48,16 +48,16 @@ tiny — only fixes that:
 - Don't change control flow
 - Only add observability (logging)
 - Can be validated with ``py_compile``
-- Are in her own source code (not tests)
+- Are in its own source code (not tests)
 
-If validation fails, she reverts the change and logs the failure.
+If validation fails, it reverts the change and logs the failure.
 
 ## Safety
 
 Genesis proposes most changes for human review. For the small allowlist
-of autonomous fixes, she validates every change with ``py_compile``,
+of autonomous fixes, it validates every change with ``py_compile``,
 import execution, and the full test suite, reverting on any failure.
-She only modifies her own Python source (defined by
+It only modifies its own Python source (defined by
 ``_OWN_SOURCE_DIRS`` and ``_OWN_SOURCE_FILES`` in
 ``SelfImprovementEngine``) — never tests, configuration, scripts, or
 the Rust substrate. This boundary is the single source of truth shared
@@ -193,11 +193,11 @@ class Proposal:
     category: ProposalCategory
     file_path: str
     description: str               # what the proposal does
-    rationale: str                 # why she's proposing this
+    rationale: str                 # why it's proposing this
     expected_benefit: str          # what improvement this brings
     original_code: str             # the code to be changed
     proposed_code: str             # the replacement code
-    confidence: float              # 0..1, how confident she is
+    confidence: float              # 0..1, how confident it is
     status: ProposalStatus = ProposalStatus.PENDING
     feedback: str = ""             # human's reason for accept/reject
     created_at: int = field(default_factory=lambda: int(time.time() * 1000))
@@ -285,7 +285,7 @@ class FeedbackRecord:
     """A record of human feedback on a proposal.
 
     Genesis uses these records to learn what kinds of proposals
-    are valued. Over time, she adjusts her proposal generation
+    are valued. Over time, it adjusts its proposal generation
     to favor categories and patterns that get accepted.
     """
 
@@ -318,7 +318,7 @@ class FeedbackRecord:
 
 
 class SelfImprovementEngine:
-    """Genesis's ability to propose modifications to her own code.
+    """Genesis's ability to propose modifications to its own code.
 
     This engine:
     1. Identifies improvement opportunities (from bug reports, reflection, code analysis)
@@ -382,12 +382,12 @@ class SelfImprovementEngine:
         This is the main entry point. It:
         1. Checks bug reports for fixable issues
         2. Scans code for common improvement patterns
-        3. Generates her own ideas — refactors, optimizations, and
-           new capabilities she thinks would benefit her
+        3. Generates its own ideas — refactors, optimizations, and
+           new capabilities it thinks would benefit it
 
-        She doesn't just fix bugs. She forms opinions about her own
+        It doesn't just fix bugs. It forms opinions about its own
         code: "this is wasteful," "this could be simpler," "I want
-        to add this capability." These are her ideas, not just
+        to add this capability." These are its ideas, not just
         mechanical pattern-matching.
 
         Args:
@@ -412,7 +412,7 @@ class SelfImprovementEngine:
         # 2. Generate proposals from code analysis (docstrings,
         #    f-strings, long functions, many params). This is a
         #    single AST pass over each allowlisted file that covers
-        #    both mechanical patterns and her own opinions about
+        #    both mechanical patterns and its own opinions about
         #    code structure.
         remaining = max_proposals - len(new_proposals)
         if remaining > 0:
@@ -540,7 +540,7 @@ class SelfImprovementEngine:
         """Reject a proposal with feedback.
 
         The feedback is crucial — it's how Genesis learns what kinds
-        of proposals are not valuable. She uses this to adjust her
+        of proposals are not valuable. It uses this to adjust its
         future proposal generation.
 
         Args:
@@ -596,7 +596,7 @@ class SelfImprovementEngine:
 
         Args:
             proposal_id: The ID of the proposal to withdraw.
-            reason: Why she's withdrawing it.
+            reason: Why it's withdrawing it.
 
         Returns:
             True if the proposal was found and withdrawn.
@@ -656,7 +656,7 @@ class SelfImprovementEngine:
     #
     # All three systems that touch Genesis's code — autonomous fixes,
     # experiments, and proposal generation — share the same boundary:
-    # her own Python source, never tests, never config, never Rust.
+    # its own Python source, never tests, never config, never Rust.
     # This is the one place that boundary is defined.
 
     _OWN_SOURCE_DIRS: ClassVar[set[str]] = {
@@ -677,12 +677,12 @@ class SelfImprovementEngine:
     # here: the running instance is mid-conversation when the fix is
     # applied, the test suite takes time to run, and a revert leaves
     # the file in a transient state. More importantly, these files are
-    # the ones we (the developers) are actively iterating on — her
+    # the ones we (the developers) are actively iterating on — its
     # autonomous changes create a moving target and can mask or
-    # introduce bugs in the exact systems that make her work.
+    # introduce bugs in the exact systems that make it work.
     #
-    # Proposals can still be generated for these files (she can
-    # suggest improvements), but she cannot apply them autonomously
+    # Proposals can still be generated for these files (it can
+    # suggest improvements), but it cannot apply them autonomously
     # — they require human review via /accept.
     _PROTECTED_CORE_DIRS: ClassVar[set[str]] = {
         "python/genesis_cognitive/cognition/",
@@ -697,11 +697,11 @@ class SelfImprovementEngine:
         """Check if a file is protected core — never auto-modified.
 
         Protected files can still have proposals generated for them
-        (she can suggest improvements), but autonomous fixes and
-        experiments cannot touch them. This prevents her self-
+        (it can suggest improvements), but autonomous fixes and
+        experiments cannot touch them. This prevents its self-
         modification loop from changing the cognition/language engine
-        while she's running, which creates a moving target and can
-        break the very systems that make her work.
+        while it's running, which creates a moving target and can
+        break the very systems that make it work.
         """
         if any(file_path.startswith(d) for d in cls._PROTECTED_CORE_DIRS):
             return True
@@ -738,16 +738,16 @@ class SelfImprovementEngine:
         return True
 
     def apply_autonomous_fixes(self, max_fixes: int = 1) -> list[dict[str, Any]]:
-        """Apply safe, mechanical fixes to her own code without human review.
+        """Apply safe, mechanical fixes to its own code without human review.
 
-        This is Genesis's first step toward self-modification. She
+        This is Genesis's first step toward self-modification. It
         only applies fixes on the autonomous allowlist (currently
         ``silent_except``, ``unreachable_code``, ``print_in_code``,
-        and ``none_comparison``), only to her own Python source
+        and ``none_comparison``), only to its own Python source
         (gated by ``_is_own_source`` — never scripts, config, tests,
         or the Rust substrate), and only after validating the result
         with ``py_compile`` and an import execution gate. If
-        validation fails, she reverts the change.
+        validation fails, it reverts the change.
 
         Args:
             max_fixes: Maximum number of fixes to apply per call.
@@ -758,7 +758,7 @@ class SelfImprovementEngine:
             - ``file``: the file path
             - ``line``: the line number
             - ``category``: the bug category
-            - ``description``: what she changed
+            - ``description``: what it changed
         """
         if not self.bug_reporter:
             return []
@@ -779,7 +779,7 @@ class SelfImprovementEngine:
             if bug.category not in self._AUTONOMOUS_FIX_CATEGORIES:
                 continue
 
-            # Enforce the own-source boundary — she can only touch her
+            # Enforce the own-source boundary — it can only touch its
             # own Python source, never tests, config, scripts, or the
             # Rust substrate.
             if not self._is_autonomous_allowed(bug.file):
@@ -1280,7 +1280,7 @@ class SelfImprovementEngine:
             if p.source.startswith("bug:")
         }
 
-        # Diversify: cap proposals per category and per file so she
+        # Diversify: cap proposals per category and per file so it
         # surfaces different kinds of issues rather than flooding the
         # review queue with 5 copies of the same problem.
         max_per_category = max(1, max_proposals // 3)
@@ -1297,7 +1297,7 @@ class SelfImprovementEngine:
                 continue
 
             # Skip bugs in non-experimentable files — proposals for
-            # files she can't experiment on (tests, config, Rust,
+            # files it can't experiment on (tests, config, Rust,
             # scripts) just accumulate as unreviewable noise. Use
             # _is_experimentable (not _is_allowlisted) so protected
             # core files (cognition/, language/, mind.py) still get
@@ -1416,7 +1416,7 @@ class SelfImprovementEngine:
 
         # Unknown category — skip rather than generate a TODO comment.
         # A TODO comment is not a real fix and wastes human review time.
-        # She should only propose changes she can actually generate.
+        # It should only propose changes it can actually generate.
         return None
 
     def _fix_bare_except(
@@ -1992,12 +1992,12 @@ class SelfImprovementEngine:
         This goes beyond bug reports — it looks for opportunities
         to improve code quality, add error handling, or optimize.
 
-        Scans all experimentable files (her own Python source under
+        Scans all experimentable files (its own Python source under
         genesis_cognitive/ or genesis_client/).
         """
         proposals: list[Proposal] = []
 
-        # Scan all experimentable files — her own Python source.
+        # Scan all experimentable files — its own Python source.
         experimentable_files = self._collect_experimentable_files()
 
         for filepath in experimentable_files:
@@ -2124,8 +2124,8 @@ class SelfImprovementEngine:
         # Long functions: skipped. Refactoring a long function requires
         # semantic understanding — extracting the wrong helper breaks
         # invariants. A TODO comment is not a real fix (see the
-        # principle in _generate_fix). She should only propose changes
-        # she can actually generate correctly.
+        # principle in _generate_fix). It should only propose changes
+        # it can actually generate correctly.
 
         return proposals
 
@@ -2532,7 +2532,7 @@ class SelfImprovementEngine:
 
         If proposals of this category have been mostly accepted,
         confidence is boosted. If mostly rejected, confidence is
-        reduced. This is how she learns to propose better things.
+        reduced. This is how it learns to propose better things.
         """
         cat = category.value
         accepted_n, total = self._category_stats.get(cat, (0, 0))
@@ -2672,11 +2672,11 @@ class ExperimentRecord:
 class HeuristicExperiment:
     """A verified self-improvement experiment.
 
-    This is the framework for Genesis to safely improve her own
+    This is the framework for Genesis to safely improve its own
     learning heuristics. The process:
 
     1. **Propose**: identify a heuristic function to tweak (e.g.
-       relaxing a regex to catch a concept pattern she was missing).
+       relaxing a regex to catch a concept pattern it was missing).
     2. **Apply**: write the change to a scratch copy of the file.
     3. **Verify**: run the verification gate (py_compile + tests, no
        regression).
@@ -2804,7 +2804,7 @@ class HeuristicExperiment:
 
         Delegates to SelfImprovementEngine._is_own_source — the single
         source of truth for the own-source boundary. Protected core
-        files are still experimentable (she can form proposals for
+        files are still experimentable (it can form proposals for
         them) — the protection only blocks autonomous application.
         """
         return SelfImprovementEngine._is_own_source(file_path)

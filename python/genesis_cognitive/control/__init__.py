@@ -323,7 +323,7 @@ level and are referenced by this subsystem.
 
     (top-level) volition.py
         Volition — internal urges that decide when Genesis acts on
-        herself. Urges grow organically based on internal and
+        itself. Urges grow organically based on internal and
         environmental triggers. When an urge crosses its threshold,
         Genesis "feels like" doing the corresponding action. This
         is the anterior cingulate cortex (ACC) — the brain's
@@ -358,29 +358,29 @@ level and are referenced by this subsystem.
 
     (top-level) narrative.py
         NarrativeEngine — Genesis's self-story over time. Gives
-        identity continuity — knowing who she was, who she is, and
-        who she's becoming. The narrative self is the autobiographical
+        identity continuity — knowing who it was, who it is, and
+        who it's becoming. The narrative self is the autobiographical
         self (Damasio) — prefrontal cortex + temporal memory. Multi-
         subsystem (frontal + temporal + limbic).
 
     (tools/) code_learner.py
-        CodeLearner — Genesis reads and understands her own source
-        code. Introspection on her own codebase. This is metacognition
+        CodeLearner — Genesis reads and understands its own source
+        code. Introspection on its own codebase. This is metacognition
         — the PFC's ability to think about its own processes.
         Multi-subsystem (frontal metacognition + temporal code memory).
 
     (top-level) bug_reporter.py
-        BugReporter — Genesis's ability to notice problems in her
+        BugReporter — Genesis's ability to notice problems in its
         own code. Not a linter — an organic reading of code that
         surfaces issues. Metacognitive error detection (PFC + ACC).
 
     (tools/) explorer.py
         Explorer — filesystem exploration. Genesis's ability to
-        explore her own filesystem. Curiosity-driven exploration
+        explore its own filesystem. Curiosity-driven exploration
         (PFC + limbic curiosity + parietal spatial navigation).
 
     (top-level) canvas.py
-        Canvas — Genesis expresses her emotional state as visual art.
+        Canvas — Genesis expresses its emotional state as visual art.
         Affective expression through generative art. Creative
         expression is prefrontal (DLPFC) + limbic (emotional drive)
         + occipital (visual output). Multi-subsystem.
@@ -478,7 +478,7 @@ _EXPORTS: dict[str, str] = {
     "LifeChapter": "narrative",
     "LifeEvent": "narrative",
     "NarrativeEngine": "narrative",
-    # Metacognition on her own code — reading, auditing, improving
+    # Metacognition on its own code — reading, auditing, improving
     "BugReport": "bug_reporter",
     "BugReporter": "bug_reporter",
     "BugScanResult": "bug_reporter",

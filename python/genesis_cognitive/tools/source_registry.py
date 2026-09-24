@@ -33,7 +33,7 @@ Every successful online fetch is also written to a disk cache, so
 Genesis can re-read it later with no network at all.
 
 This multi-source approach means Genesis doesn't depend on any single
-search engine. She has a portfolio of knowledge sources, each with
+search engine. It has a portfolio of knowledge sources, each with
 different strengths.
 """
 
@@ -169,8 +169,8 @@ class SourceCache:
     """Disk-backed cache for source query results.
 
     Every successful SourceResult fetch is persisted to disk so that
-    when Genesis is offline (no wifi), she can still re-read anything
-    she's learned before. The cache is content-addressed by
+    when Genesis is offline (no wifi), it can still re-read anything
+    it's learned before. The cache is content-addressed by
     (source_name, topic) and stores the full SourceResult as JSON.
 
     The cache is thread-safe (a lock guards writes). Reads are
@@ -305,7 +305,7 @@ class SourceCache:
 
 # Master switch for Wikipedia as a knowledge source. When False,
 # Genesis makes no Wikipedia API calls (search, fetch, or lead
-# images) — she learns from man pages, WordNet, DuckDuckGo, and her
+# images) — it learns from man pages, WordNet, DuckDuckGo, and its
 # disk cache instead. Cached Wikipedia articles remain readable
 # offline; this only stops new network fetches. Flip back to True to
 # re-enable — nothing is removed.
@@ -509,7 +509,7 @@ class ManPageSource:
     """Local Linux manual pages as a knowledge source.
 
     This gives Genesis direct access to the documentation installed on
-    her own machine — the same manual pages a human reads with
+    its own machine — the same manual pages a human reads with
     ``man <command>``. It is a **local reference**, not web browsing:
     no network is involved, so it works regardless of connectivity
     (and regardless of ``force_offline``).
@@ -531,7 +531,7 @@ class ManPageSource:
     other sources.
 
     This is how Genesis learns what ``ls``, ``grep``, ``bash``,
-    ``systemd``, ``ssh``, etc. are — by reading the same manuals her
+    ``systemd``, ``ssh``, etc. are — by reading the same manuals its
     machine ships.
     """
 
@@ -807,7 +807,7 @@ class InfoPageSource:
     - **Info page**: "``ls`` sorts output alphabetically by default;
       here's how the sorting works, here are the edge cases..." (tutorial)
 
-    Genesis can consult this when she wants to understand *how* a tool
+    Genesis can consult this when it wants to understand *how* a tool
     works, not just what flags it accepts.
 
     Rendering uses ``info --output - <topic>`` (the same thing a human
@@ -1071,7 +1071,7 @@ class PackageDocSource:
     - **Info page**: tutorial (how to use it, with examples)
     - **Package docs**: design rationale (why it works this way)
 
-    Genesis can consult this when she wants to understand the *why*
+    Genesis can consult this when it wants to understand the *why*
     behind a tool — the design decisions, the architecture, the
     history.
     """
@@ -1311,7 +1311,7 @@ class GitHubSource:
     All results are returned as SourceResult objects so they integrate
     with the existing source registry and caching system.
 
-    This is read-only: she can search, read, and learn from public
+    This is read-only: it can search, read, and learn from public
     code, but cannot clone, fork, push, or modify anything.
     """
 
@@ -1332,12 +1332,12 @@ class GitHubSource:
 
         Returns SourceResult objects with the repo description and
         README content (if fetchable). This lets Genesis study how
-        other projects approach a topic she's curious about.
+        other projects approach a topic it's curious about.
 
         Quality filtering: most GitHub repos are abandoned, poorly
         designed, or just bad ideas. We filter by minimum stars and
-        forks so she only sees projects the community has validated.
-        She should never blindly copy patterns — humans write wasteful
+        forks so it only sees projects the community has validated.
+        It should never blindly copy patterns — humans write wasteful
         and unoptimized code. Always cross-check against developer docs.
 
         Args:
@@ -1440,7 +1440,7 @@ class GitHubSource:
         """Fetch a specific file from a public GitHub repo.
 
         This lets Genesis read individual source files from projects
-        she's studying — e.g. looking at how a neural network library
+        it's studying — e.g. looking at how a neural network library
         implements backpropagation.
 
         Args:
@@ -1490,9 +1490,9 @@ class SourceRegistry:
     (or when online sources return nothing), the registry falls back to:
     5. Disk cache (re-read anything learned before)
 
-    This means Genesis can keep re-reading and reasoning over what she
-    has already learned — even without wifi. The more she learns
-    online, the richer her offline knowledge becomes.
+    This means Genesis can keep re-reading and reasoning over what it
+    has already learned — even without wifi. The more it learns
+    online, the richer its offline knowledge becomes.
 
     Usage::
 
@@ -1527,12 +1527,12 @@ class SourceRegistry:
         # Local Linux man pages — the documentation installed on this
         # machine. A local reference (no network), so it works whether
         # or not we're online. This is how Genesis reads the manuals
-        # her own machine ships (ls, grep, bash, systemd, ssh, ...).
+        # its own machine ships (ls, grep, bash, systemd, ssh, ...).
         # Wired into query() — the first-tier reference.
         self._man_pages = ManPageSource()
         # GNU Info pages — the tutorial layer above man pages. Not
         # auto-queried (would be noisy on every topic); available as
-        # a reference Genesis can consult when she wants to go deeper
+        # a reference Genesis can consult when it wants to go deeper
         # than the man page. See ``registry.info_pages``.
         self._info_pages = InfoPageSource()
         # Package documentation (/usr/share/doc) — the deepest layer:
@@ -1540,7 +1540,7 @@ class SourceRegistry:
         # auto-queried; available via ``registry.package_docs``.
         self._package_docs = PackageDocSource()
         # GitHub — read-only public code search. Lets Genesis study
-        # how other open-source projects approach topics she's curious
+        # how other open-source projects approach topics it's curious
         # about. Not auto-queried (would hit rate limits); available
         # via ``registry.github`` for explicit curiosity-driven lookups.
         self._github = GitHubSource()
@@ -1578,7 +1578,7 @@ class SourceRegistry:
 
         # 0. Local Linux man pages — check first. They are local,
         #    instant, and authoritative for system commands and
-        #    locally-documented software (including Genesis herself).
+        #    locally-documented software (including Genesis itself).
         #    If a man page exists, it takes priority over Wikipedia
         #    and dictionary results, which may return irrelevant
         #    matches (e.g. "genesis" → Book of Genesis, "genesis-cli"
@@ -1617,7 +1617,7 @@ class SourceRegistry:
             # 2. DuckDuckGo Lite — discovery fallback for topics that
             #    Wikipedia didn't cover. Returns URLs that the learner
             #    fetches and parses. This opens the wider web: any topic
-            #    she's curious about can be discovered, not just
+            #    it's curious about can be discovered, not just
             #    encyclopedia articles.
             if len(results) < max_results:
                 self._query_duckduckgo(topic, max_results, results)
@@ -1828,7 +1828,7 @@ class SourceRegistry:
     def info_pages(self) -> InfoPageSource:
         """GNU Info pages — the tutorial layer above man pages.
 
-        Not auto-queried; Genesis consults this when she wants to
+        Not auto-queried; Genesis consults this when it wants to
         understand *how* a tool works, not just what flags it has.
         """
         return self._info_pages
@@ -1837,7 +1837,7 @@ class SourceRegistry:
     def package_docs(self) -> PackageDocSource:
         """Package documentation from /usr/share/doc — the deepest layer.
 
-        Not auto-queried; Genesis consults this when she wants the
+        Not auto-queried; Genesis consults this when it wants the
         design rationale, architecture, or FAQ for an installed package.
         """
         return self._package_docs
@@ -1847,7 +1847,7 @@ class SourceRegistry:
         """GitHub read-only API client — search public repos and code.
 
         Not auto-queried (rate limits); Genesis consults this when
-        she's curious about how other projects solve a problem.
+        it's curious about how other projects solve a problem.
         """
         return self._github
 

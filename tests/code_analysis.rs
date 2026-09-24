@@ -424,11 +424,11 @@ pub fn create_user(name: String, age: u32) -> User {
     assert!(episodes[2].contains("create_user"));
 }
 
-// ─── Self-analysis: Genesis parsing her own code ──────────────
+// ─── Self-analysis: Genesis parsing its own code ──────────────
 
 #[test]
 fn test_self_analysis_neurochemical() {
-    // Parse the neurochemical module — Genesis understanding herself
+    // Parse the neurochemical module — Genesis understanding itself
     let source = include_str!("../src/state/neurochemical.rs");
     let analysis = analyze_file(source, "neurochemical.rs").expect("parse");
 

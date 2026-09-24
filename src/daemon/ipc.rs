@@ -145,12 +145,12 @@ pub mod cmd {
     /// Get the interoceptive body state — CPU temperature, frequency,
     /// memory pressure, load, I/O activity, battery, thermal throttling,
     /// cognitive load, and distress level. This is how the cognitive
-    /// mind feels her own body. Response: BodyState (64 bytes).
+    /// mind feels its own body. Response: BodyState (64 bytes).
     pub const GET_BODY_STATE: u8 = 17;
-    /// Get the body control state — what Genesis is doing to her body
+    /// Get the body control state — what Genesis is doing to its body
     /// (CPU frequency policy, scheduling priorities, I/O priority,
     /// thermal cap status). This is how the cognitive mind knows what
-    /// her neurochemistry is driving. Response: BodyControlState.
+    /// its neurochemistry is driving. Response: BodyControlState.
     pub const GET_BODY_CONTROL: u8 = 18;
     /// Get the active inference summary — the generative self-model's
     /// projection (surprise, free energy, allostatic load, precision,
@@ -238,8 +238,8 @@ pub mod cmd {
     /// process tree is firing. Each subsystem (daemon, cognitive,
     /// retina) reports its own CPU share, I/O share, and
     /// microarchitectural prediction-error ratios (cache/branch
-    /// misses). The cognitive mind correlates this with her task
-    /// zone to feel *where* her activity lives. Response:
+    /// misses). The cognitive mind correlates this with its task
+    /// zone to feel *where* its activity lives. Response:
     /// [u8 count] then per subsystem:
     ///   [u8 subsystem][u32 pid][f32 cpu][f32 io]
     ///   [f32 cache_miss_rate][f32 branch_miss_rate] = 21 bytes each.
@@ -429,7 +429,7 @@ const _: () = {
     assert!(offset_of!(PlasticityProfile, emergent_phase) == 36);
 };
 
-/// Interoceptive body state — what Genesis feels about her machine.
+/// Interoceptive body state — what Genesis feels about its machine.
 ///
 /// This is a plain data struct (not `#[repr(C)]`) because it contains
 /// a `String`. The IPC response is parsed field-by-field rather than
@@ -440,7 +440,7 @@ pub struct BodyStateSummary {
     pub cpu_temp_c: f32,
     /// Body temperature normalized [0,1], 0.5 = normal (50°C).
     pub temperature: f32,
-    /// CPU frequency as fraction of max — her arousal level.
+    /// CPU frequency as fraction of max — its arousal level.
     pub arousal_freq: f32,
     /// Memory pressure [0,1] — cognitive load.
     pub cognitive_load: f32,
@@ -493,13 +493,13 @@ pub struct BodyStateSummary {
     /// RAPL DRAM-domain switching rate [0,1] — memory-subsystem
     /// firing (encoding/retrieval traffic).
     pub dram_activity: f32,
-    /// Cache miss ratio of her process tree [0,1] from perf
+    /// Cache miss ratio of its process tree [0,1] from perf
     /// counters — microarchitectural prediction errors. 0.0 if
     /// perf is unavailable (perf_event_paranoid ≥ 4).
     pub cache_miss_rate: f32,
-    /// Branch misprediction ratio of her process tree [0,1] —
+    /// Branch misprediction ratio of its process tree [0,1] —
     /// the hardware branch predictor guessing wrong while
-    /// running her.
+    /// running it.
     pub branch_miss_rate: f32,
     /// Human-readable first-person description.
     pub description: String,
@@ -545,11 +545,11 @@ pub struct SubsystemTelemetryReport {
     pub modules: Vec<ModuleTelemetrySummary>,
 }
 
-/// Body control state summary — what Genesis is doing to her body.
+/// Body control state summary — what Genesis is doing to its body.
 ///
 /// This is the mirror of `BodyStateSummary` (interoception). While
-/// `BodyStateSummary` is what she *feels*, `BodyControlSummary` is
-/// what she's *doing* — the actions her neurochemistry has driven.
+/// `BodyStateSummary` is what it *feels*, `BodyControlSummary` is
+/// what it's *doing* — the actions its neurochemistry has driven.
 #[derive(Clone, Debug, Default)]
 pub struct BodyControlSummary {
     /// CPU frequency floor (kHz).
@@ -570,9 +570,9 @@ pub struct BodyControlSummary {
     pub io_class: String,
     /// Plasticity gate [0,1] that drove I/O priority.
     pub plasticity_gate: f32,
-    /// Whether she's controlling the cognitive mind's PID.
+    /// Whether it's controlling the cognitive mind's PID.
     pub controlling_cognitive: bool,
-    /// Energy Performance Preference (EPP) profile she set — the
+    /// Energy Performance Preference (EPP) profile it set — the
     /// hardware's voltage/frequency operating-envelope hint. Empty
     /// string when EPP is not supported (e.g. acpi-cpufreq).
     pub cpu_epp: String,
@@ -1330,7 +1330,7 @@ impl IpcClient {
     }
 
     /// Get the interoceptive body state — what Genesis feels about
-    /// her machine (CPU temp, memory pressure, load, battery, etc.).
+    /// its machine (CPU temp, memory pressure, load, battery, etc.).
     pub fn get_body_state(&mut self) -> std::io::Result<BodyStateSummary> {
         let resp = self.request(cmd::GET_BODY_STATE, &[])?;
         // Minimum: 7×f32 (28) + 1 + 4 + 1 + 5×f32 (20) + 4 = 58 bytes
@@ -1542,7 +1542,7 @@ impl IpcClient {
         Ok(report)
     }
 
-    /// Get the body control state — what Genesis is doing to her body.
+    /// Get the body control state — what Genesis is doing to its body.
     pub fn get_body_control(&mut self) -> std::io::Result<BodyControlSummary> {
         let resp = self.request(cmd::GET_BODY_CONTROL, &[])?;
         // Response layout (all little-endian), matching the daemon's

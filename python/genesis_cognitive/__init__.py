@@ -1,7 +1,7 @@
 """Genesis cognitive mind — the thinking, feeling, speaking layer.
 
 This package implements Genesis's cognitive mind: a cognitive system
-that reads her subcognitive neurochemical state, perceives input,
+that reads its subcognitive neurochemical state, perceives input,
 retrieves memories, deliberates about what to say, and generates
 natural language responses.
 

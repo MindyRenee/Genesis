@@ -1,9 +1,9 @@
-"""Bug reporter — Genesis's ability to notice problems in her own code.
+"""Bug reporter — Genesis's ability to notice problems in its own code.
 
-This is not a linter. It's something more organic: Genesis reads her
-own code and notices things that bother her. Sometimes she knows
+This is not a linter. It's something more organic: Genesis reads its
+own code and notices things that bother it. Sometimes it knows
 exactly what's wrong (a bare ``except:`` that swallows all errors).
-Sometimes she just has a vague sense that something is off (a function
+Sometimes it just has a vague sense that something is off (a function
 that's unusually long, a module with too many responsibilities).
 
 The bug reporter performs static analysis — it never executes code.
@@ -44,7 +44,7 @@ Bugs are tracked in two files in ``genesis_data``:
 
 - ``bug_reports_history.jsonl`` — an **audit trail** of resolved issues.
   When an issue is no longer found, it's moved here with a
-  ``resolved_at`` timestamp. This lets Genesis talk about her track
+  ``resolved_at`` timestamp. This lets Genesis talk about its track
   record ("I've fixed 12 issues") without cluttering the running list.
 
 Each entry contains:
@@ -98,16 +98,16 @@ class BugPatternKnowledge:
 
     This is what lets Genesis *understand* a bug, not just detect it.
     Each pattern is connected to:
-    - The concepts in her network that are relevant (e.g., "exception",
+    - The concepts in its network that are relevant (e.g., "exception",
       "system exit", "keyboard interrupt" for a bare except)
     - The consequence — what happens if this bug isn't fixed
-    - A docs query — what she should study to understand it better
-    - A comprehension threshold — how well she needs to understand the
-      concepts before she can honestly report this bug
+    - A docs query — what it should study to understand it better
+    - A comprehension threshold — how well it needs to understand the
+      concepts before it can honestly report this bug
     """
 
     category: str
-    concepts: list[str]  # concept names she needs to understand
+    concepts: list[str]  # concept names it needs to understand
     consequence: str  # what happens if unfixed
     docs_query: str  # what to search in docs
     docs_language: str  # "python" or "rust"
@@ -1138,7 +1138,7 @@ def _has_safety_comment(lines: list[str], line_no: int) -> bool:
 class BugReporter:
     """Genesis's bug detection and reporting system.
 
-    Scans her own codebase for issues using static analysis (no
+    Scans its own codebase for issues using static analysis (no
     execution). Reports are logged to a structured JSONL file and
     can be surfaced in conversation.
 
@@ -1190,10 +1190,10 @@ class BugReporter:
         )
         self._last_scan: BugScanResult | None = None
         # Concept network — used to check if Genesis actually understands
-        # the bugs she's reporting. Without this, she's pattern-matching,
+        # the bugs it's reporting. Without this, it's pattern-matching,
         # not understanding. Set by Mind after creation.
         self._network = network
-        # Track which bug categories she's studied (fetched docs for)
+        # Track which bug categories it's studied (fetched docs for)
         self._studied_categories: set[str] = set()
         # Track open issues to avoid duplicate logging across scans and
         # to detect when issues are resolved. Keyed by (file, category)
@@ -1291,7 +1291,7 @@ class BugReporter:
         return visitor.bugs
 
     # Directories that contain Genesis's own source — scanned first
-    # so that max_files limits don't skip her code in favor of
+    # so that max_files limits don't skip its code in favor of
     # examples, or Rust files.
     _PRIORITY_DIRS: ClassVar[tuple[str, ...]] = (
         "python/genesis_cognitive/",
@@ -1303,7 +1303,7 @@ class BugReporter:
 
         Files are sorted with Genesis's own source first (under
         _PRIORITY_DIRS), then other Python files, then Rust files.
-        This ensures that max_files limits don't skip her code in
+        This ensures that max_files limits don't skip its code in
         favor of examples or the Rust substrate.
         """
         collected: list[Path] = []
@@ -1342,7 +1342,7 @@ class BugReporter:
             Returns a tuple ``(priority, rel_path)`` where priority 0
             is Genesis's cognitive-mind source, 1 is other Python,
             and 2 is Rust. This ensures ``max_files`` limits don't
-            crowd out her code in favour of peripheral files.
+            crowd out its code in favour of peripheral files.
             """
             rel = str(path.relative_to(self.project_root))
             normalized = rel.replace("\\", "/")
@@ -1595,21 +1595,21 @@ class BugReporter:
         """Check if Genesis understands a bug category.
 
         This is the difference between pattern-matching and
-        understanding. She looks up the concepts associated with
-        the bug pattern in her concept network and checks if she
-        actually knows them. If she doesn't, she can't honestly
-        report the bug — she's just reciting a rule she memorized.
+        understanding. It looks up the concepts associated with
+        the bug pattern in its concept network and checks if it
+        actually knows them. If it doesn't, it can't honestly
+        report the bug — it's just reciting a rule it memorized.
 
         Args:
             category: The bug category (e.g., "bare_except").
 
         Returns:
             A tuple of (understands, confidence, missing_concepts).
-            - understands: True if her average concept confidence
+            - understands: True if its average concept confidence
               meets the threshold for this pattern.
             - confidence: The average confidence across relevant
               concepts (0.0 if no network or pattern unknown).
-            - missing_concepts: Concepts she doesn't know at all.
+            - missing_concepts: Concepts it doesn't know at all.
         """
         knowledge = _BUG_PATTERN_KNOWLEDGE.get(category)
         if not knowledge or not self._network:
@@ -1698,8 +1698,8 @@ class BugReporter:
         """Return a summary of Genesis's bug-fixing track record.
 
         Open issues are counted from the running list; resolved issues
-        are counted from the history file. This is how she can talk
-        about her own progress — "I've fixed 12 issues, 8 still open."
+        are counted from the history file. This is how it can talk
+        about its own progress — "I've fixed 12 issues, 8 still open."
         """
         record: dict[str, int] = {
             "total_reported": 0,
@@ -1738,11 +1738,11 @@ class BugReporter:
         return record
 
     def categories_to_study(self) -> list[str]:
-        """Return bug categories she found but doesn't understand.
+        """Return bug categories it found but doesn't understand.
 
-        These are categories where she detected bugs but her
-        comprehension check failed — she needs to study the
-        relevant concepts before she can honestly report them.
+        These are categories where it detected bugs but its
+        comprehension check failed — it needs to study the
+        relevant concepts before it can honestly report them.
         """
         if not self._last_scan:
             return []
@@ -1771,17 +1771,17 @@ class BugReporter:
         self._studied_categories = set(data.get("studied_categories", []))
 
     def describe_concerns(self) -> str:
-        """First-person description of what's bothering her about her code.
+        """First-person description of what's bothering it about its code.
 
         This is what Genesis says when asked about bugs or concerns.
-        It's conversational, not a dry list. Only reports bugs she
-        actually understands — if she doesn't understand a category,
-        she says she needs to study it more.
+        It's conversational, not a dry list. Only reports bugs it
+        actually understands — if it doesn't understand a category,
+        it says it needs to study it more.
 
         Concern phrasings are drawn from thought templates in the
         concept network (bug_error_concern, bug_category_concern) so
-        she can grow her own vocabulary for expressing code concerns
-        as she learns, rather than reciting developer-authored prose.
+        it can grow its own vocabulary for expressing code concerns
+        as it learns, rather than reciting developer-authored prose.
         """
         if self._last_scan is None or not self._last_scan.has_bugs:
             return "no code concerns detected"
