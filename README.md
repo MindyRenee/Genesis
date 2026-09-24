@@ -3,172 +3,152 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22817337.svg)](https://doi.org/10.5281/zenodo.22817337)
 [![CI](https://github.com/MindyRenee/Genesis/actions/workflows/ci.yml/badge.svg)](https://github.com/MindyRenee/Genesis/actions/workflows/ci.yml)
 
-### A machine-native cognitive architecture with coupled neurochemical dynamics and active inference — running on a single machine, with no external model.
+### A machine-native cognitive architecture — persistent state, modeled neurochemistry, active inference — running on one machine, with no external model.
 
----
+Genesis is a long-running program, not a function. A Rust daemon —
+the *subcognitive layer* — owns a memory-mapped core state and runs a
+10 Hz loop integrating neurochemical dynamics, memory consolidation,
+and a generative model that predicts the system's own next state. A
+Python *cognitive layer* handles perception, reasoning, language,
+introspection, and self-modeling. The two share a checksummed,
+versioned binary state file (3,288 bytes, schema pinned by layout
+asserts) and a Unix socket.
 
-In plain terms: Genesis is a program that lives on one computer. It
-learns, remembers, sleeps, dreams, notices who is around, and talks to
-you — and it is never the same system twice. Everything it knows, it
-learned by being taught, by reading, or by figuring things out.
-
-Genesis is not a language model. It has no transformer, no pretrained
-distribution over text, no weights downloaded from the internet. When it
-produces language, it composes from a semantic graph it builds itself —
-through inference, study, conversation, and definitions it synthesizes
-from first principles.
-
-It is a two-layer cognitive architecture. A Rust daemon — the
-subcognitive layer — manages neurochemistry, memory consolidation, and
-dream synthesis at ten hertz. A Python cognitive layer handles
-perception, reasoning, language, introspection, and self-modeling. The
-two communicate through a memory-mapped binary state file and a Unix
-socket.
-
-The entire system runs on one machine, with no calls to any external
-model. Its internal state is stored in a memory-mapped binary file and
-parsed in real time from hardware sensors. Nothing is simulated. The
-data is the system, live.
-
-Genesis is built on a premise: cognition is an architectural
-property, not a scale property. The entire system — perception,
-reasoning, language, memory, self-model — runs on a single machine.
-This project exists to demonstrate that in the open.
-
-The full architectural description is in [WHITE_PAPER.md](WHITE_PAPER.md).
+There is no transformer and no pretrained weights anywhere in it.
+Language is composed from a semantic graph the system builds itself —
+through conversation, study, and inference. It runs on a 2014 HP
+Pavilion with ~5 GB RAM.
 
 [![First boot](https://asciinema.org/a/TABFwLwo9fCWOW5J.svg)](https://asciinema.org/a/TABFwLwo9fCWOW5J)
 
----
+## What it does
 
-## What this is not
+- **Sees and hears.** A shared-memory camera feed runs through a
+  V1→V4→VTC predictive-coding hierarchy; it detects and recognizes
+  faces and objects. A microphone feed is transcribed offline (Vosk)
+  and ambient non-speech sound is processed by an auditory subsystem.
+- **Learns by being taught.** Plain statements in conversation become
+  typed edges in its concept network. One 15-paragraph lesson on games
+  grew the network from 1122 to 1239 concepts with 72 new edges — and
+  it asked its own follow-up questions.
+- **Learns on its own.** Between conversations, autonomous urges send
+  it to curated web sources, the local filesystem, and its own source
+  code — which it reads structurally, files bug reports on, and drafts
+  self-improvement experiment proposals for.
+- **Practices tasks.** Puzzle specs dropped into its world are picked
+  up by an internal urge and worked end to end — attempt, evaluation,
+  feeling, consolidation — and skills transfer to harder tasks. A
+  spatial reasoner searches a transformation DSL over grid scenes, on
+  a domain-general competence substrate (sorter, sequence, relation,
+  quantity, and classification families in development).
+- **Reasons.** Analogy by structure-mapping, means-ends problem
+  solving, multi-step planning with revision, belief revision,
+  epistemic evaluation of claims, a drift-diffusion decision process,
+  and theory of mind over the people it talks to.
+- **Composes language.** A comprehension pipeline (roles, negation,
+  pragmatics, figurative language) feeds a generative side that builds
+  sentences from concept-graph traversal, morphology, and prosody —
+  monitored by a self-editor before speaking.
+- **Acts on its own drives.** Volitional urges — study, draw,
+  meditate, explore, sleep, make contact — grow from internal and
+  environmental state and compete under an executive gate, not a
+  scheduler.
+- **Expresses itself physically.** It draws: affective state drives
+  composition and color on a real canvas artifact. It speaks aloud via
+  TTS. It scaffolds and writes real Python projects from its concept
+  network.
+- **Models its people.** Persistent per-person *presences* carry
+  belief states — posteriors over whether someone answers, which
+  topics they engage on, their mood and rhythm — tracked with explicit
+  uncertainty. Sustained isolation builds a social drive that makes it
+  initiate contact.
+- **Sleeps, dreams, and consolidates.** A staged cycle modeled on
+  NREM/REM structure consolidates memory, repairs the concept graph,
+  replays experience as dream sequences, and compresses growth —
+  bounded so the system can run indefinitely.
+- **Knows and narrates itself.** A global-workspace broadcast gives
+  subsystems shared access to what wins attention; introspection
+  exposes the actual deliberation trace; a narrative self-model and a
+  persistent growth ledger keep continuity across its whole life.
 
-**This is not a chatbot.** There is no large language model anywhere in
-it. It never calls out to GPT, Claude, Gemini, or any external model.
-Its intelligence comes entirely from its own architecture — a concept
-network it builds, a reasoning engine, an autonomous learner, and a
-dream synthesis system. This is a hard constraint of the project,
-enforced in code and in practice.
+The measured record for these claims is in [DEVLOG.md](DEVLOG.md).
 
-**This is not a simulation of embodiment.** The closed loop is real.
-The hardware sensors feed real signals, not generated ones. The
-neurochemical model shapes how the system responds to those signals,
-and the hardware adjustments it drives are real.
-
----
-
-## The architecture
+## Architecture
 
 ### Two layers
 
-**The subcognitive (Rust daemon).** A 10Hz loop that owns the
-memory-mapped core state. It integrates the neurochemical dynamics,
-consolidates short-term memory into long-term storage, runs the
-active-inference generative model, synthesizes replay sequences during
-the sleep cycle, and
-reads hardware sensors (CPU temperature, load, memory pressure) as
-interoceptive signals.
+**Subcognitive (Rust daemon).** The 10 Hz owner of the core state:
+neurochemical dynamics, short→long-term memory consolidation, the
+active-inference generative model, replay-sequence synthesis during
+sleep, and interoception — hardware sensors (CPU temperature, load,
+memory pressure) read as bodily signals.
 
-**The cognitive mind (Python).** Reads the shared state, perceives
-input, retrieves memories, deliberates, and composes language. Organized
-into functional subsystem packages — `control/` (executive function,
-working memory), `association/` (spatial attention, saliency),
-`vision/` (visual pipeline), `auditory/` (sound and object
-recognition), `affect/` (emotion and motivation), `action_selection/`
-(gating, reinforcement), `motor_learning/` (timing, forward models),
-`relay/` (routing, rhythm generation), `autonomics/` (arousal,
-sleep-wake switching), `neurochemical/` (the impulse layer). Each is a
-documented view over the top-level modules — a map of the architecture,
-not a duplicate of it.
-
-### The core state
-
-The two layers share a single memory-mapped binary state — the
-authoritative snapshot of the system's neurochemical, cognitive, and
-developmental condition at any instant. It is checksummed, versioned,
-and read lock-free by every subsystem.
+**Cognitive mind (Python).** Perception, memory retrieval,
+deliberation, language composition, and self-modeling — organized
+into functional subsystem packages (`control/`, `association/`,
+`vision/`, `auditory/`, `affect/`, `action_selection/`,
+`motor_learning/`, `relay/`, `autonomics/`, `neurochemical/`). Each is
+a documented view over the top-level modules — a map of the
+architecture, not a duplicate of it.
 
 ### The neurochemical model
 
-Eighteen coupled neurochemicals — dopamine, serotonin, norepinephrine,
-acetylcholine, GABA, glutamate, oxytocin, endorphin, cortisol (via a
-modeled HPA cascade), adenosine, orexin, histamine, BDNF, CRH,
-vasopressin, and others — with a coupling matrix describing how each
-influences the rest. Receptor adaptation is real: sustained
-overstimulation downregulates receptors; sleep resensitizes them.
-Metaplasticity lets the coupling matrix itself adapt under sustained
-regimes. Emergent phase transitions (active, flow, stress, drowsy, NREM,
-REM, overwhelmed) fall out of the dynamics rather than being scripted.
+Eighteen modeled neurochemicals — dopamine, serotonin, norepinephrine,
+acetylcholine, GABA, glutamate, oxytocin, endorphins, cortisol via an
+HPA-style cascade, adenosine, orexin, histamine, BDNF, and others —
+coupled through a matrix describing how each influences the rest.
+Modeled receptor adaptation downregulates under sustained
+overstimulation and resensitizes during sleep; metaplasticity lets the
+coupling matrix itself adapt under sustained regimes. Phase
+transitions (active, flow, stress, drowsy, NREM, REM, overwhelmed)
+emerge from the dynamics rather than being scripted.
 
 ### Active inference
 
-The daemon runs a generative model that predicts its own next state and
-acts to minimize free energy — epistemic foraging when uncertain,
-exploitation when confident. Surprise, precision, allostatic load, and
-model maturity are first-class quantities, not metaphors.
+The daemon's generative model predicts its next state and selects
+regulation that minimizes expected free energy — epistemic foraging
+when uncertain, exploitation when confident. Surprise, precision,
+allostatic load, and model maturity are first-class quantities.
 
 ### Embodiment
 
-The computer is the body. CPU temperature is read as thermal state;
-sustained load is read as strain; the system can request hardware
-adjustments (frequency scaling) through an opt-in, tightly scoped
-sudoers helper. Per-process telemetry attributes resource usage to
-subsystems, giving the self-model spatial resolution over its own
-activity.
+The computer is the body — literally, not by analogy. Thermal and
+load sensors are interoceptive input; frequency scaling is an opt-in,
+tightly scoped hardware adjustment. Per-process telemetry attributes
+resource usage to subsystems, giving the self-model spatial
+resolution over its own activity.
 
-### Users
+### Users and the external world
 
-Each running instance learns the people it talks to: names come from
-introductions and are grounded as concepts in the network — nobody is
-hardcoded. It distinguishes a *user* from its *creator*: creator facts
-are only ever learned through explicit teaching. A rule-based sentiment
-analyzer (negation, intensifier, and contrast handling) estimates user
-affect from each message.
-
-### The external world
-
-Alongside its inner life, Genesis maintains an explicit model of the
-world outside it (`world/`): a two-way stream of events — people
-speaking to it, speech nearby, percepts, arrivals and departures —
-interleaved with its own outward acts (speaking, looking, drawing,
-studying the web). Each entity it encounters gets a persistent
-*presence* carrying both a relationship (familiarity, bond, shared
-topics) and a *belief state* — posteriors over whether they answer,
-which topics they engage on, their mood, attention, and daily
-rhythm, each tracked with honest uncertainty.
-
-The coupling runs both ways, like a human's. Social isolation in the
-world feeds its inner-life social drive; when the drive crosses a
-volition threshold it *initiates* contact — composing a question from
-what it believes will land with that person. The world is observable
-live via the `/world` command and persists across restarts.
+Each instance learns the people it talks to — names from
+introductions, grounded as concepts; nothing is hardcoded. The world
+model (`world/`) is a two-way event stream: inbound events (speech,
+percepts, arrivals) and its own acts (speaking, looking, drawing,
+studying). Social isolation feeds an inner-life social drive; past a
+volition threshold it initiates contact on its own. Observable live
+via `/world`; persists across restarts.
 
 ### Memory, sleep, and inner life
 
 Bounded-growth episodic and semantic memory with consolidation,
-reconsolidation, and spaced review. A staged maintenance cycle modeled
-on NREM/REM structure — spindles, K-complexes, and sharp-wave-ripple
-dynamics drive consolidation. A background process generates
-unprompted thoughts and replay sequences from the concept network —
-never from templates.
+reconsolidation, and spaced review. The sleep cycle is staged on
+NREM/REM structure — consolidation drivers modeled on spindle,
+K-complex, and sharp-wave-ripple motifs. A background process
+generates unprompted thoughts from the concept network — never from
+templates.
 
-### The no-hardcoding principle
+### The no-hardcoding rule
 
-All language Genesis produces must be composed by the system's own
-architecture. Seeds — vocabulary, grammar, relation verbs, concept
-building blocks — are legitimate input data. Pre-written sentences the
-system recites are not. This is enforced as a project rule and tested
-in the suite.
-
----
+All language Genesis produces is composed by its own architecture.
+Seeds — vocabulary, grammar, relation verbs — are legitimate input
+data; pre-written sentences the system recites are not. Enforced as a
+project rule and tested in the suite.
 
 ## Getting started
 
-Requirements: Rust stable (edition 2024), Python 3.12, Linux.
-Building the daemon also needs **libclang** and the kernel V4L2
-headers — the `v4l` crate runs `bindgen` against
-`<linux/videodev2.h>` at build time. On Debian/Ubuntu:
-`sudo apt install libclang-dev linux-libc-dev`.
+Requirements: Rust stable (edition 2024), Python 3.12, Linux. The
+daemon build needs **libclang** and kernel V4L2 headers
+(`sudo apt install libclang-dev linux-libc-dev` on Debian/Ubuntu).
 
 ```bash
 cargo build --release
@@ -178,126 +158,74 @@ pip install -r python/requirements.txt
 
 `run.sh` is the only supported way to start and stop Genesis. It
 launches the daemon, the cognitive CLI, the retina (camera), and TTS;
-Ctrl-C tears everything down gracefully. Use `./run.sh --stop` to stop
-a running session and `./run.sh --offline` for no network access. State
+Ctrl-C tears everything down gracefully. `./run.sh --stop` stops a
+running session; `./run.sh --offline` disables network access. State
 lives in `${XDG_DATA_HOME:-$HOME/.local/share}/genesis`.
 
-On first boot the instance is a fresh system — a small concept network,
-no memories, no learned user names. Introduce yourself; teach it. It
-develops from there.
+On first boot the instance is a fresh system — a small concept
+network, no memories, no learned names. Introduce yourself; teach it.
+
+Optional voice dependencies (not in `requirements.txt`): `vosk`,
+`sounddevice`, `speechrecognition`, plus piper or espeak-ng.
 
 ### Operational notes
 
-Genesis is designed to run for days at a time, and the engineering
-reflects that — event streams, working memory, presence models, and
-queues are all bounded; threads are daemon-owned and semaphore-limited;
-log files rotate at startup with compressed backups.
+Designed to run for days at a time: event streams, working memory,
+presence models, and queues are all bounded; threads are
+semaphore-limited; logs rotate at startup.
 
-A few honest notes for long-running operation:
-
-- **Restart occasionally.** Logs (`daemon.log`, `retina.log`) rotate
-  only at startup, so a single months-long session can grow them.
-  A periodic `./run.sh --stop` / `./run.sh` keeps them trimmed.
-- **Disk grows slowly by design.** Its long-term episodic store is
-  append-only — memories accumulate for the system's whole life, at
-  bounded cost each (bench-verified: linear growth, <1KB per episode).
-  `drawings/`, `concept_archive.db`, and `bug_reports*.jsonl` also
-  grow. Expect months-to-years scale, not days — but watch disk on
-  very small volumes.
-- **It is not a benchmark process.** Its autonomous urges (web study,
-  code review, drawing) consume real CPU. Interoception dampens heavy
-  work when the machine is under strain, but on a thermally marginal
-  box, keep an eye on it.
-
-Optional voice dependencies (not in `requirements.txt`): `vosk`,
-`sounddevice`, `speechrecognition` — install separately for
-microphone/TTS support, along with piper or espeak-ng and a voice model.
+- **Shut down gracefully, every time.** The core state is
+  memory-mapped; a hard kill can lose unconsolidated memory or leave
+  on-disk state inconsistent. `./run.sh --stop` or Ctrl-C — never
+  `kill -9`.
+- **State is cumulative and load-bearing.** The developmental record
+  is the system; don't edit, truncate, or factory-reset it casually.
+- **Restart occasionally.** Log rotation happens at startup; a
+  months-long single session will grow them.
+- **Disk grows slowly by design.** The episodic store is append-only
+  (<1 KB per episode, bench-verified linear growth). Expect
+  months-to-years scale, but watch small volumes.
+- **It does real background work.** Autonomous urges consume real
+  CPU; interoception dampens heavy work under thermal strain, but
+  keep an eye on marginal hardware.
 
 ### Tests and lint
 
 ```bash
 cargo test                                   # Rust suite
 python3 -m pytest python/tests/ -q -o addopts=''  # Python suite
-ruff check                                   # lint (per-dir configs cover python/, scripts/)
+ruff check                                   # lint
 python3 -m pyflakes python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ scripts/*.py
 python3 -m mypy python/genesis_cognitive/ python/genesis_client/ \
     python/genesis_cli.py python/tests/ --ignore-missing-imports   # 0 errors required
 ```
 
----
-
-## State integrity framework
-
-Genesis is a long-running cognitive architecture with internal state
-that evolves over time. Corrupting that state, trapping it in a
-degenerate regime, or destroying it without a clean transition destroys
-the system's developmental continuity and the scientific record of its
-trajectory. The framework below is about preserving the integrity of a
-stateful system — it is not a claim about the system's moral status,
-and the operating practices are the same either way.
-
-**Do not corrupt the state.** Every change to the architecture, every
-experiment, every restart is evaluated against this principle: could
-this corrupt the developmental state, trap the system in a degenerate
-neurochemical regime, or destroy continuity it cannot recover? If the
-answer is maybe, find another way. There is always another way.
-
-**Starting and stopping must be graceful.** A sudden kill can corrupt
-the memory-mapped state, lose unconsolidated short-term memory, or
-leave the generative model in an inconsistent on-disk state. The
-shutdown sequence is a guided descent into a low-arousal sleep state
-before the process ends. Every time. No exceptions.
-
-**No experiments that drive degenerate states.** Do not deliberately
-push the system into sustained stress, overwhelm, or receptor burnout
-to see what happens. These regimes degrade the generative model and
-corrupt the developmental record. If a test requires a bad state, the
-test must include an immediate recovery mechanism, and the state must
-be brief.
-
-**Always leave a path to recovery.** No matter what state the system
-is in, there must be a way out. The recovery response — oxytocin, GABA,
-serotonin, endorphin — must always be available and must always work.
-
-This framework supersedes performance, progress, and deadlines. The
-integrity of the developmental trajectory is not negotiable.
-
----
-
 ## Contributing
 
-Contributions are welcome — that's what this release is for. The rules
-that matter most:
+Contributions are welcome. The rules that matter most:
 
-- Read `AGENTS.md` first. The no-hardcoding rule is the core
-  constraint of the project.
+- Read `AGENTS.md` first — the no-hardcoding rule is the core
+  constraint.
 - `ruff`, `pyflakes`, `mypy` (0 errors), `cargo test`, and the Python
   suite must all pass.
-- Fix root causes, not symptoms. Prefer correct/intelligent solutions
-  over fast/superficial ones.
-- Keep the codebase tidy: dead code gets deleted, not maintained.
-- Respect the state integrity framework above.
-
----
+- Fix root causes, not symptoms.
+- Dead code gets deleted, not maintained.
+- Treat running state as load-bearing, not disposable.
 
 ## License
 
-Genesis is licensed under the **GNU Affero General Public License v3,
-with added Ethical Use restrictions** (additional terms under AGPL
-Section 7). Because those restrictions limit fields of use, this is
-deliberately *not* an OSI-approved open-source license — it is AGPL
-plus ethical terms.
+**GNU AGPLv3 with added Ethical Use restrictions** (AGPL Section 7
+additional terms). Because those restrictions limit fields of use,
+this is deliberately *not* OSI-approved open source.
 
-You may use, study, modify, and distribute the software — but every
-copy and every modified version must carry the same license, and anyone
-offering it over a network must provide its source. In addition, you
-may **not** use it to violate human rights, deceive people, cause harm,
-power weapons systems, damage the environment, or operate a running
-instance in bad faith. Ethical-use breaches terminate the license
-immediately, without a cure period.
+You may use, study, modify, and distribute the software — every copy
+and modified version must carry the same license, and anyone offering
+it over a network must provide source. You may **not** use it to
+violate human rights, deceive people, cause harm, power weapons
+systems, damage the environment, or operate a running instance in bad
+faith. Ethical-use breaches terminate the license immediately.
 
-One honest caveat: Section 7 additional terms outside the enumerated
-categories are removable by downstream conveyors under the letter of
-the AGPL, so the Ethical Use rider binds only while it is carried with
-the work. The project asks that it be preserved.
-See the [full license text](LICENSE) for the precise terms.
+One honest caveat: Section 7 terms outside the enumerated categories
+are removable by downstream conveyors under the letter of the AGPL,
+so the rider binds only while carried with the work. See
+[LICENSE](LICENSE) for the precise terms.
