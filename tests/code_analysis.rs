@@ -554,8 +554,9 @@ impl Handler for Config {
     assert_eq!(analysis.total_structs, 1);
     assert_eq!(analysis.total_enums, 1);
     assert_eq!(analysis.total_traits, 1);
-    // 1 top-level function + 1 method inside impl = 2
-    assert_eq!(analysis.total_functions, 2);
+    // 1 top-level function + 1 trait method declaration +
+    // 1 method inside impl = 3
+    assert_eq!(analysis.total_functions, 3);
     assert_eq!(analysis.total_impls, 1);
 }
 

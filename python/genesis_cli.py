@@ -14,6 +14,7 @@ Commands (typed during conversation):
     /introspect — see Genesis's last cognitive process
     /learning   — what she's been learning on her own
     /thoughts   — her recent spontaneous thoughts
+    /world      — her external world: presences, events, social isolation
     /regulate  — how she's been managing her emotions
     /journal    — read Genesis's journal
     /dreams     — see what she dreamed
@@ -401,7 +402,8 @@ def _is_daemon_running(socket_path: str) -> bool:
 
 def _start_daemon(daemon_path: str, data_dir: str, socket_path: str) -> subprocess.Popen:
     """Start the daemon process (detached, survives this process)."""
-    os.makedirs(data_dir, exist_ok=True)
+    # Owner-only: the dir contains the daemon's IPC socket and state.
+    os.makedirs(data_dir, mode=0o700, exist_ok=True)
     log_path = os.path.join(data_dir, "daemon.log")
     _rotate_log_if_needed(log_path)
     log_file = open(log_path, "a")
@@ -657,7 +659,7 @@ class AmbientHandler:
         logger.info(f"[ambient] Addressed: \"{text}\" → responding to: \"{query}\"")
         try:
             response = self.mind.respond(query)
-            self._speak(response, dedup=True)
+            self._speak(response, dedup=False)
             logger.info(f"[ambient] Replied: \"{response[:120]}\"")
         except Exception as e:
             logger.exception(f"[ambient] Failed to respond to direct address: {e}")
@@ -680,6 +682,16 @@ class AmbientHandler:
         # salient stimuli (your name) but not background noise.
         if self.mind.is_sleeping:
             return
+
+        # Record the utterance in her external world — speech near her
+        # is an inbound event whether or not she chimes in. It feeds
+        # the ambient presence, the workspace, and (when salient)
+        # memory and dream replay.
+        try:
+            self.mind.world.hear_overheard(text)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"[ambient] world record failed: {e}")
+
         text_lower = text.lower()
         matched = [t for t in CHIME_IN_TOPICS if t in text_lower]
         if not matched:
@@ -809,6 +821,18 @@ class AuditoryHandler:
                         )
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"[auditory] concept network add failed: {e}")
+
+            # Record the percept in her external world — sounds are
+            # inbound events from her surroundings. Salience scales
+            # with loudness; loud sounds trigger the orienting impulse.
+            try:
+                self.mind.world.perceive(
+                    event.description,
+                    salience=min(0.9, 0.25 + event.loudness * 0.6),
+                    source="auditory",
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"[auditory] world record failed: {e}")
 
             # Log the sound event — but suppress consecutive events
             # with the same sound type to avoid flooding the output.
@@ -1172,6 +1196,11 @@ def _cmd_learning(mind: Mind, rest: str) -> str:
 def _cmd_thoughts(mind: Mind, rest: str) -> str:
     """Show Genesis's recent spontaneous thoughts and inner life."""
     return f"\n  genesis> {mind.inner_life_status()}\n"
+
+
+def _cmd_world(mind: Mind, rest: str) -> str:
+    """Show Genesis's external world — presences, events, isolation."""
+    return f"\n  genesis> {mind.world_status()}\n"
 
 
 def _cmd_regulate(mind: Mind, rest: str) -> str:
@@ -1995,12 +2024,13 @@ def _cmd_sleep_aid(mind: Mind, rest: str) -> str:
         lines.append("\n  Use /wake to wake her, or /dreams to see more.\n")
         return "\n".join(lines)
     mind.sleep_aid()
-    result = mind._render_self_report(
+    lines = [_compose(
+        mind,
         "sleep aid administered, drifting into deep sleep",
+        fallback="[sleep aid administered]",
         confidence=0.7,
         metadata={"sleep_aid": True},
-    )
-    lines = [f"\n  genesis> {result}"]
+    )]
     lines.append(mind.sleep_status())
     lines.append("\n  Use /wake to wake her.\n")
     return "\n".join(lines)
@@ -2012,6 +2042,7 @@ _COMMAND_HANDLERS: dict[str, Callable[[Mind, str], str]] = {
     "/introspect": _cmd_introspect,
     "/learning": _cmd_learning,
     "/thoughts": _cmd_thoughts,
+    "/world": _cmd_world,
     "/regulate": _cmd_regulate,
     "/journal": _cmd_journal,
     "/dreams": _cmd_dreams,
@@ -2191,6 +2222,7 @@ def _print_help() -> None:
     logger.info("    /introspect   — her last cognitive process")
     logger.info("    /learning     — what she's been learning on her own")
     logger.info("    /thoughts     — her recent spontaneous thoughts")
+    logger.info("    /world        — her external world: who's there, what's happening")
     logger.info("    /regulate     — how she's been managing her emotions")
     logger.info("    /journal      — read her journal")
     logger.info("    /dreams       — see her subcognitive dream insights")
@@ -2503,6 +2535,18 @@ def _start_sleep_watcher(mind: Mind, shutting_down: threading.Event) -> None:
                 shutting_down.wait(timeout=10.0)
                 continue
 
+            # Anchor the minimum-sleep window to when we first observe
+            # her asleep, regardless of which path put her to sleep —
+            # this watcher, heartbeat auto-sleep, volition, or /sleep.
+            # Without this, only watcher-initiated sleep set the anchor,
+            # so elapsed stayed 0 and the phase-based auto-wake below
+            # could never fire for sleep entered any other way.
+            if mind.is_sleeping:
+                if autonomous_sleep_start == 0.0:
+                    autonomous_sleep_start = _time.time()
+            else:
+                autonomous_sleep_start = 0.0
+
             if phase in (PHASE_NREM, PHASE_REM) and not mind.is_sleeping and not mind.is_meditating:
                 try:
                     mind.sleep()
@@ -2520,10 +2564,7 @@ def _start_sleep_watcher(mind: Mind, shutting_down: threading.Event) -> None:
                 # may briefly dip back to Active during sleep. Let the
                 # sleep cycle reach N3 (at least min_sleep_seconds) before
                 # allowing an autonomous wake.
-                if autonomous_sleep_start > 0:
-                    elapsed = _time.time() - autonomous_sleep_start
-                else:
-                    elapsed = 0.0
+                elapsed = _time.time() - autonomous_sleep_start
                 if elapsed >= min_sleep_seconds:
                     try:
                         # Show her state before waking so the user sees what happened
@@ -3020,7 +3061,8 @@ def main() -> int:
 
     daemon_socket = args.daemon_socket or os.path.join(data_dir, DEFAULT_DAEMON_SOCKET)
 
-    os.makedirs(data_dir, exist_ok=True)
+    # Owner-only: the dir contains the daemon's IPC socket and state.
+    os.makedirs(data_dir, mode=0o700, exist_ok=True)
 
     if _acquire_cli_lock(data_dir) is None:
         return 1

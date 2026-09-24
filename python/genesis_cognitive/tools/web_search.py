@@ -24,8 +24,10 @@ from and composes with — she never recites web text verbatim.
 from __future__ import annotations
 
 import html.parser
+import ipaddress
 import logging
 import re
+import socket
 import ssl
 import urllib.error
 import urllib.parse
@@ -133,12 +135,90 @@ _SKIP_EXTENSIONS = (
 )
 
 
+def _host_of(url: str) -> str:
+    """Extract the lowercase hostname — no userinfo, port, or brackets."""
+    try:
+        return (urllib.parse.urlparse(url).hostname or "").lower().rstrip(".")
+    except ValueError:
+        return ""
+
+
 def _domain_of(url: str) -> str:
-    """Extract the lowercase netloc from a URL, stripping leading www."""
-    netloc = urllib.parse.urlparse(url).netloc.lower()
-    if netloc.startswith("www."):
-        netloc = netloc[4:]
-    return netloc
+    """Extract the lowercase domain from a URL, stripping leading www."""
+    host = _host_of(url)
+    if host.startswith("www."):
+        host = host[4:]
+    return host
+
+
+# ─── Local-target refusal (SSRF guard) ─────────────────────────────
+#
+# The autonomous learner follows search results and outbound links
+# found inside fetched pages — both attacker-influenceable. Without
+# this, a planted ``http://169.254.169.254/`` or ``http://192.168.1.1/``
+# link would make her fetch cloud instance metadata (IAM tokens on
+# GCP/AWS-style endpoints) or LAN admin pages straight into her
+# concept network, where they could surface in conversation later.
+
+_LOCAL_HOSTNAMES: frozenset[str] = frozenset({
+    "localhost", "localhost.localdomain", "ip6-localhost",
+    "ip6-loopback", "broadcasthost",
+})
+
+_LOCAL_HOST_SUFFIXES = (
+    ".localhost", ".local", ".lan", ".home", ".internal", ".corp",
+)
+
+
+def _ip_is_non_public(
+    ip: ipaddress.IPv4Address | ipaddress.IPv6Address,
+) -> bool:
+    """True for any address that isn't a normal public Internet host."""
+    if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
+        ip = ip.ipv4_mapped
+    return (
+        ip.is_private
+        or ip.is_loopback
+        or ip.is_link_local
+        or ip.is_multicast
+        or ip.is_reserved
+        or ip.is_unspecified
+    )
+
+
+def _host_is_local(host: str) -> bool:
+    """Cheap local-target check: literal IPs and well-known local names.
+
+    No DNS lookup — hostname-to-private-IP mappings are caught by
+    ``_resolves_to_non_public`` in ``fetch``.
+    """
+    if host in _LOCAL_HOSTNAMES or host.endswith(_LOCAL_HOST_SUFFIXES):
+        return True
+    try:
+        return _ip_is_non_public(ipaddress.ip_address(host))
+    except ValueError:
+        return False
+
+
+def _resolves_to_non_public(host: str) -> bool:
+    """Resolve the host and refuse if any answer is non-public.
+
+    Catches names pointed at loopback/link-local/RFC-1918 space
+    (e.g. cloud ``*.internal`` metadata names). DNS rebinding between
+    this check and connect remains theoretically possible; closing it
+    fully would require pinning the resolved address.
+    """
+    try:
+        infos = socket.getaddrinfo(host, None, proto=socket.IPPROTO_TCP)
+    except OSError:
+        return False
+    for info in infos:
+        try:
+            if _ip_is_non_public(ipaddress.ip_address(info[4][0])):
+                return True
+        except ValueError:
+            continue
+    return False
 
 
 def is_url_safe(url: str) -> bool:
@@ -159,6 +239,10 @@ def is_url_safe(url: str) -> bool:
     # Skip non-content file types
     path = urllib.parse.urlparse(url).path.lower()
     if path.endswith(_SKIP_EXTENSIONS):
+        return False
+    # Refuse local/private targets (literal IPs and local hostnames;
+    # the DNS-level check happens in fetch, which does I/O anyway).
+    if _host_is_local(_host_of(url)):
         return False
     return True
 
@@ -361,6 +445,19 @@ def fetch(url: str) -> WebFetchResult | None:
         logger.debug(f"web fetch refused (blocked URL): {url}")
         return None
 
+    # http/https only — urlopen also handles file:// and ftp://, which
+    # must never reach the network stack from generated input.
+    if urllib.parse.urlparse(url).scheme not in ("http", "https"):
+        logger.debug(f"web fetch refused (non-http scheme): {url}")
+        return None
+
+    # DNS-level SSRF check: refuse names that resolve to loopback,
+    # link-local, or private ranges.
+    host = _host_of(url)
+    if _resolves_to_non_public(host):
+        logger.debug(f"web fetch refused (resolves to private address): {url}")
+        return None
+
     try:
         req = urllib.request.Request(
             url,
@@ -369,6 +466,13 @@ def fetch(url: str) -> WebFetchResult | None:
         with urllib.request.urlopen(
             req, timeout=REQUEST_TIMEOUT, context=_get_ssl_context()
         ) as resp:
+            # Redirect targets bypass is_url_safe — re-check the final
+            # URL before the body enters her memory. A public page that
+            # 302s to a metadata endpoint gets its GET refused here.
+            final_host = _host_of(resp.geturl())
+            if _host_is_local(final_host) or _resolves_to_non_public(final_host):
+                logger.debug(f"web fetch refused (redirect to private address): {url}")
+                return None
             content_type = resp.headers.get("Content-Type", "")
             if "text/html" not in content_type and "text/plain" not in content_type:
                 return None

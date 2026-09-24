@@ -220,7 +220,7 @@ class V4Model:
             y0 = int(r * patch_h)
             y1 = int((r + self.pool_size) * patch_h)
             x0 = int(c * patch_w)
-            x1 = int(c + self.pool_size) * int(patch_w)
+            x1 = int((c + self.pool_size) * patch_w)
             y1 = min(y1, h)
             x1 = min(x1, w)
 

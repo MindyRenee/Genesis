@@ -1,11 +1,11 @@
 """Occipital subsystem — primary visual cortex (V1) for Genesis.
 
 This module turns the raw camera feed from the retina into structured visual
-percepts. It is modelled on the 2026 sparse-coding account of V1 inference
-(Yun, Belsten, Olshausen et al., "Toward a mechanistic understanding of
-inference in visual cortex and diffusion models", arXiv:2607.15693), with
-orientation-selective simple-cell features, recurrent horizontal connections
-captured by a learned interaction matrix M, and ISTA-style inference dynamics.
+percepts. It implements the classical sparse-coding account of V1 inference
+(Olshausen & Field, 1996 — orientation-selective simple-cell features) with
+recurrent horizontal connections captured by a learned interaction matrix M
+and ISTA-style inference dynamics in the spirit of the locally competitive
+algorithm (Rozell et al., 2008).
 
 The architecture:
 

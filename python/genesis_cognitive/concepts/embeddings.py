@@ -85,13 +85,16 @@ class EmbeddingStore:
     # Built from SVD of the holographic graph's association matrix.
     EXPERIENTIAL_DIM = 32
 
-    # Toroidal geometry: spectral + experiential dimensions are
-    # mapped to angles on a torus T^d, where d = SPECTRAL_DIM +
-    # EXPERIENTIAL_DIM. This makes the space periodic, enabling
-    # representation of cyclical relationships (antonyms, recurrence)
-    # that flat R^n cannot capture.
+    # Toroidal geometry: the experiential dimensions are mapped to
+    # angles on a torus T^d, where d = EXPERIENTIAL_DIM. This makes the
+    # space periodic, enabling representation of cyclical relationships
+    # (antonyms, recurrence) that flat R^n cannot capture. The spectral
+    # dimensions are NOT in the toroidal block — they're polluted by
+    # hub attachments (concepts sharing a hub look close even when
+    # semantically unrelated), while the experiential layer is clean
+    # (it comes from sleep-discovered associations, not graph topology).
     #
-    # The toroidal block is [0 : spectral_dim + experiential_dim].
+    # The toroidal block is [spectral_dim : spectral_dim + experiential_dim].
     # The flat block is [spectral_dim + experiential_dim : end].
     # Hybrid similarity = α * geodesic(toroidal) + (1-α) * cosine(flat).
     TOROIDAL_WEIGHT = 0.3  # weight for toroidal similarity in hybrid
@@ -195,11 +198,12 @@ class EmbeddingStore:
         # layer. Set via set_holographic_graph() after mind startup.
         self._holographic_graph: Any = None
 
-        # Toroidal geometry: the toroidal block is the spectral +
-        # experiential dimensions. Each dimension is mapped to an
-        # angle θ ∈ [0, 2π) via min-max scaling. The angle matrix
+        # Toroidal geometry: the toroidal block is the experiential
+        # dimensions only (spectral is excluded — hub attachments
+        # pollute it). Each dimension is mapped to an angle
+        # θ ∈ [0, 2π) via min-max scaling. The angle matrix
         # and ranges are computed at build time.
-        self._toroidal_dim = 0  # spectral_dim + experiential_dim
+        self._toroidal_dim = 0  # experiential_dim
         self._angle_matrix: np.ndarray | None = None  # (N, toroidal_dim)
         self._toroidal_ranges: np.ndarray | None = None  # (toroidal_dim, 2)
 
@@ -266,6 +270,25 @@ class EmbeddingStore:
         self._ensure_loaded()
         return self._concept_matrix, self._concept_names
 
+    def get_angle_data(
+        self,
+    ) -> tuple[list[str], np.ndarray] | None:
+        """Return toroidal angle coordinates and their concept names.
+
+        Public accessor for the language flow field's angular
+        embedding (consumers previously reached into ``_angle_matrix``
+        and ``_concept_names`` directly).
+
+        Returns:
+            (names, angle_matrix) where names is the list of concept
+            IDs aligned with matrix rows and angle_matrix has shape
+            (N, toroidal_dim); None if angles have not been computed.
+        """
+        self._ensure_loaded()
+        if self._angle_matrix is None or self._angle_matrix.shape[0] == 0:
+            return None
+        return self._concept_names, self._angle_matrix
+
     def get_word_vector(self, word: str) -> np.ndarray | None:
         """Get the GloVe vector for a single word.
 
@@ -300,7 +323,7 @@ class EmbeddingStore:
             return self._concept_cache[concept_name]
 
         # Check the cold layer — archived concepts have a flat-block
-        # vector stored without the toroidal (spectral + experiential)
+        # vector stored without the leading spectral + experiential
         # block. Expand to full width with zeros so callers can compare
         # against hot vectors; the zeros contribute nothing to cosine.
         archive_idx = self._archive_to_idx.get(concept_name)
@@ -359,9 +382,10 @@ class EmbeddingStore:
         if self._concept_matrix is None:
             return []
 
-        # If no experiential layer, fall back to text search.
-        # The toroidal block without the experiential layer is just
-        # the spectral component, which is polluted by hub attachments.
+        # If no experiential layer, fall back to text search — there
+        # is no toroidal block at all without it (the toroidal block
+        # is the experiential dimensions; spectral alone isn't used
+        # because hub attachments pollute it).
         if self._experiential_dim == 0:
             concept = self.network.get_concept(concept_name)
             query = concept_name.replace("_", " ")
@@ -412,7 +436,7 @@ class EmbeddingStore:
     ) -> list[tuple[str, float]]:
         """Search using hybrid toroidal + flat distance.
 
-        The toroidal block (spectral + experiential) uses geodesic
+        The toroidal block (experiential only) uses geodesic
         distance on T^d. The flat block (TF-IDF + GloVe) uses cosine
         similarity. The two are combined with TOROIDAL_WEIGHT.
 

@@ -280,5 +280,5 @@ def open_archive(data_dir: str | Path) -> ConceptArchive:
     The database file is ``<data_dir>/concept_archive.db``.
     """
     data_dir = Path(data_dir)
-    data_dir.mkdir(parents=True, exist_ok=True)
+    data_dir.mkdir(parents=True, mode=0o700, exist_ok=True)
     return ConceptArchive(data_dir / "concept_archive.db")

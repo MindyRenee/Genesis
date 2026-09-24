@@ -1182,6 +1182,10 @@ impl TickLoop {
             if let Some(module) = state.manifest.get_mut(ModuleId::Subcognitive) {
                 module.heartbeat(now_ms);
             }
+            // Clear stale flags first — association is a discrete
+            // activity, and leftover bits (e.g. MEMORY_CONSOLIDATION
+            // from a prior pass) would falsely report concurrent work.
+            state.zones.subcognitive_flags = 0;
             state.zones.set_flag(subcognitive_flag::EPISODIC_INDEXING);
             state.manifest.recompute();
         }) {
@@ -1201,6 +1205,8 @@ impl TickLoop {
             if let Some(module) = state.manifest.get_mut(ModuleId::Subcognitive) {
                 module.heartbeat(now_ms);
             }
+            // Clear stale flags first — see associate() for rationale.
+            state.zones.subcognitive_flags = 0;
             state.zones.set_flag(subcognitive_flag::DREAMING);
             state.manifest.recompute();
         }) {

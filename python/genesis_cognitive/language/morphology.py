@@ -130,6 +130,33 @@ _VERB_BASES: frozenset[str] = frozenset(
         "swallow", "spit", "cough", "sneeze", "yawn", "nap",
         "paint", "sculpt", "carve", "weave", "sew", "knit",
         "repair", "bend", "fold", "roll",
+        # Additional everyday verbs — physical manipulation, motion,
+        # and domestic actions that teaching and story language use
+        # ("picked up the milk", "locked the door", "hung the coat").
+        "pick", "hand", "fill", "hang", "plug", "lock", "shut",
+        "unlock", "blow", "dry", "figure", "rule", "point", "calm",
+        "back", "deal", "dig", "ride", "slide", "creep", "kneel",
+        "dwell", "spring", "spin", "sting", "cling", "fling", "wring",
+        "sling", "leap", "flee", "forgive", "shine", "strive",
+        "swear", "sweep", "swell", "spill", "wrap", "tie",
+        "untie", "knock", "drag", "grasp", "slip", "trip", "bounce",
+        "twist", "squeeze", "crush", "smash", "crack", "snap", "chip",
+        "peel", "slice", "chop", "whisk", "beat", "blend", "fry",
+        "roast", "toast", "grill", "sip", "gulp", "lick", "taste",
+        "smell", "sniff", "sigh", "gasp", "pant", "choke", "vomit",
+        "shiver", "tremble", "sweat", "bleed", "heal", "recover",
+        "stretch", "lean", "crawl", "hop", "skip", "march", "stroll",
+        "wander", "roam", "escape", "clutch", "grip", "toss", "hurl",
+        "cast", "pitch", "shove", "tug", "yank", "lower", "haul",
+        "pack", "unpack", "unload", "stack", "pile", "scatter",
+        "arrange", "organize", "tidy", "mop", "vacuum", "dust",
+        "polish", "rinse", "soak", "dip", "spray", "sprinkle", "wipe",
+        "scrub", "mend", "stitch", "glue", "tape", "nail", "screw",
+        "hammer", "drill", "saw", "bury", "weed", "prune", "mow",
+        "rake", "shovel", "sow", "pluck", "tickle", "slap", "punch",
+        "stroke", "press", "rub", "scratch", "bid", "smite",
+        "forsake", "string", "stink", "shrink", "light", "lend",
+        "spell", "prove", "fire",
     }
 )
 
@@ -166,6 +193,20 @@ _IRREGULAR_BASE: dict[str, str] = {
     "shot": "shoot", "spent": "spend", "split": "split",
     "spread": "spread", "struck": "strike", "stuck": "stick",
     "swung": "swing", "wept": "weep", "withdrew": "withdraw",
+    "woke": "wake", "threw": "throw", "hung": "hang",
+    "rode": "ride", "dug": "dig", "forgave": "forgive",
+    "drew": "draw", "blew": "blow", "rose": "rise",
+    "wove": "weave", "bit": "bite", "lit": "light",
+    "slid": "slide", "bent": "bend", "lent": "lend",
+    "dealt": "deal", "fed": "feed", "fled": "flee",
+    "leapt": "leap", "learnt": "learn", "knelt": "kneel",
+    "dwelt": "dwell", "crept": "creep", "dreamt": "dream",
+    "spelt": "spell", "spilt": "spill", "spun": "spin",
+    "stung": "sting", "clung": "cling", "flung": "fling",
+    "wrung": "wring", "slung": "sling", "sprang": "spring",
+    "sprung": "spring", "stank": "stink", "shrank": "shrink",
+    "shrunk": "shrink", "shone": "shine", "strove": "strive",
+    "swore": "swear", "swept": "sweep", "swelled": "swell",
     # Past participles that differ from simple past
     "gone": "go", "seen": "see", "given": "give", "taken": "take",
     "known": "know", "written": "write", "spoken": "speak",
@@ -176,7 +217,13 @@ _IRREGULAR_BASE: dict[str, str] = {
     "forgotten": "forget", "chosen": "choose", "frozen": "freeze",
     "stolen": "steal", "swum": "swim", "sung": "sing",
     "rung": "ring", "sunk": "sink", "shaken": "shake",
-    "arisen": "arise", "lain": "lie",
+    "arisen": "arise", "lain": "lie", "woken": "wake",
+    "thrown": "throw", "ridden": "ride", "sworn": "swear",
+    "bidden": "bid", "begun": "begin", "woven": "weave",
+    "bitten": "bite", "stricken": "strike", "smitten": "smite",
+    "forsaken": "forsake", "swollen": "swell", "proven": "prove",
+    "shown": "show", "sewn": "sew", "mown": "mow",
+    "strung": "string",
 }
 
 # Singular nouns ending in 's' — these look plural but take "is".
@@ -398,6 +445,12 @@ _SIMPLE_PAST: frozenset[str] = frozenset(
         "caught", "fought", "sought", "shot", "spent", "split",
         "spread", "struck", "stuck", "swung", "wept", "withdrew",
         "was", "were", "did", "had",
+        "woke", "threw", "hung", "rode", "dug", "forgave", "drew",
+        "blew", "rose", "wove", "bit", "lit", "slid", "bent", "lent",
+        "dealt", "fed", "fled", "leapt", "knelt", "dwelt", "crept",
+        "spun", "stung", "clung", "flung", "wrung", "slung", "sprang",
+        "sprung", "stank", "shrank", "shone", "strove", "swore",
+        "swept", "strung",
     }
 )
 

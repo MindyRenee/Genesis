@@ -245,6 +245,8 @@ pub struct DependencyGraph {
 
 impl DependencyGraph {
     /// Find all callers of a given function (reverse lookup).
+    /// `name` is a qualified name (`Type::method` or `mod::func`) —
+    /// top-level functions qualify as their bare name.
     pub fn callers_of(&self, name: &str) -> Vec<&str> {
         self.edges
             .iter()
@@ -254,6 +256,7 @@ impl DependencyGraph {
     }
 
     /// Find all callees of a given function (forward lookup).
+    /// `name` is a qualified name, as in [`Self::callers_of`].
     pub fn callees_of(&self, name: &str) -> Vec<&str> {
         self.edges
             .iter()
@@ -360,7 +363,15 @@ impl FileAnalysis {
 /// A visitor that walks the AST and collects semantic units.
 struct UnitVisitor {
     units: Vec<SemanticUnit>,
+    /// Lexical scope stack: module names, and the self-type or trait
+    /// name while inside an impl/trait block. Methods inside
+    /// `impl Foo` qualify as `mod::Foo::method`, so same-named
+    /// methods on different types don't collide in the dependency
+    /// graph.
     current_module: Vec<String>,
+    /// Visibility of the trait currently being visited — trait items
+    /// carry no visibility of their own, so they inherit the trait's.
+    trait_is_pub: bool,
 }
 
 impl UnitVisitor {
@@ -368,6 +379,7 @@ impl UnitVisitor {
         Self {
             units: Vec::new(),
             current_module: Vec::new(),
+            trait_is_pub: false,
         }
     }
 
@@ -377,6 +389,85 @@ impl UnitVisitor {
         } else {
             format!("{}::{name}", self.current_module.join("::"))
         }
+    }
+
+    /// The enclosing scope prefix of a qualified name — the portion
+    /// before the last `::` segment. `mod::Foo::method` → `mod::Foo`;
+    /// `function` → `""`.
+    fn scope_of(qualified: &str) -> &str {
+        match qualified.rfind("::") {
+            Some(i) => &qualified[..i],
+            None => "",
+        }
+    }
+
+    /// Extract a function unit shared by free functions, impl methods,
+    /// and trait items. `block` is `None` for declaration-only items
+    /// (required trait methods, extern fns). `is_public` is resolved by
+    /// the caller because trait items have no visibility field.
+    fn visit_fn_like(
+        &mut self,
+        ident: &syn::Ident,
+        is_public: bool,
+        sig: &syn::Signature,
+        attrs: &[syn::Attribute],
+        block: Option<&syn::Block>,
+        line_end: usize,
+    ) {
+        let name = ident.to_string();
+        let qualified = self.qualified_name(&name);
+
+        let params: Vec<String> = sig
+            .inputs
+            .iter()
+            .filter_map(|arg| {
+                if let syn::FnArg::Typed(p) = arg {
+                    Some(type_to_string(&p.ty))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let return_type = return_type_string(&sig.output);
+        let (statement_count, branch_count, loop_count) = block
+            .map(|b| self.count_statements(&b.stmts))
+            .unwrap_or_default();
+        let calls = block
+            .map(|b| self.extract_calls(&b.stmts))
+            .unwrap_or_default();
+
+        let mut references = Vec::new();
+        for arg in &sig.inputs {
+            if let syn::FnArg::Typed(p) = arg {
+                extend_dedup(&mut references, self.extract_references(&p.ty));
+            }
+        }
+        if let ReturnType::Type(_, ty) = &sig.output {
+            extend_dedup(&mut references, self.extract_references(ty));
+        }
+
+        let doc_comments = self.extract_doc_comments(attrs);
+        let line_start = ident.span().start().line;
+
+        self.units.push(SemanticUnit {
+            kind: UnitKind::Function,
+            name,
+            qualified_name: qualified,
+            line_start,
+            line_end,
+            calls,
+            references,
+            params,
+            return_type,
+            is_public,
+            is_async: sig.asyncness.is_some(),
+            is_unsafe: is_unsafe(&sig.safety),
+            has_body: block.is_some(),
+            statement_count,
+            branch_count,
+            loop_count,
+            doc_comments,
+        });
     }
 
     fn extract_doc_comments(&self, attrs: &[syn::Attribute]) -> Vec<String> {
@@ -674,7 +765,9 @@ impl<'ast> Visit<'ast> for UnitVisitor {
         let is_public = is_pub(&node.vis);
         let is_async = node.sig.asyncness.is_some();
         let is_unsafe_fn = is_unsafe(&node.sig.safety);
-        let has_body = !node.block.stmts.is_empty();
+        // An ItemFn always has a body block — has_body distinguishes
+        // "has a body" from "declaration only" (trait/extern items).
+        let has_body = true;
 
         let params: Vec<String> = node
             .sig
@@ -730,7 +823,12 @@ impl<'ast> Visit<'ast> for UnitVisitor {
             doc_comments,
         });
 
+        // Push the function name as scope so nested items (a `fn inner`
+        // inside this function) qualify as `outer::inner` rather than
+        // colliding with same-named items nested in other functions.
+        self.current_module.push(node.sig.ident.to_string());
         syn::visit::visit_item_fn(self, node);
+        self.current_module.pop();
     }
 
     fn visit_item_struct(&mut self, node: &'ast ItemStruct) {
@@ -828,10 +926,31 @@ impl<'ast> Visit<'ast> for UnitVisitor {
             doc_comments,
         });
 
+        // Scope trait items under the trait name so a required method
+        // `Display::fmt` and a default body `Display::detailed` qualify
+        // distinctly from same-named methods on other traits.
+        // Trait items inherit the trait's visibility (they carry none).
+        self.trait_is_pub = is_pub(&node.vis);
+        self.current_module.push(node.ident.to_string());
         syn::visit::visit_item_trait(self, node);
+        self.current_module.pop();
+        self.trait_is_pub = false;
     }
 
     fn visit_item_impl(&mut self, node: &'ast ItemImpl) {
+        // The impl unit's display name prefers the trait (so
+        // `impl Display for User` shows as `impl_Display`), but the
+        // lexical scope for its methods is the *self type* — methods
+        // belong to `User::display`, not `Display::display`.
+        let self_name = if let syn::Type::Path(p) = &*node.self_ty {
+            p.path
+                .segments
+                .last()
+                .map(|s| s.ident.to_string())
+                .unwrap_or_else(|| "unknown".to_string())
+        } else {
+            "unknown".to_string()
+        };
         let name = node
             .trait_
             .as_ref()
@@ -841,17 +960,7 @@ impl<'ast> Visit<'ast> for UnitVisitor {
                     .map(|s| s.ident.to_string())
                     .unwrap_or_default()
             })
-            .unwrap_or_else(|| {
-                if let syn::Type::Path(p) = &*node.self_ty {
-                    p.path
-                        .segments
-                        .last()
-                        .map(|s| s.ident.to_string())
-                        .unwrap_or_default()
-                } else {
-                    "unknown".to_string()
-                }
-            });
+            .unwrap_or_else(|| self_name.clone());
 
         let qualified = self.qualified_name(&format!("impl_{name}"));
         let line_start = if let syn::Type::Path(p) = &*node.self_ty {
@@ -885,7 +994,12 @@ impl<'ast> Visit<'ast> for UnitVisitor {
             doc_comments: Vec::new(),
         });
 
+        // Scope impl items under the self type: `Foo::new` and
+        // `Bar::new` become distinct qualified names instead of
+        // colliding in the dependency graph.
+        self.current_module.push(self_name);
         syn::visit::visit_item_impl(self, node);
+        self.current_module.pop();
     }
 
     fn visit_impl_item_fn(&mut self, node: &'ast syn::ImplItemFn) {
@@ -895,7 +1009,7 @@ impl<'ast> Visit<'ast> for UnitVisitor {
         let is_public = is_pub(&node.vis);
         let is_async = node.sig.asyncness.is_some();
         let is_unsafe_fn = is_unsafe(&node.sig.safety);
-        let has_body = !node.block.stmts.is_empty();
+        let has_body = true; // an impl method always has a body block
 
         let params: Vec<String> = node
             .sig
@@ -952,10 +1066,141 @@ impl<'ast> Visit<'ast> for UnitVisitor {
         syn::visit::visit_impl_item_fn(self, node);
     }
 
+    fn visit_trait_item_fn(&mut self, node: &'ast syn::TraitItemFn) {
+        let line_end = node
+            .default
+            .as_ref()
+            .map(|b| b.brace_token.span.close().start().line)
+            .unwrap_or_else(|| node.sig.ident.span().start().line);
+        self.visit_fn_like(
+            &node.sig.ident,
+            // Trait items have no visibility modifier — they are public
+            // to implementors iff the trait itself is public.
+            self.trait_is_pub,
+            &node.sig,
+            &node.attrs,
+            node.default.as_ref(),
+            line_end,
+        );
+    }
+
     fn visit_item_mod(&mut self, node: &'ast syn::ItemMod) {
+        // Emit a Module unit so `mod` declarations are first-class
+        // semantic units, then recurse so items inside `mod foo { }`
+        // qualify under `foo`.
+        let name = node.ident.to_string();
+        let qualified = self.qualified_name(&name);
+        let line_start = node.ident.span().start().line;
+        let line_end = node
+            .content
+            .as_ref()
+            .map(|(brace, _)| brace.span.close().start().line)
+            .unwrap_or(line_start);
+
+        self.units.push(SemanticUnit {
+            kind: UnitKind::Module,
+            name,
+            qualified_name: qualified,
+            line_start,
+            line_end,
+            calls: Vec::new(),
+            references: Vec::new(),
+            params: Vec::new(),
+            return_type: None,
+            is_public: is_pub(&node.vis),
+            is_async: false,
+            is_unsafe: node.unsafety.is_some(),
+            has_body: node.content.is_some(),
+            statement_count: node.content.as_ref().map(|(_, items)| items.len()).unwrap_or(0),
+            branch_count: 0,
+            loop_count: 0,
+            doc_comments: self.extract_doc_comments(&node.attrs),
+        });
+
         self.current_module.push(node.ident.to_string());
         syn::visit::visit_item_mod(self, node);
         self.current_module.pop();
+    }
+
+    fn visit_item_type(&mut self, node: &'ast syn::ItemType) {
+        let name = node.ident.to_string();
+        let qualified = self.qualified_name(&name);
+        let line = node.ident.span().start().line;
+        let mut references = Vec::new();
+        extend_dedup(&mut references, self.extract_references(&node.ty));
+        self.units.push(SemanticUnit {
+            kind: UnitKind::TypeAlias,
+            name,
+            qualified_name: qualified,
+            line_start: line,
+            line_end: line,
+            calls: Vec::new(),
+            references,
+            params: Vec::new(),
+            return_type: None,
+            is_public: is_pub(&node.vis),
+            is_async: false,
+            is_unsafe: false,
+            has_body: true,
+            statement_count: 1,
+            branch_count: 0,
+            loop_count: 0,
+            doc_comments: self.extract_doc_comments(&node.attrs),
+        });
+    }
+
+    fn visit_item_const(&mut self, node: &'ast syn::ItemConst) {
+        let name = node.ident.to_string();
+        let qualified = self.qualified_name(&name);
+        let line = node.ident.span().start().line;
+        let mut references = Vec::new();
+        extend_dedup(&mut references, self.extract_references(&node.ty));
+        self.units.push(SemanticUnit {
+            kind: UnitKind::Constant,
+            name,
+            qualified_name: qualified,
+            line_start: line,
+            line_end: line,
+            calls: Vec::new(),
+            references,
+            params: Vec::new(),
+            return_type: Some(type_to_string(&node.ty)),
+            is_public: is_pub(&node.vis),
+            is_async: false,
+            is_unsafe: false,
+            has_body: true,
+            statement_count: 1,
+            branch_count: 0,
+            loop_count: 0,
+            doc_comments: self.extract_doc_comments(&node.attrs),
+        });
+    }
+
+    fn visit_item_static(&mut self, node: &'ast syn::ItemStatic) {
+        let name = node.ident.to_string();
+        let qualified = self.qualified_name(&name);
+        let line = node.ident.span().start().line;
+        let mut references = Vec::new();
+        extend_dedup(&mut references, self.extract_references(&node.ty));
+        self.units.push(SemanticUnit {
+            kind: UnitKind::Static,
+            name,
+            qualified_name: qualified,
+            line_start: line,
+            line_end: line,
+            calls: Vec::new(),
+            references,
+            params: Vec::new(),
+            return_type: Some(type_to_string(&node.ty)),
+            is_public: is_pub(&node.vis),
+            is_async: false,
+            is_unsafe: false,
+            has_body: true,
+            statement_count: 1,
+            branch_count: 0,
+            loop_count: 0,
+            doc_comments: self.extract_doc_comments(&node.attrs),
+        });
     }
 }
 
@@ -1023,38 +1268,90 @@ pub fn analyze_file(source: &str, file_path: &str) -> Result<FileAnalysis, Strin
 }
 
 /// Build a dependency graph from semantic units.
+///
+/// Nodes are keyed by **qualified** name (`mod::Type::method`) so
+/// same-named methods on different types stay distinct. Calls are
+/// recorded as simple names (the AST doesn't carry the callee's
+/// resolved path), so each call is resolved to a qualified target:
+///
+/// 1. Try scope-relative matches outward from the caller's scope —
+///    a method `a::Foo::m` calling `helper` first tries `a::Foo::helper`,
+///    then `a::helper`, then `helper`.
+/// 2. If no scoped candidate matches but exactly one unit has that
+///    simple name, link it (unambiguous top-level call).
+/// 3. Otherwise the call is ambiguous or external — no edge.
 fn build_dependency_graph(units: &[SemanticUnit]) -> DependencyGraph {
     let mut node_map: HashMap<String, GraphNode> = HashMap::with_capacity(units.len());
-    let mut edges = Vec::with_capacity(units.len() * 3);
+    // Simple name → all qualified names of function units with it.
+    let mut by_simple: HashMap<&str, Vec<&str>> = HashMap::new();
 
     // Create nodes for all functions
     for unit in units {
         if unit.kind == UnitKind::Function {
             node_map.insert(
-                unit.name.clone(),
+                unit.qualified_name.clone(),
                 GraphNode {
                     qualified_name: unit.qualified_name.clone(),
                     kind: unit.kind,
-                    call_count: unit.calls.len(),
+                    call_count: 0, // filled in after edge resolution
                     caller_count: 0,
                 },
             );
+            by_simple
+                .entry(unit.name.as_str())
+                .or_default()
+                .push(unit.qualified_name.as_str());
         }
     }
 
-    // Create edges from calls
+    // Resolve a simple call name to a qualified unit name.
+    // `caller_qname` supplies the caller's scope chain.
+    let resolve_call = |caller_qname: &str, call: &str| -> Option<&str> {
+        let candidates = by_simple.get(call)?;
+        if candidates.len() == 1 {
+            return Some(candidates[0]);
+        }
+        // Multiple units share the simple name — walk the caller's
+        // scope chain outward (innermost first) looking for
+        // `scope::call` among the candidates.
+        let mut scope = UnitVisitor::scope_of(caller_qname);
+        loop {
+            let scoped = if scope.is_empty() {
+                call.to_string()
+            } else {
+                format!("{scope}::{call}")
+            };
+            if let Some(&hit) = candidates.iter().find(|&&q| q == scoped) {
+                return Some(hit);
+            }
+            if scope.is_empty() {
+                return None;
+            }
+            scope = UnitVisitor::scope_of(scope);
+        }
+    };
+
+    // Create edges from resolved calls
+    let mut edges = Vec::with_capacity(units.len() * 3);
     for unit in units {
         if unit.kind != UnitKind::Function {
             continue;
         }
+        let mut resolved = 0usize;
         for call in &unit.calls {
-            // Only add edges to functions we know about (same file)
-            if node_map.contains_key(call) {
-                edges.push(GraphEdge {
-                    from: unit.name.clone(),
-                    to: call.clone(),
-                });
+            if let Some(target) = resolve_call(&unit.qualified_name, call) {
+                // No self-edges — a recursive call adds no dependency.
+                if target != unit.qualified_name {
+                    edges.push(GraphEdge {
+                        from: unit.qualified_name.clone(),
+                        to: target.to_string(),
+                    });
+                    resolved += 1;
+                }
             }
+        }
+        if let Some(node) = node_map.get_mut(&unit.qualified_name) {
+            node.call_count = resolved;
         }
     }
 

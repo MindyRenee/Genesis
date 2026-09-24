@@ -167,6 +167,14 @@ class StatusMixin:
     def inner_life_status(self) -> str:
         """Get a description of her recent spontaneous thoughts."""
         return self.inner_life.describe_recent_thoughts()
+    def world_status(self) -> str:
+        """Get a description of her external world.
+
+        Who is in her world (presences, present or away), how long it
+        has been since anyone engaged her, and the recent two-way
+        event stream — her side of the world included.
+        """
+        return self.world.summarize()
     def regulation_status(self) -> str:
         """Get a description of her emotional self-regulation."""
         return self.regulator.describe_regulation()

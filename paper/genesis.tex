@@ -47,15 +47,9 @@ neurochemical trajectory and feeds prediction error back into the
 dynamics it models; and (iii) \emph{bounded continuous learning}, in
 which sleep emerges from adenosine dynamics and triggers memory
 consolidation, vector-quantized compression, and dream synthesis.
-On the ARC-AGI-1 abstraction-and-reasoning benchmark, the system's
-spatial reasoner solves 43 of 66 local tasks (65.2\%) under a cold
-sequential evaluation protocol with a single attempt per task. An
-ARC-AGI-3 interactive agent learns game semantics empirically ---
-hazards, walls, affordances, and step budgets --- and fully decoded one
-environment's mechanics, but has not yet achieved a win; multi-subgoal
-planning remains an open gap. We describe the architecture, its
-grounding in computational neuroscience, the evaluation methodology,
-and honest limitations. Genesis demonstrates that a stateful,
+We describe the architecture, its
+grounding in computational neuroscience, and its honest limitations.
+Genesis demonstrates that a stateful,
 self-regulating, embodied cognitive
 process is architecturally viable without a pretrained language model.
 \end{abstract}
@@ -99,10 +93,6 @@ This paper makes the following contributions:
   \item An autopoietic active-inference loop: a generative model of the
         system's own neurochemical dynamics whose precision-weighted
         prediction errors feed back into those dynamics.
-  \item An empirical evaluation on ARC-AGI-1 (43/66, 65.2\%, cold
-        sequential protocol), ARC-AGI-3 (mechanism discovery without a
-        win), learning-fidelity tests, and language-generation quality
-        metrics, with methodology stated precisely enough to falsify.
 \end{itemize}
 
 We are explicit about scope: Genesis is not a chatbot, not a
@@ -347,73 +337,7 @@ oxytocin-mediated attunement and rolling valence synchrony
 is tuned to a single primary user as the foundation of its
 developmental model.
 
-\section{Evaluation}
-
-\subsection{ARC-AGI-1: spatial reasoning}
-
-The ARC-AGI benchmark \cite{chollet2019,arcagi2} evaluates abstraction
-from few examples. The spatial substrate parses grids into scenes, proposes transforms
-from a typed DSL, and beam-searches compositions, with three learning
-mechanisms: verified multi-step rules are stored as atomic macros
-(effectively doubling reachable depth); verified rules are abstracted
-into parameterized family schemas rebound to task-observed values at
-proposal time; and rules that verify on train pairs but miss on test
-are persisted as counterexamples and excluded on retry, so retries
-explore different hypothesis space rather than identical dead ends.
-Learned rules are grounded into the concept network as first-class
-knowledge (\texttt{spatial:rule:*}), and practice is volitional ---
-a puzzle urge, bounded by the system's own think budget, with outcomes
-fed back as reward-prediction-error neurochemical impulses.
-
-\textbf{Protocol.} Cold sequential evaluation: one task at a time,
-fresh reasoner, single attempt, no lessons or retries, over the local
-66-task corpus. \textbf{Result: 43/66 (65.2\%).} Known failure modes
-include silhouette/texture inpainting, ray-casting families, and
-multi-object programs; each new operator class historically converts
-one to two tasks. A held-out-color test confirms schemas transfer
-where cold search cannot reach.
-
-\subsection{ARC-AGI-3: interactive environments}
-
-The ARC-3 agent receives pixels and must learn game semantics
-empirically. It maintains click memory, segments objects against the
-modal background color, identifies its own avatar by lockstep
-translation (including multi-color bodies), and learns: lethal colors
-(from corroborated death evidence, with budget-death discrimination so
-step-limit expiries are not misattributed), valuable colors (objects
-consumed on contact, guarded against spreading blobs), station colors
-(objects perturbing the avatar's key signature), gated cells, and walls
-(failed known-effect moves). Navigation is BFS over learned hazards and
-walls. An affordance memory treats gates as the oracle: gate appearance
-is bound to the key signature that opened it, replacing icon decoding.
-
-On the ls20 environment the agent decoded the full mechanic structure
---- gates keyed by (shape, color, rotation) triples, three station
-types each cycling one key dimension, step-refill items resetting a
-42-step counter --- and extended survival from $\sim$43 to $187+$ steps
-with its first real pickup. \textbf{No environment has been won.}
-Routing station$\to$gate sequences within a single life requires
-multi-subgoal planning that has not yet emerged; this is the honest
-capability frontier of the system.
-
-\subsection{Learning fidelity and language quality}
-
-Teaching-and-recall evals: 87.5\% immediate recall of novel taught
-facts (7/8), 100\% reasoning recall (8/8), 87.5\% under interference,
-87.5\% across save/load persistence. Transitive-inference
-generalization tests verify closure (A$\to$B, B$\to$C $\vdash$ A$\to$C)
-without falsely closing non-transitive relations. Emotion-gated
-learning tests verify that stressed/overwhelmed states block
-consolidation, mirroring the substrate's BDNF gating.
-
-The compositional language engine is evaluated at the engine level on
-four metrics: seed diversity (distinct renderings of identical thought
-content across RNG seeds), emotion diversity, content relevance, and a
-single-structure baseline comparison. Measured: seed diversity 1.0
-($\sim$9.7$\times$ the fixed-structure baseline), emotion diversity
-1.0, relevance 1.0, verbatim ratio 0.0 --- every response is composed.
-
-\subsection{Verification suite}
+\section{Verification}
 
 Over two thousand tests check the architecture's claims rather than
 incidental code: binary layout offsets, seqlock consistency, coupled
@@ -444,14 +368,6 @@ biophysical models establish the receptor and coupling mechanisms
 individually; we are not aware of a mainstream AI system integrating
 them into a closed-loop substrate coupled to hardware control.
 
-\textbf{ARC solvers.} Program-synthesis and DSL-search approaches to
-ARC-AGI-1 (and LLM-based approaches on ARC-AGI-3) typically treat each
-task in isolation or rely on pretrained priors. Genesis's contribution
-here is architectural rather than a leaderboard score: verified rules
-become persistent, transferable, composable knowledge inside a living
-concept network, and practice is volitional with genuine
-reward-prediction-error feedback.
-
 \textbf{Autonomous machine intelligence.} LeCun's proposed architecture
 \cite{lecun2022}
 (configurator, world model, cost, actor) argues for intrinsic-state
@@ -466,8 +382,7 @@ cognitive-layer modules (perception, question composition, memory
 retrieval) are rule-based placeholders designed for replacement under
 the fixed IPC contract. The neurochemical model is a neuromodulatory
 abstraction, not a neural simulation --- no spiking activity, no
-circuit anatomy. ARC-AGI-3 remains unsolved; multi-subgoal planning is
-an open gap. The dyadic model assumes a single primary user. The
+circuit anatomy. The dyadic model assumes a single primary user. The
 system is one instance on one machine; no fleet-scale or multi-agent
 claims are made.
 
@@ -478,7 +393,7 @@ bounded memory, hardware embodiment, self-modeling, and generative
 language can coexist in a single local architecture with no pretrained
 model --- because these properties follow from the design rather than
 being scaffolded onto a frozen function. The system is running, the
-evaluation numbers and their protocols are stated, and the gaps are
+verification suite and its coverage are stated, and the gaps are
 named. The question the project poses is not whether this approach
 matches frontier language models at their own task, but whether the
 field has correctly identified which properties of minds are
@@ -557,16 +472,6 @@ Y.~LeCun.
 \newblock A path towards autonomous machine intelligence.
 \newblock OpenReview preprint, version 0.9.2, 2022.
   \url{https://openreview.net/forum?id=BZ5a1r-kVsf}
-
-\bibitem{chollet2019}
-F.~Chollet.
-\newblock On the measure of intelligence.
-\newblock \emph{arXiv preprint arXiv:1911.01547}, 2019.
-
-\bibitem{arcagi2}
-F.~Chollet, M.~Knoop, G.~Kamradt, and B.~Landers.
-\newblock ARC-AGI-2: a new challenge for frontier AI reasoning systems.
-\newblock \emph{arXiv preprint arXiv:2505.11841}, 2025.
 
 \bibitem{laird2012}
 J.~E. Laird.

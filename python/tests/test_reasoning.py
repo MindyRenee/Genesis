@@ -761,6 +761,13 @@ def test_probabilistic_infer() -> None:
     assert "probability" in result.conclusion
     assert result.confidence > 0
 
+    # Regression: matching evidence must be applied exactly once.
+    # The edge weight 0.5 initialises the prior to Beta(5, 5); a single
+    # +2.0 positive observation must yield Beta(7, 5), not Beta(9, 5).
+    belief = pr.get_belief("fire", "causes", "smoke")
+    assert belief.alpha == 7.0
+    assert belief.beta == 5.0
+
 
 # ═══════════════════════════════════════════════════════════════════
 # TemporalReasoning

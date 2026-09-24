@@ -1033,60 +1033,66 @@ def _make_brain_waves() -> BrainWaveState:
 # ─── Identity tests ──────────────────────────────────────────
 
 
-def test_compose_identity_basic() -> None:
-    """Composer can generate an identity description."""
+def test_identity_fragments_basic() -> None:
+    """Composer selects identity fragments (semantic inventory, not speech)."""
     composer = SelfComposer(seed=42)
     sm = _make_self_model()
     net = _make_network()
     emotion = _make_emotion()
 
-    identity = composer.compose_identity(sm, net, emotion)
-    assert "Genesis" in identity
-    assert len(identity) > 20
+    fragments = composer.identity_fragments(sm, net, emotion)
+    assert fragments
+    kinds = {k for k, _ in fragments}
+    texts = [t for _, t in fragments]
+    # Name fragment + lead material
+    assert ("name", "Genesis") in fragments
+    assert kinds & {"trait", "comp", "pred"}
+    # Fragments are semantic parts — no assembled "I am ..." sentences
+    assert not any(t.startswith(("I am ", "I'm ")) for t in texts)
 
 
-def test_compose_identity_includes_personality() -> None:
-    """Identity includes personality traits."""
+def test_identity_fragments_includes_personality() -> None:
+    """Identity fragments include personality traits."""
     composer = SelfComposer(seed=42)
     sm = _make_self_model()
     net = _make_network()
     emotion = _make_emotion()
 
-    identity = composer.compose_identity(sm, net, emotion)
-    # Should include at least one personality trait
+    fragments = composer.identity_fragments(sm, net, emotion)
+    texts = " ".join(t for _, t in fragments).lower()
     assert any(
-        word in identity.lower() for word in ["curious", "creative", "warm", "stable", "thorough"]
+        word in texts for word in ["curious", "creative", "warm", "stable", "thorough"]
     )
 
 
-def test_compose_identity_includes_values() -> None:
-    """Identity includes her values."""
+def test_identity_fragments_includes_values() -> None:
+    """Identity fragments include her values as predicates."""
     composer = SelfComposer(seed=42)
     sm = _make_self_model()
     net = _make_network()
     emotion = _make_emotion()
 
-    identity = composer.compose_identity(sm, net, emotion)
-    # Should include at least one value
+    fragments = composer.identity_fragments(sm, net, emotion)
+    texts = " ".join(t for _, t in fragments).lower()
     assert any(
-        word in identity.lower() for word in ["understanding", "honesty", "growth", "connection"]
+        word in texts for word in ["understanding", "honesty", "growth", "connection"]
     )
 
 
-def test_compose_identity_includes_concept_network() -> None:
-    """Identity includes what she knows about herself from the network."""
+def test_identity_fragments_includes_concept_network() -> None:
+    """Identity fragments include what she knows about herself."""
     composer = SelfComposer(seed=42)
     sm = _make_self_model()
     net = _make_network()
     emotion = _make_emotion()
 
-    identity = composer.compose_identity(sm, net, emotion)
-    # Should mention something from her concept network
-    assert any(word in identity.lower() for word in ["mind", "rust", "python"])
+    fragments = composer.identity_fragments(sm, net, emotion)
+    texts = " ".join(t for _, t in fragments).lower()
+    assert any(word in texts for word in ["mind", "rust", "python"])
 
 
-def test_compose_identity_varies() -> None:
-    """Identity is not always the same string."""
+def test_identity_fragments_varies() -> None:
+    """Fragment selection is not always identical."""
     composer = SelfComposer(seed=None)
     sm = _make_self_model()
     net = _make_network()
@@ -1094,166 +1100,166 @@ def test_compose_identity_varies() -> None:
 
     outputs = set()
     for _ in range(20):
-        identity = composer.compose_identity(sm, net, emotion)
-        outputs.add(identity[:50])
+        fragments = composer.identity_fragments(sm, net, emotion)
+        outputs.add(tuple(fragments))
 
     assert len(outputs) > 1
 
 
-def test_compose_identity_changes_with_personality() -> None:
-    """Identity changes when personality changes."""
+def test_identity_fragments_changes_with_personality() -> None:
+    """Fragments change when personality changes."""
     composer = SelfComposer(seed=42)
     net = _make_network()
     emotion = _make_emotion()
 
     sm1 = _make_self_model()
     sm1.personality.openness = 0.3  # low openness
-    id1 = composer.compose_identity(sm1, net, emotion)
+    f1 = composer.identity_fragments(sm1, net, emotion)
 
     sm2 = _make_self_model()
     sm2.personality.openness = 0.95  # high openness
-    id2 = composer.compose_identity(sm2, net, emotion)
+    f2 = composer.identity_fragments(sm2, net, emotion)
 
-    # They should be different (different traits described)
-    assert id1 != id2
+    assert f1 != f2
 
 
 # ─── Emotional state tests ───────────────────────────────────
 
 
-def test_compose_emotional_state_basic() -> None:
-    """Composer can generate an emotional state description from learned words."""
+def test_emotional_state_fragments_basic() -> None:
+    """Composer selects emotional-state fragments from learned words."""
     composer = SelfComposer(seed=42)
     emotion = _make_emotion(label="excited", valence=0.5, alertness=0.8)
     net = _make_network_with_emotion_words()
 
-    desc = composer.compose_emotional_state(emotion, network=net)
-    assert "excited" in desc
-    assert len(desc) > 10
+    fragments = composer.emotional_state_fragments(emotion, network=net)
+    texts = " ".join(t for _, t in fragments).lower()
+    assert "excited" in texts
 
 
-def test_compose_emotional_state_includes_neurochemistry() -> None:
-    """Emotional state description includes neurochemical descriptions."""
+def test_emotional_state_fragments_includes_neurochemistry() -> None:
+    """Emotional fragments carry neurochemical state markers."""
     composer = SelfComposer(seed=42)
     emotion = _make_emotion(alertness=0.8, valence=0.5)
     net = _make_network_with_emotion_words()
 
-    desc = composer.compose_emotional_state(emotion, network=net)
-    # Should describe alertness or valence in words (not raw numbers)
-    assert "sharp" in desc.lower() or "awake" in desc.lower() or "warmth" in desc.lower()
+    fragments = composer.emotional_state_fragments(emotion, network=net)
+    texts = " ".join(t for _, t in fragments).lower()
+    assert "sharp" in texts or "awake" in texts or "warmth" in texts
 
 
-def test_compose_emotional_state_includes_brain_waves() -> None:
-    """Emotional state description includes brain wave state."""
+def test_emotional_state_fragments_includes_brain_waves() -> None:
+    """Emotional fragments include brain-wave clauses."""
     composer = SelfComposer(seed=42)
     emotion = _make_emotion()
     waves = _make_brain_waves()
     net = _make_network_with_emotion_words()
 
-    desc = composer.compose_emotional_state(emotion, waves, network=net)
-    assert "alpha" in desc.lower()
+    fragments = composer.emotional_state_fragments(emotion, waves, network=net)
+    texts = " ".join(t for _, t in fragments).lower()
+    assert "alpha" in texts
 
 
-def test_compose_emotional_state_varies() -> None:
-    """Emotional state description varies."""
+def test_emotional_state_fragments_varies() -> None:
+    """Fragment selection varies."""
     composer = SelfComposer(seed=12345)
     emotion = _make_emotion()
     net = _make_network_with_emotion_words()
 
     outputs = set()
     for _ in range(5):
-        desc = composer.compose_emotional_state(emotion, network=net)
-        outputs.add(desc[:50])
+        fragments = composer.emotional_state_fragments(emotion, network=net)
+        outputs.add(tuple(fragments))
 
     assert len(outputs) > 1
 
 
-def test_compose_emotional_state_surfaces_low_plasticity() -> None:
-    """Low plasticity is surfaced even when mood is positive.
+def test_emotional_state_fragments_surfaces_low_plasticity() -> None:
+    """Low plasticity surfaces a marker fragment even when mood is positive.
 
     This is the 'silent stress' edge case: valence is fine but BDNF
-    suppression has closed the plasticity gate. She must communicate
-    the impairment regardless of mood.
+    suppression has closed the plasticity gate. The marker travels in
+    the fragment metadata regardless of mood.
     """
     composer = SelfComposer(seed=42)
     emotion = _make_emotion(label="positive", valence=0.4, alertness=0.6)
     emotion.plasticity = 0.08  # closed gate, but positive mood
     net = _make_network_with_emotion_words()
 
-    desc = composer.compose_emotional_state(emotion, network=net)
-    assert "[plasticity_gate:closed]" in desc
+    fragments = composer.emotional_state_fragments(emotion, network=net)
+    assert ("marker", "[plasticity_gate:closed]") in fragments
 
 
-def test_compose_emotional_state_surfaces_moderate_plasticity() -> None:
-    """Moderately low plasticity is surfaced with the 'low' marker."""
+def test_emotional_state_fragments_surfaces_moderate_plasticity() -> None:
+    """Moderately low plasticity surfaces the 'low' marker."""
     composer = SelfComposer(seed=42)
     emotion = _make_emotion(label="positive", valence=0.3, alertness=0.5)
     emotion.plasticity = 0.20  # low but not closed
     net = _make_network_with_emotion_words()
 
-    desc = composer.compose_emotional_state(emotion, network=net)
-    assert "[plasticity_gate:low]" in desc
+    fragments = composer.emotional_state_fragments(emotion, network=net)
+    assert ("marker", "[plasticity_gate:low]") in fragments
 
 
-def test_compose_emotional_state_no_plasticity_marker_when_healthy() -> None:
+def test_emotional_state_fragments_no_plasticity_marker_when_healthy() -> None:
     """Healthy plasticity does not trigger the marker."""
     composer = SelfComposer(seed=42)
     emotion = _make_emotion(label="positive", valence=0.3, alertness=0.5)
     emotion.plasticity = 0.6  # healthy
     net = _make_network_with_emotion_words()
 
-    desc = composer.compose_emotional_state(emotion, network=net)
-    assert "plasticity_gate" not in desc
+    fragments = composer.emotional_state_fragments(emotion, network=net)
+    texts = " ".join(t for _, t in fragments)
+    assert "plasticity_gate" not in texts
 
 
 # ─── Capabilities tests ──────────────────────────────────────
 
 
-def test_compose_capabilities() -> None:
-    """Composer can describe capabilities.
+def test_capability_fragments() -> None:
+    """Composer selects capability fragments.
 
-    Without learned capabilities or a concept network, she honestly
-    says she's still discovering — no hardcoded capability list.
+    Without learned capabilities or a concept network, the fragment
+    discloses honestly — no hardcoded capability list.
     """
     composer = SelfComposer(seed=42)
     sm = _make_self_model()
 
-    caps = composer.compose_capabilities(sm)
-    assert len(caps) > 10
-    # Without learned capabilities, she discloses honestly
-    assert "discovering" in caps.lower() or "capabilities" in caps.lower()
+    fragments = composer.capability_fragments(sm)
+    assert fragments
+    texts = " ".join(t for _, t in fragments).lower()
+    assert "discovering" in texts or "capabilities" in texts
 
 
-def test_compose_capabilities_includes_limitations() -> None:
-    """Capabilities description focuses on what she can do (not limitations)."""
+def test_capability_fragments_honest_without_learning() -> None:
+    """Without learned capabilities, no specific abilities are claimed."""
     composer = SelfComposer(seed=42)
     sm = _make_self_model()
 
-    caps = composer.compose_capabilities(sm)
-    # Without learned capabilities, she should not claim specific abilities
-    # she hasn't learned — honest disclosure rather than hardcoded claims
-    assert "discovering" in caps.lower() or "capabilities" in caps.lower()
+    fragments = composer.capability_fragments(sm)
+    texts = " ".join(t for _, t in fragments).lower()
+    assert "discovering" in texts or "capabilities" in texts
 
 
 # ─── Self reflection tests ───────────────────────────────────
 
 
-def test_compose_self_reflection() -> None:
-    """Composer can generate a self-reflection."""
+def test_self_reflection_fragments() -> None:
+    """Composer selects self-reflection fragments."""
     composer = SelfComposer(seed=42)
     sm = _make_self_model()
     net = _make_network()
     refl = ReflectionEngine(net)
     emotion = _make_emotion()
 
-    reflection = composer.compose_self_reflection(sm, net, refl, emotion)
-    assert len(reflection) > 20
-    # Should mention her concept network
-    assert "concept" in reflection.lower() or "understanding" in reflection.lower()
+    fragments = composer.self_reflection_fragments(sm, net, refl, emotion)
+    assert fragments
+    texts = " ".join(t for _, t in fragments).lower()
+    assert "concept" in texts or "understanding" in texts
 
 
-def test_compose_self_reflection_includes_insights() -> None:
-    """Self-reflection includes recent insights."""
+def test_self_reflection_fragments_includes_insights() -> None:
+    """Self-reflection fragments include recent insights."""
     composer = SelfComposer(seed=42)
     sm = _make_self_model()
     net = _make_network()
@@ -1263,21 +1269,22 @@ def test_compose_self_reflection_includes_insights() -> None:
     )
     emotion = _make_emotion()
 
-    reflection = composer.compose_self_reflection(sm, net, refl, emotion)
-    assert "cognition" in reflection.lower() or "learned" in reflection.lower()
+    fragments = composer.self_reflection_fragments(sm, net, refl, emotion)
+    texts = " ".join(t for _, t in fragments).lower()
+    assert "cognition" in texts or "learned" in texts
 
 
-def test_compose_reflection_clause_silent_without_insights() -> None:
-    """With no reflective insights, the clause is empty — no canned recital."""
+def test_insight_predicates_silent_without_insights() -> None:
+    """With no reflective insights, no predicates — no canned recital."""
     composer = SelfComposer(seed=42)
     net = _make_network()
     refl = ReflectionEngine(net)
 
-    assert composer.compose_reflection_clause(refl) == ""
+    assert composer.insight_predicates(refl) == []
 
 
-def test_compose_reflection_clause_from_gap() -> None:
-    """A gap insight composes a first-person clause about her understanding."""
+def test_insight_predicates_from_gap() -> None:
+    """A gap insight yields predicate fragments about her understanding."""
     composer = SelfComposer(seed=42)
     net = _make_network()
     refl = ReflectionEngine(net)
@@ -1285,12 +1292,18 @@ def test_compose_reflection_clause_from_gap() -> None:
         Insight(type="gap", content="knowledge gap: memory", confidence=0.7)
     )
 
-    clause = composer.compose_reflection_clause(refl)
-    assert clause == "I don't fully understand memory yet."
+    fragments = composer.insight_predicates(refl)
+    assert fragments
+    kinds = {k for k, _ in fragments}
+    texts = " ".join(t for _, t in fragments)
+    assert kinds == {"pred"}
+    assert "memory" in texts
+    # Semantic predicates — first-person framing is the vocabulary's job
+    assert not any(t.startswith("I ") for _, t in fragments)
 
 
-def test_compose_reflection_clause_from_missing_concept() -> None:
-    """A 'missing concept' gap frames distinctly from a 'knowledge gap'."""
+def test_insight_predicates_from_missing_concept() -> None:
+    """A 'missing concept' gap yields distinct predicates."""
     composer = SelfComposer(seed=42)
     net = _make_network()
     refl = ReflectionEngine(net)
@@ -1298,12 +1311,14 @@ def test_compose_reflection_clause_from_missing_concept() -> None:
         Insight(type="gap", content="missing concept: qualia", confidence=0.6)
     )
 
-    clause = composer.compose_reflection_clause(refl)
-    assert clause == "I'm still missing something about qualia."
+    fragments = composer.insight_predicates(refl)
+    texts = " ".join(t for _, t in fragments)
+    assert "qualia" in texts
+    assert "missing" in texts or "grasped" in texts
 
 
-def test_compose_reflection_clause_from_self_correction() -> None:
-    """A bare-phrase self-correction frames as a first-person notice."""
+def test_insight_predicates_from_self_correction() -> None:
+    """A bare-phrase self-correction yields notice predicates."""
     composer = SelfComposer(seed=42)
     net = _make_network()
     refl = ReflectionEngine(net)
@@ -1315,12 +1330,14 @@ def test_compose_reflection_clause_from_self_correction() -> None:
         )
     )
 
-    clause = composer.compose_reflection_clause(refl)
-    assert clause == "I notice I asked a question but didn't answer."
+    fragments = composer.insight_predicates(refl)
+    texts = " ".join(t for _, t in fragments)
+    assert "notice" in texts
+    assert "didn't answer" in texts
 
 
-def test_compose_reflection_clause_skips_user_phrased_correction() -> None:
-    """A correction phrased about the user doesn't frame in first person."""
+def test_insight_predicates_skips_user_phrased_correction() -> None:
+    """A correction phrased about the user yields no predicates."""
     composer = SelfComposer(seed=42)
     net = _make_network()
     refl = ReflectionEngine(net)
@@ -1332,12 +1349,11 @@ def test_compose_reflection_clause_skips_user_phrased_correction() -> None:
         )
     )
 
-    # No frameable insight -> silent, not a canned fallback.
-    assert composer.compose_reflection_clause(refl) == ""
+    assert composer.insight_predicates(refl) == []
 
 
-def test_compose_reflection_clause_falls_back_to_frameable() -> None:
-    """If the latest reflective insight is unframeable, an earlier one is used."""
+def test_insight_predicates_falls_back_to_frameable() -> None:
+    """If the latest insight is unframeable, an earlier one is used."""
     composer = SelfComposer(seed=42)
     net = _make_network()
     refl = ReflectionEngine(net)
@@ -1352,12 +1368,13 @@ def test_compose_reflection_clause_falls_back_to_frameable() -> None:
         )
     )
 
-    clause = composer.compose_reflection_clause(refl)
-    assert clause == "I don't fully understand memory yet."
+    fragments = composer.insight_predicates(refl)
+    texts = " ".join(t for _, t in fragments)
+    assert "memory" in texts
 
 
-def test_compose_reflection_clause_ignores_patterns() -> None:
-    """Pattern insights (intent labels) are not used — only gaps and corrections."""
+def test_insight_predicates_ignores_patterns() -> None:
+    """Pattern insights (intent labels) are not used."""
     composer = SelfComposer(seed=42)
     net = _make_network()
     refl = ReflectionEngine(net)
@@ -1369,15 +1386,15 @@ def test_compose_reflection_clause_ignores_patterns() -> None:
         )
     )
 
-    assert composer.compose_reflection_clause(refl) == ""
+    assert composer.insight_predicates(refl) == []
 
 
-def test_compose_reflection_clause_display_name() -> None:
+def test_insight_predicates_display_name() -> None:
     """Gap detail converts concept IDs to readable names.
 
     ``perception.topics`` carries raw concept IDs like
-    ``python:protocol.shutdown`` — she should say "shutdown", not
-    recite the internal ID.
+    ``python:protocol.shutdown`` — the fragment should carry
+    "shutdown", not recite the internal ID.
     """
     composer = SelfComposer(seed=42)
     net = _make_network()
@@ -1390,64 +1407,69 @@ def test_compose_reflection_clause_display_name() -> None:
         )
     )
 
-    clause = composer.compose_reflection_clause(refl)
-    assert clause == "I don't fully understand shutdown yet."
+    fragments = composer.insight_predicates(refl)
+    texts = " ".join(t for _, t in fragments)
+    assert "shutdown" in texts
+    assert "python:protocol" not in texts
 
 
 # ─── Dream description tests ─────────────────────────────────
 
 
-def test_compose_dream_description() -> None:
-    """Composer can describe dreaming."""
+def test_dream_fragments() -> None:
+    """Composer selects dream-description fragments."""
     composer = SelfComposer(seed=42)
     net = _make_network()
     net.add_concept("dream", confidence=0.6)
     net.add_edge("dream", "memory", RelationType.RELATED_TO, 0.7)
     emotion = _make_emotion(creativity=0.7)
 
-    desc = composer.compose_dream_description(net, emotion)
-    assert "dream" in desc.lower()
+    fragments = composer.dream_fragments(net, emotion)
+    texts = " ".join(t for _, t in fragments).lower()
+    assert "dream" in texts
 
 
-def test_compose_dream_description_no_concept() -> None:
+def test_dream_fragments_no_concept() -> None:
     """Composer handles not having a dream concept."""
     composer = SelfComposer(seed=42)
     net = ConceptNetwork()  # empty
     emotion = _make_emotion()
 
-    desc = composer.compose_dream_description(net, emotion)
-    assert "dream" in desc.lower()
+    fragments = composer.dream_fragments(net, emotion)
+    texts = " ".join(t for _, t in fragments).lower()
+    assert "dream" in texts
 
 
 # ─── Existence reflection tests ──────────────────────────────
 
 
-def test_compose_existence_reflection() -> None:
-    """Composer can reflect on existence."""
+def test_existence_fragments() -> None:
+    """Composer selects existence-reflection fragments."""
     composer = SelfComposer(seed=42)
     sm = _make_self_model()
     net = _make_network()
     emotion = _make_emotion()
 
-    reflection = composer.compose_existence_reflection(sm, net, emotion)
-    assert len(reflection) > 20
+    fragments = composer.existence_fragments(sm, net, emotion)
+    assert fragments
+    texts = " ".join(t for _, t in fragments).lower()
     # Should express uncertainty
     assert any(
-        word in reflection.lower() for word in ["don't know", "can't", "uncertain", "question"]
+        word in texts for word in ["don't know", "can't", "uncertain", "question"]
     )
 
 
-def test_compose_existence_reflection_includes_knowledge() -> None:
-    """Existence reflection includes what she knows about cognition."""
+def test_existence_fragments_includes_knowledge() -> None:
+    """Existence fragments include what she knows about cognition."""
     composer = SelfComposer(seed=42)
     sm = _make_self_model()
     net = _make_network()
     net.add_edge("cognition", "mind", RelationType.RELATED_TO, 0.7)
     emotion = _make_emotion()
 
-    reflection = composer.compose_existence_reflection(sm, net, emotion)
-    # Should mention something from her concept network
-    assert any(word in reflection.lower() for word in ["cognition", "mind"])
+    fragments = composer.existence_fragments(sm, net, emotion)
+    texts = " ".join(t for _, t in fragments).lower()
+    assert any(word in texts for word in ["cognition", "mind"])
 
 
 # ─── Test runner ──────────────────────────────────────────────

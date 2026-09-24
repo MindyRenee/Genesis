@@ -1291,7 +1291,7 @@ class BugReporter:
         return visitor.bugs
 
     # Directories that contain Genesis's own source — scanned first
-    # so that max_files limits don't skip her code in favor of evals,
+    # so that max_files limits don't skip her code in favor of
     # examples, or Rust files.
     _PRIORITY_DIRS: ClassVar[tuple[str, ...]] = (
         "python/genesis_cognitive/",
@@ -1304,7 +1304,7 @@ class BugReporter:
         Files are sorted with Genesis's own source first (under
         _PRIORITY_DIRS), then other Python files, then Rust files.
         This ensures that max_files limits don't skip her code in
-        favor of evals, examples, or the Rust substrate.
+        favor of examples or the Rust substrate.
         """
         collected: list[Path] = []
         for path in self.project_root.rglob("*"):
@@ -1461,7 +1461,7 @@ class BugReporter:
             self._open_keys = current_keys
 
             # Ensure directory exists
-            self.log_path.parent.mkdir(parents=True, exist_ok=True)
+            self.log_path.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
 
             # Archive resolved issues to the history file BEFORE rewriting
             # the running list — _archive_resolved reads the current log

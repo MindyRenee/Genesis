@@ -477,7 +477,7 @@ class ConsolidationMixin:
         for cid, concept in self._concepts.items():
             if concept.origin in protected:
                 continue
-            if concept.activation >= activation_threshold:
+            if (concept.activation or 0.0) >= activation_threshold:
                 continue
             if concept.review_count > 0:
                 continue
@@ -667,8 +667,9 @@ class ConsolidationMixin:
 
         # ── 4: Decay activation (sleep clears short-term activation) ──
         for concept in list(self._concepts.values()):
-            if concept.activation > 0.1:
-                concept.activation = max(0.0, concept.activation - 0.3)
+            activation = concept.activation or 0.0
+            if activation > 0.1:
+                concept.activation = max(0.0, activation - 0.3)
                 decay_cleared += 1
 
         return decay_cleared

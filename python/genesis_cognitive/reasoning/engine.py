@@ -19,6 +19,7 @@ the chain of evidence, and a confidence score.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, ClassVar
@@ -309,8 +310,8 @@ class ReasoningEngine:
                 both_active = (
                     concept_a
                     and concept_b
-                    and concept_a.activation > 0.3
-                    and concept_b.activation > 0.3
+                    and (concept_a.activation or 0.0) > 0.3
+                    and (concept_b.activation or 0.0) > 0.3
                 )
                 if both_active:
                     results[-1].conclusion = (
@@ -1705,21 +1706,31 @@ class BetaDistribution:
     alpha: float = 1.0  # positive evidence count + prior
     beta: float = 1.0  # negative evidence count + prior
 
+    def __post_init__(self) -> None:
+        """Validate that both Beta shape parameters are finite and positive."""
+        if not all(math.isfinite(value) and value > 0.0 for value in (self.alpha, self.beta)):
+            raise ValueError("Beta shape parameters must be finite and positive")
+
+    @staticmethod
+    def _validate_weight(weight: float) -> None:
+        """Reject non-finite or negative evidence weight."""
+        if not math.isfinite(weight) or weight < 0.0:
+            raise ValueError("Evidence weight must be finite and non-negative")
+
     @property
     def mean(self) -> float:
         """Expected value (point estimate) of the distribution."""
-        total = self.alpha + self.beta
-        if total < 1e-10:
-            return 0.5
-        return self.alpha / total
+        scale = max(self.alpha, self.beta)
+        alpha, beta = self.alpha / scale, self.beta / scale
+        return alpha / (alpha + beta)
 
     @property
     def variance(self) -> float:
         """Variance of the distribution (uncertainty)."""
-        total = self.alpha + self.beta
-        if total < 1e-10:
-            return 0.0
-        return (self.alpha * self.beta) / (total * total * (total + 1.0))
+        scale = max(self.alpha, self.beta, 1.0)
+        alpha, beta = self.alpha / scale, self.beta / scale
+        total = alpha + beta
+        return (alpha / total) * (beta / total) / (total + 1.0 / scale) / scale
 
     @property
     def confidence(self) -> float:
@@ -1741,10 +1752,14 @@ class BetaDistribution:
                       False if it contradicts.
             weight: Strength of the evidence (default 1.0).
         """
+        self._validate_weight(weight)
+        updated = (self.alpha if positive else self.beta) + weight
+        if not math.isfinite(updated):
+            raise ValueError("Evidence update would overflow the belief")
         if positive:
-            self.alpha += weight
+            self.alpha = updated
         else:
-            self.beta += weight
+            self.beta = updated
 
     def describe(self) -> str:
         """Human-readable description of the distribution."""
@@ -1882,11 +1897,6 @@ class ProbabilisticReasoning:
                 f"({'supports' if pos else 'contradicts'}, w={wt:.2f}) "
                 f"→ {ev_belief.describe()}"
             )
-
-        # Update the main belief based on evidence
-        for src, rel, tgt, pos, wt in evidence:
-            if self._belief_key(src, rel, tgt) == self._belief_key(source, relation, target):
-                belief.update(pos, wt)
 
         conclusion = (
             f"{source} {relation} {target} with probability "
@@ -2546,6 +2556,13 @@ class MetaReasoning:
             timestamp=_time.time(),
         )
         self.reasoning_history.append(record)
+        # Bound the history — this is a long-running daemon and an
+        # unbounded list leaks memory and slows get_strategy_stats'
+        # per-record scans. Aggregate stats are kept in
+        # _strategy_scores / _problem_preferences, so dropping old
+        # records loses no learned information.
+        if len(self.reasoning_history) > 1000:
+            del self.reasoning_history[: len(self.reasoning_history) - 1000]
 
         # Update strategy effectiveness score using exponential moving average
         alpha = 0.1  # learning rate

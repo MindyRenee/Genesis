@@ -301,9 +301,18 @@ class PlanningEngine:
             plan.status = PlanStatus.BLOCKED
             plan.failure_reason = "low feasibility score"
 
-        # Store the plan.
+        # Store the plan. Bound the history — plans accumulate over a
+        # long-running daemon's lifetime; completed/blocked plans past
+        # the cap are still indexed by goal in _plans_by_goal only if
+        # they're the latest for that goal.
         self._plans.append(plan)
         self._plans_by_goal[goal] = plan
+        if len(self._plans) > 200:
+            removed = self._plans[: len(self._plans) - 200]
+            del self._plans[: len(self._plans) - 200]
+            for old in removed:
+                if self._plans_by_goal.get(old.goal) is old:
+                    del self._plans_by_goal[old.goal]
 
         return plan
 
@@ -792,7 +801,11 @@ class PlanningEngine:
         self._blocked_count = _int_val("blocked_count")
         self._revised_count = _int_val("revised_count")
         self._steps_executed = _int_val("steps_executed")
-        # Restore plans.
+        # Restore plans — clear first so a repeated restore doesn't
+        # accumulate duplicates in _plans (memory engine's
+        # restore_records does the same).
+        self._plans.clear()
+        self._plans_by_goal.clear()
         plans_data = data.get("plans", [])
         if isinstance(plans_data, list):
             for pd in plans_data:

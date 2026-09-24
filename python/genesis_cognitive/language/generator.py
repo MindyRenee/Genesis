@@ -458,18 +458,10 @@ class GenerativeEngine(LanguageEngine):
         # freedom to express the same state in different ways rather
         # than always saying "I feel X and Y."
         #
-        # Exception: self_report with identity_text metadata and
-        # first-person content (from self_composer or preference
-        # answers) is already a coherent sentence. Treating it as raw
-        # avoids the grammar prepending "I am" ("I am I haven't formed
-        # a favorite color yet").
-        if (
-            intent == "self_report"
-            and thought.metadata.get("identity_text")
-            and (content.startswith("I ") or content.startswith("I'm "))
-        ):
-            return True
-
+        # self_report likewise composes: self-description material
+        # arrives as typed semantic fragments (self_fragments) that the
+        # vocabulary turns into candidates — never as a finished
+        # sentence that bypasses the engine.
         if intent in (
             "inform", "self_report", "philosophize", "correct",
             "discuss_code", "empathize", "encourage", "express_emotion",
@@ -688,7 +680,17 @@ class GenerativeEngine(LanguageEngine):
             "topics": thought.topics,
             "confidence": thought.confidence,
             "first_interaction": thought.metadata.get("first_interaction", False),
-            "identity_text": thought.metadata.get("identity_text", ""),
+            # Self-description fragments — typed (kind, text) semantic
+            # material from the self-composer (name, traits, predicates,
+            # clauses, markers). The vocabulary composes the content
+            # slot from them; the thought content itself stays a short
+            # anchor (topic or name) rather than a finished sentence.
+            "self_fragments": thought.metadata.get("self_fragments"),
+            # Causal-answer qualification — structured relation data
+            # (kind/subject/object/others) from the thought composer's
+            # graph traversal. The vocabulary composes the connective
+            # phrasing; the reasoning layer supplies only the facts.
+            "qualification": thought.metadata.get("qualification"),
             # Her name — so the intro_clause slot can compose
             # "I'm <name>" from the self-model rather than a hardcoded
             # string. The name is a seed (building block), not a
@@ -733,19 +735,50 @@ class GenerativeEngine(LanguageEngine):
             # Reciprocal question — for express_emotion, a "how about you?"
             # follow-up composed from the vocabulary's seed list.
             "reciprocal_question": thought.metadata.get("reciprocal_question"),
+            # Preference metadata — lets the vocabulary compose the
+            # content slot as a predicate from structured data
+            # (status/topic/value) instead of reciting a pre-composed
+            # first-person sentence.
+            "preference": thought.metadata.get("preference"),
             # Web search metadata — when she looked something up online,
             # the vocabulary composes her expression of what she found
             # from the summary, not by reciting the page verbatim.
             "web_summary": thought.metadata.get("web_summary"),
             "web_source": thought.metadata.get("web_source"),
+            # Vision scene metadata — the retina feed's structured
+            # percept (lighting, color, faces, objects, positions).
+            # The vocabulary composes her report from the data; the
+            # vision module itself never writes her words.
+            "vision_scene": thought.metadata.get("vision_scene"),
+            # Vision status — when perception itself failed or is
+            # unavailable ("unavailable", "mid_update", "unprocessed",
+            # "load_failed"), the vocabulary composes her report of
+            # *that* instead of leaving a raw status word in the slot.
+            "vision_status": thought.metadata.get("vision_status"),
         }
 
         # Determine how many sentences to generate
         num_sentences = self._determine_length(intent, emotion, thought)
 
+        # When the thought carries self-description fragments, the
+        # vocabulary composes complete sentence candidates ("I care
+        # about X", "Alice is a creator"). Copula frames ("I am
+        # {content}") only fit when every candidate is guaranteed to
+        # lead with "I'm" — i.e. when the fragments carry name/trait/
+        # complement material. Otherwise they're excluded so the frame
+        # can't produce "I am care about X".
+        pool: list[SentenceStructure] | None = None
+        if context.get("self_fragments"):
+            pool = self._self_fragment_pool(
+                self.grammar.get_structures(intent),
+                context["self_fragments"],
+            )
+
         # Select the first (content-bearing) sentence structure
         emotion_weight = emotion.creativity * 0.5 + emotion.openness_to_engage * 0.5
-        first_structure = self.grammar.select_structure(intent, emotion_weight)
+        first_structure = self.grammar.select_structure(
+            intent, emotion_weight, pool=pool
+        )
 
         # Generate the first sentence (carries the {content} slot)
         sentences: list[str] = []
@@ -862,6 +895,50 @@ class GenerativeEngine(LanguageEngine):
         return text.strip()
 
     @staticmethod
+    def _self_fragment_pool(
+        structures: list[SentenceStructure],
+        fragments: list,
+    ) -> list[SentenceStructure]:
+        """Exclude copula frames when fragment candidates aren't copula-safe.
+
+        Copula frames ("I am {content}", "I'm {content}", "{opener} I am
+        {content}") prepend "I am" to the content slot. That's safe when
+        the fragments carry name/trait/complement material — every
+        candidate then leads with "I'm", which the collision guard
+        strips cleanly. When the fragments are pure predicates or
+        clauses (no lead material), a candidate like "I care about X"
+        or "Alice is a creator" under a copula frame produces "I am
+        care about X" — so those frames are removed from the pool.
+        """
+        has_lead = any(
+            isinstance(f, (tuple, list)) and len(f) == 2
+            and f[0] in ("name", "trait", "comp")
+            for f in fragments
+        )
+        if has_lead:
+            return structures
+        safe = [
+            s for s in structures
+            if not GenerativeEngine._is_copula_content_frame(s)
+        ]
+        return safe or structures
+
+    @staticmethod
+    def _is_copula_content_frame(structure: SentenceStructure) -> bool:
+        """True when a literal ending in "I am"/"I'm" precedes {content}."""
+        segs = structure.segments
+        for i, seg in enumerate(segs[:-1]):
+            nxt = segs[i + 1]
+            if (
+                isinstance(seg, Literal)
+                and isinstance(nxt, Slot)
+                and nxt.name == "content"
+                and seg.text.rstrip().endswith(("I am", "I'm"))
+            ):
+                return True
+        return False
+
+    @staticmethod
     def _strip_leading_pronoun(word: str) -> str:
         """Strip a redundant leading first-person pronoun from content.
 
@@ -905,12 +982,11 @@ class GenerativeEngine(LanguageEngine):
         if intent in {"greet", "farewell", "acknowledge"}:
             return 1
 
-        # When identity_text metadata is present, the content is already
-        # a complete self-description composed by the self_composer.
-        # Generating multiple sentences from it produces repetition
-        # ("I am Genesis, curious and creative... And Genesis, curious
-        # and creative..."). Keep it to one sentence.
-        if thought.metadata.get("identity_text"):
+        # When self_fragments metadata is present, the vocabulary
+        # already composes a complete multi-clause utterance from the
+        # fragments. Generating multiple sentences from it produces
+        # repetition. Keep it to one structure.
+        if thought.metadata.get("self_fragments"):
             return 1
 
         # When reasoning metadata is present, the content is a composed
@@ -945,6 +1021,11 @@ class GenerativeEngine(LanguageEngine):
         # wants, etc.), there's only one fact to express — don't
         # duplicate it across multiple sentences.
         if thought.metadata.get("user_belief") is not None:
+            n = min(n, 1)
+
+        # Same for preference answers — one fact about her own
+        # preference state, one sentence.
+        if thought.metadata.get("preference") is not None:
             n = min(n, 1)
 
         return min(n, 4)  # cap at 4 sentences
@@ -989,33 +1070,36 @@ class GenerativeEngine(LanguageEngine):
         )
         return self.generate(thought, emotion)
 
-    def self_report(self, emotion: EmotionalState, identity_text: str = "") -> str:
+    def self_report(
+        self,
+        emotion: EmotionalState,
+        self_fragments: list[tuple[str, str]] | None = None,
+    ) -> str:
         """Generate a self-report.
 
-        If ``identity_text`` is supplied it is used as the semantic
-        content; otherwise the self-composer is invoked to compose
-        identity from the concept network. The language engine
-        composes the actual phrasing — no hardcoded self-description
-        strings are recited.
+        If ``self_fragments`` is supplied it provides the semantic
+        inventory (typed (kind, text) fragments); otherwise the
+        self-composer is invoked to select identity fragments from
+        the concept network. The language engine composes the actual
+        phrasing — no hardcoded self-description strings are recited.
         """
-        if identity_text:
-            content = identity_text
-        else:
-            # Compose identity from the self-model + concept network
-            # rather than reciting a hardcoded self-description.
+        fragments = self_fragments
+        if fragments is None:
+            # Select identity fragments from the self-model + concept
+            # network rather than reciting a hardcoded self-description.
             from ..self.composer import SelfComposer
 
             composer = SelfComposer()
-            content = composer.compose_identity(
+            fragments = composer.identity_fragments(
                 self.self_model, self._network, emotion
             )
         thought = Thought(
-            content=content,
+            content=self.self_model.name or "identity",
             intent="self_report",
             emotion=emotion.label,
             confidence=0.8,
             self_reflection=True,
-            metadata={"identity_text": identity_text},
+            metadata={"self_fragments": fragments, "field": "identity"},
         )
         return self.generate(thought, emotion)
 

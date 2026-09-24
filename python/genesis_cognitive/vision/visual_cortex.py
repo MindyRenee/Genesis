@@ -63,16 +63,13 @@ class VisualPercept:
     is_novel: bool = False
 
     def describe(self) -> str:
-        """Generate a structural description of the percept.
+        """Topic marker for the language engine.
 
-        Returns a short semantic marker for the language engine to
-        compose from. The actual first-person voice is composed by
-        the generator, not recited from here.
+        The percept's semantics travel in ``Thought`` metadata
+        (concept, candidates, color, surprise); this returns the topic
+        the content slot composes around. The first-person voice is
+        composed by the generator, not recited from here.
         """
-        if self.concept and self.confidence > 0.3:
-            return "see"
-        if self.dominant_color or self.v1_summary or self.is_novel:
-            return "see"
         return "see"
 
 

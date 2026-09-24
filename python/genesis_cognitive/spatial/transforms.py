@@ -1903,7 +1903,7 @@ def _propose_keep_object(examples: list[Example]) -> list[Transform]:
 def _propose_object_recolor(examples: list[Example]) -> list[Transform]:
     """Propose recoloring a selected object (largest/smallest) to a color.
 
-    Catches the common ARC pattern where the output keeps the input's
+    Catches the common pattern where the output keeps the input's
     geometry but one *object* changes color — which a global color map
     can't express when that color appears elsewhere.
     """
@@ -1934,7 +1934,7 @@ def _propose_fill_enclosed(examples: list[Example]) -> list[Transform]:
 
     A background cell is enclosed if it can't reach the grid border
     through other background cells — the classic "color the inside of
-    the box" ARC operation.
+    the box" operation.
     """
     new_colors: set[int] = set()
     for inp, out in examples:
@@ -2441,7 +2441,7 @@ def _propose_connect_aligned(examples: list[Example]) -> list[Transform]:
 def _propose_select_by_color(examples: list[Example]) -> list[Transform]:
     """Propose cropping to the object(s) of a specific color.
 
-    `keep_largest`/`keep_smallest` select by size; many ARC tasks
+    `keep_largest`/`keep_smallest` select by size; many tasks
     select by *color* — "extract the red shape". Crop to the union
     bbox of all objects of that color.
     """

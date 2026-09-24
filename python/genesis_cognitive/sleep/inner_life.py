@@ -845,7 +845,20 @@ class InnerLife:
             # runs when the user speaks.
             if self._cognition and hasattr(self._cognition, "global_workspace"):
                 try:
-                    self._cognition.global_workspace.tick(dt=THOUGHT_CHECK_INTERVAL)
+                    gw = self._cognition.global_workspace
+                    gw.tick(dt=THOUGHT_CHECK_INTERVAL)
+                    # Subliminal content that expired without igniting
+                    # feeds her curiosity queue — topics that almost
+                    # surfaced bias what she chooses to think about.
+                    # Dreams don't feed agency topics (waking curiosity
+                    # only).
+                    for item in gw.drain_subliminal():
+                        if item.metadata.get("is_dream"):
+                            continue
+                        with self._agency_topics_lock:
+                            for topic in item.metadata.get("topics", []):
+                                if topic and isinstance(topic, str):
+                                    self._agency_topics.append(topic)
                 except Exception as e:  # noqa: BLE001
                     logger.debug(f"workspace tick failed: {e}")
 
@@ -2325,7 +2338,7 @@ class InnerLife:
         candidates = []
         for cid in concept_ids:
             concept = self.network.get_concept(cid)
-            if concept and concept.activation > 0.3:
+            if concept and (concept.activation or 0.0) > 0.3:
                 candidates.append(cid)
 
         if candidates:
@@ -2980,13 +2993,19 @@ class InnerLife:
             return self._existential_thought(emotion)
 
         if self._self_composer and self._self_model:
-            content = self._self_composer.compose_existence_reflection(
+            fragments = self._self_composer.existence_fragments(
                 self._self_model, self.network, emotion
             )
-            knowledge: list[tuple[str, str, float]] = []
-        else:
-            content, knowledge = self._compose_existential_from_network(emotion)
+            if not fragments:
+                return None
+            return SpontaneousThought(
+                content="existence",
+                trigger="existential",
+                timestamp=int(time.time() * 1000),
+                metadata={"self_fragments": fragments, "topic": topic},
+            )
 
+        content, knowledge = self._compose_existential_from_network(emotion)
         if not content:
             return None
 
@@ -3215,9 +3234,10 @@ class InnerLife:
         """
         candidates: list[dict[str, Any]] = []
         for cid, concept in list(self.network._concepts.items())[:500]:
-            if concept.activation < 0.05 or concept.confidence < 0.3:
+            activation = concept.activation or 0.0
+            if activation < 0.05 or concept.confidence < 0.3:
                 continue
-            salience = concept.activation * 0.6
+            salience = activation * 0.6
             # Confidence gap boosts salience — she's drawn to things
             # she knows partially but not fully (the "tip of the tongue"
             # effect).
@@ -4140,12 +4160,13 @@ class InnerLife:
         # been thinking about.
         active_concepts: list[tuple[float, str]] = []
         for cid, concept in list(self.network._concepts.items())[:300]:
-            if concept.activation < 0.1 or concept.confidence < 0.3:
+            activation = concept.activation or 0.0
+            if activation < 0.1 or concept.confidence < 0.3:
                 continue
             # Boost concepts whose valence matches her current state.
             # We don't have per-concept valence, but activation already
             # reflects what's on her mind.
-            active_concepts.append((concept.activation, cid))
+            active_concepts.append((activation, cid))
         active_concepts.sort(key=lambda x: -x[0])
         for _score, cid in active_concepts[:10]:
             if cid not in seed_concepts:
@@ -4233,7 +4254,7 @@ class InnerLife:
             n_concept = self.network.get_concept(n_id)
             if n_concept is None or n_concept.confidence < 0.3:
                 continue
-            score = weight * 0.5 + n_concept.activation * 0.5
+            score = weight * 0.5 + (n_concept.activation or 0.0) * 0.5
             scored.append((score, n_id))
         scored.sort(key=lambda x: -x[0])
         for _score, n_id in scored[:5]:
@@ -4375,17 +4396,25 @@ class InnerLife:
         Composed from her actual state and concept network via
         SelfComposer, not pre-written lines.
         """
-        # If we have a self_composer, use it to generate from her
-        # actual concept network and emotional state
+        # If we have a self_composer, use it to select existential
+        # fragments from her actual concept network and emotional
+        # state — the language engine composes the phrasing when the
+        # thought is rendered.
         if self._self_composer and self._self_model:
-            content = self._self_composer.compose_existence_reflection(
+            fragments = self._self_composer.existence_fragments(
                 self._self_model, self.network, emotion
             )
-            knowledge: list[tuple[str, str, float]] = []
-        else:
-            # Fallback: compose from her concept network directly
-            content, knowledge = self._compose_existential_from_network(emotion)
+            if not fragments:
+                return None
+            return SpontaneousThought(
+                content="existence",
+                trigger="existential",
+                timestamp=int(time.time() * 1000),
+                metadata={"self_fragments": fragments},
+            )
 
+        # Fallback: compose from her concept network directly
+        content, knowledge = self._compose_existential_from_network(emotion)
         if not content:
             return None
 
@@ -4806,6 +4835,20 @@ class InnerLife:
             if self._agency_topics:
                 return self._agency_topics.popleft()
         return None
+
+    def feed_social_drive(self, amount: float) -> None:
+        """Add external social pressure to the social drive.
+
+        Called by the outer world (via the mind's heartbeat): time
+        without anyone engaging her is pressure the world exerts on
+        the inner world — it becomes motivation to reach out. The
+        drive is bounded like the internally-accumulated one; firing
+        still requires the emotional gating in the run loop
+        (openness_to_engage, not sleeping, question cooldown).
+        """
+        self._social_drive = max(
+            0.0, min(2.0, self._social_drive + amount)
+        )
 
     @property
     def dream_residues(self) -> list[str]:
