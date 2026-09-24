@@ -382,7 +382,7 @@ impl TickLoop {
         //     load, battery, I/O wait). The impulses are small and
         //     accumulate over multiple ticks through the coupled
         //     dynamics, creating a gradual physiological response.
-        if self.tick_count.is_multiple_of(INTEROCEPTION_INTERVAL_TICKS) {
+        if self.tick_count % INTEROCEPTION_INTERVAL_TICKS == 0 {
             self.last_body_state = self.interoceptor.read();
             super::interoception::publish_body_state(&self.last_body_state);
         }
@@ -539,7 +539,7 @@ impl TickLoop {
         //     GET_BODY_CONTROL and requests application via
         //     APPLY_BODY_CONTROL when she decides to act on it. The
         //     tick never touches the cognitive mind's PID.
-        if self.tick_count.is_multiple_of(CPUFREQ_INTERVAL_TICKS) {
+        if self.tick_count % CPUFREQ_INTERVAL_TICKS == 0 {
             // Read a consistent snapshot for the effective levels.
             // `read_consistent` copies through raw pointers — no
             // aliasing with concurrent writers.
@@ -690,7 +690,7 @@ impl TickLoop {
 
         // 4. Association (run periodically, skip if overwhelmed)
         //    LTM lock held only for this phase.
-        if !is_overwhelmed && self.tick_count.is_multiple_of(ASSOCIATION_INTERVAL_TICKS) {
+        if !is_overwhelmed && self.tick_count % ASSOCIATION_INTERVAL_TICKS == 0 {
             let mut ltm_guard = ltm.access();
             // Find associations for the most recently stored episodes.
             // We scan the index for the highest episode IDs (most recent)
@@ -703,7 +703,7 @@ impl TickLoop {
         // 5. Dreaming (only when sleeping)
         //    LTM lock held only for this phase.
         let mut did_dream = false;
-        if is_sleeping && self.tick_count.is_multiple_of(DREAM_INTERVAL_TICKS) {
+        if is_sleeping && self.tick_count % DREAM_INTERVAL_TICKS == 0 {
             let mut ltm_guard = ltm.access();
             let dream_result = AssociationEngine::dream(&mut ltm_guard, now_ms, MAX_DREAM_HOPS);
             result.dream_insights = dream_result.insights;
@@ -717,13 +717,13 @@ impl TickLoop {
         //    very low plasticity → sync every 5th interval (minimal I/O).
         //    This works with the I/O priority control: when plasticity is
         //    low, both the frequency and priority of disk writes drop.
-        if self.tick_count.is_multiple_of(SYNC_INTERVAL_TICKS) {
+        if self.tick_count % SYNC_INTERVAL_TICKS == 0 {
             let plasticity = state.memory.plasticity_gate;
             let sync_cycle = self.tick_count / SYNC_INTERVAL_TICKS;
             let should_sync = if plasticity < 0.1 {
-                sync_cycle.is_multiple_of(5) // ~100 seconds at 5 Hz
+                sync_cycle % 5 == 0 // ~100 seconds at 5 Hz
             } else if plasticity < 0.4 {
-                sync_cycle.is_multiple_of(3) // ~60 seconds at 5 Hz
+                sync_cycle % 3 == 0 // ~60 seconds at 5 Hz
             } else {
                 true // ~20 seconds (base rate at 5 Hz)
             };
@@ -753,7 +753,7 @@ impl TickLoop {
         //    No LTM lock needed.
         let check_staleness = self
             .tick_count
-            .is_multiple_of(STALENESS_CHECK_INTERVAL_TICKS);
+            % STALENESS_CHECK_INTERVAL_TICKS == 0;
 
         // 8. Intention-driven action selection.
         //    Build a self-model from the pre-transition state, score

@@ -622,7 +622,7 @@ impl LtmStore {
             .map_err(LtmError::Io)?;
 
         let meta_len = meta_file.metadata().map_err(LtmError::Io)?.len();
-        if meta_len < 64 || !(meta_len - 64).is_multiple_of(INDEX_ENTRY_SIZE as u64) {
+        if meta_len < 64 || (meta_len - 64) % INDEX_ENTRY_SIZE as u64 != 0 {
             return Err(LtmError::Io(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "LTM metadata contains an incomplete header or entry",
