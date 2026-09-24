@@ -1819,8 +1819,21 @@ class ThoughtComposer:
 
         # Determine the subject to use in the sentence
         if use_pronoun:
-            is_person = subject.lower() in {"genesis", "she", "her", "i"}
-            subject_phrase = "she" if is_person else "it"
+            subj_lower = subject.lower()
+            if subj_lower in {"she", "he", "they", "it"}:
+                subject_phrase = subj_lower
+            elif subj_lower in {"her", "him", "them"}:
+                subject_phrase = {"her": "she", "him": "he",
+                                  "them": "they"}[subj_lower]
+            else:
+                # Pronouns are learned, not assigned — "genesis"
+                # resolves to "it" unless the network has a learned
+                # gender property for it.
+                from ..language.morphology import person_pronoun
+                ref = "genesis" if subj_lower in {"i", "me"} else subject
+                subject_phrase, _plural = person_pronoun(
+                    ref, self.network
+                )
         else:
             subject_phrase = subject
 
