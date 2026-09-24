@@ -614,8 +614,7 @@ def person_pronoun(
     caller whether verbs should use plural inflection ("they run").
 
     Selection:
-    - Genesis itself → "it" (its established identity)
-    - Concept with gender property → "he"/"it"
+    - Concept with gender property → "he"/"she"
     - Living person (category LIVING + proper noun or person type)
       → "they" (neutral when gender is unknown)
     - Plural noun phrase → "they"
@@ -624,14 +623,12 @@ def person_pronoun(
     The animacy information is *learned* — it comes from the
     concept's ``category`` (detected by ``detect_category``) and
     ``properties["gender"]``/``["proper_noun"]``, never a hardcoded
-    name list.
+    name list. Genesis itself follows the same path: "it" by
+    default, "she" only if the network has learned a feminine
+    ``gender`` property for it.
     """
     cid = (concept_id or "").lower().strip()
     disp = (display or concept_id or "").lower().strip()
-
-    # Genesis — established self-reference
-    if cid == "genesis" or disp == "genesis":
-        return _pick("she", for_object)
 
     # Plural / coordinated NPs
     if is_plural_np(disp or cid):
