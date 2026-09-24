@@ -2263,7 +2263,146 @@ class MathResult:
     success: bool = True
 
 
-def try_math(question: str, network: Any = None) -> MathResult | None:
+def _math_fragment(lower: str) -> str:
+    """Extract the mathematical fragment of a question, dropping the
+    natural-language shell so 'what is' doesn't read as variables."""
+    for pattern in (
+        r"(?:what\s+is|what's|calculate|compute|evaluate)\s+(.+)",
+        r"(?:solve|find\s+x\s+in|find\s+the\s+value\s+of\s+x\s+in)\s+(.+)",
+        r"(?:discover|find\s+patterns?\s+in|explore|investigate)\s+(.+)",
+    ):
+        match = re.match(pattern, lower)
+        if match:
+            return match.group(1).rstrip("?").strip()
+    return lower
+
+
+def _math_state(question: str) -> dict[str, Any]:
+    """Structural signature of a math question.
+
+    Operators, arity, and form are schema-level structure; the literal
+    numbers are bindings — '2 + 3' and '5 + 7' are the same task
+    wearing different values.
+    """
+    lower = question.lower().strip()
+    fragment = _math_fragment(lower)
+    tokens = tokenize(fragment)
+    numbers = sum(1 for t in tokens if t.type == TokenType.NUMBER)
+    idents = {t.value for t in tokens if t.type == TokenType.IDENT}
+    functions = idents & _BUILTIN_FUNCTIONS.keys()
+    variables = idents - _BUILTIN_FUNCTIONS.keys() - {
+        "pi",
+        "e",
+        "infinity",
+    }
+    ops = {
+        t.value
+        for t in tokens
+        if t.type
+        in (
+            TokenType.PLUS,
+            TokenType.MINUS,
+            TokenType.STAR,
+            TokenType.SLASH,
+            TokenType.CARET,
+        )
+    }
+    has_eq = any(
+        t.type
+        in (
+            TokenType.EQ,
+            TokenType.LT,
+            TokenType.GT,
+            TokenType.LE,
+            TokenType.GE,
+            TokenType.NE,
+        )
+        for t in tokens
+    )
+    if lower.startswith(("prove ", "show that ")):
+        form = "prove"
+    elif re.match(
+        r"(?:discover|find\s+patterns?\s+in|explore|investigate)\s", lower
+    ):
+        form = "discover"
+    elif re.match(
+        r"(?:solve|find\s+x\s+in|find\s+the\s+value\s+of\s+x\s+in)\s", lower
+    ):
+        form = "solve"
+    elif re.match(
+        r"(?:what\s+is|what's|calculate|compute|evaluate)\s", lower
+    ):
+        form = "compute"
+    else:
+        form = "expression"
+    state: dict[str, Any] = {
+        "math.form": form,
+        "math.equation": has_eq,
+        "math.numbers": min(numbers, 5),
+        "math.variables": min(len(variables), 3),
+        "math.functions": min(len(functions), 3),
+    }
+    for op in sorted(ops):
+        state[f"math.op:{op}"] = True
+    return state
+
+
+def _record_math_episode(
+    task_competence: Any,
+    question: str,
+    result: MathResult,
+    salience: float | None,
+) -> None:
+    """Consolidate a math episode into the shared competence substrate.
+
+    The math engine's own evaluation is the check, so verification is
+    ``"solver"`` — honest provenance, not an external claim. Failed
+    results record schema failures without consolidating a skill.
+    Recognition runs *after* dispatch so non-math questions never
+    litter the schema store.
+    """
+    from .competence import GoalCondition, ProcedureStep
+
+    goal = GoalCondition("math.answered", "eq", 1)
+    context = task_competence.recognize(
+        domain="math",
+        state=_math_state(question),
+        goal_conditions=[goal],
+        roles=("symbolic", "exact"),
+    )
+    steps = [
+        ProcedureStep(
+            action=result.result_type,
+            family=result.result_type,
+            description=step,
+        )
+        for step in result.steps
+    ]
+    if not steps:
+        steps = [
+            ProcedureStep(
+                action=result.result_type,
+                family=result.result_type,
+                description=result.answer,
+            )
+        ]
+    task_competence.record_episode(
+        context,
+        steps=steps,
+        success=result.success,
+        verification_score=1.0 if result.success else 0.0,
+        goal_conditions=[goal],
+        verification="solver",
+        salience=salience,
+    )
+
+
+def try_math(
+    question: str,
+    network: Any = None,
+    task_competence: Any = None,
+    salience: float | None = None,
+) -> MathResult | None:
     """Try to answer a question using mathematical reasoning.
 
     This is the entry point for the cognition engine. It detects
@@ -2275,6 +2414,11 @@ def try_math(question: str, network: Any = None) -> MathResult | None:
     Without a concept network, all rules are enabled (backward
     compatible).
 
+    When ``task_competence`` is provided, each answered question is
+    recorded as an episode: schemas accumulate which math families
+    succeed or fail, and verified results consolidate as skills the
+    concept network can reason about.
+
     Returns None if the question is not a math question.
     """
     lower = question.lower().strip()
@@ -2285,32 +2429,21 @@ def try_math(question: str, network: Any = None) -> MathResult | None:
         registry = MathRuleRegistry.from_concept_network(network)
         enabled_rules = registry.enabled_rules
 
-    # ── Detect computation: "what is 2 + 2?" ──
-    result = _try_compute(lower, enabled_rules)
-    if result is not None:
-        return result
-
-    # ── Detect bare expression: "2 + 2", "sqrt(16)" ──
-    result = _try_bare_expression(lower)
-    if result is not None:
-        return result
-
-    # ── Detect equation solving: "solve 2x = 6" ──
-    result = _try_solve(lower, enabled_rules)
-    if result is not None:
-        return result
-
-    # ── Detect proof requests: "prove that ..." ──
-    result = _try_proof(question, lower)
-    if result is not None:
-        return result
-
-    # ── Detect discovery requests: "discover patterns in primes" ──
-    result = _try_discover(lower)
-    if result is not None:
-        return result
-
-    return None
+    result = (
+        # ── Computation: "what is 2 + 2?" ──
+        _try_compute(lower, enabled_rules)
+        # ── Bare expression: "2 + 2", "sqrt(16)" ──
+        or _try_bare_expression(lower)
+        # ── Equation solving: "solve 2x = 6" ──
+        or _try_solve(lower, enabled_rules)
+        # ── Proof requests: "prove that ..." ──
+        or _try_proof(question, lower)
+        # ── Discovery: "discover patterns in primes" ──
+        or _try_discover(lower)
+    )
+    if result is not None and task_competence is not None:
+        _record_math_episode(task_competence, question, result, salience)
+    return result
 
 
 def _try_compute(lower: str, enabled_rules: set[str] | None) -> MathResult | None:

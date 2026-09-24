@@ -19,9 +19,17 @@ from __future__ import annotations
 import logging
 import time
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..reasoning.competence import (
+    GoalCondition,
+    ProcedureStep,
+    SkillMatch,
+    TaskCompetence,
+    TaskContext,
+)
 from .grid import Grid
 from .scene import Scene, perceive
 from .transforms import Example, Transform, propose
@@ -108,6 +116,10 @@ class SpatialSolution:
     verified_rules: list[str] = field(default_factory=list)
     # Why the best hypothesis failed, when nothing verified.
     failure: FailureInfo | None = None
+    # The domain-general task frame this solve was recognized as, and
+    # the reusable skill ids considered before search.
+    task_context: TaskContext | None = None
+    retrieved_skills: list[str] = field(default_factory=list)
 
 
 def _cell_accuracy(candidate: Grid, target: Grid) -> float:
@@ -132,8 +144,15 @@ class SpatialReasoner:
     itself works on grids alone.
     """
 
-    def __init__(self, network: Any | None = None) -> None:
+    def __init__(
+        self,
+        network: Any | None = None,
+        task_competence: TaskCompetence | None = None,
+    ) -> None:
         self.network = network
+        self.task_competence = task_competence or TaskCompetence()
+        self._active_task: TaskContext | None = None
+        self._active_skills: list[SkillMatch] = []
         # Rules it has learned — from its own successful solves or
         # from being taught the correct answer after a failure. These
         # are proposed *first* on future tasks: prior knowledge acts
@@ -144,6 +163,11 @@ class SpatialReasoner:
         # worked before. Biases the search toward experienced
         # families — recognition is cheaper than exploration.
         self._family_priors: Counter[str] = Counter()
+        # Schema-level priors adopted from the competence substrate:
+        # which families solved tasks of *this kind* before — on other
+        # instances, by other reasoners. The search policy itself is
+        # learned per task family, not just the solutions.
+        self._schema_priors: Counter[str] = Counter()
 
     @staticmethod
     def _family(transform: Transform) -> str:
@@ -196,6 +220,416 @@ class SpatialReasoner:
     def learned_rules(self) -> tuple[Transform, ...]:
         """Rules learned from verified solves, oldest first (read-only)."""
         return tuple(self._learned)
+
+    @staticmethod
+    def _jsonable(value: Any) -> Any:
+        """Convert transform parameters to persistence-safe JSON values."""
+        if isinstance(value, dict):
+            return {str(k): SpatialReasoner._jsonable(v) for k, v in value.items()}
+        if isinstance(value, list | tuple | set | frozenset):
+            return [SpatialReasoner._jsonable(v) for v in value]
+        if value is None or isinstance(value, str | int | float | bool):
+            return value
+        return str(value)
+
+    @staticmethod
+    def _task_state_features(
+        examples: list[Example], tests: list[Grid]
+    ) -> dict[str, Any]:
+        """Describe the task's structure without binding its answer."""
+        features: dict[str, Any] = {
+            "grid.task": True,
+            "examples.multi": len(examples) > 1,
+            "tests.present": bool(tests),
+        }
+        if not examples:
+            return features
+
+        same_shape = all(inp.shape == out.shape for inp, out in examples)
+        shrinks = all(
+            out.width <= inp.width and out.height <= inp.height
+            and out.shape != inp.shape
+            for inp, out in examples
+        )
+        grows = all(
+            out.width >= inp.width and out.height >= inp.height
+            and out.shape != inp.shape
+            for inp, out in examples
+        )
+        features["shape.same"] = same_shape
+        features["shape.shrinks"] = shrinks
+        features["shape.grows"] = grows
+
+        color_map: dict[int, int] = {}
+        map_consistent = True
+        added = removed = False
+        fractions: list[float] = []
+        input_objects = output_objects = 0
+        for inp, out in examples:
+            in_colors = set(inp.colors())
+            out_colors = set(out.colors())
+            added |= bool(out_colors - in_colors)
+            removed |= bool(in_colors - out_colors)
+            if inp.shape == out.shape:
+                changed = sum(
+                    1
+                    for r, c, v in inp.iter_cells()
+                    if out.at(r, c) != v
+                )
+                fractions.append(changed / max(1, inp.width * inp.height))
+                for r, c, v in inp.iter_cells():
+                    target = out.at(r, c)
+                    if v in color_map and color_map[v] != target:
+                        map_consistent = False
+                    color_map[v] = target
+            else:
+                fractions.append(1.0)
+            input_objects += len(perceive(inp, compute_relations=False).objects)
+            output_objects += len(perceive(out, compute_relations=False).objects)
+
+        mean_change = sum(fractions) / len(fractions)
+        if mean_change == 0:
+            change_bucket = "none"
+        elif mean_change < 0.25:
+            change_bucket = "low"
+        elif mean_change < 0.65:
+            change_bucket = "medium"
+        else:
+            change_bucket = "high"
+        features["cells.change"] = change_bucket
+        features["color.map.consistent"] = map_consistent and bool(color_map)
+        features["color.added"] = added
+        features["color.removed"] = removed
+        features["objects.present"] = input_objects > 0
+        features["objects.count.same"] = input_objects == output_objects
+        features["objects.count.delta"] = (
+            "increase"
+            if output_objects > input_objects
+            else "decrease" if output_objects < input_objects else "same"
+        )
+        return features
+
+    @staticmethod
+    def _operator_affordances(
+        examples: list[Example], state: Mapping[str, Any]
+    ) -> set[str]:
+        """Infer broad operator affordances from example structure."""
+        affordances = {"compose", "verify_exact"}
+        if state.get("shape.same"):
+            affordances.add("shape_preserving")
+        if state.get("shape.shrinks"):
+            affordances.update(("select", "crop"))
+        if state.get("shape.grows"):
+            affordances.update(("generate", "expand"))
+        if state.get("color.map.consistent"):
+            affordances.add("recolor")
+        if state.get("color.added"):
+            affordances.add("fill")
+        if state.get("color.removed"):
+            affordances.add("erase")
+        if state.get("objects.present"):
+            affordances.add("object_manipulation")
+        if examples and all(
+            inp.shape == out.shape
+            and inp.to_lists() != out.to_lists()
+            and Counter(v for _, _, v in inp.iter_cells())
+            == Counter(v for _, _, v in out.iter_cells())
+            for inp, out in examples
+        ):
+            affordances.add("translate")
+        return affordances
+
+    def _recognize_task(
+        self, examples: list[Example], tests: list[Grid]
+    ) -> TaskContext:
+        """Bind this grid task to a domain-general task schema."""
+        state = self._task_state_features(examples, tests)
+        goal = GoalCondition("train.exact_match", "eq", 1.0)
+        context = self.task_competence.recognize(
+            domain="spatial.transform",
+            state=state,
+            actions=self._operator_affordances(examples, state),
+            goal_conditions=[goal],
+            entities=("grid", "cell", "object", "color", "background"),
+            roles=("transform", "input-output"),
+        )
+        self._active_task = context
+        self._active_skills = list(context.skills)
+        # The schema's accumulated search prior becomes this task's
+        # proposal ordering — "tasks like this usually yield to X."
+        self._schema_priors = Counter(context.schema.family_priors)
+        return context
+
+    def _resolve_skill_step(
+        self, step: ProcedureStep, params: dict[str, Any] | None = None
+    ) -> Transform | None:
+        """Rebind a serializable procedure step to an executable transform."""
+        params = step.parameters if params is None else params
+        if params is step.parameters:
+            for learned in self._learned:
+                if learned.describe() == step.description or (
+                    learned.name == step.action
+                    and learned.params == step.parameters
+                ):
+                    return learned
+        from .transforms import instantiate
+
+        names = [step.family, step.action, step.action.split("_")[0]]
+        for name in dict.fromkeys(n for n in names if n):
+            transform = instantiate(name, dict(params))
+            if transform is not None:
+                return transform
+        return None
+
+    @staticmethod
+    def _rebind_candidates(
+        intermediates: list[Example],
+    ) -> list[int]:
+        """Colors this task produces that intermediates don't contain —
+        the evidence a stored binding should be swapped against."""
+        produced: set[int] = set()
+        for mid, out in intermediates:
+            produced |= set(out.colors()) - set(mid.colors())
+        return sorted(produced)
+
+    def _rebound_skill_steps(
+        self,
+        skill_steps: tuple[ProcedureStep, ...],
+        intermediates: list[Example],
+    ) -> list[list[Transform]]:
+        """Re-parameterized variants of a stored procedure.
+
+        A skill's stored params are *bindings* — the fill color that
+        was right last time, not the definition of "fill." When the
+        current task's evidence offers different values, the same
+        procedure is re-emitted with rebound params: the hypothesis
+        space itself reuses learned structure instead of replaying it
+        verbatim. Every variant is still exactly evaluated — a bad
+        rebind is a bad proposal, not a claimed success.
+        """
+        candidates = self._rebind_candidates(intermediates)
+        if not candidates:
+            return []
+        variants: list[list[Transform]] = []
+        for i, step in enumerate(skill_steps):
+            for pname, value in step.parameters.items():
+                if not isinstance(value, int) or value in candidates:
+                    continue
+                for new_value in candidates:
+                    params = dict(step.parameters)
+                    params[pname] = new_value
+                    resolved: list[Transform] = []
+                    for j, s in enumerate(skill_steps):
+                        t = self._resolve_skill_step(
+                            s, params if j == i else None
+                        )
+                        if t is None:
+                            break
+                        resolved.append(t)
+                    else:
+                        variants.append(resolved)
+                    if len(variants) >= 4:
+                        return variants
+        return variants
+
+    def _skill_transforms(
+        self, intermediates: list[Example] | None = None
+    ) -> list[Transform]:
+        """Turn retrieved skills into candidate macro-transforms.
+
+        Emits the verbatim replay plus, when the task's evidence
+        offers different bindings, re-parameterized variants — the
+        skill is a *procedure*, not a recording.
+        """
+        transforms: list[Transform] = []
+        for match in self._active_skills:
+            step_lists: list[tuple[str, list[Transform]]] = []
+            steps: list[Transform] = []
+            for step in match.skill.steps:
+                resolved = self._resolve_skill_step(step)
+                if resolved is None:
+                    break
+                steps.append(resolved)
+            if len(steps) == len(match.skill.steps) and steps:
+                step_lists.append(("", steps))
+            if intermediates:
+                for variant in self._rebound_skill_steps(
+                    match.skill.steps, intermediates
+                ):
+                    step_lists.append((":rebound", variant))
+
+            for suffix, seq in step_lists:
+
+                def apply_skill(
+                    grid: Grid, seq: list[Transform] = seq
+                ) -> Grid:
+                    for transform in seq:
+                        grid = transform(grid)
+                    return grid
+
+                # Rebound variants must describe differently — the
+                # dedupe filter keys on describe(), and two variants
+                # differing only in bindings would otherwise collapse.
+                params: dict[str, Any] = {"skill": match.skill.skill_id}
+                if suffix:
+                    params["rebound"] = "|".join(
+                        t.describe() for t in seq
+                    )
+                transforms.append(
+                    Transform(
+                        f"skill:{match.skill.skill_id}{suffix}",
+                        apply_skill,
+                        params,
+                    )
+                )
+        return transforms
+
+    @staticmethod
+    def _transition_state(grid: Grid) -> dict[str, Any]:
+        """Flat state variables used by the shared transition learner."""
+        scene = perceive(grid, compute_relations=False)
+        nonempty = sum(1 for _, _, v in grid.iter_cells() if v != 0)
+        largest = max((obj.size for obj in scene.objects), default=0)
+        return {
+            "grid.width": grid.width,
+            "grid.height": grid.height,
+            "grid.blank": nonempty == 0,
+            "cells.nonempty": nonempty,
+            "colors.count": len(grid.colors()),
+            "objects.count": len(scene.objects),
+            "objects.largest": largest,
+        }
+
+    def _expanded_transforms(
+        self, transforms: list[Transform]
+    ) -> list[Transform]:
+        """Expand a retrieved skill macro into its primitive transforms."""
+        expanded: list[Transform] = []
+        for transform in transforms:
+            skill_id = transform.params.get("skill")
+            skill = (
+                self.task_competence.skills.get(str(skill_id))
+                if isinstance(skill_id, str)
+                else None
+            )
+            if skill is None:
+                expanded.append(transform)
+                continue
+            for step in skill.steps:
+                resolved = self._resolve_skill_step(step)
+                if resolved is not None:
+                    expanded.append(resolved)
+        return expanded
+
+    def _record_transition_effects(
+        self,
+        context: TaskContext,
+        transforms: list[Transform],
+        examples: list[Example],
+        *,
+        success: bool,
+    ) -> None:
+        """Replay a verified/failed procedure and learn its effects."""
+        expanded = self._expanded_transforms(transforms)
+        if not expanded:
+            return
+        for inp, _expected in examples:
+            current = inp
+            for transform in expanded:
+                try:
+                    after = transform(current)
+                except Exception as e:  # noqa: BLE001
+                    logger.debug(
+                        "transition replay failed for %s: %s",
+                        transform.describe(), e,
+                    )
+                    after = current
+                self.task_competence.record_transition(
+                    context,
+                    transform.describe(),
+                    self._transition_state(current),
+                    self._transition_state(after),
+                    success=success,
+                )
+                current = after
+
+    def _procedure_steps(
+        self, transforms: list[Transform]
+    ) -> list[ProcedureStep]:
+        """Serialize a verified transform sequence as procedure steps."""
+        steps: list[ProcedureStep] = []
+        for transform in transforms:
+            skill_id = transform.params.get("skill")
+            skill = (
+                self.task_competence.skills.get(str(skill_id))
+                if isinstance(skill_id, str)
+                else None
+            )
+            if skill is not None:
+                steps.extend(skill.steps)
+                continue
+            steps.append(
+                ProcedureStep(
+                    action=transform.name,
+                    family=self._schema_family(transform) or "",
+                    parameters={
+                        str(k): self._jsonable(v)
+                        for k, v in transform.params.items()
+                    },
+                    description=transform.describe(),
+                )
+            )
+        return steps
+
+    def record_task_outcome(
+        self,
+        solution: SpatialSolution,
+        *,
+        success: bool,
+        score: float,
+        examples: list[Example] | None = None,
+    ) -> None:
+        """Feed an externally verified solve outcome back into competence."""
+        context = solution.task_context or self._active_task
+        if context is None:
+            return
+        transforms = (
+            list(solution.hypothesis.transforms)
+            if solution.hypothesis is not None
+            else []
+        )
+        used_skills = {
+            str(t.params["skill"])
+            for t in transforms
+            if "skill" in t.params
+        }
+        if not success:
+            for skill_id in used_skills:
+                self.task_competence.mark_skill_failure(skill_id)
+        else:
+            # Learning to search: the schema remembers which transform
+            # families solved it — a prior over proposals, not an
+            # answer. Skill macros contribute their primitive
+            # families so the learned bias stays portable.
+            for t in self._expanded_transforms(transforms):
+                context.schema.family_priors[self._family(t)] = (
+                    context.schema.family_priors.get(self._family(t), 0)
+                    + 1
+                )
+        if examples:
+            self._record_transition_effects(
+                context, transforms, examples, success=success
+            )
+        self.task_competence.record_episode(
+            context,
+            steps=self._procedure_steps(transforms),
+            success=success,
+            verification_score=score,
+            goal_conditions=[GoalCondition("train.exact_match", "eq", 1.0)],
+            # Exact replay against the held-out target grid is a
+            # world-state check, not an assertion.
+            verification="external",
+        )
 
     @staticmethod
     def _schema_family(transform: Transform) -> str | None:
@@ -344,6 +778,10 @@ class SpatialReasoner:
         scenes = [perceive(inp) for inp, _ in examples]
         if not examples:
             return SpatialSolution(solved=False, hypothesis=None, scenes=scenes)
+        task_context = self._recognize_task(examples, tests)
+        retrieved_skills = [
+            match.skill.skill_id for match in self._active_skills
+        ]
 
         def evaluate(transforms: list[Transform]) -> tuple[float, int]:
             return self._evaluate(transforms, examples)
@@ -407,6 +845,8 @@ class SpatialReasoner:
                 scenes=scenes,
                 nodes_explored=explored,
                 failure=self._analyze_failure(best, examples),
+                task_context=task_context,
+                retrieved_skills=retrieved_skills,
             )
 
         guesses = [
@@ -427,6 +867,8 @@ class SpatialReasoner:
             nodes_explored=explored,
             guesses=guesses,
             verified_rules=[h.describe() for h in solved_hyps],
+            task_context=task_context,
+            retrieved_skills=retrieved_skills,
         )
 
     @staticmethod
@@ -575,13 +1017,17 @@ class SpatialReasoner:
         if len(intermediates) != len(examples):
             return candidates, explored, stop
 
-        # Learned rules lead the proposal list — recalled
-        # strategies are tried before de-novo search —
-        # followed by schema instantiations: learned rules
-        # abstracted and re-bound to this task's values.
+        # Retrieved skills lead the proposal list, followed by
+        # recalled rules and schema instantiations — all before
+        # de-novo proposals. Skills compose: a macro may follow
+        # primitives or another skill — "drop it, then fill it" is
+        # two procedures, not one new transform. Exact training
+        # replay still verifies every candidate.
         seen: set[str] = set()
         proposals = []
+        skill_transforms = self._skill_transforms(intermediates)
         for t in [
+            *skill_transforms,
             *self._learned,
             *self._schema_transforms(intermediates),
             *propose(intermediates),
@@ -590,9 +1036,11 @@ class SpatialReasoner:
                 seen.add(t.describe())
                 proposals.append(t)
         for transform in proposals:
+            fam = self._family(transform)
             preferred = (
-                self._family_priors[self._family(transform)]
-                > 0
+                self._family_priors[fam] > 0
+                or self._schema_priors[fam] > 0
+                or "skill" in transform.params
             )
             if preferred != preferred_only:
                 continue

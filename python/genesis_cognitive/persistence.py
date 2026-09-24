@@ -86,7 +86,13 @@ from .memory import (
     SpacedRepetitionScheduler,
 )
 from .narrative import LifeChapter, LifeEvent, NarrativeEngine
-from .reasoning import KnowledgeLevel, TheoryOfMind, UserBelief, UserModel
+from .reasoning import (
+    KnowledgeLevel,
+    TaskCompetence,
+    TheoryOfMind,
+    UserBelief,
+    UserModel,
+)
 from .self import (
     ErrorMonitor,
     Insight,
@@ -160,6 +166,7 @@ def save_state(
     predictive_coding: PredictiveCodingLayer | None = None,
     theory_of_mind: TheoryOfMind | None = None,
     procedural_memory: ProceduralMemory | None = None,
+    task_competence: TaskCompetence | None = None,
     spaced_repetition: SpacedRepetitionScheduler | None = None,
     td_learner: TDLearner | None = None,
     emotional_memory: EmotionalMemorySystem | None = None,
@@ -194,6 +201,7 @@ def save_state(
         predictive_coding: The predictive coding layer (Bayesian models).
         theory_of_mind: The user model.
         procedural_memory: Learned skills and habits.
+        task_competence: Learned task schemas, affordances, and skills.
         spaced_repetition: The review schedule for concepts.
         td_learner: The value function and reward history.
         emotional_memory: Emotional tags associated with memories.
@@ -225,6 +233,7 @@ def save_state(
         predictive_coding=predictive_coding,
         theory_of_mind=theory_of_mind,
         procedural_memory=procedural_memory,
+        task_competence=task_competence,
         spaced_repetition=spaced_repetition,
         td_learner=td_learner,
         emotional_memory=emotional_memory,
@@ -329,6 +338,7 @@ def _add_optional_state(
     predictive_coding: PredictiveCodingLayer | None = None,
     theory_of_mind: TheoryOfMind | None = None,
     procedural_memory: ProceduralMemory | None = None,
+    task_competence: TaskCompetence | None = None,
     spaced_repetition: SpacedRepetitionScheduler | None = None,
     td_learner: TDLearner | None = None,
     emotional_memory: EmotionalMemorySystem | None = None,
@@ -359,6 +369,8 @@ def _add_optional_state(
         state["theory_of_mind"] = _serialize_theory_of_mind(theory_of_mind)
     if procedural_memory is not None:
         state["procedural_memory"] = _serialize_procedural_memory(procedural_memory)
+    if task_competence is not None:
+        state["task_competence"] = _serialize_task_competence(task_competence)
     if spaced_repetition is not None:
         state["spaced_repetition"] = _serialize_spaced_repetition(spaced_repetition)
     if td_learner is not None:
@@ -1074,6 +1086,17 @@ def restore_procedural_memory(procedural_memory: ProceduralMemory, data: dict[st
     procedural_memory.executions = data.get("executions", 0)
 
 
+def restore_task_competence(
+    task_competence: TaskCompetence, data: dict[str, Any]
+) -> None:
+    """Restore learned task schemas, affordances, and skills."""
+    restored = TaskCompetence.from_dict(data)
+    task_competence.schemas = restored.schemas
+    task_competence.skills = restored.skills
+    task_competence.transition_count = restored.transition_count
+    task_competence.match_threshold = restored.match_threshold
+
+
 def restore_spaced_repetition(
     spaced_repetition: SpacedRepetitionScheduler, data: dict[str, Any]
 ) -> None:
@@ -1556,6 +1579,13 @@ def _serialize_procedural_memory(
         "habits_formed": procedural_memory.habits_formed,
         "executions": procedural_memory.executions,
     }
+
+
+def _serialize_task_competence(
+    task_competence: TaskCompetence,
+) -> dict[str, Any]:
+    """Serialize learned task schemas, operators, and skills."""
+    return task_competence.to_dict()
 
 
 def _serialize_spaced_repetition(

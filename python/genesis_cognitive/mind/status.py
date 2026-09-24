@@ -714,6 +714,26 @@ class StatusMixin:
             round(self.cognition.network.network_density, 4),
             f"Network density: {self.cognition.network.network_density:.4f}",
         )
+        # Competence dimension: learned abilities — schemas recognized,
+        # verified skills consolidated, episodes experienced. This is
+        # the procedural counterpart to the knowledge metrics.
+        competence = self.cognition.task_competence
+        self.growth_ledger.record(
+            "competence", "skill_count",
+            len(competence.skills),
+            f"Verified skills: {len(competence.skills)}",
+        )
+        self.growth_ledger.record(
+            "competence", "schema_count",
+            len(competence.schemas),
+            f"Task schemas recognized: {len(competence.schemas)}",
+        )
+        self.growth_ledger.record(
+            "competence", "episode_count",
+            sum(s.episodes for s in competence.schemas.values()),
+            f"Task episodes: "
+            f"{sum(s.episodes for s in competence.schemas.values())}",
+        )
 
         # Self-improvement dimension
         proposals = self.self_improvement.get_all_proposals()

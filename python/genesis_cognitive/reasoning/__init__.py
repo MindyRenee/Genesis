@@ -10,6 +10,8 @@ Subsystems:
         mapping (finds connections humans haven't seen)
     ProblemSolver, Problem, Solution, SolutionStep, GoalType —
         means-ends analysis problem-solving engine
+    TaskCompetence, TaskSchema, TaskSignature, LearnedSkill —
+        domain-general task recognition, transition learning, and skill reuse
     CriticalThinkingEngine, CriticalAssessment, AssessmentRecommendation —
         epistemic evaluation of claims (evidence quality, source
         credibility, disconfirmation search, fallacy detection)
@@ -33,6 +35,18 @@ from .analogy import (
 from .belief_revision import (
     BeliefRevisionEngine,
     RevisionRecord,
+)
+from .competence import (
+    EffectPrediction,
+    GoalCondition,
+    LearnedSkill,
+    ProcedureStep,
+    SkillMatch,
+    TaskCompetence,
+    TaskContext,
+    TaskSchema,
+    TaskSignature,
+    TransitionCheck,
 )
 from .critical_thinking import (
     AssessmentRecommendation,
@@ -103,10 +117,13 @@ __all__ = [
     "DecisionOutcome",
     "DecisionResult",
     "DriftDiffusionModel",
+    "EffectPrediction",
     "EvidenceAccumulator",
     "EvidenceItem",
+    "GoalCondition",
     "GoalType",
     "KnowledgeLevel",
+    "LearnedSkill",
     "MetaReasoning",
     "Plan",
     "PlanStatus",
@@ -117,18 +134,25 @@ __all__ = [
     "Problem",
     "ProblemSolver",
     "ProblemStatus",
+    "ProcedureStep",
     "ReasoningEngine",
     "ReasoningRecord",
     "ReasoningResult",
     "ReasoningStrategy",
     "ReasoningType",
     "RevisionRecord",
+    "SkillMatch",
     "Solution",
     "SolutionStep",
+    "TaskCompetence",
+    "TaskContext",
+    "TaskSchema",
+    "TaskSignature",
     "TemporalReasoning",
     "TemporalRelation",
     "TheoryOfMind",
     "TimeInterval",
+    "TransitionCheck",
     "UserBelief",
     "UserModel",
 ]

@@ -541,9 +541,14 @@ class CognitionEngine:
             MetaReasoning,
             ProbabilisticReasoning,
             ProblemSolver,
+            TaskCompetence,
             TemporalReasoning,
         )
 
+        self.task_competence = TaskCompetence(
+            network=self.network,
+            salience_getter=self._competence_salience,
+        )
         self.meta_reasoning = MetaReasoning(self.network)
         self.probabilistic_reasoning = ProbabilisticReasoning(self.network)
         self.temporal_reasoning = TemporalReasoning(self.network)
@@ -566,7 +571,9 @@ class CognitionEngine:
         # structure the semantic machinery can reason over.
         from ..spatial import SpatialReasoner
 
-        self.spatial = SpatialReasoner(self.network)
+        self.spatial = SpatialReasoner(
+            self.network, task_competence=self.task_competence
+        )
 
         from ..reasoning import CriticalThinkingEngine
 
@@ -735,7 +742,9 @@ class CognitionEngine:
         # before execution. Plans persist across turns.
         from ..reasoning import PlanningEngine
 
-        self.planning_engine = PlanningEngine(self.network)
+        self.planning_engine = PlanningEngine(
+            self.network, task_competence=self.task_competence
+        )
 
         # 16. Active inference reader — the cognitive mind's interface
         #     to the generative self-model. Reads inference signals
@@ -1500,6 +1509,15 @@ class CognitionEngine:
 
         if route.route == "factual":
             topics = [route.sub_kind]
+            # A math question is a factual question the math engine
+            # can answer exactly — consult it before the concept
+            # network composes an "I don't know" about an expression.
+            math_thought = self._math_thought_for(
+                user_input, perception, emotion
+            )
+            if math_thought is not None:
+                math_thought.topics = topics
+                return math_thought, topics
             composed = self.composer.compose_about(route.sub_kind, emotion, depth=3, focused=True)
             if composed is None:
                 return self._compose_factual_answer(route.sub_kind, emotion), topics
@@ -6188,6 +6206,9 @@ class CognitionEngine:
                 else f"unverified, confidence={solution.confidence:.2f}"
             ),
             confidence=solution.confidence,
+            # ProblemSolver is an epistemic verifier — it confirms
+            # knowledge about the goal, not an observed world change.
+            verification="solver",
         )
 
         if success and solution.all_knowledge:
@@ -6551,32 +6572,72 @@ class CognitionEngine:
         """
         from ..reasoning.math_reasoning import try_math
 
-        math_result = try_math(perception.raw_text, self.network)
+        # Consolidation is neuromodulatorily graded: the arousal
+        # (norepinephrine) and dopamine state at encoding decide
+        # whether a verified episode proceduralizes into a skill or
+        # stays merely episodic.
+        salience = max(
+            0.0,
+            min(1.0, 0.5 * emotion.arousal + 0.5 * self._get_dopamine_level()),
+        )
+        math_result = try_math(
+            perception.raw_text,
+            self.network,
+            task_competence=self.task_competence,
+            salience=salience,
+        )
         if math_result is not None:
-            content = math_result.answer
-            if math_result.steps:
-                steps_text = ". ".join(math_result.steps[:8])
-                content = f"{math_result.answer}  ({steps_text})"
-            # Ensure content is long enough for the language generator
-            # to treat as raw (otherwise it composes duplicate sentences)
-            if len(content) < 25:
-                content = f"answer: {content}"
-            # Successful results (computations, solutions, proofs) get
-            # high confidence. Failed results (disproven statements,
-            # unsupported equations, no patterns found) get lower
-            # confidence — the math engine recognized the question but
-            # couldn't produce a positive answer, so the response is
-            # informative but not authoritative.
-            confidence = 0.95 if math_result.success else 0.7
-            return Thought(
-                content=content,
-                intent="inform",
-                emotion=emotion.label,
-                topics=perception.topics,
-                confidence=confidence,
-                metadata={"math_type": math_result.result_type},
-            )
+            return self._math_thought(math_result, perception, emotion)
         return None
+
+    def _math_thought_for(
+        self,
+        user_input: str,
+        perception: Perception,
+        emotion: EmotionalState,
+    ) -> Thought | None:
+        """Try the math engine on routed text (e.g. a factual question)."""
+        from ..reasoning.math_reasoning import try_math
+
+        math_result = try_math(
+            user_input,
+            self.network,
+            task_competence=self.task_competence,
+            salience=self._competence_salience(),
+        )
+        if math_result is None:
+            return None
+        return self._math_thought(math_result, perception, emotion)
+
+    @staticmethod
+    def _math_thought(
+        math_result: Any, perception: Perception, emotion: EmotionalState
+    ) -> Thought:
+        """Render a MathResult as a Thought — shared by the
+        deliberation and meta-router math entry points."""
+        content = math_result.answer
+        if math_result.steps:
+            steps_text = ". ".join(math_result.steps[:8])
+            content = f"{math_result.answer}  ({steps_text})"
+        # Ensure content is long enough for the language generator
+        # to treat as raw (otherwise it composes duplicate sentences)
+        if len(content) < 25:
+            content = f"answer: {content}"
+        # Successful results (computations, solutions, proofs) get
+        # high confidence. Failed results (disproven statements,
+        # unsupported equations, no patterns found) get lower
+        # confidence — the math engine recognized the question but
+        # couldn't produce a positive answer, so the response is
+        # informative but not authoritative.
+        confidence = 0.95 if math_result.success else 0.7
+        return Thought(
+            content=content,
+            intent="inform",
+            emotion=emotion.label,
+            topics=perception.topics,
+            confidence=confidence,
+            metadata={"math_type": math_result.result_type},
+        )
 
     def _deliberate_greeting_question(
         self, perception: Perception, emotion: EmotionalState, memory: MemoryContext
@@ -7256,6 +7317,25 @@ class CognitionEngine:
         Delegates to the MemoryStore subsystem.
         """
         return self._memory_store.get_dopamine_level()
+
+    def _competence_salience(self) -> float:
+        """Ambient neuromodulatory gain for competence consolidation.
+
+        Broadcast signal every competence adapter reads at
+        consolidation time: arousal (norepinephrine — the attentional
+        tag) blended with dopamine level (the reward tag). Low state
+        means verified episodes stay episodic instead of
+        proceduralizing.
+        """
+        arousal = 0.5
+        try:
+            arousal = self._build_meta_emotion().arousal
+        except Exception:  # noqa: BLE001 — meta-emotion may be
+            pass           # unavailable before first turn; neutral
+        return max(
+            0.0,
+            min(1.0, 0.5 * arousal + 0.5 * self._get_dopamine_level()),
+        )
 
     def _build_emotional_tag(
         self,

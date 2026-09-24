@@ -25,6 +25,11 @@ Policy v2 — agency + navigation:
        displacement best closes the distance.
     4. Novelty fallback: before the model is learned, and with
        probability epsilon, explore — try untried actions.
+    5. Task competence: when a shared ``TaskCompetence`` is attached,
+       the environment is recognized as a task schema, every step's
+       transition feeds the shared affordance model, and a won
+       episode's control map consolidates as a reusable skill that
+       primes navigation on structurally similar environments.
 
 On WIN/GAME_OVER the episode resets, but the learned model (avatar
 color, action displacements, object memory) persists — it gets to
@@ -37,6 +42,12 @@ import random
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..reasoning import (
+    GoalCondition,
+    ProcedureStep,
+    TaskCompetence,
+    TaskContext,
+)
 from .grid import Grid
 from .scene import perceive
 
@@ -54,6 +65,31 @@ class ActionStats:
     @property
     def mean_change(self) -> float:
         return self.total_change / self.attempts if self.attempts else 0.0
+
+
+# A track binds to the same object across frames if its centroid stays
+# within this many cells. Movers in these environments travel ~1 cell
+# per step; 3.5 tolerates faster movers without letting teleporting
+# spawns fake a trajectory.
+_TRACK_MAX_SHIFT = 3.5
+
+
+@dataclass
+class _ObjectTrack:
+    """A persistent object identity bound across consecutive frames.
+
+    Colors are bindings; a track is the object itself. Evidence about
+    autonomous motion accrues on the track, so two same-colored
+    objects can't conflate, and a newly spawned object can't inherit
+    another's motion history.
+    """
+
+    track_id: int
+    color: int
+    centroid: tuple[float, float]
+    cells: frozenset[tuple[int, int]]
+    velocity: tuple[float, float] = (0.0, 0.0)
+    moved_frames: int = 0  # frames where it displaced on its own
 
 
 @dataclass
@@ -102,11 +138,30 @@ class SpatialAgent:
     Args:
         seed: RNG seed for reproducible runs.
         epsilon: probability of exploratory (non-navigational) action.
+        task_competence: shared task/skill substrate. When provided,
+            environments are recognized as task schemas, step
+            transitions feed the shared affordance model, and won
+            control maps become skills that transfer to structurally
+            similar environments. A private instance is created when
+            none is given.
     """
 
-    def __init__(self, seed: int = 42, epsilon: float = 0.3) -> None:
+    def __init__(
+        self,
+        seed: int = 42,
+        epsilon: float = 0.3,
+        task_competence: TaskCompetence | None = None,
+    ) -> None:
         self._rng = random.Random(seed)
         self.epsilon = epsilon
+        self.task_competence = task_competence or TaskCompetence()
+        # The recognized schema for the current environment/level,
+        # plus skill priors adopted from it. Priors only fill gaps —
+        # real observations always override transferred knowledge.
+        self._task_context: TaskContext | None = None
+        self._skill_priors: dict[str, tuple[float, float]] = {}
+        self._role_priors: set[str] = set()
+        self._episode_skill_ids: set[str] = set()
         self.stats: dict[Any, ActionStats] = {}
         self._last_frame: Grid | None = None
         self._last_action: Any = None
@@ -118,7 +173,13 @@ class SpatialAgent:
         # almost always things to avoid, not goals — collectibles and
         # exits are static in these environments.
         self._hazard_colors: set[int] = set()
-        self._mover_votes: dict[int, int] = {}
+        # Persistent object identities for this episode — mover
+        # evidence accrues on tracks, not on colors.
+        self._tracks: dict[int, _ObjectTrack] = {}
+        self._next_track_id = 0
+        # Schema-level prior: the mover speed skills of this family
+        # carried. One sighting of matching motion then suffices.
+        self._prior_hazard_speed: float | None = None
         # Per-hazard velocity: last observed (dr, dc) centroid shift.
         # Movers in these environments are usually ballistic (fixed
         # direction per step), so one-step extrapolation predicts
@@ -178,6 +239,275 @@ class SpatialAgent:
     def _stat(self, action: Any) -> ActionStats:
         return self.stats.setdefault(action, ActionStats())
 
+    # ── Task competence ───────────────────────────────────────
+
+    @staticmethod
+    def _count_bucket(n: int) -> str:
+        if n <= 0:
+            return "none"
+        if n <= 3:
+            return "few"
+        if n <= 8:
+            return "some"
+        return "many"
+
+    @staticmethod
+    def _grid_bucket(grid: Grid) -> str:
+        cells = grid.width * grid.height
+        if cells <= 64:
+            return "tiny"
+        if cells <= 400:
+            return "small"
+        if cells <= 4096:
+            return "medium"
+        return "large"
+
+    def _env_features(self, grid: Grid) -> dict[str, Any]:
+        """Environment-observable structure for schema matching.
+
+        Only properties of the world itself belong in the signature —
+        agent-model facts (avatar color, discovered hazards) are
+        bindings that vary across episodes of the same task.
+        """
+        scene = perceive(
+            grid, background=self._background(grid),
+            compute_relations=False,
+        )
+        return {
+            "env.interactive": True,
+            "grid.size": self._grid_bucket(grid),
+            "colors.count": self._count_bucket(len(grid.colors())),
+            "objects.count": self._count_bucket(len(scene.objects)),
+        }
+
+    def _recognize_env(self, action_space: list[Any]) -> TaskContext | None:
+        """Bind the current frame to a task schema once per episode."""
+        if self._task_context is not None or self._last_frame is None:
+            return self._task_context
+        context = self.task_competence.recognize(
+            domain="spatial.interactive",
+            state=self._env_features(self._last_frame),
+            actions=(str(a) for a in action_space),
+            goal_conditions=[GoalCondition("episode.state", "eq", "WIN")],
+            entities=("avatar", "object", "hazard", "pickup"),
+            # Schema-level vocabulary: "navigate a self among objects
+            # toward a terminal state" describes the family, not the
+            # domain — a maze, a tile-world, or an arcade env share it.
+            roles=("self", "object", "navigate"),
+        )
+        self._task_context = context
+        self._adopt_skill_priors(context)
+        return context
+
+    def _adopt_skill_priors(self, context: TaskContext) -> None:
+        """Seed navigation priors from skills won on similar envs.
+
+        The transferable procedure for an interactive environment is
+        the control map — which actions displace the avatar and by how
+        much. Priors fill gaps only: once an action has real attempts
+        its observed effect overrides the transferred value.
+        """
+        for match in context.skills:
+            adopted = False
+            for step in match.skill.steps:
+                if step.family == "control":
+                    dr = step.parameters.get("dr")
+                    dc = step.parameters.get("dc")
+                    if isinstance(dr, int | float) and isinstance(
+                        dc, int | float
+                    ):
+                        adopted = True
+                        self._skill_priors.setdefault(
+                            step.action, (float(dr), float(dc))
+                        )
+                elif step.family == "role":
+                    # Object roles transfer as priors, not facts:
+                    # the color is an instance binding, but "envs of
+                    # this kind contain pickups/hazards" is schema-
+                    # level knowledge. A hazard's speed is schema-
+                    # level too — it says how fast threats move here.
+                    role = step.parameters.get("role")
+                    if isinstance(role, str):
+                        adopted = True
+                        self._role_priors.add(role)
+                        if role == "hazard":
+                            speed = step.parameters.get("speed")
+                            if isinstance(speed, int | float):
+                                self._prior_hazard_speed = max(
+                                    self._prior_hazard_speed or 0.0,
+                                    float(speed),
+                                )
+            if adopted:
+                self._episode_skill_ids.add(match.skill.skill_id)
+
+    def _model_displacement(
+        self, action: Any, grid: Grid
+    ) -> tuple[float, float] | None:
+        """Predicted avatar displacement from the shared schema model.
+
+        The schema's operator models accumulate every observed
+        transition across episodes and structurally similar
+        environments — including episodes that never produced a
+        skill. This is the model-based lookahead: "what would this
+        action do to my position?" answered by competence, not only
+        by this env's local statistics.
+        """
+        if self._task_context is None:
+            return None
+        dr = dc = 0.0
+        seen = False
+        for p in self.task_competence.predict(
+            self._task_context, str(action), self._transition_state(grid)
+        ):
+            if p.confidence < 0.2 or p.delta is None:
+                continue
+            if p.key == "avatar.r":
+                dr, seen = p.delta, True
+            elif p.key == "avatar.c":
+                dc, seen = p.delta, True
+        return (dr, dc) if seen else None
+
+    def _transition_state(self, grid: Grid) -> dict[str, Any]:
+        """Flat state vector for the shared transition learner."""
+        bg = self._background(grid)
+        scene = perceive(grid, background=bg, compute_relations=False)
+        pos = self._avatar_pos(grid)
+        return {
+            "avatar.r": pos[0] if pos is not None else None,
+            "avatar.c": pos[1] if pos is not None else None,
+            "objects.count": len(scene.objects),
+            "cells.nonempty": sum(
+                1 for _, _, v in grid.iter_cells() if v != bg
+            ),
+        }
+
+    def _skill_steps(self) -> list[ProcedureStep]:
+        """The learned procedure: control map plus object roles.
+
+        Control steps carry the action→displacement model. Role steps
+        carry discovered object semantics — which kinds of things are
+        consumable, dangerous, or transformative. The color is kept as
+        the instance binding; what transfers is the role's existence.
+        """
+        steps = []
+        for action in sorted(self.stats, key=str):
+            st = self.stats[action]
+            if st.attempts == 0:
+                continue
+            dr, dc = st.dr / st.attempts, st.dc / st.attempts
+            if dr == 0.0 and dc == 0.0:
+                continue
+            steps.append(
+                ProcedureStep(
+                    action=str(action),
+                    family="control",
+                    parameters={"dr": round(dr, 3), "dc": round(dc, 3)},
+                    description=(
+                        f"{action} displaces avatar ({dr:+.2f},{dc:+.2f})"
+                    ),
+                )
+            )
+        for role, colors in (
+            ("pickup", self._valuable_colors),
+            ("hazard", self._hazard_colors),
+            ("station", self._station_colors),
+        ):
+            for color in sorted(colors):
+                params: dict[str, Any] = {"role": role, "color": color}
+                # Hazard steps also carry the family's mover speed —
+                # dynamics are schema-level even though color isn't.
+                if role == "hazard":
+                    v = self._hazard_velocity.get(color)
+                    if v is not None:
+                        params["speed"] = round(abs(v[0]) + abs(v[1]), 2)
+                steps.append(
+                    ProcedureStep(
+                        action="touch",
+                        family="role",
+                        parameters=params,
+                        description=f"{role} object (color {color})",
+                    )
+                )
+        return steps
+
+    def _track_objects(
+        self, prev: Grid, cur: Grid
+    ) -> dict[int, tuple[float, float]]:
+        """Bind this frame's objects to persistent tracks.
+
+        Returns ``{track_id: (dr, dc)}`` for tracks that genuinely
+        moved. An object whose cell count collapsed keeps its identity
+        (it's still *that* object) but its centroid shift is
+        consumption, not motion — it earns no mover vote.
+        """
+        if not self._tracks:
+            # First transition of the episode: seed tracks from the
+            # previous frame so its motion is visible immediately.
+            for obj in perceive(
+                prev,
+                background=self._background(prev),
+                compute_relations=False,
+            ).objects:
+                self._tracks[self._next_track_id] = _ObjectTrack(
+                    self._next_track_id, obj.color, obj.centroid, obj.cells
+                )
+                self._next_track_id += 1
+
+        cur_objs = perceive(
+            cur, background=self._background(cur), compute_relations=False
+        ).objects
+        pairs: list[tuple[float, int, int]] = []
+        for obj in cur_objs:
+            for tid, track in self._tracks.items():
+                if track.color != obj.color:
+                    continue
+                d = (
+                    abs(track.centroid[0] - obj.centroid[0])
+                    + abs(track.centroid[1] - obj.centroid[1])
+                )
+                if d <= _TRACK_MAX_SHIFT:
+                    pairs.append((d, tid, obj.index))
+        pairs.sort()
+
+        used_tracks: set[int] = set()
+        used_objs: set[int] = set()
+        moved: dict[int, tuple[float, float]] = {}
+        obj_by_index = {o.index: o for o in cur_objs}
+        for _d, tid, oidx in pairs:
+            if tid in used_tracks or oidx in used_objs:
+                continue
+            used_tracks.add(tid)
+            used_objs.add(oidx)
+            obj = obj_by_index[oidx]
+            track = self._tracks[tid]
+            size_change = abs(len(obj.cells) - len(track.cells))
+            if size_change < max(2, len(track.cells) * 0.25):
+                dr = obj.centroid[0] - track.centroid[0]
+                dc = obj.centroid[1] - track.centroid[1]
+                track.velocity = (dr, dc)
+                if dr or dc:
+                    moved[tid] = (dr, dc)
+            else:
+                track.velocity = (0.0, 0.0)
+            track.cells = obj.cells
+            track.centroid = obj.centroid
+
+        for obj in cur_objs:
+            if obj.index in used_objs:
+                continue
+            tid = self._next_track_id
+            self._next_track_id += 1
+            self._tracks[tid] = _ObjectTrack(
+                tid, obj.color, obj.centroid, obj.cells
+            )
+            used_tracks.add(tid)
+        # An unmatched track is gone — destroyed or consumed. Identity
+        # does not outlive the object's absence from the scene.
+        self._tracks = {
+            tid: t for tid, t in self._tracks.items() if tid in used_tracks
+        }
+        return moved
+
     def _learn_from_step(
         self, prev: Grid, cur: Grid, action: Any
     ) -> float:
@@ -189,53 +519,47 @@ class SpatialAgent:
         if change == 0.0:
             return 0.0
 
-        # Agency detection: find the color whose centroid moved most
-        # consistently with this action. The avatar is whatever the
-        # agent controls — detected from contingency, not told.
-        best_color, best_shift = None, 0.0
+        moved = self._track_objects(prev, cur)
+
+        # Agency detection: the track that displaced most is the
+        # avatar candidate — the thing its action controls, detected
+        # from contingency, not told.
+        best_tid, best_shift = None, 0.0
         best_dr = best_dc = 0.0
-        movers: list[int] = []
-        for color in prev.colors() | cur.colors():
-            if color == 0:
-                continue
-            c0 = _color_centroid(prev, color)
-            c1 = _color_centroid(cur, color)
-            if c0 is None or c1 is None:
-                continue
-            # A collected object's cells vanish — centroid shifts with
-            # no motion. Don't let consumption masquerade as movement:
-            # a real mover keeps (roughly) its cell count.
-            n0 = len(prev.cells_with(color))
-            n1 = len(cur.cells_with(color))
-            if abs(n1 - n0) >= max(2, n0 * 0.25):
-                continue
-            dr, dc = c1[0] - c0[0], c1[1] - c0[1]
+        for tid, (dr, dc) in moved.items():
             shift = abs(dr) + abs(dc)
-            if shift > 0:
-                movers.append(color)
             if shift > best_shift:
-                best_color, best_shift = color, shift
+                best_tid, best_shift = tid, shift
                 best_dr, best_dc = dr, dc
-        # Hazard learning: colors that moved but aren't the avatar
-        # candidate this step — things that move on their own are
-        # avoided as goals. Votes accumulate so one noisy frame can't
-        # mark a goal color forever.
-        for color in movers:
-            if color == best_color:
+        # Hazard learning: tracks that moved but aren't the avatar
+        # candidate — things that move on their own are avoided as
+        # goals. Votes accumulate per object so one noisy frame can't
+        # mark a color forever, and a freshly spawned lookalike can't
+        # inherit another object's motion record.
+        for tid, (dr, dc) in moved.items():
+            if tid == best_tid:
                 continue
-            c0 = _color_centroid(prev, color)
-            c1 = _color_centroid(cur, color)
-            if c0 is not None and c1 is not None:
-                self._hazard_velocity[color] = (
-                    c1[0] - c0[0], c1[1] - c0[1]
-                )
-            self._mover_votes[color] = self._mover_votes.get(color, 0) + 1
-            if self._mover_votes[color] >= 3:
-                self._hazard_colors.add(color)
-        if best_color is not None and best_shift > 0:
+            track = self._tracks[tid]
+            self._hazard_velocity[track.color] = track.velocity
+            track.moved_frames += 1
+            # A transferred "hazard" role prior lowers the evidence
+            # bar: envs of this kind contain self-moving threats. If
+            # the prior also carried the family's mover speed and this
+            # object's motion matches it, one sighting suffices.
+            threshold = 2 if "hazard" in self._role_priors else 3
+            speed = abs(dr) + abs(dc)
+            if (
+                self._prior_hazard_speed is not None
+                and abs(speed - self._prior_hazard_speed) <= 0.5
+            ):
+                threshold = 1
+            if track.moved_frames >= threshold:
+                self._hazard_colors.add(track.color)
+        if best_tid is not None and best_shift > 0:
             # Attribute the winning displacement to this action.
             st.dr += best_dr
             st.dc += best_dc
+            best_color = self._tracks[best_tid].color
             self._avatar_votes[best_color] = (
                 self._avatar_votes.get(best_color, 0) + 1
             )
@@ -250,9 +574,24 @@ class SpatialAgent:
         grid = frame_to_grid(frame)
         change = 0.0
         if self._last_frame is not None and self._last_action is not None:
+            prev = self._last_frame
             change = self._learn_from_step(
-                self._last_frame, grid, self._last_action
+                prev, grid, self._last_action
             )
+            if self._task_context is not None:
+                # The shared substrate learns the same affordance data
+                # in a domain-general, persistable form. Its check is
+                # also a surprise signal: when the world defies an
+                # action's learned effects, renew curiosity instead of
+                # repeating a now-suspect policy.
+                check = self.task_competence.record_transition(
+                    self._task_context,
+                    str(self._last_action),
+                    self._transition_state(prev),
+                    self._transition_state(grid),
+                )
+                if check.predicted and check.score < 0.6:
+                    self._grit_steps = max(self._grit_steps, 20)
         if self._pending_click is not None:
             self._click_outcomes[self._pending_click] = change
             self._pending_click = None
@@ -300,7 +639,9 @@ class SpatialAgent:
             if remaining <= len(obj.cells) // 2:
                 self._valuable_colors.add(obj.color)
                 self._hazard_colors.discard(obj.color)
-                self._mover_votes.pop(obj.color, None)
+                for track in self._tracks.values():
+                    if track.color == obj.color:
+                        track.moved_frames = 0
                 self._hazard_velocity.pop(obj.color, None)
                 # A gate just opened — bind its appearance to the
                 # avatar signature that opened it.
@@ -597,10 +938,21 @@ class SpatialAgent:
         best, best_cost = None, float("inf")
         for action in action_space:
             st = self.stats.get(action)
-            if st is None or st.attempts == 0:
-                continue  # untried actions belong to exploration
-            step_dr = st.dr / st.attempts
-            step_dc = st.dc / st.attempts
+            if st is not None and st.attempts > 0:
+                step_dr = st.dr / st.attempts
+                step_dc = st.dc / st.attempts
+            else:
+                # No local evidence — ask the schema's transition
+                # model first (it carries every observed step across
+                # similar envs), then verified-skill priors.
+                disp = self._model_displacement(action, grid)
+                if disp is not None:
+                    step_dr, step_dc = disp
+                else:
+                    prior = self._skill_priors.get(str(action))
+                    if prior is None:
+                        continue  # untried actions belong to exploration
+                    step_dr, step_dc = prior
             if step_dr == 0 and step_dc == 0:
                 continue  # this action doesn't move the avatar
             new_r, new_c = pos[0] + step_dr, pos[1] + step_dc
@@ -626,6 +978,8 @@ class SpatialAgent:
         """
         if not action_space:
             raise ValueError("empty action space")
+
+        self._recognize_env(action_space)
 
         eps = self.epsilon if self.avatar_color is None else self.epsilon * 0.25
         if self._grit_steps > 0:
@@ -730,10 +1084,36 @@ class SpatialAgent:
         """Called on WIN / GAME_OVER / budget exhaustion.
 
         The learned self-model (avatar color, action effects, visited
-        goals) persists — only the perceptual trace resets.
+        goals) persists — only the perceptual trace resets. The
+        episode's outcome is also reported to the shared competence
+        substrate: only a verified WIN consolidates the learned
+        control map as a reusable skill.
         """
         if state == "WIN" and self._last_action is not None:
             self._stat(self._last_action).wins += 1
+        if self._task_context is not None:
+            if state != "WIN":
+                for skill_id in self._episode_skill_ids:
+                    self.task_competence.mark_skill_failure(skill_id)
+            self.task_competence.record_episode(
+                self._task_context,
+                steps=self._skill_steps(),
+                success=state == "WIN",
+                verification_score=1.0 if state == "WIN" else 0.0,
+                goal_conditions=[
+                    GoalCondition("episode.state", "eq", "WIN")
+                ],
+                # The environment's terminal condition is the world
+                # reporting the outcome.
+                verification="external",
+            )
+            # Next level/instance re-recognizes — possibly the same
+            # schema, possibly a new one. Object identities do not
+            # carry across episodes: a new instance binds fresh.
+            self._task_context = None
+            self._episode_skill_ids.clear()
+            self._tracks.clear()
+            self._prior_hazard_speed = None
         self._last_frame = None
         self._last_action = None
         self._pending_click = None
