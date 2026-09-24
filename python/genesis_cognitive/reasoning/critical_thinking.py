@@ -392,8 +392,31 @@ class CriticalThinkingEngine:
         the edge's origin in the network.
         """
         evidence: list[EvidenceItem] = []
+        seen_pairs: set[tuple[str, str, str]] = set()
+        # Prefer the structured provenance path when present — these
+        # are the actual edges traversed, so we can score the real
+        # source and weight instead of guessing from the conclusion.
+        for src, rel_str, tgt, _weight in result.path:
+            edge = self._find_edge_by_parts(src, rel_str, tgt)
+            if edge is None:
+                continue
+            key = (edge.source, rel_str, edge.target)
+            if key in seen_pairs:
+                continue
+            seen_pairs.add(key)
+            evidence.append(EvidenceItem(
+                source_concept=edge.source,
+                relation=rel_str,
+                target_concept=edge.target,
+                raw_weight=edge.weight,
+                source_reliability=self._source_reliability(edge.origin),
+                origin=edge.origin,
+                supports=True,
+            ))
         for rel_str, target, weight in result.knowledge:
             edge = self._find_edge(result, rel_str, target)
+            if edge is not None and (edge.source, rel_str, edge.target) in seen_pairs:
+                continue
             origin = edge.origin if edge else "inferred"
             reliability = self._source_reliability(origin)
             source_concept = edge.source if edge else ""
@@ -819,4 +842,6 @@ def _with_confidence(
         novel=result.novel,
         contradictions=result.contradictions,
         knowledge=result.knowledge,
+        path=result.path,
+        partial=result.partial,
     )

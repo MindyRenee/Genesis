@@ -11,6 +11,8 @@ Subsystems:
     source_registry — trusted-source registry and query APIs
     explorer — filesystem exploration for self-directed learning
     code_learner — introspection over its own codebase
+    code_analysis — scoped structural analysis: call graphs, cyclomatic
+        complexity, and change-impact surfaces for Python source
     project_creator, project_composer — composing real projects from
         its concept network
 """
