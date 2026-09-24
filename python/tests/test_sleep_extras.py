@@ -1099,8 +1099,8 @@ def test_sleep_aid_sets_sleeping_zone():
 
 
 # ======================================================================
-# Wake readiness — the nap timer should wait for her to be ready
-# instead of forcing her awake mid-cycle.
+# Wake readiness — the nap timer should wait for it to be ready
+# instead of forcing it awake mid-cycle.
 # ======================================================================
 
 

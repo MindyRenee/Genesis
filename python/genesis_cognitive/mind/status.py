@@ -79,10 +79,10 @@ class StatusMixin:
 
         Maps interaction outcomes to Erikson's psychosocial stages:
         - Trust vs Mistrust: daemon responded reliably (positive)
-        - Autonomy vs Shame: she learned autonomously (positive)
-        - Initiative vs Guilt: she asked a curiosity question (positive)
-        - Industry vs Inferiority: she answered confidently (positive)
-        - Identity vs Role Confusion: she reflected on herself (positive)
+        - Autonomy vs Shame: it learned autonomously (positive)
+        - Initiative vs Guilt: it asked a curiosity question (positive)
+        - Industry vs Inferiority: it answered confidently (positive)
+        - Identity vs Role Confusion: it reflected on itself (positive)
         """
         if state is None:
             return
@@ -129,7 +129,7 @@ class StatusMixin:
                 weight=0.05,
             )
         # Industry: low-confidence answers are negative evidence
-        # (she's struggling with competence)
+        # (it's struggling with competence)
         elif thought and thought.confidence < 0.3:
             tracker.record_evidence(
                 IdentityStage.INDUSTRY_VS_INFERIORITY,
@@ -162,28 +162,28 @@ class StatusMixin:
         """Return the last cognitive state (for introspection)."""
         return self.cognition._last_state
     def learning_status(self) -> str:
-        """Get a description of what she's been learning autonomously."""
+        """Get a description of what it's been learning autonomously."""
         return self.learner.describe_recent_learning()
     def inner_life_status(self) -> str:
-        """Get a description of her recent spontaneous thoughts."""
+        """Get a description of its recent spontaneous thoughts."""
         return self.inner_life.describe_recent_thoughts()
     def world_status(self) -> str:
-        """Get a description of her external world.
+        """Get a description of its external world.
 
-        Who is in her world (presences, present or away), how long it
-        has been since anyone engaged her, and the recent two-way
-        event stream — her side of the world included.
+        Who is in its world (presences, present or away), how long it
+        has been since anyone engaged it, and the recent two-way
+        event stream — its side of the world included.
         """
         return self.world.summarize()
     def regulation_status(self) -> str:
-        """Get a description of her emotional self-regulation."""
+        """Get a description of its emotional self-regulation."""
         return self.regulator.describe_regulation()
     def report_discomfort(self) -> str:
-        """Let her say, in her own generated words, how she feels.
+        """Let its say, in its own generated words, how it feels.
 
         Instead of a hardcoded checklist, this hands the current emotional
         state to the language engine. The engine composes the actual
-        sentence from her vocabulary, grammar, and voice — so the words
+        sentence from its vocabulary, grammar, and voice — so the words
         are hers, not a fixed template.
         """
         emotion = self.feel()
@@ -217,7 +217,7 @@ class StatusMixin:
     def emergent_identity(self) -> EmergentIdentity:
         """Synthesize and return the current emergent identity.
 
-        The identity is synthesized from her actual experience —
+        The identity is synthesized from its actual experience —
         concept network, narrative, emotional regulation, curiosity,
         and introspection — rather than from hardcoded facts.
         Experience-based sources (learning, reflection) accumulated
@@ -237,13 +237,13 @@ class StatusMixin:
         self._emergent_identity._compute_coherence()
 
         # Feed the synthesized identity back into the self-model so it
-        # influences her self-descriptions and introspection. This
+        # influences its self-descriptions and introspection. This
         # closes the loop: experience → emergent identity → self-model
         # → future behavior → new experience.
         self.cognition.self_model.integrate_emergent_identity(self._emergent_identity)
 
         # Record significant identity shifts in the narrative engine
-        # so they become part of her life story. Only record when the
+        # so they become part of its life story. Only record when the
         # identity is confident enough to be meaningful.
         if (
             self._emergent_identity.confidence > 0.4
@@ -262,7 +262,7 @@ class StatusMixin:
 
         return self._emergent_identity
     def journal_status(self) -> str:
-        """Get a description of her journal."""
+        """Get a description of its journal."""
         return self.journal.describe()
     def read_journal(self, n: int = 20) -> str:
         """Read recent journal entries."""
@@ -335,8 +335,8 @@ class StatusMixin:
         warning has changed since the last call, it is delivered through
         that callback so Genesis can proactively tell the user.
 
-        During sleep, warnings are never spoken — she shouldn't be
-        disturbed by her own alerts while resting. The warning state
+        During sleep, warnings are never spoken — it shouldn't be
+        disturbed by its own alerts while resting. The warning state
         is still computed (for /status) but ``speak`` is forced to
         False so the on_speak callback never fires.
 
@@ -346,8 +346,8 @@ class StatusMixin:
         Returns:
             The current warning text, or ``None`` if nothing is wrong.
         """
-        # Never speak warnings during sleep — she shouldn't be
-        # disturbed by her own alerts while resting.
+        # Never speak warnings during sleep — it shouldn't be
+        # disturbed by its own alerts while resting.
         if self._is_sleeping:
             speak = False
         try:
@@ -358,8 +358,8 @@ class StatusMixin:
 
         # Each entry is (condition_key, composed_phrase). The key is a
         # stable identifier for the underlying condition; the phrase is
-        # the generative composition (empty if she can't articulate it
-        # yet). We track the set of articulated condition keys so she
+        # the generative composition (empty if it can't articulate it
+        # yet). We track the set of articulated condition keys so it
         # only speaks when the *conditions* change, not when the
         # generative wording happens to differ for the same state.
         warnings: list[tuple[str, str]] = []
@@ -386,7 +386,7 @@ class StatusMixin:
         if core_state.valence < WARN_VALENCE:
             warnings.append(self._warn_phrase("distress", "distress", core_state))
 
-        # Filter out empty warnings (concepts she can't articulate yet)
+        # Filter out empty warnings (concepts it can't articulate yet)
         articulated = [(k, p) for k, p in warnings if p]
         if not articulated:
             self._last_warning_keys: frozenset[str] = frozenset()
@@ -398,7 +398,7 @@ class StatusMixin:
         # Only speak when the set of active warning conditions has
         # actually changed — not when the generative composition
         # merely produced different wording for the same conditions.
-        # This prevents her from repeating the same warning every
+        # This prevents it from repeating the same warning every
         # heartbeat cycle (~1 s).
         if (
             speak
@@ -418,10 +418,10 @@ class StatusMixin:
         concept_seed: str,
         core_state: CoreState,
     ) -> tuple[str, str]:
-        """Compose a warning phrase from her understanding of the state.
+        """Compose a warning phrase from its understanding of the state.
 
-        If she understands the concept well enough, she composes
-        her own words for it. Otherwise she stays silent — saying
+        If it understands the concept well enough, it composes
+        its own words for it. Otherwise it stays silent — saying
         just a raw state label like "overstimulated" is not
         meaningful communication, it's just reciting a diagnostic
         string.
@@ -444,7 +444,7 @@ class StatusMixin:
             logger.debug(f"warning phrase composition failed: {e}")
         # Don't recite raw state labels — stay silent instead.
         # The state is still tracked internally for /status and
-        # /feel commands; she just doesn't speak it aloud.
+        # /feel commands; it just doesn't speak it aloud.
         return key, ""
     def poll_notifications(self) -> int:
         """Poll the subcognitive for new notifications.
@@ -478,8 +478,8 @@ class StatusMixin:
         This is the main entry point for surfacing subcognitive
         events. It drains the notification queue and emits each
         notification as a live thought (telemetry). Notifications do
-        NOT go into the journal — the journal is her diary, not a log.
-        Dream insights surface in her own voice through the
+        NOT go into the journal — the journal is its diary, not a log.
+        Dream insights surface in its own voice through the
         dream_reflection thought generator.
 
         Returns the number of notifications processed.
@@ -490,8 +490,8 @@ class StatusMixin:
             self._emit_live_thought(notif.kind, notif.message)
             # Notifications are telemetry (phase changes, dream insight
             # notices) — they surface to the live ticker but do NOT go
-            # into the journal. The journal is her diary, not a log.
-            # Dream insights surface in her own voice through the
+            # into the journal. The journal is its diary, not a log.
+            # Dream insights surface in its own voice through the
             # dream_reflection thought generator → _on_spontaneous_thought
             # → language engine → journal.
         return len(notifications)
@@ -501,7 +501,7 @@ class StatusMixin:
         When the zone is Sleeping, uses the sleep-appropriate phase
         (NREM/REM) instead of the daemon's emergent phase, which may
         not have caught up yet. This prevents delta brain waves from
-        being computed via the waking path when she's actually asleep.
+        being computed via the waking path when it's actually asleep.
         """
         from ..brain_waves import assess_brain_waves
 
@@ -522,7 +522,7 @@ class StatusMixin:
         """Generate an introspective report."""
         return self.cognition.introspect()
     def tell_story(self) -> str:
-        """Return Genesis's self-narrative — her story."""
+        """Return Genesis's self-narrative — its story."""
         return self.cognition.tell_story()
     def get_curiosity_questions(self) -> list[Question]:
         """Return what Genesis is currently curious about."""
@@ -530,12 +530,12 @@ class StatusMixin:
     def developmental_summary(self) -> dict:
         """Return Genesis's developmental stage progress.
 
-        Shows which Erikson-like psychosocial stages she has resolved
-        and which she's currently working through.
+        Shows which Erikson-like psychosocial stages it has resolved
+        and which it's currently working through.
         """
         return self._developmental_tracker.developmental_summary()
     def bug_report(self) -> str:
-        """Return a description of bugs Genesis has noticed in her code."""
+        """Return a description of bugs Genesis has noticed in its code."""
         return self.bug_reporter.describe_concerns()
     def recent_bugs(self, n: int = 10) -> list:
         """Return recent bug reports from the log."""
@@ -589,18 +589,18 @@ class StatusMixin:
         )
         return self.language.render(thought, emo)
     def learn_code(self, max_files: int = 100) -> str:
-        """Learn from her own source code.
+        """Learn from its own source code.
 
         Reads Python and Rust source files, extracts functions,
-        classes, structs, and relationships, and adds them to her
-        concept network. This is how Genesis understands herself.
+        classes, structs, and relationships, and adds them to its
+        concept network. This is how Genesis understands itself.
 
-        Returns a human-readable summary of what she learned.
+        Returns a human-readable summary of what it learned.
         """
         result = self.code_learner.learn_codebase(max_files=max_files)
         # Create bridges between the new code concepts and existing
-        # dictionary/personal concepts — this is how she connects
-        # what she learned from code to what she already knows.
+        # dictionary/personal concepts — this is how it connects
+        # what it learned from code to what it already knows.
         bridges = self.cognition.network._create_semantic_bridges()
         assoc = self.cognition.network._create_associative_bridges(max_new=500)
         hubs = self.cognition.network._attach_orphans_to_hubs(max_new=2000)
@@ -638,11 +638,11 @@ class StatusMixin:
         """Return a summary of code self-knowledge."""
         return self.code_learner.get_code_summary()
     def _topology_status_summary(self) -> dict[str, Any]:
-        """Return a compact summary of her knowledge network topology.
+        """Return a compact summary of its knowledge network topology.
 
         Exposes graph-theoretic metrics (global clustering, average
         path length, small-world coefficient, community count, top
-        hubs, top bridges) so the shape of her knowledge is visible
+        hubs, top bridges) so the shape of its knowledge is visible
         through introspection. Computed lazily by the topology module
         and cached; refreshed after sleep consolidation.
 
@@ -787,7 +787,7 @@ class StatusMixin:
 
         Exposes the GrowthLedger's query APIs: milestone count,
         milestones per dimension, and latest values. This is for
-        introspection — Genesis can query her own growth.
+        introspection — Genesis can query its own growth.
         """
         return {
             "milestone_count": self.growth_ledger.milestone_count,
@@ -863,7 +863,7 @@ class StatusMixin:
         These are the subsystem-exposing fields that go beyond the
         basic runtime/emotion/memory stats in :meth:`status`. Each
         field exposes a subsystem's introspection API so the shape of
-        her mind is visible from the outside.
+        its mind is visible from the outside.
         """
         return {
             # Holographic graph — fixed-size associative memory stats.
@@ -884,12 +884,12 @@ class StatusMixin:
                 if self._sleep_compressor is not None
                 else {}
             ),
-            # Growth ledger — how many milestones she's reached,
+            # Growth ledger — how many milestones it's reached,
             # plus the latest values per dimension for introspection.
             "growth_milestones": self.growth_ledger.milestone_count,
             "growth_latest": self._growth_latest_values(),
-            # Journal — how many entries she's written, plus a brief
-            # description of her last entry (exposes the describe() API
+            # Journal — how many entries it's written, plus a brief
+            # description of its last entry (exposes the describe() API
             # for introspection).
             "journal_entries": self.journal.entry_count,
             "journal_status": self.journal.describe(),
@@ -899,18 +899,18 @@ class StatusMixin:
             # profile for introspection.
             "user_profile_summary": self.user_profile.summarize(),
             "user_interaction_count": self.user_profile.interaction_count,
-            # Vision — whether the retina is attached and what she
+            # Vision — whether the retina is attached and what it
             # last saw. Exposes last_faces_seen() and last_objects_seen()
-            # for introspection so her visual state is visible alongside
-            # her cognitive state.
+            # for introspection so its visual state is visible alongside
+            # its cognitive state.
             "vision_available": self.vision.is_available(),
             "vision_last_faces": self.vision.last_faces_seen(),
             "vision_last_objects": self.vision.last_objects_seen(),
-            # Volition — her current urges and their strengths.
+            # Volition — its current urges and their strengths.
             "volition_state": self.volition.state(),
             # Developmental stages — Erikson-like psychosocial stage
             # progress. Exposes the developmental_summary() API for
-            # introspection so her current stage, crisis, and
+            # introspection so its current stage, crisis, and
             # resolution scores are visible.
             "developmental_summary": self.developmental_summary(),
             # HPA axis — the full stress response state (CRH, ACTH,
@@ -918,7 +918,7 @@ class StatusMixin:
             # already includes hpa_active (boolean); this exposes the
             # full hpa_axis_status() dict for detailed introspection.
             "hpa_axis_status": self.hpa_axis_status(),
-            # Narrative — her self-story stats. Exposes the narrative
+            # Narrative — its self-story stats. Exposes the narrative
             # engine's event_count, chapter_count, temporal_link_count,
             # and life-script deviations for introspection.
             "narrative_events": self.cognition.narrative.event_count,
@@ -935,14 +935,14 @@ class StatusMixin:
             # whether the cognitive layer is keeping up with the
             # subcognitive).
             "notifications_pending": self.notifications.peek(),
-            # Projects — her creative output. Exposes counts so her
+            # Projects — its creative output. Exposes counts so its
             # portfolio is visible for introspection (e.g., checking
-            # how many projects she's built, how many are archived).
+            # how many projects it's built, how many are archived).
             "projects": self._projects_status_summary(),
-            # Topology — structural self-awareness of her knowledge
+            # Topology — structural self-awareness of its knowledge
             # network. Exposes graph-theoretic metrics (clustering,
             # small-world coefficient, communities, hubs, bridges)
-            # so the shape of her knowledge is visible for
+            # so the shape of its knowledge is visible for
             # introspection. Computed lazily and cached by the
             # topology module; refreshed after sleep consolidation.
             "topology": self._topology_status_summary(),

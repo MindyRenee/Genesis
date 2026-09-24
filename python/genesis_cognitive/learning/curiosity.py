@@ -18,7 +18,7 @@ them. This is what makes a mind *want* to learn rather than just
    plasticity → low curiosity (the mind is rigid).
 
 4. **Autonomous exploration**: When not in conversation, Genesis
-   can explore her own concept network, finding gaps and forming
+   can explore its own concept network, finding gaps and forming
    hypotheses. This is contemplation — thinking without input.
 
 # Types of curiosity
@@ -61,7 +61,7 @@ appears, the concept's confidence changes), curiosity resets — the
 mind re-engages with a gap that has become interesting again.
 
 The curiosity engine is what makes Genesis more than a reactive
-system. She has her own drive to understand.
+system. It has its own drive to understand.
 """
 
 from __future__ import annotations
@@ -128,7 +128,7 @@ class Question:
     """A question Genesis generates from curiosity.
 
     Not all questions are asked out loud. Some are internal —
-    Genesis wondering to herself. The `should_ask` field determines
+    Genesis wondering to itself. The `should_ask` field determines
     whether this question should be posed to the user.
 
     The `text` field is composed by the GenerativeEngine from the
@@ -139,8 +139,8 @@ class Question:
     text: str  # composed by GenerativeEngine (may be empty until then)
     target_concept: str  # what concept it's about
     gap_type: str  # "missing_edge", "low_confidence", "contradiction"
-    curiosity_score: float  # 0..1, how curious she is
-    should_ask: bool = False  # should she ask the user?
+    curiosity_score: float  # 0..1, how curious it is
+    should_ask: bool = False  # should it ask the user?
     internal: bool = True  # is this internal musing?
     # Category of question — drives the curiosity→learning bridge.
     # "isolation", "uncertainty", "causation" can be answered by
@@ -156,7 +156,7 @@ class Question:
     # uncertainty (entropy reduction). Higher = more worth asking.
     # Computed by compute_information_gap(); 0.0 if not yet computed.
     info_gain: float = 0.0
-    # Extra detail about the gap — e.g. a neighbor she's uncertain
+    # Extra detail about the gap — e.g. a neighbor it's uncertain
     # about, a hypothesis conclusion, a contradiction description.
     # Used by the GenerativeEngine to compose the question text.
     gap_detail: str = ""
@@ -213,8 +213,8 @@ class CuriosityEngine:
         # O(1) lookup companion to _asked_questions for novelty checks.
         self._asked_questions_set: set[str] = set()
         # Concepts whose questions have been resolved (learned about).
-        # generate_questions() skips these so she doesn't repeatedly
-        # wonder about something she just learned. The set is large
+        # generate_questions() skips these so it doesn't repeatedly
+        # wonder about something it just learned. The set is large
         # (2000) so resolved concepts don't get evicted and re-asked
         # after the user already answered them.
         self._resolved_questions: deque[str] = deque(maxlen=2000)
@@ -246,7 +246,7 @@ class CuriosityEngine:
         Called by the autonomous learner after it successfully learns
         about a concept that came from a curiosity question. This
         prevents the curiosity engine from re-generating questions
-        about something she just understood.
+        about something it just understood.
         """
         concept = concept.lower().strip()
         if concept and concept not in self._resolved_questions_set:
@@ -324,7 +324,7 @@ class CuriosityEngine:
                 number of questions generated (exploratory drive).
                 Delta suppresses question generation entirely (deep
                 rest). Theta shifts focus to consolidation-style
-                questions (reviewing what she already knows rather
+                questions (reviewing what it already knows rather
                 than seeking new topics).
         """
         curiosity_level = self.assess_curiosity(emotion, brain_waves)
@@ -361,7 +361,7 @@ class CuriosityEngine:
                 break
 
             # Skip concepts whose questions were recently resolved —
-            # she already learned about them, no need to wonder again.
+            # it already learned about them, no need to wonder again.
             if concept_id.lower() in self._resolved_questions_set:
                 continue
 
@@ -384,8 +384,8 @@ class CuriosityEngine:
 
         When selecting from activation (idle curiosity), we prefer
         high-quality concepts — those with definitions, typed edges,
-        or high confidence. This prevents her from wondering about
-        empty vocabulary that was never integrated into her knowledge.
+        or high confidence. This prevents it from wondering about
+        empty vocabulary that was never integrated into its knowledge.
         """
         if active_concepts:
             focus = []
@@ -481,7 +481,7 @@ class CuriosityEngine:
         """Sort, set should_ask, and truncate the question list."""
         # Sort by combined curiosity score and information gain.
         # Questions with high info gain are prioritized, weighted by
-        # curiosity score — a gap she's not curious about isn't worth
+        # curiosity score — a gap it's not curious about isn't worth
         # asking even if it's information-rich.
         questions.sort(key=lambda q: -(q.curiosity_score * 0.6 + q.info_gain * 0.4))
 
@@ -619,7 +619,7 @@ class CuriosityEngine:
                 if a == b:
                     continue
                 # Only ask about relationships between genuine world
-                # concepts. Without this, she asks "do *and* and *but*
+                # concepts. Without this, it asks "do *and* and *but*
                 # cause each other?" — pairing function words or code
                 # symbols that happen to co-occur.
                 if not is_world_concept(a) or not is_world_concept(b):
@@ -952,12 +952,12 @@ class CuriosityEngine:
     def contemplate(self, emotion: EmotionalState) -> list[Question]:
         """Autonomous contemplation — thinking without input.
 
-        When Genesis is not in conversation, she can contemplate:
-        explore her concept network, find gaps, and form questions.
+        When Genesis is not in conversation, it can contemplate:
+        explore its concept network, find gaps, and form questions.
         This is internal musing, not for the user.
         """
         if emotion.openness_to_engage > 0.7:
-            # She's engaged with the world — contemplation is lower priority
+            # It's engaged with the world — contemplation is lower priority
             return []
 
         questions = self.generate_questions(emotion, max_questions=5)

@@ -112,14 +112,14 @@ class HeartbeatMixin:
     def _read_threat_signals(self) -> dict[str, float]:
         """Read integrity-threat signals for the safeguard urge.
 
-        - daemon_lost: the subcognitive socket dropped — she can't
-          reach her own body (interoception, neurochemistry, state
+        - daemon_lost: the subcognitive socket dropped — it can't
+          reach its own body (interoception, neurochemistry, state
           sync all live there). Ramps over 30s so a transient flap
           doesn't fire the urge; a sustained loss saturates it.
           Skipped entirely in offline mode — a mind started without
           a daemon isn't missing anything.
         - save_failure: consecutive autosave failures, normalized
-          over 2 — her continuity across restarts is at risk.
+          over 2 — its continuity across restarts is at risk.
         - telemetry_anomaly: system metrics deviating from the learned
           baseline (system_monitor). Only counts once the baseline is
           established — a young mind has no "normal" to deviate from.
@@ -228,13 +228,13 @@ class HeartbeatMixin:
         The cognitive mind reads the recommendation via
         GET_BODY_CONTROL, then REQUESTS application of the shared
         body control (CPU freq, daemon scheduling) via
-        APPLY_BODY_CONTROL. She also applies her own scheduling
-        and I/O priority from her brain wave state. The tick
+        APPLY_BODY_CONTROL. It also applies its own scheduling
+        and I/O priority from its brain wave state. The tick
         never touches the cognitive mind's PID.
 
         This is the cortical control of cognitive resource
         allocation: brain waves (which integrate neurochemistry
-        bottom-up and cognitive top-down drive) determine her
+        bottom-up and cognitive top-down drive) determine its
         scheduling and I/O priority. The body recommendation is
         an afferent input, not a command — the brain waves can
         override it.
@@ -281,11 +281,11 @@ class HeartbeatMixin:
                 self.client.apply_body_control()
 
                 # ── Apply brain-wave-driven self-priority ──
-                # The cognitive mind decides her own scheduling
-                # and I/O priority from her brain wave state,
+                # The cognitive mind decides its own scheduling
+                # and I/O priority from its brain wave state,
                 # blended with the body's recommendation. This
-                # is her cortical control of her own process
-                # resources — the tick does not control her.
+                # is its cortical control of its own process
+                # resources — the tick does not control it.
                 if current_brain_wave_state is not None:
                     from ..brain_waves import apply_self_priority, derive_self_priority
                     self_nice, self_io = derive_self_priority(
@@ -315,10 +315,10 @@ class HeartbeatMixin:
     ) -> tuple[int, float]:
         """Run the memory consolidation phase of the heartbeat loop.
 
-        She consolidates memories when STM has accumulated
-        enough entries AND her plasticity gate is open. Not
+        It consolidates memories when STM has accumulated
+        enough entries AND its plasticity gate is open. Not
         on a schedule — when there's something to consolidate
-        and she's in a state that supports it.
+        and it's in a state that supports it.
 
         Returns the updated (last_stm_count, last_consolidate_time).
         """
@@ -350,7 +350,7 @@ class HeartbeatMixin:
         """Run the volition phase of the heartbeat loop.
 
         Volition urges accumulate and fire when they cross
-        thresholds. This is her free will — not a timer.
+        thresholds. This is its free will — not a timer.
         """
         if (
             self._is_sleeping
@@ -469,7 +469,7 @@ class HeartbeatMixin:
         last_inference_save_time).
         """
         # ── 7. Associate (event-driven) ──
-        # She finds associations when new episodes have been
+        # It finds associations when new episodes have been
         # stored — not on a schedule. If STM count grew, there
         # are new memories to connect.
         if now - last_associate_time >= 10.0 and not self._is_sleeping:
@@ -480,7 +480,7 @@ class HeartbeatMixin:
                 logger.debug(f"associate failed: {e}")
 
         # ── 8. Dream (sleep-state-driven) ──
-        # She dreams only when sleeping, and only when enough
+        # It dreams only when sleeping, and only when enough
         # time has passed for a dream cycle. Not on a tick count.
         if self._is_sleeping and now - last_dream_time >= 4.0:
             try:
@@ -518,7 +518,7 @@ class HeartbeatMixin:
         — not on a fixed timer, but when enough cycles have passed.
         This is communication, not control.
 
-        She feels her body when enough time has passed for the sensors
+        It feels its body when enough time has passed for the sensors
         to have changed meaningfully. This is information gathering,
         not a scheduled action.
 
@@ -559,12 +559,12 @@ class HeartbeatMixin:
             # Cognitive work is metabolic work. total_work is measured
             # execution — seconds the sampler observed Genesis code at
             # a leaf frame during this window. Adenosine is the ATP
-            # byproduct of neural activity, so her own measured compute
+            # byproduct of neural activity, so its own measured compute
             # generates sleep pressure on top of the daemon's baseline
             # accumulation (~0.055/hr while awake). This block runs
             # every ~10s, so the per-impulse scale is set for parity at
             # full load: 0.00015/impulse ≈ 0.054/hr at work_frac=1.0 —
-            # sustained hard thinking roughly doubles how fast she
+            # sustained hard thinking roughly doubles how fast it
             # tires; idling adds almost nothing.
             window = max(now - last_heartbeat_time, 1.0)
             work_frac = min(1.0, total_work / window)
@@ -587,9 +587,9 @@ class HeartbeatMixin:
                     self.regulator.interoception.update_from_body_state(body_state)
                 report = self.client.get_subsystem_telemetry()
                 self.regulator.interoception.update_subsystem_telemetry(report)
-                # Feed the same report into her self-model — which
-                # part of her is firing becomes part of what she
-                # knows about herself (body_model.subsystem_activity /
+                # Feed the same report into its self-model — which
+                # part of it is firing becomes part of what it
+                # knows about itself (body_model.subsystem_activity /
                 # module_activity → embodiment_facts → language).
                 self.self_model.update_brain_activity(report)
             except (OSError, ConnectionError, ValueError) as e:
@@ -602,12 +602,12 @@ class HeartbeatMixin:
     ) -> float:
         """Sense network connectivity (heartbeat step 5b).
 
-        The network is a sensory channel — part of her embodiment.
-        She reads her connectivity state from the learner's source
-        registry (which proactively probes). This updates her
-        self-model so she *knows* she's offline, not just silently
-        fails queries. Her awareness of being offline emerges from
-        her self-model and influences her expression through the
+        The network is a sensory channel — part of its embodiment.
+        It reads its connectivity state from the learner's source
+        registry (which proactively probes). This updates its
+        self-model so it *knows* it's offline, not just silently
+        fails queries. Its awareness of being offline emerges from
+        its self-model and influences its expression through the
         same concept-network pathways as every other body state.
 
         Also detects daemon reconnection: when the daemon comes back
@@ -686,7 +686,7 @@ class HeartbeatMixin:
         # ── 9c. External world — presence decay and social pressure ──
         # The world runs on the heartbeat like every other subsystem:
         # state-gated, not timer-gated. Silent presences leave; the
-        # world's social isolation feeds her inner-life social drive —
+        # world's social isolation feeds its inner-life social drive —
         # the outer world's pressure becomes inner motivation.
         try:
             self.world.tick()
@@ -735,7 +735,7 @@ class HeartbeatMixin:
         last_dream_time = 0.0
         last_inference_save_time = 0.0
         # Emergent identity synthesis runs every ~5 minutes. The
-        # identity is synthesized from her actual experience (concept
+        # identity is synthesized from its actual experience (concept
         # network, narrative, emotional regulation, curiosity) and
         # fed back into the self-model — closing the loop: experience
         # → emergent identity → self-model → future behavior → new
@@ -761,7 +761,7 @@ class HeartbeatMixin:
         last_learner_wave: str = ""
         # Neurochemical time must track real time: each advance_neuro
         # step simulates the time actually elapsed since the last
-        # successful advance. A fixed dt per cycle would decouple her
+        # successful advance. A fixed dt per cycle would decouple its
         # neurochemical clock from the wall clock — the circadian
         # oscillator, adenosine sleep pressure, and cortisol clearance
         # would all run at the wrong rate.
@@ -853,7 +853,7 @@ class HeartbeatMixin:
             )
 
             # ── 9b. Emergent identity synthesis (every ~5 min) ──
-            # Synthesizes who she is from her actual experience and
+            # Synthesizes who it is from its actual experience and
             # feeds it back into the self-model. This closes the loop:
             # experience → emergent identity → self-model → behavior.
             if now - last_identity_time >= 300.0 and not self._is_sleeping:

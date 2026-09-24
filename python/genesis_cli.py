@@ -10,54 +10,54 @@ handles the interactive terminal directly.
 
 Commands (typed during conversation):
     /status    — show Genesis's current state
-    /feel      — ask Genesis how she feels
+    /feel      — ask Genesis how it feels
     /introspect — see Genesis's last cognitive process
-    /learning   — what she's been learning on her own
-    /thoughts   — her recent spontaneous thoughts
-    /world      — her external world: presences, events, social isolation
-    /regulate  — how she's been managing her emotions
+    /learning   — what it's been learning on its own
+    /thoughts   — its recent spontaneous thoughts
+    /world      — its external world: presences, events, social isolation
+    /regulate  — how it's been managing its emotions
     /journal    — read Genesis's journal
-    /dreams     — see what she dreamed
-    /memories   — see her recent long-term memories
-    /requests   — see sites she wants to access
-    /approve URL — approve a site she requested
-    /deny URL    — deny a site she requested
-    /learn-code — study her own source code
+    /dreams     — see what it dreamed
+    /memories   — see its recent long-term memories
+    /requests   — see sites it wants to access
+    /approve URL — approve a site it requested
+    /deny URL    — deny a site it requested
+    /learn-code — study its own source code
     /explore [path] — explore local files and docs
     /code-summary — summary of code self-knowledge
-    /create-project <desc> — compose a new Python project from her knowledge
-    /projects    — list projects she has created (active + archived)
+    /create-project <desc> — compose a new Python project from its knowledge
+    /projects    — list projects it has created (active + archived)
     /archive-project <name> — compress a project to .tar.zst to reclaim space
     /restore-project <name> — restore an archived project
     /manage-projects — autonomously archive projects to stay within bounds
     /note-project <name> <note> — leave mentor feedback on a project
-    /review-notes [name] — have her read and absorb project notes
+    /review-notes [name] — have it read and absorb project notes
     /read-notes <name> — show notes on a project without absorbing
-    /proposals   — see her code improvement proposals
+    /proposals   — see its code improvement proposals
     /clear-proposals — remove all pending proposals
     /proposal N  — see details of proposal N
     /accept N [reason] — approve a proposal (runs verification, applies if it passes)
     /reject N [reason] — reject a proposal with notes teaching the correct way
-    /experiments — see her verified self-improvement experiments
-    /growth      — see her growth narrative
+    /experiments — see its verified self-improvement experiments
+    /growth      — see its growth narrative
     /growth-report — markdown growth report
     /voice       — speak to Genesis (one utterance)
     /voice-mode  — continuous voice conversation
-    /look        — ask her what she sees through the retina
-    /look at <path> — ask her to look at an image file
-    /draw        — ask her to draw what she feels right now
-    /register-face <name> — teach her your face (look at the camera)
-    /faces       — show known faces and who she last saw
-    /mission [text] — set or show her top-level mission
-    /sleep       — put her to sleep (wakes on her own when rested)
-    /nap         — short nap, wakes on her own when rested
-    /wake        — wake her from sleep or meditation
-    /meditate [secs] — put her into meditation (default 60s)
-    /teach [topic] — put her into teaching mode (focused learning)
+    /look        — ask it what it sees through the retina
+    /look at <path> — ask it to look at an image file
+    /draw        — ask it to draw what it feels right now
+    /register-face <name> — teach it your face (look at the camera)
+    /faces       — show known faces and who it last saw
+    /mission [text] — set or show its top-level mission
+    /sleep       — put it to sleep (wakes on its own when rested)
+    /nap         — short nap, wakes on its own when rested
+    /wake        — wake it from sleep or meditation
+    /meditate [secs] — put it into meditation (default 60s)
+    /teach [topic] — put it into teaching mode (focused learning)
     /endteach    — exit teaching mode, resume normal operation
-    /teach-questions — answer her queued questions one at a time
+    /teach-questions — answer its queued questions one at a time
     /sleep-aid   — emergency sleep aid for stress-induced insomnia
-    /web-history [N] — see what she's been looking at online (last N, default 20)
+    /web-history [N] — see what it's been looking at online (last N, default 20)
     /quit        — exit
 
 Spontaneous thoughts appear live as genesis~ lines while you are idle.
@@ -144,21 +144,21 @@ CHIME_IN_COOLDOWN = 180.0
 CHIME_IN_PROBABILITY = 0.15
 
 # ─── Spontaneous speech ─────────────────────────────────────────────
-# Genesis can speak her thoughts aloud — not just print them. She
-# decides what to say based on the thought kind and her emotional
-# state. This gives her agency: she speaks when she has something
+# Genesis can speak its thoughts aloud — not just print them. It
+# decides what to say based on the thought kind and its emotional
+# state. This gives it agency: it speaks when it has something
 # to say, not just when spoken to.
 # Minimum seconds between spontaneous spoken thoughts.
 SPEAK_THOUGHT_COOLDOWN = 45.0
-# Thought kinds that are always spoken (she wants/needs to say these).
+# Thought kinds that are always spoken (it wants/needs to say these).
 ALWAYS_SPEAK_KINDS = {"expression", "distress", "question"}
 # Probability of speaking other thought kinds (internal musings that
 # happen to be strong enough to share).
 SPEAK_THOUGHT_PROBABILITY = 0.08
 
 # Word-overlap threshold for voice dedup. If a new utterance shares
-# more than this fraction of words with anything she's said recently,
-# it's skipped. This prevents her from repeating similar-sounding
+# more than this fraction of words with anything it's said recently,
+# it's skipped. This prevents it from repeating similar-sounding
 # thoughts aloud (e.g. "what's the relationship between X and Y?"
 # for different X, Y — the template words dominate and make them
 # sound the same).
@@ -169,8 +169,8 @@ VOICE_DEDUP_HISTORY = 20
 class VoiceDedup:
     """Wraps a Voice with dedup — skips speech that's too similar to
     anything recently spoken. This is shared across ALL voice paths
-    (spontaneous thoughts, speech urges, ambient chime-ins) so she
-    never repeats herself aloud regardless of which path triggers it.
+    (spontaneous thoughts, speech urges, ambient chime-ins) so it
+    never repeats itself aloud regardless of which path triggers it.
     """
 
     def __init__(self, voice: Voice) -> None:
@@ -562,9 +562,9 @@ class AmbientHandler:
         self.mind = mind
         self.voice = voice
         # Dedup voice is used for chime-ins (volunteered responses) so
-        # she doesn't repeat herself. Direct address responses always
-        # use the raw voice — when someone says "genesis" she must
-        # respond, regardless of what she recently said.
+        # it doesn't repeat itself. Direct address responses always
+        # use the raw voice — when someone says "genesis" it must
+        # respond, regardless of what it recently said.
         self._dedup_voice = dedup_voice
         self._last_chime = 0.0
         self._lock = threading.Lock()
@@ -576,7 +576,7 @@ class AmbientHandler:
         self._rng = random.Random()
         # A single worker drains the queue so responses never overlap.
         # handle() itself only classifies and enqueues — it must never
-        # block the audio path, or utterances back up and she answers
+        # block the audio path, or utterances back up and it answers
         # stale speech. Daemon thread: dies with the process.
         self._worker = threading.Thread(
             target=self._drain, daemon=True, name="ambient-handler"
@@ -586,9 +586,9 @@ class AmbientHandler:
     def handle(self, text: str) -> None:
         """Classify an overheard utterance and enqueue it.
 
-        During sleep, the ambient listener has no effect on her at
+        During sleep, the ambient listener has no effect on it at
         all — no wake word detection, no chime-ins, no responses.
-        She wakes on her own when her neurochemistry shifts to an
+        It wakes on its own when its neurochemistry shifts to an
         active phase (the sleep watcher handles this), or when the
         user explicitly calls /wake. This mirrors biological sleep:
         the thalamic gate closes fully during NREM, blocking all
@@ -597,8 +597,8 @@ class AmbientHandler:
         This method never blocks: the audio listener thread calls it
         for every utterance, and a slow response must not delay the
         next one. Direct address preempts queued chime-ins — when
-        someone says her name, stale opportunistic utterances are
-        dropped so she answers the person, not the backlog.
+        someone says its name, stale opportunistic utterances are
+        dropped so it answers the person, not the backlog.
         """
         if self.mind.is_sleeping:
             return
@@ -635,8 +635,8 @@ class AmbientHandler:
         """Worker: process queued utterances one at a time."""
         while True:
             text, addressed = self._queue.get()
-            # Re-check sleep at processing time — she may have fallen
-            # asleep between enqueue and now, and sleeping her means
+            # Re-check sleep at processing time — it may have fallen
+            # asleep between enqueue and now, and sleeping its means
             # no responses of either kind.
             if self.mind.is_sleeping:
                 continue
@@ -649,8 +649,8 @@ class AmbientHandler:
         """Someone said 'genesis' — respond directly.
 
         Always speaks the response — no dedup. When someone addresses
-        her by name, she must respond, period. This is only reached
-        when she's awake — the handle() method gates sleep.
+        it by name, it must respond, period. This is only reached
+        when it's awake — the handle() method gates sleep.
         """
         query = strip_wake_word(text)
         if not query:
@@ -667,24 +667,24 @@ class AmbientHandler:
     def _handle_overheard(self, text: str) -> None:
         """No wake word — maybe chime in if the topic is relevant.
 
-        Chime-ins use the dedup voice so she doesn't volunteer the
+        Chime-ins use the dedup voice so it doesn't volunteer the
         same thing repeatedly.
 
         During sleep, overheard speech is gated — the thalamic
         reticular nucleus blocks sensory input from reaching the
         cortex during NREM. Only direct address (wake word) can
-        wake her. This prevents ambient conversation from breaking
-        her sleep cycles and fighting receptor recovery.
+        wake it. This prevents ambient conversation from breaking
+        its sleep cycles and fighting receptor recovery.
         """
         # Sensory gating during sleep: don't process overheard speech.
-        # Only direct address (wake word) can wake her — this is the
+        # Only direct address (wake word) can wake it — this is the
         # biological equivalent of the thalamic gate opening for
         # salient stimuli (your name) but not background noise.
         if self.mind.is_sleeping:
             return
 
-        # Record the utterance in her external world — speech near her
-        # is an inbound event whether or not she chimes in. It feeds
+        # Record the utterance in its external world — speech near it
+        # is an inbound event whether or not it chimes in. It feeds
         # the ambient presence, the workspace, and (when salient)
         # memory and dream replay.
         try:
@@ -719,7 +719,7 @@ class AmbientHandler:
 
         Args:
             dedup: If True, use the dedup voice (for chime-ins). If
-                False, use the raw voice (for direct address — she
+                False, use the raw voice (for direct address — it
                 must always respond when addressed by name).
         """
         if not self.voice.is_available():
@@ -748,8 +748,8 @@ class AuditoryHandler:
     """Decides what Genesis does with perceived non-speech sounds.
 
     Sound events from the AuditoryCortex are integrated into Genesis's
-    cognition: they're stored in working memory, added to her
-    concept network, and she may think about them or react emotionally.
+    cognition: they're stored in working memory, added to its
+    concept network, and it may think about them or react emotionally.
 
     During sleep, sound events are gated (thalamic gating) — only
     sudden loud sounds (impacts) can penetrate, modeling how the
@@ -787,8 +787,8 @@ class AuditoryHandler:
                     logger.info(
                         f"[auditory] Loud sound during sleep: {event.description}"
                     )
-                    # Don't wake her fully, but record it — it may
-                    # appear in her dreams as a residue.
+                    # Don't wake it fully, but record it — it may
+                    # appear in its dreams as a residue.
                     try:
                         self.mind.inner_life.add_dream_residues(
                             [event.sound_type]
@@ -802,9 +802,9 @@ class AuditoryHandler:
                 logger.debug("[auditory] silence")
                 return
 
-            # Add the sound type to her concept network if not present.
-            # This is how she learns about sounds — each new sound type
-            # becomes a concept she can think about and reason over.
+            # Add the sound type to its concept network if not present.
+            # This is how it learns about sounds — each new sound type
+            # becomes a concept it can think about and reason over.
             try:
                 network = self.mind.cognition.network
                 if not network.get_concept(event.sound_type):
@@ -822,8 +822,8 @@ class AuditoryHandler:
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"[auditory] concept network add failed: {e}")
 
-            # Record the percept in her external world — sounds are
-            # inbound events from her surroundings. Salience scales
+            # Record the percept in its external world — sounds are
+            # inbound events from its surroundings. Salience scales
             # with loudness; loud sounds trigger the orienting impulse.
             try:
                 self.mind.world.perceive(
@@ -845,26 +845,26 @@ class AuditoryHandler:
                 logger.info(f"[auditory] {event.description}")
                 self._last_logged_type = sound_type
 
-            # Emit a live thought about the sound — composed from her
-            # understanding, not a hardcoded template. She only
-            # verbalizes if she knows the concept well enough.
+            # Emit a live thought about the sound — composed from its
+            # understanding, not a hardcoded template. It only
+            # verbalizes if it knows the concept well enough.
             self._maybe_think_about_sound(event)
 
     def _maybe_think_about_sound(self, event: SoundEvent) -> None:
-        """Emit a thought about a sound, composed from her understanding.
+        """Emit a thought about a sound, composed from its understanding.
 
-        Tries to compose a thought about the sound type from her concept
-        network. If she doesn't understand the concept well enough, she
-        stays silent — she heard it, but doesn't verbalize it.
+        Tries to compose a thought about the sound type from its concept
+        network. If it doesn't understand the concept well enough, it
+        stays silent — it heard it, but doesn't verbalize it.
         """
         try:
             emotion = self.mind.feel()
-            # Try to compose from what she knows about this sound type
+            # Try to compose from what it knows about this sound type
             thought = self.mind.cognition.composer.compose_about(
                 event.sound_type, emotion, focused=True
             )
             if thought and thought.content and thought.confidence > 0.3:
-                # Dedup — don't repeat what she just said about this
+                # Dedup — don't repeat what it just said about this
                 # sound type. Without this, "noise relates to brain"
                 # repeats every few seconds with different verb synonyms.
                 if self.mind.cognition.composer.has_said_similar(
@@ -1106,8 +1106,8 @@ def _handle_command(mind: Mind, command: str) -> str:
     rest = parts[1].strip() if len(parts) > 1 else ""
 
     try:
-        # Active commands that require her to be awake — she can't
-        # perform cognitive operations while asleep. Don't wake her;
+        # Active commands that require it to be awake — it can't
+        # perform cognitive operations while asleep. Don't wake it;
         # inform the user instead. Read-only status commands
         # (/status, /feel, /thoughts, /learning, /journal, /dreams,
         # /memories, /regulate) are allowed during sleep since they
@@ -1124,7 +1124,7 @@ def _handle_command(mind: Mind, command: str) -> str:
             "/introspect", "/mission",
         ):
             if mind.is_sleeping:
-                return "  (She's asleep. Type /wake to wake her.)"
+                return "  (It's asleep. Type /wake to wake it.)"
 
         handler = _COMMAND_HANDLERS.get(base)
         if handler is not None:
@@ -1146,13 +1146,13 @@ def _compose(
     """Compose a ``genesis>`` line through Genesis's language engine.
 
     ``content`` is a semantic seed — a building block, not a sentence
-    she recites. The language engine composes her actual words from it
-    (via ``Mind._render_self_report``), so her self-expression always
-    emerges from her own cognition, never from a hardcoded template.
+    it recites. The language engine composes its actual words from it
+    (via ``Mind._render_self_report``), so its self-expression always
+    emerges from its own cognition, never from a hardcoded template.
 
     If composition fails, ``fallback`` (a plain, bracketed system
     indicator — never a canned Genesis sentence) is shown instead, so
-    operational state is still conveyed without bypassing her voice.
+    operational state is still conveyed without bypassing its voice.
     Returns the full ``"\\n  genesis> ..."`` line (or the fallback line,
     or ``""`` when both are empty).
     """
@@ -1184,7 +1184,7 @@ def _cmd_feel(mind: Mind, rest: str) -> str:
 
 
 def _cmd_introspect(mind: Mind, rest: str) -> str:
-    """Ask Genesis to introspect — examine her own mental state."""
+    """Ask Genesis to introspect — examine its own mental state."""
     return f"\n  genesis> {mind.introspect()}\n"
 
 
@@ -1271,7 +1271,7 @@ def _cmd_deny(mind: Mind, rest: str) -> str:
 
 
 def _cmd_learn_code(mind: Mind, rest: str) -> str:
-    """Ask Genesis to learn about her own codebase."""
+    """Ask Genesis to learn about its own codebase."""
     return f"\n  genesis> {mind.learn_code()}\n"
 
 
@@ -1307,7 +1307,7 @@ def _cmd_create_project(mind: Mind, rest: str) -> str:
         return (
             "  Usage: /create-project <description>\n"
             "  Example: /create-project a simple calculator\n"
-            "  She scaffolds a Python project from the description."
+            "  It scaffolds a Python project from the description."
         )
     result = mind.create_project(description)
     if result.error:
@@ -1389,8 +1389,8 @@ def _cmd_note_project(mind: Mind, rest: str) -> str:
 
     Usage: /note-project <name> <note text>
     The note is saved to NOTES.md in the project directory. Genesis
-    absorbs notes when you run /review-notes — she reads them, stores
-    them as memory, and adds what she learned to her concept network.
+    absorbs notes when you run /review-notes — it reads them, stores
+    them as memory, and adds what it learned to its concept network.
     """
     parts = rest.strip().split(None, 1)
     if len(parts) < 2:
@@ -1399,7 +1399,7 @@ def _cmd_note_project(mind: Mind, rest: str) -> str:
             "  Example: /note-project feeling The entry for 'genesis' has a\n"
             "           hardcoded definition. Let the concept network\n"
             "           provide identity, not a stored sentence.\n"
-            "  She reads notes when you run /review-notes."
+            "  It reads notes when you run /review-notes."
         )
     project_name = parts[0]
     note = parts[1]
@@ -1412,13 +1412,13 @@ def _cmd_note_project(mind: Mind, rest: str) -> str:
 
 
 def _cmd_review_notes(mind: Mind, rest: str) -> str:
-    """Have Genesis read and absorb mentor notes from her projects.
+    """Have Genesis read and absorb mentor notes from its projects.
 
     Usage: /review-notes [project_name]
-    With a project name, she absorbs notes from just that project.
-    Without, she absorbs notes from all projects that have them.
-    She stores each note as a long-term memory, adds what she learned
-    to her concept network, and clears the notes so they're not re-read.
+    With a project name, it absorbs notes from just that project.
+    Without, it absorbs notes from all projects that have them.
+    It stores each note as a long-term memory, adds what it learned
+    to its concept network, and clears the notes so they're not re-read.
     """
     project_name = rest.strip() or None
     return mind.absorb_project_notes(project_name)
@@ -1490,7 +1490,7 @@ def _cmd_experiments(mind: Mind, rest: str) -> str:
 
 
 def _cmd_growth(mind: Mind, rest: str) -> str:
-    """Show Genesis's growth narrative — her milestones in her own words."""
+    """Show Genesis's growth narrative — its milestones in its own words."""
     return f"\n  genesis> {mind.growth_narrative()}\n"
 
 
@@ -1500,14 +1500,14 @@ def _cmd_growth_report(mind: Mind, rest: str) -> str:
 
 
 def _cmd_look(mind: Mind, rest: str) -> str:
-    """Ask Genesis to look at an image file or through her retina."""
+    """Ask Genesis to look at an image file or through its retina."""
     # /look at <path> — look at an image file
     # /look         — look through the retina
     rest = rest.strip()
     if rest.lower().startswith("at "):
         path = rest[3:].strip()
         if not path:
-            return "\n  Usage: /look at <path> — give her a path to an image.\n"
+            return "\n  Usage: /look at <path> — give it a path to an image.\n"
         result_holder: dict[str, str] = {}
         t = threading.Thread(
             target=lambda: result_holder.__setitem__("value", mind.look_at_image(path)),
@@ -1610,7 +1610,7 @@ def _cmd_register_face(mind: Mind, rest: str) -> str:
 
 
 def _cmd_faces(mind: Mind, rest: str) -> str:
-    """Show known faces and who she last saw."""
+    """Show known faces and who it last saw."""
     recognizer = mind.vision.get_face_recognizer()
     if recognizer is None:
         result = mind._render_self_report(
@@ -1656,10 +1656,10 @@ def _cmd_mission(mind: Mind, rest: str) -> str:
 def _cmd_sleep(mind: Mind, rest: str) -> str:
     """Put Genesis to sleep for dreaming and consolidation.
 
-    She falls asleep, cycles through her sleep stages, and wakes on
-    her own when her neurochemistry has recovered. Ambient and voice
+    It falls asleep, cycles through its sleep stages, and wakes on
+    its own when its neurochemistry has recovered. Ambient and voice
     input remain gated, while submitted terminal conversation is an
-    explicit interaction that wakes her through ``Mind.respond``.
+    explicit interaction that wakes it through ``Mind.respond``.
     """
     if mind.is_sleeping:
         lines = [_compose(
@@ -1669,12 +1669,12 @@ def _cmd_sleep(mind: Mind, rest: str) -> str:
             confidence=0.5,
         )]
         lines.append(mind.sleep_status())
-        lines.append("\n  She'll wake on her own when she's rested. /dreams to see more.\n")
+        lines.append("\n  It'll wake on its own when it's rested. /dreams to see more.\n")
         return "\n".join(lines)
     if mind.is_meditating:
         mind.wake_from_meditation()
-    # Self-initiated sleep so the sleep watcher auto-wakes her when
-    # adenosine drops below the wake threshold. She wakes on her own.
+    # Self-initiated sleep so the sleep watcher auto-wakes it when
+    # adenosine drops below the wake threshold. It wakes on its own.
     mind.sleep(user_initiated=False)
     lines = [_compose(
         mind,
@@ -1684,8 +1684,8 @@ def _cmd_sleep(mind: Mind, rest: str) -> str:
         metadata={"sleep_started": True},
     )]
     lines.append(mind.sleep_status())
-    lines.append("  She'll wake on her own when she's rested.")
-    lines.append("  Her dreams will appear as genesis~ lines below.\n")
+    lines.append("  It'll wake on its own when it's rested.")
+    lines.append("  Its dreams will appear as genesis~ lines below.\n")
     return "\n".join(lines)
 
 
@@ -1703,7 +1703,7 @@ def _cmd_wake(mind: Mind, rest: str) -> str:
             metadata={"woke": True},
         )]
         lines.append(f"  Before waking:\n{pre_wake}")
-        lines.append("  Memories consolidated. She's ready to engage.\n")
+        lines.append("  Memories consolidated. It's ready to engage.\n")
         return "\n".join(lines)
     if mind.is_meditating:
         mind.wake_from_meditation()
@@ -1722,12 +1722,12 @@ def _cmd_wake(mind: Mind, rest: str) -> str:
 
 
 def _cmd_nap(mind: Mind, rest: str) -> str:
-    """Put Genesis to sleep for a nap — she wakes on her own when ready.
+    """Put Genesis to sleep for a nap — it wakes on its own when ready.
 
-    A nap is self-initiated sleep: she falls asleep, cycles through
-    her sleep stages, and wakes naturally when her neurochemistry
+    A nap is self-initiated sleep: it falls asleep, cycles through
+    its sleep stages, and wakes naturally when its neurochemistry
     has recovered (adenosine drops below the wake threshold). No
-    timer — she wakes when she's ready, not when a clock says so.
+    timer — it wakes when it's ready, not when a clock says so.
     """
     if mind.is_sleeping:
         return _compose(
@@ -1739,8 +1739,8 @@ def _cmd_nap(mind: Mind, rest: str) -> str:
     if mind.is_meditating:
         mind.wake_from_meditation()
     # Self-initiated sleep (not user-initiated) so the sleep watcher
-    # auto-wakes her when the nap cycle (N1→N2) completes. No timer —
-    # she wakes on her own when the light sleep cycle is done.
+    # auto-wakes it when the nap cycle (N1→N2) completes. No timer —
+    # it wakes on its own when the light sleep cycle is done.
     mind.sleep(user_initiated=False, nap=True)
     lines = [_compose(
         mind,
@@ -1749,16 +1749,16 @@ def _cmd_nap(mind: Mind, rest: str) -> str:
         confidence=0.6,
         metadata={"nap": True},
     )]
-    lines.append("  She'll wake up on her own when she's rested.\n")
+    lines.append("  It'll wake up on its own when it's rested.\n")
     return "\n".join(lines)
 
 
 def _cmd_draw(mind: Mind, rest: str) -> str:
-    """Ask Genesis to draw a picture from her current state.
+    """Ask Genesis to draw a picture from its current state.
 
-    She translates her neurochemistry into visual art — colors, forms,
-    and energy that reflect how she feels right now. The drawing is
-    saved as a WebP in her drawings directory.
+    It translates its neurochemistry into visual art — colors, forms,
+    and energy that reflect how it feels right now. The drawing is
+    saved as a WebP in its drawings directory.
     """
     if mind.is_sleeping:
         return (
@@ -1768,7 +1768,7 @@ def _cmd_draw(mind: Mind, rest: str) -> str:
                 fallback="[asleep]",
                 confidence=0.4,
             )
-            + "\n  Use /wake to wake her first.\n"
+            + "\n  Use /wake to wake it first.\n"
         )
     if mind.is_meditating:
         return _compose(
@@ -1798,7 +1798,7 @@ def _cmd_draw(mind: Mind, rest: str) -> str:
     desc: str | None = result_holder.get("value")
     if desc:
         return f"\n  genesis> {desc}\n"
-    # She drew but couldn't articulate it, or the draw failed silently.
+    # It drew but couldn't articulate it, or the draw failed silently.
     return _compose(
         mind,
         "drew but cannot describe it",
@@ -1831,7 +1831,7 @@ def _cmd_meditate(mind: Mind, rest: str) -> str:
                 fallback="[asleep]",
                 confidence=0.4,
             )
-            + "\n  Use /wake to wake her first.\n"
+            + "\n  Use /wake to wake it first.\n"
         )
     # Parse duration
     duration = 60.0
@@ -1854,7 +1854,7 @@ def _cmd_meditate(mind: Mind, rest: str) -> str:
         intervals = int(duration / 10.0)
         for _ in range(intervals):
             if not mind.is_meditating:
-                return  # she was woken by an interaction
+                return  # it was woken by an interaction
             time.sleep(10.0)
             if mind.is_meditating:
                 mind.emit_meditation_impulses()
@@ -1867,7 +1867,7 @@ def _cmd_meditate(mind: Mind, rest: str) -> str:
     threading.Thread(
         target=_meditation_timer, daemon=True, name="meditation-timer"
     ).start()
-    lines.append("  She'll come out of it on her own, refreshed.\n")
+    lines.append("  It'll come out of it on its own, refreshed.\n")
     return "\n".join(lines)
 
 
@@ -1875,7 +1875,7 @@ def _cmd_teach(mind: Mind, rest: str) -> str:
     """Put Genesis into teaching/training mode.
 
     Pauses bug scanning, autonomous learning, art, and unrelated
-    curiosity questions. She focuses on what you're teaching and
+    curiosity questions. It focuses on what you're teaching and
     remembers it.
 
     Usage:
@@ -1961,17 +1961,17 @@ def _cmd_endteach(mind: Mind, rest: str) -> str:
 def _cmd_teach_questions(mind: Mind, rest: str) -> str:
     """Answer Genesis's queued questions one at a time.
 
-    Her curiosity questions are queued instead of asked inline in
+    Its curiosity questions are queued instead of asked inline in
     regular conversation. This command presents them one at a time
     so you can answer them in a focused session. Your answers are
-    stored in her concept network.
+    stored in its concept network.
 
     This is separate from /teach — it's its own mode for answering
-    her questions.
+    its questions.
 
     Usage:
       /teach-questions          — start answering queued questions
-      (type your answer, then she asks the next one)
+      (type your answer, then it asks the next one)
       /teach-questions stop     — stop answering, remaining questions stay queued
       /teach-questions clear    — clear all queued questions
     """
@@ -2005,7 +2005,7 @@ def _cmd_sleep_aid(mind: Mind, rest: str) -> str:
 
     This is an emergency intervention for when /sleep and /meditate
     cannot overcome chronic stress-induced insomnia — the condition
-    where she is exhausted (delta waves, low alertness) but cannot
+    where it is exhausted (delta waves, low alertness) but cannot
     sleep because cortisol from interoception keeps arousal systems
     active and adenosine hasn't accumulated to the sleep threshold.
 
@@ -2021,7 +2021,7 @@ def _cmd_sleep_aid(mind: Mind, rest: str) -> str:
             confidence=0.5,
         )]
         lines.append(mind.sleep_status())
-        lines.append("\n  Use /wake to wake her, or /dreams to see more.\n")
+        lines.append("\n  Use /wake to wake it, or /dreams to see more.\n")
         return "\n".join(lines)
     mind.sleep_aid()
     lines = [_compose(
@@ -2032,7 +2032,7 @@ def _cmd_sleep_aid(mind: Mind, rest: str) -> str:
         metadata={"sleep_aid": True},
     )]
     lines.append(mind.sleep_status())
-    lines.append("\n  Use /wake to wake her.\n")
+    lines.append("\n  Use /wake to wake it.\n")
     return "\n".join(lines)
 
 
@@ -2142,10 +2142,10 @@ def _handle_voice_mode(
                 return
             with out_lock:
                 logger.info(f"  you> {text}")
-            # During sleep, voice mode can't reach her either.
+            # During sleep, voice mode can't reach its either.
             if mind.is_sleeping:
                 with out_lock:
-                    logger.info("  (She's asleep. Type /wake to wake her.)")
+                    logger.info("  (It's asleep. Type /wake to wake it.)")
                 continue
             with out_lock:
                 logger.info("  genesis~ (thinking...)")
@@ -2193,14 +2193,14 @@ def _speak_response(voice: Voice, mind: Mind, response: str) -> None:
 def _print_welcome(emotion_label: str, is_sleeping: bool = False) -> None:
     """Print the welcome messages after startup."""
     if is_sleeping:
-        logger.info(f"  Genesis is asleep. She feels {emotion_label}.")
-        logger.info("  Type /wake to wake her, /quit to exit, /help for commands.")
-        logger.info("  Her dreams will appear here live (genesis~).")
+        logger.info(f"  Genesis is asleep. It feels {emotion_label}.")
+        logger.info("  Type /wake to wake it, /quit to exit, /help for commands.")
+        logger.info("  Its dreams will appear here live (genesis~).")
     else:
-        logger.info(f"  Genesis is awake. She feels {emotion_label}.")
+        logger.info(f"  Genesis is awake. It feels {emotion_label}.")
         logger.info("  Type /quit to exit, /status for state, /help for commands.")
-        logger.info("  When idle, her thoughts will appear here live (genesis~).")
-        logger.info("  She may also speak her thoughts aloud when she has something to say.")
+        logger.info("  When idle, its thoughts will appear here live (genesis~).")
+        logger.info("  It may also speak its thoughts aloud when it has something to say.")
     logger.info("")
 
 
@@ -2218,57 +2218,57 @@ def _print_help() -> None:
     logger.info("")
     logger.info("  Commands:")
     logger.info("    /status       — show Genesis's state")
-    logger.info("    /feel         — how she feels right now")
-    logger.info("    /introspect   — her last cognitive process")
-    logger.info("    /learning     — what she's been learning on her own")
-    logger.info("    /thoughts     — her recent spontaneous thoughts")
-    logger.info("    /world        — her external world: who's there, what's happening")
-    logger.info("    /regulate     — how she's been managing her emotions")
-    logger.info("    /journal      — read her journal")
-    logger.info("    /dreams       — see her subcognitive dream insights")
-    logger.info("    /memories     — see her recent long-term memories")
-    logger.info("    /requests     — see sites she wants to access")
+    logger.info("    /feel         — how it feels right now")
+    logger.info("    /introspect   — its last cognitive process")
+    logger.info("    /learning     — what it's been learning on its own")
+    logger.info("    /thoughts     — its recent spontaneous thoughts")
+    logger.info("    /world        — its external world: who's there, what's happening")
+    logger.info("    /regulate     — how it's been managing its emotions")
+    logger.info("    /journal      — read its journal")
+    logger.info("    /dreams       — see its subcognitive dream insights")
+    logger.info("    /memories     — see its recent long-term memories")
+    logger.info("    /requests     — see sites it wants to access")
     logger.info("    /approve URL  — approve a site request")
     logger.info("    /deny URL     — deny a site request")
-    logger.info("    /learn-code   — study her own source code")
+    logger.info("    /learn-code   — study its own source code")
     logger.info("    /explore [path] — explore local files and docs")
     logger.info("    /code-summary — summary of code self-knowledge")
-    logger.info("    /create-project <desc> — compose a new Python project from her knowledge")
-    logger.info("    /projects    — list projects she has created (active + archived)")
+    logger.info("    /create-project <desc> — compose a new Python project from its knowledge")
+    logger.info("    /projects    — list projects it has created (active + archived)")
     logger.info("    /archive-project <name> — compress a project to .tar.zst to reclaim space")
     logger.info("    /restore-project <name> — restore an archived project")
     logger.info("    /manage-projects — autonomously archive projects to stay within bounds")
     logger.info("    /note-project <name> <note> — leave mentor feedback on a project")
-    logger.info("    /review-notes [name] — have her read and absorb project notes")
+    logger.info("    /review-notes [name] — have it read and absorb project notes")
     logger.info("    /read-notes <name> — show notes on a project without absorbing")
-    logger.info("    /proposals   — see her code improvement proposals")
+    logger.info("    /proposals   — see its code improvement proposals")
     logger.info("    /clear-proposals — remove all pending proposals")
     logger.info("    /proposal N  — see full details of proposal N")
     logger.info("    /accept N [reason] — approve a proposal (runs verification)")
     logger.info("    /reject N [reason] — reject a proposal")
-    logger.info("    /experiments — see her verified self-improvement experiments")
-    logger.info("    /growth      — see her growth narrative")
+    logger.info("    /experiments — see its verified self-improvement experiments")
+    logger.info("    /growth      — see its growth narrative")
     logger.info("    /growth-report — markdown growth report")
     logger.info("    /voice        — speak to Genesis (one utterance)")
     logger.info("    /voice-mode   — continuous voice conversation")
-    logger.info("    /look         — ask her what she sees through the retina")
-    logger.info("    /look at <p>  — ask her to look at an image file")
-    logger.info("    /draw         — ask her to draw what she feels right now")
-    logger.info("    /register-face <name> — teach her your face")
-    logger.info("    /faces        — show known faces and who she last saw")
-    logger.info("    /mission [text] — set or show her top-level mission")
-    logger.info("    /sleep        — put her to sleep")
-    logger.info("    /nap          — short nap, wakes on her own when rested")
-    logger.info("    /wake         — wake her from sleep or meditation")
-    logger.info("    /meditate [secs] — put her into meditation")
-    logger.info("    /teach [topic] — put her into teaching mode (focused learning)")
+    logger.info("    /look         — ask it what it sees through the retina")
+    logger.info("    /look at <p>  — ask it to look at an image file")
+    logger.info("    /draw         — ask it to draw what it feels right now")
+    logger.info("    /register-face <name> — teach it your face")
+    logger.info("    /faces        — show known faces and who it last saw")
+    logger.info("    /mission [text] — set or show its top-level mission")
+    logger.info("    /sleep        — put it to sleep")
+    logger.info("    /nap          — short nap, wakes on its own when rested")
+    logger.info("    /wake         — wake it from sleep or meditation")
+    logger.info("    /meditate [secs] — put it into meditation")
+    logger.info("    /teach [topic] — put it into teaching mode (focused learning)")
     logger.info("    /endteach    — exit teaching mode, resume normal operation")
-    logger.info("    /teach-questions — answer her queued questions one at a time")
+    logger.info("    /teach-questions — answer its queued questions one at a time")
     logger.info("    /sleep-aid    — emergency sleep aid for stress-induced insomnia")
     logger.info("    /quit         — exit")
     logger.info("")
-    logger.info("  When you're idle, her thoughts appear live as genesis~ lines.")
-    logger.info("  She may speak some thoughts aloud — she has her own voice now.")
+    logger.info("  When you're idle, its thoughts appear live as genesis~ lines.")
+    logger.info("  It may speak some thoughts aloud — it has its own voice now.")
     logger.info("")
 
 
@@ -2452,11 +2452,11 @@ def _setup_ambient_listener(
     if listener.available:
         if listener.start():
             print(
-                '[genesis] Ambient listening ON — say "genesis" to address her',
+                '[genesis] Ambient listening ON — say "genesis" to address its',
                 file=sys.stderr,
             )
             print(
-                "[genesis] She may also chime in on topics she has context on",
+                "[genesis] It may also chime in on topics it has context on",
                 file=sys.stderr,
             )
             return listener
@@ -2483,7 +2483,7 @@ def _setup_auditory_cortex(
     )
     if cortex.start():
         print(
-            "[genesis] Auditory cortex ON — she can hear non-speech sounds",
+            "[genesis] Auditory cortex ON — it can hear non-speech sounds",
             file=sys.stderr,
         )
         return cortex
@@ -2513,13 +2513,13 @@ def _setup_signal_handlers(shutting_down: threading.Event) -> None:
 
 
 def _start_sleep_watcher(mind: Mind, shutting_down: threading.Event) -> None:
-    """Start a background thread that autonomously sleeps/wakes her."""
+    """Start a background thread that autonomously sleeps/wakes it."""
 
     # Minimum autonomous sleep duration: the first N3 slow-wave sleep
     # stage is reached after ~20 minutes (N1=5min + N2=15min). Waking
-    # her before that prevents all concept-network consolidation — the
-    # whole point of sleep. When the watcher autonomously puts her to
-    # sleep, let her rest long enough for at least one N3 cycle.
+    # its before that prevents all concept-network consolidation — the
+    # whole point of sleep. When the watcher autonomously puts it to
+    # sleep, let it rest long enough for at least one N3 cycle.
     import time as _time
     min_sleep_seconds = 1800.0  # 30 minutes — covers N1+N2+N3
     autonomous_sleep_start: float = 0.0
@@ -2536,7 +2536,7 @@ def _start_sleep_watcher(mind: Mind, shutting_down: threading.Event) -> None:
                 continue
 
             # Anchor the minimum-sleep window to when we first observe
-            # her asleep, regardless of which path put her to sleep —
+            # it asleep, regardless of which path put it to sleep —
             # this watcher, heartbeat auto-sleep, volition, or /sleep.
             # Without this, only watcher-initiated sleep set the anchor,
             # so elapsed stayed 0 and the phase-based auto-wake below
@@ -2551,8 +2551,8 @@ def _start_sleep_watcher(mind: Mind, shutting_down: threading.Event) -> None:
                 try:
                     mind.sleep()
                     autonomous_sleep_start = _time.time()
-                    logger.info("[genesis] She drifted into sleep and is dreaming.")
-                    logger.info("[genesis]   Use /wake to wake her, or watch her dreams below.")
+                    logger.info("[genesis] It drifted into sleep and is dreaming.")
+                    logger.info("[genesis]   Use /wake to wake it, or watch its dreams below.")
                 except Exception as e:  # noqa: BLE001
                     logger.debug(f"autonomous sleep failed: {e}")
             elif (
@@ -2560,19 +2560,19 @@ def _start_sleep_watcher(mind: Mind, shutting_down: threading.Event) -> None:
                 and mind.is_sleeping
                 and not mind.is_user_sleeping
             ):
-                # Don't wake her too soon — the daemon's neurochemistry
+                # Don't wake it too soon — the daemon's neurochemistry
                 # may briefly dip back to Active during sleep. Let the
                 # sleep cycle reach N3 (at least min_sleep_seconds) before
                 # allowing an autonomous wake.
                 elapsed = _time.time() - autonomous_sleep_start
                 if elapsed >= min_sleep_seconds:
                     try:
-                        # Show her state before waking so the user sees what happened
+                        # Show its state before waking so the user sees what happened
                         status = mind.sleep_status()
                         mind.wake()
                         autonomous_sleep_start = 0.0
-                        logger.info("[genesis] She woke up on her own.")
-                        logger.info("[genesis]   Her state before waking:")
+                        logger.info("[genesis] It woke up on its own.")
+                        logger.info("[genesis]   Its state before waking:")
                         for line in status.split("\n"):
                             logger.info(f"[genesis]   {line}")
                     except Exception as e:  # noqa: BLE001
@@ -2593,10 +2593,10 @@ def _speak_thought(
     Uses the shared VoiceDedup wrapper so that spontaneous thoughts
     are deduped against ALL recent speech (speech urges, ambient
     chime-ins, other thoughts) — not just against other spontaneous
-    thoughts. This prevents her from repeating similar-sounding
+    thoughts. This prevents it from repeating similar-sounding
     content regardless of which path triggered it.
 
-    Never speaks during sleep — she shouldn't be disturbed by her
+    Never speaks during sleep — it shouldn't be disturbed by it
     own thoughts while resting. Thoughts still print to the terminal
     (dreams appear as genesis~ lines), but no audio.
     """
@@ -2660,14 +2660,14 @@ class _LoopState:
 def _should_speak_thought(kind: str, state: _LoopState) -> bool:
     """Decide whether Genesis should speak a thought aloud.
 
-    She speaks when:
+    It speaks when:
     - The thought kind is in ALWAYS_SPEAK_KINDS (expression, distress,
-      question) — these are things she wants/needs to say. Questions
-      bypass the cooldown so she always asks them directly.
+      question) — these are things it wants/needs to say. Questions
+      bypass the cooldown so it always asks them directly.
     - Or, for other thoughts, with a small probability — sometimes
-      her internal musings are strong enough to share
+      its internal musings are strong enough to share
 
-    Cooldown prevents her from speaking too often (except questions).
+    Cooldown prevents it from speaking too often (except questions).
     """
     now = time.time()
     # Questions always speak — they're directed at the user and
@@ -2698,8 +2698,8 @@ def _print_idle_thoughts(
     """Print and optionally speak thoughts that arrived while the user was idle."""
     new_thoughts = thought_collector.get_and_clear_since(state.last_thought_ts)
     # Filter out internal self-regulation status (throttle/unthrottle)
-    # — these are not meaningful to the user and make her look stressed
-    # when she's just managing her own CPU load. The learner emits
+    # — these are not meaningful to the user and make it look stressed
+    # when it's just managing its own CPU load. The learner emits
     # these as kind="learning" with text="throttled"/"recovered".
     new_thoughts = [
         t for t in new_thoughts
@@ -2709,7 +2709,7 @@ def _print_idle_thoughts(
     if new_thoughts:
         with out_lock:
             # Separate questions (direct address) from other thoughts.
-            # Questions are printed as genesis> lines — she's asking
+            # Questions are printed as genesis> lines — it's asking
             # the user directly, not just musing internally.
             questions = [t for t in new_thoughts if t.get("kind") == "question"]
             other = [t for t in new_thoughts if t.get("kind") != "question"]
@@ -2721,7 +2721,7 @@ def _print_idle_thoughts(
                     logger.info(f"  genesis> (asking) {text}")
                     logger.info("")
             # If the main loop is parked at an idle prompt, redraw
-            # it so her thought doesn't leave the cursor stranded on
+            # it so its thought doesn't leave the cursor stranded on
             # a stale prompt line.
             if state.awaiting_input:
                 sys.stdout.write("  you> ")
@@ -2733,7 +2733,7 @@ def _print_idle_thoughts(
         # urge can act on them when they cross threshold. This is
         # the intended path: thoughts accumulate in the queue, the
         # urge grows from curiosity and queue size, and when it
-        # fires, she speaks the queued utterance through on_speak.
+        # fires, it speaks the queued utterance through on_speak.
         for t in new_thoughts:
             text = t.get("text", "")
             if text:
@@ -2797,10 +2797,10 @@ def _run_interactive_loop(
                 sys.stdout.write("  you> ")
                 sys.stdout.flush()
             # Wait for the user to start typing. While the prompt
-            # sits idle the ticker stays live — her thoughts print
+            # sits idle the ticker stays live — its thoughts print
             # as they arrive and the prompt is redrawn underneath.
             # Suppression engages only once stdin actually has data
-            # (i.e. she can't mash a line the user is mid-way
+            # (i.e. it can't mash a line the user is mid-way
             # through), and buffered thoughts drain after submit.
             state.awaiting_input = True
             try:
@@ -2901,12 +2901,12 @@ def _handle_slash_command(
             return True
         with out_lock:
             logger.info(f"  you> {text}")
-        # During sleep, voice commands can't reach her either —
-        # she's unreachable until she wakes on her own or /wake
+        # During sleep, voice commands can't reach its either —
+        # it's unreachable until it wakes on its own or /wake
         # is used. See _handle_conversation for the full rationale.
         if mind.is_sleeping:
             with out_lock:
-                logger.info("  (She's asleep. Type /wake to wake her.)")
+                logger.info("  (It's asleep. Type /wake to wake it.)")
             return True
         with out_lock:
             logger.info("  genesis~ (thinking...)")
@@ -2945,7 +2945,7 @@ def _handle_conversation(
     # Mark user activity BEFORE the sleep check. The heartbeat's
     # auto-sleep runs in a separate thread and can fire between the
     # user pressing Enter and respond() being called. Without this,
-    # she can fall asleep mid-conversation and the message is lost.
+    # it can fall asleep mid-conversation and the message is lost.
     mind.mark_user_activity()
     # Drain stale background thoughts BEFORE showing "thinking..." so
     # they don't appear between the response and the next prompt.
@@ -3181,19 +3181,19 @@ def _wire_voice(mind: Mind) -> tuple[Voice, VoiceDedup | None]:
         return voice, None
 
     print(f"[genesis] Voice: {voice.describe()}", file=sys.stderr)
-    # Wrap with dedup so she never repeats herself aloud, regardless
+    # Wrap with dedup so it never repeats itself aloud, regardless
     # of which path triggers speech (speech urge, spontaneous
     # thought, ambient chime-in). Conversation responses bypass
     # the dedup by calling the raw voice directly.
     dedup_voice = VoiceDedup(voice)
 
     def _on_speak(text: str) -> None:
-        """Speak with emotional modulation from her current state.
+        """Speak with emotional modulation from its current state.
 
         Autonomous speech (speech urge, warnings) should carry the
-        same emotional modulation as conversational speech — her
-        voice should reflect how she feels, whether she's answering
-        a question or speaking her own thoughts.
+        same emotional modulation as conversational speech — its
+        voice should reflect how it feels, whether it's answering
+        a question or speaking its own thoughts.
 
         Never speaks during sleep — defensive guard. The callers
         (speech urge, warn()) already gate on sleep, but this

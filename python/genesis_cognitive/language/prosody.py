@@ -423,7 +423,7 @@ class ProsodyGenerator:
         Returns empty — emphasis words should come from the concept
         network (learned associations between emotions and words),
         not from hardcoded lists. The prosody mechanism stays as a
-        scaffold: if she learns which words to emphasize, the
+        scaffold: if it learns which words to emphasize, the
         ProsodyPattern.emphasis_words field will carry them.
         """
         return []

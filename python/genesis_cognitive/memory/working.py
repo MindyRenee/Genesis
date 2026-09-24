@@ -8,15 +8,15 @@ what was just said, what am I paying attention to.
 # Why this matters
 
 Without working memory, each interaction is isolated. Genesis can't:
-- Notice when you're building on something she said
+- Notice when you're building on something it said
 - Remember that you discussed cognition 3 turns ago
 - Track a thread of argument across multiple exchanges
 - Recognize when you've changed the subject
-- Follow up on something she was curious about
+- Follow up on something it was curious about
 
-With working memory, she can hold attention. She can say "Earlier you
-mentioned X — I've been thinking about it." She can notice "We've been
-talking about cognition for a while." She can connect what you're
+With working memory, it can hold attention. It can say "Earlier you
+mentioned X — I've been thinking about it." It can notice "We've been
+talking about cognition for a while." It can connect what you're
 saying now to what you said before.
 
 # Baddeley's working memory model
@@ -27,7 +27,7 @@ model, adapted for Genesis's text-based cognition:
 - **Central executive**: controls attention allocation, suppresses
   irrelevant items, and coordinates the slave systems.
 - **Phonological loop**: a verbal rehearsal buffer — Genesis can
-  "repeat" words/concepts to herself to maintain them. Items decay
+  "repeat" words/concepts to itself to maintain them. Items decay
   in ~2 seconds without rehearsal (Baddeley, 1992).
 - **Visuospatial sketchpad**: a structural/relational buffer — Genesis
   can hold spatial/structural relationships in mind (e.g., "A is
@@ -50,7 +50,7 @@ WorkingMemory holds:
   capacity-limited to 3-5 items)
 - thread: the current conversation thread (topic + turns)
 - recent_turns: the last N exchanges (for reference)
-- open_questions: things she was curious about but hasn't asked yet
+- open_questions: things it was curious about but hasn't asked yet
 - topic_history: what topics have been discussed (for continuity)
 - phonological_loop: verbal rehearsal buffer (slave system)
 - visuospatial_sketchpad: structural/relational buffer (slave system)
@@ -176,8 +176,8 @@ class PhonologicalLoop:
     """The phonological loop — a verbal rehearsal buffer.
 
     One of Baddeley's slave systems (Baddeley, 1992). For Genesis,
-    this is a verbal rehearsal buffer: she can "repeat" words or
-    concepts to herself to maintain them in working memory. Without
+    this is a verbal rehearsal buffer: it can "repeat" words or
+    concepts to itself to maintain them in working memory. Without
     rehearsal, items decay in approximately 2 seconds (the duration of
     the phonological store, matching the ~2s auditory-memory trace in
     humans; Baddeley, 1992).
@@ -379,7 +379,7 @@ class VisuoSpatialSketchpad:
     """The visuospatial sketchpad — a structural/relational buffer.
 
     The second of Baddeley's slave systems (Baddeley, 1992). For
-    Genesis, this is a structural/relational buffer: she can hold
+    Genesis, this is a structural/relational buffer: it can hold
     spatial or structural relationships in mind (e.g., "A is connected
     to B", "hippocampus is inside brain"). This is the analogue of the
     human visuospatial sketchpad, which maintains visual and spatial
@@ -669,7 +669,7 @@ class CentralExecutive:
 
 
 class WorkingMemory:
-    """Genesis's working memory — what she's holding in mind.
+    """Genesis's working memory — what it's holding in mind.
 
     This tracks the active conversation context: what's being discussed,
     what was recently said, what concepts are in attention, and what
@@ -732,7 +732,7 @@ class WorkingMemory:
         # All threads (history)
         self._threads: list[ConversationThread] = []
 
-        # Open questions (things she was curious about)
+        # Open questions (things it was curious about)
         self._open_questions: list[str] = []
 
         # Topics discussed (for continuity detection)

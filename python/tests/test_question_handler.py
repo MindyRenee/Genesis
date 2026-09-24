@@ -112,7 +112,7 @@ def test_what_created_self_is_incoming():
     """'What created you?' is passive — subject is the object of the relation.
 
     Regression: this used to walk outgoing edges and answer what
-    Genesis creates instead of what created her.
+    Genesis creates instead of what created it.
     """
     meta = _relation_meta(_handler(_network()), "What created you?", QuestionType.WHAT)
     assert meta is not None
@@ -155,7 +155,7 @@ def test_produced_passive_is_incoming():
 
 
 def test_negated_question_declined():
-    """Negated questions ask about absences her edges can't enumerate."""
+    """Negated questions ask about absences its edges can't enumerate."""
     handler = _handler(_network())
     assert _relation_meta(
         handler, "Why does sleep not cause memory?", QuestionType.WHY

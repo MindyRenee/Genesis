@@ -286,10 +286,10 @@ imports and re-exports it; the frontal subsystem does the same.
         network (amplifies/suppresses concept activation).
 
     (top-level) system_monitor.py
-        SystemMonitor — Genesis's awareness of her machine
+        SystemMonitor — Genesis's awareness of its machine
         environment. CPU, memory, disk, network state. This is
         interoception of the physical environment — the parietal
-        subsystem's spatial/body awareness extended to the machine she
+        subsystem's spatial/body awareness extended to the machine it
         lives on. Multi-subsystem (parietal spatial + limbic interoception).
 
     (top-level) perception/
@@ -334,7 +334,7 @@ _EXPORTS: dict[str, str] = {
     "MultisensoryIntegrator": "perception",
     "Perception": "perception",
     # Interoception of the machine environment — the parietal subsystem's
-    # spatial/body awareness extended to the hardware she lives on
+    # spatial/body awareness extended to the hardware it lives on
     "SystemMonitor": "system_monitor",
     "SystemSnapshot": "system_monitor",
     # Perceptual-symbolic reasoning — object perception, spatial

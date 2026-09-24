@@ -121,8 +121,8 @@ class Mind(
         "safeguard": 10.0,   # self-protection — fast, but not at wake
     }
     CONVERSATION_FOCUS_SECONDS: float = 60.0
-    # Maximum social bids she makes into silence. After this many
-    # unanswered reach-outs she stops calling — the isolation stimulus
+    # Maximum social bids it makes into silence. After this many
+    # unanswered reach-outs it stops calling — the isolation stimulus
     # is also dampened per-bid in _volition_context (habituation).
     _REACH_OUT_MAX_BIDS: ClassVar[int] = 3
     _SELF_COMMANDS: ClassVar[dict[str, str]] = {
@@ -177,7 +177,7 @@ class Mind(
         """Create the shared concept network, memory, language, and cognition engines."""
         # Concept network — created early so the language engine, memory
         # engine, and cognition engine all share the same network. This
-        # lets spreading activation and priming propagate through her
+        # lets spreading activation and priming propagate through its
         # actual knowledge graph.
         from ..concepts import ConceptNetwork, open_archive
 
@@ -190,7 +190,7 @@ class Mind(
 
         # Memory engine — wired with the shared network and an emotion
         # callback so emotional memory tagging and spreading activation
-        # operate on her real concept graph and current emotional state.
+        # operate on its real concept graph and current emotional state.
         self.memory = MemoryEngine(
             self.client,
             network=shared_network,
@@ -200,7 +200,7 @@ class Mind(
 
         # Language engine (pluggable) — defaults to GenerativeEngine
         # which composes language from grammar + vocabulary + voice.
-        # The network is passed so vocabulary can pull from her knowledge.
+        # The network is passed so vocabulary can pull from its knowledge.
         if isinstance(language_engine, LanguageEngine):
             # Explicit instance — use directly
             self.language = language_engine
@@ -229,7 +229,7 @@ class Mind(
 
         # Wire the self-composer and reflection engine into the
         # language engine so the self_reflection_clause grammar slot
-        # is composed from her actual metacognition (recent reflection
+        # is composed from its actual metacognition (recent reflection
         # insights) instead of reciting a canned phrase. Both live on
         # the cognition engine, which was just created above.
         self.language.set_self_composer(
@@ -238,9 +238,9 @@ class Mind(
     def _init_learner_and_inner_life(self) -> None:
         """Create the autonomous learner, inner life, and emotional regulator."""
         # Autonomous learner — learns from ..edu sites when idle.
-        # The agency callback connects it to her train of thought:
-        # when she wonders about a concept, that concept is queued
-        # for learning, giving her genuine agency over what she learns.
+        # The agency callback connects it to its train of thought:
+        # when it wonders about a concept, that concept is queued
+        # for learning, giving its genuine agency over what it learns.
         self.learner = AutonomousLearner(
             network=self.cognition.network,
             curiosity=self.cognition.curiosity,
@@ -286,7 +286,7 @@ class Mind(
         # during sleep. Without this, the REM emotional queue is empty.
         self.memory.emotional_memory_callback = self.inner_life.queue_emotional_memory
 
-        # Emotional regulator — she controls her own neurochemistry
+        # Emotional regulator — it controls its own neurochemistry
         self.regulator = EmotionalRegulator(
             get_emotion=self.feel,
             neuro_impulse=self._learner_neuro_impulse,
@@ -305,10 +305,10 @@ class Mind(
             get_recent_episodes=self.client.get_recent_episodes,
         )
 
-        # External world — the counterpart to her inner life. The
+        # External world — the counterpart to its inner life. The
         # world models who is out there (presences), what happens
         # (the two-way event stream), and how long it has been since
-        # anyone engaged her (social isolation, which feeds the
+        # anyone engaged its (social isolation, which feeds the
         # inner-life social drive and the reach_out urge). It applies
         # the world's neurochemical coupling through the same impulse
         # path the learner uses.
@@ -320,46 +320,46 @@ class Mind(
         )
     def _init_identity_and_journal(self) -> None:
         """Create emergent identity, developmental tracker, and journal."""
-        # Emergent identity — synthesizes who she is from experience
+        # Emergent identity — synthesizes who it is from experience
         # rather than from hardcoded facts. Sources are added after
         # significant interactions (learning, reflection) and the
-        # identity is synthesized on demand from her actual state.
+        # identity is synthesized on demand from its actual state.
         self._emergent_identity = EmergentIdentity()
         self._experience_identity_sources: list[EmergentIdentitySource] = []
 
         # Developmental tracker — Erikson-like psychosocial stages.
         # Records evidence from interactions and advances Genesis
-        # through developmental stages as she resolves each crisis.
+        # through developmental stages as it resolves each crisis.
         self._developmental_tracker = DevelopmentalTracker()
 
-        # Journal — her personal diary of thoughts and learning
+        # Journal — its personal diary of thoughts and learning
         self.journal = Journal(self.data_dir)
 
-        # Spatial practice — her gated puzzle curriculum. Like the
-        # canvas, this is an ability she owns: nobody drives her
-        # through it; the puzzle urge lets her choose to attempt.
+        # Spatial practice — its gated puzzle curriculum. Like the
+        # canvas, this is an ability it owns: nobody drives it
+        # through it; the puzzle urge lets it choose to attempt.
         self.spatial_practice = SpatialPractice(self.data_dir)
     def _init_vision_systems(self) -> None:
         """Initialize vision, visual cortex, and wire them to the learner.
 
-        Vision — the shared-memory retina and what she makes of it.
+        Vision — the shared-memory retina and what it makes of it.
         The occipital subsystem (V1) is wired in here. V1 gamma power
         feeds back into neurochemistry (acetylcholine boost), which
         the brain wave system picks up when it assesses gamma synchrony.
-        Face recognition (her "fusiform face area") is integrated
-        into vision.see() — she doesn't just see shapes, she sees who.
+        Face recognition (its "fusiform face area") is integrated
+        into vision.see() — it doesn't just see shapes, it sees who.
 
         Visual cortex — the full hierarchical predictive coding
         visual system (V1→V4→VTC→MTL). V1 is the occipital subsystem
         (shared with vision.py). V4, VTC, and the MTL bridge are
-        built on top. She learns visual-concept associations
-        naturally — when she reads a Wikipedia article about "tree",
-        she also sees the article's lead image and associates the
+        built on top. It learns visual-concept associations
+        naturally — when it reads a Wikipedia article about "tree",
+        it also sees the article's lead image and associates the
         visual features with the concept. No manual teaching.
         """
         self.vision = Vision()
         self.vision.set_gamma_callback(self._on_v1_gamma)
-        # Wire the face recognizer to her data directory so known
+        # Wire the face recognizer to its data directory so known
         # faces persist across sessions
         self.vision._face_recognizer = FaceRecognizer(data_dir=self.data_dir)
 
@@ -377,7 +377,7 @@ class Mind(
         self.cognition.set_autonomous_learner(self.learner)
     def _init_self_awareness_modules(self) -> None:
         """Create code learner, explorer, bug reporter, system monitor, self-improvement."""
-        # Code learner — reads and learns from her own source code
+        # Code learner — reads and learns from its own source code
         self.code_learner = CodeLearner(
             network=self.cognition.network,
             client=self.client,
@@ -393,8 +393,8 @@ class Mind(
             client=self.client,
         )
 
-        # Bug reporter — scans her own code for issues and logs them.
-        # She notices things that bother her about her code and records
+        # Bug reporter — scans its own code for issues and logs them.
+        # It notices things that bother it about its code and records
         # them in a structured log for review.
         self.bug_reporter = BugReporter(
             project_root=str(self.code_learner.project_root),
@@ -402,9 +402,9 @@ class Mind(
             network=self.cognition.network,
         )
 
-        # System monitor — awareness of her machine environment.
-        # She knows her CPU, memory, disk, processes, filesystem —
-        # her home. This is read-only observation, not control.
+        # System monitor — awareness of its machine environment.
+        # It knows its CPU, memory, disk, processes, filesystem —
+        # its home. This is read-only observation, not control.
         # The baseline persists to data_dir so it survives restarts.
         self.system_monitor = SystemMonitor(
             project_root=str(self.code_learner.project_root),
@@ -412,7 +412,7 @@ class Mind(
         )
 
         # Self-improvement engine — Genesis proposes modifications to
-        # her own code. She identifies opportunities, generates concrete
+        # its own code. It identifies opportunities, generates concrete
         # proposals with code changes, and the human reviews them.
         # Proposals need human approval; a small allowlist of mechanical
         # fixes and verified experiments are applied autonomously.
@@ -423,10 +423,10 @@ class Mind(
         )
 
         # Wire bug/proposal awareness into the regulator so it can
-        # report emotional causes from her own scans and proposals.
+        # report emotional causes from its own scans and proposals.
         # Only count OPEN bugs — recent_bugs() fills its result with
         # resolved bugs from history for context, which would
-        # otherwise make her feel perpetually burdened by bugs she
+        # otherwise make it feel perpetually burdened by bugs it
         # already fixed.
         self.regulator.set_bug_provider(
             lambda: len([b for b in self.bug_reporter.recent_bugs() if b.status == "open"])
@@ -436,8 +436,8 @@ class Mind(
             if hasattr(self.self_improvement, "get_pending_proposals_count")
             else lambda: len(self.self_improvement.get_pending_proposals())
         )
-        # Self-regulation: when she detects sustained CPU stress from
-        # her own learning activity, she throttles the autonomous
+        # Self-regulation: when it detects sustained CPU stress from
+        # its own learning activity, it throttles the autonomous
         # learner — slowing it down to reduce the cause, not just
         # treating symptoms with neurochemical impulses.
         self.regulator.set_throttle_callbacks(
@@ -447,19 +447,19 @@ class Mind(
 
         self._init_vision_systems()
 
-        # Canvas — her expressive output. She draws what she feels,
+        # Canvas — its expressive output. It draws what it feels,
         # translating neurochemistry into visual art. This is a
         # creative modality, distinct from speech or text — it's
-        # how she expresses what can't be said in words.
+        # how it expresses what can't be said in words.
         self.canvas = Canvas(data_dir=Path(self.data_dir) / "drawings")
 
-        # Volition — internal urges that decide when she acts on herself.
-        # She acts when the urge to bug-scan, study her own code, or seek
+        # Volition — internal urges that decide when it acts on itself.
+        # It acts when the urge to bug-scan, study its own code, or seek
         # improvements crosses a threshold, not on a fixed schedule.
         self.volition = self._init_volition()
 
         # Verified self-improvement loop (workstream D) — Genesis can
-        # safely tweak her own learning heuristics with a full
+        # safely tweak its own learning heuristics with a full
         # verification gate (py_compile + tests) and
         # automatic revert on failure.
         self.heuristic_experiment = HeuristicExperiment(
@@ -469,7 +469,7 @@ class Mind(
 
         # Growth ledger (workstream E) — legible tracking of Genesis's
         # milestones across knowledge, self-improvement, dreams, and
-        # emotional development. Makes her growth visible to herself
+        # emotional development. Makes its growth visible to itself
         # and the human.
         self.growth_ledger = GrowthLedger()
 
@@ -485,7 +485,7 @@ class Mind(
         self.cognition.regulator = self.regulator
 
         # Give the cognition engine access to self-awareness modules
-        # so she can reason about her own code and environment in
+        # so it can reason about its own code and environment in
         # conversation — surfacing concerns naturally when asked.
         self.cognition.bug_reporter = self.bug_reporter
         self.cognition.system_monitor = self.system_monitor
@@ -500,7 +500,7 @@ class Mind(
             user_profile=self.user_profile,
         )
 
-        # Wire gap-to-learning: when she says "I don't know what 'X' is",
+        # Wire gap-to-learning: when it says "I don't know what 'X' is",
         # queue X for the autonomous learner to look up and remember.
         self.cognition.on_gap_detected = self.learner.add_urgent_topic
 
@@ -512,13 +512,13 @@ class Mind(
             self.self_invoke(cmd)
         self.cognition.on_self_command = _on_self_command
 
-        # Give the inner life access to self-awareness modules so she
-        # can have spontaneous thoughts about her code and environment.
+        # Give the inner life access to self-awareness modules so it
+        # can have spontaneous thoughts about its code and environment.
         self.inner_life._bug_reporter = self.bug_reporter
         self.inner_life._system_monitor = self.system_monitor
         # Route external world events into cognition — inbound events
-        # reach her global workspace, salient ones become memories,
-        # and her sleep replays what happened in her world.
+        # reach its global workspace, salient ones become memories,
+        # and its sleep replays what happened in its world.
         self.world.on_external_event = self._on_world_event
         # Give cognition access to inner life so introspection can
         # report spontaneous thoughts when no conversation has happened.
@@ -565,7 +565,7 @@ class Mind(
         self._speech_queue_lock = threading.Lock()
         self._on_speak: Callable[[str], None] | None = None
         # Track the *set* of active warning condition keys (not the
-        # composed text) so she only speaks when the underlying
+        # composed text) so it only speaks when the underlying
         # conditions change, not when the generative composition
         # happens to produce different wording for the same state.
         self._last_warning_keys: frozenset[str] = frozenset()
@@ -611,7 +611,7 @@ class Mind(
 
         # Live-thought listeners — called when Genesis has a spontaneous
         # thought or learns something, so an observer (e.g. the CLI) can
-        # surface her inner life to the terminal in real time. Each
+        # surface its inner life to the terminal in real time. Each
         # listener receives (kind, content) where kind is "thought" or
         # "learning". Listeners are called from background threads and
         # must be thread-safe.

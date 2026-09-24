@@ -134,7 +134,7 @@ class SpatialReasoner:
 
     def __init__(self, network: Any | None = None) -> None:
         self.network = network
-        # Rules she has learned — from her own successful solves or
+        # Rules it has learned — from its own successful solves or
         # from being taught the correct answer after a failure. These
         # are proposed *first* on future tasks: prior knowledge acts
         # as a prior over the hypothesis space, the way recalled
@@ -157,14 +157,14 @@ class SpatialReasoner:
         """Remember a rule for future tasks.
 
         Called automatically on successful solves, or externally to
-        teach her the correct rule after she gets a task wrong. When a
+        teach it the correct rule after it gets a task wrong. When a
         concept network is attached, each rule is also grounded as a
-        ``spatial:rule:*`` concept so her semantic machinery (memory,
-        language, analogy) can reason about what she knows.
+        ``spatial:rule:*`` concept so its semantic machinery (memory,
+        language, analogy) can reason about what it knows.
 
         Args:
             taught: True when the rule comes from external correction
-                rather than her own verified solve — grounded with
+                rather than its own verified solve — grounded with
                 origin ``teaching`` so provenance stays honest.
         """
         known = {t.describe() for t in self._learned}
@@ -414,7 +414,7 @@ class SpatialReasoner:
         ]
 
         # Success teaches: the most general verified rule becomes part
-        # of her recalled strategy set — overfit alternates are not
+        # of its recalled strategy set — overfit alternates are not
         # retained as knowledge.
         self.learn(solved_hyps[0].transforms)
 

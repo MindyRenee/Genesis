@@ -1066,7 +1066,7 @@ def test_identity_fragments_includes_personality() -> None:
 
 
 def test_identity_fragments_includes_values() -> None:
-    """Identity fragments include her values as predicates."""
+    """Identity fragments include its values as predicates."""
     composer = SelfComposer(seed=42)
     sm = _make_self_model()
     net = _make_network()
@@ -1080,7 +1080,7 @@ def test_identity_fragments_includes_values() -> None:
 
 
 def test_identity_fragments_includes_concept_network() -> None:
-    """Identity fragments include what she knows about herself."""
+    """Identity fragments include what it knows about itself."""
     composer = SelfComposer(seed=42)
     sm = _make_self_model()
     net = _make_network()
@@ -1284,7 +1284,7 @@ def test_insight_predicates_silent_without_insights() -> None:
 
 
 def test_insight_predicates_from_gap() -> None:
-    """A gap insight yields predicate fragments about her understanding."""
+    """A gap insight yields predicate fragments about its understanding."""
     composer = SelfComposer(seed=42)
     net = _make_network()
     refl = ReflectionEngine(net)
@@ -1460,7 +1460,7 @@ def test_existence_fragments() -> None:
 
 
 def test_existence_fragments_includes_knowledge() -> None:
-    """Existence fragments include what she knows about cognition."""
+    """Existence fragments include what it knows about cognition."""
     composer = SelfComposer(seed=42)
     sm = _make_self_model()
     net = _make_network()

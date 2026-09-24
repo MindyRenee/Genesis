@@ -189,7 +189,7 @@ class Provenance:
     the concept origin that produced it. ``is_seed`` is True when the
     origin is in ``_SEED_ORIGINS`` — meaning the content is a
     developer-authored building block, not something Genesis learned
-    or composed herself.
+    or composed itself.
 
     Generators use this to prefer learned/composed content over seeds
     and to disclose when output is seed-only.
@@ -207,7 +207,7 @@ def is_seed_origin(origin: str) -> bool:
     """Return True if this origin marks developer-authored seed content.
 
     This is the single source of truth for distinguishing seeds from
-    content Genesis composed or learned herself. Generators use it to
+    content Genesis composed or learned itself. Generators use it to
     prefer learned content and to disclose when output is seed-only.
     """
     return origin in _SEED_ORIGINS

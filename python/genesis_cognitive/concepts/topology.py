@@ -1,7 +1,7 @@
-"""Network topology — Genesis's understanding of her own knowledge structure.
+"""Network topology — Genesis's understanding of its own knowledge structure.
 
 This module computes graph-theoretic metrics on the concept network,
-giving Genesis self-awareness about the shape of her knowledge:
+giving Genesis self-awareness about the shape of its knowledge:
 
 - **Clustering coefficient** — how interconnected a concept's neighbors
   are. High clustering means a concept sits in a dense cluster of
@@ -14,13 +14,13 @@ giving Genesis self-awareness about the shape of her knowledge:
   concepts).
 
 - **Community detection** — which concepts form clusters. This reveals
-  the domains of her knowledge: "cognition cluster", "emotion
+  the domains of its knowledge: "cognition cluster", "emotion
   cluster", "plant cluster", etc.
 
 - **Small-world metrics** — average path length, global clustering.
-  Is her knowledge network small-world (like the brain)? Should it be?
+  Is its knowledge network small-world (like the brain)? Should it be?
 
-These metrics let her say things like: "I'm well-connected around
+These metrics let it say things like: "I'm well-connected around
 cognition but isolated around mathematics" — structural
 self-awareness that emerges from graph theory, not hardcoded facts.
 
@@ -133,7 +133,7 @@ class NetworkTopology:
         Concepts in the same community are more densely connected
         to each other than to concepts in other communities.
 
-        This reveals the domains of her knowledge.
+        This reveals the domains of its knowledge.
         """
         self._ensure_computed()
         return self._cache["communities"]
@@ -190,7 +190,7 @@ class NetworkTopology:
     def hub_concepts(self, k: int = 10) -> list[tuple[str, float]]:
         """The k most central concepts by eigenvector centrality.
 
-        These are the "hubs" of her knowledge — the concepts that
+        These are the "hubs" of its knowledge — the concepts that
         connect to the most other important concepts.
         """
         self._ensure_computed()
@@ -201,7 +201,7 @@ class NetworkTopology:
     def bridge_concepts(self, k: int = 10) -> list[tuple[str, float]]:
         """The k concepts with highest betweenness centrality.
 
-        These are the "bridges" of her knowledge — concepts that
+        These are the "bridges" of its knowledge — concepts that
         connect otherwise distant domains.
         """
         self._ensure_computed()
@@ -210,7 +210,7 @@ class NetworkTopology:
         return sorted_concepts[:k]
 
     def knowledge_domains(self) -> list[tuple[str, int, float]]:
-        """Summary of her knowledge domains (communities).
+        """Summary of its knowledge domains (communities).
 
         Returns a list of (top_concept, size, cohesion) for each
         community, sorted by size descending. The top_concept is
@@ -235,9 +235,9 @@ class NetworkTopology:
         return domains
 
     def describe_structure(self) -> str:
-        """Compose a natural-language description of her knowledge structure.
+        """Compose a natural-language description of its knowledge structure.
 
-        This is what she says when asked about the shape of her
+        This is what it says when asked about the shape of its
         knowledge — it's structural self-awareness, not hardcoded.
 
         For large networks, expensive metrics are skipped to keep

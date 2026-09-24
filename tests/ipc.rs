@@ -1087,7 +1087,7 @@ fn test_get_body_state() {
     // Autonomic and thermoregulatory fields must round-trip through
     // the wire — the cognitive mind's affect inference reads
     // autonomic_rate/thermoregulatory_effort, so a serialization
-    // regression that drops them would silently break her self-model.
+    // regression that drops them would silently break its self-model.
     assert!(
         (resp.autonomic_rate - 1.2).abs() < 0.01,
         "autonomic_rate should be 1.2, got {}",
@@ -1262,7 +1262,7 @@ fn test_get_body_state() {
     );
     // The daemon sends an empty description — the cognitive mind's
     // language engine composes the actual words from the structured
-    // fields above, using her concept network. The IPC layer must
+    // fields above, using its concept network. The IPC layer must
     // faithfully transmit the empty string, not inject content.
     assert!(
         resp3.description.is_empty(),
@@ -1275,7 +1275,7 @@ fn test_get_body_state() {
 #[test]
 fn test_get_lobe_telemetry() {
     // Per-lobe telemetry round-trips: the daemon publishes one
-    // record per process in her tree (daemon/cognitive/retina),
+    // record per process in its tree (daemon/cognitive/retina),
     // each carrying its CPU/I/O share and miss ratios.
     use genesis::daemon::interoception::{
         Subsystem, SubsystemTelemetry, publish_subsystem_telemetry,

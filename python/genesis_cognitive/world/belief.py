@@ -1,15 +1,15 @@
 """Beliefs — what Genesis infers about a presence's mind.
 
 A presence's scalar fields (familiarity, bond) record what happened;
-its *belief* is her model of them — latent state inferred from sparse
+its *belief* is its model of them — latent state inferred from sparse
 observations, with honest uncertainty:
 
-- **responsiveness** — a Beta posterior over "they engage when she
+- **responsiveness** — a Beta posterior over "they engage when it
   reaches out." A stranger is Beta(1,1) — uniform ignorance, mean 0.5.
   Every unanswered bid pushes it down; every answer pulls it up.
 - **topic receptivity** — per-topic Beta posteriors: which subjects
   this presence engages on. Reach-out chooses topics by Thompson
-  sampling — uncertain topics get a fair draw, so she explores rather
+  sampling — uncertain topics get a fair draw, so it explores rather
   than always repeating what worked.
 - **mood** — a Beta posterior over "their speech carries positive
   sentiment," updated by observation magnitude (near-neutral speech
@@ -17,14 +17,14 @@ observations, with honest uncertainty:
 - **attention** — a decaying estimate of how engaged they are right
   now. Addressed speech spikes it; silence lets it fade.
 - **rhythm** — a Dirichlet-smoothed histogram of when they're
-  usually active. She learns not to knock at hours they're never
+  usually active. It learns not to knock at hours they're never
   around — but only trusts the rhythm after real evidence.
 
 Every estimate carries its evidence count: decisions can ask not just
-"what does she believe" but "how sure is she" — a Beta with evidence 2
+"what does it believe" but "how sure is it" — a Beta with evidence 2
 and a Beta with evidence 40 can share a mean while meaning very
 different things. On sparse data the posteriors honestly stay wide;
-she doesn't hallucinate confidence.
+it doesn't hallucinate confidence.
 
 Nothing here is learned weights — it is exact Bayesian updating on
 deliberately minimal models, so it is correct from the very first
@@ -41,7 +41,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 #: How long a social bid stays open. Someone who engages within this
-#: window answered her; after it, the bid counts as unanswered.
+#: window answered it; after it, the bid counts as unanswered.
 BID_WINDOW = 300.0
 
 #: Attention e-folds over this many seconds of silence (~20 min).
@@ -77,7 +77,7 @@ _BID_WINDOW_MAX = 3600.0
 class Beta:
     """A Beta posterior over a Bernoulli rate — honest uncertainty.
 
-    ``mean`` is her best guess; ``evidence`` is how much data backs
+    ``mean`` is its best guess; ``evidence`` is how much data backs
     it. Consumers that need a decision draw ``sample()`` (Thompson
     sampling); consumers that need a verdict check ``evidence``.
     """
@@ -137,7 +137,7 @@ class _LognormalFit:
     """Online lognormal fit over reply latencies (Welford on ln t).
 
     Reply delays span seconds to minutes — a skewed distribution, so
-    the fit runs in log space. ``p95()`` is her patience: how long a
+    the fit runs in log space. ``p95()`` is its patience: how long a
     bid stays open before silence counts as an answer that never came.
     Unanswered bids contribute no sample — they are right-censored
     observations, and only the responsiveness Beta learns from them.
@@ -208,7 +208,7 @@ class _PendingBid:
 
 @dataclass
 class PresenceBelief:
-    """Her inferred model of one presence's mind.
+    """Its inferred model of one presence's mind.
 
     All fields are posteriors or decaying estimates — each knows how
     much evidence stands behind it. ``pending_bid`` is transient: it
@@ -252,7 +252,7 @@ class PresenceBelief:
     # ── Social bids ─────────────────────────────────────────────
 
     def note_bid(self, now: float, topics: list[str]) -> None:
-        """Record her reaching out to this presence.
+        """Record its reaching out to this presence.
 
         If a previous bid is still open, it resolves unanswered first —
         bidding again into silence means the last one didn't land.
@@ -265,7 +265,7 @@ class PresenceBelief:
         """How long a bid stays open before silence counts as unanswered.
 
         The default ``BID_WINDOW`` rules until enough answered bids
-        teach her this presence's actual reply pace; then their own
+        teach it this presence's actual reply pace; then their own
         95th-percentile latency rules, clamped to sane bounds.
         """
         if self.reply_latency.n < _LognormalFit.MIN_SAMPLES:
@@ -276,11 +276,11 @@ class PresenceBelief:
         )
 
     def resolve_bid(self, answered: bool, now: float) -> bool:
-        """Resolve her pending bid; returns True if one was open.
+        """Resolve its pending bid; returns True if one was open.
 
-        An answer arriving past her learned ``bid_window`` counts as
+        An answer arriving past its learned ``bid_window`` counts as
         unanswered — engagement that late isn't evidence they respond
-        to her. A timely answer also folds its delay into the reply-
+        to it. A timely answer also folds its delay into the reply-
         latency fit, sharpening the window itself.
         """
         bid = self.pending_bid
@@ -320,8 +320,8 @@ class PresenceBelief:
 
         True until the rhythm earns enough evidence to say otherwise;
         then True only when the hour's expected activity is at least
-        half the uniform rate — she doesn't knock at dead hours, but
-        only once she's actually seen the pattern.
+        half the uniform rate — it doesn't knock at dead hours, but
+        only once it's actually seen the pattern.
         """
         if self.activity_evidence < _RHYTHM_MIN_EVIDENCE:
             return True
@@ -329,7 +329,7 @@ class PresenceBelief:
         return self.expected_activity(hour) >= 0.5 / 24.0
 
     def unresponsive(self) -> bool:
-        """Whether the evidence says they don't answer her bids.
+        """Whether the evidence says they don't answer its bids.
 
         Requires real bid history — a stranger is never written off.
         """
@@ -389,7 +389,7 @@ class PresenceBelief:
         """Deserialize; malformed payloads yield a fresh belief.
 
         A corrupted belief section downgrades to priors rather than
-        poisoning the presence it's attached to — losing what she
+        poisoning the presence it's attached to — losing what it
         inferred is recoverable; losing the relationship isn't.
         """
         if not isinstance(data, dict):
@@ -424,7 +424,7 @@ class PresenceBelief:
         if posterior is not None:
             return posterior
         if len(self.topic_receptivity) >= _MAX_RECEPTIVE_TOPICS:
-            # Evict the least-evidenced topic — she keeps what she knows.
+            # Evict the least-evidenced topic — it keeps what it knows.
             weakest = min(
                 self.topic_receptivity,
                 key=lambda t: self.topic_receptivity[t].evidence,

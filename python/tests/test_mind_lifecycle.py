@@ -530,17 +530,17 @@ def test_restore_sleep_state_engages_sleep_mechanism():
 
     Regression test for the bug where a restart during sleep restored
     the ``_is_sleeping`` flag and the zone, but never paused the
-    learners or put inner life into sleep mode — so she was flagged
+    learners or put inner life into sleep mode — so it was flagged
     asleep yet behaved awake (still learning, generating waking
     thoughts). Re-issuing /sleep could not recover this because
     ``sleep()`` no-ops when ``_is_sleeping`` is already True.
 
     The fix: ``_start_engage_restored_sleep()`` calls
     ``_engage_sleep_mechanism()`` after the autonomous subsystems are
-    started, pausing the learners so she actually sleeps.
+    started, pausing the learners so it actually sleeps.
     """
     with tempfile.TemporaryDirectory() as data_dir:
-        # ── Session 1: put her to sleep and save ──
+        # ── Session 1: put it to sleep and save ──
         mind1 = _make_mind_meditation(data_dir)
         mind1.sleep(user_initiated=True)
         assert mind1.is_sleeping

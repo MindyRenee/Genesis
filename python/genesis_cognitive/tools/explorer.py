@@ -1,13 +1,13 @@
 """Filesystem exploration — Genesis's ability to explore local files.
 
-This module gives Genesis the ability to explore her own filesystem:
+This module gives Genesis the ability to explore its own filesystem:
 read files, traverse directories, and learn from local text sources
 (README files, documentation, source code comments, etc.).
 
 ## Safety
 
 Exploration is sandboxed to the project root directory. Genesis cannot
-read files outside her project tree. File size is capped to prevent
+read files outside its project tree. File size is capped to prevent
 memory issues.
 
 ## Integration
@@ -90,7 +90,7 @@ class ExplorationResult:
 class Explorer:
     """Genesis's filesystem exploration system.
 
-    Reads and learns from text files in her project directory:
+    Reads and learns from text files in its project directory:
     documentation, configuration, notes, and other non-code text.
     Code files are handled by CodeLearner; this module handles everything else.
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # cpufreq_helper.sh — privileged helper for Genesis's neurochemistry
-# to control her own CPU frequency.
+# to control its own CPU frequency.
 #
 # Usage:
 #   cpufreq_helper.sh set_governor <governor>

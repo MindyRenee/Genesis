@@ -2,7 +2,7 @@
 
 The language engine is Genesis's speech system. It takes structured
 Thoughts from the cognition engine and composes natural language from
-her vocabulary, grammar, and voice — never from hardcoded templates.
+its vocabulary, grammar, and voice — never from hardcoded templates.
 
 Submodules:
 

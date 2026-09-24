@@ -121,7 +121,7 @@ class UserProfile:
         self.interaction_count += 1
 
     def summarize(self) -> str:
-        """Return a short, human-readable summary of what she knows.
+        """Return a short, human-readable summary of what it knows.
 
         Capped at a few items per category to avoid dumping the entire
         profile as a single unbounded string.

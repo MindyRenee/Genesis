@@ -1,8 +1,8 @@
 """Commitment boundaries — continuous signal → discrete state.
 
 Genesis's internal state is continuous (graded activations, sigmoid
-dose-responses, floating-point neurochemistry), but her transitions
-are discrete: she is asleep or awake, announced-drowsy or not. A
+dose-responses, floating-point neurochemistry), but its transitions
+are discrete: it is asleep or awake, announced-drowsy or not. A
 commitment boundary is the digitizer that sits between the two — the
 functional analog of an all-or-none spike threshold or a logic-level
 band, generalized for a scalar signal:

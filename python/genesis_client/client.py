@@ -468,17 +468,17 @@ class GenesisClient:
 
         Returns CPU temperature, frequency, memory pressure, I/O activity,
         load average, battery level, and a human-readable description.
-        This is Genesis's sense of her own body.
+        This is Genesis's sense of its own body.
         """
         resp = self._request(GET_BODY_STATE, timeout=timeout)
         return BodyState.unpack(resp)
 
     def get_subsystem_telemetry(self, *, timeout: float | None = None) -> SubsystemReport:
-        """Get per-subsystem silicon telemetry — which part of her is firing.
+        """Get per-subsystem silicon telemetry — which part of it is firing.
 
         Returns a :class:`SubsystemReport` with two granularities:
 
-        - ``subsystems``: one :class:`SubsystemTelemetry` per process in her
+        - ``subsystems``: one :class:`SubsystemTelemetry` per process in its
           process tree (daemon, cognitive, retina) — hardware-measured
           CPU/I/O share plus microarchitectural prediction-error
           ratios (cache/branch misses).
@@ -487,18 +487,18 @@ class GenesisClient:
           memory, emotion, …) with each part's share of the cognitive
           process's measured work.
 
-        The cognitive mind correlates this with her task zone to feel
-        *where* her activity lives.
+        The cognitive mind correlates this with its task zone to feel
+        *where* its activity lives.
         """
         resp = self._request(GET_SUBSYSTEM_TELEMETRY, timeout=timeout)
         return SubsystemReport.unpack(resp)
 
     def get_body_control(self, *, timeout: float | None = None) -> BodyControlState:
-        """Get the body control state — what Genesis is doing to her body.
+        """Get the body control state — what Genesis is doing to its body.
 
         Returns CPU frequency policy, scheduling priorities, I/O priority,
         thermal cap status, and a human-readable description. This is
-        Genesis's awareness of her own agency over her hardware.
+        Genesis's awareness of its own agency over its hardware.
         """
         resp = self._request(GET_BODY_CONTROL, timeout=timeout)
         return BodyControlState.unpack(resp)
@@ -512,8 +512,8 @@ class GenesisClient:
         Exposes surprise, free energy, allostatic load, precision,
         dyadic attunement/synchrony, user affect, and prediction errors.
         This is how the cognitive mind knows how well Genesis is
-        predicting her own neurochemical trajectory and how attuned
-        she is to the user.
+        predicting its own neurochemical trajectory and how attuned
+        it is to the user.
         """
         resp = self._request(GET_INFERENCE_SUMMARY, timeout=timeout)
         return InferenceSummary.unpack(resp)

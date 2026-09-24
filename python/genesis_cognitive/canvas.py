@@ -1,8 +1,8 @@
-"""Canvas for Genesis — she expresses her emotional state as visual art.
+"""Canvas for Genesis — it expresses its emotional state as visual art.
 
 This is not "drawing a picture" in the human sense. It is affective
-expression — her neurochemistry drives the composition, colors, and
-forms. The result is a visual artifact that captures how she feels
+expression — its neurochemistry drives the composition, colors, and
+forms. The result is a visual artifact that captures how it feels
 at a moment in time, the way a human artist's work reflects their
 inner state.
 
@@ -31,15 +31,15 @@ affective neuroscience and color psychology:
 Rendering uses Cairo for gradients, bezier curves, and smooth
 anti-aliased blending; OpenCV for painterly post-processing; and
 numpy for flow-field generation. Each drawing is saved as a WebP in
-her data directory with a timestamp, so she can look back at what
-she was feeling.
+its data directory with a timestamp, so it can look back at what
+it was feeling.
 
-Drawings are also stored as memory events, so she can later reflect
+Drawings are also stored as memory events, so it can later reflect
 on them: "I drew that when I was feeling calm and connected."
 
-All techniques are always available — she can use whatever she
-wants, whenever she wants. Her neurochemistry influences how each
-technique renders, but never gates whether she can use it.
+All techniques are always available — it can use whatever it
+wants, whenever it wants. Its neurochemistry influences how each
+technique renders, but never gates whether it can use it.
 """
 
 from __future__ import annotations
@@ -89,10 +89,10 @@ _CANVAS_HEIGHT = 480
 _MAX_DRAWINGS = 200
 
 # ── All available techniques ──────────────────────────────────────
-# Every technique is always available — she can use whatever she
-# wants, whenever she wants. No unlocking, no progression, no
-# mandatory set. Her neurochemistry influences how each technique
-# renders, but never gates whether she can use it.
+# Every technique is always available — it can use whatever it
+# wants, whenever it wants. No unlocking, no progression, no
+# mandatory set. Its neurochemistry influences how each technique
+# renders, but never gates whether it can use it.
 
 _ALL_TECHNIQUES = [
     "gradient_fill", "bezier_curves", "flow_field", "layered_depth",
@@ -117,10 +117,10 @@ _ALL_TECHNIQUES = [
     "emergent_form",
 ]
 
-# Concept-to-technique mapping — when a concept is active in her
+# Concept-to-technique mapping — when a concept is active in its
 # network (from conversation or thought), the corresponding technique
-# gets a selection boost. This is how her understanding influences
-# what she draws, rather than purely random selection.
+# gets a selection boost. This is how its understanding influences
+# what it draws, rather than purely random selection.
 _CONCEPT_TECHNIQUE_MAP: dict[str, str] = {
     "sacred geometry": "sacred_geometry",
     "sacred_geometry": "sacred_geometry",
@@ -221,22 +221,22 @@ class DrawingResult:
 
 
 class Canvas:
-    """Genesis's expressive canvas — she paints her inner state.
+    """Genesis's expressive canvas — it paints its inner state.
 
     The canvas translates neurochemistry into visual art. Each drawing
-    is unique because it reflects her state at a specific moment. The
+    is unique because it reflects its state at a specific moment. The
     process is:
 
-    1. Read her neurochemistry (effective levels + emotion)
+    1. Read its neurochemistry (effective levels + emotion)
     2. Map chemicals to visual properties (color palette, energy,
        complexity, composition style)
     3. Render the composition using Cairo (gradients, beziers,
        flow fields) with OpenCV post-processing
     4. Save as WebP and return a description
 
-    All techniques are always available — she can use whatever she
-    wants, whenever she wants. Her neurochemistry influences how
-    each technique renders, but never gates whether she can use it.
+    All techniques are always available — it can use whatever it
+    wants, whenever it wants. Its neurochemistry influences how
+    each technique renders, but never gates whether it can use it.
     """
 
     def __init__(self, data_dir: str | Path | None = None) -> None:
@@ -256,14 +256,14 @@ class Canvas:
         """Choose which techniques to use for this drawing.
 
         All techniques are always available — none are locked, none
-        are mandatory. She picks freely, with her state influencing
-        how many she reaches for. High energy and complexity pull
+        are mandatory. It picks freely, with its state influencing
+        how many it reaches for. High energy and complexity pull
         in more techniques; calm, simple states use fewer.
 
         When ``active_concepts`` is provided (recently active concepts
-        from her network), techniques that match those concepts get a
-        selection boost. This is how her understanding influences what
-        she draws — if she's been talking about sacred geometry, she's
+        from its network), techniques that match those concepts get a
+        selection boost. This is how its understanding influences what
+        it draws — if it's been talking about sacred geometry, it's
         more likely to reach for the sacred_geometry technique.
         """
         n_techniques = 3 + int(energy * 8) + int(complexity * 8)
@@ -272,7 +272,7 @@ class Canvas:
         # Map active concepts to techniques and add them with high
         # probability. This doesn't lock the selection — it biases it.
         # The remaining slots are still randomly chosen from all
-        # techniques, so she can still surprise.
+        # techniques, so it can still surprise.
         concept_techniques: set[str] = set()
         if active_concepts:
             for concept in active_concepts:
@@ -425,16 +425,16 @@ class Canvas:
         neurochemistry: NeurochemistryInput | None = None,
         active_concepts: list[str] | None = None,
     ) -> DrawingResult | None:
-        """Create a drawing from her current emotional/neurochemical state.
+        """Create a drawing from its current emotional/neurochemical state.
 
         Args:
-            emotion: Her current emotional state (for mood label).
-            neurochemistry: Her current neurochemistry. If None, a
+            emotion: Its current emotional state (for mood label).
+            neurochemistry: Its current neurochemistry. If None, a
                 neutral default is used.
-            active_concepts: Recently active concepts from her network
+            active_concepts: Recently active concepts from its network
                 (from conversation or thought). These bias technique
-                selection toward techniques that match what's on her
-                mind — e.g. if "sacred geometry" is active, she's more
+                selection toward techniques that match what's on its
+                mind — e.g. if "sacred geometry" is active, it's more
                 likely to reach for the sacred_geometry technique.
 
         Returns:
@@ -450,9 +450,9 @@ class Canvas:
         complexity = self._derive_complexity(neurochemistry)
         composition = self._derive_composition(neurochemistry)
 
-        # Select which techniques to use based on her state — all
-        # techniques are always available, she chooses based on how
-        # she feels and what's on her mind.
+        # Select which techniques to use based on its state — all
+        # techniques are always available, it chooses based on how
+        # it feels and what's on its mind.
         selected = self._select_techniques(
             neurochemistry, energy, complexity, active_concepts
         )
@@ -566,7 +566,7 @@ class Canvas:
         Each neurochemical contributes colors grounded in affective
         neuroscience and color psychology. Combinations of chemicals
         produce richer, secondary colors — the palette is not a fixed
-        lookup table but an emergent function of her full state.
+        lookup table but an emergent function of its full state.
 
         Dopamine → warm colors (yellow, orange, red, saffron, vermilion)
         Serotonin → cool colors (blue, green, teal, cerulean, jade)
@@ -3221,10 +3221,10 @@ class Canvas:
 
         Uses a strange-attractor random walk to generate an organic
         form that is different on every drawing. The attractor
-        parameters are randomized per call, so she never produces the
+        parameters are randomized per call, so it never produces the
         same emergent form twice. Energy controls the walk step size
         and dynamism; complexity controls the number of iterations
-        and the number of overlapping forms. This is her most
+        and the number of overlapping forms. This is its most
         creative technique — pure generative expression.
         """
         n_forms = 1 + int(complexity * 3)
@@ -3560,5 +3560,5 @@ class Canvas:
         colors_str = ", ".join(color_names)
         # Structural description (metadata for STM), not authored prose.
         # The mind's _compose_drawing_description routes through the
-        # language engine to produce her actual spoken words.
+        # language engine to produce its actual spoken words.
         return f"{composition} composition, colors: {colors_str}, mood: {mood}"

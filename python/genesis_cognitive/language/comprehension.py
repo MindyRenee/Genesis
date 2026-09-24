@@ -11,7 +11,7 @@ The comprehension engine performs basic semantic parsing:
    command, or exclamation? (Searle, 1969)
 2. **Proposition extraction**: Who did what to whom? Parses sentences
    into subject-predicate-object triples.
-3. **Reference resolution**: Pronouns ("he", "she", "it", "they") are
+3. **Reference resolution**: Pronouns ("he", "it", "it", "they") are
    resolved to their referents based on context (Hobbs, 1978; the
    centering theory of Grosz, Joshi & Weinstein, 1995).
 4. **Key concept identification**: Which words carry the semantic
@@ -690,7 +690,7 @@ class ComprehensionEngine:
 
         engine = ComprehensionEngine()
         result = engine.comprehend(
-            "She gave the book to him yesterday.",
+            "It gave the book to him yesterday.",
             context={"recent_entities": ["Mary", "John"]},
         )
         # result.speech_act → STATEMENT
@@ -922,7 +922,7 @@ class ComprehensionEngine:
         The statistical acquisition system learns multi-word units
         like "trial and error" or "salt and pepper" from user input.
         A coordinator inside a learned chunk is part of the unit,
-        not a clause boundary — this is how exposure teaches her
+        not a clause boundary — this is how exposure teaches it
         that "salt and pepper" is one thing, not two clauses.
         """
         self._known_chunks = frozenset(
@@ -1049,7 +1049,7 @@ class ComprehensionEngine:
             # the coordinator probably joined two noun phrases whose
             # compound is the real subject ("salt and pepper ARE on
             # the table" — "pepper" alone would take "is"). Pronouns
-            # and capitalized names still open clauses ("and she
+            # and capitalized names still open clauses ("and it
             # left", "and Mary is here").
             if (
                 second in self._PLURAL_AGREEING

@@ -1,4 +1,4 @@
-"""Face recognition for Genesis — detects and identifies people she sees.
+"""Face recognition for Genesis — detects and identifies people it sees.
 
 Uses OpenCV's YuNet face detector and SFace recognizer (DNN-based,
 not Haar cascades) for robust, modern face detection and recognition.
@@ -19,10 +19,10 @@ The pipeline:
         v
     "I see Alice" / "I see someone I don't recognize"
 
-Known faces are stored as embeddings in a JSON file in her data
-directory. She learns new faces when told "this is [name]" via
+Known faces are stored as embeddings in a JSON file in its data
+directory. It learns new faces when told "this is [name]" via
 the /register-face command. The user's face is linked to their
-UserProfile name, so when she sees them she knows who she's
+UserProfile name, so when it sees them it knows who it's
 talking to — not just "the user," but their actual name.
 
 Biological basis:

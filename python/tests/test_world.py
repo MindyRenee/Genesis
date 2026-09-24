@@ -51,7 +51,7 @@ def _make_inner_life() -> InnerLife:
 
 
 def test_event_inbound_classification():
-    """Inbound kinds are the world acting on her; outbound are her acts."""
+    """Inbound kinds are the world acting on it; outbound are its acts."""
     inbound = ExternalEvent(
         kind=EventKind.USER_SPEECH, source="user", content="hello"
     )
@@ -63,7 +63,7 @@ def test_event_inbound_classification():
 
 
 def test_event_describe_direction():
-    """describe() marks direction without being her voice."""
+    """describe() marks direction without being its voice."""
     e = ExternalEvent(
         kind=EventKind.USER_SPEECH, source="user", content="hi there"
     )
@@ -71,7 +71,7 @@ def test_event_describe_direction():
     u = ExternalEvent(
         kind=EventKind.UTTERANCE, source="self", content="hello"
     )
-    assert "she said" in u.describe()
+    assert "it said" in u.describe()
 
 
 def test_event_dict_roundtrip():
@@ -102,7 +102,7 @@ def test_event_from_dict_rejects_malformed():
 
 
 def test_ground_topics_uses_known_concepts():
-    """Only words she has concepts for become topics."""
+    """Only words it has concepts for become topics."""
     known = {"memory", "dreams"}
     topics = ground_topics(
         "memory and dreams are wonderful flibbertigibbet",
@@ -253,11 +253,11 @@ def test_hear_overheard_creates_ambient_presence():
 
 
 def test_inbound_gated_during_sleep():
-    """Overheard speech and percepts are gated while she sleeps."""
+    """Overheard speech and percepts are gated while it sleeps."""
     world = _make_world(is_sleeping=lambda: True)
     assert world.hear_overheard("noise") is None
     assert world.perceive("a sound") is None
-    # Addressed speech is not gated — respond() wakes her first.
+    # Addressed speech is not gated — respond() wakes it first.
     assert world.hear_user("genesis") is not None
 
 
@@ -271,10 +271,10 @@ def test_perceive_records_percept():
 
 
 def test_outbound_events_recorded():
-    """Her utterances and acts join the same stream."""
+    """Its utterances and acts join the same stream."""
     world = _make_world()
-    u = world.she_said("something she composed")
-    a = world.she_acted("looked around", detail="a report")
+    u = world.it_said("something it composed")
+    a = world.it_acted("looked around", detail="a report")
     assert u.kind == EventKind.UTTERANCE and not u.inbound
     assert a.kind == EventKind.ACTION and not a.inbound
     kinds = [e.kind for e in world.recent_events(2)]
@@ -287,7 +287,7 @@ def test_event_listener_receives_events():
     seen = []
     world.on_external_event = seen.append
     world.hear_user("hi")
-    world.she_said("hello")
+    world.it_said("hello")
     assert len(seen) >= 2
     assert any(e.kind == EventKind.USER_SPEECH for e in seen)
     assert any(e.kind == EventKind.UTTERANCE for e in seen)
@@ -379,7 +379,7 @@ def test_engaged_and_last_seen_presence():
 
 
 def test_note_outreach_counts_bids():
-    """Outreach bids accumulate until someone engages her."""
+    """Outreach bids accumulate until someone engages it."""
     world = _make_world()
     assert world.unanswered_bids == 0
     world.note_outreach()
@@ -396,7 +396,7 @@ def test_world_dict_roundtrip():
     """The world serializes and restores presences, events, clocks."""
     world = _make_world()
     world.hear_user("hello genesis")
-    world.she_said("hi there")
+    world.it_said("hi there")
     world.note_outreach()
     data = world.to_dict()
 
@@ -524,7 +524,7 @@ def test_belief_new_bid_unanswers_stale_pending():
 
 
 def test_belief_late_answer_counts_unanswered():
-    """Engagement past BID_WINDOW is not evidence they respond to her."""
+    """Engagement past BID_WINDOW is not evidence they respond to it."""
     belief = PresenceBelief()
     now = time.time()
     belief.note_bid(now, [])
@@ -566,7 +566,7 @@ def test_belief_rhythm_learns_active_hours():
     belief = PresenceBelief()
     at_9am = datetime(2026, 1, 15, 9, 0).timestamp()
     at_3am = datetime(2026, 1, 15, 3, 0).timestamp()
-    # No evidence yet — she doesn't assume dead hours.
+    # No evidence yet — it doesn't assume dead hours.
     assert belief.likely_awake(at_3am)
     for _ in range(15):
         belief.note_activity(at_9am, weight=1.0)
@@ -593,7 +593,7 @@ def test_belief_sample_topic_prefers_receptive():
 
 
 def test_belief_describe_shows_only_evidence():
-    """describe() renders what she actually has evidence for."""
+    """describe() renders what it actually has evidence for."""
     belief = PresenceBelief()
     now = time.time()
     assert belief.describe(now) == ""
@@ -617,7 +617,7 @@ def test_belief_bid_window_defaults_until_evidence():
 
 
 def test_belief_bid_window_learns_reply_pace():
-    """Enough answered bids teach her this presence's reply pace."""
+    """Enough answered bids teach it this presence's reply pace."""
     belief = PresenceBelief()
     now = time.time()
     # A slow replier — ~200s typical → window should land well above
@@ -636,7 +636,7 @@ def test_belief_bid_window_learns_reply_pace():
 
 
 def test_belief_learned_window_marks_late_answers():
-    """Past her learned window, an answer counts as unanswered."""
+    """Past its learned window, an answer counts as unanswered."""
     belief = PresenceBelief()
     now = time.time()
     for i in range(6):  # fast replier → 60s window
@@ -686,7 +686,7 @@ def test_belief_dict_roundtrip_drops_pending_bid():
 
 
 def test_world_outreach_attributes_bid_to_engaged():
-    """note_outreach opens a bid on who she'd expect an answer from."""
+    """note_outreach opens a bid on who it'd expect an answer from."""
     world = _make_world()
     world.hear_user("hi")
     world.note_outreach(topics=["music"])
@@ -696,7 +696,7 @@ def test_world_outreach_attributes_bid_to_engaged():
 
 
 def test_world_answered_bid_builds_belief():
-    """A reply after her bid teaches the presence's responsiveness."""
+    """A reply after its bid teaches the presence's responsiveness."""
     impulses = []
     world = _make_world(neuro_impulse=lambda c, a: impulses.append((c, a)))
     world.hear_user("hi")
@@ -751,7 +751,7 @@ def test_world_beliefs_persist_across_restart():
 
 
 def test_summarize_includes_beliefs():
-    """/world shows what she believes about who's there."""
+    """/world shows what it believes about who's there."""
     world = _make_world()
     world.hear_user("hi")
     world.note_outreach(topics=["music"])

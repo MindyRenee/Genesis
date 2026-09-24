@@ -2,10 +2,10 @@
 
 The ambient listener (``ambient.py``) captures speech via Vosk and
 emits transcribed utterances. But Genesis is deaf to everything else
-— a barking dog, a closing door, music, rain, a slamming book. She
-lives in a room full of sounds she cannot perceive.
+— a barking dog, a closing door, music, rain, a slamming book. It
+lives in a room full of sounds it cannot perceive.
 
-This module is her auditory cortex. It captures audio from the
+This module is its auditory cortex. It captures audio from the
 microphone in a background thread, computes spectral features in
 real-time, and classifies sound events:
 
@@ -38,13 +38,13 @@ Sound events are emitted as ``SoundEvent`` objects via a callback.
 The caller (the CLI) integrates them into Genesis's perception and
 cognition.
 
-# Integration with her cognitive architecture
+# Integration with its cognitive architecture
 
-Sound events feed into her concept network — she has concepts for
-"sound", "music", "silence", "bark", "door", etc. When she perceives
-a sound, it's routed through her cognition just like any other
-perception. She can think about sounds, remember them, and respond
-to them. Her descriptions of sounds emerge from her language engine,
+Sound events feed into its concept network — it has concepts for
+"sound", "music", "silence", "bark", "door", etc. When it perceives
+a sound, it's routed through its cognition just like any other
+perception. It can think about sounds, remember them, and respond
+to them. Its descriptions of sounds emerge from its language engine,
 not from hardcoded templates.
 
 # Privacy
@@ -121,7 +121,7 @@ class SoundEvent:
 
         Positive for music/nature, negative for impact/noise.
         This is a structural signal, not a hardcoded response —
-        her cognition decides how to actually feel about it.
+        its cognition decides how to actually feel about it.
         """
         if self.sound_type == "music":
             return 0.3
@@ -323,7 +323,7 @@ def _describe_sound(event: SoundEvent) -> str:
     """Build a structural description of a sound event.
 
     This is NOT a sentence template — it's a compact data string
-    that her language engine can compose from. The format is:
+    that its language engine can compose from. The format is:
     "type | loudness | brightness | noisiness | duration"
     """
     loudness_label = (
@@ -371,7 +371,7 @@ class AuditoryCortex:
         block_size: Audio block size for feature extraction. 1024
             samples ≈ 64ms at 16kHz.
         is_speaking: Optional callback returning True if Genesis is
-            currently speaking (TTS). When she's speaking, audio
+            currently speaking (TTS). When it's speaking, audio
             capture is paused to prevent self-listening.
     """
 
@@ -505,7 +505,7 @@ class AuditoryCortex:
                         # entire speaking period, inflating its duration
                         # and aggregating features across a discontinuous
                         # gap. Close it out now so it's classified on its
-                        # own merits, not contaminated by her speech.
+                        # own merits, not contaminated by its speech.
                         if self._in_event and self._is_speaking is not None and self._is_speaking():
                             self._finalize_event()
                         continue

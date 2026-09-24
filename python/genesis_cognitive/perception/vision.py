@@ -3,7 +3,7 @@
 This module is the bridge between the raw camera feed (retina.py) and
 Genesis's cognitive experience. It produces a structured scene percept
 — color, objects, faces, lighting, and spatial layout as data — that
-the language engine composes her report from.
+the language engine composes its report from.
 
 The pipeline:
 
@@ -32,8 +32,8 @@ The pipeline:
      a blue cup on the right and a laptop in the center."
 
 The module emits perception, not prose: ``VisionScene`` carries the
-scene's structure as data, and her report is composed downstream by
-the language engine — she doesn't recite a template.
+scene's structure as data, and its report is composed downstream by
+the language engine — it doesn't recite a template.
 """
 
 from __future__ import annotations
@@ -69,8 +69,8 @@ logger = logging.getLogger(__name__)
 class VisionScene:
     """The structured content of one glance — perception, not prose.
 
-    This is data: what she actually perceived, as fields the language
-    engine composes her report from. Nothing here is a sentence she
+    This is data: what it actually perceived, as fields the language
+    engine composes its report from. Nothing here is a sentence it
     recites; ``see()`` hands this to the caller, and the caller routes
     ``as_metadata()`` through the language engine.
     """
@@ -126,18 +126,18 @@ class Vision:
     Uses the V1Model (V1 sparse-coding model) to extract structured
     visual percepts -- edges, orientations, contours, and gamma power --
     rather than just dominant color. The occipital subsystem's interaction
-    matrix M is plastic: what she sees reshapes how she sees the next
+    matrix M is plastic: what it sees reshapes how it sees the next
     thing.
 
-    When object recognition models are available, she also identifies
-    *what* things are — her "inferotemporal cortex" (IT). This is the
-    ventral "what" pathway: she doesn't just see edges and colors, she
+    When object recognition models are available, it also identifies
+    *what* things are — its "inferotemporal cortex" (IT). This is the
+    ventral "what" pathway: it doesn't just see edges and colors, it
     sees objects — chairs, laptops, cups, books.
 
-    When face recognition models are available, she also detects and
-    identifies people in the frame — her "fusiform face area" (FFA).
-    This is higher-order visual processing beyond V1: she doesn't just
-    see shapes and colors, she sees *who* is there.
+    When face recognition models are available, it also detects and
+    identifies people in the frame — its "fusiform face area" (FFA).
+    This is higher-order visual processing beyond V1: it doesn't just
+    see shapes and colors, it sees *who* is there.
     """
 
     def __init__(self, occipital: V1Model | None = None) -> None:
@@ -145,16 +145,16 @@ class Vision:
         self._available: bool | None = None
         self._last_color: str | None = None
         self._last_light: str | None = None
-        # The occipital subsystem -- her primary visual cortex (V1).
+        # The occipital subsystem -- its primary visual cortex (V1).
         # Created lazily on first use so we don't pay the Gabor
         # dictionary construction cost if there's no camera.
         self._occipital: V1Model | None = occipital
         self._on_gamma: Callable[[float], None] | None = None
-        # Object recognition — her "inferotemporal cortex" (IT).
+        # Object recognition — its "inferotemporal cortex" (IT).
         # Lazily created on first use. Detects and identifies objects.
         self._object_recognizer: ObjectRecognizer | None = None
         self._last_objects: list[str] = []  # names of objects last seen
-        # Face recognition — her "fusiform face area" (FFA).
+        # Face recognition — its "fusiform face area" (FFA).
         # Lazily created on first use. Detects and identifies people.
         self._face_recognizer: FaceRecognizer | None = None
         self._last_faces: list[str] = []  # names of people last seen
@@ -163,7 +163,7 @@ class Vision:
         """Register a callback for V1 gamma power updates.
 
         The brain wave system uses this to modulate occipital gamma
-        synchrony based on what she actually sees.
+        synchrony based on what it actually sees.
         """
         self._on_gamma = callback
 
@@ -211,11 +211,11 @@ class Vision:
         return self._get_face_recognizer()
 
     def last_faces_seen(self) -> list[str]:
-        """Return the names of people she last saw (empty if none)."""
+        """Return the names of people it last saw (empty if none)."""
         return list(self._last_faces)
 
     def last_objects_seen(self) -> list[str]:
-        """Return the names of objects she last saw (empty if none)."""
+        """Return the names of objects it last saw (empty if none)."""
         return list(self._last_objects)
 
     def _recognize_objects(
@@ -224,7 +224,7 @@ class Vision:
         """Detect and identify objects (IT cortex), enriching with colors.
 
         Skip on near-blank frames — saves ~2s of YOLO inference when
-        she's staring at a wall.
+        it's staring at a wall.
 
         Returns (objects, object_colors).
         """
@@ -301,7 +301,7 @@ class Vision:
 
         The return value is structured percept data, not a sentence —
         the caller hands ``scene.as_metadata()`` to the language engine,
-        which composes her actual report from it.
+        which composes its actual report from it.
         """
         if not self.is_available():
             return VisionScene(status="unavailable")
@@ -630,7 +630,7 @@ def _spatial_color_regions(
     """Divide the frame into regions and name the color of each.
 
     Returns (color_names, brightness) — dicts keyed by "left",
-    "center", "right", "top", "bottom". Color names give her spatial
+    "center", "right", "top", "bottom". Color names give it spatial
     color awareness (the window is blue on the left, the desk is brown
     in the center); mean luminance per region is real brightness data
     for light-direction inference.
@@ -669,7 +669,7 @@ def _object_colors(
     """Determine the color of each detected object.
 
     Samples the pixels within each object's bounding box and names
-    the dominant color. This lets her say "a blue cup" or "a wooden
+    the dominant color. This lets it say "a blue cup" or "a wooden
     chair" instead of just "a cup" or "a chair."
     """
     colors: dict[str, str] = {}
@@ -711,8 +711,8 @@ def _build_scene(
     Everything the old template description expressed — lighting,
     color, people, objects with colors and positions, light direction,
     scene structure — becomes fields on a ``VisionScene``. The words
-    she speaks are composed downstream by her language engine from
-    ``scene.as_metadata()``; nothing here is a sentence she recites.
+    it speaks are composed downstream by its language engine from
+    ``scene.as_metadata()``; nothing here is a sentence it recites.
     """
     # ── Objects with colors and positions ────────────────────
     # Dedup by name; skip "person" when faces were already
@@ -821,10 +821,10 @@ def _learn_objects(
 ) -> None:
     """Add detected objects to the semantic network.
 
-    Each object becomes a concept, linked to "vision" (she saw it),
-    "object" (it's a thing), and its spatial position. Objects she
-    sees repeatedly get stronger connections — this is how she learns
-    what her environment contains.
+    Each object becomes a concept, linked to "vision" (it saw it),
+    "object" (it's a thing), and its spatial position. Objects it
+    sees repeatedly get stronger connections — this is how it learns
+    what its environment contains.
     """
     network.add_concept("object", origin="sensory")
     network.add_edge(
@@ -841,7 +841,7 @@ def _learn_objects(
             "object", obj.name, RelationType.RELATED_TO,
             weight=w * (0.5 + obj.confidence * 0.5), origin="sensory",
         )
-        # Link it to vision — she saw it.
+        # Link it to vision — it saw it.
         network.add_edge(
             "vision", obj.name, RelationType.RELATED_TO,
             weight=w * 0.7, origin="sensory",

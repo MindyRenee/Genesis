@@ -551,9 +551,9 @@ class GraphWalkGenerator:
         # Augment typed edges with latent-space discoveries. The
         # embedding store finds concepts that are semantically close
         # to the seed even when no explicit typed edge connects them.
-        # This is where generalization happens — she discovers
+        # This is where generalization happens — it discovers
         # connections through vector proximity, not just through
-        # graph edges she was explicitly taught.
+        # graph edges it was explicitly taught.
         if len(results) < _MAX_TOTAL_CLAUSES:
             self._add_latent_discoveries(
                 seed, results, visited, emotion, topic_set,
@@ -584,19 +584,19 @@ class GraphWalkGenerator:
 
         This is the latent-space composition path. Without it, the
         graph-walk can only narrate typed edges — producing mechanical
-        "X causes Y, X enables Z" output. With it, she can also express
-        "X reminds me of W" — connections she discovered through
+        "X causes Y, X enables Z" output. With it, it can also express
+        "X reminds me of W" — connections it discovered through
         semantic proximity, not explicit teaching.
         """
         if self._embeddings is None:
             return
         if not getattr(self._embeddings, "has_embeddings", False):
             return
-        # High caution suppresses exploration — she stays with what she
+        # High caution suppresses exploration — it stays with what it
         # knows for certain rather than venturing into latent associations.
         if emotion.caution > 0.7:
             return
-        # Very low openness — she doesn't want to engage, so no
+        # Very low openness — it doesn't want to engage, so no
         # exploratory discoveries.
         if emotion.openness_to_engage < 0.3:
             return
@@ -761,7 +761,7 @@ class GraphWalkGenerator:
         # ── Subsequent sentences from remaining edges ──
         # These clauses are all mid-sentence (they follow the opener),
         # so the seed is pronominalized. The pronoun is animacy-aware —
-        # "she" for Genesis, "they" for plurals, "it" for things.
+        # "it" for Genesis, "they" for plurals, "it" for things.
         # Other subjects use _display_name which already returns
         # correct casing (lowercase for common nouns, capitalized for
         # proper nouns).
@@ -890,7 +890,7 @@ class GraphWalkGenerator:
         # tropical air."). The framing is a grammatical seed (building
         # block); the content (subject, verb, object) comes from the
         # concept network. This gives the response conversational depth
-        # — she's sharing what she knows, not reciting an edge list.
+        # — it's sharing what it knows, not reciting an edge list.
         first = subject[0].upper() + subject[1:] if subject else subject
         # Use a varied framing seed. The pronoun makes the clause
         # flow naturally after the framing.
@@ -926,7 +926,7 @@ class GraphWalkGenerator:
         return self._display_name(object_id)
 
     # Accusative pronouns that trigger pre-particle placement
-    # ("makes her possible", "brings it about")
+    # ("makes it possible", "brings it about")
     _OBJECT_PRONOUN_SET = frozenset(
         {"it", "her", "him", "them", "me", "us", "you"}
     )

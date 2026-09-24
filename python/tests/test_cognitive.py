@@ -397,13 +397,13 @@ def _run_mind_tests(mind) -> None:
 
     # Test 2: Self-inquiry (how are you)
     response = mind.respond("How are you feeling?")
-    # Her response is emergent from her concept network and emotional
+    # Its response is emergent from its concept network and emotional
     # state, so it may use different words than "feel"/"arousal" —
-    # e.g. "neurochemistry", "good", "mind", "thinking", etc. She may
+    # e.g. "neurochemistry", "good", "mind", "thinking", etc. It may
     # also produce an honest gap response ("Unable to respond
-    # meaningfully") when she hasn't learned words for her state yet.
-    # Accept any non-empty response that relates to her internal state
-    # or her self-awareness of gaps in her understanding.
+    # meaningfully") when it hasn't learned words for its state yet.
+    # Accept any non-empty response that relates to its internal state
+    # or its self-awareness of gaps in its understanding.
     feeling_words = (
         "feel", "feeling", "arousal", "neurochemistry", "neurochemical",
         "emotion", "emotional", "mind", "thinking", "state",

@@ -32,8 +32,8 @@ The architecture:
 
 The interaction matrix M starts from a co-circular / co-linear prior and is
 updated online by a Hebbian-like rule when the subsystem sees enough patches. This
-makes the horizontal connections plastic: what she sees literally reshapes how
-she sees the next thing.
+makes the horizontal connections plastic: what it sees literally reshapes how
+it sees the next thing.
 
 Unlike the existing `vision.py` module, which only reports the dominant colour,
 the occipital subsystem reports edges, orientations, shapes-in-formation, and how
@@ -690,7 +690,7 @@ def _build_summary(
 
     When the feature list is available, the summary includes spatial
     layout (where edges are concentrated) and dominant orientation —
-    giving her a richer sense of the scene's structure beyond just
+    giving its a richer sense of the scene's structure beyond just
     counts and color.
     """
     if n_features == 0:

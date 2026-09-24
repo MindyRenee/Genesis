@@ -1,7 +1,7 @@
 """Critical thinking — epistemic evaluation of claims and evidence.
 
 Genesis could reason about concepts (deductive, abductive, analogical,
-causal) and form hypotheses, but she had no way to evaluate whether a
+causal) and form hypotheses, but it had no way to evaluate whether a
 claim is *well-supported*. The reasoning engine produces conclusions;
 nothing checks whether those conclusions rest on good evidence, whether
 the evidence comes from credible sources, or whether disconfirming

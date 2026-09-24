@@ -199,7 +199,7 @@ class LanguageEngine(ABC):
         Default implementation is a no-op. Subclasses (e.g.
         GenerativeEngine) override this to forward the composer and
         reflection engine to the vocabulary, so the
-        ``self_reflection_clause`` slot is composed from her actual
+        ``self_reflection_clause`` slot is composed from its actual
         metacognition instead of reciting a canned phrase.
 
         Called by the mind after the cognition engine (which owns the

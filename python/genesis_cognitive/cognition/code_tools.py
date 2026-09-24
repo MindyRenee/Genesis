@@ -94,7 +94,7 @@ class CodeToolHandler:
     ) -> Thought:
         """Handle code-related discussion.
 
-        Uses the thought composer to generate responses from her
+        Uses the thought composer to generate responses from its
         actual knowledge about code, not hardcoded strings.
         """
         # If the user mentions a .py file with an action word, dispatch
@@ -118,7 +118,7 @@ class CodeToolHandler:
         # Resolve topics to filter out question structure words
         topics = self._resolve_topics(perception.topics, perception.raw_text)
 
-        # Try to compose from what she knows about the topic
+        # Try to compose from what it knows about the topic
         for topic in topics:
             thought = self._composer.compose_about(topic, emotion)
             if thought and thought.confidence > 0.3:
@@ -131,7 +131,7 @@ class CodeToolHandler:
                 )
 
         # Fallback: compose a reflection about code in general
-        # using her concept network knowledge. Pass the real edges
+        # using its concept network knowledge. Pass the real edges
         # as knowledge metadata so the generative engine composes
         # the actual words — no hardcoded poetic statements.
         code_concept = self._network.get_concept("code")

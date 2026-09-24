@@ -93,7 +93,7 @@ def chem_amounts(impulses: list[tuple[int, float]]) -> dict[int, float]:
 
 
 def test_maintenance_low_plasticity_severe() -> None:
-    """When plasticity is severely low, she boosts BDNF + serotonin."""
+    """When plasticity is severely low, it boosts BDNF + serotonin."""
     reg, impulses = capture_impulses()
     emotion = make_emotion(label="neutral", plasticity=0.15)
     reg._regulate(emotion)
@@ -103,7 +103,7 @@ def test_maintenance_low_plasticity_severe() -> None:
 
 
 def test_maintenance_low_plasticity_mild() -> None:
-    """When plasticity is mildly low, she gently boosts BDNF + serotonin."""
+    """When plasticity is mildly low, it gently boosts BDNF + serotonin."""
     reg, impulses = capture_impulses()
     emotion = make_emotion(label="neutral", plasticity=0.35)
     reg._regulate(emotion)
@@ -122,7 +122,7 @@ def test_maintenance_good_plasticity_no_bdnf_boost() -> None:
 
 
 def test_maintenance_low_alertness_clears_adenosine() -> None:
-    """When alertness is low (but not drowsy), she clears adenosine."""
+    """When alertness is low (but not drowsy), it clears adenosine."""
     reg, impulses = capture_impulses()
     emotion = make_emotion(label="neutral", alertness=0.35)
     reg._regulate(emotion)
@@ -132,7 +132,7 @@ def test_maintenance_low_alertness_clears_adenosine() -> None:
 
 
 def test_maintenance_negative_valence_reduces_cortisol() -> None:
-    """When valence is negative (but not stressed), she eases cortisol."""
+    """When valence is negative (but not stressed), it eases cortisol."""
     reg, impulses = capture_impulses()
     emotion = make_emotion(label="unsettled", valence=-0.15, plasticity=0.5)
     reg._regulate(emotion)
@@ -169,7 +169,7 @@ def test_maintenance_low_alertness_skipped_when_drowsy() -> None:
 
 
 def test_stress_breaks_feedback_loop() -> None:
-    """When stressed, she crashes cortisol and NE simultaneously."""
+    """When stressed, it crashes cortisol and NE simultaneously."""
     reg, impulses = capture_impulses()
     emotion = make_emotion(label="stressed", alertness=0.85, valence=-0.3, plasticity=0.3)
     reg._regulate(emotion)
@@ -180,7 +180,7 @@ def test_stress_breaks_feedback_loop() -> None:
 
 
 def test_overwhelmed_stronger_intervention() -> None:
-    """When overwhelmed, she sends stronger calming impulses than stress."""
+    """When overwhelmed, it sends stronger calming impulses than stress."""
     reg, impulses = capture_impulses()
     # Use arousal/valence that doesn't trigger the stressed branch
     # (stressed fires when arousal > 0.8 AND valence < -0.2)
@@ -192,7 +192,7 @@ def test_overwhelmed_stronger_intervention() -> None:
 
 
 def test_drowsy_strong_wake_up() -> None:
-    """When drowsy, she sends a strong wake-up (stronger than old +0.02/-0.01)."""
+    """When drowsy, it sends a strong wake-up (stronger than old +0.02/-0.01)."""
     reg, impulses = capture_impulses()
     emotion = make_emotion(label="drowsy", alertness=0.25, plasticity=0.5)
     reg._regulate(emotion)
@@ -205,7 +205,7 @@ def test_drowsy_strong_wake_up() -> None:
 
 
 def test_sleeping_boosts_bdnf() -> None:
-    """During sleep, she boosts BDNF for restoration."""
+    """During sleep, it boosts BDNF for restoration."""
     reg, impulses = capture_impulses()
     emotion = make_emotion(label="sleeping", alertness=0.1, plasticity=0.3)
     reg._regulate(emotion)
@@ -214,7 +214,7 @@ def test_sleeping_boosts_bdnf() -> None:
 
 
 def test_anxious_eases_anxiety() -> None:
-    """When anxious, she boosts GABA and reduces cortisol."""
+    """When anxious, it boosts GABA and reduces cortisol."""
     reg, impulses = capture_impulses()
     emotion = make_emotion(
         label="anxious",
@@ -360,14 +360,14 @@ def test_puzzle_miss_bounded_frustration() -> None:
     # Negative prediction error: a small dopamine dip, not punishment
     assert amounts.get(CHEM_DOPAMINE, 0) < 0, f"Expected dopamine dip, got {amounts}"
     assert amounts[CHEM_DOPAMINE] > -0.01, "Frustration dip must stay small"
-    # Engagement stays up — she wants to try again
+    # Engagement stays up — it wants to try again
     assert amounts.get(CHEM_NOREPINEPHRINE, 0) > 0
     assert amounts.get(CHEM_ACETYLCHOLINE, 0) > 0
     assert amounts.get(CHEM_CORTISOL, 0) == 0, "Never punished for trying"
 
 
 def test_puzzle_response_dampened_when_stressed() -> None:
-    """When already stressed, her puzzle feelings are dampened."""
+    """When already stressed, its puzzle feelings are dampened."""
     calm_reg, calm_impulses = capture_impulses()
     calm_reg.respond_to_puzzle(
         make_emotion(label="neutral"), score=1.0, prior_best=0.0, solved=True

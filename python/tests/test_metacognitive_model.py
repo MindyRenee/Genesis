@@ -468,7 +468,7 @@ def test_high_metacognitive_surprise_overrides_delta_skip() -> None:
 
     When the previous cycle's metacognitive surprise is high, the
     model is saying "I can't predict my own cognition." Even in
-    delta (deep rest), she should reflect harder. We force high
+    delta (deep rest), it should reflect harder. We force high
     surprise with random outcomes (varying type, count, and
     presence), then check that a delta cycle runs the deeper checks.
     """

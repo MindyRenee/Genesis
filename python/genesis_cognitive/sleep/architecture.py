@@ -68,7 +68,7 @@ class SleepCycleTracker:
     no hippocampal replay) and no REM (no emotional processing). This
     models a short rest: light consolidation via N2 sleep spindles
     (hippocampal→neocortical transfer) without the heavy systems
-    consolidation of N3 or the emotional processing of REM. She wakes
+    consolidation of N3 or the emotional processing of REM. It wakes
     after the N2 period ends rather than continuing into deep sleep.
     """
 

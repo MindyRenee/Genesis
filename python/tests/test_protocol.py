@@ -548,7 +548,7 @@ def test_client_advance_neuro_clamps_dt(dt_sent, dt_expected):
 
     The mind passes raw measured elapsed time; the client enforces the
     daemon's dt contract at the boundary so longer stalls are
-    truncated rather than rejected. Without this, her neurochemical
+    truncated rather than rejected. Without this, its neurochemical
     clock would lag the wall clock whenever the loop stalls.
     """
     import struct

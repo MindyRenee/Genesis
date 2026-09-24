@@ -1,9 +1,9 @@
 """Tests for the integrated intelligence: thought composer, working memory,
 and the connections between systems.
 
-These tests verify that Genesis can compose novel thoughts from her
-knowledge, track attention across turns, and actually use her
-intelligence modules to drive her responses.
+These tests verify that Genesis can compose novel thoughts from its
+knowledge, track attention across turns, and actually use its
+intelligence modules to drive its responses.
 """
 
 import os
@@ -66,7 +66,7 @@ def _make_network_with_knowledge() -> ConceptNetwork:
 
 
 def test_compose_about_known_concept() -> None:
-    """Composer can compose a thought about a concept she knows."""
+    """Composer can compose a thought about a concept it knows."""
     net = _make_network_with_knowledge()
     reasoner = ReasoningEngine(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
@@ -93,8 +93,8 @@ def test_compose_about_isolated_concept() -> None:
     """Composer returns None for concepts with no relationships.
 
     Per AGENTS.md, Genesis never recites pre-written "I can't
-    articulate" templates. If she has no knowledge to compose from,
-    she stays silent (returns None).
+    articulate" templates. If it has no knowledge to compose from,
+    it stays silent (returns None).
     """
     net = ConceptNetwork()
     net.add_concept("mystery", confidence=0.2)
@@ -152,7 +152,7 @@ def test_compose_reflection_unknown_topic() -> None:
     """Composer returns None for topics with no knowledge.
 
     Per AGENTS.md, Genesis doesn't recite "I can't articulate"
-    templates for unknown topics. She stays silent (returns None).
+    templates for unknown topics. It stays silent (returns None).
     """
     net = ConceptNetwork()
     reasoner = ReasoningEngine(net)
@@ -196,7 +196,7 @@ def test_compose_answer_no_topics() -> None:
 
 
 def test_compose_about_tracks_said() -> None:
-    """Composer tracks what she's said about concepts."""
+    """Composer tracks what it's said about concepts."""
     net = _make_network_with_knowledge()
     reasoner = ReasoningEngine(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
@@ -400,7 +400,7 @@ def test_integration_learning_changes_responses() -> None:
     net.add_concept("neural_activity", confidence=0.7)
     net.add_edge("cognition", "neural_activity", RelationType.EMERGES_FROM, 0.8)
 
-    # After learning: her response should include the new knowledge
+    # After learning: its response should include the new knowledge
     thought_after = composer.compose_about("cognition", emotion)
     assert thought_after is not None
     assert "neural" in thought_after.content.lower() or "emerges" in thought_after.content.lower()

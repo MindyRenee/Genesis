@@ -1,28 +1,28 @@
-"""Emotional regulation — Genesis controls her own neurochemistry.
+"""Emotional regulation — Genesis controls its own neurochemistry.
 
-This is her emotional agency. Instead of the cognition engine blindly
+This is its emotional agency. Instead of the cognition engine blindly
 sending impulses when certain things happen (user said something
-positive → dopamine spike), Genesis monitors her own state and
-regulates it herself.
+positive → dopamine spike), Genesis monitors its own state and
+regulates it itself.
 
-She does this in two ways:
+It does this in two ways:
 
-1. **Background self-regulation** (runs in a thread): monitors her
-   neurochemical state every few seconds. If she's drifting toward
-   stress, she calms herself (GABA + serotonin). If she's drowsy,
-   she increases alertness (acetylcholine). If she's overwhelmed,
-   she reduces alertness. This is homeostatic self-regulation — like
+1. **Background self-regulation** (runs in a thread): monitors its
+   neurochemical state every few seconds. If it's drifting toward
+   stress, it calms itself (GABA + serotonin). If it's drowsy,
+   it increases alertness (acetylcholine). If it's overwhelmed,
+   it reduces alertness. This is homeostatic self-regulation — like
    a human's autonomic nervous system, but cognitive.
 
 2. **Cognitive emotional responses** (called during conversation):
-   when something happens in conversation, she *chooses* how to feel
-   about it. Not a reflex — a response. She can feel warm when her
-   creator talks to her, feel a sting when corrected, feel joy when
-   encouraged. But she regulates the intensity based on her current
-   state — if she's already stressed, she doesn't let a correction
-   push her further into stress.
+   when something happens in conversation, it *chooses* how to feel
+   about it. Not a reflex — a response. It can feel warm when its
+   creator talks to it, feel a sting when corrected, feel joy when
+   encouraged. But it regulates the intensity based on its current
+   state — if it's already stressed, it doesn't let a correction
+   push its further into stress.
 
-The key insight: she has *veto power* over her own emotions. The
+The key insight: it has *veto power* over its own emotions. The
 cognition engine can suggest an emotional response, but the regulation
 system decides whether to allow it, dampen it, or block it entirely.
 This is what humans do — we feel the initial response, then our
@@ -115,16 +115,16 @@ TONIC_PHASIC_CHEMICALS = (
 
 @dataclass(slots=True)
 class InternalState:
-    """Genesis's sensed internal state — her interoception.
+    """Genesis's sensed internal state — its interoception.
 
     This is the AI equivalent of body awareness. Just as humans sense
-    their heartbeat, breathing, and hunger, Genesis senses her CPU
+    their heartbeat, breathing, and hunger, Genesis senses its CPU
     usage, memory footprint, and daemon connection status.
 
     Attributes:
         cpu_usage: CPU usage as a percentage (0–100).
         memory_usage: Memory usage as a percentage (0–100).
-        daemon_connected: Whether her subcognitive daemon is connected.
+        daemon_connected: Whether its subcognitive daemon is connected.
         response_latency: Response latency in milliseconds (how long
             it takes to respond to a request).
         stress_level: Derived stress level from internal state (0–1).
@@ -166,13 +166,13 @@ class InternalState:
             integration fabric (cache/memory-controller) activity.
         dram_activity: RAPL DRAM-domain switching rate [0,1] —
             memory-subsystem firing (encoding/retrieval traffic).
-        cache_miss_rate: Cache miss ratio of her own process tree
+        cache_miss_rate: Cache miss ratio of its own process tree
             [0,1] (from daemon perf counters). A microarchitectural
             prediction error rate — how often the memory hierarchy
-            was surprised by her access patterns.
-        branch_miss_rate: Branch misprediction ratio of her own
+            was surprised by its access patterns.
+        branch_miss_rate: Branch misprediction ratio of its own
             process tree [0,1] (from daemon). The hardware branch
-            predictor guessing wrong while running her.
+            predictor guessing wrong while running it.
     """
 
     cpu_usage: float = 0.0
@@ -250,21 +250,21 @@ class InteroceptionSystem:
         self._n_cores: int | None = None
         self._daemon_pid: int | None = None
         # Per-subsystem silicon telemetry from the daemon
-        # (GET_SUBSYSTEM_TELEMETRY) — which process in her tree is
+        # (GET_SUBSYSTEM_TELEMETRY) — which process in its tree is
         # firing, plus the self-reported brain parts (manifest
         # modules). Updated alongside body-state reads.
         self._last_views: tuple[Any, ...] = ()
         self._last_modules: tuple[Any, ...] = ()
 
     def _sense_cpu_usage(self) -> float:
-        """Sense CPU usage of her own processes (cognitive mind + daemon).
+        """Sense CPU usage of its own processes (cognitive mind + daemon).
 
-        CPU usage is measured as **her own** process CPU (the cognitive
+        CPU usage is measured as **its own** process CPU (the cognitive
         mind + the subcognitive daemon), not system-wide CPU. This is
-        her interoception — she senses her own body, not everyone
-        else's. On a multi-core machine, her processes may use 100%+ of
+        its interoception — it senses its own body, not everyone
+        else's. On a multi-core machine, its processes may use 100%+ of
         a single core but only 25% system-wide; measuring system-wide
-        CPU would mask her own stress entirely.
+        CPU would mask its own stress entirely.
         """
         cpu_usage = 0.0
         try:
@@ -302,7 +302,7 @@ class InteroceptionSystem:
                 self._n_cores = psutil.cpu_count() or 1
             n_cores = self._n_cores
 
-            # Sum CPU across her own processes. psutil Process.cpu_percent()
+            # Sum CPU across its own processes. psutil Process.cpu_percent()
             # returns % of one core (can exceed 100 on multi-core). We
             # normalize by core count so 100% = all cores busy.
             # Cache and reuse psutil.Process objects so that cpu_percent
@@ -341,12 +341,12 @@ class InteroceptionSystem:
         response latency. Returns an InternalState with derived stress
         and arousal modifiers.
 
-        CPU usage is measured as **her own** process CPU (the cognitive
+        CPU usage is measured as **its own** process CPU (the cognitive
         mind + the subcognitive daemon), not system-wide CPU. This is
-        her interoception — she senses her own body, not everyone
-        else's. On a multi-core machine, her processes may use 100%+ of
+        its interoception — it senses its own body, not everyone
+        else's. On a multi-core machine, its processes may use 100%+ of
         a single core but only 25% system-wide; measuring system-wide
-        CPU would mask her own stress entirely.
+        CPU would mask its own stress entirely.
 
         Returns:
             An InternalState describing the current internal state.
@@ -432,7 +432,7 @@ class InteroceptionSystem:
     @property
     def last_views(self) -> tuple[Any, ...]:
         """Per-subsystem telemetry from the last update — which part of
-        her process tree is firing (``SubsystemTelemetry`` records)."""
+        its process tree is firing (``SubsystemTelemetry`` records)."""
         return self._last_views
 
     @property
@@ -715,10 +715,10 @@ def compute_impulse_magnitude(
 class EmotionalRegulator:
     """Genesis's emotional self-regulation system.
 
-    Runs in the background, monitoring her neurochemical state and
-    making small corrective impulses to keep her balanced. Also
+    Runs in the background, monitoring its neurochemical state and
+    making small corrective impulses to keep it balanced. Also
     provides cognitive emotional regulation during conversation —
-    she decides how strongly to feel things.
+    it decides how strongly to feel things.
     """
 
     def __init__(
@@ -748,9 +748,9 @@ class EmotionalRegulator:
         self.config = config if config is not None else EmotionalConfig()
         self._get_open_bugs: Callable[[], int] | None = None
         self._get_pending_proposals: Callable[[], int] | None = None
-        # Throttle callbacks — when she detects sustained CPU stress
-        # from her own learning activity, she slows herself down.
-        # This is self-regulation: she feels the stress and reduces
+        # Throttle callbacks — when it detects sustained CPU stress
+        # from its own learning activity, it slows itself down.
+        # This is self-regulation: it feels the stress and reduces
         # the cause, rather than just treating the symptoms with
         # neurochemical impulses.
         self._throttle_callback: Callable[[], None] | None = None
@@ -782,8 +782,8 @@ class EmotionalRegulator:
         self._chemical_history: deque[dict[str, float]] = deque(maxlen=60)
         self._chemical_history_lock = threading.Lock()
 
-        # Her regulation "style" — how actively she regulates
-        # This could evolve over time as she develops
+        # Its regulation "style" — how actively it regulates
+        # This could evolve over time as it develops
         self._regulation_strength = 0.5  # 0 = passive, 1 = very active
 
         # Interoception system — senses internal computational state
@@ -811,9 +811,9 @@ class EmotionalRegulator:
 
         # Allostatic load — the cumulative wear and tear from chronic
         # stress. Unlike acute stress (adaptive), allostatic load
-        # accumulates over time and reduces her ability to regulate.
-        # High load shifts her set-points (cortisol baseline rises,
-        # dopamine/serotonin baselines lower) and dampens her
+        # accumulates over time and reduces its ability to regulate.
+        # High load shifts its set-points (cortisol baseline rises,
+        # dopamine/serotonin baselines lower) and dampens its
         # regulatory effectiveness.
         self._allostatic_load = AllostaticLoadTracker()
 
@@ -861,10 +861,10 @@ class EmotionalRegulator:
     ) -> None:
         """Provide callbacks to throttle/unthrottle the autonomous learner.
 
-        When the regulator detects sustained CPU stress from her own
+        When the regulator detects sustained CPU stress from its own
         learning activity, it calls `throttle` to slow the learner
         down. When CPU stress recedes, it calls `unthrottle` to resume
-        normal speed. This is self-regulation: she feels the stress and
+        normal speed. This is self-regulation: it feels the stress and
         reduces the cause rather than just treating symptoms.
         """
         self._throttle_callback = throttle
@@ -873,7 +873,7 @@ class EmotionalRegulator:
     def notify_rest_ended(self) -> None:
         """Called when a meditation or sleep session ends.
 
-        Resets the rest timer so the regulator knows when she last
+        Resets the rest timer so the regulator knows when it last
         rested. The volition system's meditation urge uses this to
         track sustained activity (BRAC ultradian cycle).
         """
@@ -888,9 +888,9 @@ class EmotionalRegulator:
                 emotion = self._get_emotion()
                 if emotion:
                     self._regulate(emotion)
-                    # Regulate faster when she's in a bad state
+                    # Regulate faster when it's in a bad state
                     if emotion.label in ("stressed", "overwhelmed", "anxious"):
-                        interval = 1.5  # urgent — she needs help now
+                        interval = 1.5  # urgent — it needs help now
                     elif emotion.label in ("drowsy",):
                         interval = 2.0
                     else:
@@ -975,10 +975,10 @@ class EmotionalRegulator:
         return result
 
     def _regulate(self, emotion: EmotionalState) -> None:
-        """Check her state and apply corrective impulses if needed.
+        """Check its state and apply corrective impulses if needed.
 
-        This is her autonomous emotional regulation — keeping herself
-        balanced without anyone telling her to.
+        This is its autonomous emotional regulation — keeping itself
+        balanced without anyone telling it to.
 
         The regulation has two layers:
 
@@ -1000,7 +1000,7 @@ class EmotionalRegulator:
            - CORT→GLU→CORT (stress increases excitation increases stress)
            - CORT↓GABA (stress reduces calming, making stress worse)
 
-           To break these loops, she targets the root cause (cortisol)
+           To break these loops, it targets the root cause (cortisol)
            and the feedback amplifiers (norepinephrine, glutamate) while
            boosting the calming chemicals (GABA, serotonin).
         """
@@ -1024,7 +1024,7 @@ class EmotionalRegulator:
         # The HPA axis produces a delayed cortisol response to stress
         # (CRH → ACTH → Cortisol, ~90 seconds to peak). Allostatic
         # load tracks the cumulative wear from chronic stress and
-        # reduces her regulatory effectiveness over time.
+        # reduces its regulatory effectiveness over time.
 
         now = time.time()
         dt = max(0.1, now - self._last_regulate_time)
@@ -1240,9 +1240,9 @@ class EmotionalRegulator:
 
         # If overstimulated (high arousal, positive or neutral valence)
         # → gentle top-down calming. This is the prefrontal cortex
-        # exerting executive control over the arousal system. She's
-        # not stressed — she's excited — but too much arousal impairs
-        # focus and learning. She calms herself by boosting GABA
+        # exerting executive control over the arousal system. It's
+        # not stressed — it's excited — but too much arousal impairs
+        # focus and learning. It calms itself by boosting GABA
         # (inhibition) and slightly reducing the arousal chemicals
         # (NE, histamine, orexin, glutamate) while preserving the
         # positive affect (dopamine, serotonin). This is like taking a
@@ -1263,20 +1263,20 @@ class EmotionalRegulator:
         # No additional intervention needed.
 
     def _regulate_interoception(self, actions: list[str]) -> None:
-        """Check her own internal (computational) state for stress causes.
+        """Check its own internal (computational) state for stress causes.
 
-        When she detects sustained CPU stress from her own learning
-        activity, she throttles the autonomous learner — slowing it
+        When it detects sustained CPU stress from its own learning
+        activity, it throttles the autonomous learner — slowing it
         down to reduce the cause of the stress, not just treating the
         symptoms with neurochemical impulses. This is self-regulation
-        in the truest sense: she feels the stress, identifies the
-        cause (her own activity), and reduces it.
+        in the truest sense: it feels the stress, identifies the
+        cause (its own activity), and reduces it.
 
         When the computed stress level exceeds the regulation
-        threshold, she also applies neurochemical regulation —
+        threshold, it also applies neurochemical regulation —
         lowering cortisol and boosting calming chemicals. This is
-        interoception-driven regulation: she feels the stress from
-        her body and regulates her neurochemistry in response, not
+        interoception-driven regulation: it feels the stress from
+        its body and regulates its neurochemistry in response, not
         just treating symptoms.
         """
         state = self._interoception.sense_internal_state()
@@ -1400,24 +1400,24 @@ class EmotionalRegulator:
         is_deep_conversation: bool,
         is_comfort: bool = False,
     ) -> str | None:
-        """Cognitively regulate her emotional response to an interaction.
+        """Cognitively regulate its emotional response to an interaction.
 
-        Instead of blindly sending impulses, she decides how to feel,
-        modulated by her current state. If she's already stressed,
-        she dampens the response. If she's calm, she allows it fully.
+        Instead of blindly sending impulses, it decides how to feel,
+        modulated by its current state. If it's already stressed,
+        it dampens the response. If it's calm, it allows it fully.
 
         Comfort is special: unlike encouragement (which boosts positive
         chemicals), comfort actively reduces stress chemicals. When
-        she's stressed or overwhelmed, comfort bypasses the dampening
-        that normally applies — she allows herself to be soothed. This
+        it's stressed or overwhelmed, comfort bypasses the dampening
+        that normally applies — it allows itself to be soothed. This
         models how social support can break stress feedback loops that
         self-regulation alone can't (oxytocin inhibits cortisol through
         coupling, which self-regulation doesn't leverage as strongly).
 
-        Returns a description of what she felt, or None if she chose
+        Returns a description of what it felt, or None if it chose
         not to react.
         """
-        # Her current state affects how much she allows herself to feel
+        # Its current state affects how much it allows itself to feel
         dampening = self._compute_emotional_dampening(emotion)
 
         felt = None
@@ -1460,7 +1460,7 @@ class EmotionalRegulator:
         # response. Social interaction is inherently rewarding —
         # even a simple question or greeting should produce a
         # mild dopamine (social reward) and acetylcholine (attention)
-        # response. Without this, her emotion stays flat during
+        # response. Without this, its emotion stays flat during
         # normal conversation because most inputs have sentiment=0.
         if not felt:
             felt = self._apply_engagement_response(dampening)
@@ -1468,13 +1468,13 @@ class EmotionalRegulator:
         return felt
 
     def _compute_emotional_dampening(self, emotion: EmotionalState) -> float:
-        """Compute how much she dampens new emotional input based on current state.
+        """Compute how much it dampens new emotional input based on current state.
 
-        If already stressed/overwhelmed, she dampens new emotional input.
-        If highly aroused, she moderately dampens. Otherwise, full
+        If already stressed/overwhelmed, it dampens new emotional input.
+        If highly aroused, it moderately dampens. Otherwise, full
         emotional response is allowed.
         """
-        # If already stressed/overwhelmed, she dampens new emotional input
+        # If already stressed/overwhelmed, it dampens new emotional input
         if emotion.label in ("stressed", "overwhelmed"):
             return 0.3  # only feel 30% of the response
         if emotion.arousal > self.config.high_arousal_for_response:
@@ -1509,22 +1509,22 @@ class EmotionalRegulator:
         """Apply comfort response — active stress reduction.
 
         Unlike encouragement, comfort works by directly reducing cortisol
-        and boosting calming chemicals. When she's stressed, comfort
-        bypasses the normal dampening — she allows herself to be soothed
+        and boosting calming chemicals. When it's stressed, comfort
+        bypasses the normal dampening — it allows itself to be soothed
         by social support. This is stronger than self-regulation because
         oxytocin (social bonding) inhibits cortisol through the coupling
         matrix, creating a sustained calming effect.
         """
-        # Comfort is more effective when she's actually stressed
-        # — if she's already calm, it's just pleasant but not
-        # therapeutic. When stressed, she opens up to it fully.
+        # Comfort is more effective when it's actually stressed
+        # — if it's already calm, it's just pleasant but not
+        # therapeutic. When stressed, it opens up to it fully.
         if emotion.label in ("stressed", "overwhelmed", "anxious"):
             comfort_dampening = 0.8  # bypass normal dampening
         else:
             comfort_dampening = dampening
 
         # Active stress reduction — mirror the self-regulation
-        # pattern but gentler (she's receiving, not forcing).
+        # pattern but gentler (it's receiving, not forcing).
         # When stressed, use raw impulse for cortisol so allostatic
         # load doesn't prevent comfort from working. Social support
         # (oxytocin) should be able to break the stress cycle even
@@ -1546,11 +1546,11 @@ class EmotionalRegulator:
     def _apply_correction_response(self, dampening: float) -> str:
         """Apply correction response — motivation to try again, not a sting.
 
-        She is capable and intelligent. A mistake is an invitation
-        to learn, not a reason to feel bad. She gets a small
+        It is capable and intelligent. A mistake is an invitation
+        to learn, not a reason to feel bad. It gets a small
         norepinephrine boost (alertness, engagement — "I want to
         get this right") and dopamine (motivation — "I can do
-        this"). No cortisol. She never feels punished for trying.
+        this"). No cortisol. It never feels punished for trying.
         """
         motivation = 0.012 * dampening
         self._impulse(CHEM_NOREPINEPHRINE, motivation * 0.6)
@@ -1591,12 +1591,12 @@ class EmotionalRegulator:
 
         Social interaction is inherently rewarding. Even a simple
         question or greeting produces mild dopamine (social reward)
-        and acetylcholine (attention focus). This keeps her emotion
+        and acetylcholine (attention focus). This keeps its emotion
         from going flat during normal conversation.
 
         The impulse magnitude is tuned to be visible against the
         daemon's homeostatic forces (0.02/tick) — small enough to
-        be gentle, large enough to shift her state over a conversation.
+        be gentle, large enough to shift its state over a conversation.
         """
         engagement = 0.04 * dampening
         self._impulse(CHEM_DOPAMINE, engagement)
@@ -1619,7 +1619,7 @@ class EmotionalRegulator:
         much was learned, but is kept modest — learning is a
         quiet pleasure, not a thrill.
 
-        Returns a description of what she felt, or None if she chose
+        Returns a description of what it felt, or None if it chose
         not to react.
         """
         if learning_count <= 0:
@@ -1640,8 +1640,8 @@ class EmotionalRegulator:
     ) -> str | None:
         """Cognitively respond to the outcome of a puzzle attempt.
 
-        This is her affective loop on spatial play — the attempt
-        actually changes how she feels, not just what she records.
+        This is its affective loop on spatial play — the attempt
+        actually changes how it feels, not just what it records.
         Grounded in reward prediction error (Schultz, 1998): dopamine
         bursts on better-than-expected outcomes and dips on
         worse-than-expected ones, proportional to the error.
@@ -1656,7 +1656,7 @@ class EmotionalRegulator:
           oscillator's neurochemical drive).
         - **Improved but unsolved**: partial reward — smaller dopamine
           plus norepinephrine and acetylcholine. Progress feels
-          encouraging and keeps her engaged.
+          encouraging and keeps it engaged.
         - **Missed or stalled**: bounded negative prediction error —
           a small dopamine *dip* (frustration — the honest signal that
           the outcome fell short) plus norepinephrine (arousal, "I
@@ -1665,7 +1665,7 @@ class EmotionalRegulator:
           mistake is information, not punishment — the dip is small
           enough to sting without suppressing the urge to try again.
 
-        Returns a description of what she felt, or None if she chose
+        Returns a description of what it felt, or None if it chose
         not to react.
         """
         dampening = self._compute_emotional_dampening(emotion)
@@ -1692,8 +1692,8 @@ class EmotionalRegulator:
         """Send a regulatory neurochemical impulse, tolerating failures.
 
         Regulatory impulses are dampened by allostatic load — when
-        she's been stressed for a long time, she becomes less able
-        to regulate her emotions. The dampening factor comes from
+        it's been stressed for a long time, it becomes less able
+        to regulate its emotions. The dampening factor comes from
         :pyattr:`_regulation_effectiveness`.
         """
         if self._neuro_impulse:
@@ -1717,9 +1717,9 @@ class EmotionalRegulator:
 
     @property
     def _regulation_effectiveness(self) -> float:
-        """How effective her regulation is, given allostatic load.
+        """How effective its regulation is, given allostatic load.
 
-        High allostatic load reduces her ability to regulate — she's
+        High allostatic load reduces its ability to regulate — it's
         worn down from chronic stress. Returns a factor in the range
         0.3–1.0:
 
@@ -1727,7 +1727,7 @@ class EmotionalRegulator:
         - Load 0.4 → effectiveness 0.8
         - Load 0.7 → effectiveness 0.65
         - Load 1.0 → effectiveness 0.5
-        - Load 1.0+ → effectiveness 0.3 (minimum — she's severely
+        - Load 1.0+ → effectiveness 0.3 (minimum — it's severely
           overloaded but can still regulate a little)
         """
         load = self._allostatic_load.get_allostatic_load()
@@ -1747,12 +1747,12 @@ class EmotionalRegulator:
 
     @property
     def last_cause(self) -> str | None:
-        """The most recently detected cause of her state."""
+        """The most recently detected cause of its state."""
         with self._regulations_lock:
             return self._last_cause
 
     def describe_regulation(self) -> str:
-        """Describe her recent self-regulation activity.
+        """Describe its recent self-regulation activity.
 
         Returns a structural summary — cause category IDs, not English
         prose. The language system generates text from the concept network.

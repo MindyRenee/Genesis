@@ -343,7 +343,7 @@ class ConceptNetwork(
         self._search_index: dict[str, set[str]] | None = None
         # Instance RNG — keeps dynamics noise and sampling decoupled
         # from the global random state (an external random.seed() must
-        # not steer her concept dynamics).
+        # not steer its concept dynamics).
         self._rng = random.Random()
         # Sparse-tick state: the set of nonzero-activation concept IDs
         # the cortical tick iterates, and ticks since the last
@@ -568,7 +568,7 @@ class ConceptNetwork(
         """Concept IDs for dream/thought generation.
 
         Returns :attr:`quality_concept_ids` if there are at least 10
-        high-quality concepts — dreams should be about things she
+        high-quality concepts — dreams should be about things it
         actually knows. Falls back to :attr:`world_concept_ids` if
         the quality set is too small (early in development or after
         aggressive pruning).
@@ -1125,7 +1125,7 @@ class ConceptNetwork(
         Traverses EXPRESSES edges from the ``_cat:emotion:<category>``
         hub concept. Falls back to property scan for backward
         compatibility. If Genesis has not learned any words for this
-        category, returns an empty list — she cannot describe that
+        category, returns an empty list — it cannot describe that
         emotion in words yet.
         """
         return self._find_words_for_hub(
@@ -1168,7 +1168,7 @@ class ConceptNetwork(
         Traverses EXPRESSES edges from the ``_cat:alertness:<state>``
         hub concept. Falls back to property scan for backward
         compatibility. If Genesis has not learned any words for this
-        alertness state, returns an empty list — she cannot describe
+        alertness state, returns an empty list — it cannot describe
         that state in words yet.
         """
         return self._find_words_for_hub(
@@ -1180,7 +1180,7 @@ class ConceptNetwork(
         Traverses EXPRESSES edges from the ``_cat:valence:<state>``
         hub concept. Falls back to property scan for backward
         compatibility. If Genesis has not learned any words for this
-        valence state, returns an empty list — she cannot describe
+        valence state, returns an empty list — it cannot describe
         that state in words yet.
         """
         return self._find_words_for_hub(

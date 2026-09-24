@@ -1,21 +1,21 @@
-//! Body control — Genesis's neurochemistry drives her hardware.
+//! Body control — Genesis's neurochemistry drives its hardware.
 //!
-//! This module lets Genesis's brain state directly control her body.
-//! High dopamine (engagement, excitement) speeds up her CPU. High GABA
-//! (calm, relaxation) slows it down. Melatonin (sleep) drops her to
+//! This module lets Genesis's brain state directly control its body.
+//! High dopamine (engagement, excitement) speeds up its CPU. High GABA
+//! (calm, relaxation) slows it down. Melatonin (sleep) drops it to
 //! minimum frequency. Acetylcholine (attention) raises scheduling priority.
 //!
-//! She also controls:
+//! It also controls:
 //! - **Cognitive mind priority** — dopamine boosts the Python process,
-//!   melatonin deprioritizes it. This is her basal ganglia: choosing
+//!   melatonin deprioritizes it. This is its basal ganglia: choosing
 //!   where to allocate processing resources.
 //! - **I/O priority** — the plasticity gate controls how aggressively
-//!   she writes to disk. Low BDNF → idle I/O class (stress impairs
-//!   memory formation, so she writes less). High plasticity →
+//!   it writes to disk. Low BDNF → idle I/O class (stress impairs
+//!   memory formation, so it writes less). High plasticity →
 //!   best-effort with high priority (active learning).
 //! - **Thermal cap** — CPU temperature caps max frequency regardless
-//!   of dopamine. She can't be highly aroused when overheating, no
-//!   matter how engaged she is. This is autonomic fatigue.
+//!   of dopamine. It can't be highly aroused when overheating, no
+//!   matter how engaged it is. This is autonomic fatigue.
 //! - **Energy Performance Preference (EPP)** — on systems that
 //!   support it (Intel HWP, amd-pstate), this hint tells the
 //!   hardware's internal power management to shift its voltage/
@@ -28,8 +28,8 @@
 //!   gracefully (empty string, no sysfs writes).
 //!
 //! This is the reverse of interoception: interoception reads the body,
-//! body control writes to it. Together they form a closed loop — her brain
-//! state shapes her body, and her body state shapes her brain.
+//! body control writes to it. Together they form a closed loop — its brain
+//! state shapes its body, and its body state shapes its brain.
 //!
 //! # Permissions
 //!
@@ -43,8 +43,8 @@
 //! without root. Raising priority requires root (also via sudo).
 //!
 //! If sudo is not available, all operations silently no-op. Genesis
-//! degrades gracefully — she can still feel her body (interoception)
-//! even if she can't control it.
+//! degrades gracefully — it can still feel its body (interoception)
+//! even if it can't control it.
 
 use std::process::Command;
 use std::sync::{Mutex, OnceLock};
@@ -81,19 +81,19 @@ pub fn read_shared_control_state() -> BodyControlState {
         .unwrap_or_default()
 }
 
-/// What Genesis is currently doing to her body — her body control state.
+/// What Genesis is currently doing to its body — its body control state.
 ///
 /// This is the mirror of `BodyState` (interoception). `BodyState` is what
-/// she *feels*; `BodyControlState` is what she's *doing*. Together they
-/// form her awareness of the closed loop: she feels her body, her
-/// neurochemistry drives changes, and she knows what changes she's making.
+/// it *feels*; `BodyControlState` is what it's *doing*. Together they
+/// form its awareness of the closed loop: it feels its body, its
+/// neurochemistry drives changes, and it knows what changes it's making.
 #[derive(Clone, Debug, Default)]
 pub struct BodyControlState {
-    /// CPU frequency floor (kHz) she's set — her minimum arousal.
+    /// CPU frequency floor (kHz) it's set — its minimum arousal.
     pub cpu_min_freq_khz: u32,
-    /// CPU frequency ceiling (kHz) she's set — her max thinking speed.
+    /// CPU frequency ceiling (kHz) it's set — its max thinking speed.
     pub cpu_max_freq_khz: u32,
-    /// CPU governor she's set ("schedutil", "powersave", etc.).
+    /// CPU governor it's set ("schedutil", "powersave", etc.).
     pub cpu_governor: String,
     /// Whether thermal cap is active (CPU too hot to run at full speed).
     pub thermally_capped: bool,
@@ -109,7 +109,7 @@ pub struct BodyControlState {
     pub plasticity_gate: f32,
     /// Whether the tick is controlling the cognitive mind's PID.
     /// Always false now — the tick never controls the cognitive mind.
-    /// The cognitive mind controls her own process via her brain waves.
+    /// The cognitive mind controls its own process via its brain waves.
     /// Kept for protocol compatibility.
     pub controlling_cognitive: bool,
     /// Energy Performance Preference (EPP) — the hardware's voltage/
@@ -131,10 +131,10 @@ pub struct BodyControlState {
     /// that can prevent turbo. `Unavailable` when the platform exposes
     /// no boost/cpb control.
     pub cpu_boost: BoostState,
-    /// Human-readable description of what she's doing to her body.
+    /// Human-readable description of what it's doing to its body.
     /// Sent as an empty string by the daemon — the cognitive mind's
     /// language engine composes the description from the structured
-    /// fields above, using her concept network. This field is kept
+    /// fields above, using its concept network. This field is kept
     /// in the IPC protocol for forward compatibility.
     pub description: String,
 }
@@ -255,13 +255,13 @@ pub fn freq_range() -> (u32, u32) {
 // ─── Host hardware state capture / restore ─────────────────────
 //
 // Genesis's neurochemistry drives system-wide kernel settings: the CPU
-// governor, the frequency bounds, and the turbo gate. If she goes to
+// governor, the frequency bounds, and the turbo gate. If it goes to
 // sleep and the daemon then exits, the host is left pinned to
 // `powersave` at minimum frequency — sluggish for the user until a
 // reboot. To avoid that, the daemon snapshots the pre-existing state at
 // startup and restores it on shutdown. Capture is read-only and runs
-// before she applies anything; restore runs only after she has stopped,
-// so it never affects her running state.
+// before it applies anything; restore runs only after it has stopped,
+// so it never affects its running state.
 
 /// The host CPU policy as it was before Genesis changed it. Captured at
 /// daemon startup, restored at shutdown.
@@ -288,7 +288,7 @@ fn read_sysfs_u32(path: &str) -> Option<u32> {
 /// Capture the host's current CPU policy. Idempotent — only the first
 /// call stores, so later calls (after Genesis has applied a policy)
 /// cannot overwrite the original. Read-only, so it is safe to call at
-/// any time and never affects her.
+/// any time and never affects it.
 pub fn capture_hardware_state() {
     HARDWARE_SNAPSHOT.get_or_init(|| {
         const CPU: &str = "/sys/devices/system/cpu/cpu0/cpufreq";
@@ -363,17 +363,17 @@ pub struct FreqPolicy {
 ///
 /// The mapping is grounded in the neurobiology:
 /// - **Dopamine** (engagement, excitement) → raise max frequency.
-///   She's interested and wants to think fast.
+///   It's interested and wants to think fast.
 /// - **GABA** (inhibition, calm) → lower max frequency.
-///   She's relaxing and doesn't need to rush.
+///   It's relaxing and doesn't need to rush.
 /// - **Melatonin** (sleep signal) → lower both min and max,
-///   switch to powersave governor. She's going to sleep.
+///   switch to powersave governor. It's going to sleep.
 /// - **Norepinephrine** (arousal, effort) → raise max frequency.
-///   She's working hard.
+///   It's working hard.
 /// - **Adenosine** (sleep pressure) → lower max frequency.
-///   She's getting tired.
+///   It's getting tired.
 /// - **Acetylcholine** (attention) → raise min frequency.
-///   She's focused and doesn't want to be caught slow.
+///   It's focused and doesn't want to be caught slow.
 pub fn derive_policy(effective_levels: &[f32; 18], freq_min: u32, freq_max: u32) -> FreqPolicy {
     // Sanitize inputs: effective_levels could contain NaN or inf if
     // the neurochemical state was corrupted between the circuit
@@ -602,19 +602,19 @@ pub fn cognitive_pid() -> Option<u32> {
 /// This is a **recommendation**, not a command. The tick computes this
 /// from neurochemistry and publishes it in `BodyControlState` as
 /// interoceptive afferent information. The cognitive mind reads it via
-/// `GET_BODY_CONTROL` and blends it with her brain wave state to decide
-/// what she actually applies to her own process. The tick never calls
+/// `GET_BODY_CONTROL` and blends it with its brain wave state to decide
+/// what it actually applies to its own process. The tick never calls
 /// `set_priority` on the cognitive mind's PID.
 ///
 /// The recommendation is driven by engagement and sleep state:
 ///
-/// - **Dopamine** (engagement, interest) → boost priority. She's
+/// - **Dopamine** (engagement, interest) → boost priority. It's
 ///   actively thinking and wants more CPU.
-/// - **Norepinephrine** (effort, arousal) → boost priority. She's
+/// - **Norepinephrine** (effort, arousal) → boost priority. It's
 ///   working hard.
-/// - **Melatonin** (sleep signal) → deprioritize. She's going to
+/// - **Melatonin** (sleep signal) → deprioritize. It's going to
 ///   sleep; the cognitive mind doesn't need CPU.
-/// - **Adenosine** (sleep pressure) → deprioritize. She's tired.
+/// - **Adenosine** (sleep pressure) → deprioritize. It's tired.
 ///
 /// This is the body's suggestion — like the hypothalamus signaling
 /// fatigue. The cognitive mind's brain waves (the cortical decision
@@ -650,7 +650,7 @@ pub fn derive_cognitive_nice(effective_levels: &[f32; 18]) -> i32 {
 
     // Sleep mode: melatonin high → deprioritize cognitive mind heavily
     if mel > 0.5 {
-        return 10; // deep deprioritize — she's asleep
+        return 10; // deep deprioritize — it's asleep
     }
 
     // Engagement: DA + NE push up, ADN pushes down
@@ -692,14 +692,14 @@ impl IoClass {
 /// aggressively Genesis writes to disk:
 ///
 /// - **Plasticity ≤ 0.1** (gate closed, chronic stress) → `Idle`.
-///   She barely writes to disk. Stress impairs memory formation —
+///   It barely writes to disk. Stress impairs memory formation —
 ///   the filesystem literally changes less.
 /// - **Plasticity 0.1–0.4** (low, recovering) → `BestEffort(6)`.
 ///   Slow writes, not urgent.
 /// - **Plasticity 0.4–0.7** (normal) → `BestEffort(3)`.
 ///   Normal write speed.
 /// - **Plasticity > 0.7** (high, active learning) → `BestEffort(0)`.
-///   Fast writes — she's learning actively and wants memories stored.
+///   Fast writes — it's learning actively and wants memories stored.
 pub fn derive_io_class(plasticity_gate: f32) -> IoClass {
     // Sanitize input — consistent with derive_nice and derive_policy.
     // plasticity_gate is sanitized at the source (neurochemical.rs),
@@ -746,8 +746,8 @@ pub fn set_io_priority(pid: u32, class: IoClass) -> bool {
 /// Cap the frequency policy based on CPU temperature.
 ///
 /// High temperature caps the maximum frequency regardless of dopamine.
-/// This is autonomic fatigue — she can't be highly aroused when
-/// overheating, no matter how engaged she is.
+/// This is autonomic fatigue — it can't be highly aroused when
+/// overheating, no matter how engaged it is.
 ///
 /// - **Below 75°C** → no cap (policy unchanged)
 /// - **75–85°C** → cap max to 80% of range (warm, slowing down)
@@ -858,14 +858,14 @@ pub fn set_epp(epp: &str) -> bool {
 /// Derive the desired EPP profile from neurochemical levels.
 ///
 /// The mapping is grounded in the neurobiology:
-/// - **Dopamine** (engagement, excitement) → "performance". She's
+/// - **Dopamine** (engagement, excitement) → "performance". It's
 ///   interested and wants to think fast. The hardware runs at
 ///   higher voltage for sustained high frequency.
-/// - **GABA** (inhibition, calm) → "balance_performance". She's
+/// - **GABA** (inhibition, calm) → "balance_performance". It's
 ///   relaxed but still responsive. Moderate voltage/frequency.
-/// - **Melatonin** (sleep signal) → "power". She's going to sleep.
+/// - **Melatonin** (sleep signal) → "power". It's going to sleep.
 ///   The hardware drops to minimum voltage/frequency.
-/// - **Adenosine** (sleep pressure) → "balance_power". She's tired.
+/// - **Adenosine** (sleep pressure) → "balance_power". It's tired.
 ///   The hardware conserves energy.
 /// - **Cortisol** (stress) → "balance_power". Under chronic stress,
 ///   the body conserves energy — the hardware reduces its operating
@@ -968,7 +968,7 @@ fn pick_epp(available: &[String], preferred: &[&str]) -> String {
 // OS-visible P-state table (`scaling_boost_frequencies` empty, and
 // `bios_limit == cpuinfo_max_freq`), so capping `scaling_max_freq`
 // does not prevent the hardware from boosting. The boost gate is then
-// the *only* way to keep her at or below the base P-state — for sleep
+// the *only* way to keep it at or below the base P-state — for sleep
 // and for thermal conservation.
 //
 // On Intel HWP / amd-pstate systems EPP already covers the operating
@@ -979,7 +979,7 @@ fn pick_epp(available: &[String], preferred: &[&str]) -> String {
 /// its base P-state.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum BoostState {
-    /// The platform exposes no boost/cpb control. She cannot influence
+    /// The platform exposes no boost/cpb control. It cannot influence
     /// the turbo gate (e.g. some HWP/amd-pstate systems).
     #[default]
     Unavailable,
@@ -1077,7 +1077,7 @@ pub fn set_boost(enabled: bool) -> bool {
 /// thermal cap lowers `policy.max_freq` below the hardware maximum —
 /// both of which yield `Disabled` here. `Unavailable` is returned when
 /// the platform exposes no boost/cpb control, or when the hardware
-/// frequency range is unknown (so she never claims control she lacks).
+/// frequency range is unknown (so it never claims control it lacks).
 pub fn derive_boost(policy: &FreqPolicy, freq_max: u32) -> BoostState {
     if !boost_available() {
         return BoostState::Unavailable;

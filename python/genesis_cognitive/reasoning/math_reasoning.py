@@ -703,7 +703,7 @@ def simplify(node: Any, enabled_rules: set[str] | None = None) -> Any:
     This makes the simplifier's rule set configurable. The
     ``MathRuleRegistry.from_concept_network`` method builds the
     enabled_rules set from concepts in the concept network, so
-    that rules Genesis has learned are applied and rules she
+    that rules Genesis has learned are applied and rules it
     hasn't learned are skipped.
     """
     if enabled_rules is None:
@@ -1136,7 +1136,7 @@ def solve_equation(eq: Equation, enabled_rules: set[str] | None = None) -> Solve
     Uses transformation rules (balance, isolate, simplify) applied
     mechanically by the engine. The simplification rules are gated by
     ``enabled_rules`` (see ``simplify()`` for the rule names). The
-    steps are recorded so Genesis can explain her reasoning.
+    steps are recorded so Genesis can explain its reasoning.
     """
     steps: list[SolveStep] = []
 

@@ -1,35 +1,35 @@
-"""Self-assessment engine — Genesis evaluating her own knowledge and answers.
+"""Self-assessment engine — Genesis evaluating its own knowledge and answers.
 
 This module gives Genesis metacognitive awareness: the ability to
-evaluate whether she actually knows something, how confident she is,
-and what she doesn't know. It's the foundation for self-improvement —
+evaluate whether it actually knows something, how confident it is,
+and what it doesn't know. It's the foundation for self-improvement —
 you can't learn what you're missing if you don't know you're missing it.
 
 ## What this provides
 
-1. **Knowledge verification** — given a topic, check whether she
+1. **Knowledge verification** — given a topic, check whether it
    actually has learned knowledge about it in the concept network.
    Not just "does the concept exist" but "does it have meaningful
    content" (definition, relationships, properties).
 
 2. **Confidence calibration** — given a planned answer, estimate
-   how confident she should be. This is based on:
+   how confident it should be. This is based on:
    - How well-connected the relevant concepts are in the network
-   - Whether the answer relies on concepts she actually knows about
-   - Whether she's answering from learned knowledge or making things up
+   - Whether the answer relies on concepts it actually knows about
+   - Whether it's answering from learned knowledge or making things up
 
-3. **Knowledge gap detection** — systematically identify what she
+3. **Knowledge gap detection** — systematically identify what it
    doesn't know. A concept exists but has no definition. A concept
-   has no relationships. A topic was asked about but she has no
+   has no relationships. A topic was asked about but it has no
    concept for it at all.
 
 4. **Answer quality scoring** — after producing an answer, evaluate
    whether it was relevant, complete, and grounded in actual knowledge
    vs. being vague or fabricated.
 
-5. **Capability awareness** — track what kinds of questions she can
-   answer well and which ones she struggles with, so she can be
-   honest about her limitations.
+5. **Capability awareness** — track what kinds of questions it can
+   answer well and which ones it struggles with, so it can be
+   honest about its limitations.
 
 ## How it connects to the rest of the system
 
@@ -87,7 +87,7 @@ class AnswerAssessment:
     answer: str
     topics: list[str]
     grounded: bool = False  # is the answer based on real knowledge?
-    confidence: float = 0.0  # how confident should she be?
+    confidence: float = 0.0  # how confident should it be?
     issues: list[str] = field(default_factory=list)
     knows_all_topics: bool = True
     missing_topics: list[str] = field(default_factory=list)
@@ -99,23 +99,23 @@ class CapabilityProfile:
 
     # Track success/failure rates by question type
     question_type_stats: dict[str, dict[str, int]] = field(default_factory=dict)
-    # Concepts she's been asked about but doesn't know
+    # Concepts it's been asked about but doesn't know
     known_gaps: set[str] = field(default_factory=set)
-    # Concepts she's recently learned (gaps that were filled)
+    # Concepts it's recently learned (gaps that were filled)
     recently_learned: deque[str] = field(default_factory=lambda: deque(maxlen=100))
-    # Topics she's confident about
+    # Topics it's confident about
     confident_topics: set[str] = field(default_factory=set)
     # Total assessments made
     total_assessments: int = 0
 
 
 class SelfAssessmentEngine:
-    """Metacognitive self-assessment — knowing what she knows and doesn't.
+    """Metacognitive self-assessment — knowing what it knows and doesn't.
 
     This engine runs alongside the main cognition loop. Before answering,
-    it assesses whether she actually has the knowledge to answer well.
+    it assesses whether it actually has the knowledge to answer well.
     After answering, it scores the answer quality. Over time, it builds
-    a profile of her capabilities.
+    a profile of its capabilities.
     """
 
     def __init__(self, network: ConceptNetwork) -> None:
@@ -166,7 +166,7 @@ class SelfAssessmentEngine:
         if len(self._topic_confidence) > self._max_topic_confidence:
             self._topic_confidence.pop(next(iter(self._topic_confidence)))
 
-        # If she knows it well, mark as confident topic
+        # If it knows it well, mark as confident topic
         if assessment.confidence > 0.6:
             self.profile.confident_topics.add(topic)
             # If it was a known gap, it's now filled
@@ -186,7 +186,7 @@ class SelfAssessmentEngine:
         """Assess how well Genesis knows a topic.
 
         This is the core metacognitive function: given a topic, how
-        much does she actually know about it? The assessment is based
+        much does it actually know about it? The assessment is based
         entirely on the concept network — no hardcoded knowledge.
 
         A concept is "well known" if it has:
@@ -309,7 +309,7 @@ class SelfAssessmentEngine:
         if is_ignorant:
             assessment.confidence = min(assessment.confidence, 0.2)
             assessment.issues.append("Answer admits lack of knowledge")
-            # This is actually good — she's being honest
+            # This is actually good — it's being honest
             assessment.grounded = True  # honest about not knowing
         return is_ignorant
 
@@ -416,7 +416,7 @@ class SelfAssessmentEngine:
 
         This runs BEFORE the answer is spoken (or right after). It
         checks whether the answer is grounded in actual knowledge or
-        whether she's fabricating.
+        whether it's fabricating.
 
         Key signals:
         - Do all topics in the answer have concepts in the network?
@@ -459,7 +459,7 @@ class SelfAssessmentEngine:
     def detect_gaps(self, topics: list[str]) -> list[str]:
         """Detect knowledge gaps for a set of topics.
 
-        Returns a list of gap descriptions — things she doesn't know
+        Returns a list of gap descriptions — things it doesn't know
         that are relevant to the topics. These can be fed to the
         curiosity engine to generate learning questions.
         """
@@ -572,7 +572,7 @@ class SelfAssessmentEngine:
         if assessment.knows_all_topics:
             score += 0.2
         else:
-            # Partial credit for topics she does know
+            # Partial credit for topics it does know
             known = len(assessment.topics) - len(assessment.missing_topics)
             if assessment.topics:
                 score += (known / len(assessment.topics)) * 0.2
@@ -627,7 +627,7 @@ class SelfAssessmentEngine:
                 self.remember_gap(topic.lower())
 
     def get_capability_summary(self) -> str:
-        """Get a human-readable summary of her capabilities.
+        """Get a human-readable summary of its capabilities.
 
         This is what Genesis would say if asked "what do you know
         well?" or "what are you struggling with?"
@@ -678,10 +678,10 @@ class SelfAssessmentEngine:
         return ka.confidence
 
     def should_hedge(self, topics: list[str]) -> bool:
-        """Should Genesis hedge her answer given the topics?
+        """Should Genesis hedge its answer given the topics?
 
-        Returns True if she should express uncertainty — either
-        because she doesn't know the topics well, or because she
+        Returns True if it should express uncertainty — either
+        because it doesn't know the topics well, or because it
         has a history of errors on similar topics.
         """
         for topic in topics:
@@ -697,11 +697,11 @@ class SelfAssessmentEngine:
         are ones that:
         1. Have been asked about but couldn't answer
         2. Are weakly connected but exist in the network
-        3. Are related to concepts she already knows well
+        3. Are related to concepts it already knows well
         """
         priorities: list[str] = []
 
-        # First priority: gaps she's been asked about
+        # First priority: gaps it's been asked about
         priorities.extend(sorted(self.profile.known_gaps))
 
         # Second priority: weak concepts
@@ -726,7 +726,7 @@ class SelfAssessmentEngine:
             self._topic_confidence.pop(t, None)
 
     def remember_gap(self, topic: str) -> None:
-        """Record a topic she doesn't know, with a bound on the set.
+        """Record a topic it doesn't know, with a bound on the set.
 
         Topics come from arbitrary user input, so ``known_gaps`` would
         grow without bound in a long-running daemon. When the set is
@@ -748,7 +748,7 @@ class SelfAssessmentEngine:
 
         After learning new concepts, check whether any previously
         recorded gaps have been filled. This prevents the self-
-        assessment from listing concepts as unknown that she has
+        assessment from listing concepts as unknown that it has
         since learned about.
         """
         for concept_id in concepts:

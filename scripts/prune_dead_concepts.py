@@ -20,7 +20,7 @@ but never actually used — the bridges are noise, not knowledge.
 
 Protected origins (identity, introspection, foundational, seeded,
 structural) are never pruned in aggressive mode — they are the
-structural foundation of her mind. Taught/stated/learned concepts are
+structural foundation of its mind. Taught/stated/learned concepts are
 pruned only when dead AND connected solely by weak auto-generated
 bridges; their teaching edges do not by themselves protect a dormant
 concept.
@@ -57,7 +57,7 @@ _GZIP_MAGIC = b"\x1f\x8b"
 logger = logging.getLogger(__name__)
 
 # Origins that represent deliberate seeding — never pruned even if
-# dormant. These are the structural foundation of her mind.
+# dormant. These are the structural foundation of its mind.
 _PROTECTED_ORIGINS = frozenset({
     "identity", "introspection", "foundational", "seeded", "structural",
 })

@@ -26,10 +26,10 @@ string. The runtime data model is compositional, not string-with-holes.
 # Structure
 
 A Sentence is composed of:
-- An opening (optional): how she starts
+- An opening (optional): how it starts
 - A core: the main semantic content
 - A modifier (optional): hedging, qualification, elaboration
-- A closing (optional): how she wraps up
+- A closing (optional): how it wraps up
 
 Multiple Sentences compose into a Response.
 """

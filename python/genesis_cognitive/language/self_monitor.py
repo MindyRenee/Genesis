@@ -139,7 +139,7 @@ class SelfMonitor:
 
     The monitor tracks repair_count — how many times it has repaired
     output. This is useful for introspection: Genesis can observe how
-    often she catches her own errors.
+    often it catches its own errors.
     """
 
     def __init__(
@@ -898,7 +898,7 @@ class SelfMonitor:
         Returns the PragmaticAnalysis from the most recent
         _check_pragmatics call, or None if no analysis has been
         performed yet. Useful for introspection: Genesis can observe
-        what she understood the user to mean.
+        what it understood the user to mean.
         """
         return self._last_pragmatic_analysis
 

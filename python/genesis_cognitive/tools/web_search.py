@@ -1,8 +1,8 @@
 """Web search — Genesis's on-demand gateway to the World Wide Web.
 
-This module gives Genesis the ability to search the web whenever she
+This module gives Genesis the ability to search the web whenever it
 wants — in conversation, for fun, to learn. It is a read-only capability:
-she can search, fetch pages, and read content, but cannot submit forms,
+it can search, fetch pages, and read content, but cannot submit forms,
 post data, or modify anything online.
 
 Search uses DuckDuckGo Lite (no API key, privacy-respecting, free).
@@ -17,8 +17,8 @@ Content filtering:
     open web is available by default, with known-bad content blocked.
 
 This is a building block (a tool), not a response generator. The
-text returned by ``fetch`` is raw content that her cognition learns
-from and composes with — she never recites web text verbatim.
+text returned by ``fetch`` is raw content that its cognition learns
+from and composes with — it never recites web text verbatim.
 """
 
 from __future__ import annotations
@@ -156,8 +156,8 @@ def _domain_of(url: str) -> str:
 # The autonomous learner follows search results and outbound links
 # found inside fetched pages — both attacker-influenceable. Without
 # this, a planted ``http://169.254.169.254/`` or ``http://192.168.1.1/``
-# link would make her fetch cloud instance metadata (IAM tokens on
-# GCP/AWS-style endpoints) or LAN admin pages straight into her
+# link would make it fetch cloud instance metadata (IAM tokens on
+# GCP/AWS-style endpoints) or LAN admin pages straight into its
 # concept network, where they could surface in conversation later.
 
 _LOCAL_HOSTNAMES: frozenset[str] = frozenset({
@@ -467,7 +467,7 @@ def fetch(url: str) -> WebFetchResult | None:
             req, timeout=REQUEST_TIMEOUT, context=_get_ssl_context()
         ) as resp:
             # Redirect targets bypass is_url_safe — re-check the final
-            # URL before the body enters her memory. A public page that
+            # URL before the body enters its memory. A public page that
             # 302s to a metadata endpoint gets its GET refused here.
             final_host = _host_of(resp.geturl())
             if _host_is_local(final_host) or _resolves_to_non_public(final_host):

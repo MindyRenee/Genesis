@@ -1034,7 +1034,7 @@ class ConsolidationMixin:
         slightly lower confidence.
 
         This is called when Genesis actively thinks about or uses
-        a concept — confirming she still "knows" it.
+        a concept — confirming it still "knows" it.
         """
         concept = self._concepts.get(concept_id)
         if not concept:

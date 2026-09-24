@@ -41,7 +41,7 @@ The engine is wired into the cognition engine and called after
 critical evaluation. Every critical assessment that finds
 disconfirming evidence or strong support now feeds back into the
 network, so Genesis's beliefs actually change in response to
-evidence — not just her confidence in individual reasoning results.
+evidence — not just its confidence in individual reasoning results.
 """
 
 from __future__ import annotations
@@ -83,8 +83,8 @@ class RevisionRecord:
     """A record of a single belief revision.
 
     Tracks what was revised, why, and how much it changed. This is
-    the audit trail — Genesis can explain *why* she changed her mind
-    about something, not just that she did.
+    the audit trail — Genesis can explain *why* it changed its mind
+    about something, not just that it did.
     """
 
     concept: str
@@ -118,7 +118,7 @@ class BeliefRevisionEngine:
       probabilistic reasoning engine (Bayesian update)
     - Edges below threshold after revision → pruned (structure learning)
 
-    This is the mechanism by which Genesis *changes her mind*. The
+    This is the mechanism by which Genesis *changes its mind*. The
     critical thinking engine judges whether a claim is justified;
     the belief revision engine actually revises the belief.
 

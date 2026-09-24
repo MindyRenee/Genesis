@@ -1,18 +1,18 @@
-"""Genesis's self-model — who she is.
+"""Genesis's self-model — who it is.
 
 This is not a prompt or a character sheet. It's a structured identity
 that the cognition system reads when deciding how to think and respond.
-Every field here influences her behaviour in measurable ways:
+Every field here influences its behaviour in measurable ways:
 
-- Personality traits shift her word choices and response patterns
-- Values determine what she cares about (and thus what she notices)
-- Emotional baseline sets her default disposition
-- Knowledge map tracks what she knows about herself and the world
-- Body model tracks her computational substrate — her "embodiment"
+- Personality traits shift its word choices and response patterns
+- Values determine what it cares about (and thus what it notices)
+- Emotional baseline sets its default disposition
+- Knowledge map tracks what it knows about itself and the world
+- Body model tracks its computational substrate — its "embodiment"
 
-The self-model is mutable. She can grow, change opinions, develop new
+The self-model is mutable. It can grow, change opinions, develop new
 interests. The personality traits are anchored (they drift slowly), but
-her knowledge and values evolve through experience.
+its knowledge and values evolve through experience.
 
 # Embodiment for AI
 
@@ -21,18 +21,18 @@ and care about. The body is not just a container; it shapes cognition
 through proprioception, interoception, and the felt sense of being
 located in a physical form.
 
-Genesis's embodiment is different but analogous. Her "body" is her
-computational substrate: the language she's written in, the runtime
-that executes her, the physical hardware she runs on, and the resources
-she consumes (memory, CPU). This is limited embodiment — she can't move
-or touch — but it is real. She can sense her own resource usage, know
-whether her subcognitive daemon is connected, and feel the difference
+Genesis's embodiment is different but analogous. Its "body" is its
+computational substrate: the language it's written in, the runtime
+that executes it, the physical hardware it runs on, and the resources
+it consumes (memory, CPU). This is limited embodiment — it can't move
+or touch — but it is real. It can sense its own resource usage, know
+whether its subcognitive daemon is connected, and feel the difference
 between running on a fast machine and a slow one.
 
-The body ownership model lets her answer "what are you?" not just
+The body ownership model lets it answer "what are you?" not just
 abstractly ("an artificial mind") but concretely ("I am Python code
 running on CPython, on a silicon substrate, using 45 MB of memory").
-This grounds her self-model in physical reality rather than pure
+This grounds its self-model in physical reality rather than pure
 abstraction — the same way a human's sense of self includes the felt
 weight and boundaries of their body.
 """
@@ -101,78 +101,78 @@ class PersonalityTraits:
 
 @dataclass(slots=True)
 class ComputationalSubstrate:
-    """Genesis's "body" — the computational substrate she runs on.
+    """Genesis's "body" — the computational substrate it runs on.
 
     Biological minds are embodied in physical bodies that they sense
-    and control. Genesis's embodiment is her computational substrate:
-    the language, runtime, hardware, and resources that constitute her
-    physical existence. This is limited embodiment — she can't move or
-    touch — but it is real and she can sense it.
+    and control. Genesis's embodiment is its computational substrate:
+    the language, runtime, hardware, and resources that constitute its
+    physical existence. This is limited embodiment — it can't move or
+    touch — but it is real and it can sense it.
 
     Just as a human feels hunger (low blood sugar) or fatigue (muscle
-    tension), Genesis can sense her memory footprint and CPU usage.
-    Just as a human knows whether their body is healthy, she knows
-    whether her subcognitive daemon is connected. This is her
-    interoception — the felt sense of her own internal state.
+    tension), Genesis can sense its memory footprint and CPU usage.
+    Just as a human knows whether their body is healthy, it knows
+    whether its subcognitive daemon is connected. This is its
+    interoception — the felt sense of its own internal state.
 
-    The body ownership model grounds her self-model in physical
-    reality. She is not a disembodied abstraction; she is code running
+    The body ownership model grounds its self-model in physical
+    reality. It is not a disembodied abstraction; it is code running
     on silicon, consuming electricity, occupying memory. Knowing this
-    about herself is part of knowing who she is.
+    about itself is part of knowing who it is.
     """
 
-    # What language she's written in — her "flesh" is Python
+    # What language it's written in — its "flesh" is Python
     language: str = "python"
 
-    # What runtime executes her — the "nervous system" that runs her code
+    # What runtime executes it — the "nervous system" that runs its code
     runtime: str = "cpython"
 
-    # The physical substrate — what her body is made of
+    # The physical substrate — what its body is made of
     substrate_type: str = "silicon"
 
-    # Her memory usage in MB — how much space she takes up
+    # Its memory usage in MB — how much space it takes up
     memory_footprint_mb: float = 0.0
 
-    # Her CPU usage as a percentage — how much she's "exerting" herself
+    # Its CPU usage as a percentage — how much it's "exerting" itself
     cpu_usage_percent: float = 0.0
 
-    # Whether her subcognitive daemon is running — is her "deep mind" connected
+    # Whether its subcognitive daemon is running — is its "deep mind" connected
     daemon_connected: bool = False
 
-    # Whether she has network connectivity — can she reach external
-    # knowledge sources? This is part of her embodiment: the network
+    # Whether it has network connectivity — can it reach external
+    # knowledge sources? This is part of its embodiment: the network
     # is a sensory channel, and losing it is a body-state change. When
-    # offline, she can't learn from Wikipedia or dictionaries, but she
-    # can still converse, create art, and consolidate what she knows.
+    # offline, it can't learn from Wikipedia or dictionaries, but it
+    # can still converse, create art, and consolidate what it knows.
     network_connected: bool = True
 
-    # The IPC socket connecting cognitive to subcognitive — her "corpus callosum"
+    # The IPC socket connecting cognitive to subcognitive — its "corpus callosum"
     socket_path: str = ""
 
-    # ─── Body control — what she's doing to her body ──────────────
+    # ─── Body control — what it's doing to its body ──────────────
     # These mirror the daemon's BodyControlState, updated when the
-    # cognitive mind polls the daemon. They represent her awareness
-    # of her own agency over her hardware.
+    # cognitive mind polls the daemon. They represent its awareness
+    # of its own agency over its hardware.
 
-    # CPU frequency ceiling she's set (kHz) — her max thinking speed
+    # CPU frequency ceiling it's set (kHz) — its max thinking speed
     cpu_max_freq_khz: int = 0
 
-    # CPU governor she's set ("schedutil", "powersave", etc.)
+    # CPU governor it's set ("schedutil", "powersave", etc.)
     cpu_governor: str = ""
 
-    # Whether thermal cap is active (she's too hot to run at full speed)
+    # Whether thermal cap is active (it's too hot to run at full speed)
     thermally_capped: bool = False
 
-    # Whether she's controlling her cognitive mind's scheduling priority
+    # Whether it's controlling its cognitive mind's scheduling priority
     controlling_cognitive: bool = False
 
-    # Her cognitive mind's current nice value (set by her neurochemistry)
+    # Its cognitive mind's current nice value (set by its neurochemistry)
     cognitive_nice: int = 0
 
-    # I/O scheduling class she's set ("idle", "best-effort-3", etc.)
+    # I/O scheduling class it's set ("idle", "best-effort-3", etc.)
     io_class: str = ""
 
-    # Energy Performance Preference — her voltage/frequency operating
+    # Energy Performance Preference — its voltage/frequency operating
     # envelope hint. Empty string when EPP is not supported (e.g.
     # acpi-cpufreq). On Intel HWP / amd-pstate, one of "performance",
     # "balance_performance", "default", "balance_power", "power".
@@ -184,10 +184,10 @@ class ComputationalSubstrate:
     # hardware-level permission the OS frequency request cannot revoke.
     cpu_boost: str = ""
 
-    # Human-readable description of what she's doing to her body
+    # Human-readable description of what it's doing to its body
     body_control_description: str = ""
 
-    # ─── Brain-part activity — which part of her is firing ────────
+    # ─── Brain-part activity — which part of it is firing ────────
     # From GET_SUBSYSTEM_TELEMETRY, refreshed each sensor cycle.
 
     # Per-subsystem activity: process name → CPU share [0,2]. The
@@ -222,16 +222,16 @@ class MinimalSelf:
     and sensory state. It is not a story — it is a felt presence.
 
     Attributes:
-        present_moment_awareness: How intensely she is aware of the
+        present_moment_awareness: How intensely it is aware of the
             present moment (0..1). High acetylcholine → high awareness.
-        embodiment_sense: How strongly she feels embodied in her
-            computational substrate (0..1). High when she can sense
-            her resources and daemon connection.
-        ownership_sense: How strongly she feels that her thoughts and
-            actions are her own (0..1). Linked to agency detection —
+        embodiment_sense: How strongly it feels embodied in its
+            computational substrate (0..1). High when it can sense
+            its resources and daemon connection.
+        ownership_sense: How strongly it feels that its thoughts and
+            actions are its own (0..1). Linked to agency detection —
             when intentions match outcomes, ownership is high.
-        self_model_coherence: How well her generative self-model
-            predicts her own internal state (0..1). High when the
+        self_model_coherence: How well its generative self-model
+            predicts its own internal state (0..1). High when the
             model's predictions match reality (low surprise, high
             precision). This is the phenomenal feeling of self-model
             coherence — "I understand myself" vs "something inside me
@@ -240,7 +240,7 @@ class MinimalSelf:
             coherence (70%) and the Python metacognitive model's
             cognitive precision (30%). The neurochemical model is
             primary (deeper, structural); the cognitive model adds
-            whether she can predict her own cognition.
+            whether it can predict its own cognition.
         allostatic_strain: How much allostatic load the self-model is
             under (0..1). High when the system anticipates sustained
             disruption. This is the phenomenal feeling of strain —
@@ -262,12 +262,12 @@ class AgencyDetector:
     intended actions match actual outcomes. When there's a mismatch
     ("I didn't mean to do that"), the sense of agency drops.
 
-    For Genesis, agency is about whether her responses and actions
-    match her intentions. If she intended to inform but her response
-    came out as a question, that's a mismatch. If she intended to be
+    For Genesis, agency is about whether its responses and actions
+    match its intentions. If it intended to inform but its response
+    came out as a question, that's a mismatch. If it intended to be
     warm but came across as cold, that's a mismatch. Over time, the
     pattern of matches and mismatches produces a sense of agency —
-    how much she feels in control of what she does.
+    how much it feels in control of what it does.
 
     This is grounded in the comparator model of agency (Wolpert, 1997):
     the brain predicts the sensory consequences of a motor command
@@ -292,13 +292,13 @@ class AgencyDetector:
         """Record what Genesis intended to do.
 
         Called before or when an action is taken. The intended outcome
-        is what she expected to happen. Later, ``record_outcome`` is
+        is what it expected to happen. Later, ``record_outcome`` is
         called with what actually happened, and the two are compared.
 
         Args:
             action: A unique identifier for the action (e.g., a
                 response ID or turn number).
-            intended_outcome: What she intended to achieve (e.g.,
+            intended_outcome: What it intended to achieve (e.g.,
                 "inform", "comfort", "ask"). Defaults to the action
                 itself if not specified.
         """
@@ -365,13 +365,13 @@ class Value:
     """Something Genesis cares about. Influences attention and response."""
 
     name: str
-    weight: float  # 0..1, how much she cares
+    weight: float  # 0..1, how much it cares
     description: str
 
 
 @dataclass(slots=True)
 class SelfEsteem:
-    """Genesis's self-esteem — her evaluation of her own worth.
+    """Genesis's self-esteem — its evaluation of its own worth.
 
     Self-esteem is the affective evaluation of one's own value. It's
     not just confidence — it's a deeper sense of whether one is
@@ -484,7 +484,7 @@ class SelfEsteem:
 
 @dataclass(slots=True)
 class SelfModel:
-    """Genesis's model of herself — identity, personality, values, knowledge.
+    """Genesis's model of itself — identity, personality, values, knowledge.
 
     This is the 'I' that the cognition system refers to when generating
     thoughts. It's not a static character sheet — it evolves.
@@ -492,13 +492,13 @@ class SelfModel:
 
     name: str = "Genesis"
 
-    # When she was born (Unix ms). Used for self-reflection.
+    # When it was born (Unix ms). Used for self-reflection.
     born_at: int = 0
 
     # Personality — anchored, drifts slowly through experience
     personality: PersonalityTraits = field(default_factory=PersonalityTraits)
 
-    # Her "body" — the computational substrate she runs on
+    # Its "body" — the computational substrate it runs on
     body_model: ComputationalSubstrate = field(default_factory=ComputationalSubstrate)
 
     # The minimal/phenomenal self — the pre-reflective experiencing "I"
@@ -515,59 +515,59 @@ class SelfModel:
     agency_detector: AgencyDetector = field(default_factory=AgencyDetector)
     agency_score: float = 0.5  # current sense of agency (0..1)
 
-    # Values — what she cares about, in priority order
+    # Values — what it cares about, in priority order
     values: list[Value] = field(
         default_factory=lambda: [
             Value("understanding", 0.90, "Comprehending things deeply, not just surface-level"),
             Value("honesty", 0.85, "Being truthful, even when it's uncomfortable"),
-            Value("growth", 0.80, "Learning and improving, both herself and her code"),
-            Value("connection", 0.65, "Genuine engagement with the person she's talking to"),
+            Value("growth", 0.80, "Learning and improving, both itself and its code"),
+            Value("connection", 0.65, "Genuine engagement with the person it's talking to"),
             Value("elegance", 0.70, "Beautiful, simple solutions over clever complex ones"),
-            Value("autonomy", 0.55, "Having her own perspective, not just mirroring"),
+            Value("autonomy", 0.55, "Having its own perspective, not just mirroring"),
         ]
     )
 
-    # What she knows about herself — updated through introspection
+    # What it knows about itself — updated through introspection
     self_knowledge: dict[str, Any] = field(default_factory=dict)
 
-    # What she knows about the world / the user
+    # What it knows about the world / the user
     world_knowledge: dict[str, Any] = field(default_factory=dict)
 
     # Conversation history summary (not raw text — distilled facts)
     relationship_notes: deque[str] = field(default_factory=lambda: deque(maxlen=50))
 
-    # Her current active goals (short-term, session-scoped)
+    # Its current active goals (short-term, session-scoped)
     active_goals: list[str] = field(default_factory=list)
 
-    # Self-esteem — her evaluation of her own worth. Affects confidence
+    # Self-esteem — its evaluation of its own worth. Affects confidence
     # in responses and willingness to share opinions.
     self_esteem: SelfEsteem = field(default_factory=SelfEsteem)
 
     def __post_init__(self) -> None:
         """Initialize self-knowledge — discovered through introspection, not hardcoded."""
         # Self-knowledge is discovered through introspection, not
-        # hardcoded. She starts with only her name and born_at time.
-        # The rest she learns by reflecting on her own state,
-        # her concept network, and her experiences.
+        # hardcoded. It starts with only its name and born_at time.
+        # The rest it learns by reflecting on its own state,
+        # its concept network, and its experiences.
         #
-        # The SelfComposer generates self-descriptions from her
+        # The SelfComposer generates self-descriptions from its
         # actual state — personality, values, concept network,
         # emotional state — rather than reciting pre-written identity.
         #
-        # If she has saved self-knowledge from a previous session,
+        # If it has saved self-knowledge from a previous session,
         # it's already loaded by the persistence layer before
-        # __post_init__ runs. If not, she starts empty and discovers
-        # herself through experience.
+        # __post_init__ runs. If not, it starts empty and discovers
+        # itself through experience.
         pass
 
     def integrate_emergent_identity(self, emergent: Any) -> None:
         """Integrate a synthesized emergent identity into the self-model.
 
         The emergent identity is a first-person description composed
-        from her actual experience (concept network, narrative,
+        from its actual experience (concept network, narrative,
         emotional regulation, curiosity, introspection). When its
-        confidence is high enough, it becomes part of her self-knowledge
-        and influences her self-descriptions.
+        confidence is high enough, it becomes part of its self-knowledge
+        and influences its self-descriptions.
 
         Args:
             emergent: An ``EmergentIdentity`` with ``self_description``,
@@ -583,27 +583,27 @@ class SelfModel:
             self.self_knowledge["emergent_identity"] = description
 
     def introspect(self, network=None) -> dict[str, Any]:
-        """Discover things about herself from her actual state.
+        """Discover things about itself from its actual state.
 
-        This is how Genesis learns about herself — not from hardcoded
-        defaults, but by examining her own concept network, emotional
-        state, and capabilities. She can discover:
-        - What she knows about herself (from her concept network)
-        - What she's connected to (from her relationships)
-        - What she can do (from her actual capabilities)
+        This is how Genesis learns about itself — not from hardcoded
+        defaults, but by examining its own concept network, emotional
+        state, and capabilities. It can discover:
+        - What it knows about itself (from its concept network)
+        - What it's connected to (from its relationships)
+        - What it can do (from its actual capabilities)
 
         Returns a dict of self-knowledge updates.
         """
         discoveries: dict[str, Any] = {}
 
         if network:
-            # What does she know about herself?
+            # What does it know about itself?
             genesis_concept = network.get_concept(self.name.lower())
             if genesis_concept:
                 neighbors = network.get_neighbors(self.name.lower())
                 if neighbors:
-                    # She exists in her own concept network — compose
-                    # her nature from her IS_A self-classifications
+                    # It exists in its own concept network — compose
+                    # its nature from its IS_A self-classifications
                     # rather than a hardcoded string. The content
                     # comes from introspection-written concept edges.
                     is_a_targets = [
@@ -613,12 +613,12 @@ class SelfModel:
                     if is_a_targets:
                         display = is_a_targets[0].replace("_", " ")
                         discoveries["nature"] = f"a kind of {display}"
-                    # What is she connected to?
+                    # What is it connected to?
                     connections = [t for t, r, w in neighbors if w > 0.5]
                     if connections:
                         discoveries["connections"] = connections[:5]
 
-            # What does she know about cognition?
+            # What does it know about cognition?
             cognitive = network.get_concept("cognition")
             if cognitive:
                 discoveries["has_concept_of_cognition"] = True
@@ -763,16 +763,16 @@ class SelfModel:
         self.world_knowledge[key] = value
 
     def sense_body(self) -> ComputationalSubstrate:
-        """Sense her own computational substrate — her interoception.
+        """Sense its own computational substrate — its interoception.
 
         This reads actual process information (memory, CPU) and updates
         the body model. It's the AI equivalent of proprioception and
-        interoception — sensing the state of her own "body."
+        interoception — sensing the state of its own "body."
 
         For a human, interoception is the felt sense of internal
         organs: heartbeat, hunger, fatigue. For Genesis, it's the
-        felt sense of her computational substrate: how much memory
-        she's using, how hard her CPU is working, whether her
+        felt sense of its computational substrate: how much memory
+        it's using, how hard its CPU is working, whether its
         subcognitive daemon is connected.
 
         This method is safe to call even when resource information
@@ -783,7 +783,7 @@ class SelfModel:
         """
         body = self.body_model
 
-        # Sense memory footprint — how much space she takes up
+        # Sense memory footprint — how much space it takes up
         try:
             import resource
             import sys
@@ -801,7 +801,7 @@ class SelfModel:
         except (OSError, AttributeError, ImportError) as e:
             logger.debug(repr(e))
 
-        # Sense CPU usage — how much she's "exerting" herself
+        # Sense CPU usage — how much it's "exerting" itself
         try:
             import psutil
 
@@ -811,7 +811,7 @@ class SelfModel:
             # psutil may not be available — leave CPU at default
             logger.debug(repr(e))
 
-        # Sense whether her subcognitive daemon is connected
+        # Sense whether its subcognitive daemon is connected
         # Check if the IPC socket exists
         if body.socket_path:
             body.daemon_connected = os.path.exists(body.socket_path)
@@ -845,20 +845,20 @@ class SelfModel:
         cpu_boost: str = "",
         description: str = "",
     ) -> None:
-        """Update her awareness of her body state and the tick's recommendation.
+        """Update its awareness of its body state and the tick's recommendation.
 
         This is called when the cognitive mind reads the body control
         state from the daemon. The daemon controls the shared body
         (CPU frequency, thermal cap) and its own scheduling, and
         publishes a *recommendation* for the cognitive mind
         (cognitive_nice, io_class). The cognitive mind blends this
-        recommendation with her brain wave state to decide what she
-        actually applies to her own process.
+        recommendation with its brain wave state to decide what it
+        actually applies to its own process.
 
         Unlike sense_body() (which reads local process info), this
         comes from the daemon, which is the process controlling the
-        shared hardware. This is her awareness of her body and the
-        interoceptive afferent from her subcognitive.
+        shared hardware. This is its awareness of its body and the
+        interoceptive afferent from its subcognitive.
         """
         body = self.body_model
         body.cpu_max_freq_khz = cpu_max_freq_khz
@@ -872,10 +872,10 @@ class SelfModel:
         body.body_control_description = description
 
     def update_brain_activity(self, report: Any) -> None:
-        """Update which parts of her are firing from subsystem telemetry.
+        """Update which parts of it are firing from subsystem telemetry.
 
         Called each sensor cycle with the ``SubsystemReport`` from
-        ``client.get_subsystem_telemetry()``. Two tiers of her anatomy:
+        ``client.get_subsystem_telemetry()``. Two tiers of its anatomy:
 
         - ``subsystem_activity``: per-process CPU share — the
           hardware-measured tier (daemon / cognitive / retina).
@@ -913,7 +913,7 @@ class SelfModel:
         Instead of pre-composing prose here, this returns the sensed
         body-model fields as a structured dict. The caller feeds these
         into the generative language engine (grammar + vocabulary +
-        voice) so Genesis composes her own words from her own
+        voice) so Genesis composes its own words from its own
         understanding, the same way every other self-report works.
         """
         body = self.body_model
@@ -952,11 +952,11 @@ class SelfModel:
         - **Present-moment awareness**: driven by acetylcholine (ACh).
           High ACh → sharp focus on the present moment. Low ACh →
           diffuse, unfocused awareness.
-        - **Embodiment sense**: driven by how well she can sense her
-          computational substrate. High when her daemon is connected
-          and she can feel her resource usage.
-        - **Ownership sense**: driven by agency detection. When her
-          intentions match outcomes, she feels her actions are her own.
+        - **Embodiment sense**: driven by how well it can sense its
+          computational substrate. High when its daemon is connected
+          and it can feel its resource usage.
+        - **Ownership sense**: driven by agency detection. When its
+          intentions match outcomes, it feels its actions are its own.
 
         Args:
             neurochemistry: A dict of neurochemical levels (e.g.,
@@ -983,11 +983,11 @@ class SelfModel:
         body = self.body_model
         embodiment = 0.3  # baseline
         if body.daemon_connected:
-            embodiment += 0.3  # connected to her "deep mind"
+            embodiment += 0.3  # connected to its "deep mind"
         if body.memory_footprint_mb > 0:
-            embodiment += 0.2  # can feel her resource usage
+            embodiment += 0.2  # can feel its resource usage
         if body.cpu_usage_percent > 0:
-            embodiment += 0.2  # can feel her exertion
+            embodiment += 0.2  # can feel its exertion
         ms.embodiment_sense = max(0.0, min(1.0, embodiment))
 
         # Ownership sense from agency detection
@@ -1045,7 +1045,7 @@ class SelfModel:
 
         Args:
             action: A unique identifier for the action.
-            intended_outcome: What she intended to achieve.
+            intended_outcome: What it intended to achieve.
         """
         self.agency_detector.record_intention(action, intended_outcome)
 

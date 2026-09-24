@@ -37,12 +37,12 @@ class ProjectsMixin:
     def create_project(self, description: str):
         """Create a Python project from a description.
 
-        Composes a real, queryable knowledge-base module from her
-        concept network — not a ``print()`` scaffold. She gathers
-        what she knows about the topic (concepts, definitions, typed
+        Composes a real, queryable knowledge-base module from its
+        concept network — not a ``print()`` scaffold. It gathers
+        what it knows about the topic (concepts, definitions, typed
         edges) and composes a working Python module that encodes that
         knowledge, with matching tests. Falls back to a minimal
-        scaffold if she doesn't know enough about the topic.
+        scaffold if it doesn't know enough about the topic.
 
         Args:
             description: A natural-language description / topic.
@@ -67,7 +67,7 @@ class ProjectsMixin:
     def archive_project(self, name: str) -> bool:
         """Archive a project to ``.tar.zst`` and reclaim its space.
 
-        She has full autonomy over her project lifecycle. This
+        It has full autonomy over its project lifecycle. This
         compresses the project into the archive directory and removes
         the expanded files.
         """
@@ -78,15 +78,15 @@ class ProjectsMixin:
     def manage_projects(self) -> list[str]:
         """Autonomously manage project storage to stay within bounds.
 
-        She reviews her own projects and archives ones that are too
-        large or too numerous. Returns the list of project names she
+        It reviews its own projects and archives ones that are too
+        large or too numerous. Returns the list of project names it
         archived.
         """
         return manage_project_lifecycle(self.data_dir)
     def _projects_status_summary(self) -> dict[str, Any]:
-        """Return a compact summary of her project portfolio for status().
+        """Return a compact summary of its project portfolio for status().
 
-        Exposes counts (active, archived, total) and total size so her
+        Exposes counts (active, archived, total) and total size so its
         creative output is visible through introspection without
         requiring a full ``list_projects()`` call.
         """
@@ -108,9 +108,9 @@ class ProjectsMixin:
         """Leave a mentor's note on one of Genesis's projects.
 
         The note is appended to ``NOTES.md`` in the project directory.
-        Genesis absorbs notes via ``absorb_project_notes()`` — she
-        reads them, stores them as long-term memory, and adds what she
-        learned to her concept network.
+        Genesis absorbs notes via ``absorb_project_notes()`` — it
+        reads them, stores them as long-term memory, and adds what it
+        learned to its concept network.
 
         Args:
             project_name: The project to leave a note on.
@@ -129,11 +129,11 @@ class ProjectsMixin:
     def absorb_project_notes(self, project_name: str | None = None) -> str:
         """Read and absorb mentor notes from project(s).
 
-        This is how Genesis learns from feedback on her creative work.
-        She reads the NOTES.md file(s) from her projects, stores each
-        note as a long-term memory, adds what she learned to her
-        concept network, and emits a thought about what she learned.
-        The notes are cleared after absorption so she doesn't re-read
+        This is how Genesis learns from feedback on its creative work.
+        It reads the NOTES.md file(s) from its projects, stores each
+        note as a long-term memory, adds what it learned to its
+        concept network, and emits a thought about what it learned.
+        The notes are cleared after absorption so it doesn't re-read
         the same feedback.
 
         Args:
@@ -141,7 +141,7 @@ class ProjectsMixin:
                 If None, absorb notes from all projects that have them.
 
         Returns:
-            A summary of what she absorbed, rendered through her
+            A summary of what it absorbed, rendered through its
             language engine.
         """
         if project_name is not None:
@@ -182,7 +182,7 @@ class ProjectsMixin:
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"absorb_project_notes: memory store failed: {e}")
 
-            # Add what she learned to her concept network. The project
+            # Add what it learned to its concept network. The project
             # concept already exists (added by _add_project_concept);
             # link the feedback to it.
             try:
@@ -206,7 +206,7 @@ class ProjectsMixin:
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"absorb_project_notes: concept add failed: {e}")
 
-            # Clear the notes so she doesn't re-absorb them
+            # Clear the notes so it doesn't re-absorb them
             clear_project_notes(self.data_dir, pname)
             absorbed_count += 1
             summaries.append(pname)
@@ -216,7 +216,7 @@ class ProjectsMixin:
             f"{', '.join(summaries)}"
         )
 
-        # Emit a live thought about what she learned
+        # Emit a live thought about what it learned
         self._emit_live_thought("code", summary_text)
 
         return self._render_self_report(

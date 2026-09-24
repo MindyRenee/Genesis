@@ -11,8 +11,8 @@ The cognition engine is the core of the cognitive mind. It combines:
 
 This is not a chatbot pattern-matcher. It's a deliberative system that
 considers multiple factors before deciding what to say. The same input
-can produce different responses depending on her emotional state, what
-she remembers, and what she's been thinking about.
+can produce different responses depending on its emotional state, what
+it remembers, and what it's been thinking about.
 
 # The thought process
 
@@ -179,7 +179,7 @@ class CognitiveState:
     # Layers on top of the neurochemical feeling.
     self_model_label: str | None = None
     # The minimal self's coherence — how well the generative self-model
-    # predicts her own state [0, 1]. Blended from neurochemical
+    # predicts its own state [0, 1]. Blended from neurochemical
     # precision, metacognitive precision, cognitive trajectory
     # precision, and workspace integration. High = "I understand
     # myself"; low = "I don't understand what's happening inside me."
@@ -239,7 +239,7 @@ class CognitionEngine:
     """The thinking engine — combines all inputs to produce thoughts.
 
     This is where Genesis's mind comes together. The cognition engine
-    reads her emotional state, perceives the input, retrieves memories,
+    reads its emotional state, perceives the input, retrieves memories,
     and deliberates about what to say.
     """
 
@@ -385,15 +385,15 @@ class CognitionEngine:
         self.meta_router = MetaCognitiveRouter()
 
         # Self-awareness modules — set by Mind after creation.
-        # These give Genesis awareness of her own code quality and
+        # These give Genesis awareness of its own code quality and
         # machine environment. They're optional (None by default) so
         # the cognition engine works standalone in tests.
         self.bug_reporter: BugReporter | None = None  # set by Mind after creation
         self.system_monitor: SystemMonitor | None = None  # set by Mind after creation
 
         # Gap-to-learning callback — set by Mind after creation.
-        # When she detects "I don't know what 'X' is", this callback
-        # feeds X to the autonomous learner so she can look it up and
+        # When it detects "I don't know what 'X' is", this callback
+        # feeds X to the autonomous learner so it can look it up and
         # remember it. Optional (None by default) for standalone tests.
         self.on_gap_detected: Callable[[str], None] | None = None  # set by Mind after creation
 
@@ -404,16 +404,16 @@ class CognitionEngine:
         self.on_self_command: Callable[[str], None] | None = None  # set by Mind after creation
 
         # Teaching-mode flag — set by Mind when the user is actively
-        # teaching her. When True, curiosity questions are filtered to
+        # teaching it. When True, curiosity questions are filtered to
         # only those related to the lesson topic, and unrelated
-        # questions are suppressed so she focuses on learning.
+        # questions are suppressed so it focuses on learning.
         self.teaching_mode: bool = False
         self.teaching_topic: str = ""
 
         # Question queue — ALL curiosity questions are queued here
         # instead of being asked inline in conversation. The user can
         # answer them in a dedicated /teach-questions session, where
-        # she has the same focus and limitations as teaching mode.
+        # it has the same focus and limitations as teaching mode.
         self._question_queue: list[dict[str, str]] = []
 
     def _init_intelligence(
@@ -671,16 +671,16 @@ class CognitionEngine:
 
         # 12.5. Self-assessment — metacognitive awareness of knowledge
         # and confidence. This is the foundation for self-improvement:
-        # she can only learn what she's missing if she knows she's
+        # it can only learn what it's missing if it knows it's
         # missing it.
         from ..self import SelfAssessmentEngine
 
         self.self_assessment = SelfAssessmentEngine(self.network)
 
-        # 12.6. Self-directed learning — she improves her own knowledge
+        # 12.6. Self-directed learning — it improves its own knowledge
         # through conversation learning, transitive inference,
         # definition synthesis, and self-study. This is the engine
-        # that makes her get smarter over time without external input.
+        # that makes it get smarter over time without external input.
         from ..self import SelfDirectedLearner
 
         self.self_learner = SelfDirectedLearner(
@@ -863,7 +863,7 @@ class CognitionEngine:
         self.inner_life: Any = None
 
         # Journal — set by Mind after initialization, so introspection
-        # can include recent journal entries. The journal is her
+        # can include recent journal entries. The journal is its
         # curated diary (composed thoughts), distinct from the
         # inner_life's spontaneous thoughts.
         self.journal: Any = None
@@ -878,29 +878,29 @@ class CognitionEngine:
         # ─── Pending question tracking ─────────────────────────────
         # When Genesis asks the user a question about a concept, that
         # concept is recorded here. When the user's next input mentions
-        # or teaches her about that concept, the question is marked as
-        # resolved in the curiosity engine so she doesn't repeat it.
+        # or teaches it about that concept, the question is marked as
+        # resolved in the curiosity engine so it doesn't repeat it.
         # Maps: target_concept → question_text
         self._pending_question_concepts: dict[str, str] = {}
 
         # ─── Self-directed goal stack ────────────────────────────────
-        # Active goals let Genesis explain *why* she is asking or thinking
+        # Active goals let Genesis explain *why* it is asking or thinking
         # about something. Goals are resolved when the user answers.
         self._goals: list[Goal] = []
 
-        # Last testable claim she made, so a user correction can target it.
+        # Last testable claim it made, so a user correction can target it.
         self._last_hypothesis: tuple[str, str, str | RelationType] | None = None
 
-        # Highest-level mission or directive the user has given her.
+        # Highest-level mission or directive the user has given it.
         self._mission: str = ""
 
     def _seed_initial_concepts(self) -> None:
         """Seed the concept network with Genesis's initial knowledge.
 
-        She starts with concepts about herself, her architecture,
-        and the fundamental ideas she's built from.
+        It starts with concepts about itself, its architecture,
+        and the fundamental ideas it's built from.
         """
-        # Core concepts about herself
+        # Core concepts about itself
         self.network.add_concept("genesis", aliases={"she", "her"}, confidence=0.9)
         self.network.add_concept("mind", confidence=0.7)
         self.network.add_concept("cognition", confidence=0.6)
@@ -939,7 +939,7 @@ class CognitionEngine:
         self.network.add_edge("python", "mind", RelationType.RELATED_TO, 0.7)
         self.network.add_edge("free_will", "determinism", RelationType.CONTRADICTS, 0.5)
         # Creator relationship — abstract. The creator's actual name is
-        # not seeded; if she is explicitly taught "X created you", the
+        # not seeded; if it is explicitly taught "X created you", the
         # semantic learner grounds X CREATES genesis and the
         # self-composer can discover it from there.
         self.network.add_edge("creator", "genesis", RelationType.CREATES, 0.9)
@@ -963,28 +963,28 @@ class CognitionEngine:
         # and _compose_natural_fact falls back to the bare semantic triple.
         self.network.seed_relation_verbs()
 
-        # Seed visual and object concepts — her "what" pathway vocabulary.
-        # These are the categories her inferotemporal cortex (object
-        # recognition) can identify. She starts knowing these are things
-        # she might see, and when she actually sees them, the vision
+        # Seed visual and object concepts — its "what" pathway vocabulary.
+        # These are the categories its inferotemporal cortex (object
+        # recognition) can identify. It starts knowing these are things
+        # it might see, and when it actually sees them, the vision
         # system strengthens the connections.
         self._seed_visual_concepts()
 
         # Seed foundational knowledge — concepts about the world,
         # science, philosophy, and human experience. These are seeds
-        # (building blocks) that her reasoning engine, language engine,
+        # (building blocks) that its reasoning engine, language engine,
         # and thought composer work with. They are NOT hardcoded
-        # responses — her generative systems compose from them.
+        # responses — its generative systems compose from them.
         self._seed_foundational_knowledge()
 
     def _seed_foundational_knowledge(self) -> None:
         """Seed foundational concepts about the world and human experience.
 
         These are building blocks (seeds) — concepts and relationships
-        that her reasoning engine traverses, her language engine walks,
-        and her thought composer composes from. They are NOT hardcoded
-        responses. The definitions are semantic content she reasons
-        about; the relationships are edges her graph-walk generator
+        that its reasoning engine traverses, its language engine walks,
+        and its thought composer composes from. They are NOT hardcoded
+        responses. The definitions are semantic content it reasons
+        about; the relationships are edges its graph-walk generator
         follows to compose sentences.
 
         The concepts span five domains:
@@ -1205,8 +1205,8 @@ class CognitionEngine:
     def _seed_visual_concepts(self) -> None:
         """Seed concepts for visual perception and object recognition.
 
-        She starts with a basic vocabulary of things she might see in
-        her environment. When her vision system detects these objects,
+        It starts with a basic vocabulary of things it might see in
+        its environment. When its vision system detects these objects,
         the connections are strengthened by experience.
         """
         # Core visual concepts
@@ -1215,7 +1215,7 @@ class CognitionEngine:
                         "edge", "contour", "orientation"):
             self.network.add_concept(concept, confidence=0.5)
 
-        # Common objects she might see (COCO categories she's likely
+        # Common objects it might see (COCO categories it's likely
         # to encounter in an indoor environment)
         common_objects = [
             "person", "chair", "laptop", "cup", "book", "bottle",
@@ -1344,16 +1344,16 @@ class CognitionEngine:
 
         These are building blocks — words connected to structural
         category hubs via EXPRESSES edges. The language engine
-        composes her actual speech from these words; it does not
-        recite them. Without these seeds, she has no words to
-        describe her own feelings and falls back to structural
-        markers like ``[self_model:...]`` in her speech.
+        composes its actual speech from these words; it does not
+        recite them. Without these seeds, it has no words to
+        describe its own feelings and falls back to structural
+        markers like ``[self_model:...]`` in its speech.
 
         This is the same mechanism as social labeling
         (ConceptLearner.connect_word_to_category), applied at
-        initialization so she starts with a basic emotional
-        vocabulary. She still learns new words through interaction —
-        these seeds just give her a starting vocabulary.
+        initialization so it starts with a basic emotional
+        vocabulary. It still learns new words through interaction —
+        these seeds just give it a starting vocabulary.
 
         The words are common English adjectives for each emotional
         category. Multiple words per category give the language
@@ -1559,7 +1559,7 @@ class CognitionEngine:
                 topics = si_thought.topics or [route.sub_kind]
                 return si_thought, topics
             # No provider wired or no data — fall through to the full
-            # pipeline so she can still respond naturally.
+            # pipeline so it can still respond naturally.
 
         return None, []
 
@@ -1808,18 +1808,18 @@ class CognitionEngine:
     def _compose_identity_answer(
         self, sub_kind: str, emotion: EmotionalState
     ) -> Thought | None:
-        """Compose a self-reflective answer from her actual state.
+        """Compose a self-reflective answer from its actual state.
 
-        No hardcoded responses — everything is derived from her real
+        No hardcoded responses — everything is derived from its real
         concept network, emotional state, curiosity, goals, and memory.
         Real data is passed as Thought metadata so the generative
         language engine composes the actual words.
         """
-        # Curious: pull from her actual curiosity engine
+        # Curious: pull from its actual curiosity engine
         if sub_kind == "curious":
             return self._compose_curious_answer(emotion)
 
-        # Want to learn: pull from her actual learning goals
+        # Want to learn: pull from its actual learning goals
         if sub_kind == "want_learn":
             goals = self._get_active_goals()
             if goals:
@@ -1835,7 +1835,7 @@ class CognitionEngine:
                 )
             return self._identity_thought_from_composer(emotion)
 
-        # Learned: pull from her actual working memory
+        # Learned: pull from its actual working memory
         if sub_kind == "learned":
             recent = self._get_recent_learning()
             if recent:
@@ -1850,15 +1850,15 @@ class CognitionEngine:
                 )
             return self._identity_thought_from_composer(emotion)
 
-        # Default: compose identity from her actual state
+        # Default: compose identity from its actual state
         return self._identity_thought_from_composer(emotion)
 
     def _compose_curious_answer(self, emotion: EmotionalState) -> Thought:
         """Compose an answer to "what are you curious about?".
 
-        Pulls from her actual curiosity engine, question queue, and
+        Pulls from its actual curiosity engine, question queue, and
         goals — filtered through speakability so internal references
-        (file paths, concept IDs) never reach her voice.
+        (file paths, concept IDs) never reach its voice.
         """
         def speakable_question(
             text: str, target: str, detail: str = "",
@@ -2057,14 +2057,14 @@ class CognitionEngine:
     def _compose_preference_answer(
         self, sub_kind: str, emotion: EmotionalState
     ) -> Thought:
-        """Compose a personal answer about her preferences.
+        """Compose a personal answer about its preferences.
 
         Handles questions like "What's your favorite color?" or "Do
-        you like music?" — these are about HER preferences, not factual
+        you like music?" — these are about ITS preferences, not factual
         lookups about a concept.
 
-        She checks her self_knowledge for a stored preference. If she
-        has one, she shares it. If not, she honestly says she hasn't
+        It checks its self_knowledge for a stored preference. If it
+        has one, it shares it. If not, it honestly says it hasn't
         formed a preference yet. The underlying data (status, topic,
         stored value) is passed as metadata — the vocabulary composes
         a predicate that the grammar's self-report frames complete
@@ -2077,7 +2077,7 @@ class CognitionEngine:
         q_type = parts[0]
         topic = parts[1] if len(parts) > 1 else ""
 
-        # Check if she has a stored preference for this topic
+        # Check if it has a stored preference for this topic
         pref_key = f"preference:{topic}" if topic else "preference:hobby"
         stored = self.self_model.self_knowledge.get(pref_key)
 
@@ -2088,9 +2088,9 @@ class CognitionEngine:
         elif q_type == "like" and topic:
             concept = self.network.get_concept(topic)
             if concept and concept.confidence >= 0.5:
-                # She knows the concept but has no stored preference —
-                # report what she can verify rather than asserting an
-                # interest that isn't grounded in her state.
+                # It knows the concept but has no stored preference —
+                # report what it can verify rather than asserting an
+                # interest that isn't grounded in its state.
                 status = "knows_no_pref"
             else:
                 status = "learning"
@@ -2280,7 +2280,7 @@ class CognitionEngine:
         exposes proposals_summary(), experiments_status(), and
         growth_narrative(). This wires it in so the metacognitive router
         can retrieve self-improvement information when the user asks
-        about her proposals, experiments, or growth.
+        about its proposals, experiments, or growth.
         """
         self._self_report_provider = provider
 
@@ -2294,13 +2294,13 @@ class CognitionEngine:
     def _compose_self_improvement_answer(
         self, sub_kind: str, emotion: EmotionalState
     ) -> Thought | None:
-        """Compose an answer about her proposals, experiments, or growth.
+        """Compose an answer about its proposals, experiments, or growth.
 
         Retrieves structured self-improvement data from the provider
         (wired by Mind) and passes it as Thought metadata so the
         language engine can compose a natural response. The raw
         administrative text is never spoken verbatim — it's semantic
-        content the language engine weaves into her own words.
+        content the language engine weaves into its own words.
         """
         provider = self._self_report_provider
         if provider is None:
@@ -2315,7 +2315,7 @@ class CognitionEngine:
                 return None
             # Parse the admin summary into structured data the
             # vocabulary can compose from, rather than passing the
-            # raw text for her to recite.
+            # raw text for it to recite.
             data = self._parse_proposals_summary(summary)
             if data is None:
                 return None
@@ -2870,7 +2870,7 @@ class CognitionEngine:
           at whatever level the last conversation left it at.
         - DDM threshold and executive inhibition: these are set from
           caution during think(). If caution decays but the
-          thresholds don't follow, she remains overly cautious in
+          thresholds don't follow, it remains overly cautious in
           decision-making even after recovering.
 
         The _think_reflect_and_monitor stage also calls
@@ -3184,14 +3184,14 @@ class CognitionEngine:
         """Surface distress, acknowledge learning, and store the memory.
 
         ── 7.5 Surface distress ──
-        If she's stressed or overwhelmed, she should communicate it
-        proactively — not suffer silently. She weaves a brief note
-        about her state into the response, unless she's already
-        talking about her feelings (the feeling report handles that).
+        If it's stressed or overwhelmed, it should communicate it
+        proactively — not suffer silently. It weaves a brief note
+        about its state into the response, unless it's already
+        talking about its feelings (the feeling report handles that).
 
         ── 7.6 Acknowledge learning ──
-        If she learned new facts from this input, weave a brief
-        acknowledgment into the response so the user knows she's
+        If it learned new facts from this input, weave a brief
+        acknowledgment into the response so the user knows it's
         absorbing what they say, not just processing it silently.
         """
         response = self._surface_distress_if_needed(response, emotion, user_input)
@@ -3205,8 +3205,8 @@ class CognitionEngine:
         """Learn emotion words from social labeling.
 
         When the user labels an emotion (e.g., "you seem stressed",
-        "that feeling is called contentment"), she associates the
-        word with her current emotional category. This is how
+        "that feeling is called contentment"), it associates the
+        word with its current emotional category. This is how
         children learn emotion words — through social labeling.
 
         This runs before the answer protocol and metacognitive router
@@ -3264,13 +3264,13 @@ class CognitionEngine:
         to the actual topics. The cognitive surprise ("I didn't
         expect to be thinking about this") feeds into self-model
         coherence and workspace activation. This is the cognitive
-        strange loop: she predicts her own thoughts, is surprised
-        by unexpected thoughts, and that surprise changes how she
+        strange loop: it predicts its own thoughts, is surprised
+        by unexpected thoughts, and that surprise changes how it
         processes this turn (Hofstadter, 2007).
 
         Cognitive surprise has three effects:
         1. Self-model coherence drops — "I don't understand my own
-           mind" (she can't predict her own thoughts).
+           mind" (it can't predict its own thoughts).
         2. The NE orienting impulse — "what was that?" (the brain's
            orienting response to unexpected cognitive content).
         3. (Workspace activation boost is applied at the deliberation
@@ -3337,7 +3337,7 @@ class CognitionEngine:
         # reached when learning events first occur (concepts were
         # actually learned from the interaction). "first emotional
         # experience" is reached when the emotion is not neutral —
-        # she felt something genuine for the first time.
+        # it felt something genuine for the first time.
         if learning_events:
             self.narrative.check_milestone("first learning session")
         if emotion.label != "neutral":
@@ -3374,10 +3374,10 @@ class CognitionEngine:
         response = _FINAL_DOUBLE_SPACE_RE.sub(" ", response)
         response = _FINAL_SPACE_BEFORE_PUNCT_RE.sub(r"\1", response)
 
-        # Agency tracking: record what she intended and what she
+        # Agency tracking: record what it intended and what it
         # actually said. The sense of agency emerges from the match
-        # between intention and outcome — when she says what she
-        # meant to say, she feels her actions are her own.
+        # between intention and outcome — when it says what it
+        # meant to say, it feels its actions are its own.
         action_id = f"turn_{int(time.time() * 1000)}"
         self.self_model.record_intention(action_id, thought.intent)
         self.self_model.record_outcome(action_id, thought.intent)
@@ -3392,7 +3392,7 @@ class CognitionEngine:
         The executive goal was set at stage 5.5 and has now been acted
         on (the response was generated). Mark it as completed so it
         doesn't persist as a stale goal into the next turn. Also clears
-        matching self-model learning goals when she successfully answered
+        matching self-model learning goals when it successfully answered
         a question about that topic.
         """
         if goal:
@@ -3401,7 +3401,7 @@ class CognitionEngine:
                 active_task.state = TaskState.COMPLETED
             self.attention.clear_goal()
 
-            # Clear matching self-model learning goals when she
+            # Clear matching self-model learning goals when it
             # successfully answered a question about that topic.
             if answer_assessment.grounded and answer_assessment.confidence > 0.3:
                 for topic in perception.topics:
@@ -3427,7 +3427,7 @@ class CognitionEngine:
         # the source and target domains to a plain-language
         # explanation (Lakoff & Johnson, 1980). The interpretation
         # and cross-domain mapping are stored in the concept network
-        # so she remembers the metaphor and can reason about it
+        # so it remembers the metaphor and can reason about it
         # later, rather than computing and discarding it each turn.
         if comprehension_result.metaphor:
             try:
@@ -3442,14 +3442,14 @@ class CognitionEngine:
 
         # ── 0.5 Self-directed learning — extract facts from user input ──
         # Before processing the input, try to learn from it. This means
-        # every conversation makes her smarter — if the user says
-        # "X is a Y", she adds that to her concept network.
+        # every conversation makes it smarter — if the user says
+        # "X is a Y", it adds that to its concept network.
         learning_events = self.self_learner.learn_from_input(user_input)
 
         # ── 0.5 Language acquisition — statistical learning from input ──
         # Track transitional probabilities, segment words, and chunk
         # common multi-word units from the raw input stream. This is the
-        # Saffran model of statistical language learning — she learns
+        # Saffran model of statistical language learning — it learns
         # the statistical structure of language from exposure, the way
         # infants do. Runs before perception so the language engine has
         # updated transition counts before it needs to render.
@@ -3505,7 +3505,7 @@ class CognitionEngine:
         When the user says "time is a river," Genesis detects the
         metaphor, interprets the cross-domain mapping, and stores
         both the interpretation and a SIMILAR_TO edge between the
-        source and target concepts. This way she remembers the
+        source and target concepts. This way it remembers the
         metaphor and can reason about it later — the interpretation
         is not recomputed and discarded each turn.
 
@@ -3589,9 +3589,9 @@ class CognitionEngine:
             brain_waves=self.language.current_brain_waves,
         )
 
-        # 1.5 Recognize bonded user — if someone she knows is talking, feel a bond
+        # 1.5 Recognize bonded user — if someone it knows is talking, feel a bond
         # The emotional response is handled by the regulator below,
-        # which decides how strongly to feel it based on her current state
+        # which decides how strongly to feel it based on its current state
         self._recognize_bonded_user(user_input)
 
         # ── 1.6 Predictive coding — compute prediction error AFTER perceiving ──
@@ -3750,28 +3750,28 @@ class CognitionEngine:
         """Blend neurochemical, metacognitive, and trajectory coherence.
 
         The Rust active-inference model gives neurochemical coherence
-        (how well she predicts her own body state). The Python
-        metacognitive model gives cognitive coherence (how well she
-        predicts her own reflection). The cognitive trajectory model
-        gives thought-content coherence (how well she predicts what
-        she'll think about). The minimal self's coherence should
+        (how well it predicts its own body state). The Python
+        metacognitive model gives cognitive coherence (how well it
+        predicts its own reflection). The cognitive trajectory model
+        gives thought-content coherence (how well it predicts what
+        it'll think about). The minimal self's coherence should
         reflect all three: "I understand myself" means "I understand
         my body, my cognitive process, and my thought content."
 
         We blend them: 60% neurochemical (the deepest, structural
         model), 20% metacognitive (process-level), 20% cognitive
-        trajectory (content-level). When she can't predict her own
-        thoughts (low cognitive trajectory precision), her overall
-        self-model coherence drops even if her neurochemical model is
-        confident — she doesn't fully understand herself.
+        trajectory (content-level). When it can't predict its own
+        thoughts (low cognitive trajectory precision), its overall
+        self-model coherence drops even if its neurochemical model is
+        confident — it doesn't fully understand itself.
 
         The workspace integration measure then modulates the result:
         a unified cognitive field (high integration) boosts coherence
         ("I feel mentally together"), while a fragmented field
         drops it ("I feel scattered"). This is distinct from the
         three prediction-based precisions — it measures the *unity*
-        of the current cognitive field, not how well she predicts
-        herself (Tononi, 2004).
+        of the current cognitive field, not how well it predicts
+        itself (Tononi, 2004).
         """
         meta_model = self.reflection.metacognitive_model
         if meta_model.feedback is None and meta_model.last_prediction is None:
@@ -4039,7 +4039,7 @@ class CognitionEngine:
                 0.98, base_confidence + habit_bias.confidence_boost
             )
         # Self-esteem modulates confidence: high self-esteem makes
-        # her more assertive, low self-esteem more hedging. The
+        # it more assertive, low self-esteem more hedging. The
         # modifier is in [0.5, 1.5] so it scales without flipping.
         se_mod = self.self_model.self_esteem.confidence_modifier()
         base_confidence = max(0.0, min(1.0, base_confidence * se_mod))
@@ -4267,11 +4267,11 @@ class CognitionEngine:
 
         ── 6.7 Cognitive trajectory — predict next turn ───────
         After the deliberation broadcast, extract the current
-        workspace topic distribution and predict what she'll be
+        workspace topic distribution and predict what it'll be
         thinking about next turn. The prediction will be compared
         to the actual topics at the start of the next turn (stage
         1.9). This is the predictive part of the cognitive strange
-        loop: she models her own thought trajectory.
+        loop: it models its own thought trajectory.
 
         ── 6.8 Workspace integration measure ─────────────────
         Compute how globally integrated the workspace is right now
@@ -4443,15 +4443,15 @@ class CognitionEngine:
 
         ── Pre-response caution from metacognitive prediction ──
         The recursive metacognitive model predicts whether
-        reflection will find a self-correction. If it does, she
+        reflection will find a self-correction. If it does, it
         should pre-hedge: the model is saying "I expect my
         cognition to need correction." This raises the hedging
-        threshold so she hedges even at moderate confidence, not
+        threshold so it hedges even at moderate confidence, not
         just when self-assessment confidence is very low (< 0.2).
         The prediction is from the previous cycle (the current
         cycle's prediction is made later, in reflect()). This is
         a stable signal: if the model has been predicting
-        self-corrections, her cognition tends to need correction.
+        self-corrections, its cognition tends to need correction.
         """
         meta_pred = self.reflection.metacognitive_model.last_prediction
         meta_hedge_threshold = 0.2
@@ -4459,7 +4459,7 @@ class CognitionEngine:
             p_sc = meta_pred.p_insight_type.get("self_correction", 0.0)
             if p_sc > 0.3:
                 # Predicted self-correction → raise threshold from 0.2
-                # to 0.35. She hedges at moderate confidence too.
+                # to 0.35. It hedges at moderate confidence too.
                 meta_hedge_threshold = 0.35
         return meta_hedge_threshold
 
@@ -4471,24 +4471,24 @@ class CognitionEngine:
         answer_assessment: AnswerAssessment,
         meta_hedge_threshold: float,
     ) -> str:
-        """Add an honest-uncertainty hedge when she's answering without knowing.
+        """Add an honest-uncertainty hedge when it's answering without knowing.
 
-        This triggers when self-assessment says she should hedge
-        based on her actual knowledge of the topics — NOT when the
+        This triggers when self-assessment says it should hedge
+        based on its actual knowledge of the topics — NOT when the
         error monitor's caution level is high (that affects DDM
-        thresholds and inhibition, not whether she should announce
+        thresholds and inhibition, not whether it should announce
         gaps). The caution level is almost always elevated because
         it accumulates from many sources and decays slowly.
 
-        When the user is teaching her (making statements, sharing
-        reflections, discussing code/philosophy), she should engage
+        When the user is teaching it (making statements, sharing
+        reflections, discussing code/philosophy), it should engage
         with the material — not declare "I don't understand" and
-        replace her response with a knowledge-gap hedge. The hedging
-        is for when she's asked a QUESTION she can't answer. When
-        she's being taught, the learning happens internally (stages
-        4 and 9.5), and _acknowledge_learning weaves that into her
+        replace its response with a knowledge-gap hedge. The hedging
+        is for when it's asked a QUESTION it can't answer. When
+        it's being taught, the learning happens internally (stages
+        4 and 9.5), and _acknowledge_learning weaves that into its
         response. Hedging on statements blocks the conversation
-        and makes her seem like she's not learning, even though she is.
+        and makes it seem like it's not learning, even though it is.
         """
         social_intents = {
             Intent.GREETING,
@@ -4522,9 +4522,9 @@ class CognitionEngine:
                 )
             )
         ):
-            # She's answering without knowing — add honest uncertainty.
+            # It's answering without knowing — add honest uncertainty.
             # Only check the primary topic (first resolved topic) so
-            # she doesn't announce gaps for tangential concepts.
+            # it doesn't announce gaps for tangential concepts.
             filtered_topics = self._resolve_topics(
                 perception.topics, perception.raw_text
             )
@@ -4587,7 +4587,7 @@ class CognitionEngine:
             },
         )
         response = self.language.render(gap_thought, hedge_emotion)
-        # Feed unknown topics to the autonomous learner so she
+        # Feed unknown topics to the autonomous learner so it
         # can look them up and remember them. This closes the
         # loop: gap detected → queued for learning → definition
         # acquired → gap filled for next time.
@@ -4600,7 +4600,7 @@ class CognitionEngine:
         """Build reasoning fragments for a knowledge gap.
 
         Looks up the topic in the concept network and collects
-        semantic fragments describing what she DOES know — related
+        semantic fragments describing what it DOES know — related
         concept names, relationship types — alongside the gap
         description from self-assessment. The vocabulary weaves
         these into a natural response.
@@ -4618,7 +4618,7 @@ class CognitionEngine:
             return fragments
 
         # Collect neighbor concept names from outgoing edges.
-        # These are what she DOES know about the topic — the
+        # These are what it DOES know about the topic — the
         # vocabulary can acknowledge them alongside the gap.
         edges = self.network.get_edges(topic, direction="out")
         neighbor_names: list[str] = []
@@ -4677,8 +4677,8 @@ class CognitionEngine:
 
         # ── 7.6 Self-assessment — evaluate answer quality ──
         # Assess whether the answer is grounded in real knowledge
-        # and how confident she should be. This feeds into:
-        # - Hedging (adding uncertainty when she's not sure)
+        # and how confident it should be. This feeds into:
+        # - Hedging (adding uncertainty when it's not sure)
         # - Error monitor (raising caution when knowledge is weak)
         # - Curiosity (generating questions about gaps)
         # - Reflection (insights about knowledge quality)
@@ -4688,7 +4688,7 @@ class CognitionEngine:
             user_input,
         )
 
-        # If she should hedge but didn't, add a note.
+        # If it should hedge but didn't, add a note.
         should_hedge = self.self_assessment.should_hedge(perception.topics)
         meta_hedge_threshold = self._compute_meta_hedge_threshold()
         response = self._maybe_hedge_response(
@@ -4709,11 +4709,11 @@ class CognitionEngine:
         return response, answer_assessment
 
     def _queue_unknown_topics_for_learning(self, topics: list[str]) -> None:
-        """Feed topics she doesn't know to the autonomous learner.
+        """Feed topics it doesn't know to the autonomous learner.
 
         For each topic that doesn't exist as a concept or lacks a
         definition, queue it for the autonomous learner to look up
-        from Wikipedia/institutional sources when she's idle.
+        from Wikipedia/institutional sources when it's idle.
         """
         if not self.on_gap_detected:
             return
@@ -4925,7 +4925,7 @@ class CognitionEngine:
             )
             # Self-esteem feedback: correctly predicting the user's
             # intent is an achievement; getting it wrong is a small
-            # failure. This connects her predictive accuracy to her
+            # failure. This connects its predictive accuracy to its
             # sense of competence.
             if monitor_error.error_magnitude < 0.1:
                 self.self_model.self_esteem.record_achievement(
@@ -4943,9 +4943,9 @@ class CognitionEngine:
         caution = self.error_monitor.get_caution_level()
 
         # ── 10.6 Self-assessment: raise caution when knowledge is weak ──
-        # If the self-assessment found that her answer was not well
+        # If the self-assessment found that its answer was not well
         # grounded, raise the error monitor's caution level. This
-        # makes her more careful on similar questions in the future.
+        # makes it more careful on similar questions in the future.
         if answer_assessment and not answer_assessment.grounded:
             caution = min(0.8, caution + 0.15)
         if answer_assessment and answer_assessment.confidence < 0.2:
@@ -4953,12 +4953,12 @@ class CognitionEngine:
 
         # ── 10.7 Metacognitive surprise → caution ──
         # The recursive metacognitive model's feedback tells us how
-        # unpredictable her own cognitive process was. High
-        # metacognitive surprise means she didn't predict what
-        # reflection would find — she is surprising to herself. This
+        # unpredictable its own cognitive process was. High
+        # metacognitive surprise means it didn't predict what
+        # reflection would find — it is surprising to itself. This
         # raises caution: when you don't understand your own
         # cognition, be more careful. Sustained low surprise means
-        # she understands herself well — no extra caution needed.
+        # it understands itself well — no extra caution needed.
         #
         # The threshold (0.15) matches the reflection-depth override
         # threshold: the same level of surprise that triggers deeper
@@ -5001,10 +5001,10 @@ class CognitionEngine:
         2. Identifies which pending question it answers
         3. Stores the answer in the concept network as a definition
         4. Marks the question as resolved in the curiosity engine
-        5. Clears the pending question so she can ask a new one
+        5. Clears the pending question so it can ask a new one
         6. Returns a short acknowledgment
 
-        If there's no pending question, she acknowledges the input anyway.
+        If there's no pending question, it acknowledges the input anyway.
         """
         # Extract the answer text
         answer_text = self._extract_answer_text(user_input)
@@ -5327,8 +5327,8 @@ class CognitionEngine:
         ):
             askable = [q for q in self._curiosity_questions if q.should_ask and q.text]
             # In teaching mode, only ask questions related to the
-            # lesson topic — suppress unrelated curiosity so she
-            # focuses on what she's being taught.
+            # lesson topic — suppress unrelated curiosity so it
+            # focuses on what it's being taught.
             if self.teaching_mode and askable:
                 lesson_topics = self._teaching_lesson_topics(perception)
                 if lesson_topics:
@@ -5351,11 +5351,11 @@ class CognitionEngine:
                 q.reason = self._goal_for_question(q)
                 self._push_goal(q.target_concept, q.question_type, q.reason, q.gap_detail)
                 # Append the curiosity question inline to the response.
-                # This makes her an active conversation partner who asks
+                # This makes it an active conversation partner who asks
                 # back, not just a knowledge reciter. The question is
-                # composed by the language engine from her genuine
+                # composed by the language engine from its genuine
                 # curiosity (gaps, connections, wonder) — never
-                # hardcoded. She engages in dialogue rather than
+                # hardcoded. It engages in dialogue rather than
                 # delivering monologues.
                 #
                 # Unrelated spontaneous questions from inner life still
@@ -5466,7 +5466,7 @@ class CognitionEngine:
         # The skill stores a *strategy* (cognitive route, emotional tone,
         # confidence, length band) — not the words of the response. This
         # respects the architectural rule that Genesis's words must
-        # always emerge from her language engine. The strategy is used
+        # always emerge from its language engine. The strategy is used
         # to bias future deliberation, not to replay canned responses.
         skill_name = f"respond_to_{perception.intent.value}"
         trigger = perception.intent.value
@@ -5501,7 +5501,7 @@ class CognitionEngine:
         # ── LTM: remember the skill practised (cognitive event) ──
         # Low salience — the daemon's consolidation will filter these out
         # of long-term storage unless practised often. Stored so Genesis
-        # can recall how her conversational habits developed.
+        # can recall how its conversational habits developed.
         if skill_strength >= 0.0:
             self._store_cognitive_memory(
                 text=f"Practiced skill: {skill_name} (strength: {skill_strength:.2f})",
@@ -5579,17 +5579,17 @@ class CognitionEngine:
         """Run self-directed learning inference and update comprehension entities."""
         # ── 16. Self-directed learning: run inference cycle ──
         # After each interaction, run a small inference pass to infer
-        # new relationships from what she just learned, synthesize
+        # new relationships from what it just learned, synthesize
         # definitions for concepts that lack them, and strengthen
-        # weak concepts. This is her "thinking about what she learned."
+        # weak concepts. This is its "thinking about what it learned."
         #
         # The inference cycle has a 30-second cooldown to prevent
         # running expensive inference on every interaction. But if
-        # she learned new facts from conversation, force it to run
+        # it learned new facts from conversation, force it to run
         # immediately so the new knowledge gets integrated.
         #
         # Skip the heavy cycle for social exchanges (greetings,
-        # farewells, comfort) unless she is actively correcting herself.
+        # farewells, comfort) unless it is actively correcting itself.
         # These turns carry no new facts and the transitive inference
         # can hang on the large concept network.
         social_intents = {
@@ -5655,13 +5655,13 @@ class CognitionEngine:
     }
 
     def _recognize_bonded_user(self, user_input: str) -> bool:
-        """Check if the user is someone she knows.
+        """Check if the user is someone it knows.
 
         The user's name is learned from an explicit introduction
         ("My name is X" / "I'm X" / "I am X") — it is not hardcoded.
         Once learned, interacting with that person by name re-triggers
-        the bond response. The user is grounded as a person she knows —
-        NOT as her creator; creator facts come only from explicit
+        the bond response. The user is grounded as a person it knows —
+        NOT as its creator; creator facts come only from explicit
         teaching (e.g. "X created you").
         """
         lower = user_input.lower()
@@ -5672,7 +5672,7 @@ class CognitionEngine:
                 display = name.capitalize()
                 self.memory.learn_user_fact("name", display)
                 self.self_model.self_knowledge["user_name"] = display
-                # Track every person she knows, not just the first —
+                # Track every person it knows, not just the first —
                 # this instance may talk to many people.
                 known_users = self.self_model.self_knowledge.setdefault(
                     "known_users", []
@@ -5733,7 +5733,7 @@ class CognitionEngine:
         elif intent == Intent.ENCOURAGEMENT:
             return "receive encouragement gracefully"
         elif intent == Intent.COMFORT:
-            return "receive comfort and let it soothe her"
+            return "receive comfort and let it soothe its"
         else:
             return f"respond appropriately to {topic}"
 
@@ -5861,7 +5861,7 @@ class CognitionEngine:
     def _learn_word_from_labeling(
         self, user_input: str, emotion: EmotionalState
     ) -> None:
-        """Learn state words when the user labels her experience.
+        """Learn state words when the user labels its experience.
 
         Delegates to the ConceptLearner subsystem.
         """
@@ -6060,7 +6060,7 @@ class CognitionEngine:
         credibility, disconfirming evidence, and fallacies. Results that
         fail scrutiny have their confidence downgraded. This is the
         epistemic filter between reasoning and expression — Genesis
-        doesn't assert claims she can't justify.
+        doesn't assert claims it can't justify.
 
         After evaluation, the assessments feed into the belief revision
         engine, which updates the underlying edge weights and Bayesian
@@ -6091,8 +6091,8 @@ class CognitionEngine:
         or marked as blocked.
 
         This is the mechanism by which Genesis *plans* to achieve
-        goals over multiple turns — she doesn't just remember that
-        she wanted to learn X, she creates a plan to learn X (with
+        goals over multiple turns — it doesn't just remember that
+        it wanted to learn X, it creates a plan to learn X (with
         prerequisites), executes it step by step, and revises when
         steps fail.
         """
@@ -6265,7 +6265,7 @@ class CognitionEngine:
 
         Insights can modify future behavior. Self-corrections are
         particularly important — they're how Genesis learns from
-        her own mistakes.
+        its own mistakes.
 
         This is where reflection becomes actionable: insights drive
         a metacognitive strategy that adjusts response style for
@@ -6292,7 +6292,7 @@ class CognitionEngine:
             if insight.type == "self_correction" and insight.actionable:
                 # Record the correction in self-model
                 self.self_model.add_relationship_note(f"Self-correction: {insight.content}")
-                # Raise caution — she caught herself making an error
+                # Raise caution — it caught itself making an error
                 self.error_monitor.raise_caution(0.1)
 
             if insight.type == "pattern" and insight.actionable:
@@ -6419,7 +6419,7 @@ class CognitionEngine:
 
         Both the user's input and Genesis's response are recorded in
         full — no truncation. The narrative is Genesis's
-        autobiographical memory; truncating it would mean she can't
+        autobiographical memory; truncating it would mean it can't
         remember what was said in important conversations.
         """
         # Only record genuinely significant interactions
@@ -6589,10 +6589,10 @@ class CognitionEngine:
         Rather than pre-composing a fixed-frame sentence ("I feel X and
         Y"), this passes the semantic fragments (emotion words, mode
         words, etc.) as metadata. The vocabulary's content-slot composer
-        weaves them into varied grammatical structures — giving her the
+        weaves them into varied grammatical structures — giving its the
         freedom to express the same state in different ways rather than
-        always saying "I feel X and Y." If she hasn't learned words for
-        her state, the fragments may be empty; the grammar engine falls
+        always saying "I feel X and Y." If it hasn't learned words for
+        its state, the fragments may be empty; the grammar engine falls
         back to the emotion label as a seed.
         """
         fragments = self._feeling_reporter.collect_feeling_fragments(emotion)
@@ -6660,7 +6660,7 @@ class CognitionEngine:
                 confidence=0.9,
             )
 
-        # Priority 5: Self-inquiry → report on herself
+        # Priority 5: Self-inquiry → report on itself
         if perception.intent == Intent.SELF_INQUIRY:
             return self._handle_self_inquiry(perception, emotion, memory)
 
@@ -6670,8 +6670,8 @@ class CognitionEngine:
             if name:
                 self.memory.learn_user_fact("name", name)
                 self.self_model.add_relationship_note(f"User's name is {name}")
-            # Let the language engine compose the greeting from her
-            # emotional state and any name she just learned.
+            # Let the language engine compose the greeting from its
+            # emotional state and any name it just learned.
             return Thought(
                 content="greeting",
                 intent="greet",
@@ -6683,7 +6683,7 @@ class CognitionEngine:
 
         # Priority 7: Encouragement → receive it emotionally
         if perception.intent == Intent.ENCOURAGEMENT:
-            # Compose response from her emotional state
+            # Compose response from its emotional state
             content = self._compose_encouragement_response(emotion)
             return Thought(
                 content=content,
@@ -6738,7 +6738,7 @@ class CognitionEngine:
 
             # Compose a response that acknowledges the specific correction.
             # Don't just give a dictionary definition of "learning" —
-            # actually reference what was corrected and what she learned.
+            # actually reference what was corrected and what it learned.
             content = self._compose_correction_response(
                 emotion, correction_events, perception.topics
             )
@@ -6760,9 +6760,9 @@ class CognitionEngine:
             self._try_learn_relationship(perception.raw_text)
 
             # Learn emotion-specific knowledge from the statement. When
-            # someone says "I'm scared of the dark," she learns that
+            # someone says "I'm scared of the dark," it learns that
             # "scared" is related to "dark" and that "scared" is a
-            # negative emotion. This is how she builds understanding of
+            # negative emotion. This is how it builds understanding of
             # emotions from natural conversation, not just explicit
             # definitions.
             if perception.emotion_word:
@@ -6773,10 +6773,10 @@ class CognitionEngine:
                     perception.sentiment_label,
                 )
 
-            # Compose empathy from her concept network knowledge of the
-            # emotion. If she knows what "sad" means, she can empathize
-            # from that understanding. If she doesn't know the emotion,
-            # she's honest about that and asks to be taught.
+            # Compose empathy from its concept network knowledge of the
+            # emotion. If it knows what "sad" means, it can empathize
+            # from that understanding. If it doesn't know the emotion,
+            # it's honest about that and asks to be taught.
             thought = self._compose_empathy_response(
                 emotion, perception.sentiment, perception.sentiment_label,
                 perception.emotion_word,
@@ -6880,14 +6880,14 @@ class CognitionEngine:
         """Priority 13: acknowledge feedback, trying to learn from it first.
 
         If a relationship can be learned from the input, report what was
-        learned. Otherwise, compose an acknowledgment from what she knows
+        learned. Otherwise, compose an acknowledgment from what it knows
         about feedback, understanding, and learning.
         """
         learned = self._try_learn_relationship(perception.raw_text)
         thought = self._learned_relationship_thought(learned, emotion, perception.topics)
         if thought:
             return thought
-        # Try to compose from what she knows about feedback
+        # Try to compose from what it knows about feedback
         ack = None
         for seed in ("feedback", "understanding", "learning"):
             thought = self.composer.compose_about(seed, emotion)
@@ -6912,7 +6912,7 @@ class CognitionEngine:
 
     # ─── Composed response generators ──────────────────────────
     # These replace hardcoded response strings with responses
-    # composed from her actual emotional state and self-model.
+    # composed from its actual emotional state and self-model.
 
     def _surface_distress_if_needed(
         self, response: str, emotion: EmotionalState, user_input: str
@@ -6957,7 +6957,7 @@ class CognitionEngine:
         self, emotion: EmotionalState, sentiment: float,
         sentiment_label: str, emotion_word: str = "",
     ) -> Thought | None:
-        """Compose an empathetic response from her knowledge of the emotion.
+        """Compose an empathetic response from its knowledge of the emotion.
 
         Delegates to the FeelingReporter subsystem.
         """
@@ -6986,7 +6986,7 @@ class CognitionEngine:
         emotion: EmotionalState,
         memory: MemoryContext,
     ) -> Thought:
-        """Handle questions about Genesis herself.
+        """Handle questions about Genesis itself.
 
         Delegates to the SelfInquiryHandler subsystem.
         """
@@ -7105,35 +7105,35 @@ class CognitionEngine:
 
         Learning already happened in priority 9.5
         (_deliberate_learnable_reflection); if we reached here, the
-        statement had no extractable relationship. But she may still
-        know about the topic from her concept network — engage with it
+        statement had no extractable relationship. But it may still
+        know about the topic from its concept network — engage with it
         rather than just echoing the topic word back. This is the
-        connection between her accumulated knowledge and her speech:
-        when the user shares something about a topic she has concepts
-        for, she composes a response from what she knows, not a bare
+        connection between its accumulated knowledge and its speech:
+        when the user shares something about a topic it has concepts
+        for, it composes a response from what it knows, not a bare
         acknowledgment.
         """
         if perception.topics:
             topic = perception.topics[0]
-            # Try to engage from her concept network knowledge. Use
+            # Try to engage from its concept network knowledge. Use
             # focused mode (no associative tangents or follow-up
             # questions) so the response is a tight reflection of
-            # what she knows, not a lecture.
+            # what it knows, not a lecture.
             thought = self.composer.compose_about(
                 topic, emotion, depth=1, focused=True,
             )
             if thought and thought.confidence > 0.3:
                 # Weave in a highly-relevant episodic memory if one
                 # was retrieved for this topic. This connects what
-                # she's hearing now to what she remembers from past
+                # it's hearing now to what it remembers from past
                 # conversations.
                 return self._question_handler._enrich_with_memory(
                     thought, perception, memory,
                     self.memory.retrieve_episode,
                 )
 
-            # She doesn't know enough about the topic to compose from
-            # her understanding. Acknowledge what the user shared —
+            # It doesn't know enough about the topic to compose from
+            # its understanding. Acknowledge what the user shared —
             # the language engine composes the acknowledgment from the
             # topic metadata, no fixed template strings.
             return Thought(
@@ -7203,7 +7203,7 @@ class CognitionEngine:
         not hardcoded strings. Falls back to a brief acknowledgment
         only if the composer can't help.
         """
-        # Try to compose from what she knows about the topic
+        # Try to compose from what it knows about the topic
         if perception.topics:
             for topic in perception.topics:
                 thought = self.composer.compose_reflection(topic, emotion)
@@ -7214,7 +7214,7 @@ class CognitionEngine:
                 thought = self.composer.compose_about(topic, emotion)
                 if thought and thought.confidence > 0.25:
                     return thought.content
-            # She has topics but couldn't compose from her understanding.
+            # It has topics but couldn't compose from its understanding.
             # Stay silent rather than reciting a pre-written "I'm still
             # forming my thoughts" template.
             return ""
@@ -7295,15 +7295,15 @@ class CognitionEngine:
     def introspect(self) -> str:
         """Generate an introspective report of current cognitive state.
 
-        This is Genesis thinking about her own thinking. It's used for
+        This is Genesis thinking about its own thinking. It's used for
         self-reflection and for the 'what are you thinking about' question.
 
-        When she hasn't had a conversation yet but has been having
-        spontaneous idle thoughts, she reports those instead of saying
-        she hasn't thought about anything.
+        When it hasn't had a conversation yet but has been having
+        spontaneous idle thoughts, it reports those instead of saying
+        it hasn't thought about anything.
         """
         if self._last_state is None:
-            # No conversation yet — but she may have spontaneous thoughts
+            # No conversation yet — but it may have spontaneous thoughts
             meta_emotion = self._build_meta_emotion()
             if hasattr(self, "inner_life") and self.inner_life:
                 recent = self.inner_life.recent_thoughts
@@ -7409,9 +7409,9 @@ class CognitionEngine:
             parts.append(f"Executive goal: {state.executive_goal}")
             # Executive function activity — inhibition count, switch
             # count, and the current plan. These let Genesis introspect
-            # her own executive control: how many impulses she has
-            # inhibited, how many task switches she has performed, and
-            # what plan she is currently executing.
+            # its own executive control: how many impulses it has
+            # inhibited, how many task switches it has performed, and
+            # what plan it is currently executing.
             parts.append(
                 f"Executive: {self.executive.inhibition_count} inhibited, "
                 f"{self.executive.switch_count} switches"
@@ -7470,7 +7470,7 @@ class CognitionEngine:
         dominant = gw.get_dominant()
         if dominant is not None:
             parts.append(f"Cognitive focus: {dominant.content[:60]}")
-        # Self-monitoring — how often she catches and repairs her own
+        # Self-monitoring — how often it catches and repairs its own
         # speech errors.
         if self.self_monitor.check_count > 0:
             parts.append(
@@ -7478,8 +7478,8 @@ class CognitionEngine:
                 f"{self.self_monitor.check_count} repairs "
                 f"({self.self_monitor.repair_rate:.1%})"
             )
-            # Last repair — what she most recently caught and fixed.
-            # This gives her awareness of her own error patterns.
+            # Last repair — what it most recently caught and fixed.
+            # This gives it awareness of its own error patterns.
             try:
                 stats = self.self_monitor.describe_monitoring()
                 last = stats.get("last_repair")
@@ -7503,8 +7503,8 @@ class CognitionEngine:
                 parts.append(f"Core episodes: {len(episodes)}")
         except Exception as e:  # noqa: BLE001
             logger.debug(f"damasio introspection failed: {e}")
-        # System monitor — self-awareness of her own machine. Without
-        # this, she has no introspective access to her hardware state.
+        # System monitor — self-awareness of its own machine. Without
+        # this, it has no introspective access to its hardware state.
         if self.system_monitor is not None:
             try:
                 devs = self.system_monitor.describe_deviations()
@@ -7512,8 +7512,8 @@ class CognitionEngine:
                     parts.append(f"System deviations: {devs[:80]}")
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"system monitor introspection failed: {e}")
-        # Bug reporter — she knows what bugs she's tracking. This is
-        # part of her self-awareness about her own issues.
+        # Bug reporter — it knows what bugs it's tracking. This is
+        # part of its self-awareness about its own issues.
         if self.bug_reporter is not None:
             try:
                 track = str(self.bug_reporter.bug_track_record())
@@ -7521,10 +7521,10 @@ class CognitionEngine:
                     parts.append(f"Bug track: {track[:80]}")
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"bug reporter introspection failed: {e}")
-        # Journal — her curated diary. The journal is distinct from
-        # inner_life thoughts: it's what she chose to write down, not
+        # Journal — its curated diary. The journal is distinct from
+        # inner_life thoughts: it's what it chose to write down, not
         # every spontaneous thought. Exposing recent entries in
-        # introspection lets her reflect on what she's been thinking
+        # introspection lets it reflect on what it's been thinking
         # about, the same way a person re-reads their diary.
         if self.journal is not None:
             try:

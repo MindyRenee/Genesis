@@ -148,7 +148,7 @@ class Voice:
         self._speech_tail = 0.3  # keep mic muted for 300ms after TTS ends
         # Speech queue: when speech is in progress, new utterances are
         # queued instead of cutting off the current speech. This prevents
-        # her words from being truncated mid-sentence when multiple
+        # its words from being truncated mid-sentence when multiple
         # thoughts or responses arrive in quick succession.
         self._speech_queue: collections.deque[
             tuple[str, float, float, float, float]
@@ -250,7 +250,7 @@ class Voice:
 
         # If already speaking, queue the new utterance instead of
         # cutting off the current speech mid-sentence. This prevents
-        # her words from being truncated when multiple thoughts or
+        # its words from being truncated when multiple thoughts or
         # responses arrive in quick succession. Blocking speech
         # always interrupts — the caller is waiting for it.
         if not blocking and self.is_speaking:

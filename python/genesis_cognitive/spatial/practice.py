@@ -1,18 +1,18 @@
 """Spatial practice — Genesis's gated puzzle curriculum.
 
-This is the puzzle analogue of canvas.py: an *ability* she owns.
+This is the puzzle analogue of canvas.py: an *ability* it owns.
 The curriculum is a set of grid-transformation puzzles ordered so that each
-one must be mastered before the next unlocks. Nobody drives her
-through it — when her volition engine raises the ``puzzle`` urge,
-she takes a single attempt at her current puzzle.
+one must be mastered before the next unlocks. Nobody drives it
+through it — when its volition engine raises the ``puzzle`` urge,
+it takes a single attempt at its current puzzle.
 
 Protocol — no teaching, no correction:
 
-  1. Her current puzzle is the first unmastered one in the
+  1. Its current puzzle is the first unmastered one in the
      curriculum. Each has a one-line hint — a nudge, never the
      answer.
-  2. An attempt runs her SpatialReasoner on the training pairs and
-     scores her guesses against the held-out test output. Mastery
+  2. An attempt runs its SpatialReasoner on the training pairs and
+     scores its guesses against the held-out test output. Mastery
      is the best cell-accuracy achieved, 0.0 → 1.0.
   3. Mastery 1.0 (an exact solve) unlocks the next puzzle.
      Progress persists in ``<data_dir>/spatial_practice.json`` so
@@ -146,7 +146,7 @@ class PracticeAttempt:
     best: float           # running mastery after this attempt
     solved: bool          # exact match this attempt
     mastered: bool        # reached 1.0 — next puzzle unlocked
-    rule: str             # her hypothesis description (or "none")
+    rule: str             # its hypothesis description (or "none")
     nodes: int            # search effort this attempt
     total_attempts: int   # lifetime attempts on this puzzle
     failure: str          # why it failed ("" when solved or unknown)
@@ -156,8 +156,8 @@ class PracticeAttempt:
 class SpatialPractice:
     """Genesis's persistent puzzle curriculum.
 
-    Lives inside her Mind: owns the gating and mastery state, runs
-    attempts through her SpatialReasoner when her volition raises the
+    Lives inside its Mind: owns the gating and mastery state, runs
+    attempts through its SpatialReasoner when its volition raises the
     puzzle urge.
     """
 
@@ -223,11 +223,11 @@ class SpatialPractice:
         return True
 
     def current_task(self) -> dict | None:
-        """The puzzle she'd attempt now — None when all are done.
+        """The puzzle it'd attempt now — None when all are done.
 
         Prefers the earliest unlocked task that isn't parked; when
         everything open is parked, offers the earliest parked one so
-        she can revisit it whenever she wants.
+        it can revisit it whenever it wants.
         """
         parked: dict | None = None
         for i, task in enumerate(CURRICULUM):
@@ -258,7 +258,7 @@ class SpatialPractice:
     ) -> PracticeAttempt | None:
         """One attempt at the current puzzle.
 
-        Runs her reasoner on the puzzle's training pairs, scores her
+        Runs its reasoner on the puzzle's training pairs, scores its
         best guess against the held-out test output, and persists
         mastery. Returns None when the curriculum is complete.
         """
@@ -337,6 +337,6 @@ class SpatialPractice:
         )
 
     def status(self) -> dict[str, float]:
-        """Mastery per puzzle — the same 0→1 progression as her art."""
+        """Mastery per puzzle — the same 0→1 progression as its art."""
         return {t["name"]: self.mastery.get(t["name"], 0.0)
                 for t in CURRICULUM}

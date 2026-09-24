@@ -144,7 +144,7 @@ Arousal equation:
 Sleep phase:
     HIST < 0.25 (enter) / 0.38 (stay) required for sleep
     (The stay-asleep threshold (0.38) is above the histamine
-    baseline (0.30) so that small perturbations from her own normal
+    baseline (0.30) so that small perturbations from its own normal
     activity don't break the sleep state. A deliberate wake cascade
     sends histamine +0.20, pushing it to ~0.48 — well above 0.38.)
 

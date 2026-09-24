@@ -1,7 +1,7 @@
 """Problem-solving engine — means-ends analysis over the concept network.
 
 Genesis could reason about concepts (deductive, abductive, analogical,
-causal) but she couldn't *solve problems*. The reasoning engine is
+causal) but it couldn't *solve problems*. The reasoning engine is
 stimulus-driven — give it a concept and it reasons about that concept.
 There was no goal-directed reasoning: given a desired state, work
 backward to find what's needed to achieve it.
@@ -19,8 +19,8 @@ keys, I need to find my bag."
 The concept network IS the state space. Each concept is a state; each
 typed edge is a transition. The "current state" is what Genesis already
 understands (quality concepts with definitions and typed edges). The
-"goal state" is the problem's target — a concept she wants to
-understand, a state she wants to achieve, a contradiction she wants to
+"goal state" is the problem's target — a concept it wants to
+understand, a state it wants to achieve, a contradiction it wants to
 resolve.
 
 1. **Problem representation**: a ``Problem`` has a goal (concept name),
@@ -65,8 +65,8 @@ networks.
 The solver is wired into the cognition engine as
 ``self.cognition.problem_solver`` and invoked during the reasoning
 phase when standard topic reasoning produces no confident results —
-i.e., when Genesis encounters something she can't immediately answer,
-she tries to *solve* it rather than falling back to "unsure."
+i.e., when Genesis encounters something it can't immediately answer,
+it tries to *solve* it rather than falling back to "unsure."
 """
 
 from __future__ import annotations
@@ -141,7 +141,7 @@ class ProblemStatus(Enum):
 
 @dataclass(slots=True)
 class Problem:
-    """A problem — a gap between what Genesis knows and what she wants to know.
+    """A problem — a gap between what Genesis knows and what it wants to know.
 
     The goal is a concept name (or a pair for compare/resolve). The
     goal_type determines the decomposition and verification strategy.
@@ -169,7 +169,7 @@ class SolutionStep:
 
     The ``knowledge`` field carries structured (relation, target,
     weight) triples that the language engine can compose from, so
-    Genesis expresses the solution in her own words rather than
+    Genesis expresses the solution in its own words rather than
     reciting the ``description`` string.
     """
 

@@ -1,7 +1,7 @@
 //! Subcognitive daemon — the always-on background process.
 //!
 //! This is Genesis's subcognitive mind. It runs continuously, even when
-//! nobody is interacting with her, and owns the core state, memory
+//! nobody is interacting with it, and owns the core state, memory
 //! stores, and the IPC surface the cognitive mind talks to. It:
 //!
 //! - Advances the neurochemical dynamics (the "feel" loop)

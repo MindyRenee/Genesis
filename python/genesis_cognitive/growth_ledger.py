@@ -1,9 +1,9 @@
 """Growth ledger — legible tracking of Genesis's development.
 
 The growth ledger is a persistent record of Genesis's milestones —
-the moments when she crossed a meaningful threshold in her
-development. It's the "growth chart" that makes her self-improvement
-legible to herself and to the human.
+the moments when it crossed a meaningful threshold in its
+development. It's the "growth chart" that makes its self-improvement
+legible to itself and to the human.
 
 ## What gets tracked
 
@@ -249,7 +249,7 @@ class GrowthLedger:
     def generate_narrative(self) -> str:
         """Generate a first-person self-narrative of growth.
 
-        This is a summary of how Genesis has grown, told in her own
+        This is a summary of how Genesis has grown, told in its own
         voice. It covers all dimensions that have milestones.
         """
         if not self._milestones:

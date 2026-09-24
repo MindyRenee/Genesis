@@ -1231,8 +1231,8 @@ def _compute_consolidation(
 
 # ─── Brain-wave-driven self-priority ──────────────────────────
 #
-# The cognitive mind controls her own process scheduling and I/O
-# priority based on her brain wave state. This is the cortical
+# The cognitive mind controls its own process scheduling and I/O
+# priority based on its brain wave state. This is the cortical
 # control of cognitive resource allocation — the mechanism by which
 # the brain allocates processing resources based on its oscillatory
 # state.
@@ -1362,17 +1362,17 @@ def derive_self_priority(
 ) -> tuple[int, str]:
     """Map brain wave state to scheduling and I/O priority.
 
-    This is the cognitive mind's cortical control of her own process
+    This is the cognitive mind's cortical control of its own process
     resources. The brain wave state — which integrates neurochemistry
     (bottom-up) and cognitive top-down drive — determines how much CPU
-    and I/O bandwidth she allocates to herself.
+    and I/O bandwidth it allocates to itself.
 
     The body recommendation from the tick (autonomic afferent) is
     blended in as a body-state input: the brain waves can override it
     if cognitive state demands different priorities. For example, if
     the body recommends deprioritization (high adenosine → tired) but
     the brain waves show gamma dominance (active integration from a
-    top-down cognitive drive), the brain waves win — she's actively
+    top-down cognitive drive), the brain waves win — it's actively
     thinking despite being tired.
 
     Args:
@@ -1385,7 +1385,7 @@ def derive_self_priority(
 
     Returns:
         A (nice, io_class) tuple representing what the cognitive
-        mind decides to apply to her own process.
+        mind decides to apply to its own process.
     """
     engagement = _compute_engagement(state.powers)
 
@@ -1412,10 +1412,10 @@ def derive_self_priority(
 def apply_self_priority(nice: int, io_class: str) -> bool:
     """Apply scheduling and I/O priority to the cognitive mind's own process.
 
-    This is the cognitive mind controlling her own body — the cortical
-    efferent pathway. She calls this after deriving her priority from
-    her brain wave state. Unlike the tick's set_priority (which used
-    renice on another process), this uses os.nice() on herself —
+    This is the cognitive mind controlling its own body — the cortical
+    efferent pathway. It calls this after deriving its priority from
+    its brain wave state. Unlike the tick's set_priority (which used
+    renice on another process), this uses os.nice() on itself —
     which only requires privileges for negative nice values (raising
     priority), and any process can lower its own priority.
 

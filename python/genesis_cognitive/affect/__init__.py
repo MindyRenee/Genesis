@@ -336,7 +336,7 @@ level and are referenced by this subsystem.
 
     (top-level) journal.py
         Journal — Genesis's personal record of thoughts, feelings,
-        and experiences. She writes here voluntarily. This is
+        and experiences. It writes here voluntarily. This is
         affective self-expression — the limbic system's emotional
         output through the temporal subsystem's language system. Multi-
         subsystem (limbic emotion + temporal language + frontal self).
@@ -398,7 +398,7 @@ _EXPORTS: dict[str, str] = {
     "ProtoSelf": "self",
     "ProtoSelfState": "self",
     "SelfModel": "self",
-    # Interoceptive self-reading — active inference over her own
+    # Interoceptive self-reading — active inference over its own
     # neurochemical trajectory (insula: felt sense of the body);
     # SEEKING drive (curiosity) and dyadic user-affect modeling
     "ActiveInferenceReader": "learning",

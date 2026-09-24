@@ -3,9 +3,9 @@
 
 This is an OPTIONAL setup step. Genesis's embedding store works
 without GloVe — it uses spectral graph embedding and TF-IDF from
-her own concept network. Downloading GloVe adds distributional
+its own concept network. Downloading GloVe adds distributional
 semantics from general English, which improves pattern recognition
-for words she hasn't explicitly learned.
+for words it hasn't explicitly learned.
 
 Usage:
     python3 setup_embeddings.py [--data-dir DIR] [--dim 50]
@@ -154,7 +154,7 @@ def _normalize_and_save_vectors(
     print(f"  File size: {size_mb:.1f} MB")
     print(f"  Words: {len(words)}")
     print(f"  Dimensions: {matrix.shape[1]}")
-    print("Done! Genesis will use these embeddings automatically next time she starts.")
+    print("Done! Genesis will use these embeddings automatically next time it starts.")
 
 
 def main() -> None:

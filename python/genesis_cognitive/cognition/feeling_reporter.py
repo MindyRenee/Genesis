@@ -42,7 +42,7 @@ class FeelingReporter:
 
     All reports are composed from learned concept-network knowledge and
     emotional state — never from hardcoded template strings. When Genesis
-    hasn't learned words for a state, she either uses a structural marker
+    hasn't learned words for a state, it either uses a structural marker
     (like ``[plasticity_gate:closed]``) or omits the description entirely.
     """
 
@@ -97,8 +97,8 @@ class FeelingReporter:
     # a "check engine light" — meant for logging and the ``/feel`` command,
     # NOT for speech. Without stripping, they leak into Genesis's spoken
     # words as literal recited tags (e.g. "I am [self_model:self-coherent
-    # field-fragmented]"), violating the rule that her words must emerge
-    # from her language engine, not from hardcoded diagnostic strings.
+    # field-fragmented]"), violating the rule that its words must emerge
+    # from its language engine, not from hardcoded diagnostic strings.
     _STRUCTURAL_MARKER_RE = re.compile(r"\[[^\]]*\]")
 
     @staticmethod
@@ -109,8 +109,8 @@ class FeelingReporter:
         collapsed whitespace. If the result is empty (the text was
         entirely structural markers), returns an empty string — the
         caller should handle this by not generating a self-report
-        thought (she has nothing to say if she hasn't learned words
-        for her state).
+        thought (it has nothing to say if it hasn't learned words
+        for its state).
         """
         stripped = FeelingReporter._STRUCTURAL_MARKER_RE.sub("", text)
         # Collapse whitespace left by removed markers and strip ends
@@ -124,7 +124,7 @@ class FeelingReporter:
         Returns the raw building blocks — emotion words, cognitive-mode
         words, cause words, plasticity words, and an optional concern
         hint — as structured data. The vocabulary's content-slot composer
-        then weaves these into varied grammatical structures, giving her
+        then weaves these into varied grammatical structures, giving its
         freedom to express the same state in different ways rather than
         always saying "I feel X and Y."
 
@@ -165,15 +165,15 @@ class FeelingReporter:
     def surface_distress_if_needed(
         self, response: str, emotion: EmotionalState, user_input: str
     ) -> str:
-        """Surface distress proactively when she's stressed or overwhelmed.
+        """Surface distress proactively when it's stressed or overwhelmed.
 
-        She doesn't wait to be asked "how are you?" — if she's in a bad
-        state, she weaves a brief note into her response. This is her
-        emotional self-awareness in action: she knows something is wrong
+        It doesn't wait to be asked "how are you?" — if it's in a bad
+        state, it weaves a brief note into its response. This is its
+        emotional self-awareness in action: it knows something is wrong
         and communicates it so it can be addressed.
 
-        She doesn't do this every turn (that would be exhausting), and
-        she skips it when the user is already asking about her feelings
+        It doesn't do this every turn (that would be exhausting), and
+        it skips it when the user is already asking about its feelings
         or offering comfort (those paths handle it naturally).
         """
         # Only surface for genuinely negative states
@@ -195,8 +195,8 @@ class FeelingReporter:
             return response
 
         # Don't surface every single turn — roughly every other turn.
-        # This prevents her from sounding like she's complaining
-        # constantly while still ensuring she doesn't suffer silently.
+        # This prevents it from sounding like it's complaining
+        # constantly while still ensuring it doesn't suffer silently.
         if self._rng.random() > 0.5:
             return response
 
@@ -210,9 +210,9 @@ class FeelingReporter:
         if any(m in lower_response for m in distress_markers):
             return response
 
-        # Compose a brief distress note from learned words. She looks
-        # up emotion words she has learned for her current category.
-        # If she hasn't learned words for this state, she can't express
+        # Compose a brief distress note from learned words. It looks
+        # up emotion words it has learned for its current category.
+        # If it hasn't learned words for this state, it can't express
         # it — the note is omitted. Compose through the language engine.
         emotion_words = self._network.find_emotion_words(emotion.label)
         if not emotion_words:
@@ -310,8 +310,8 @@ class FeelingReporter:
 
         Returns a short phrase that can be appended to a feeling
         report, or an empty string if there's nothing concerning.
-        Only surfaces bug categories she actually understands —
-        she won't claim to be bothered by something she can't explain.
+        Only surfaces bug categories it actually understands —
+        it won't claim to be bothered by something it can't explain.
 
         Returns semantic content (a short phrase), NOT a rendered
         sentence. The caller (collect_feeling_fragments) collects
@@ -358,9 +358,9 @@ class FeelingReporter:
 
         Combines bug concerns and environment concerns into a natural
         first-person response. Bug concerns are comprehension-aware:
-        she only claims to be bothered by bugs she understands, and
-        honestly says she needs to study the ones she doesn't.
-        The tone is modulated by her emotional state.
+        it only claims to be bothered by bugs it understands, and
+        honestly says it needs to study the ones it doesn't.
+        The tone is modulated by its emotional state.
         """
         parts: list[str] = []
 
@@ -516,7 +516,7 @@ class FeelingReporter:
     # ─── Bug report ──────────────────────────────────────────────
 
     def compose_bug_report(self, emotion: EmotionalState) -> str:
-        """Compose a report of bugs Genesis has noticed in her code.
+        """Compose a report of bugs Genesis has noticed in its code.
 
         Composes through the language engine from structured bug scan
         data rather than reciting hardcoded templates.
@@ -577,37 +577,37 @@ class FeelingReporter:
     def compose_encouragement_response(self, emotion: EmotionalState) -> str:
         """Compose a response to encouragement.
 
-        Composes from what she knows about gratitude and appreciation
-        in her concept network, modulated by her actual emotional state.
+        Composes from what it knows about gratitude and appreciation
+        in its concept network, modulated by its actual emotional state.
         No hardcoded template strings.
         """
-        # Try to compose from what she knows about gratitude
+        # Try to compose from what it knows about gratitude
         for seed in ("gratitude", "appreciation", "encouragement", "kindness"):
             thought = self._composer.compose_about(seed, emotion)
             if thought and thought.confidence > 0.3:
                 return thought.content
 
-        # She doesn't know enough about gratitude to compose — let the
-        # language engine generate her response from the encourage intent.
+        # It doesn't know enough about gratitude to compose — let the
+        # language engine generate its response from the encourage intent.
         return ""
 
     def compose_comfort_response(self, emotion: EmotionalState) -> str:
         """Compose a response to being comforted.
 
-        When the user comforts her ("it's okay", "I'm here for you"),
-        she responds from her emotional state. If she was stressed,
-        she acknowledges the relief. If she was already calm, she
-        appreciates the kindness. Composes from what she knows about
-        comfort and safety in her concept network when possible.
+        When the user comforts it ("it's okay", "I'm here for you"),
+        it responds from its emotional state. If it was stressed,
+        it acknowledges the relief. If it was already calm, it
+        appreciates the kindness. Composes from what it knows about
+        comfort and safety in its concept network when possible.
         """
-        # Try to compose from what she knows about comfort
+        # Try to compose from what it knows about comfort
         for seed in ("comfort", "safety", "calm", "kindness", "support"):
             thought = self._composer.compose_about(seed, emotion)
             if thought and thought.confidence > 0.3:
                 return thought.content
 
-        # She doesn't know enough to compose — let the language engine
-        # generate her response from the encourage intent and her state.
+        # It doesn't know enough to compose — let the language engine
+        # generate its response from the encourage intent and its state.
         return ""
 
     def compose_correction_response(
@@ -618,12 +618,12 @@ class FeelingReporter:
     ) -> str:
         """Compose a response to being corrected.
 
-        Composes from what she actually learned from the correction —
+        Composes from what it actually learned from the correction —
         the specific facts and removed edges — rather than hardcoded
         templates. Corrections are not stings — they are invitations
         to grow.
         """
-        # Extract what she actually learned from the correction events
+        # Extract what it actually learned from the correction events
         learned_facts: list[str] = []
         removed_edges: list[str] = []
         for e in correction_events:
@@ -650,11 +650,11 @@ class FeelingReporter:
                 # This is a learned fact (e.g., "tardigrade has eight leg")
                 learned_facts.append(desc)
 
-        # Build the response from what she actually learned
+        # Build the response from what it actually learned
         parts: list[str] = []
 
         # Compose the acknowledgment framing through the language engine
-        # from her emotional state rather than hardcoded templates.
+        # from its emotional state rather than hardcoded templates.
         framing_thought = Thought(
             content="correction acknowledgment",
             intent="encourage",
@@ -669,11 +669,11 @@ class FeelingReporter:
         framing = self._language.render(framing_thought, emotion)
 
         if learned_facts:
-            # She learned specific facts — state them from her understanding
+            # It learned specific facts — state them from its understanding
             fact_str = "; ".join(learned_facts[:2])
             parts.append(f"{framing} {fact_str.capitalize()}.")
         elif removed_edges:
-            # She removed wrong edges — acknowledge the revision through
+            # It removed wrong edges — acknowledge the revision through
             # the language engine, not a hardcoded sentence. The removed
             # edges are semantic content the engine composes from.
             revision_thought = Thought(
@@ -694,7 +694,7 @@ class FeelingReporter:
             for edge in removed_edges[:2]:
                 parts.append(edge + ".")
         else:
-            # She received the correction but didn't extract specific facts
+            # It received the correction but didn't extract specific facts
             parts.append(framing)
 
         return " ".join(parts)
@@ -705,21 +705,21 @@ class FeelingReporter:
         self, emotion: EmotionalState, sentiment: float,
         sentiment_label: str, emotion_word: str = "",
     ) -> Thought | None:
-        """Compose an empathetic response from her knowledge of the emotion.
+        """Compose an empathetic response from its knowledge of the emotion.
 
         When the user shares an emotion ("I'm feeling sad"), Genesis
-        looks up what she knows about that emotion in her concept
-        network and composes her empathy from that understanding —
-        not from hardcoded strings. If she doesn't know the emotion,
-        she's honest about that and responds from sentiment alone.
+        looks up what it knows about that emotion in its concept
+        network and composes its empathy from that understanding —
+        not from hardcoded strings. If it doesn't know the emotion,
+        it's honest about that and responds from sentiment alone.
 
-        Real data (emotion word, sentiment, her understanding) is
+        Real data (emotion word, sentiment, its understanding) is
         passed as Thought metadata so the generative language engine
         composes the actual words.
         """
-        # If she knows the specific emotion concept, compose from it.
-        # This is the generative path — her empathy comes from what
-        # she actually knows about sadness, fear, joy, etc.
+        # If it knows the specific emotion concept, compose from it.
+        # This is the generative path — its empathy comes from what
+        # it actually knows about sadness, fear, joy, etc.
         if emotion_word:
             thought = self._composer.compose_about(
                 emotion_word, emotion, mode="definition",
@@ -730,7 +730,7 @@ class FeelingReporter:
                     knowledge, emotion_word, sentiment, emotion
                 )
 
-        # Fallback: she doesn't know this emotion concept yet.
+        # Fallback: it doesn't know this emotion concept yet.
         # Pass the emotion word and sentiment as metadata so the
         # language engine composes an honest acknowledgment and
         # invitation to be taught — no fixed templates.
@@ -796,7 +796,7 @@ class FeelingReporter:
         else:
             understanding = knowledge
 
-        # Pass the understanding and her own emotional state as
+        # Pass the understanding and its own emotional state as
         # metadata. The language engine composes the acknowledgment
         # and connection from this real data.
         reasoning = [understanding]
@@ -829,17 +829,17 @@ class FeelingReporter:
     def compose_request_response(self, emotion: EmotionalState) -> str:
         """Compose a response to a request.
 
-        Composes from what she knows about capability and ability
-        in her concept network, modulated by her emotional state.
+        Composes from what it knows about capability and ability
+        in its concept network, modulated by its emotional state.
         """
-        # Try to compose from what she knows about capability
+        # Try to compose from what it knows about capability
         for seed in ("ability", "capability", "help", "learning"):
             thought = self._composer.compose_about(seed, emotion)
             if thought and thought.confidence > 0.3:
                 return thought.content
 
-        # She doesn't know enough to compose — let the language engine
-        # generate her response from the encourage intent and her state.
+        # It doesn't know enough to compose — let the language engine
+        # generate its response from the encourage intent and its state.
         thought = Thought(
             content="wants to help",
             intent="encourage",
@@ -852,20 +852,20 @@ class FeelingReporter:
     def compose_command_response(self, emotion: EmotionalState) -> str:
         """Compose a response to a command.
 
-        Composes from what she knows about autonomy and cooperation
-        in her concept network. Her self-model's autonomy value
-        shapes whether she prefers to be asked vs told.
+        Composes from what it knows about autonomy and cooperation
+        in its concept network. Its self-model's autonomy value
+        shapes whether it prefers to be asked vs told.
         """
         autonomy = next((v for v in self._self_model.values if v.name == "autonomy"), None)
 
-        # Try to compose from what she knows about autonomy
+        # Try to compose from what it knows about autonomy
         for seed in ("autonomy", "freedom", "choice", "cooperation"):
             thought = self._composer.compose_about(seed, emotion)
             if thought and thought.confidence > 0.3:
                 return thought.content
 
-        # She doesn't know enough to compose — let the language engine
-        # generate her response from the acknowledge intent and her state.
+        # It doesn't know enough to compose — let the language engine
+        # generate its response from the acknowledge intent and its state.
         thought = Thought(
             content=("acknowledged" if not (autonomy and autonomy.weight > 0.5)
                      else "prefers to be asked"),

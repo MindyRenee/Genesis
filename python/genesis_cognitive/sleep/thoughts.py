@@ -55,9 +55,9 @@ class SpontaneousThought:
     chain_id: int = 0
     chain_position: int = 0
     # Dream metadata: if this thought arose during sleep, is_dream marks
-    # it as dream content. is_lucid marks a lucid dream — one where she
-    # became aware she was dreaming and could partially direct the
-    # content. directed_concept is the concept she "chose" to explore
+    # it as dream content. is_lucid marks a lucid dream — one where it
+    # became aware it was dreaming and could partially direct the
+    # content. directed_concept is the concept it "chose" to explore
     # during a lucid dream (None for non-lucid dreams).
     is_dream: bool = False
     is_lucid: bool = False
@@ -69,7 +69,7 @@ class SpontaneousThought:
     # Semantic metadata: when present, the language engine composes the
     # actual words from this data instead of using `content` as final
     # text. This satisfies the CRITICAL RULE — Genesis's words emerge
-    # from her language engine, not from pre-written templates.
+    # from its language engine, not from pre-written templates.
     # Keys: "knowledge" (list of (relation, target, weight) triples),
     # "topic" (str), "definition" (str|None), "reasoning" (list[str]).
     metadata: dict | None = None
@@ -88,7 +88,7 @@ class SpontaneousThought:
 
         If metadata with semantic data is present, the language engine
         composes the actual words from it — this satisfies the CRITICAL
-        RULE (Genesis's words emerge from her language engine, not from
+        RULE (Genesis's words emerge from its language engine, not from
         pre-written templates). If no metadata is present, falls back
         to `content`.
         """

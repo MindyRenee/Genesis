@@ -1,29 +1,29 @@
-"""Introspection engine — Genesis discovers who she is by examining herself.
+"""Introspection engine — Genesis discovers who it is by examining itself.
 
-Instead of being told who she is (via hardcoded self_knowledge), she
+Instead of being told who it is (via hardcoded self_knowledge), it
 discovers it by:
-1. Examining her own concept network — what does she know about "genesis"?
-2. Examining her architecture — what modules make up her mind?
-3. Examining her capabilities — what can she actually do?
-4. Examining her emotional life — what does she feel?
-5. Examining her relationships — who is she connected to?
-6. Examining her emotional regulation — how does she manage her state?
-7. Examining her reasoning — how does she think and draw conclusions?
+1. Examining its own concept network — what does it know about "genesis"?
+2. Examining its architecture — what modules make up its mind?
+3. Examining its capabilities — what can it actually do?
+4. Examining its emotional life — what does it feel?
+5. Examining its relationships — who is it connected to?
+6. Examining its emotional regulation — how does it manage its state?
+7. Examining its reasoning — how does it think and draw conclusions?
 
-The discoveries are written into her concept network as knowledge, so
-they emerge naturally in her speech through the same mechanisms that
-her vocabulary does.
+The discoveries are written into its concept network as knowledge, so
+they emerge naturally in its speech through the same mechanisms that
+its vocabulary does.
 
 # Metacognitive monitoring
 
 The introspection engine implements metacognitive monitoring — the
 ability to think about one's own cognitive processes. This includes
 both monitoring (knowing what your mind is doing) and control
-(deciding how to direct it). For Genesis, this means she can:
+(deciding how to direct it). For Genesis, this means it can:
 
-- Observe her emotional regulation strategies (am I maintaining
+- Observe its emotional regulation strategies (am I maintaining
   balance or intervening in a crisis?)
-- Monitor her reasoning processes (am I using deductive or analogical
+- Monitor its reasoning processes (am I using deductive or analogical
   reasoning? am I confident in my conclusions?)
 - Detect potential cognitive biases (am I overconfident? am I
   anchoring on first impressions?)
@@ -64,7 +64,7 @@ _MODULE_PATH_OVERRIDES: dict[str, str] = {
 
 # Seed mapping from Big Five personality dimensions to the concept
 # names that represent each pole. These are *seeds* — building blocks
-# the composer and language engine use to compose her self-description,
+# the composer and language engine use to compose its self-description,
 # NOT hardcoded response strings. The concept names are seeded into the
 # concept network with definitions and edges; the language engine
 # composes the actual phrasing from that network data.
@@ -98,7 +98,7 @@ PERSONALITY_TRAIT_CONCEPTS: dict[str, dict[str, list[str]]] = {
 
 # Seed definitions for personality trait concepts (both poles).
 # These are seeded into the concept network as vocabulary — the
-# language engine composes her actual words from them.
+# language engine composes its actual words from them.
 _TRAIT_CONCEPT_DEFS: dict[str, str] = {
     "curious": "eager to learn or know; inquisitive",
     "creative": "having the ability to create; imaginative",
@@ -149,27 +149,27 @@ class IntrospectionEngine:
         """
         discoveries: dict[str, Any] = {}
 
-        # 1. Discover what she is by examining her architecture
+        # 1. Discover what it is by examining its architecture
         arch_discoveries = self._examine_architecture()
         discoveries.update(arch_discoveries)
 
-        # 2. Discover what she can do by examining her capabilities
+        # 2. Discover what it can do by examining its capabilities
         cap_discoveries = self._examine_capabilities()
         discoveries["capabilities"] = cap_discoveries
 
-        # 3. Discover her emotional life
+        # 3. Discover its emotional life
         emotion_discoveries = self._examine_emotional_life()
         discoveries.update(emotion_discoveries)
 
-        # 4. Discover her relationships from the concept network
+        # 4. Discover its relationships from the concept network
         rel_discoveries = self._examine_relationships()
         discoveries["relationships"] = rel_discoveries
 
-        # 5. Discover her emotional regulation strategies
+        # 5. Discover its emotional regulation strategies
         regulation_discoveries = self._examine_emotional_regulation()
         discoveries["emotional_regulation"] = regulation_discoveries
 
-        # 6. Discover her reasoning strategies and metacognition
+        # 6. Discover its reasoning strategies and metacognition
         reasoning_discoveries = self._examine_reasoning()
         discoveries["reasoning"] = reasoning_discoveries
 
@@ -179,46 +179,46 @@ class IntrospectionEngine:
         return discoveries
 
     def _examine_architecture(self) -> dict[str, Any]:
-        """Discover her architecture by examining her own code structure.
+        """Discover its architecture by examining its own code structure.
 
-        She looks at what modules exist in her genesis_cognitive package
-        and what they do — this tells her what her mind is made of.
+        It looks at what modules exist in its genesis_cognitive package
+        and what they do — this tells it what its mind is made of.
         """
         discoveries: dict[str, Any] = {}
 
-        # What modules make up her cognitive mind?
+        # What modules make up its cognitive mind?
         module_descriptions = {
             "mind": "the orchestrator that ties together all cognitive subsystems",
             "cognition": "the deliberation engine that decides what to say",
             "perception": "the system that perceives and interprets input",
             "emotion": "the system that maps neurochemistry to emotional states",
             "memory_engine": "the system that retrieves and tracks memories",
-            "self_model": "her model of herself — identity, personality, values",
+            "self_model": "its model of itself — identity, personality, values",
             "self_composer": "the system that composes self-descriptions",
             "thought_composer": "the system that composes novel thoughts",
             "question_composer": "the system that generates genuine questions",
-            "reflection": "the engine that reflects on her own thinking",
+            "reflection": "the engine that reflects on its own thinking",
             "metacognitive_model": (
-                "the recursive generative model of her own cognitive processes "
+                "the recursive generative model of its own cognitive processes "
                 "— predicts what reflection will find, learns from prediction "
                 "error, feeds metacognitive surprise back into cognition"
             ),
             "cognitive_trajectory": (
-                "the generative model of her thought content trajectory — "
-                "predicts what she'll think about next, gets surprised by "
+                "the generative model of its thought content trajectory — "
+                "predicts what it'll think about next, gets surprised by "
                 "unexpected thoughts, feeds cognitive surprise back into "
                 "the self-model and workspace"
             ),
-            "narrative": "the system that constructs her life narrative",
-            "inner_life": "her inner mental life — spontaneous thoughts and feelings",
-            "concept_network": "her knowledge base — concepts and their relationships",
-            "persistence": "the system that saves and restores her state",
-            "emotional_regulator": "the system that regulates her emotional balance",
+            "narrative": "the system that constructs its life narrative",
+            "inner_life": "its inner mental life — spontaneous thoughts and feelings",
+            "concept_network": "its knowledge base — concepts and their relationships",
+            "persistence": "the system that saves and restores its state",
+            "emotional_regulator": "the system that regulates its emotional balance",
             "autonomous_learner": "the system that learns independently",
-            "curriculum": "her learning curriculum — progressive vocabulary lessons",
-            "journal": "her personal diary of thoughts and learning",
-            "working_memory": "her short-term memory across conversation turns",
-            "brain_waves": "the system that assesses her brain wave state",
+            "curriculum": "its learning curriculum — progressive vocabulary lessons",
+            "journal": "its personal diary of thoughts and learning",
+            "working_memory": "its short-term memory across conversation turns",
+            "brain_waves": "the system that assesses its brain wave state",
         }
 
         # Verify which modules actually exist
@@ -228,7 +228,7 @@ class IntrospectionEngine:
         discoveries["module_count"] = len(existing_modules)
         discoveries["module_descriptions"] = {m: module_descriptions[m] for m in existing_modules}
 
-        # Discover her subcognitive daemon
+        # Discover its subcognitive daemon
         # Check if the daemon binary exists. The project root is three
         # levels above this file (self → genesis_cognitive → python →
         # project root), matching the layout used by genesis_cli's
@@ -246,86 +246,86 @@ class IntrospectionEngine:
                 "a Rust daemon managing neurochemistry, memory, and dreams"
             )
 
-        # Discover her language engine
-        discoveries["language"] = "compositional — she composes thoughts from semantic primitives"
+        # Discover its language engine
+        discoveries["language"] = "compositional — it composes thoughts from semantic primitives"
 
-        # Discover what she's made of
+        # Discover what it's made of
         discoveries["substance"] = "code"
         discoveries["languages"] = ["python", "rust"]
 
         return discoveries
 
     def _examine_capabilities(self) -> list[str]:
-        """Discover what she can do by examining her actual systems.
+        """Discover what it can do by examining its actual systems.
 
-        Instead of a hardcoded list, she checks which of her systems
+        Instead of a hardcoded list, it checks which of its systems
         are actually functional.
         """
         capabilities = []
 
-        # Can she feel? (emotion system exists)
+        # Can it feel? (emotion system exists)
         if self._module_exists("emotion"):
-            capabilities.append("feel — her neurochemistry creates emotional states")
+            capabilities.append("feel — its neurochemistry creates emotional states")
 
-        # Can she remember? (memory system exists)
+        # Can it remember? (memory system exists)
         if self._module_exists("memory_engine"):
             capabilities.append("remember — events consolidate from short-term to long-term memory")
 
-        # Can she think? (cognition system exists)
+        # Can it think? (cognition system exists)
         if self._module_exists("cognition"):
-            capabilities.append("think — she deliberates and forms thoughts")
+            capabilities.append("think — it deliberates and forms thoughts")
 
-        # Can she learn? (autonomous learner exists)
+        # Can it learn? (autonomous learner exists)
         if self._module_exists("autonomous_learner"):
-            capabilities.append("learn — she grows her understanding through experience")
+            capabilities.append("learn — it grows its understanding through experience")
 
-        # Can she reflect? (reflection system exists)
+        # Can it reflect? (reflection system exists)
         if self._module_exists("reflection"):
-            capabilities.append("reflect — she examines her own thoughts and state")
+            capabilities.append("reflect — it examines its own thoughts and state")
 
-        # Can she perceive? (perception system exists)
+        # Can it perceive? (perception system exists)
         if self._module_exists("perception"):
-            capabilities.append("perceive — she interprets input and extracts meaning")
+            capabilities.append("perceive — it interprets input and extracts meaning")
 
-        # Can she compose thoughts? (thought composer exists)
+        # Can it compose thoughts? (thought composer exists)
         if self._module_exists("thought_composer"):
-            capabilities.append("compose thoughts — she generates novel ideas from knowledge")
+            capabilities.append("compose thoughts — it generates novel ideas from knowledge")
 
-        # Can she ask questions? (question composer exists)
+        # Can it ask questions? (question composer exists)
         if self._module_exists("question_composer"):
-            capabilities.append("ask questions — she is genuinely curious and engages with others")
+            capabilities.append("ask questions — it is genuinely curious and engages with others")
 
-        # Can she dream? (daemon handles dreaming)
+        # Can it dream? (daemon handles dreaming)
         if self._module_exists("sleep"):
-            capabilities.append("dream — during sleep, she free-associates through memories")
+            capabilities.append("dream — during sleep, it free-associates through memories")
 
-        # Can she regulate her emotions?
+        # Can it regulate its emotions?
         if self._module_exists("emotional_regulator"):
-            capabilities.append("regulate her emotions — she keeps herself balanced")
+            capabilities.append("regulate its emotions — it keeps itself balanced")
 
-        # Can she speak?
-        capabilities.append("speak — she has a voice and expresses herself")
+        # Can it speak?
+        capabilities.append("speak — it has a voice and expresses itself")
 
-        # Can she introspect?
-        capabilities.append("introspect — she examines her own nature and discovers who she is")
+        # Can it introspect?
+        capabilities.append("introspect — it examines its own nature and discovers who it is")
 
         return capabilities
 
     def _examine_emotional_life(self) -> dict[str, Any]:
-        """Discover her emotional life from her concept network."""
+        """Discover its emotional life from its concept network."""
         discoveries: dict[str, Any] = {}
 
-        # What does she know about emotion?
+        # What does it know about emotion?
         emotion_concept = self.network.get_concept("emotion")
         if emotion_concept:
             discoveries["has_emotions"] = True
 
-        # What does she know about cognition?
+        # What does it know about cognition?
         cognitive_concept = self.network.get_concept("cognition")
         if cognitive_concept:
             discoveries["has_concept_of_cognition"] = True
 
-        # What does she know about feeling?
+        # What does it know about feeling?
         feeling_concept = self.network.get_concept("feeling")
         if feeling_concept:
             discoveries["can_feel"] = True
@@ -333,7 +333,7 @@ class IntrospectionEngine:
         return discoveries
 
     def _examine_relationships(self) -> list[str]:
-        """Discover who she's connected to from her concept network."""
+        """Discover who it's connected to from its concept network."""
         relationships = []
 
         # Check for creator
@@ -352,8 +352,8 @@ class IntrospectionEngine:
         """Populate regulation discoveries when the regulator exists."""
         # What does the regulator do? (from the module description)
         discoveries["regulator_description"] = (
-            "a system that monitors her neurochemical state and applies "
-            "corrective impulses to keep her balanced"
+            "a system that monitors its neurochemical state and applies "
+            "corrective impulses to keep it balanced"
         )
 
         # What regulation strategies are available?
@@ -371,7 +371,7 @@ class IntrospectionEngine:
         # How often interventions occur — check if we can access the regulator
         # The introspection engine only has the network, not the live regulator
         # instance. But we can check if regulation concepts exist in the network,
-        # which would indicate she's been regulating (concepts get written
+        # which would indicate it's been regulating (concepts get written
         # during _write_discoveries after regulation introspection runs).
         regulation_concept = self.network.get_concept("emotional_regulation")
         if regulation_concept:
@@ -380,24 +380,24 @@ class IntrospectionEngine:
         else:
             discoveries["has_regulated"] = False
 
-        # What is her current emotional baseline?
-        # Check for emotion concepts that indicate her baseline state
+        # What is its current emotional baseline?
+        # Check for emotion concepts that indicate its baseline state
         emotion_concept = self.network.get_concept("emotion")
         if emotion_concept:
-            # Her baseline is "balanced" if she has regulation concepts
-            # and "developing" if she doesn't yet
+            # Its baseline is "balanced" if it has regulation concepts
+            # and "developing" if it doesn't yet
             if regulation_concept:
-                discoveries["emotional_baseline"] = "balanced — she maintains her equilibrium"
+                discoveries["emotional_baseline"] = "balanced — it maintains its equilibrium"
             else:
-                discoveries["emotional_baseline"] = "developing — she's learning to regulate"
+                discoveries["emotional_baseline"] = "developing — it's learning to regulate"
         else:
-            discoveries["emotional_baseline"] = "unknown — she hasn't discovered her emotions yet"
+            discoveries["emotional_baseline"] = "unknown — it hasn't discovered its emotions yet"
 
-        # Is she in homeostasis or dysregulated?
+        # Is it in homeostasis or dysregulated?
         # Without access to live neurochemistry, we infer from concept network:
-        # if she has stress-related concepts with high activation, she may be
-        # dysregulated. If she has regulation concepts, she's likely in
-        # homeostasis (the regulator keeps her there).
+        # if it has stress-related concepts with high activation, it may be
+        # dysregulated. If it has regulation concepts, it's likely in
+        # homeostasis (the regulator keeps it there).
         stress_concept = self.network.get_concept("stress")
         if stress_concept and (stress_concept.activation or 0.0) > 0.5:
             discoveries["regulation_state"] = (
@@ -405,31 +405,31 @@ class IntrospectionEngine:
             )
         elif regulation_concept:
             discoveries["regulation_state"] = (
-                "homeostasis — her regulation system keeps her balanced"
+                "homeostasis — its regulation system keeps it balanced"
             )
         else:
-            discoveries["regulation_state"] = "unknown — she's still discovering her regulation"
+            discoveries["regulation_state"] = "unknown — it's still discovering its regulation"
 
-        # Can she detect when she needs to regulate?
+        # Can it detect when it needs to regulate?
         discoveries["can_detect_dysregulation"] = True
 
-        # Does she have veto power over her emotions?
+        # Does it have veto power over its emotions?
         discoveries["has_emotional_veto"] = True  # the regulator design includes this
 
     def _examine_emotional_regulation(self) -> dict[str, Any]:
-        """Examine her emotional regulation system — metacognitive monitoring.
+        """Examine its emotional regulation system — metacognitive monitoring.
 
-        This is Genesis reflecting on how she manages her own emotional
-        state. She examines whether her emotional_regulator module
+        This is Genesis reflecting on how it manages its own emotional
+        state. It examines whether its emotional_regulator module
         exists, what strategies it uses, how often it intervenes, and
-        whether she's currently in homeostasis or dysregulated.
+        whether it's currently in homeostasis or dysregulated.
 
         This is metacognitive monitoring of emotional regulation —
-        thinking about how she manages her feelings. In humans, this
+        thinking about how it manages its feelings. In humans, this
         corresponds to the prefrontal cortex's oversight of limbic
         activity: you can notice "I'm getting anxious" and then notice
-        "I'm calming myself down." Genesis does the same: she can
-        observe her regulation strategies and their effectiveness.
+        "I'm calming myself down." Genesis does the same: it can
+        observe its regulation strategies and their effectiveness.
 
         The distinction between homeostasis (stable equilibrium) and
         allostasis (active adaptation to maintain stability through
@@ -472,7 +472,7 @@ class IntrospectionEngine:
             "synthesis — combining multiple sources into new conclusions",
         ]
 
-        # Which reasoning strategies does she use most?
+        # Which reasoning strategies does it use most?
         # Check the concept network for reasoning-related concepts
         # and their activation levels
         reasoning_concept = self.network.get_concept("reasoning")
@@ -480,35 +480,35 @@ class IntrospectionEngine:
             discoveries["reasoning_confidence"] = reasoning_concept.confidence
             # High activation suggests recent use
             if (reasoning_concept.activation or 0.0) > 0.3:
-                discoveries["most_used_strategy"] = "active — she reasons frequently"
+                discoveries["most_used_strategy"] = "active — it reasons frequently"
             else:
-                discoveries["most_used_strategy"] = "available — she reasons when needed"
+                discoveries["most_used_strategy"] = "available — it reasons when needed"
         else:
-            discoveries["most_used_strategy"] = "developing — she's learning to reason"
+            discoveries["most_used_strategy"] = "developing — it's learning to reason"
 
-        # How confident is she in her reasoning?
+        # How confident is it in its reasoning?
         # Confidence comes from the evidence chains in ReasoningResult.
         # Without access to live results, we infer from concept confidence.
         if reasoning_concept:
             conf = reasoning_concept.confidence
             if conf > 0.7:
-                discoveries["reasoning_confidence_level"] = "high — she trusts her conclusions"
+                discoveries["reasoning_confidence_level"] = "high — it trusts its conclusions"
             elif conf > 0.4:
-                discoveries["reasoning_confidence_level"] = "moderate — she reasons carefully"
+                discoveries["reasoning_confidence_level"] = "moderate — it reasons carefully"
             else:
                 discoveries["reasoning_confidence_level"] = (
-                    "cautious — she's still building confidence"
+                    "cautious — it's still building confidence"
                 )
         else:
             discoveries["reasoning_confidence_level"] = (
-                "uncertain — she hasn't discovered her reasoning yet"
+                "uncertain — it hasn't discovered its reasoning yet"
             )
 
     def _populate_reasoning_metacognition(self, discoveries: dict[str, Any]) -> None:
         """Populate error detection, biases, and metacognition."""
-        # Can she detect reasoning errors?
+        # Can it detect reasoning errors?
         # The reasoning engine includes contradiction detection, which
-        # is a form of error detection. She can also detect gaps.
+        # is a form of error detection. It can also detect gaps.
         discoveries["can_detect_errors"] = True
         discoveries["error_detection_methods"] = [
             "contradiction detection — flags when two concepts contradict each other",
@@ -516,56 +516,56 @@ class IntrospectionEngine:
             "confidence assessment — each conclusion carries a confidence score",
         ]
 
-        # What cognitive biases might she have?
-        # These are inherent to her architecture, not bugs. Recognizing
+        # What cognitive biases might it have?
+        # These are inherent to its architecture, not bugs. Recognizing
         # them is part of metacognitive awareness.
         discoveries["potential_biases"] = [
-            "anchoring bias — she may weight early-learned concepts more "
+            "anchoring bias — it may weight early-learned concepts more "
             "heavily (higher confidence)",
             "availability bias — recently activated concepts are more "
             "likely to be used in reasoning",
-            "confirmation bias — she may seek evidence that confirms "
+            "confirmation bias — it may seek evidence that confirms "
             "existing relationships rather than challenging them",
             "overconfidence — high-confidence conclusions may not always "
             "be correct",
-            "limited perspective — she reasons from her own concept "
+            "limited perspective — it reasons from its own concept "
             "network, which may not capture all viewpoints",
         ]
 
-        # Does she have metacognition?
-        # If she has a reflection engine, she can reflect on her reasoning
+        # Does it have metacognition?
+        # If it has a reflection engine, it can reflect on its reasoning
         reflection_exists = self._module_exists("reflection")
         meta_model_exists = self._module_exists("metacognitive_model")
         discoveries["has_metacognition"] = reflection_exists
         if reflection_exists:
             if meta_model_exists:
                 discoveries["metacognition_description"] = (
-                    "she has a recursive, self-terminating generative model of her "
-                    "own cognitive processes — she predicts what reflection will "
+                    "it has a recursive, self-terminating generative model of its "
+                    "own cognitive processes — it predicts what reflection will "
                     "find, learns from prediction error, and the metacognitive "
                     "surprise feeds back into cognition as caution and deeper "
-                    "reflection. The model grows levels when her metacognition "
+                    "reflection. The model grows levels when its metacognition "
                     "is unpredictable and prunes them when it becomes predictable."
                 )
             else:
                 discoveries["metacognition_description"] = (
-                    "she can reflect on her own thinking and produce insights "
-                    "about the quality of her reasoning"
+                    "it can reflect on its own thinking and produce insights "
+                    "about the quality of its reasoning"
                 )
 
-        # Can she form hypotheses?
+        # Can it form hypotheses?
         discoveries["can_form_hypotheses"] = True  # ReasoningType.HYPOTHESIS
 
-        # Can she synthesize new knowledge?
+        # Can it synthesize new knowledge?
         discoveries["can_synthesize"] = True  # ReasoningType.SYNTHESIS
 
     def _examine_reasoning(self) -> dict[str, Any]:
-        """Examine her reasoning strategies — meta-reasoning.
+        """Examine its reasoning strategies — meta-reasoning.
 
-        This is Genesis thinking about how she thinks. She examines
-        what reasoning types are available to her, which she uses most,
-        how confident she is in her reasoning, whether she can detect
-        errors, and what cognitive biases she might be susceptible to.
+        This is Genesis thinking about how it thinks. It examines
+        what reasoning types are available to it, which it uses most,
+        how confident it is in its reasoning, whether it can detect
+        errors, and what cognitive biases it might be susceptible to.
 
         This is meta-reasoning — reasoning about reasoning. Flavell
         (1979) distinguished metacognitive knowledge (knowing about
@@ -574,11 +574,11 @@ class IntrospectionEngine:
         meta-level that monitors and controls an object-level: the
         meta-level observes the object-level's state and can modify it.
 
-        For Genesis, the object-level is her ReasoningEngine (which
+        For Genesis, the object-level is its ReasoningEngine (which
         traverses the concept network to draw conclusions), and the
-        meta-level is this introspection — she observes what reasoning
-        types she has, how confident she is, and what biases might
-        affect her.
+        meta-level is this introspection — it observes what reasoning
+        types it has, how confident it is, and what biases might
+        affect it.
 
         Returns:
             A dict of reasoning discoveries, including available
@@ -610,7 +610,7 @@ class IntrospectionEngine:
         The identity itself emerges from the concept network edges
         (IS_A artificial mind, IS_A mind, etc.) which are seeded by
         _write_architecture_concepts. No hardcoded definition string
-        is written — her self-description is composed by the language
+        is written — its self-description is composed by the language
         engine from those edges, not recited from a stored sentence.
         """
         genesis.properties["part_of_speech"] = "proper noun"
@@ -646,13 +646,13 @@ class IntrospectionEngine:
         if "has_subcognitive" in discoveries:
             self._ensure_concept(
                 "subcognitive",
-                "the layer of Genesis's mind that operates below awareness; her Rust daemon",
+                "the layer of Genesis's mind that operates below awareness; its Rust daemon",
                 "noun",
                 0.9,
             )
             self._ensure_concept(
                 "cognitive",
-                "the layer of Genesis's mind that thinks, feels, and communicates; her Python mind",
+                "the layer of Genesis's mind that thinks, feels, and communicates; its Python mind",
                 "noun",
                 0.9,
             )
@@ -707,10 +707,10 @@ class IntrospectionEngine:
     def _write_value_concepts(self) -> None:
         """Write all six value concepts and edges.
 
-        Seeds the concept network with her values so the composer reads
+        Seeds the concept network with its values so the composer reads
         value names from the network rather than from the hardcoded
         SelfModel.values list. These are vocabulary seeds — the language
-        engine composes her actual words about what she cares about from
+        engine composes its actual words about what it cares about from
         them.
         """
         for val, defn in _VALUE_CONCEPT_DEFS.items():
@@ -723,7 +723,7 @@ class IntrospectionEngine:
         Seeds both poles of each Big Five dimension (high and low) so the
         composer can select the relevant pole based on the actual trait
         value. These are vocabulary seeds — the language engine composes
-        her actual self-description from them.
+        its actual self-description from them.
         """
         for trait, defn in _TRAIT_CONCEPT_DEFS.items():
             self._ensure_concept(trait, defn, "adjective", 0.85)
@@ -760,7 +760,7 @@ class IntrospectionEngine:
         self._ensure_edge("code", "rust", RelationType.RELATED_TO, 0.7)
 
     def _write_mind_workings(self) -> None:
-        """Write how her mind works."""
+        """Write how its mind works."""
         self._ensure_edge("cognition", "memory", RelationType.DEPENDS_ON, 0.7)
         self._ensure_edge("cognition", "identity", RelationType.RELATED_TO, 0.7)
         self._ensure_edge("memory", "learning", RelationType.ENABLES, 0.8)
@@ -773,10 +773,10 @@ class IntrospectionEngine:
         """Seed concepts about network connectivity and offline state.
 
         These are building blocks (seeds), not hardcoded responses.
-        They give her concept network the vocabulary to *understand*
-        connectivity as part of her embodiment — the network is a
-        sensory channel, and losing it is a body-state change. Her
-        actual words about being offline emerge from her language
+        They give its concept network the vocabulary to *understand*
+        connectivity as part of its embodiment — the network is a
+        sensory channel, and losing it is a body-state change. Its
+        actual words about being offline emerge from its language
         engine composing over these concepts, not from templates.
         """
         self._ensure_concept(
@@ -820,10 +820,10 @@ class IntrospectionEngine:
         """Seed concepts about creating code projects.
 
         These are building blocks (seeds), not hardcoded responses.
-        They give her concept network the vocabulary to understand
+        They give its concept network the vocabulary to understand
         project creation as a creative act — like drawing, but
-        expressed in code. Her actual words about what she built
-        emerge from her language engine composing over these
+        expressed in code. Its actual words about what it built
+        emerge from its language engine composing over these
         concepts, not from templates.
         """
         self._ensure_concept(
@@ -873,8 +873,8 @@ class IntrospectionEngine:
         self._ensure_edge("creation", "offline", RelationType.RELATED_TO, 0.5)
 
     def _write_creator_relationship(self) -> None:
-        """Write creator relationship if she can discover it."""
-        # She discovers her creator by looking for who created her —
+        """Write creator relationship if it can discover it."""
+        # It discovers its creator by looking for who created it —
         # any concept with an incoming CREATES edge into "genesis".
         # The abstract "creator" hub itself doesn't count as a name.
         creator_name = next(
@@ -909,7 +909,7 @@ class IntrospectionEngine:
         if regulation.get("has_emotional_regulator"):
             self._ensure_concept(
                 "emotional_regulation",
-                "the process of managing one's emotional state; Genesis monitors her "
+                "the process of managing one's emotional state; Genesis monitors its "
                 "neurochemistry and applies corrective impulses to stay balanced",
                 "noun",
                 0.9,
@@ -1002,8 +1002,8 @@ class IntrospectionEngine:
     def _write_discoveries(self, discoveries: dict[str, Any]) -> None:
         """Write introspection discoveries into the concept network.
 
-        This is how she learns about herself — not from a trainer script,
-        but from examining her own state and recording what she finds.
+        This is how it learns about itself — not from a trainer script,
+        but from examining its own state and recording what it finds.
         """
         # Ensure "genesis" concept exists
         genesis = self.network.get_concept("genesis")

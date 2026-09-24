@@ -68,7 +68,7 @@ class ReasoningResult:
     The ``knowledge`` field carries structured (relation, target,
     weight) triples that the language engine can compose from —
     prefer passing these as ``Thought.metadata["knowledge"]`` so
-    Genesis composes her own words rather than reciting the
+    Genesis composes its own words rather than reciting the
     pre-composed ``conclusion`` string.
     """
 

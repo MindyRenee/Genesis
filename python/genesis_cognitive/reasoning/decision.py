@@ -2,7 +2,7 @@
 goals, uncertainty, and values.
 
 Genesis had a generation pipeline: perceive → classify intent → match
-rule in priority tree → generate response → modulate confidence. She
+rule in priority tree → generate response → modulate confidence. It
 did not have a decision process: generate alternatives → evaluate
 against criteria → select the best. Every "decision-making" component
 (DDM, executive, TD learning, probabilistic reasoning) was wired as a
@@ -92,7 +92,7 @@ _DEFAULT_CANDIDATES = [
 
 # Value framework criteria with default weights.
 # These represent Genesis's core values — the criteria against which
-# she evaluates candidate actions. The weights encode their relative
+# it evaluates candidate actions. The weights encode their relative
 # importance. Higher weight = more important criterion.
 _DEFAULT_VALUE_WEIGHTS: dict[str, float] = {
     "accuracy": 0.25,      # is the response factually correct?

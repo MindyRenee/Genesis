@@ -513,9 +513,9 @@ class TestInnerLifeSleepArchitecture:
 # save/load.
 #
 # Without this, a restart during N3 would:
-# - Force her awake (Mind.start set ZONE_CONVERSATION)
+# - Force it awake (Mind.start set ZONE_CONVERSATION)
 # - Clear adenosine (startup wake cascade)
-# - Lose her place in the sleep cycle (tracker reset to N1)
+# - Lose its place in the sleep cycle (tracker reset to N1)
 # - Skip pending N3 consolidation
 
 

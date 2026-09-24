@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class VisualPercept:
     """A complete visual percept from the full hierarchy.
 
-    This is what Genesis cognitively experiences when she sees
+    This is what Genesis cognitively experiences when it sees
     something — the result of the full V1→V4→VTC→MTL pipeline
     plus the predictive coding errors at each level.
     """

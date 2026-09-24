@@ -1,4 +1,4 @@
-"""Volition — internal urges that decide when Genesis acts on herself.
+"""Volition — internal urges that decide when Genesis acts on itself.
 
 Unlike scheduled background loops, urges grow organically based on
 internal and environmental triggers. When an urge crosses its

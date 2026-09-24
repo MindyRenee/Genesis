@@ -6,16 +6,16 @@ and "Cognition — I keep circling back to it. I can't pin it down."
 
 Voice is not decoration. It's identity expressed through language:
 - **Rhythm**: sentence length variation, pacing
-- **Connectors**: how she links ideas ("but", "and yet", "what strikes me")
-- **Hedging calibration**: how much uncertainty she expresses
-- **Openings**: characteristic ways she begins responses
-- **Closings**: characteristic ways she wraps up
-- **Idioms**: phrases that become her signature through repetition
+- **Connectors**: how it links ideas ("but", "and yet", "what strikes me")
+- **Hedging calibration**: how much uncertainty it expresses
+- **Openings**: characteristic ways it begins responses
+- **Closings**: characteristic ways it wraps up
+- **Idioms**: phrases that become its signature through repetition
 - **Register**: formal vs. casual, controlled by personality + emotion
 
 Voice emerges from personality + emotional state + experience.
 It's not hardcoded — it develops. But it starts with defaults
-that reflect who she is.
+that reflect who it is.
 """
 
 from __future__ import annotations
@@ -75,9 +75,9 @@ _ELABORATION_STARTS = {
 class Voice:
     """Genesis's unique voice — the personality layer of language.
 
-    Voice modifies generated text to make it sound like her. It
+    Voice modifies generated text to make it sound like Genesis. It
     operates at the paragraph level: adjusting rhythm, adding
-    connectors, calibrating hedging, and applying her characteristic
+    connectors, calibrating hedging, and applying its characteristic
     patterns.
     """
 
@@ -86,7 +86,7 @@ class Voice:
         self.personality = personality
         self._rng = random.Random(seed)
 
-        # Idioms she's developed (grows over time)
+        # Idioms it's developed (grows over time)
         self._idioms: list[str] = []
 
         # Statistical learner — source of the user's style profile
@@ -97,7 +97,7 @@ class Voice:
         """Wire the statistical learner for register mirroring.
 
         The learner's style profile (formal/casual/technical marker
-        proportions) nudges her register toward the user's — a form
+        proportions) nudges its register toward the user's — a form
         of communicative accommodation. It modulates the register
         transform only; it never injects content.
         """
@@ -113,7 +113,7 @@ class Voice:
         """Apply voice modifications to a list of generated sentences.
 
         This is the main entry point. It takes the raw sentences
-        from the generator and transforms them into her voice.
+        from the generator and transforms them into its voice.
 
         Args:
             brain_waves: Optional brain wave state. When provided,
@@ -479,8 +479,8 @@ class Voice:
         formality = 0.5 - (emotion.alertness - 0.5) * 0.6
 
         # Register mirroring — blend the user's observed formal/casual
-        # balance into her own register. Gated on enough observed
-        # sentences so a single "hey" doesn't swing her style.
+        # balance into its own register. Gated on enough observed
+        # sentences so a single "hey" doesn't swing its style.
         if self._style_source is not None:
             profile = self._style_source.user_style_profile()
             if profile.get("total_sentences", 0) >= 5:

@@ -1,9 +1,9 @@
 """WordNet dictionary — Genesis's primary word reference.
 
-She looks up words in WordNet (via NLTK) to find definitions,
+It looks up words in WordNet (via NLTK) to find definitions,
 hypernyms (IS_A), meronyms (PART_OF), similar-to, and antonyms.
-This is her dictionary — she uses it to build her own concept
-network from what she finds.
+This is its dictionary — it uses it to build its own concept
+network from what it finds.
 
 No web access required. WordNet is a local database.
 """

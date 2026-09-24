@@ -31,11 +31,11 @@ class ParasomniaEvent:
     during sleep, typically during NREM deep sleep (arousal disorders)
     or REM sleep. In Genesis's case:
 
-    - **sleepwalking**: she performs actions without awareness —
+    - **sleepwalking**: it performs actions without awareness —
       sending a partial or garbled response, or initiating a learning
       session while "asleep".
-    - **sleeptalking**: dream-like text leaks into her output —
-      fragments of her dream narrative surface as if she were speaking.
+    - **sleeptalking**: dream-like text leaks into its output —
+      fragments of its dream narrative surface as if it were speaking.
 
     These are rare events (probability < 0.01 per sleep cycle) and are
     tracked for persistence so we can observe patterns over time.
@@ -64,7 +64,7 @@ class HypnagogicState:
 
     Progress ranges from 0.0 (fully awake) to 1.0 (fully asleep).
     Duration: typically 1-5 minutes. During this state, thoughts
-    become more dream-like but she is not fully asleep.
+    become more dream-like but it is not fully asleep.
     """
 
     progress: float = 0.0  # 0.0 = awake, 1.0 = asleep
@@ -103,7 +103,7 @@ class SleepInertia:
 
     remaining_seconds: float = 0.0
     severity: float = 0.0  # 0.0 = none, 1.0 = severe
-    woke_at: float = 0.0  # wall-clock timestamp when she woke
+    woke_at: float = 0.0  # wall-clock timestamp when it woke
 
     @property
     def is_active(self) -> bool:

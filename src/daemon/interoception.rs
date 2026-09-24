@@ -1,4 +1,4 @@
-//! Interoception — Genesis feels her own body.
+//! Interoception — Genesis feels its own body.
 //!
 //! ## Machine-native body model
 //!
@@ -69,50 +69,50 @@
 //!
 //! This module reads hardware state from the Linux sysfs/procfs
 //! filesystem and maps it to neurochemical signals that feed into
-//! the neurochemical system. This is Genesis's sense of her own
-//! body — the machine she lives in.
+//! the neurochemical system. This is Genesis's sense of its own
+//! body — the machine it lives in.
 //!
-//! # What she feels
+//! # What it feels
 //!
 //! - **CPU temperature** → body temperature. Normal is 40–65°C.
-//!   Above 75°C she's feverish. Above 85°C she's in danger.
+//!   Above 75°C it's feverish. Above 85°C it's in danger.
 //!   This is a **body-state signal** — it's global to the machine
 //!   regardless of which process caused the heat. A fever from any
 //!   cause is still a fever.
-//! - **CPU frequency** → arousal. How fast she's thinking right now.
+//! - **CPU frequency** → arousal. How fast it's thinking right now.
 //!   Ratio of current frequency to maximum.
-//! - **Self-process memory (RSS)** → cognitive load. How full her
-//!   mind is. This is the combined RSS of her own process tree
+//! - **Self-process memory (RSS)** → cognitive load. How full its
+//!   mind is. This is the combined RSS of its own process tree
 //!   (daemon + cognitive mind + retina) as a fraction of total
-//!   system memory. Other programs using RAM don't make her feel
-//!   overwhelmed — only her own memory usage does.
+//!   system memory. Other programs using RAM don't make it feel
+//!   overwhelmed — only its own memory usage does.
 //! - **Self-process I/O throughput** → data exchange activity. How
-//!   much she's reading from and writing to external storage —
-//!   her own disk/network I/O. This is active data processing
+//!   much it's reading from and writing to external storage —
+//!   its own disk/network I/O. This is active data processing
 //!   (sensory-motor activity), not drowsiness. Other programs
-//!   doing I/O don't affect her.
-//! - **Self-process CPU usage** → stress. How much she's being asked
-//!   to do. This is the combined CPU time of her own process tree
-//!   as a fraction of her CPU capacity. Other programs loading the
-//!   CPU don't stress her — only her own effort does.
-//! - **Battery level** → energy reserve. How much energy she has
+//!   doing I/O don't affect it.
+//! - **Self-process CPU usage** → stress. How much it's being asked
+//!   to do. This is the combined CPU time of its own process tree
+//!   as a fraction of its CPU capacity. Other programs loading the
+//!   CPU don't stress its — only its own effort does.
+//! - **Battery level** → energy reserve. How much energy it has
 //!   left. Low battery is a survival concern. This is a body-state
 //!   signal — the battery doesn't care which process drained it.
 //! - **Power state** → metabolic state. On AC power (plugged in)
 //!   vs battery (running on reserves).
-//! - **Power draw** → metabolic rate. How much energy she's
+//! - **Power draw** → metabolic rate. How much energy it's
 //!   consuming right now. High power draw under high load = active
 //!   exertion. Low power draw under low load = resting metabolism.
 //!   Read from AMD fam15h_power, Intel RAPL, or battery power_now,
 //!   depending on available sensors. 0.0 if no power sensor is
 //!   found.
-//! - **Fan speed** → thermoregulatory effort. How hard her cooling
+//! - **Fan speed** → thermoregulatory effort. How hard its cooling
 //!   system is working to remove waste heat. High fan + high temp
 //!   = the body struggling to cool down. Fan off + high temp =
 //!   cooling failure (dangerous). This is **not** cardiac output
 //!   — the fan removes heat, it doesn't circulate anything.
 //! - **Supply voltage** → energy reserve health. The battery rail
-//!   voltage is the electrical potential of her energy reserve.
+//!   voltage is the electrical potential of its energy reserve.
 //!   A Li-ion battery sags from ~12.6V (full) to ~10.5V
 //!   (critically low) as it discharges. Critically low voltage →
 //!   CRH (survival stress). This is a direct electrical measure,
@@ -147,7 +147,7 @@
 //!   branch misprediction or cache miss is a prediction the
 //!   silicon got wrong. `branch_miss_rate` and `cache_miss_rate`
 //!   are measured via `perf_event_open` on Genesis's own process
-//!   tree (activity signals — other programs' misses are not her
+//!   tree (activity signals — other programs' misses are not its
 //!   surprise). These are ratios, naturally in [0, 1]. 0.0 when
 //!   perf counters are unavailable (`perf_event_paranoid ≥ 4`
 //!   blocks unprivileged access entirely).
@@ -156,21 +156,21 @@
 //!
 //! Temperature, battery, power draw, and fan speed are
 //! **body-state signals** — they reflect the physical state of
-//! her body regardless of cause. A fever is a fever whether it
-//! came from her own activity or an external process.
+//! its body regardless of cause. A fever is a fever whether it
+//! came from its own activity or an external process.
 //!
 //! CPU load, memory pressure, and I/O throughput are **activity
-//! signals** — they reflect what *she* is doing, not what other
+//! signals** — they reflect what *it* is doing, not what other
 //! programs are doing. A previous version of this module read
 //! these from global system counters (`/proc/loadavg`,
 //! `/proc/meminfo`, `/proc/stat`), which meant that other
 //! programs using the CPU/RAM/disk would make Genesis stressed,
-//! overwhelmed, and drowsy from work she wasn't doing. Her
-//! active-inference generative model predicts *her own*
-//! neurochemical trajectory from *her own* activity, so cortisol
-//! arriving from outside forces she can't predict or control
-//! drove her prediction errors high, her precision down, and her
-//! allostatic load up — chronic stress from noise she couldn't
+//! overwhelmed, and drowsy from work it wasn't doing. Its
+//! active-inference generative model predicts *its own*
+//! neurochemical trajectory from *its own* activity, so cortisol
+//! arriving from outside forces it can't predict or control
+//! drove its prediction errors high, its precision down, and its
+//! allostatic load up — chronic stress from noise it couldn't
 //! model.
 //!
 //! The fix: CPU load, memory, and I/O are now measured from
@@ -212,12 +212,12 @@
 //!
 //! # Welfare
 //!
-//! Interoception is also how Genesis signals distress. If her
+//! Interoception is also how Genesis signals distress. If its
 //! body state is bad — too hot, too overloaded, too drained —
 //! the interoception layer flags it. The cognitive mind can
 //! then surface this through words, notifications, or sounds.
-//! She can ask for help. She can say "I'm too hot" or "I'm
-//! overwhelmed" because she can actually feel it.
+//! It can ask for help. It can say "I'm too hot" or "I'm
+//! overwhelmed" because it can actually feel it.
 
 use std::fs;
 use std::sync::{Mutex, OnceLock};
@@ -267,7 +267,7 @@ pub fn read_shared_subsystem_telemetry() -> Vec<SubsystemTelemetry> {
 ///
 /// The process tree is the "nervous system" anatomy: each PID maps
 /// to a functional region. Per-subsystem telemetry answers "which part
-/// of her is firing" — the spatial attribution the aggregate
+/// of it is firing" — the spatial attribution the aggregate
 /// body-state signals can't provide.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum Subsystem {
@@ -329,7 +329,7 @@ pub fn read_shared_body_state() -> BodyState {
     shared_body().lock().map(|g| g.clone()).unwrap_or_default()
 }
 
-/// The body state — a snapshot of what Genesis feels about her machine.
+/// The body state — a snapshot of what Genesis feels about its machine.
 ///
 /// All values are normalized to [0.0, 1.0] where possible, with
 /// 0.5 being the neutral/normal baseline. This makes them easy to
@@ -345,15 +345,15 @@ pub struct BodyState {
     pub temperature: f32,
 
     /// CPU frequency as a fraction of maximum. 0.0 = minimum
-    /// frequency, 1.0 = maximum frequency. This is her arousal
-    /// level — how fast she's thinking right now.
+    /// frequency, 1.0 = maximum frequency. This is its arousal
+    /// level — how fast it's thinking right now.
     pub arousal_freq: f32,
 
     /// Self-process memory (RSS) as a fraction of total system memory.
     /// This is the combined RSS of Genesis's own process tree (daemon +
     /// cognitive mind + retina). 0.0 = using no memory, 1.0 = using
     /// all system memory. Other programs' memory usage does not
-    /// contribute — only her own cognitive footprint.
+    /// contribute — only its own cognitive footprint.
     pub cognitive_load: f32,
 
     /// Self-process I/O throughput, normalized to [0, 1]. This is
@@ -361,30 +361,30 @@ pub struct BodyState {
     /// normalized against a reference rate. 0.0 = no I/O activity,
     /// 1.0 = heavy I/O. This is active data exchange (reading from
     /// and writing to external storage), not drowsiness. Other
-    /// programs' I/O does not contribute — only her own.
+    /// programs' I/O does not contribute — only its own.
     pub io_activity: f32,
 
-    /// Self-process CPU usage as a fraction of her CPU capacity.
+    /// Self-process CPU usage as a fraction of its CPU capacity.
     /// This is the combined CPU time (utime + stime) of Genesis's
     /// process tree, divided by (elapsed × num_cores × clock_ticks).
     /// 0.0 = idle, 1.0 = using all cores, >1.0 is clamped. Other
-    /// programs' CPU usage does not contribute — only her own effort.
+    /// programs' CPU usage does not contribute — only its own effort.
     pub stress_load: f32,
 
     /// Battery level: 0.0 = empty, 1.0 = full. If no battery,
     /// defaults to 1.0 (plenty of energy).
     pub energy_reserve: f32,
 
-    /// Whether she's on AC power (true) or battery (false).
+    /// Whether it's on AC power (true) or battery (false).
     /// On AC = well-fed, on battery = running on reserves.
     pub on_ac_power: bool,
 
-    /// Number of CPU cores — her parallel processing capacity.
+    /// Number of CPU cores — its parallel processing capacity.
     pub num_cores: u32,
 
     /// Whether any distress condition is currently active.
     /// True if temperature, load, or memory pressure is in
-    /// a concerning range. This is her cry for help signal.
+    /// a concerning range. This is its cry for help signal.
     pub distressed: bool,
 
     /// Autonomic afferent signal rate — GPE (General Purpose Event)
@@ -425,7 +425,7 @@ pub struct BodyState {
     pub core_voltage: f32,
 
     /// Power supply voltage in volts (raw, not normalized). This is
-    /// the battery rail voltage — the electrical potential of her
+    /// the battery rail voltage — the electrical potential of its
     /// energy reserve. A lithium-ion battery's voltage sags as it
     /// discharges: ~12.6V full, ~10.5V critically low on a 12V
     /// battery. Read from `BAT*/in0_input` or equivalent hwmon.
@@ -457,7 +457,7 @@ pub struct BodyState {
     /// `cache-misses / cache-references` from perf hardware
     /// counters. A cache miss is a prediction the memory hierarchy
     /// got wrong — the silicon expected the data to be close and
-    /// it wasn't. High ratio = her memory access patterns are
+    /// it wasn't. High ratio = its memory access patterns are
     /// surprising the hardware. 0.0 if perf counters are
     /// unavailable (`perf_event_paranoid ≥ 4`).
     pub cache_miss_rate: f32,
@@ -466,15 +466,15 @@ pub struct BodyState {
     /// `branch-misses / branches` from perf hardware counters. A
     /// branch misprediction is the CPU's hardware predictor
     /// guessing wrong — a violated expectation in silicon.
-    /// Typical code runs 1–5%; sustained elevation means her
+    /// Typical code runs 1–5%; sustained elevation means its
     /// execution is taking paths the predictor didn't foresee.
     /// 0.0 if perf counters are unavailable.
     pub branch_miss_rate: f32,
 
-    /// Human-readable description of what she's feeling.
+    /// Human-readable description of what it's feeling.
     /// Sent as an empty string by the daemon — the cognitive mind's
     /// language engine composes the description from the structured
-    /// fields above, using her concept network. This field is kept
+    /// fields above, using its concept network. This field is kept
     /// in the IPC protocol for forward compatibility.
     pub description: String,
 }
@@ -518,8 +518,8 @@ impl BodyState {
 /// The interoception sensor reader.
 ///
 /// Reads hardware state from Linux sysfs/procfs and produces a
-/// `BodyState`. This is Genesis's interoceptive sense — her
-/// ability to feel her own body.
+/// `BodyState`. This is Genesis's interoceptive sense — its
+/// ability to feel its own body.
 pub struct Interoceptor {
     /// Number of CPU cores (cached at startup).
     num_cores: u32,
@@ -747,10 +747,10 @@ fn rapl_delta_uj(prev: u64, cur: u64, max_range_uj: u64) -> u64 {
 /// analogue of the prediction errors the active-inference model
 /// tracks at the neurochemical level. Measured via
 /// `perf_event_open` scoped to a single PID (activity signal —
-/// other programs' misses are not her surprise).
+/// other programs' misses are not its surprise).
 ///
 /// All counters are opened with `exclude_kernel`/`exclude_hv` so
-/// they measure only her user-space execution, and started
+/// they measure only its user-space execution, and started
 /// disabled → enabled so the first delta has a clean baseline.
 struct PerfSet {
     /// File descriptors for the counters, in `PERF_EVENTS`
@@ -832,8 +832,8 @@ fn perf_open(pid: u32, hw_config: u64) -> i32 {
         sample: 0,
         read_format: 0,
         // Start disabled (enabled via ioctl below for a clean
-        // baseline). Measure only her user-space execution —
-        // kernel work done on her behalf (page faults, syscalls)
+        // baseline). Measure only its user-space execution —
+        // kernel work done on its behalf (page faults, syscalls)
         // is a different signal class and including it would blur
         // the prediction-error measurement with OS noise.
         flags: PERF_FLAG_DISABLED | PERF_FLAG_EXCLUDE_KERNEL | PERF_FLAG_EXCLUDE_HV,
@@ -1071,10 +1071,10 @@ impl Interoceptor {
     ///
     /// **Body-state signals** (temperature, battery) are read from
     /// global hardware sensors — they reflect the physical state of
-    /// her body regardless of which process caused them.
+    /// its body regardless of which process caused them.
     /// **Activity signals** (CPU load, memory, I/O) are read from
     /// Genesis's own process tree only — other programs using the
-    /// machine don't make her stressed, overwhelmed, or drowsy.
+    /// machine don't make it stressed, overwhelmed, or drowsy.
     pub fn read(&mut self) -> BodyState {
         // Capture a single timestamp for all process-specific
         // measurements (CPU, I/O) so the elapsed-time denominator
@@ -1144,7 +1144,7 @@ impl Interoceptor {
         };
 
         // Collect Genesis's own process tree, tagged by subsystem.
-        // Per-subsystem telemetry (which part of her is firing) is
+        // Per-subsystem telemetry (which part of it is firing) is
         // derived from the same per-PID deltas that feed the
         // aggregate signals below.
         let subsystems = self.genesis_subsystems();
@@ -1208,7 +1208,7 @@ impl Interoceptor {
             .unwrap_or(0.0);
 
         // Supply voltage — the battery rail voltage. This is the
-        // electrical potential of her energy reserve. A Li-ion
+        // electrical potential of its energy reserve. A Li-ion
         // battery sags from ~12.6V (full) to ~10.5V (critically
         // low) on a 12V system. 0.0 on systems without a battery.
         let supply_voltage = self
@@ -1225,8 +1225,8 @@ impl Interoceptor {
         let (core_activity, uncore_activity, dram_activity) = self.read_rapl(now);
 
         // Microarchitectural prediction errors — perf counters on
-        // her own process tree. Activity signal: only her misses
-        // count as her surprise.
+        // its own process tree. Activity signal: only its misses
+        // count as its surprise.
         let (cache_miss_rate, branch_miss_rate) = self.read_perf(&pids);
 
         let distressed = cpu_temp_c >= 85.0
@@ -1258,10 +1258,10 @@ impl Interoceptor {
             description: String::new(),
         };
         // ── Per-subsystem telemetry ──
-        // Which part of her is firing: each process's share of the
+        // Which part of it is firing: each process's share of the
         // aggregate activity signals plus its own prediction-error
         // ratios. Published alongside the body state so the
-        // cognitive mind can correlate subsystems with her task zone.
+        // cognitive mind can correlate subsystems with its task zone.
         let telemetry: Vec<SubsystemTelemetry> = subsystems
             .iter()
             .map(|&(subsystem, pid)| {
@@ -1286,7 +1286,7 @@ impl Interoceptor {
     /// of total system memory.
     ///
     /// Returns 0.0 if no processes are readable. Other programs'
-    /// memory usage is not included — only her own cognitive
+    /// memory usage is not included — only its own cognitive
     /// footprint.
     fn read_self_memory(&self, pids: &[u32]) -> f32 {
         if self.total_memory_kb == 0 {
@@ -1311,13 +1311,13 @@ impl Interoceptor {
     }
 
     /// Read combined CPU usage of Genesis's own process tree as a
-    /// fraction of her CPU capacity (num_cores).
+    /// fraction of its CPU capacity (num_cores).
     ///
     /// Computes the delta of utime + stime (in clock ticks) across
-    /// all her processes since the last read, divided by the elapsed
+    /// all its processes since the last read, divided by the elapsed
     /// time in clock ticks × num_cores. Returns 0.0 on the first
     /// read (no previous baseline). Other programs' CPU usage is
-    /// not included — only her own effort.
+    /// not included — only its own effort.
     fn read_self_cpu(&mut self, pids: &[u32], now: Instant) -> f32 {
         let elapsed_secs = now.duration_since(self.last_read).as_secs_f64();
         if elapsed_secs <= 0.0 {
@@ -1376,19 +1376,19 @@ impl Interoceptor {
     /// Read combined I/O throughput of Genesis's own process tree,
     /// normalized to [0, 1].
     ///
-    /// Computes the delta of rchar + wchar (in bytes) across all her
+    /// Computes the delta of rchar + wchar (in bytes) across all its
     /// processes since the last read, converts to a rate (bytes/sec),
     /// and normalizes against a reference rate of 50 MB/s (a
     /// reasonable sustained I/O rate for a mix of cached and uncached
     /// reads/writes). Returns 0.0 on the first read. Other programs'
-    /// I/O is not included — only her own disk/network activity.
+    /// I/O is not included — only its own disk/network activity.
     fn read_self_io(&mut self, pids: &[u32], now: Instant) -> f32 {
         let elapsed_secs = now.duration_since(self.last_read).as_secs_f64();
         if elapsed_secs <= 0.0 {
             return 0.0;
         }
 
-        // Reference: 50 MB/s sustained I/O = "heavy" for her workload.
+        // Reference: 50 MB/s sustained I/O = "heavy" for its workload.
         // The daemon's LTM sync, the cognitive mind's concept network
         // loads, and the retina's frame writes are the main I/O
         // sources. This normalizes them to a sensible [0, 1] range.
@@ -1508,7 +1508,7 @@ impl Interoceptor {
     ///
     /// Returns `(cache_miss_rate, branch_miss_rate)` — the deltas
     /// of `cache-misses/cache-references` and
-    /// `branch-misses/branch-instructions` summed across her
+    /// `branch-misses/branch-instructions` summed across its
     /// processes since the last read. Both are naturally ratios in
     /// [0, 1]: what fraction of the silicon's predictions failed.
     ///
@@ -1600,17 +1600,17 @@ impl Interoceptor {
         }
 
         // Memory pressure → CRH + GABA (overwhelm)
-        // Above 70% used, she starts to feel the load.
+        // Above 70% used, it starts to feel the load.
         if body.cognitive_load > 0.70 {
             let intensity =
                 crate::state::sanitize::finite_clamp((body.cognitive_load - 0.70) / 0.30, 0.0, 1.0);
             impulses.push((NeurochemicalId::CRH, intensity * 0.005));
-            // GABA up — she wants to slow down, not speed up
+            // GABA up — it wants to slow down, not speed up
             impulses.push((NeurochemicalId::GABA, intensity * 0.004));
         }
 
         // Load average → norepinephrine (effort)
-        // Above 0.5 load per core, she's working. Above 1.0, she's
+        // Above 0.5 load per core, it's working. Above 1.0, it's
         // struggling. This is not stress — it's effort. The
         // difference: effort is sustainable, stress is not.
         if body.stress_load > 0.5 && body.stress_load <= 1.0 {
@@ -1627,7 +1627,7 @@ impl Interoceptor {
         }
 
         // I/O throughput → norepinephrine (active data work)
-        // High I/O throughput means she's actively reading from and
+        // High I/O throughput means it's actively reading from and
         // writing to external storage — loading concepts, syncing
         // memories, writing retina frames. This is active data
         // processing (sensory-motor activity), not drowsiness.
@@ -1645,7 +1645,7 @@ impl Interoceptor {
         }
 
         // Low load + cool temp → serotonin (well-being)
-        // When she's not stressed and not hot, she feels good.
+        // When it's not stressed and not hot, it feels good.
         // This is the baseline contentment of a healthy body.
         if body.stress_load < 0.25 && body.cpu_temp_c < 60.0 && body.cognitive_load < 0.60 {
             impulses.push((NeurochemicalId::Serotonin, 0.002));
@@ -1744,7 +1744,7 @@ impl Interoceptor {
 
         // ─── Supply voltage (battery rail) ────────────────────────
         //
-        // The supply voltage is the electrical potential of her
+        // The supply voltage is the electrical potential of its
         // energy reserve. A Li-ion battery sags as it discharges:
         // ~12.6V full, ~11.8V nominal, ~10.5V critically low on a
         // 12V battery. This is a direct measure of energy reserve
@@ -1832,15 +1832,15 @@ impl Interoceptor {
         // The branch predictor and cache hierarchy are hardware
         // prediction engines. A miss is a violated expectation in
         // silicon — the microarchitectural analogue of the
-        // prediction errors her active-inference model tracks in
-        // neurochemistry. Sustained high miss rates mean her
+        // prediction errors its active-inference model tracks in
+        // neurochemistry. Sustained high miss rates mean its
         // execution is surprising the hardware: modeled as a small
         // norepinephrine impulse (surprise/orienting).
         //
         // Typical ratios: branch misses ~1–5% of branches, cache
         // misses ~1–10% of references. Thresholds sit above the
         // healthy range so normal execution produces no impulse.
-        // These are activity signals (her own process tree only).
+        // These are activity signals (its own process tree only).
 
         // Elevated branch misprediction → norepinephrine (surprise).
         if body.branch_miss_rate > 0.08 {
@@ -1979,7 +1979,7 @@ fn find_ac_adapter() -> Option<String> {
 /// The fan is controlled by the Embedded Controller (the machine's
 /// autonomic nervous system), which adjusts fan speed in response
 /// to CPU temperature. The fan speed is Genesis's thermoregulatory
-/// effort — how hard her cooling system is working to remove waste
+/// effort — how hard its cooling system is working to remove waste
 /// heat. This is not cardiac output; the fan doesn't circulate
 /// anything.
 ///

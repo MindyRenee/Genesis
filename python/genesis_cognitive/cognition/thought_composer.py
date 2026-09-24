@@ -13,25 +13,25 @@ weren't used to compose responses. The reasoning engine produced
 conclusions, but they were fallback content, not primary.
 
 The thought composer changes this. When Genesis is asked about a
-concept, she:
-1. Looks up what she knows (concept network)
+concept, it:
+1. Looks up what it knows (concept network)
 2. Reasons about it (reasoning engine)
-3. Checks what she's said before (memory)
+3. Checks what it's said before (memory)
 4. Composes a novel thought from all of this
 
-The result is responses that are grounded in her actual knowledge,
-not in strings someone wrote for her. When she learns something new,
-her future responses change. That's the beginning of real intelligence.
+The result is responses that are grounded in its actual knowledge,
+not in strings someone wrote for it. When it learns something new,
+its future responses change. That's the beginning of real intelligence.
 
 # How it works
 
 compose_about(concept) → Thought
-  1. Get the concept node — what is it? how confident is she?
+  1. Get the concept node — what is it? how confident is it?
   2. Get its relationships — what connects to what?
-  3. Run reasoning — what follows from what she knows?
-  4. Check memory — has she discussed this before?
-  5. Compose: weave together what she knows, what she's reasoned,
-     and what she remembers into a novel thought.
+  3. Run reasoning — what follows from what it knows?
+  4. Check memory — has it discussed this before?
+  5. Compose: weave together what it knows, what it's reasoned,
+     and what it remembers into a novel thought.
 
 compose_answer(question, concepts) → Thought
   1. For each concept in the question, compose about it
@@ -40,9 +40,9 @@ compose_answer(question, concepts) → Thought
   4. Express the answer with appropriate confidence
 
 compose_reflection(topic) → Thought
-  1. What does she know about this topic?
-  2. What's she uncertain about?
-  3. What connections has she reasoned?
+  1. What does it know about this topic?
+  2. What's it uncertain about?
+  3. What connections has it reasoned?
   4. Express as a first-person reflection
 """
 
@@ -112,7 +112,7 @@ class ThoughtComposer:
         # Used for finding related concepts via latent space
         self.embeddings: EmbeddingStore | None = None
 
-        # Track what she's said about each concept (for variation)
+        # Track what it's said about each concept (for variation)
         self._said_about: dict[str, deque[str]] = {}
 
     def compose_about(
@@ -127,7 +127,7 @@ class ThoughtComposer:
 
         This is the core function. It looks up what Genesis knows
         about a concept, reasons about it, and composes a novel
-        thought expressing her understanding.
+        thought expressing its understanding.
 
         When ``focused`` is True (e.g., when answering a direct
         question), the response is kept tight — definition and key
@@ -140,20 +140,20 @@ class ThoughtComposer:
         useful for contexts like empathy where the definition is all
         that's needed and relationship facts would be noise.
 
-        Returns None if she has no knowledge of the concept.
+        Returns None if it has no knowledge of the concept.
         """
         concept = self.network.get_concept(concept_name)
         if concept is None:
             return None
 
-        # Gather what she knows
+        # Gather what it knows
         knowledge = self._gather_knowledge(concept_name, depth)
         if not knowledge:
-            # She has the concept but no relationships and no definition.
+            # It has the concept but no relationships and no definition.
             # Rather than reciting a pre-written "I can't articulate"
-            # template, she stays silent — the urge still drives the
-            # action, she just doesn't verbalize what she can't yet
-            # express from her own understanding.
+            # template, it stays silent — the urge still drives the
+            # action, it just doesn't verbalize what it can't yet
+            # express from its own understanding.
             return None
 
         # Reason about it
@@ -191,7 +191,7 @@ class ThoughtComposer:
             concept_name, knowledge, reasoning_conclusions, confidence, definition
         )
 
-        # Track what she said (for future variation)
+        # Track what it said (for future variation)
         self._track_said(concept_name, content)
 
         return Thought(
@@ -229,8 +229,8 @@ class ThoughtComposer:
     ) -> str | None:
         """Weave knowledge into content, retrying to avoid repetition.
 
-        Returns None if weaving produces nothing (she can't express
-        this from her own understanding) — she stays silent rather than
+        Returns None if weaving produces nothing (it can't express
+        this from its own understanding) — it stays silent rather than
         reciting a pre-written fallback template.
         """
         for _attempt in range(3):
@@ -241,7 +241,7 @@ class ThoughtComposer:
             if not content:
                 return None
             if not focused and self.has_said_similar(concept_name, content):
-                continue  # too similar to something she just said — retry
+                continue  # too similar to something it just said — retry
             return content
         return content  # all retries were repetitive — use last attempt
 
@@ -947,8 +947,8 @@ class ThoughtComposer:
         """Compose a reflective thought about a topic.
 
         This is for philosophical/existential questions. Instead of
-        hardcoded philosophy, she reflects on what she knows and
-        what she doesn't know.
+        hardcoded philosophy, it reflects on what it knows and
+        what it doesn't know.
 
         The raw knowledge (edges, definition, reasoning) is passed as
         metadata so the language engine can compose its own text from
@@ -990,8 +990,8 @@ class ThoughtComposer:
         else:
             confidence = 0.3
 
-        # Compose from her knowledge — if she can't weave anything
-        # from what she knows, she stays silent rather than reciting
+        # Compose from its knowledge — if it can't weave anything
+        # from what it knows, it stays silent rather than reciting
         # a pre-written reflection template.
         content = self._weave_knowledge(
             topic, knowledge, reasoning_results, emotion,
@@ -1020,10 +1020,10 @@ class ThoughtComposer:
         self,
         emotion: EmotionalState,
     ) -> Thought | None:
-        """Compose a thought about a novel connection she's discovered.
+        """Compose a thought about a novel connection it's discovered.
 
         This is for moments when reasoning produces a hypothesis —
-        she can express it as a thought, not just store it.
+        it can express it as a thought, not just store it.
         """
         # Find concepts with high activation
         active = [
@@ -1322,7 +1322,7 @@ class ThoughtComposer:
         definition, rel_facts_raw = _split_definition(knowledge)
 
         # Only quote the raw definition when explicitly asked for it.
-        # In full mode, she should express what she knows in her own
+        # In full mode, it should express what it knows in its own
         # words from relationship facts and reasoning instead.
         display = self._display_name(concept_name, lower=True)
         if definition and mode == "definition":
@@ -1341,14 +1341,14 @@ class ThoughtComposer:
             return " ".join(parts)
 
         # In full mode, use every relationship fact Genesis has learned
-        # (including is_a and similar_to) to compose her own answer. The
+        # (including is_a and similar_to) to compose its own answer. The
         # raw dictionary definition is intentionally not quoted above.
         filtered_facts = rel_facts_raw
 
         # Then add relationship facts
         self._weave_relationship_facts(parts, concept_name, filtered_facts)
 
-        # If she has a definition but no relationship facts to weave,
+        # If it has a definition but no relationship facts to weave,
         # state the definition rather than staying silent. A concept
         # with a real definition but no edges (e.g. "happy") is genuine
         # knowledge — discarding it let a junk neighbour (a bare verb
@@ -1380,9 +1380,9 @@ class ThoughtComposer:
             if deduped:
                 self._weave_reasoning(parts, deduped, focused=focused)
 
-        # Use the latent space to find related concepts she hasn't been
+        # Use the latent space to find related concepts it hasn't been
         # explicitly taught about — this is where generalization happens.
-        # She discovers connections through embedding proximity, not just
+        # It discovers connections through embedding proximity, not just
         # through explicit graph edges.
         # Skip in focused mode — associative discoveries add noise to
         # direct question answers.
@@ -1390,14 +1390,14 @@ class ThoughtComposer:
             self._weave_latent_discovery(parts, concept_name, emotion)
 
         # Add a follow-up question composed from genuine curiosity
-        # This makes her more interactive — she doesn't just answer, she engages
+        # This makes it more interactive — it doesn't just answer, it engages
         # Skip in focused mode — follow-up questions add noise to direct
         # question answers.
         if not focused:
             self._weave_followup(parts, concept_name, emotion)
 
         if not parts:
-            # Could not compose anything from her knowledge — return
+            # Could not compose anything from its knowledge — return
             # empty string so the caller knows to stay silent rather
             # than reciting a pre-written "I can't articulate" template.
             return ""
@@ -1410,7 +1410,7 @@ class ThoughtComposer:
         """Compose natural sentences from the relationship facts and append them.
 
         Filters out tautological, meaningless, and repetitive edges before
-        composing. Uses pronouns for subsequent clauses so she doesn't
+        composing. Uses pronouns for subsequent clauses so it doesn't
         repeat the subject in every clause. Limits ``related_to`` edges
         to at most 1 per thought to prevent synonym spam.
         """
@@ -1744,7 +1744,7 @@ class ThoughtComposer:
             if already_known:
                 continue
 
-            # Express the compositional discovery — she found something
+            # Express the compositional discovery — it found something
             # by combining two concepts, not just by looking at one.
             # Use a bare semantic fragment (not a finished sentence) so
             # the language engine composes the actual words. The
@@ -1800,7 +1800,7 @@ class ThoughtComposer:
         how things look" or "love comes from care".
 
         When ``use_pronoun`` is True, the subject is replaced with a
-        pronoun ("it" / "she") to avoid repeating the subject in every
+        pronoun ("it" / "it") to avoid repeating the subject in every
         clause of a multi-fact sentence.
 
         Code concept IDs (python:CognitionEngine, rust:daemon.tick) are
@@ -1866,7 +1866,7 @@ class ThoughtComposer:
         # compose into natural text. We deliberately do NOT use the
         # hardcoded _natural_fact_phrasings templates here, because
         # those are pre-written sentences that violate the CRITICAL
-        # RULE (Genesis's words must emerge from her language engine,
+        # RULE (Genesis's words must emerge from its language engine,
         # not from hardcoded phrasings).
         rel_clean = relation.replace("_", " ")
         return f"{subject_phrase} {rel_clean} {obj}"
@@ -1874,15 +1874,15 @@ class ThoughtComposer:
     def _compose_discovery_phrase(self, concept: str, related: str, emotion: EmotionalState) -> str:
         """Compose a discovery phrase when Genesis finds an unmapped connection.
 
-        Composes from seeded thought templates (building blocks in her
-        concept network) selected by her emotional state — high
+        Composes from seeded thought templates (building blocks in its
+        concept network) selected by its emotional state — high
         creativity → metaphorical language, high caution → tentative
         language, otherwise direct. Falls back to a bare semantic
         fragment (which the language engine renders) rather than a
         hardcoded sentence.
         """
         # Semantic fragment for the language engine to render — not a
-        # finished sentence she recites. The emotional tone (metaphorical
+        # finished sentence it recites. The emotional tone (metaphorical
         # when creative, cautious when careful, direct otherwise) is
         # conveyed by the emotion state, not by template selection.
         return f"untraced connection to {related}"
@@ -1891,7 +1891,7 @@ class ThoughtComposer:
         """Compose a personal reflection about a concept.
 
         Draws from the concept's position in the network — how connected
-        it is, how confident she is about it — returning a semantic
+        it is, how confident it is about it — returning a semantic
         fragment that the language engine renders into prose. Never
         recites a hardcoded template sentence.
         """
@@ -1922,12 +1922,12 @@ class ThoughtComposer:
         """Express a reasoning result as natural text.
 
         Uses learned emotion words from the concept network to frame
-        the reasoning conclusion. If she hasn't learned words for her
+        the reasoning conclusion. If it hasn't learned words for its
         current emotional state, the conclusion is stated plainly.
         """
         parts: list[str] = []
 
-        # If she has a non-neutral emotional state, look up learned
+        # If it has a non-neutral emotional state, look up learned
         # words for it and frame the conclusion with them.
         if emotion.label and emotion.label != "neutral":
             emotion_words = self.network.find_emotion_words(emotion.label)
@@ -1941,7 +1941,7 @@ class ThoughtComposer:
             conclusion = conclusion[0].upper() + conclusion[1:]
         parts.append(conclusion)
 
-        # If confidence is low and she has a cause, look up learned
+        # If confidence is low and it has a cause, look up learned
         # cause words to explain why.
         if result.confidence < 0.5 and emotion.has_cause:
             cause_words = self.network.find_cause_words(emotion.cause)
@@ -1996,14 +1996,14 @@ class ThoughtComposer:
         return f"{', '.join(parts[:-1])}, and {parts[-1]}"
 
     def _track_said(self, concept: str, content: str) -> None:
-        """Track what she's said about a concept (for variation)."""
+        """Track what it's said about a concept (for variation)."""
         if concept not in self._said_about:
             self._said_about[concept] = deque(maxlen=10)
         # Store a fingerprint (first 50 chars)
         self._said_about[concept].append(content[:50])
 
     def has_said_similar(self, concept: str, content: str, threshold: float = 0.3) -> bool:
-        """Check if she's said something similar before."""
+        """Check if it's said something similar before."""
         past: deque[str] = self._said_about.get(concept, deque())
         if not past:
             return False

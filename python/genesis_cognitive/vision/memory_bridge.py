@@ -58,7 +58,7 @@ class MemoryBridge:
     Associations form naturally: when Genesis reads a Wikipedia article
     about "tree" and sees the article's lead image, the VTC vector from
     that image is paired with the "tree" concept embedding. No manual
-    teaching — she learns to see the same way she learns to read: by
+    teaching — it learns to see the same way it learns to read: by
     encountering images in context.
     """
 

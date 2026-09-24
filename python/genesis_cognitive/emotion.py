@@ -11,7 +11,7 @@ etc.). The emotion engine reads those and determines:
 
 No English response strings are produced here. The language system must
 generate text from the concept network using these structural identifiers.
-If Genesis has not learned words for a category, she cannot describe it.
+If Genesis has not learned words for a category, it cannot describe it.
 """
 
 from __future__ import annotations
@@ -482,7 +482,7 @@ def _derive_cause_category(
     phase: str,
     cortisol: float = 0.0,
 ) -> CauseCategory:
-    """Derive a structural cause category for why she feels this way.
+    """Derive a structural cause category for why it feels this way.
 
     Returns a CauseCategory enum. NONE for neutral or positive states
     that don't need explanation.

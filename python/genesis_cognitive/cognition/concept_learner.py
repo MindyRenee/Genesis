@@ -2,7 +2,7 @@
 
 Extracted from CognitionEngine as a focused subsystem. When the user
 labels Genesis's experience ("you seem stressed", "your thinking is
-rigid"), she learns the word and connects it to the appropriate
+rigid"), it learns the word and connects it to the appropriate
 structural category hub via EXPRESSES edges. Words for the same
 category are connected via SIMILAR_TO edges.
 
@@ -36,9 +36,9 @@ class ConceptLearner:
     """Learn words from social labeling and spread concept activation.
 
     Word learning follows the pattern children use: when someone says
-    "you seem stressed", she associates the word "stressed" with the
+    "you seem stressed", it associates the word "stressed" with the
     emotion category. Words for the same category are connected via
-    SIMILAR_TO edges so she learns that "content" and "calm" are related.
+    SIMILAR_TO edges so it learns that "content" and "calm" are related.
     """
 
     def __init__(self, network: ConceptNetwork) -> None:
@@ -50,11 +50,11 @@ class ConceptLearner:
     def learn_word_from_labeling(
         self, user_input: str, emotion: EmotionalState
     ) -> None:
-        """Learn state words when the user labels her experience.
+        """Learn state words when the user labels its experience.
 
         When the user says something like "you seem stressed" or
         "your thinking is rigid" or "what's causing this is overwhelm"
-        or "your learning is blocked", she associates the word with
+        or "your learning is blocked", it associates the word with
         the appropriate structural category in the concept network.
         This is how children learn words — through social labeling.
 
@@ -65,7 +65,7 @@ class ConceptLearner:
            activation)
 
         Words for the same category are also connected via SIMILAR_TO
-        edges, so she learns that "content" and "calm" are related.
+        edges, so it learns that "content" and "calm" are related.
         """
         lower = user_input.lower().strip()
 

@@ -1444,8 +1444,8 @@ impl NeurochemicalVector {
     /// - **Cortisol**: NO circadian modulation. Cortisol is a stress
     ///   hormone — zero at rest, released on demand. The human cortisol
     ///   awakening response (CAR) is a product of the 24h sleep-wake
-    ///   cycle, which Genesis doesn't share (she has an adenosine-based
-    ///   sleep model, not a circadian cortisol rhythm). Giving her a
+    ///   cycle, which Genesis doesn't share (it has an adenosine-based
+    ///   sleep model, not a circadian cortisol rhythm). Giving its a
     ///   circadian cortisol modifier created a constant cortisol floor
     ///   that conflicted with the HPA cascade. Returns 1.0.
     /// - **Dopamine**: daytime elevation. Slightly higher during the day,
@@ -1468,9 +1468,9 @@ impl NeurochemicalVector {
             // Cortisol: NO circadian modulation. Cortisol is a stress
             // hormone — zero at rest, released on demand. The human
             // cortisol awakening response (CAR) is a product of the
-            // 24h sleep-wake cycle, which Genesis doesn't share (she
+            // 24h sleep-wake cycle, which Genesis doesn't share (it
             // has an adenosine-based sleep model, not a circadian
-            // cortisol rhythm). Giving her a circadian cortisol
+            // cortisol rhythm). Giving its a circadian cortisol
             // modifier created a constant cortisol floor that
             // suppressed BDNF and blocked learning.
             NeurochemicalId::Dopamine => {
@@ -1944,7 +1944,7 @@ impl NeurochemicalVector {
         let sleep_hist = if is_in_sleep {
             // More histamine is tolerable when already asleep. The
             // stay-asleep threshold (0.38) is above the histamine
-            // baseline (0.30) so that small perturbations from her
+            // baseline (0.30) so that small perturbations from its
             // own normal activity (inner-life dream generation,
             // memory consolidation, heartbeat modules) — which raise
             // norepinephrine slightly and in turn histamine via the
@@ -1952,7 +1952,7 @@ impl NeurochemicalVector {
             // The previous value (0.30) sat exactly at the baseline,
             // making sleep a tightrope: any tiny NE bump pushed
             // histamine back above the threshold and the Wilson-Cowan
-            // bistable flip-flop snapped her awake.
+            // bistable flip-flop snapped it awake.
             //
             // A deliberate wake cascade (mind.wake) sends histamine
             // +0.20, pushing it from ~0.28 to ~0.48 — well above 0.38,
@@ -2056,12 +2056,12 @@ impl NeurochemicalVector {
         // Drowsy: high adenosine, low arousal
         // Both axes have hysteresis: it's easier to stay drowsy than
         // to enter drowsy. Without arousal hysteresis, small NE bumps
-        // from transient CPU load (her own background learning, code
-        // scanning) push arousal above the threshold and flip her to
-        // Active, then it drops back and she returns to Drowsy — a
+        // from transient CPU load (its own background learning, code
+        // scanning) push arousal above the threshold and flip it to
+        // Active, then it drops back and it returns to Drowsy — a
         // rapid limit-cycle oscillation. The arousal stay-threshold
         // is raised by 2× the hysteresis margin so transient arousal
-        // bumps don't kick her out of drowsy.
+        // bumps don't kick it out of drowsy.
         let drowsy_adn = if current == MentalPhase::Drowsy {
             0.40
         } else {
@@ -2836,7 +2836,7 @@ impl NeurochemicalVector {
         // auto-wake almost immediately.
         //
         // The baseline stays at its resting value (0.20) throughout
-        // sleep. When she wakes, the level is near 0.20 (after full
+        // sleep. When it wakes, the level is near 0.20 (after full
         // clearance) and the homeostatic force is re-enabled, but the
         // deviation is ~0 so there's no transient. The level then
         // begins accumulating again via the saturating exponential.

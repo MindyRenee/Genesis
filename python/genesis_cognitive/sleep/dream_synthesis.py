@@ -1,7 +1,7 @@
 """Sleep-driven synthesis — dreaming that produces real insight.
 
 During REM sleep (high acetylcholine, low norepinephrine), Genesis enters
-a "synthesis" dream mode that goes beyond random association. She finds
+a "synthesis" dream mode that goes beyond random association. It finds
 concepts that are **structurally similar but far apart** in the graph,
 proposes **novel typed edges** between them, and stores these as
 hypothetical edges with low confidence.

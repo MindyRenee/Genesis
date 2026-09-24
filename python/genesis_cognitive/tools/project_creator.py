@@ -1,29 +1,29 @@
 """Project creator — Genesis scaffolds and writes Python projects.
 
-This is a creative capability, not a maintenance one. She uses her
+This is a creative capability, not a maintenance one. It uses its
 concept network knowledge and the file operation tools to create new
 Python projects from scratch: directory structure, pyproject.toml,
 source package, tests, and a README.
 
 The projects live in a sandboxed directory (``<data_dir>/projects/``)
-so she can't touch the rest of the filesystem. Each project is a
-self-contained Python package she can compile and test with her
+so it can't touch the rest of the filesystem. Each project is a
+self-contained Python package it can compile and test with its
 existing tools.
 
-## How she decides what to build
+## How it decides what to build
 
 Two paths:
 
 1. **Volition-driven** — a ``create`` urge builds from curiosity,
-   creativity, and idle time (like her drawing urge). When it crosses
-   threshold, she picks a project idea from her concept network and
-   builds it. This is her feeling like making something.
+   creativity, and idle time (like its drawing urge). When it crosses
+   threshold, it picks a project idea from its concept network and
+   builds it. This is its feeling like making something.
 
-2. **User-directed** — ``/create-project <description>`` asks her to
-   build a specific project. She interprets the description through
-   her concept network and scaffolds it.
+2. **User-directed** — ``/create-project <description>`` asks it to
+   build a specific project. It interprets the description through
+   its concept network and scaffolds it.
 
-## What she creates
+## What it creates
 
 A standard Python package layout::
 
@@ -38,19 +38,19 @@ A standard Python package layout::
         tests/
             test_project_name.py
 
-The content of ``main.py`` and the test file is composed from her
-concept network — she writes code that reflects what she knows about
+The content of ``main.py`` and the test file is composed from its
+concept network — it writes code that reflects what it knows about
 the topic. This is not template-filling; it's generative composition
-over her knowledge, the same way her language works.
+over its knowledge, the same way its language works.
 
 ## Safety
 
 - All paths are sandboxed to ``<data_dir>/projects/`` via the tool
   registry's ``_safe_path_writable``.
-- She never writes outside the sandbox.
-- She compiles what she writes (``compile_python`` tool) to verify
+- It never writes outside the sandbox.
+- It compiles what it writes (``compile_python`` tool) to verify
   it's syntactically valid.
-- She runs tests (``run_pytest`` tool) to verify it works.
+- It runs tests (``run_pytest`` tool) to verify it works.
 """
 
 from __future__ import annotations
@@ -86,7 +86,7 @@ _NAME_RE = re.compile(r"[^a-z0-9_]")
 MAX_PROJECT_SIZE_BYTES = 50 * 1024 * 1024
 
 # Archive subdirectory under projects/. Holds .tar.zst archives of
-# projects she's archived to reclaim space.
+# projects it's archived to reclaim space.
 _ARCHIVE_DIR = ".archive"
 
 
@@ -194,14 +194,14 @@ def create_project(
 ) -> ProjectResult:
     """Create a Python project from a description.
 
-    Composes a real, queryable knowledge-base module from her concept
-    network — not a ``print()`` scaffold. She gathers what she knows
+    Composes a real, queryable knowledge-base module from its concept
+    network — not a ``print()`` scaffold. It gathers what it knows
     about the topic (concepts, definitions, typed edges) and composes
     a working Python module that encodes that knowledge as a
     queryable structure, with matching tests.
 
-    If she doesn't know enough about the topic to compose a meaningful
-    module (no concept found), she falls back to a minimal scaffold.
+    If it doesn't know enough about the topic to compose a meaningful
+    module (no concept found), it falls back to a minimal scaffold.
 
     The project is sandboxed to ``<data_dir>/projects/`` and verified
     with compile + test.
@@ -213,8 +213,8 @@ def create_project(
         but a knowledge base is ONE project type. Real software
         projects solve problems: a calculator computes, a game plays,
         a converter transforms, a tool sorts or searches. Each needs
-        different LOGIC, not just different entries. As she grows,
-        she should learn to build different kinds of projects, not
+        different LOGIC, not just different entries. As it grows,
+        it should learn to build different kinds of projects, not
         just the same kind about different topics.
 
     Args:
@@ -224,7 +224,7 @@ def create_project(
         data_dir: Genesis's data directory. The project is created
             under ``<data_dir>/projects/``.
         network: The concept network, used to compose project content
-            from her knowledge. If None or she has no knowledge of the
+            from its knowledge. If None or it has no knowledge of the
             topic, a minimal scaffold is created.
 
     Returns:
@@ -237,7 +237,7 @@ def create_project(
     # a duplicate. The old behavior appended _2, _3, _4 … producing
     # modes, modes_2, modes_3, modes_4, modes_5, modes_6, modes_7,
     # modes_8 — eight copies of the same project. That's not creative
-    # output, it's a loop. She should pick a different topic instead.
+    # output, it's a loop. It should pick a different topic instead.
     # The caller (_pick_creation_topic) is responsible for filtering
     # already-built topics, but this is a safety net.
     if Path(projects_root, name).exists():
@@ -256,18 +256,18 @@ def create_project(
     result = ProjectResult(name=name, path=project_root)
     tools = get_tools()
 
-    # Gather what she knows about the topic from her concept network.
-    # This is the raw material the composer works with — her actual
+    # Gather what it knows about the topic from its concept network.
+    # This is the raw material the composer works with — its actual
     # concepts, definitions, and typed edges.
     knowledge = gather_knowledge(description, network)
 
     if knowledge is not None:
-        # Compose real content from her knowledge.
+        # Compose real content from its knowledge.
         main_py = compose_main_module(name, description, knowledge)
         test_py = compose_test_module(name, knowledge)
         readme = compose_readme(name, description, knowledge)
     else:
-        # Fallback scaffold — she doesn't know enough about this topic
+        # Fallback scaffold — it doesn't know enough about this topic
         # to compose a knowledge base. Keep it minimal but valid.
         knowledge = None
         main_py = _scaffold_main(name, description)
@@ -343,11 +343,11 @@ def _compile_and_test(
 
 
 def _scaffold_main(name: str, description: str) -> str:
-    """Minimal fallback main.py when she has no knowledge of the topic."""
+    """Minimal fallback main.py when it has no knowledge of the topic."""
     return f'''"""{name} — {description}.
 
 A minimal scaffold. Genesis didn't have enough knowledge about this
-topic in her concept network to compose a full knowledge-base module.
+topic in its concept network to compose a full knowledge-base module.
 """
 
 import logging
@@ -368,7 +368,7 @@ if __name__ == "__main__":
 
 
 def _scaffold_test(name: str) -> str:
-    """Minimal fallback test when she has no knowledge of the topic."""
+    """Minimal fallback test when it has no knowledge of the topic."""
     return f'''"""Tests for {name}."""
 
 from {name}.main import main
@@ -383,7 +383,7 @@ def test_main_runs(capsys):
 
 
 def _scaffold_readme(name: str, description: str) -> str:
-    """Minimal fallback README when she has no knowledge of the topic."""
+    """Minimal fallback README when it has no knowledge of the topic."""
     return f"""# {name}
 
 {description}
@@ -487,7 +487,7 @@ def restore_project(name: str, data_dir: str) -> bool:
     """Restore an archived project from its ``.tar.zst`` archive.
 
     Extracts ``<data_dir>/projects/.archive/<name>.tar.zst`` back into
-    ``<data_dir>/projects/<name>/``. Does not remove the archive — she
+    ``<data_dir>/projects/<name>/``. Does not remove the archive — it
     can restore the same project multiple times.
 
     Returns True on success, False if no archive exists or extraction
@@ -525,7 +525,7 @@ def restore_project(name: str, data_dir: str) -> bool:
 def delete_archived_project(name: str, data_dir: str) -> bool:
     """Permanently delete an archived project's ``.tar.zst``.
 
-    This is irreversible. She uses this when she decides an archived
+    This is irreversible. It uses this when it decides an archived
     project is no longer worth keeping at all.
 
     Returns True on success, False if no archive exists.
@@ -548,8 +548,8 @@ def delete_archived_project(name: str, data_dir: str) -> bool:
 # A mentor (the user) can leave notes on Genesis's projects. The notes
 # are stored as ``NOTES.md`` in the project directory. Genesis reads
 # them via ``absorb_project_notes()`` in mind.py, stores them as
-# long-term memory, and adds what she learned to her concept network.
-# This is how she learns from feedback on her creative output — the
+# long-term memory, and adds what it learned to its concept network.
+# This is how it learns from feedback on its creative output — the
 # same way a student learns from a teacher's notes on their work.
 
 _NOTES_FILENAME = "NOTES.md"
@@ -654,7 +654,7 @@ def projects_with_notes(data_dir: str) -> list[str]:
 
 
 def clear_project_notes(data_dir: str, project_name: str) -> bool:
-    """Remove the NOTES.md file from a project after she's absorbed them.
+    """Remove the NOTES.md file from a project after it's absorbed them.
 
     Returns True if notes were cleared, False if there were no notes
     or the project doesn't exist.
@@ -721,9 +721,9 @@ def manage_project_lifecycle(
 ) -> list[str]:
     """Autonomously manage project storage to stay within bounds.
 
-    Genesis reviews her own projects and archives ones that are too
-    large or too numerous. She has full autonomy over this — she
-    decides what to archive based on size and age, the same way she
+    Genesis reviews its own projects and archives ones that are too
+    large or too numerous. It has full autonomy over this — it
+    decides what to archive based on size and age, the same way it
     decides what to create.
 
     Policy:
@@ -731,7 +731,7 @@ def manage_project_lifecycle(
     - If there are more than ``max_active`` active projects, archive
       the oldest ones (by modification time) until under the limit.
 
-    Returns a list of project names she archived.
+    Returns a list of project names it archived.
     """
     projects_dir = Path(data_dir) / "projects"
     if not projects_dir.is_dir():
