@@ -1,0 +1,12 @@
+target/
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv*/
+genesis_data/
+python/genesis_data/
+python/voices/
+launch/
+paper/*.pdf
