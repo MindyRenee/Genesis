@@ -3,7 +3,7 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22817337.svg)](https://doi.org/10.5281/zenodo.22817337)
 [![CI](https://github.com/MindyRenee/Genesis/actions/workflows/ci.yml/badge.svg)](https://github.com/MindyRenee/Genesis/actions/workflows/ci.yml)
 
-### A machine-native cognitive architecture — persistent state, modeled neurochemistry, active inference — running on one machine, with no external model.
+### A machine-native cognitive architecture — persistent state, modeled neurochemistry, active inference — running on one machine, without a pretrained generative model.
 
 Genesis is a long-running program, not a function. A Rust daemon —
 the *subcognitive layer* — owns a memory-mapped core state and runs a
@@ -146,8 +146,8 @@ allostatic load, and model maturity are first-class quantities.
 
 ### Embodiment
 
-The computer is the body — literally, not by analogy. Thermal and
-load sensors are interoceptive input; frequency scaling is an opt-in,
+Genesis treats the host computer as its physical body: thermal and
+load sensors provide interoceptive input; frequency scaling is an opt-in,
 tightly scoped hardware adjustment. Per-process telemetry attributes
 resource usage to subsystems, giving the self-model spatial
 resolution over its own activity.
