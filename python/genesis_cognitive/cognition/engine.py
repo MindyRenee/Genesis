@@ -147,6 +147,13 @@ __all__ = ["CognitionEngine", "CognitiveState", "Goal"]
 _FINAL_REPEATED_PUNCT_RE = re.compile(r"([.!?])\1+")
 _FINAL_DOUBLE_SPACE_RE = re.compile(r"  +")
 _FINAL_SPACE_BEFORE_PUNCT_RE = re.compile(r"\s+([.,;!?])")
+# A '?'/'!' followed by bare trailing periods — a punctuated slot that
+# landed mid-join and then had a period appended ("Tell me more?.").
+# The question/exclamation mark is the real terminal punctuation.
+_FINAL_STRAY_PERIOD_RE = re.compile(r"([?!])\s*\.+\s*$")
+# A dangling dash before terminal punctuation — an em-dash fragment
+# left by an omitted trailing slot ("If you do not mind —?").
+_FINAL_DANGLING_DASH_RE = re.compile(r"\s*[—–-]\s*([?!.]+)\s*$")
 
 
 @dataclass(slots=True)
@@ -336,6 +343,7 @@ class CognitionEngine:
             working_memory=self.working_memory,
             rng=self._rng,
             response_style_getter=lambda: self._response_style,
+            network=self.network,
         )
         # Memory store — extracted subsystem for memory persistence.
         self._memory_store = MemoryStore(
@@ -698,6 +706,15 @@ class CognitionEngine:
         # Used by _get_recent_learning() to access Wikipedia/GitHub
         # learning topics. Set via set_autonomous_learner().
         self._autonomous_learner: AutonomousLearner | None = None
+
+        # Problem intake — injected by Mind after creation. A problem
+        # heard in conversation compiles to a task spec, lands in the
+        # offered-puzzle drop-box, registers as a world event, and is
+        # worked by the same practice machinery the puzzle urge uses.
+        # Set via set_problem_intake().
+        self._spatial_practice: Any = None
+        self._outer_world: Any = None
+        self._puzzle_feeler: Any = None
 
         # Self-report provider — injected by Mind after creation.
         # Used by the metacognitive router to retrieve proposals,
@@ -2296,6 +2313,25 @@ class CognitionEngine:
         """
         self._self_report_provider = provider
 
+    def set_problem_intake(
+        self,
+        practice: Any,
+        world: Any = None,
+        feel: Any = None,
+    ) -> None:
+        """Inject the inner-world channels a heard problem uses.
+
+        ``practice`` is the SpatialPractice (the drop-box + attempts),
+        ``world`` the OuterWorld (the event stream the problem enters
+        through), and ``feel`` a callable applying the regulator's
+        puzzle outcome response — the same neurochemical feedback the
+        volition path uses, so a problem solved on request feels the
+        same as one solved on its own initiative.
+        """
+        self._spatial_practice = practice
+        self._outer_world = world
+        self._puzzle_feeler = feel
+
     def _compose_mission_answer(self, emotion: EmotionalState) -> Thought:
         """Answer "what is your mission?" from the stored mission.
 
@@ -3149,7 +3185,8 @@ class CognitionEngine:
         _timing["memory_reason"] = _time.perf_counter() - _t1
         _t1 = _time.perf_counter()
         thought, ddm_result, workspace_item_summaries = self._think_deliberate_ddm_workspace(
-            perception, emotion, memory_context, user_input, reasoning_results
+            perception, emotion, memory_context, user_input,
+            reasoning_results, comprehension_result,
         )
         _timing["deliberate"] = _time.perf_counter() - _t1
         _t1 = _time.perf_counter()
@@ -3385,6 +3422,8 @@ class CognitionEngine:
         response = _FINAL_REPEATED_PUNCT_RE.sub(r"\1", response)
         response = _FINAL_DOUBLE_SPACE_RE.sub(" ", response)
         response = _FINAL_SPACE_BEFORE_PUNCT_RE.sub(r"\1", response)
+        response = _FINAL_STRAY_PERIOD_RE.sub(r"\1", response)
+        response = _FINAL_DANGLING_DASH_RE.sub(r"\1", response)
 
         # Agency tracking: record what it intended and what it
         # actually said. The sense of agency emerges from the match
@@ -4329,6 +4368,7 @@ class CognitionEngine:
         memory: MemoryContext,
         user_input: str,
         reasoning_results: list | None,
+        comprehension_result: ComprehensionResult | None = None,
     ) -> tuple[Thought, DecisionResult | None, list[str]]:
         """Stages 6–6.6: deliberate, DDM evidence, repetition check, workspace broadcast.
 
@@ -4342,9 +4382,10 @@ class CognitionEngine:
         """
         habit_bias, original_ddm_threshold = self._apply_habit_bias(perception)
 
-        # 6. Deliberate (now informed by reasoning)
+        # 6. Deliberate (now informed by reasoning and comprehension)
         thought = self._deliberate(
-            perception, emotion, memory, user_input, reasoning_results
+            perception, emotion, memory, user_input,
+            reasoning_results, comprehension_result,
         )
 
         # ── 6.1 Drift-diffusion — accumulate evidence for the decision ──
@@ -6479,6 +6520,7 @@ class CognitionEngine:
         memory: MemoryContext,
         user_input: str,
         reasoning_results: list[ReasoningResult] | None = None,
+        comprehension_result: ComprehensionResult | None = None,
     ) -> Thought:
         """Decide what to say based on all inputs.
 
@@ -6502,6 +6544,11 @@ class CognitionEngine:
             return result
 
         result = self._deliberate_math_greetings(perception, emotion, memory)
+        if result is not None:
+            return result
+        result = self._deliberate_problem_offer(
+            perception, emotion, comprehension_result
+        )
         if result is not None:
             return result
         result = self._deliberate_self_intro_encourage(perception, emotion, memory)
@@ -6631,6 +6678,145 @@ class CognitionEngine:
             topics=perception.topics,
             confidence=confidence,
             metadata={"math_type": math_result.result_type},
+        )
+
+    def _deliberate_problem_offer(
+        self,
+        perception: Perception,
+        emotion: EmotionalState,
+        comprehension_result: ComprehensionResult | None = None,
+    ) -> Thought | None:
+        """A problem described in words enters the inner world to be
+        solved.
+
+        The outer-to-inner bridge: perception delivers the utterance,
+        intake compiles it into a task spec, the spec is dropped into
+        ``offered_puzzles`` (the same channel a file offer uses) and
+        announced as a world event, and the practice machinery — the
+        shared task competence, the family agent, the world's own
+        oracle — works it. Nothing is solved in the language layer:
+        the mind does the work and this thought reports what came
+        back. A spec that fails validation (a stated rule contradicting
+        its own asserted labels, an unsolvable arrangement) returns an
+        honest "couldn't make it work" rather than a fabricated answer.
+        """
+        practice = getattr(self, "_spatial_practice", None)
+        if practice is None:
+            return None
+        from ..spatial.practice import normalize_offered
+        from .problem_intake import compile_problem, interpret_problem
+
+        # Intake interprets the semantic structure comprehension
+        # already produced — propositions, roles, negation — never
+        # the raw string. If this turn wasn't comprehended (e.g. a
+        # direct _deliberate call in a test), comprehend it now.
+        if comprehension_result is None:
+            spec = compile_problem(perception.raw_text)
+        else:
+            spec = interpret_problem(comprehension_result)
+        if spec is None:
+            return None
+        task = normalize_offered(spec, "heard_problem")
+        if task is None:
+            return Thought(
+                content="that problem doesn't hold together",
+                intent="inform",
+                emotion=emotion.label,
+                topics=perception.topics,
+                confidence=0.4,
+                metadata={
+                    "problem_result": {
+                        "family": str(spec.get("family", "")),
+                        "kind": str(spec.get("kind", "")),
+                        "solved": False,
+                        "invalid": True,
+                    }
+                },
+            )
+
+        # Into the inner world — the spec persists as an offered
+        # puzzle like any other drop-box file, and the world hears
+        # that a problem arrived.
+        try:
+            practice.offer(task)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"problem offer failed: {e}")
+        world = getattr(self, "_outer_world", None)
+        if world is not None:
+            try:
+                world.notify(
+                    f"a problem was described: {task['name']}",
+                    salience=0.6,
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"problem world event failed: {e}")
+
+        # Work it now — the user asked, so the same machinery the
+        # puzzle urge drives runs immediately, on this task rather
+        # than whichever pending offer is oldest.
+        prior_best = practice.mastery.get(str(task["name"]), 0.0)
+        result = practice.attempt(self.spatial, task=task)
+        if result is None:
+            return None
+        feel = getattr(self, "_puzzle_feeler", None)
+        if feel is not None:
+            try:
+                feel(
+                    score=result.score,
+                    prior_best=prior_best,
+                    solved=result.solved,
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"puzzle feeler failed: {e}")
+        return self._problem_thought(task, result, perception, emotion)
+
+    @staticmethod
+    def _problem_thought(
+        task: dict, result: Any, perception: Perception, emotion: EmotionalState
+    ) -> Thought:
+        """Render a practice attempt as a Thought carrying structured
+        result data — the vocabulary composes the utterance from
+        ``problem_result``, the same way vision scenes or relation
+        answers reach speech."""
+        details = result.details or {}
+        md: dict[str, Any] = {
+            "family": result.family,
+            "kind": str(details.get("kind") or task.get("kind", "")),
+            "name": result.task,
+            "solved": result.solved,
+            "score": result.score,
+            "rule": result.rule,
+        }
+        anchor = ""
+        if result.family == "classification":
+            labels = details.get("labels") or {}
+            md["yes"] = sorted(n for n, v in labels.items() if v)
+            md["no"] = sorted(n for n, v in labels.items() if not v)
+            anchor = ", ".join(md["yes"]) or "none"
+        elif result.family == "sequence":
+            cells = [str(c) for c in (details.get("cells") or [])]
+            scaffold = int(task.get("scaffold") or 0)
+            md["next"] = cells[scaffold:] if 0 < scaffold < len(cells) else cells[-1:]
+            anchor = " ".join(md["next"]) if md["next"] else ""
+        elif result.family == "relations":
+            md["order"] = [str(n) for n in (details.get("order") or [])]
+            anchor = ", ".join(md["order"])
+        elif result.family == "quantities":
+            md["counts"] = details.get("counts") or []
+            md["target"] = details.get("target")
+            anchor = " + ".join(str(c) for c in md["counts"])
+        elif result.family == "sorter":
+            md["placements"] = details.get("placements") or []
+            anchor = f"{len(md['placements'])} placed"
+        if not anchor:
+            anchor = result.task
+        return Thought(
+            content=anchor,
+            intent="inform",
+            emotion=emotion.label,
+            topics=perception.topics,
+            confidence=0.9 if result.solved else 0.5,
+            metadata={"problem_result": md},
         )
 
     def _deliberate_greeting_question(

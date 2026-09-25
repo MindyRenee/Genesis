@@ -25,41 +25,20 @@
 //!
 //! ## Commands
 //!
-//! | ID | Command          | Direction | Payload                    |
-//! |----|------------------|-----------|----------------------------|
-//! |  1 | GetState         | Req       | (none)                     |
-//! |    |                  | Resp      | GenesisCoreState (3288 B)  |
-//! |  2 | GetNeuroSummary  | Req       | (none)                     |
-//! |    |                  | Resp      | NeuroSummary (32 B)        |
-//! |  3 | StoreEvent       | Req       | StoreEventReq              |
-//! |    |                  | Resp      | u8 ack (1=ok, 0x80+=error) |
-//! |  4 | RetrieveEpisode  | Req       | u64 episode_id             |
-//! |    |                  | Resp      | EpisodePayload             |
-//! |  5 | FindSimilar      | Req       | FindSimilarReq             |
-//! |    |                  | Resp      | FindSimilarResp            |
-//! |  6 | SetZone          | Req       | u8 zone                    |
-//! |    |                  | Resp      | u8 ack (1=ok)              |
-//! |  7 | GetPhase         | Req       | (none)                     |
-//! |    |                  | Resp      | u8 phase + f32 arousal +   |
-//! |    |                  |           |      f32 valence           |
-//! |  8 | Ping             | Req       | (none)                     |
-//! |    |                  | Resp      | u8 ack (1=ok) + u64 uptime |
-//! |  9 | NeuroImpulse     | Req       | u8 chem_id + f32 magnitude |
-//! |    |                  | Resp      | u8 ack (1=ok)              |
-//! | 10 | GetMemoryStats   | Req       | (none)                     |
-//! |    |                  | Resp      | MemoryStats (24 B)         |
-//! | 11 | Sync             | Req       | (none)                     |
-//! |    |                  | Resp      | u8 ack (1=ok)              |
-//! | 12 | Shutdown         | Req       | (none)                     |
-//! |    |                  | Resp      | u8 ack (1=ok)              |
-//! | 13 | UpdateModuleStatus| Req      | u8 module_id + u8 status   |
-//! |    |                  | Resp      | u8 ack (1=ok)              |
-//! | 14 | GetRecentEpisodes| Req       | u8 limit + u8 source_filter|
-//! |    |                  | Resp      | RecentEpisodesResp         |
-//! | 16 | GetPlasticityProfile| Req    | (none)                     |
-//! |    |                  | Resp      | PlasticityProfile (40 B)  |
-//! | 23 | NeuroAdjustBaseline| Req    | u8 chem_id + f32 delta     |
-//! |    |                  | Resp      | u8 ack (1=ok)              |
+//! The authoritative command list is the [`cmd`] module below —
+//! every opcode's request/response wire layout is documented on its
+//! constant. Summary:
+//!
+//! | IDs    | Group                                                    |
+//! |--------|----------------------------------------------------------|
+//! | 1–14   | Core data/ack commands (state, memory, zone, phase, …)   |
+//! | 15     | Handshake (protocol version negotiation)                 |
+//! | 16–23  | Extended queries and updates (plasticity, body state,    |
+//! |        | inference, user affect, episode search/archive/store,    |
+//! |        | baseline adjustment)                                     |
+//! | 24–33  | Reactive commands — the cognitive mind drives daemon     |
+//! |        | functions (advance neuro, consolidate, associate,        |
+//! |        | dream, sensors, body control, save, telemetry)           |
 //!
 //! ## Notifications (server → client, unsolicited)
 //!
@@ -1863,8 +1842,9 @@ impl IpcClient {
 /// checking the high bit of the first response byte.
 ///
 /// Data commands (GET_STATE, GET_NEURO_SUMMARY, etc.) return raw
-/// struct bytes on success, or a zeroed struct of the same size if
-/// the mmap seqlock read fails (graceful degradation).
+/// struct bytes on success, or `vec![error::READ_FAILED]` if the
+/// mmap seqlock read fails — a distinguishable error rather than a
+/// zeroed struct that would masquerade as valid zero state.
 pub fn default_handler(
     mmap: &MmapState,
     stm: &RingBuffer,

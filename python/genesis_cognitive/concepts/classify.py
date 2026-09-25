@@ -371,8 +371,14 @@ _FUNCTION_WORDS: frozenset[str] = frozenset({
     "someone", "anyone", "everyone", "nobody",
     "somebody", "anybody", "everybody",
 })
-_CODE_PREFIXES: tuple[str, ...] = ("python:", "rust:")
-_STRUCTURAL_PREFIXES: tuple[str, ...] = ("_cat:", "_col:", "identity:", "_utt:")
+_CODE_PREFIXES: tuple[str, ...] = (
+    "python:", "rust:", "man:", "wikipedia:", "wordnet:",
+)
+_STRUCTURAL_PREFIXES: tuple[str, ...] = (
+    "_cat:", "_col:", "identity:", "_utt:",
+    # Task/competence machinery — internal markers, not world knowledge.
+    "skill:", "goal:", "domain:", "spatial:", "var:", "type:",
+)
 def is_world_concept(concept_id: str) -> bool:
     """Return True if *concept_id* looks like genuine world knowledge.
 

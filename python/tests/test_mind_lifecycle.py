@@ -390,6 +390,85 @@ def test_curiosity_filtering_in_teaching_mode():
         assert not cognition._concept_relates_to_lesson("pizza", "neuroscience")
 
 
+def test_pick_creation_topic_skips_internal_namespaces():
+    """Internal ``:``-namespaced concepts are never project topics.
+
+    Regression: ``_cat:cause:guarded_cortisol`` (a structural marker)
+    was picked from the network, sanitized into the fused garbage
+    name ``catcauseguarded_cortisol``, and leaked into user-facing
+    output as a spoken word and a project directory. Every
+    colon-namespaced ID is internal machinery — utterance seeds
+    (``_cat:``/``_utt:``), code symbols (``python:``/``rust:``),
+    task markers (``skill:``/``goal:``/``domain:``/``spatial:``).
+    """
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_mind(data_dir)
+        net = mind.cognition.network
+
+        # Internal namespaces present in the live concept network.
+        for internal in (
+            "_cat:cause:guarded_cortisol",
+            "_utt:hello",
+            "python:genesis_cognitive.concepts",
+            "rust:daemon::tick",
+            "skill:sorter",
+            "goal:explore",
+            "domain:grid",
+            "spatial:cell",
+        ):
+            net.add_concept(internal, confidence=0.9, origin="structural")
+            mind.learner._curiosity_queue.append(internal)
+
+        # One legitimate user-facing topic — high confidence.
+        net.add_concept("ferret", confidence=0.9, origin="learned")
+
+        for _ in range(20):
+            topic = mind._pick_creation_topic()
+            assert topic is not None
+            assert ":" not in topic, (
+                f"internal namespaced topic picked: {topic!r}"
+            )
+            # Never any of the internal symbols, from queue or network.
+            assert not topic.startswith((
+                "_cat:", "_utt:", "python:", "rust:", "man:",
+                "wikipedia:", "wordnet:", "skill:", "goal:",
+                "domain:", "spatial:", "var:", "type:",
+            ))
+
+
+def test_notification_thread_exits_within_join_budget():
+    """The notification poller must exit well inside the 5s join budget.
+
+    Regression: the loop slept a monolithic ``time.sleep(10.0)`` per
+    cycle while shutdown joins with a 5s deadline — a Ctrl-C landing
+    >5s into a sleep logged "notifications thread did not exit" and
+    reported the shutdown as incomplete even though the state save
+    succeeded. The loop now sleeps in 1s increments so it observes
+    ``_running = False`` within ~1s.
+    """
+    import threading
+    import time
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_mind(data_dir)
+        mind._running = True
+        thread = threading.Thread(
+            target=mind._notification_loop,
+            name="subcognitive-notifications",
+            daemon=True,
+        )
+        thread.start()
+        try:
+            # Let it settle into its sleep cycle, then stop it.
+            time.sleep(0.3)
+            mind._running = False
+            assert mind._join_shutdown_thread(thread, "notifications")
+            assert not thread.is_alive()
+        finally:
+            mind._running = False
+            thread.join(timeout=5.0)
+
+
 # ======================================================================
 # From tests/test_meditation_pause.py
 # ======================================================================

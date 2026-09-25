@@ -305,6 +305,35 @@ def test_create_project_tests_pass() -> None:
         )
 
 
+def test_create_project_refuses_internal_symbol_topics() -> None:
+    """Internal namespaced concept IDs are never project topics.
+
+    Regression: ``_cat:cause:guarded_cortisol`` (a structural marker)
+    passed through topic selection and ``_sanitize_name`` fused it
+    into ``catcauseguarded_cortisol`` — a garbage project name that
+    leaked into generated language. Every ``:``-namespaced ID is
+    internal machinery (``python:``, ``_cat:``, ``_utt:``,
+    ``skill:``, ``goal:``, ``domain:``, ``spatial:``, ``var:``,
+    ``type:``, ``rust:``, ``man:``, ``wikipedia:``, ``wordnet:``).
+    """
+    with tempfile.TemporaryDirectory() as data_dir:
+        for topic in (
+            "_cat:cause:guarded_cortisol",
+            "_utt:hello",
+            "python:genesis_cognitive.concepts",
+            "skill:sorter",
+            "goal:explore",
+            "domain:grid",
+        ):
+            result = create_project(description=topic, data_dir=data_dir)
+            assert result.error == "internal symbol", (
+                f"{topic!r} should be refused, got error={result.error!r}"
+            )
+        # Nothing was created on disk.
+        projects_dir = Path(data_dir) / "projects"
+        assert not projects_dir.exists() or not any(projects_dir.iterdir())
+
+
 def test_list_projects_empty() -> None:
     """list_projects returns empty when no projects exist."""
     with tempfile.TemporaryDirectory() as data_dir:

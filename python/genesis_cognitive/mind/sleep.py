@@ -45,6 +45,16 @@ from .thresholds import (
 logger = logging.getLogger(__name__)
 
 
+def _fmt_counts(counts: dict) -> str:
+    """Render a stats/count mapping as 'k v, k v' for live-thought display."""
+    def _v(v: object) -> object:
+        return round(v, 3) if isinstance(v, float) else v
+    return ", ".join(
+        f"{k} {_v(v)}"
+        for k, v in sorted(counts.items(), key=lambda kv: str(kv[0]))
+    )
+
+
 class SleepMixin:
     """Mixin for :class:`Mind` — see module docstring."""
     if TYPE_CHECKING:
@@ -274,7 +284,7 @@ class SleepMixin:
                 )
                 self._emit_live_thought(
                     "sleeping",
-                    f"Sleep compression: {comp_stats}",
+                    f"Sleep compression: {_fmt_counts(comp_stats)}",
                 )
             except Exception as e:  # noqa: BLE001
                 logger.warning("Sleep compression failed: %s", e)
@@ -309,18 +319,20 @@ class SleepMixin:
         if cat_counts:
             self._emit_live_thought(
                 "learning",
-                f"Sleep categorization: {cat_counts}",
+                f"Sleep categorization: {_fmt_counts(cat_counts)}",
             )
         if mod_counts:
             self._emit_live_thought(
                 "learning",
-                f"Sleep modality classification: {mod_counts}",
+                f"Sleep modality classification: {_fmt_counts(mod_counts)}",
             )
 
         # Consolidate the concept network during slow-wave sleep
         result = network.consolidate_during_sleep()
         if any(result.values()):
-            self._emit_live_thought("sleeping", f"Sleep consolidation: {result}")
+            self._emit_live_thought(
+                "sleeping", f"Sleep consolidation: {_fmt_counts(result)}"
+            )
 
         if not self.cognition.embeddings.has_embeddings:
             return
@@ -357,7 +369,9 @@ class SleepMixin:
         # slow-wave sleep consolidation.
         plasticity_result = self.cognition.plasticity.apply_sleep_consolidation()
         if plasticity_result["total"] > 0:
-            self._emit_live_thought("sleeping", f"Sleep plasticity: {plasticity_result}")
+            self._emit_live_thought(
+                "sleeping", f"Sleep plasticity: {_fmt_counts(plasticity_result)}"
+            )
 
         # Edge-weight Hebbian plasticity — strengthen edges from
         # the day's co-occurrences, apply homeostatic decay to

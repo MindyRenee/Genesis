@@ -24,7 +24,7 @@ def load_image(path: str | Path) -> np.ndarray | None:
     """
     try:
         from PIL import Image
-        img = Image.open(path)
+        img: Image.Image = Image.open(path)
         if img.mode != "RGB":
             img = img.convert("RGB")
         return np.array(img, dtype=np.uint8)
@@ -47,7 +47,7 @@ def decode_image_bytes(data: bytes) -> np.ndarray | None:
 
         from PIL import Image
 
-        img = Image.open(io.BytesIO(data))
+        img: Image.Image = Image.open(io.BytesIO(data))
         if img.mode != "RGB":
             img = img.convert("RGB")
         return np.array(img, dtype=np.uint8)
@@ -83,7 +83,7 @@ def resize_for_vision(
     try:
         from PIL import Image
         img = Image.fromarray(frame)
-        img = img.resize((new_w, new_h), Image.LANCZOS)
+        img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
         return np.array(img, dtype=np.uint8)
     except Exception:  # noqa: BLE001
         # Fallback: simple stride-based resize

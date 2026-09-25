@@ -1551,7 +1551,6 @@ class ThoughtComposer:
             return reasoning_results
         # Build a set of content words already in parts
         existing_text = " ".join(parts).lower()
-        existing_words = set(existing_text.split())
         # Remove common stopwords — they don't carry semantic content
         _STOPWORDS = {
             "a", "an", "the", "is", "are", "was", "were", "be", "been",
@@ -1564,14 +1563,22 @@ class ThoughtComposer:
             "my", "your", "his", "their", "our", "who", "what", "which",
             "how", "why", "when", "where", "through", "also", "because",
         }
-        existing_content = existing_words - _STOPWORDS
+        # Words must be tokenized without punctuation — "mammal."
+        # (with the sentence-final period) never equals "mammal" and
+        # silently drops the overlap below the dedup threshold.
+        existing_content = (
+            set(re.findall(r"[a-z0-9']+", existing_text)) - _STOPWORDS
+        )
 
         filtered: list[ReasoningResult] = []
         for r in reasoning_results:
             # Strip parenthetical asides for comparison
             conclusion_text = re.sub(r"\s*\([^)]*\)", "", r.conclusion)
             conclusion_text = conclusion_text.replace("_", " ").lower()
-            conclusion_words = set(conclusion_text.split()) - _STOPWORDS
+            conclusion_words = (
+                set(re.findall(r"[a-z0-9']+", conclusion_text))
+                - _STOPWORDS
+            )
             if not conclusion_words:
                 continue
             # If all content words of the conclusion already appear in

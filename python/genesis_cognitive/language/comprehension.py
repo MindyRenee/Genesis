@@ -63,7 +63,12 @@ from enum import Enum, auto
 from typing import Any, ClassVar
 
 from .figurative import FigurativeLanguageProcessor, IronyDetection, Metaphor
-from .morphology import deconjugate_verb, is_participle, is_verb_form
+from .morphology import (
+    VERB_LEXICON,
+    deconjugate_verb,
+    is_participle,
+    is_verb_form,
+)
 
 __all__ = [
     "ComprehensionEngine",
@@ -226,6 +231,18 @@ _IMPERATIVE_STARTERS = frozenset(
         "compare",
         "sort",
         "count",
+        # Manipulation imperatives — instructions about arranging
+        # things ("place the block", "insert the peg"). "place" is
+        # deliberately NOT in the verb lexicon ("that place is warm"
+        # is a noun phrase) — but clause-initial position can only
+        # be a verb.
+        "place",
+        "insert",
+        "drop",
+        "slide",
+        "fill",
+        "position",
+        "arrange",
     }
 )
 
@@ -760,17 +777,26 @@ class ComprehensionEngine:
         focus = ""
         for clause in clauses:
             # Shared-subject VP coordination ("I came and saw the
-            # water") expands into one clause per conjunct, each
-            # getting the full extraction pipeline.
-            for sub_clause in self._expand_vp_coordination(clause):
-                prop = self._extract_proposition(sub_clause)
-                if prop.subject or prop.predicate:
-                    propositions.append(prop)
-                # Record the questioned constituent — the gap the
-                # speaker wants filled, not an argument of the
-                # proposition.
-                if not focus and prop.focus:
-                    focus = prop.focus
+            # water") and gapped VP coordination ("put the star in
+            # its hole and the moon in its slot") each expand into
+            # one clause per conjunct, all getting the full
+            # extraction pipeline.
+            for gapped in self._expand_gapped_coordination(clause):
+                for sub_clause in self._expand_vp_coordination(gapped):
+                    prop = self._extract_proposition(sub_clause)
+                    if prop.subject or prop.predicate:
+                        propositions.append(prop)
+                    # Record the questioned constituent — the gap the
+                    # speaker wants filled, not an argument of the
+                    # proposition.
+                    if not focus and prop.focus:
+                        focus = prop.focus
+
+        # Restrictive relative clauses embedded in an object ("a
+        # machine that has two parts") carry a second proposition —
+        # the relativized clause is about the head noun, not part of
+        # the NP string. Split it out so both facts are available.
+        propositions = self._extract_relative_propositions(propositions)
 
         # Resolve pronoun references
         speaker = context.get("speaker", "user")
@@ -1058,9 +1084,14 @@ class ComprehensionEngine:
                 and first not in _OBJECT_PRONOUNS
             ):
                 return False
-        # Otherwise: a clause if any finite verb is present
-        for w in words:
+        # Otherwise: a clause if any finite verb is present. A word
+        # directly preceded by a pure determiner is a noun, not verb
+        # evidence — "and a spring" is an NP ("spring" the noun),
+        # while "and the results came" keeps "came" as its verb.
+        for j, w in enumerate(words):
             wl = w.lower().rstrip(",.!?;:")
+            if j > 0 and words[j - 1].lower().rstrip(",.!?;:") in self._PURE_DETERMINERS:
+                continue
             if wl in _COPULAR_VERBS or wl in _AUX_VERBS or self._looks_like_verb(wl):
                 return True
         return False
@@ -1120,6 +1151,74 @@ class ComprehensionEngine:
                 continue
             return wl in _COPULAR_VERBS or self._looks_like_verb(wl)
         return False
+
+    def _expand_gapped_coordination(self, clause: str) -> list[str]:
+        """Expand gapped VP coordination into full clauses.
+
+        "put the star in its hole and the moon in its slot" is two
+        instructions sharing the verb — the second conjunct elides
+        it. The clause splitter and VP expander both rightly decline
+        (the right side has no verb and does not open a VP), leaving
+        the object parser to swallow the second object inside the
+        first prepositional phrase. The signal that distinguishes a
+        gap from NP coordination: the right side is "NP preposition
+        ..." where that preposition also appears after the left
+        clause's verb — "the moon IN its slot" repeats "star IN its
+        hole". When it does, the left verb is re-copied over the
+        right conjunct.
+        """
+        words = clause.split()
+        for i, w in enumerate(words):
+            wl = w.lower().rstrip(",.!?;:")
+            if wl not in self._COORDINATORS:
+                continue
+            left, right = words[:i], words[i + 1:]
+            if not left or not right:
+                continue
+            chunk = (
+                f"{left[-1].lower().rstrip(',.!?;:')} {wl} "
+                f"{right[0].lower().rstrip(',.!?;:')}"
+            )
+            if chunk in self._known_chunks:
+                continue
+            vidx, _, _ = self._find_main_verb(left)
+            # Only subjectless (imperative) lefts are safe to copy:
+            # with a subject present the right conjunct's NP is
+            # ambiguous between shared-subject object ("she read a
+            # book and a magazine on the porch") and new-subject
+            # remnant ("the cat sat ... and the dog on the rug").
+            if vidx != 0:
+                continue
+            # A right side that is clause-like or VP-initial belongs
+            # to the other coordination passes.
+            if self._opens_verb_phrase(right) or self._right_is_clause(
+                " ".join(right)
+            ):
+                continue
+            # The right side must be "NP + prepositional phrase":
+            # a preposition inside, but not leading, the conjunct.
+            rprep = next(
+                (
+                    j
+                    for j, rw in enumerate(right)
+                    if rw.lower().rstrip(",.!?;:") in _PREPOSITIONS
+                ),
+                None,
+            )
+            if rprep is None or rprep == 0:
+                continue
+            prep = right[rprep].lower().rstrip(",.!?;:")
+            left_post_verb = {
+                x.lower().rstrip(",.!?;:") for x in left[vidx + 1 :]
+            }
+            if prep not in left_post_verb:
+                continue
+            right_clause = " ".join([*left[: vidx + 1], *right])
+            return [
+                " ".join(left),
+                *self._expand_gapped_coordination(right_clause),
+            ]
+        return [clause]
 
     # ─── Proposition extraction ─────────────────────────────────
 
@@ -1364,7 +1463,7 @@ class ComprehensionEngine:
         """
         if not is_copular or not remaining:
             return False
-        for cand in remaining[:3]:
+        for k, cand in enumerate(remaining[:3]):
             cl = cand.lower().rstrip(",.!?;:")
             if (
                 cl in _NEGATION_WORDS
@@ -1372,6 +1471,16 @@ class ComprehensionEngine:
                 or self._looks_like_adverb(cl)
             ):
                 continue
+            # A relation word taking its own complement is locative,
+            # not a participle — "the star IS LEFT OF the moon" is
+            # position, not the passive of "leave".
+            if (
+                cl in self._POSTNOMINAL_REL
+                and k + 1 < len(remaining)
+                and remaining[k + 1].lower().rstrip(",.!?;:")
+                in self._REL_COMPLEMENT_PREPS
+            ):
+                return False
             return is_participle(cl)
         return False
 
@@ -1590,16 +1699,29 @@ class ComprehensionEngine:
         immediately after an aux was blindly taken as the verb
         ("do you like X" parsed "you" as the verb).
         """
-        # Imperative detection: if the first word is a common verb,
+        # Imperative detection: if the first word is a base-form verb,
         # the sentence is imperative and the first word IS the verb.
-        # "Tell me about water" → verb="tell" at index 0.
+        # "Tell me about water" → verb="tell" at index 0. The gate is
+        # the base-form lexicon plus the imperative starter set — not
+        # _COMMON_VERBS, which is a mostly-inflected list that misses
+        # ordinary base verbs ("sort the shapes" is a command).
+        # Auxiliaries and copulas keep their own paths ("have fun"
+        # reads as possession; "be quiet" keeps its copular frame).
         if words:
             first_lower = words[0].lower().rstrip(",.!?;:")
-            if first_lower in _COMMON_VERBS and first_lower not in _AUX_VERBS:
+            if (
+                first_lower not in _AUX_VERBS
+                and first_lower not in _COPULAR_VERBS
+                and (
+                    first_lower in VERB_LEXICON
+                    or first_lower in _IMPERATIVE_STARTERS
+                )
+            ):
                 return 0, first_lower, False
 
         saw_aux = False
         post_aux_noun = -1
+        lexical_aux = -1
         for i, word in enumerate(words):
             word_lower = word.lower().rstrip(",.!?;:")
 
@@ -1612,6 +1734,12 @@ class ComprehensionEngine:
             # "doesn't", "won't", "can't") precede the main verb.
             if word_lower in _AUX_VERBS or word_lower in _NEGATION_WORDS:
                 saw_aux = True
+                # "have/has/had" and "do/does/did" double as lexical
+                # verbs (possession, light verb). If no verb form
+                # follows, the aux itself was the predicate —
+                # "alpha has a lens", not "alpha has + lens(verb)".
+                if word_lower in self._LEXICAL_AUX and lexical_aux < 0:
+                    lexical_aux = i
                 continue
 
             if word_lower in _COPULAR_VERBS:
@@ -1626,8 +1754,16 @@ class ComprehensionEngine:
                 if word_lower in self._DETERMINERS:
                     # A determiner after a skipped content word opens
                     # a new NP — the skipped word was the verb
-                    # ("will WATER the plants").
+                    # ("will WATER the plants"). But a have/do aux
+                    # claims the verb slot first: "has exactly TWO of
+                    # these" is possession, not "exactly" the verb.
                     if post_aux_noun >= 0:
+                        if lexical_aux >= 0:
+                            return (
+                                lexical_aux,
+                                words[lexical_aux].lower().rstrip(",.!?;:"),
+                                False,
+                            )
                         return (
                             post_aux_noun,
                             words[post_aux_noun].lower().rstrip(",.!?;:"),
@@ -1669,10 +1805,27 @@ class ComprehensionEngine:
                 continue
             # Heuristic: if this word is a known verb form
             if self._looks_like_verb(word_lower):
+                # A verb-shaped word inside a determiner-headed NP
+                # is the NP's head noun, not the predicate, when a
+                # finite verb still follows — "a blue square block
+                # IS on the table" parses block-as-noun + is, not
+                # "a blue square" blocking the table.
+                if self._inside_open_np(words, i):
+                    continue
                 return i, word_lower, False
 
-        # Auxiliary with no verb found — the skipped noun was the
-        # verb ("I will water plants").
+        # Auxiliary with no verb form after it — either the aux was
+        # itself the lexical verb (have/do-family: "alpha has a lens",
+        # "she does yoga") or the skipped noun was the verb ("I will
+        # water plants"). The lexical reading wins for have/do: a
+        # non-verb-like complement under them is possession, not a
+        # participle that lost its suffix.
+        if lexical_aux >= 0:
+            return (
+                lexical_aux,
+                words[lexical_aux].lower().rstrip(",.!?;:"),
+                False,
+            )
         if post_aux_noun >= 0:
             return (
                 post_aux_noun,
@@ -1680,6 +1833,11 @@ class ComprehensionEngine:
                 False,
             )
         return -1, "", False
+
+    # Auxiliaries that are also lexical verbs — have (possession)
+    # and do (light verb) can be the main verb when nothing
+    # verb-like follows them.
+    _LEXICAL_AUX = frozenset({"have", "has", "had", "do", "does", "did"})
 
     def _looks_like_verb(self, word: str) -> bool:
         """Heuristic: does this word look like a verb?
@@ -1712,6 +1870,35 @@ class ComprehensionEngine:
             return True
 
         return False
+
+    def _inside_open_np(self, words: list[str], i: int) -> bool:
+        """Is position i inside a still-open determiner-headed NP?
+
+        A determiner or possessive opens an NP that runs until a
+        preposition, conjunction, or verb closes it. If a copula or
+        auxiliary still follows i, the verb-shaped word at i is the
+        NP's head noun — "a blue square block IS on the table" gets
+        block-as-noun + is. A merely verb-SHAPED follower doesn't
+        count — "the dog bit the man" keeps bit (the verb-shaped
+        "man" is itself inside a determiner-headed NP), and "the
+        strong men LIFT the box" keeps lift (nothing follows).
+        """
+        opened = False
+        for j in range(i):
+            prev = words[j].lower().rstrip(",.!?;:")
+            if (
+                prev in self._PURE_DETERMINERS
+                or prev in _POSSESSIVE_PRONOUNS
+            ):
+                opened = True
+            elif prev in _PREPOSITIONS or prev in _CONJUNCTIONS:
+                opened = False
+        if not opened:
+            return False
+        return any(
+            w.lower().rstrip(",.!?;:") in _COPULAR_VERBS | _AUX_VERBS
+            for w in words[i + 1 :]
+        )
 
     def _detect_tense(self, words: list[str]) -> str:
         """Detect the tense of a clause.
@@ -1788,6 +1975,36 @@ class ComprehensionEngine:
                     obj_parts.extend([words[i], *words[i + 1 : j]])
                     i = j
                     continue
+                # Post-nominal relation phrases — "the star left of
+                # the moon": a relation word ending the object takes
+                # its own prepositional complement, which belongs to
+                # the NP rather than opening a clause-level role.
+                if (
+                    obj_parts
+                    and obj_parts[-1].lower().rstrip(",.!?;:")
+                    in self._POSTNOMINAL_REL
+                    and word_lower in self._REL_COMPLEMENT_PREPS
+                ):
+                    obj_parts.append(words[i])
+                    i += 1
+                    # The complement NP runs until the next
+                    # preposition or the next relation word that
+                    # carries its own complement ("... and the moon
+                    # next to the sun").
+                    while i < len(words):
+                        nxt = words[i].lower().rstrip(",.!?;:")
+                        if nxt in _PREPOSITIONS:
+                            break
+                        if (
+                            nxt in self._POSTNOMINAL_REL
+                            and i + 1 < len(words)
+                            and words[i + 1].lower().rstrip(",.!?;:")
+                            in self._REL_COMPLEMENT_PREPS
+                        ):
+                            break
+                        obj_parts.append(words[i])
+                        i += 1
+                    continue
                 break
             obj_parts.append(words[i])
             i += 1
@@ -1795,6 +2012,7 @@ class ComprehensionEngine:
         obj = " ".join(obj_parts).strip() if obj_parts else ""
 
         # Parse prepositional phrases into roles
+        last_role: SemanticRole | None = None
         while i < len(words):
             prep = words[i].lower().rstrip(",.!?;:")
             i += 1
@@ -1810,10 +2028,23 @@ class ComprehensionEngine:
             # Map preposition to semantic role
             if prep == "by" and by_is_agent:
                 roles[SemanticRole.AGENT] = phrase
+                last_role = SemanticRole.AGENT
+            elif (
+                prep == "at"
+                and phrase.split()[:1]
+                and phrase.split()[0].lower() in self._AT_ADVERBIALS
+            ):
+                # "at least / at most / at first" are adverbials, not
+                # locations — they belong to the phrase they modify.
+                if last_role is not None:
+                    roles[last_role] = f"{roles[last_role]} {prep} {phrase}"
+                else:
+                    obj = f"{obj} {prep} {phrase}".strip()
             elif prep in (
                 "in",
                 "on",
                 "at",
+                "into",
                 "above",
                 "below",
                 "under",
@@ -1823,20 +2054,113 @@ class ComprehensionEngine:
                 "by",
             ):
                 roles[SemanticRole.LOCATION] = phrase
+                last_role = SemanticRole.LOCATION
             elif prep == "to":
                 roles[SemanticRole.GOAL] = phrase
+                last_role = SemanticRole.GOAL
             elif prep == "from":
                 roles[SemanticRole.SOURCE] = phrase
+                last_role = SemanticRole.SOURCE
             elif prep == "for":
                 roles[SemanticRole.BENEFICIARY] = phrase
+                last_role = SemanticRole.BENEFICIARY
             elif prep == "with":
                 roles[SemanticRole.INSTRUMENT] = phrase
+                last_role = SemanticRole.INSTRUMENT
             elif prep == "about":
                 roles[SemanticRole.THEME] = phrase
+                last_role = SemanticRole.THEME
             elif prep in ("during", "before", "after"):
                 roles[SemanticRole.TIME] = phrase
+                last_role = SemanticRole.TIME
+            elif last_role is not None:
+                # An unmapped preposition ("of", "as", ...) extends
+                # the open role phrase rather than vanishing —
+                # "groups of 2, 5 and 4" keeps its complement.
+                roles[last_role] = f"{roles[last_role]} {prep} {phrase}"
+            else:
+                # No role open yet — the phrase modifies the object
+                # ("a cup of tea").
+                obj = f"{obj} {prep} {phrase}".strip()
 
         return obj, roles
+
+    # Relation words that take a prepositional complement inside an
+    # NP — "left of", "right of", "next to", "far from". When one of
+    # these ends the object, the following PP is its complement.
+    _POSTNOMINAL_REL = frozenset(
+        {"left", "right", "next", "far", "apart", "close", "opposite"}
+    )
+    _REL_COMPLEMENT_PREPS = frozenset({"of", "to", "from"})
+
+    # "at + X" idioms that are adverbial modifiers, never locations:
+    # "at least two", "at most five", "at first", "at once".
+    _AT_ADVERBIALS = frozenset(
+        {"least", "most", "first", "last", "best", "worst", "once", "all"}
+    )
+
+    # Relative pronouns that open a restrictive clause modifying the
+    # preceding noun phrase — "the machine that has two parts".
+    _RELATIVE_PRONOUNS = frozenset({"that", "which", "who"})
+
+    def _extract_relative_propositions(
+        self, propositions: list[Proposition]
+    ) -> list[Proposition]:
+        """Split restrictive relative clauses out of objects.
+
+        "a machine that has two parts" arrives as one proposition
+        whose object is the whole string; the "that"-clause is really
+        a second proposition about the head noun ("machine has two
+        parts"). Emitting both keeps the matrix fact and the embedded
+        fact available to downstream reasoning instead of burying the
+        clause inside an NP string.
+
+        Only splits when the post-pronoun tail opens with verb
+        material — "i know that song" (determiner use) and
+        object-relatives like "the book that i read" stay whole.
+        """
+        out: list[Proposition] = []
+        for prop in propositions:
+            out.append(prop)
+            if not prop.object:
+                continue
+            words = prop.object.split()
+            for j, w in enumerate(words):
+                wl = w.lower().rstrip(",.!?;:")
+                if j == 0 or j + 1 >= len(words):
+                    continue
+                if wl in self._RELATIVE_PRONOUNS:
+                    # "the machine that has two parts" — the tail
+                    # must open with verb material; "that song"
+                    # (determiner) and "the book that i read"
+                    # (object-relative) stay whole.
+                    tail_first = words[j + 1].lower().rstrip(",.!?;:")
+                    if not (
+                        tail_first in _AUX_VERBS
+                        or tail_first in _COPULAR_VERBS
+                        or tail_first in _NEGATION_WORDS
+                        or self._looks_like_verb(tail_first)
+                    ):
+                        continue
+                    rel_clause = f"{' '.join(words[:j])} {' '.join(words[j + 1:])}"
+                elif wl.endswith("ing") and is_verb_form(wl):
+                    # Reduced relative — "an object containing two
+                    # parts" ≡ "an object that contains two parts".
+                    rel_clause = " ".join(words)
+                else:
+                    continue
+                rel = self._extract_proposition(rel_clause)
+                if not rel.verb_found:
+                    break
+                old_obj = " ".join(words).strip()
+                prop.object = " ".join(words[:j]).strip()
+                # A copular proposition mirrors its object into
+                # ATTRIBUTE — keep them consistent after trimming.
+                if prop.roles.get(SemanticRole.ATTRIBUTE) == old_obj:
+                    prop.roles[SemanticRole.ATTRIBUTE] = prop.object
+                out.append(rel)
+                break
+        return out
 
     # ─── Reference resolution ───────────────────────────────────
 

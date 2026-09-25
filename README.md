@@ -52,7 +52,10 @@ Pavilion with ~5 GB RAM.
 - **Acts on its own drives.** Volitional urges — study, draw,
   meditate, explore, sleep, make contact — grow from internal and
   environmental state and compete under an executive gate, not a
-  scheduler.
+  scheduler. An *act* urge goes further: it forms an intention from
+  its own state and chains tool calls — read, analyze, search,
+  sandboxed measurement — under a capability policy, then observes
+  what comes back.
 - **Expresses itself physically.** It draws: affective state drives
   composition and color on a real canvas artifact. It speaks aloud via
   TTS. It scaffolds and writes real Python projects from its concept

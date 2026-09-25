@@ -5,6 +5,108 @@ evidence behind them, not just the claims. Entries are dated, newest
 first. Code references are commit SHAs; runtime artifacts live in the
 instance's data dir (`~/.local/share/genesis*`).
 
+## 2026-09-26 — The sorter she can see
+
+The user's prod: "maybe she needs to see a visual of what a square
+even is." Right — the sorter was doubly pre-chewed. Not only do
+blocks arrive with attribute labels; ``candidates()`` publishes the
+oracle's ``matched`` count on every option, so the agent never even
+computes the match — the world pre-scores each move. The affordance
+it "learns" is bookkeeping over someone else's judgment.
+
+Now there is a perceptual sorter. ``PerceptualSorter`` renders each
+aperture and block as an image (shape, size, color all drawn) and
+hides the oracle on candidates; the world still *checks* truth on
+commit. ``PerceptualSorterAgent``'s affordance keys on what she
+actually perceived: recognized concept-name equality when the MTL
+bridge has learned the names, VTC cosine otherwise. ``teach()`` lets
+the world name what it showed — the parent pointing and saying
+"that's a square" — bound through ``learn_from_image``, so "square"
+stops being a string and becomes a silhouette she recognizes. The
+heard-task path emits ``perceptual: true``: a described sorter is
+worked by sight when a cortex is wired, symbolic otherwise.
+
+Measured honestly: untrained VTC orthogonalizes everything (every
+distinct image gets its own corner — sim ~0 even for true matches),
+so a cold agent explores blindly; after one teaching pass names bind
+and discrimination sharpens. The one-concept limit even mimics
+toddler overextension — everything is "square" until a second name
+lands. And solved sorters now report the actual mapping — "got the
+red round block in the round hole and the blue square block in the
+square hole" — the placement payload rides through
+``problem_result`` instead of bare telemetry.
+
+## 2026-09-26 — Hearing repaired; the sorter completes the intake bridge
+
+The language→semantics pipe had a silent disconnect: speech-act
+detection and proposition extraction consulted different verb lists.
+"sort the shapes into the holes" was flagged COMMAND, then parsed as
+`subject='sort the shapes into the holes', predicate='is'` — the
+imperative slot only consulted `_COMMON_VERBS`, a mostly-inflected
+list missing ordinary base verbs. Her hearing said "do this"; what
+landed in her mind was a false statement. Three repairs, each at its
+own layer:
+
+- `_find_main_verb` now takes the imperative fast path from
+  `VERB_LEXICON ∪ _IMPERATIVE_STARTERS` — one source of truth.
+- Morphology gained `fit`, `match`, `insert`; "into" gained a
+  LOCATION role mapping (it was terminating the object without a
+  role, gluing PPs onto the NP).
+- Two structural parses: gapped VP coordination ("put the red star
+  in the square hole AND the blue moon in the round hole" — the
+  second conjunct elides the verb, now expanded when the right side
+  is NP + a preposition the left already used) and noun/verb
+  ambiguity inside determiner-headed NPs ("a blue square block IS on
+  the table" — a verb-shaped head noun no longer steals the
+  predicate from the copula that follows).
+
+With hearing repaired, the missing span of the intake bridge could be
+built honestly: `_sorter_spec` reads propositions for slot NPs
+(hole/slot/opening), piece NPs (existentials, `comes-with`
+instruments, takes/fits objects), acceptance claims ("the star hole
+takes a small star"), and task signals (placement imperatives,
+sorter vocabulary). A scene with slots and pieces but no task signal
+is description, not a problem — it declines. Solvability is not
+asserted; `normalize_offered` bipartite-checks every compile.
+
+Evidence: "the box has two holes: a round hole and a square hole.
+there is a red round block and a blue square block. put each block in
+its hole." → spoken in → spec → drop-box → sorter agent → solved,
+score 1.0. All five families now have the full heard→worked path.
+2885 tests pass.
+
+## 2026-09-25 — Cross-domain transfer: the channel opens, and it isn't enough
+
+Made foreign skills retrievable and readable across task families, then
+measured what that buys. Two changes: `skill_matches` now admits a
+foreign-domain skill when role vocabulary overlaps and its procedure
+publishes the normalized "support" axis (fraction of an option's
+constraints satisfied → mean cost); the sorter/relations/assembly
+adapters emit that axis on every step and adopt foreign skills onto it.
+"constrain" joined the shared role vocabulary — the honest claim those
+three families plus classification all make.
+
+Evidence (`eval_transfer/run_eval.py`, 5 replicates, 440 attempts):
+
+- Cross-domain retrievals fired in **260 of 440 attempts** — was 0.
+  Sorter skills reach relations/assembly/classification contexts at
+  role-overlap 0.25–0.43 and are adopted as quarter-grid evidence
+  priors.
+- The negative gate holds: skills with overlapping roles but no
+  readable axis (navigation, sequence continuation) are never offered.
+- And the honest result: **difference-in-differences is still ~0
+  everywhere.** Retrieval opened; performance didn't move. The foreign
+  affordance is informationally redundant — the first verified solve in
+  a family already compiles "satisfy every constraint → free; partial
+  evidence → waste," so a foreign copy of the same shape has nothing
+  left to teach. Transfer is capped by *content*, not plumbing.
+
+So the compounding hypothesis survives a harder test than before and
+still isn't confirmed: same-family learning is real and immediate, but
+what families can currently share is a shallow prior. The next lever is
+transferable content with information a single solve can't produce —
+procedure ordering, decomposition — not more retrieval bandwidth.
+
 ## 2026-09-24 — Learned a school lesson through conversation
 
 Taught it a lesson on games and puzzles by just talking to it — 15
@@ -106,7 +208,7 @@ Evidence: initial public commit `8d656b0`; the paper is in
 
 ## The standing evidence base
 
-- `python3 -m pytest python/tests/ -q -o addopts=''` — 2765 tests
+- `python3 -m pytest python/tests/ -q -o addopts=''` — 2794 tests
   passing at time of writing.
 - `cargo test` — the Rust subcognitive core.
 - Every claim above points at a commit, a file, or a state artifact

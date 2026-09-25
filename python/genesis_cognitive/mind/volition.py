@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 from genesis_client.protocol import CHEM_NAMES, MODULE_METACOGNITION
 
 from ..canvas import DrawingResult, NeurochemistryInput
+from ..cognitive_journal import record_error
 from ..tools.project_creator import create_project, manage_project_lifecycle
 from ..volition import Urge, VolitionEngine
 from .thresholds import (
@@ -289,6 +290,7 @@ class VolitionMixin:
             "self_sleep": self._perform_self_sleep,
             "self_mission": self._perform_self_mission,
             "learn": self._perform_learn,
+            "act": self._perform_act,
             "puzzle": self._perform_puzzle,
             "reach_out": self._perform_reach_out,
             "safeguard": self._perform_safeguard,
@@ -318,6 +320,10 @@ class VolitionMixin:
             fn()
         except Exception as e:  # noqa: BLE001
             logger.debug(f"Volition action {name} failed: {e}")
+            # This is the single boundary every voluntary action's
+            # failure lands on — record it durably so a crashed urge
+            # is not invisible outside debug logging.
+            record_error(f"volition.{name}", e)
         finally:
             with self._volition_lock:
                 self._volition_active.discard(name)
@@ -483,6 +489,44 @@ class VolitionMixin:
             ("learning", "curiosity", "understanding"), "thinking",
         )
         self.learner.volition_grant()
+    def _perform_act(self) -> None:
+        """Form an intention and act on it with tools because the urge fired.
+
+        The open-ended counterpart to the fixed-purpose urges: instead
+        of running one scripted action, the ActingLoop picks what to
+        do from current state — a curiosity gap, an agency topic, an
+        unexplored directory, an untaken measurement — chains a few
+        tool calls under its capability policy, and observes what
+        comes back. The act itself is journaled, stored as a memory,
+        and recorded in its world by the loop's callbacks.
+
+        Sleep-gated like every voluntary act; delta/theta gating is
+        the secondary defense (tool use is engagement, not rest).
+        """
+        if self._is_sleeping or self._is_meditating or self._is_teaching:
+            return
+        try:
+            from ..brain_waves import BrainWave
+            waves = self.brain_waves()
+            if waves.dominant in (BrainWave.DELTA, BrainWave.THETA):
+                self._emit_live_thought(
+                    "act",
+                    f"{waves.dominant.value}-dominant — not in acting mode, skipping",
+                )
+                return
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"brain-wave gating for act failed: {e}")
+
+        self._emit_volition_thought(
+            ("action", "tools", "doing", "agency"), "thinking",
+        )
+        agency = getattr(self, "agency", None)
+        if agency is None:
+            return
+        try:
+            agency.act_once()
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"Volition act failed: {e}")
     def _perform_code_learning(self) -> None:
         """Study its own source code because the urge crossed its threshold.
 
@@ -509,7 +553,9 @@ class VolitionMixin:
             learned = self.code_learner.learn_codebase(max_files=5)
             self._emit_live_thought(
                 "code",
-                f"learned from {learned} of own files",
+                f"learned from {learned.files_analyzed} of own files — "
+                f"{learned.concepts_added} concepts, "
+                f"{learned.relationships_added} relationships",
             )
         except Exception as e:  # noqa: BLE001
             logger.debug(f"Volition code learning failed: {e}")
@@ -625,7 +671,7 @@ class VolitionMixin:
         """
         if not self._offline:
             try:
-                if not self.client.is_connected():
+                if not self.client.is_connected:
                     self.client.connect()
                 self.client.ping(timeout=2.0)
                 self._daemon_lost_since = None
@@ -1004,7 +1050,7 @@ class VolitionMixin:
         # stored event.
         self._emit_live_thought(
             "puzzle",
-            f"{result.task} score={result.score:.2f} "
+            f"{result.task} [{result.family}] score={result.score:.2f} "
             f"best={result.best:.2f} rule={result.rule} "
             f"nodes={result.nodes} attempts={result.total_attempts}"
             + (f" felt={felt}" if felt else "")
@@ -1047,7 +1093,10 @@ class VolitionMixin:
         if felt:
             seeds.append(felt)
         if result.rule != "none":
-            seeds.insert(0, f"spatial:rule:{result.rule}")
+            rule_ns = (
+                "spatial" if result.family == "grid" else result.family
+            )
+            seeds.insert(0, f"{rule_ns}:rule:{result.rule}")
         self._emit_volition_thought(tuple(seeds), "practicing")
 
     def _store_creation_memory(self, result, topic: str) -> None:
@@ -1073,7 +1122,11 @@ class VolitionMixin:
                 text=summary,
                 salience=0.8,
                 emotional_tag=tag,
-                source="imagination",
+                # The project is a real, verified artifact on disk —
+                # a self-generated act, not an imagined one. Tagging
+                # it "imagination" would flag a genuine creation as
+                # confabulation risk.
+                source="genesis",
                 source_confidence=0.9,
             )
         except Exception as e:  # noqa: BLE001
@@ -1223,16 +1276,19 @@ class VolitionMixin:
             logger.debug(f'_pick_creation_topic: failed to gather existing: {e}')
 
         def _is_code_symbol(topic: str) -> bool:
-            """True if ``topic`` is an internal code symbol, not knowledge.
+            """True if ``topic`` is an internal symbol, not knowledge.
 
-            Internal code symbols have prefixes like ``python:``,
-            ``rust:``, or contain dotted module paths
-            (``foo.bar.baz``). These are its own code's internals,
-            not topics worth building a knowledge-base project around.
+            Every colon-namespaced concept ID is internal machinery —
+            code symbols (``python:``, ``rust:``, ``man:``,
+            ``wikipedia:``, ``wordnet:``), utterance seeds
+            (``_cat:``, ``_utt:``), and task markers (``spatial:``,
+            ``skill:``, ``domain:``, ``goal:``, ``var:``, ``type:``).
+            None of them are topics worth building a project around,
+            and sanitizing them into names fuses the namespace into
+            garbage words (``_cat:cause:guarded_cortisol`` →
+            ``catcauseguarded_cortisol``).
             """
-            if ":" in topic and topic.split(":")[0] in (
-                "python", "rust", "man", "wikipedia", "wordnet",
-            ):
+            if ":" in topic:
                 return True
             # Dotted paths with multiple segments look like code paths
             # (e.g. "brain_waves._compute_integration"). Real concepts

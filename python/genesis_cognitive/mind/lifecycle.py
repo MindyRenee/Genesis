@@ -535,10 +535,18 @@ class LifecycleMixin:
         # Save state before anything else — this is the critical step.
         # Keep cleaning up even if it fails, but report the failure to
         # the caller instead of presenting the shutdown as successful.
+        # Track save success separately from clean_shutdown so callers
+        # can distinguish "a background thread lingered" from "the
+        # state save actually failed" — the live session hit the former
+        # (a poller's 10s sleep outlasted its 5s join) and the CLI
+        # wrongly warned that state may not have been saved.
         try:
-            clean_shutdown &= self._save_state()
+            save_ok = self._save_state()
+            self._shutdown_save_ok: bool | None = save_ok
+            clean_shutdown &= save_ok
         except Exception as e:  # noqa: BLE001
             logger.warning(f"shutdown save failed: {e}")
+            self._shutdown_save_ok = False
             clean_shutdown = False
 
         # Close the concept archive's SQLite connection only after the
@@ -577,6 +585,16 @@ class LifecycleMixin:
         except (OSError, ConnectionError, RuntimeError, KeyboardInterrupt) as e:
             logger.debug(repr(e))
             clean_shutdown = False
+
+        # Close the cognitive journal last of all writers — it is the
+        # record of everything above. Clearing the active binding stops
+        # stray record_error calls from a stale module touching it.
+        journal = getattr(self, "journal", None)
+        if journal is not None:
+            journal.close()
+        from ..cognitive_journal import set_active
+        set_active(None)
+
         return clean_shutdown
 
     @staticmethod

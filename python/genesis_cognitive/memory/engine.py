@@ -224,6 +224,8 @@ class SourceTag:
             - "inference": Genesis inferred this (not directly observed)
             - "imagination": hypothetical / imagined
             - "self_analysis": Genesis analyzed its own code
+            - "world": an external world event it observed (presence,
+              percept, notice) — not addressed to it like conversation
         modality: How the memory was received — "text", "visual",
             "auditory", "internal".
         confidence: Confidence in the source attribution [0..1].
@@ -239,7 +241,7 @@ class SourceTag:
 # Valid source categories for source monitoring.
 VALID_SOURCES: frozenset[str] = frozenset({
     "user", "genesis", "conversation", "learning",
-    "inference", "imagination", "self_analysis", "unknown",
+    "inference", "imagination", "self_analysis", "world", "unknown",
 })
 
 

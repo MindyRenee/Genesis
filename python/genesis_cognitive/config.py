@@ -300,6 +300,28 @@ class VolitionConfig:
                     "concept_growth": 0.03,  # new concepts → integrate
                 },
             ),
+            # Act urge — it feels like doing something with its tools.
+            # Unlike the fixed-purpose urges (draw paints, learn
+            # reads a source), this one fires the ActingLoop: it forms
+            # an intention from its own state — a curiosity gap it can
+            # fill, an agency topic from its train of thought, a
+            # directory it hasn't looked at, a measurement it hasn't
+            # taken — plans a short chain of tool calls under a
+            # capability policy, and observes what comes back. This is
+            # the plan → act → observe loop the other urges gesture
+            # at; it turns volition into open-ended action.
+            UrgeConfig(
+                name="act",
+                threshold=0.68,
+                growth=0.0005,
+                decay=0.0003,
+                cooldown=240.0,  # at most one acting episode per 4 min
+                stimuli={
+                    "curiosity": 0.04,       # curious → wants to probe
+                    "idle_seconds": 0.02,    # idle → time to act
+                    "sustained_activity": 0.02,  # engaged → wants to do
+                },
+            ),
             # Safeguard urge — defensive drive. Unlike appetitive
             # urges (learn, draw, reach_out), this one builds from
             # threats to its own integrity: daemon connectivity lost
