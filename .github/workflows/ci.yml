@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  # Validate every push and pull request.
   push:
   pull_request:
 
