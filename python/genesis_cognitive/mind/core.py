@@ -37,6 +37,7 @@ from genesis_client import GenesisClient
 from ..bug_reporter import BugReporter
 from ..canvas import Canvas
 from ..cognition import CognitionEngine
+from ..cognitive_journal import CognitiveJournal, set_active
 from ..config import MindConfig
 from ..emotional_regulator import EmotionalRegulator
 from ..growth_ledger import GrowthLedger
@@ -116,6 +117,7 @@ class Mind(
         "self_sleep": 120.0, # self-sleep — don't auto-sleep right after waking
         "self_mission": 60.0,  # self-mission — moderate, needs engagement
         "learn": 30.0,       # learning — light CPU, core activity
+        "act": 45.0,         # acting — light tools, needs wake settling
         "reach_out": 20.0,   # reaching out — speech-like, light
         "safeguard": 10.0,   # self-protection — fast, but not at wake
     }
@@ -285,6 +287,30 @@ class Mind(
         # during sleep. Without this, the REM emotional queue is empty.
         self.memory.emotional_memory_callback = self.inner_life.queue_emotional_memory
 
+        # Acting loop — open-ended tool use driven by the "act" urge.
+        # Intentions come from its own state (curiosity questions,
+        # agency topics from its train of thought), the tools are its
+        # effectors, and the results come back as memories, world
+        # events, and neurochemistry. world/self callbacks are lazy —
+        # self.world doesn't exist until _init_identity.
+        from ..tools.agency import ActingLoop
+        self.agency = ActingLoop(
+            network=self.cognition.network,
+            curiosity=self.cognition.curiosity,
+            learner=self.learner,
+            data_dir=self.data_dir,
+            project_root=os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            ),
+            offline=self._offline,
+            get_emotion=self.feel,
+            get_agency_topic=self.inner_life.pop_agency_topic,
+            on_event=lambda desc: self.world.it_acted(desc),
+            on_store_memory=self._learner_store_memory,
+            on_neuro_impulse=self._learner_neuro_impulse,
+            on_live_thought=self._emit_live_thought,
+        )
+
         # Emotional regulator — it controls its own neurochemistry
         self.regulator = EmotionalRegulator(
             get_emotion=self.feel,
@@ -335,6 +361,22 @@ class Mind(
         # canvas, this is an ability it owns: nobody drives it
         # through it; the puzzle urge lets it choose to attempt.
         self.spatial_practice = SpatialPractice(self.data_dir)
+
+        # Problem intake — a problem heard in conversation (the outer
+        # world) compiles to a spec, lands in the drop-box, registers
+        # as a world event, and is worked by the same machinery the
+        # urge drives. The feeler is the regulator's puzzle response,
+        # so a requested solve feels like a chosen one.
+        self.cognition.set_problem_intake(
+            self.spatial_practice,
+            self.world,
+            lambda score, prior_best, solved: self.regulator.respond_to_puzzle(
+                self.feel(),
+                score=score,
+                prior_best=prior_best,
+                solved=solved,
+            ),
+        )
     def _init_vision_systems(self) -> None:
         """Initialize vision, visual cortex, and wire them to the learner.
 
@@ -368,6 +410,10 @@ class Mind(
         # Wire the visual cortex to the learner so it can learn from
         # images encountered during Wikipedia article learning.
         self.learner.visual_cortex = self.visual_cortex
+        # And to the practice drop-box — a perceptual puzzle (a
+        # sorter you must look at) renders its pieces through V1→VTC
+        # rather than handing the agent its symbolic attributes.
+        self.spatial_practice.cortex = self.visual_cortex
         # Wire the autonomous learner to the cognition engine so
         # _get_recent_learning() can access Wikipedia/GitHub topics.
         self.cognition.set_autonomous_learner(self.learner)
@@ -528,6 +574,7 @@ class Mind(
     def _init_runtime_state(self) -> None:
         """Initialize runtime flags, thread handles, and live-thought listeners."""
         self._running = False
+        self._shutdown_save_ok: bool | None = None
         self._interaction_count = 0
         self._last_interaction_time = time.time()
         self._think_worker_lock = threading.Lock()
@@ -611,5 +658,14 @@ class Mind(
         # "learning". Listeners are called from background threads and
         # must be thread-safe.
         self._live_thought_listeners: list = []
+
+        # Cognitive journal — the durable black box. Every event emitted
+        # through _emit_live_thought (thoughts, dreams, volition actions,
+        # sleep stages, parasomnia) is appended to cognitive_journal.jsonl
+        # in the data dir; the in-memory thought deque rolls over, this
+        # doesn't. Registering it as the active journal also lets
+        # subsystems without a Mind reference record swallowed errors.
+        self.journal = CognitiveJournal(self.data_dir)
+        set_active(self.journal)
 
         self._init_sleep_state_tracking()

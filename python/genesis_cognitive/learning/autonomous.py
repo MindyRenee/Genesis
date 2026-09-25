@@ -20,14 +20,13 @@ The learner is curiosity-driven:
 
 Safety:
 - Wikipedia API returns structured content (no HTML scraping)
-- Direct sources are curated institutional domains (.edu, .org, .gov)
-- DuckDuckGo Lite filters results to trusted domains
-- Respects robots.txt
+- HTML pages are text-extracted (no scripts, styles, or forms)
 - Rate-limited (one request every few seconds)
 - Timeout on every request
+- Bounded response reads and total page count per session
 - Limited to text content (no images, scripts, etc.)
-- Caps total pages per session
-- It can request access to non-trusted sources (user approves)
+- Open web: all domains are allowed (ALLOW_ALL_DOMAINS). The
+  site-request approval machinery is retained but bypassed.
 """
 
 from __future__ import annotations
@@ -3089,7 +3088,11 @@ class AutonomousLearner:
             if "text/html" not in content_type and "text/plain" not in content_type:
                 return None
 
-            raw = resp.read().decode("utf-8", errors="ignore")
+            # Bounded read — never pull more than 3x the processing
+            # cap into memory, even if the server streams endlessly.
+            raw = resp.read(MAX_TEXT_LENGTH * 3 + 1).decode(
+                "utf-8", errors="ignore"
+            )
 
         if len(raw) > MAX_TEXT_LENGTH * 3:
             raw = raw[: MAX_TEXT_LENGTH * 3]

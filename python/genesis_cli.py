@@ -67,6 +67,7 @@ from __future__ import annotations
 import argparse
 import collections
 import fcntl
+import json
 import logging
 import lzma
 import os
@@ -84,6 +85,7 @@ from collections.abc import Callable
 from pathlib import Path
 from types import FrameType
 
+from genesis_client.ltm_index import scan_ltm_index
 from genesis_client.protocol import PHASE_ACTIVE, PHASE_ALERT, PHASE_NREM, PHASE_REM
 from genesis_cognitive.ambient import AmbientListener, contains_wake_word, strip_wake_word
 from genesis_cognitive.auditory import AuditoryCortex, SoundEvent
@@ -923,9 +925,11 @@ def _format_episode_list(
     mind: Mind,
     resolve_refs: bool,
     title: str,
+    archived_ids: set[int] | None = None,
 ) -> str:
     """Format the list of episodes as a single string."""
     lines = [f"\n  ┌─ {title} ({len(episodes)} shown) ─────────────────────"]
+    archived_ids = archived_ids or set()
     ep_cache: dict[int, str] = {}
     assoc_re = re.compile(
         r"\[association\] episode (\d+) ↔ episode (\d+) \(distance: (\d+)\)"
@@ -934,6 +938,8 @@ def _format_episode_list(
     for ep in episodes:
         t = time.strftime("%m-%d %H:%M", time.localtime(ep.timestamp / 1000))
         module_name = _MODULE_NAMES.get(ep.source_module, f"module-{ep.source_module}")
+        if ep.episode_id in archived_ids:
+            module_name += "·archived"
         text = ep.text.replace("\n", " ").strip()
 
         if resolve_refs and text.startswith("[dream-insight]"):
@@ -1197,6 +1203,121 @@ def _cmd_thoughts(mind: Mind, rest: str) -> str:
     return f"\n  genesis> {mind.inner_life_status()}\n"
 
 
+def _cmd_puzzle(mind: Mind, rest: str) -> str:
+    """Puzzle status, or hand it a puzzle spec to work on.
+
+    /puzzle              — what it's practicing now + pending offers
+    /puzzle offer <file> — drop a puzzle spec into its world
+    /puzzle drop <name>  — take an offered puzzle back
+
+    A spec is data, not code: {"family": "grid", "train": [...],
+    "test": [...]}, {"family": "sorter", "generate"/"slots"+"blocks"},
+    {"family": "sequence", "generate"/"pattern"},
+    {"family": "assembly", "generate": {"rows","cols"}},
+    {"family": "relations", "generate"/"positions"+"objects"+"goals"},
+    {"family": "quantities", "generate"/"target"+"groups"}, or
+    {"family": "classification", "items"+"predicate"/"examples"}.
+    """
+    from genesis_cognitive.spatial.practice import (
+        CURRICULUM,
+        normalize_offered,
+    )
+
+    practice = mind.spatial_practice
+    rest = rest.strip()
+    if rest.startswith("offer "):
+        path = Path(rest[6:].strip()).expanduser()
+        try:
+            raw = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError) as e:
+            return f"\n  can't read {path}: {e}\n"
+        task = normalize_offered(raw, path.stem)
+        if task is None:
+            return (
+                "\n  not a puzzle spec — needs a family: \"grid\""
+                " (train/test pairs), \"sorter\" (generate or"
+                " slots+blocks), or \"assembly\" (generate rows/cols)\n"
+            )
+        known = {t["name"] for t in practice.offered_tasks()}
+        known |= {str(t["name"]) for t in CURRICULUM}
+        if task["name"] in known:
+            return f"\n  {task['name']} is already on its list\n"
+        practice.offered_dir().mkdir(parents=True, exist_ok=True)
+        target = practice.offered_dir() / f"{task['name']}.json"
+        target.write_text(json.dumps(raw, indent=2) + "\n")
+        # Register it as a world event — it notices a new puzzle in
+        # its environment, not just a file on disk.
+        mind.world.notify(
+            f"a new {task['family']} puzzle appeared: {task['name']}",
+            salience=0.6,
+        )
+        return (
+            f"\n  offered {task['name']} [{task['family']}] — it'll "
+            "pick it up when its puzzle urge rises\n"
+        )
+    if rest.startswith("drop "):
+        name = rest[5:].strip()
+        try:
+            files = sorted(practice.offered_dir().glob("*.json"))
+        except OSError:
+            files = []
+        for f in files:
+            if f.stem == name:
+                f.unlink()
+                return f"\n  dropped {name}\n"
+            try:
+                raw = json.loads(f.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue
+            task = normalize_offered(raw, f.stem)
+            if task is not None and task["name"] == name:
+                f.unlink()
+                return f"\n  dropped {name}\n"
+        return f"\n  no offered puzzle named {name}\n"
+    if rest:
+        return (
+            "\n  /puzzle            — what it's practicing now"
+            "\n  /puzzle offer <file> — drop a puzzle spec into its world"
+            "\n  /puzzle drop <name>  — take an offer back\n"
+        )
+    lines = [""]
+    cur = practice.current_task()
+    if cur is None:
+        lines.append(
+            "  nothing pending — every known puzzle is mastered or parked"
+        )
+    else:
+        lines.append(
+            f"  current: {cur['name']} [{cur.get('family', 'grid')}]"
+        )
+        if cur.get("hint"):
+            lines.append(f"    hint: {cur['hint']}")
+        n = cur["name"]
+        lines.append(
+            f"    attempts={practice.attempts.get(n, 0)} "
+            f"mastery={practice.mastery.get(n, 0.0):.2f}"
+        )
+    pending = [
+        t
+        for t in practice.offered_tasks()
+        if practice.mastery.get(t["name"], 0.0) < 1.0
+    ]
+    if pending:
+        lines.append("  offered:")
+        for t in pending:
+            lines.append(
+                f"    {t['name']} [{t['family']}] "
+                f"attempts={practice.attempts.get(t['name'], 0)} "
+                f"mastery={practice.mastery.get(t['name'], 0.0):.2f}"
+            )
+    st = practice.status()
+    mastered = sum(1 for v in st.values() if v >= 1.0)
+    lines.append(f"  mastered {mastered}/{len(st)}")
+    lines.append("  /puzzle offer <file> — hand it a puzzle spec")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def _cmd_world(mind: Mind, rest: str) -> str:
     """Show Genesis's external world — presences, events, isolation."""
     return f"\n  genesis> {mind.world_status()}\n"
@@ -1208,8 +1329,53 @@ def _cmd_regulate(mind: Mind, rest: str) -> str:
 
 
 def _cmd_dreams(mind: Mind, rest: str) -> str:
-    """Show Genesis's recent dreams."""
-    return _render_recent_episodes(mind, 9, "Dreams")
+    """Show Genesis's dream insights — active ones plus archived history.
+
+    Sleep compression archives old episodes: they leave the active list
+    (what ``get_recent_episodes`` reads) but stay retrievable by ID.
+    Scanning the index finds them, so the dream history is reported
+    honestly — "no dreams" only prints when the store truly holds none.
+    """
+    try:
+        active = mind.client.get_recent_episodes(limit=20, source_module=9)
+    except (OSError, ConnectionError, RuntimeError) as e:
+        return f"\n  [error] cannot reach subcognitive: {e}\n"
+
+    meta_path = Path(mind.data_dir) / "ltm_store.meta"
+    index_entries = scan_ltm_index(meta_path, source_module=9)
+    active_ids = {ep.episode_id for ep in active}
+    archived_entries = [
+        e
+        for e in index_entries
+        if e.is_archived and not e.is_deleted and e.episode_id not in active_ids
+    ]
+
+    if not active and not archived_entries:
+        return "\n  No dreams stored yet.\n"
+
+    # Newest first overall, capped at 20; archived ones are fetched by
+    # ID (retrievable by design — compression archives, never deletes).
+    episodes: list = list(active)
+    archived_ids: set[int] = set()
+    for entry in sorted(
+        archived_entries, key=lambda e: e.timestamp, reverse=True
+    )[: max(0, 20 - len(active))]:
+        try:
+            episodes.append(mind.client.retrieve_episode(entry.episode_id))
+            archived_ids.add(entry.episode_id)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"[dreams] archived episode {entry.episode_id} unread: {e}")
+
+    episodes.sort(key=lambda ep: ep.timestamp, reverse=True)
+    episodes = episodes[:20]
+
+    title = (
+        f"Dreams — {len(active)} active, "
+        f"{len(archived_entries)} archived by sleep compression"
+    )
+    return _format_episode_list(
+        episodes, mind, resolve_refs=True, title=title, archived_ids=archived_ids
+    )
 
 
 def _cmd_memories(mind: Mind, rest: str) -> str:
@@ -2076,6 +2242,7 @@ _COMMAND_HANDLERS: dict[str, Callable[[Mind, str], str]] = {
     "/endteach": _cmd_endteach,
     "/teach-questions": _cmd_teach_questions,
     "/sleep-aid": _cmd_sleep_aid,
+    "/puzzle": _cmd_puzzle,
 }
 
 
@@ -2257,6 +2424,7 @@ def _print_help() -> None:
     logger.info("    /endteach    — exit teaching mode, resume normal operation")
     logger.info("    /teach-questions — answer its queued questions one at a time")
     logger.info("    /sleep-aid    — emergency sleep aid for stress-induced insomnia")
+    logger.info("    /puzzle       — its puzzle practice; offer one with /puzzle offer <file>")
     logger.info("    /quit         — exit")
     logger.info("")
     logger.info("  When you're idle, its thoughts appear live as genesis~ lines.")
@@ -3029,10 +3197,22 @@ def _shutdown(
     if clean_shutdown and mind is not None:
         print("[genesis] Goodnight.", file=sys.stderr)
     elif not clean_shutdown:
-        print(
-            "[genesis] Shutdown incomplete — cognitive state may not be saved.",
-            file=sys.stderr,
-        )
+        # Distinguish "the state save actually failed" (critical) from
+        # "a background thread or child process lingered past its join
+        # budget" (noncritical — the save can still have succeeded).
+        # mind._shutdown_save_ok is True/False once stop() ran; None
+        # means the mind never reached the save step.
+        if mind is not None and getattr(mind, "_shutdown_save_ok", True) is False:
+            print(
+                "[genesis] Shutdown incomplete — cognitive state may not be saved.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                "[genesis] Shutdown incomplete — a background component "
+                "did not stop cleanly (cognitive state was saved).",
+                file=sys.stderr,
+            )
     return clean_shutdown
 
 

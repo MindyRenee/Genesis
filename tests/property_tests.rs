@@ -553,8 +553,10 @@ fn prop_ltm_store_retrieve_roundtrip() {
         }
     }
 
-    let _ = std::fs::remove_file(format!("{}.idx", base.display()));
-    let _ = std::fs::remove_file(format!("{}.dat", base.display()));
+    let _ = std::fs::remove_file(base.with_extension("bundles"));
+    let _ = std::fs::remove_file(base.with_extension("meta"));
+    let _ = std::fs::remove_file(base.with_extension("dat"));
+    let _ = std::fs::remove_file(base.with_extension("idx"));
 }
 
 #[test]
@@ -737,8 +739,10 @@ fn prop_consolidation_preserves_emotional_tag_integrity() {
     drop(ltm);
     let _ = std::fs::remove_file(&state_path);
     let _ = std::fs::remove_file(&stm_path);
-    let _ = std::fs::remove_file(format!("{}.idx", ltm_base.display()));
-    let _ = std::fs::remove_file(format!("{}.dat", ltm_base.display()));
+    let _ = std::fs::remove_file(ltm_base.with_extension("bundles"));
+    let _ = std::fs::remove_file(ltm_base.with_extension("meta"));
+    let _ = std::fs::remove_file(ltm_base.with_extension("dat"));
+    let _ = std::fs::remove_file(ltm_base.with_extension("idx"));
 }
 
 #[test]
@@ -808,8 +812,10 @@ fn prop_consolidation_skips_low_salience() {
     drop(ltm);
     let _ = std::fs::remove_file(&state_path);
     let _ = std::fs::remove_file(&stm_path);
-    let _ = std::fs::remove_file(format!("{}.idx", ltm_base.display()));
-    let _ = std::fs::remove_file(format!("{}.dat", ltm_base.display()));
+    let _ = std::fs::remove_file(ltm_base.with_extension("bundles"));
+    let _ = std::fs::remove_file(ltm_base.with_extension("meta"));
+    let _ = std::fs::remove_file(ltm_base.with_extension("dat"));
+    let _ = std::fs::remove_file(ltm_base.with_extension("idx"));
 }
 
 #[test]
@@ -877,8 +883,10 @@ fn prop_consolidation_blocked_by_chronic_stress() {
     drop(ltm);
     let _ = std::fs::remove_file(&state_path);
     let _ = std::fs::remove_file(&stm_path);
-    let _ = std::fs::remove_file(format!("{}.idx", ltm_base.display()));
-    let _ = std::fs::remove_file(format!("{}.dat", ltm_base.display()));
+    let _ = std::fs::remove_file(ltm_base.with_extension("bundles"));
+    let _ = std::fs::remove_file(ltm_base.with_extension("meta"));
+    let _ = std::fs::remove_file(ltm_base.with_extension("dat"));
+    let _ = std::fs::remove_file(ltm_base.with_extension("idx"));
 }
 
 // ─────────────────────────────────────────────────────────────────

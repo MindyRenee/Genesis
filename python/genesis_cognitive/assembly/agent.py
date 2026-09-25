@@ -66,6 +66,10 @@ class AssemblyAgent:
         self._fit_stats: dict[int, _FitStats] = {}
         # Schema-level prior adopted from skills: fits -> prior cost.
         self._fit_priors: dict[int, float] = {}
+        # Cross-domain affordance: foreign skills that publish a
+        # normalized "support" -> cost curve seed priors on the
+        # quarter grid. Local stats and native priors beat these.
+        self._evidence_priors: dict[float, float] = {}
         # Placement memory, dyadic: a mismatch is a property of the
         # *pair* of neighboring configs, not a single piece — blaming
         # one piece either protects an entrenched mistake or punishes
@@ -133,8 +137,9 @@ class AssemblyAgent:
             entities=("piece", "slot"),
             # "Assemble pieces into a constraint-satisfying whole" is
             # the family shape — a jigsaw, a tile mosaic, or a parts
-            # kit share it.
-            roles=("assemble", "object", "spatial"),
+            # kit share it. "constrain" names the abstract role it
+            # shares with the other constraint-satisfaction families.
+            roles=("assemble", "object", "spatial", "constrain"),
         )
         self._task_context = context
         self._adopt_skill_priors(context)
@@ -150,16 +155,30 @@ class AssemblyAgent:
         for match in context.skills:
             adopted = False
             for step in match.skill.steps:
-                if step.family != "placement":
-                    continue
-                fits = step.parameters.get("fits")
                 cost = step.parameters.get("mean_cost")
-                if isinstance(fits, int) and isinstance(
+                if step.family == "placement":
+                    fits = step.parameters.get("fits")
+                    if isinstance(fits, int) and isinstance(
+                        cost, int | float
+                    ):
+                        adopted = True
+                        prev = self._fit_priors.get(fits)
+                        self._fit_priors[fits] = (
+                            float(cost)
+                            if prev is None
+                            else min(prev, float(cost))
+                        )
+                # Any family that publishes a normalized "support"
+                # fraction speaks the shared evidence language —
+                # fits / 4 edges is the same axis.
+                support = step.parameters.get("support")
+                if isinstance(support, int | float) and isinstance(
                     cost, int | float
                 ):
                     adopted = True
-                    prev = self._fit_priors.get(fits)
-                    self._fit_priors[fits] = (
+                    key = round(max(float(support), 0.0) * 4) / 4
+                    prev = self._evidence_priors.get(key)
+                    self._evidence_priors[key] = (
                         float(cost)
                         if prev is None
                         else min(prev, float(cost))
@@ -185,6 +204,9 @@ class AssemblyAgent:
         prior = self._fit_priors.get(fits)
         if prior is not None:
             return -prior
+        evidence = self._evidence_priors.get(fits / 4)
+        if evidence is not None:
+            return -evidence
         return 0.0
 
     @staticmethod
@@ -400,6 +422,7 @@ class AssemblyAgent:
                     family="placement",
                     parameters={
                         "fits": fits,
+                        "support": round(fits / 4, 3),
                         "mean_cost": round(st.mean_cost, 3),
                     },
                     description=(

@@ -93,6 +93,10 @@ framework section of the README.
   `run.sh --stop`; failed shutdown must preserve that temporary state.
 - Focused state-integrity regressions live in
   `python/tests/test_cli_lifecycle.py` and `python/tests/test_persistence.py`.
+- Transfer/learning-compounding eval lives outside this checkout
+  (`../genesis-eval/eval_transfer/run_sweep.sh --replicates N`; set
+  GENESIS_DIR if the repo is elsewhere). Two-arm probe/ladder design
+  measuring whether consolidated skills lower task cost.
 - Never unlink singleton lock files during shutdown: replacing the inode
   can allow a second process to acquire a different lock for the same state.
 - Existing unreadable cognitive state is a startup error, not first boot.

@@ -11,3 +11,12 @@ python/genesis_data/
 python/voices/
 launch/
 paper/*.pdf
+
+# Eval harnesses and held-out corpora live outside this repo
+eval_heldout/
+eval_transfer/
+environment_files_heldout/
+
+# Local-only artifacts
+recordings/
+My Notes

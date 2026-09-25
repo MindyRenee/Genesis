@@ -42,6 +42,29 @@ logger = logging.getLogger(__name__)
 
 _MATCH_THRESHOLD = 0.55
 _RELIABILITY_OBSERVATIONS = 3.0
+# A foreign-domain skill is offered when the task signatures share
+# enough schema-level role vocabulary — "constrain", "select" — for an
+# analogy to be claimed at all. Variable names can never overlap across
+# domains, so roles are the only bridge. 0.2 lets the
+# constraint-satisfaction families (sorter/relations/assembly/
+# classification) see each other while keeping unrelated families
+# (sequence continuation, quantity composition, grid transforms)
+# out of reach.
+_CROSS_DOMAIN_ROLES = 0.2
+
+
+def _publishes_evidence(skill: LearnedSkill) -> bool:
+    """Whether a foreign skill is readable at all.
+
+    Vocabulary overlap alone is not an analogy — a skill crosses
+    domains only when its procedure exposes the normalized
+    "support" axis (fraction of an option's constraints satisfied)
+    that foreign adapters can rebind onto their own affordance.
+    """
+    return any(
+        isinstance(step.parameters.get("support"), int | float)
+        for step in skill.steps
+    )
 
 # How an episode's success was established, weakest to strongest:
 # - "reported": a caller asserted success; nothing checked it.
@@ -763,19 +786,47 @@ class TaskCompetence:
     def skill_matches(
         self, signature: TaskSignature, *, limit: int = 4
     ) -> list[SkillMatch]:
-        matches: list[SkillMatch] = []
+        """Retrieve reusable skills, vocabulary-aligned first.
+
+        Skills that clear full-signature similarity are offered
+        first — including foreign skills whose concrete vocabulary
+        genuinely aligns (the domain discount lives in
+        ``TaskSignature.similarity``).
+
+        Skills from other domains that cannot clear the full bar can
+        still transfer on abstract structure alone: shared schema-level
+        roles plus a readable procedure interface — a "support" axis
+        the foreign adapter can rebind. For a cross match,
+        ``SkillMatch.similarity`` carries the role overlap, not the
+        full-signature score. Foreign skills are always ranked below
+        similarity matches and capped separately, so they can inform
+        but never crowd out vocabulary-aligned evidence.
+        """
+        same: list[SkillMatch] = []
+        cross: list[SkillMatch] = []
         for skill in self.skills.values():
             similarity = signature.similarity(skill.signature)
-            if similarity < self.match_threshold:
+            if similarity >= self.match_threshold:
+                score = 0.68 * similarity + 0.32 * skill.confidence
+                # Procedures backed by weaker verification transfer with
+                # less authority: a reported or solver-only skill must
+                # not outrank one checked against the world.
+                score *= verification_weight(skill.verification)
+                same.append(SkillMatch(skill, similarity, score))
                 continue
-            score = 0.68 * similarity + 0.32 * skill.confidence
-            # Procedures backed by weaker verification transfer with
-            # less authority: a reported or solver-only skill must not
-            # outrank one checked against the world.
+            if skill.signature.domain == signature.domain:
+                continue
+            overlap = _jaccard(signature.roles, skill.signature.roles)
+            if overlap < _CROSS_DOMAIN_ROLES or not _publishes_evidence(
+                skill
+            ):
+                continue
+            score = 0.68 * overlap + 0.32 * skill.confidence
             score *= verification_weight(skill.verification)
-            matches.append(SkillMatch(skill, similarity, score))
-        matches.sort(key=lambda m: (-m.score, m.skill.skill_id))
-        return matches[:limit]
+            cross.append(SkillMatch(skill, overlap, score))
+        same.sort(key=lambda m: (-m.score, m.skill.skill_id))
+        cross.sort(key=lambda m: (-m.score, m.skill.skill_id))
+        return (same[: limit - 1] + cross[:2])[:limit]
 
     def predict(
         self,

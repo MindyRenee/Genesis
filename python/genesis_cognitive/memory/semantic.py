@@ -727,7 +727,7 @@ class SemanticMemory:
         # knowledge.
         for m in _IS_A_RELATIONAL_RE.finditer(clause):
             subj, role, target = (
-                _strip_article(m.group(1).strip().lower()),
+                _strip_article(_clean_subject(m.group(1).strip().lower())),
                 _strip_article(m.group(2).strip().lower()),
                 _strip_article(m.group(3).strip().lower()),
             )
@@ -1223,14 +1223,72 @@ class SemanticMemory:
 # ─── Helpers ──────────────────────────────────────────────────────────
 
 
+# Words that end an evidential clause prefix inside a captured subject:
+# "i think that ferrets are cute" captures "i think that ferrets" —
+# everything through the last such word is the speaker's framing
+# (pronoun + reporting verb), not the proposition's subject.
+_SUBJECT_PREFIX_WORDS = frozenset({
+    # pronouns
+    "i", "me", "we", "us", "you", "he", "she", "it", "they", "them",
+    "him", "her",
+    # auxiliaries / modals
+    "am", "is", "are", "was", "were", "be", "been",
+    "do", "does", "did", "have", "has", "had",
+    "can", "could", "will", "would", "shall", "should",
+    "may", "might", "must",
+    # reporting / mental-state verbs
+    "think", "thought", "believe", "know", "knew", "said", "say",
+    "says", "guess", "hope", "hoped", "feel", "felt", "hear", "heard",
+    "see", "saw", "mean", "meant", "suspect", "suppose", "told",
+    "reckon", "figure", "bet", "wish", "remember",
+})
+
+# Complementisers / relative markers that terminate a subject NP:
+# "the cat that sat" → "the cat". When one directly follows a cut
+# prefix ("i think that ferrets" → "that ferrets"), it is the
+# object-clause complementiser and is dropped too.
+_SUBJECT_BREAK_WORDS = frozenset({
+    "that", "which", "who", "whom", "whose",
+    "because", "although", "though", "while", "if", "when",
+})
+
+
+def _clean_subject(phrase: str) -> str:
+    """Reduce a captured subject to its head noun phrase.
+
+    Clause prefixes leak into subject captures: "i think that ferrets
+    are cute" yields "i think that ferrets". Evidential framing —
+    pronouns, auxiliaries, reporting verbs — is cut through the last
+    such word, and a complementiser directly after it is dropped
+    ("she said that cats" → "cats"). A relative marker inside what
+    remains ends the NP, keeping the head ("the cat that sat" →
+    "the cat").
+    """
+    words = phrase.split()
+    cut = -1
+    for i, w in enumerate(words):
+        if w in _SUBJECT_PREFIX_WORDS:
+            cut = i
+    words = words[cut + 1:]
+    if words and words[0] in _SUBJECT_BREAK_WORDS:
+        words = words[1:]
+    for i, w in enumerate(words):
+        if w in _SUBJECT_BREAK_WORDS:
+            words = words[:i]
+            break
+    return " ".join(words)
+
+
 def _normalise_pair(a: str, b: str) -> tuple[str, str]:
     """Normalise and validate a (subject, object) extraction pair.
 
     Strips leading articles ("the", "a", "an") from both sides so that
-    "the brain" → "brain" and "an organ" → "organ". Returns empty
-    strings if either side is empty.
+    "the brain" → "brain" and "an organ" → "organ". The subject is
+    additionally reduced to its head noun phrase — clause prefixes and
+    relative tails are not part of the proposition's subject. Returns
+    empty strings if either side is empty.
     """
-    subj = _strip_article(a.strip().lower())
+    subj = _strip_article(_clean_subject(a.strip().lower()))
     obj = _strip_article(b.strip().lower())
     if not subj or not obj:
         return "", ""

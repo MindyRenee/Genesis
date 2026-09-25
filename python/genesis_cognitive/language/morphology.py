@@ -150,6 +150,7 @@ _VERB_BASES: frozenset[str] = frozenset(
         "cast", "pitch", "shove", "tug", "yank", "lower", "haul",
         "pack", "unpack", "unload", "stack", "pile", "scatter",
         "arrange", "organize", "tidy", "mop", "vacuum", "dust",
+        "fit", "match", "insert",
         "polish", "rinse", "soak", "dip", "spray", "sprinkle", "wipe",
         "scrub", "mend", "stitch", "glue", "tape", "nail", "screw",
         "hammer", "drill", "saw", "bury", "weed", "prune", "mow",

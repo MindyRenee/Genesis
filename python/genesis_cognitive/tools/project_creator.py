@@ -230,6 +230,22 @@ def create_project(
     Returns:
         A ProjectResult describing what was created.
     """
+    # Internal namespaced IDs (``python:…``, ``_cat:…``, ``skill:…``)
+    # are code/utterance/task machinery, not knowledge topics. Letting
+    # one through fuses the namespace into a garbage package name
+    # (``_cat:cause:guarded_cortisol`` → ``catcauseguarded_cortisol``)
+    # and leaks internals into user-facing projects.
+    if ":" in description.strip():
+        logger.debug(
+            f"create_project: refusing internal symbol topic "
+            f"{description!r}"
+        )
+        return ProjectResult(
+            name="",
+            path="",
+            error="internal symbol",
+        )
+
     name = _sanitize_name(description)
     projects_root = str(Path(data_dir) / "projects")
 

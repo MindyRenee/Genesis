@@ -291,6 +291,118 @@ class TestSpatialAgent:
         agent.on_episode_end("GAME_OVER")
         assert agent.avatar_color == 3  # self-model persists
 
+    def test_death_attribution_prefers_safe_actions(self):
+        """An action present only in dying episodes is avoided.
+
+        Fatal choices are often delayed — a doomed pick can precede
+        the death by many steps — so blame accrues per-episode
+        presence, not last-action. After enough deaths the lethal
+        action drops out of the choice pool while the innocent one
+        remains choosable.
+        """
+        from genesis_cognitive.spatial import SpatialAgent
+
+        agent = SpatialAgent(seed=0, epsilon=1.0)
+        actions = ["action3", "action4"]
+        # Episodes containing action4 always die; clean episodes live.
+        for _ in range(6):
+            agent._cur_episode_actions = {"action3", "action4"}
+            agent.on_episode_end("GAME_OVER")
+            agent._cur_episode_actions = {"action3"}
+            agent.on_episode_end("WIN")
+        assert agent._is_lethal("action4")
+        assert not agent._is_lethal("action3")
+        for _ in range(30):
+            assert agent.choose_action(actions) == "action3"
+
+    def test_delayed_death_does_not_blame_last_action(self):
+        """The action in flight at death isn't blamed when another
+        action is the consistent discriminator."""
+        from genesis_cognitive.spatial import SpatialAgent
+
+        agent = SpatialAgent(seed=0, epsilon=1.0)
+        # Pattern: episodes die only when "action4" was used — the
+        # last action before death is often innocent "action3".
+        for _ in range(5):
+            agent._cur_episode_actions = {"action3", "action4"}
+            agent._last_action = "action3"  # innocent last action
+            agent.on_episode_end("GAME_OVER")
+        for _ in range(5):
+            agent._cur_episode_actions = {"action3"}
+            agent._last_action = "action3"
+            agent.on_episode_end("WIN")
+        assert agent._is_lethal("action4")
+        assert not agent._is_lethal("action3")
+
+    def test_responsive_cells_are_reclicked(self):
+        """A clicked cell that produced change is a working control —
+        it gets re-pressed instead of exhausting to a blind sweep."""
+        from genesis_cognitive.spatial import SpatialAgent
+
+        agent = SpatialAgent(seed=0)
+        agent.observe([[0] * 8 for _ in range(8)])
+        agent._click_outcomes[(2, 2)] = 0.5   # a responsive control
+        agent._click_outcomes[(0, 0)] = 0.0   # a dead spot
+        data = agent.action_data("action6", (8, 8))
+        assert (data["y"], data["x"]) == (2, 2)
+
+    def test_lethal_cells_excluded_from_clicks(self):
+        """Cells whose episodes reliably die stop being click targets."""
+        from genesis_cognitive.spatial import SpatialAgent
+
+        agent = SpatialAgent(seed=0)
+        agent.observe([[0] * 8 for _ in range(8)])
+        for _ in range(4):
+            agent._cur_episode_clicks = {(1, 1)}
+            agent.on_episode_end("GAME_OVER")
+        agent._cur_episode_clicks = {(5, 5)}
+        agent.on_episode_end("WIN")
+        assert agent._is_lethal_cell((1, 1))
+        assert not agent._is_lethal_cell((5, 5))
+        agent._click_outcomes[(1, 1)] = 0.9  # responsive but lethal
+        agent._click_outcomes[(5, 5)] = 0.3
+        # Episode end clears the frame — observe the fresh episode's
+        # first frame before choosing, as the run loop does.
+        agent.observe([[0] * 8 for _ in range(8)])
+        data = agent.action_data("action6", (8, 8))
+        assert (data["y"], data["x"]) == (5, 5)
+
+    def test_doom_marker_blames_introducer(self):
+        """When every dying episode contains both actions, presence
+        alone can't separate the killer from the necessary innocent.
+        The visible trace can: the action whose arrival adds a color
+        that keeps preceding death takes doom blame."""
+        from genesis_cognitive.spatial import SpatialAgent
+
+        agent = SpatialAgent(seed=0, epsilon=1.0)
+        empty = [[0] * 8 for _ in range(8)]
+        marked = [row[:] for row in empty]
+        marked[3][3] = 9  # a new color appears after "harm" acts
+        benign = [row[:] for row in empty]
+        benign[0][0] = 5
+        for _ in range(4):
+            # Dying segment: the same two actions are present, and
+            # "harm" leaves the marker behind.
+            agent.observe(empty)
+            agent._last_action = "harm"
+            agent.observe(marked)          # introduces color 9
+            agent._cur_episode_actions = {"harm", "needed"}
+            agent.on_episode_end("GAME_OVER")
+            # Surviving segment: identical action presence — so
+            # presence statistics acquit "harm"; only the marker
+            # it introduced can convict it.
+            agent.observe(empty)
+            agent._last_action = "fine"
+            agent.observe(benign)          # introduces color 5
+            agent._cur_episode_actions = {"harm", "needed", "fine"}
+            agent.on_episode_end("WIN")
+        assert not agent._is_doom_color(5)
+        assert agent._doom_blame.get("harm", 0) >= 2
+        assert "needed" not in agent._doom_blame
+        assert "fine" not in agent._doom_blame
+        assert agent._is_lethal("harm")
+        assert not agent._is_lethal("needed")
+
 
 # ── Grounding ────────────────────────────────────────────────────
 

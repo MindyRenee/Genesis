@@ -530,6 +530,17 @@ class Vocabulary:
             composed = self._compose_vision_status_content(vision_status, emotion)
             if composed:
                 return [composed]
+        # If a problem-result payload is present (a task it just
+        # worked through its practice machinery — a heard problem
+        # compiled into the inner world), compose the report from the
+        # structured outcome: family, solved, and the answer payload.
+        problem_result = context.get("problem_result")
+        if problem_result and isinstance(problem_result, dict):
+            composed = self._compose_problem_result_content(
+                problem_result, emotion
+            )
+            if composed:
+                return [composed]
         # If relation answer metadata is present, compose a response
         # from the structured relation data the question handler
         # traversed. This is how it answers "who created you?" or
@@ -2054,6 +2065,205 @@ class Vocabulary:
             return candidates[0]
         return self._rng.choice(candidates)
 
+    @staticmethod
+    def _plural_noun(word: str) -> str:
+        """A small pluralizer for rule-game kind names (tessel →
+        tessels, wug → wugs)."""
+        if not word:
+            return word
+        if word.endswith(("s", "x", "z", "ch", "sh")):
+            return word + "es"
+        if word.endswith("y") and len(word) > 1 and word[-2] not in "aeiou":
+            return word[:-1] + "ies"
+        return word + "s"
+
+    def _compose_problem_result_content(
+        self,
+        result: dict[str, Any],
+        emotion: EmotionalState,
+    ) -> str | None:
+        """Compose the content slot from a worked problem's outcome.
+
+        The practice layer supplies structured data — family, solved,
+        and the answer payload (the yes-set, the next marks, the
+        final order, the counts) — and this composes a *predicate*
+        from it. The candidate phrasings are grammar seeds (building
+        blocks) chosen by emotional state; the answer itself is always
+        the world's verdict, never a recited string.
+        """
+        family = str(result.get("family", ""))
+        if result.get("invalid"):
+            candidates = [
+                "not able to make that problem hold together",
+                "finding the pieces contradict each other",
+                "unable to turn that into something solvable",
+            ]
+            return self._pick_problem_frame(candidates, emotion)
+
+        if not result.get("solved"):
+            score: Any = result.get("score")
+            try:
+                pct = f", about {float(score) * 100:.0f}% of the way"
+            except (TypeError, ValueError):
+                pct = ""
+            candidates = [
+                "still working on it",
+                "not able to crack it yet",
+                f"still puzzling over it{pct}",
+            ]
+            return self._pick_problem_frame(candidates, emotion)
+
+        if family == "classification":
+            yes = [str(n) for n in result.get("yes", [])]
+            kind = str(result.get("kind", "") or "")
+            members = self._join_names(yes) if yes else "none of them"
+            if kind:
+                kinds = self._plural_noun(kind)
+                candidates = [
+                    f"getting {members} as the {kinds}",
+                    f"figuring the {kinds} are {members}",
+                    f"finding {members} fit the rule",
+                ]
+            else:
+                candidates = [
+                    f"getting {members} as the ones that fit",
+                    f"finding {members} match the rule",
+                    f"sorting it as {members}",
+                ]
+            return self._pick_problem_frame(candidates, emotion)
+
+        if family == "sequence":
+            nxt = [str(c) for c in result.get("next", [])]
+            if not nxt:
+                return None
+            marks = " ".join(nxt)
+            candidates = [
+                f"getting {marks} next",
+                f"seeing it continue {marks}",
+                f"finding the next one is {marks}",
+            ]
+            return self._pick_problem_frame(candidates, emotion)
+
+        if family == "relations":
+            order = [str(n) for n in result.get("order", [])]
+            if not order:
+                return None
+            seq = self._join_names(order)
+            candidates = [
+                f"arranging them {seq}",
+                f"getting the order {seq}",
+                f"working it out as {seq}",
+            ]
+            return self._pick_problem_frame(candidates, emotion)
+
+        if family == "quantities":
+            counts = result.get("counts", [])
+            target = result.get("target")
+            if not counts or target is None:
+                return None
+            parts = " + ".join(str(c) for c in counts)
+            candidates = [
+                f"making {target} with {parts}",
+                f"getting {target} from {parts}",
+                f"finding {parts} makes {target}",
+            ]
+            return self._pick_problem_frame(candidates, emotion)
+
+        if family == "sorter":
+            placements = result.get("placements") or []
+            if placements:
+                # Report the actual mapping — "the red star went in
+                # the star hole, the blue moon in the moon hole".
+                pairs = [
+                    f"{self._attr_name(p.get('block', {}), 'block')} "
+                    f"in {self._attr_name(p.get('slot', {}), 'hole')}"
+                    for p in placements
+                    if isinstance(p, dict)
+                ]
+                if pairs:
+                    mapping = self._join_names(pairs)
+                    candidates = [
+                        f"got {mapping}",
+                        f"put {mapping}",
+                        f"sorted them — {mapping}",
+                    ]
+                    return self._pick_problem_frame(candidates, emotion)
+            candidates = ["solved it", "worked it out", "got it"]
+            return self._pick_problem_frame(candidates, emotion)
+
+        if family == "assembly" or family == "grid":
+            rule = str(result.get("rule", "") or "")
+            candidates = [
+                "solved it",
+                f"worked it out — {rule}" if rule else "worked it out",
+                "got it",
+            ]
+            return self._pick_problem_frame(candidates, emotion)
+
+        return None
+
+    def _pick_problem_frame(
+        self, candidates: list[str], emotion: EmotionalState
+    ) -> str | None:
+        """Emotion-modulated frame selection — the same pattern the
+        other content composers use."""
+        if not candidates:
+            return None
+        if emotion.creativity > 0.6:
+            return self._rng.choice(candidates[len(candidates) // 2:] or candidates)
+        if emotion.caution > 0.5 or emotion.openness_to_engage < 0.4:
+            return candidates[0]
+        return self._rng.choice(candidates)
+
+    @staticmethod
+    def _join_names(names: list[str]) -> str:
+        """"a, b and c" — list joining for small answer sets."""
+        if not names:
+            return ""
+        if len(names) == 1:
+            return names[0]
+        return ", ".join(names[:-1]) + " and " + names[-1]
+
+    @staticmethod
+    def _attr_name(attrs: Any, head: str) -> str:
+        """Attribute map → speakable NP for sorter payloads.
+
+        Generated tasks use key/value pairs ({"shape": "star",
+        "color": "red"} → "the red star"); heard tasks use flat
+        presence attrs ({"red": "yes", "round": "yes"} → "the red
+        round block"). A "shape"/"kind" value is the noun anchor;
+        everything else is a modifier before it.
+        """
+        if not isinstance(attrs, dict):
+            return f"the {head}"
+        anchor = ""
+        mods: list[str] = []
+        for k, v in attrs.items():
+            if str(k) in ("shape", "kind") and str(v) != "yes":
+                anchor = str(v)
+            else:
+                mods.append(str(k) if str(v) == "yes" else str(v))
+        # English modifier order — size before color before the rest —
+        # is lexical knowledge, not a template: "the small red star",
+        # never "the red small star".
+        size_words = {"small", "little", "tiny", "big", "large", "huge"}
+        color_words = {
+            "red", "blue", "yellow", "green", "purple", "orange",
+            "pink", "brown", "black", "white", "gray", "grey",
+        }
+
+        def order(w: str) -> int:
+            if w in size_words:
+                return 0
+            if w in color_words:
+                return 1
+            return 2
+
+        mods.sort(key=order)
+        noun = anchor or head
+        mods_str = " ".join(mods)
+        return f"the {mods_str} {noun}" if mods_str else f"the {noun}"
+
     def _compose_preference_content(
         self,
         preference: dict[str, Any],
@@ -2619,8 +2829,15 @@ class Vocabulary:
         # ── Build clauses from relationship facts ──
         # Each fact becomes a predicate clause: "{verb} {target}".
         # Multiple clauses are joined with connectors that vary
-        # with emotional state.
-        clauses, seen_clauses, seen_targets = self._build_rel_clauses(rel_facts)
+        # with emotional state. Facts whose target IS the topic are
+        # tautologies ("excited feels the excited") — drop them.
+        clauses, seen_clauses, seen_targets = self._build_rel_clauses(
+            [
+                f
+                for f in rel_facts
+                if self._display_name(f[1]).lower() != display.lower()
+            ]
+        )
 
         # ── Add reasoning conclusions ──
         self._add_reasoning_clauses(

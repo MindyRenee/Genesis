@@ -107,9 +107,19 @@ def frame_to_grid(frame: Any) -> Grid:
 
     Frames arrive as a *list of layers* (each a 2-D array); the final
     layer is the composed scene. A bare 2-D array is accepted too.
+    Layers may be numpy arrays or plain nested lists — detect either.
     """
-    if isinstance(frame, (list, tuple)) and frame and hasattr(frame[0], "shape"):
-        frame = frame[-1]
+    if isinstance(frame, Grid):
+        return frame
+    if isinstance(frame, (list, tuple)) and frame:
+        first = frame[0]
+        is_layered = hasattr(first, "shape") or (
+            isinstance(first, (list, tuple))
+            and first
+            and isinstance(first[0], (list, tuple))
+        )
+        if is_layered:
+            frame = frame[-1]
     rows = frame.tolist() if hasattr(frame, "tolist") else frame
     return Grid.from_lists([list(r) for r in rows])
 
@@ -233,6 +243,32 @@ class SpatialAgent:
         # can never help, so complex actions target fresh cells.
         self._click_outcomes: dict[tuple[int, int], float] = {}
         self._pending_click: tuple[int, int] | None = None
+        # Death credit assignment, per-episode presence: action ->
+        # [episodes used, episodes died]. The fatal choice in these
+        # games is often delayed — a bad move dooms the level but the
+        # death lands steps later, so last-action blame hits whatever
+        # was in flight. Presence is the honest signal: an action that
+        # only ever appears in episodes that end in death is lethal;
+        # one present in wins and losses alike is innocent.
+        self._action_outcomes: dict[Any, list[int]] = {}
+        self._cur_episode_actions: set[Any] = set()
+        self._episodes_total = 0
+        self._episodes_died = 0
+        # Same attribution at click granularity: a clicked cell whose
+        # episodes reliably die is a lethal control — the "wrong
+        # button" pattern. Cells that demonstrably respond (frame
+        # change > 0) are reusable controls, not one-shot targets.
+        self._cell_outcomes: dict[tuple[int, int], list[int]] = {}
+        self._cur_episode_clicks: set[tuple[int, int]] = set()
+        # Omen tracking: color -> [segments appeared, segments died].
+        # A color that only ever shows up in segments that end in
+        # death is a doom marker; whatever introduced it is suspect.
+        self._color_outcomes: dict[int, list[int]] = {}
+        self._cur_episode_colors: set[int] = set()
+        self._seg_introduced: dict[int, Any] = {}
+        # Introducer blame: action name or click cell -> times it
+        # brought a known doom-marker into the world.
+        self._doom_blame: dict[Any, int] = {}
 
     # ── Learning ──────────────────────────────────────────────
 
@@ -592,8 +628,25 @@ class SpatialAgent:
                 )
                 if check.predicted and check.score < 0.6:
                     self._grit_steps = max(self._grit_steps, 20)
+            # Omen tracking: colors that newly appear after an action
+            # (or click) are that action's visible consequences. Doom
+            # often leaves a marker long before the death lands — a
+            # "bad" sprite, a wound, a wrong piece. When the segment
+            # ends, colors introduced along the way get outcome records
+            # and consistent doom-markers blame their introducer.
+            source: Any = (
+                self._pending_click
+                if self._pending_click is not None
+                else self._last_action
+            )
+            prev_colors = {v for _r, _c, v in prev.iter_cells()}
+            for _r, _c, v in grid.iter_cells():
+                if v not in prev_colors:
+                    self._seg_introduced.setdefault(v, source)
+                    self._cur_episode_colors.add(v)
         if self._pending_click is not None:
             self._click_outcomes[self._pending_click] = change
+            self._cur_episode_clicks.add(self._pending_click)
             self._pending_click = None
         if self._last_frame is not None and self._last_action is not None:
             self._detect_consumption(self._last_frame, grid)
@@ -987,23 +1040,108 @@ class SpatialAgent:
             # curious — a fresh try beats repeating the fatal path.
             self._grit_steps -= 1
             eps = max(eps, self.epsilon)
+
+        # Death avoidance: prefer actions whose episodes don't
+        # reliably die. Falls back to the full space when everything
+        # looks lethal — attributions are noisy, never a hard ban.
+        safe = [a for a in action_space if not self._is_lethal(a)]
+        pool = safe or action_space
+
         if self._rng.random() >= eps and self._last_frame is not None:
-            nav = self._navigate(self._last_frame, action_space)
+            nav = self._navigate(self._last_frame, pool)
             if nav is not None:
                 self._last_action = nav
+                self._cur_episode_actions.add(nav)
                 return nav
 
         # Exploration: prefer untried actions, then high-effect ones.
-        untried = [a for a in action_space if self._stat(a).attempts == 0]
+        untried = [a for a in pool if self._stat(a).attempts == 0]
         if untried:
             action = self._rng.choice(untried)
         else:
-            weights = [
-                0.1 + self._stat(a).mean_change for a in action_space
-            ]
-            action = self._rng.choices(action_space, weights=weights)[0]
+            weights = [0.1 + self._stat(a).mean_change for a in pool]
+            action = self._rng.choices(pool, weights=weights)[0]
         self._last_action = action
+        self._cur_episode_actions.add(action)
         return action
+
+    def _is_lethal(self, action: Any) -> bool:
+        """Whether *action* reliably precedes death, vs the baseline.
+
+        Laplace-smoothed conditional rates: P(death | action used in
+        episode) minus P(death | action not used). A positive lift with
+        a minimum of evidence marks the action as lethal.
+        """
+        used, died = self._action_outcomes.get(action, (0, 0))
+        if used < 2:
+            return False
+        p_used = (died + 1) / (used + 2)
+        p_other = (self._episodes_died - died + 1) / (
+            self._episodes_total - used + 2
+        )
+        return p_used - p_other > 0.4 or self._doom_blame.get(action, 0) >= 2
+
+    def _is_lethal_cell(self, cell: tuple[int, int]) -> bool:
+        """Same lift rule for clicked cells — the wrong-button signal."""
+        used, died = self._cell_outcomes.get(cell, (0, 0))
+        if used >= 2:
+            p_used = (died + 1) / (used + 2)
+            p_other = (self._episodes_died - died + 1) / (
+                self._episodes_total - used + 2
+            )
+            if p_used - p_other > 0.4:
+                return True
+        return self._doom_blame.get(cell, 0) >= 2
+
+    def _is_doom_color(self, color: int) -> bool:
+        """Whether *color*'s appearances reliably precede death."""
+        used, died = self._color_outcomes.get(color, (0, 0))
+        if used < 2:
+            return False
+        p_used = (died + 1) / (used + 2)
+        p_other = (self._episodes_died - died + 1) / (
+            self._episodes_total - used + 2
+        )
+        return p_used - p_other > 0.4
+
+    def _close_segment(self, died: bool) -> None:
+        """Record outcomes for everything this segment touched.
+
+        Called at episode end (``on_episode_end``) and at checkpoints
+        (``mark_goal_reached``). Updates presence-based outcome records
+        for actions, clicked cells, and newly-seen colors; on death,
+        actions/cells that introduced known doom-markers take blame.
+        """
+        self._episodes_total += 1
+        if died:
+            self._episodes_died += 1
+        for a in self._cur_episode_actions:
+            rec = self._action_outcomes.setdefault(a, [0, 0])
+            rec[0] += 1
+            if died:
+                rec[1] += 1
+        self._cur_episode_actions.clear()
+        for cell in self._cur_episode_clicks:
+            crec = self._cell_outcomes.setdefault(cell, [0, 0])
+            crec[0] += 1
+            if died:
+                crec[1] += 1
+        self._cur_episode_clicks.clear()
+        for color in self._cur_episode_colors:
+            crec = self._color_outcomes.setdefault(color, [0, 0])
+            crec[0] += 1
+            if died:
+                crec[1] += 1
+        if died:
+            # Blame the bringers of doom-markers — the action or click
+            # that first made a doomed color appear.
+            for color, source in self._seg_introduced.items():
+                if self._is_doom_color(color):
+                    self._doom_blame[source] = (
+                        self._doom_blame.get(source, 0) + 1
+                    )
+        self._cur_episode_colors.clear()
+        self._seg_introduced.clear()
 
     def _click_targets(self, grid: Grid) -> list[tuple[int, int]]:
         """Candidate click cells: object centroids first, then cells.
@@ -1039,25 +1177,44 @@ class SpatialAgent:
         grid = self._last_frame
         h, w = frame_shape
         if grid is not None:
-            candidates = self._click_targets(grid)
+            candidates = [
+                t for t in self._click_targets(grid)
+                if not self._is_lethal_cell(t)
+            ]
             if not candidates:
                 candidates = [
                     (r, c)
                     for r in range(0, h, 2)
                     for c in range(0, w, 2)
+                    if not self._is_lethal_cell((r, c))
                 ]
+            # A cell that produced real change is a working control —
+            # re-press it before burning steps on untouched background.
+            # A control that stops responding falls out of this set on
+            # its next click (its recorded outcome updates to ~0).
+            responsive = [
+                t for t in self._click_outcomes
+                if self._click_outcomes[t] > 0
+                and not self._is_lethal_cell(t)
+            ]
             fresh = [
                 t for t in candidates if t not in self._click_outcomes
             ]
-            if fresh:
+            if responsive:
+                r, c = max(
+                    responsive, key=lambda t: self._click_outcomes[t]
+                )
+            elif fresh:
                 r, c = fresh[0]
             elif self._click_outcomes:
                 # Everything tried — return to whatever did the most.
                 r, c = max(
                     self._click_outcomes, key=lambda k: self._click_outcomes[k]
                 )
-            else:
+            elif candidates:
                 r, c = candidates[0]
+            else:
+                r, c = (0, 0)
             self._pending_click = (r, c)
             return {"x": c, "y": r}
         r = self._rng.randint(0, h - 1)
@@ -1068,7 +1225,16 @@ class SpatialAgent:
     # ── Episode boundary ──────────────────────────────────────
 
     def mark_goal_reached(self) -> None:
-        """Record that the avatar reached its current goal cell."""
+        """Record that the avatar reached its current goal cell.
+
+        Also a credit-assignment checkpoint: a level-up means every
+        action since the last checkpoint belonged to a *surviving*
+        segment. Closing the segment here keeps blame proportional —
+        without it, an innocent action that appears in every segment
+        looks as lethal as the action that only ever appears in dying
+        ones.
+        """
+        self._close_segment(died=False)
         if self._last_frame is not None:
             goal = self._pick_goal(self._last_frame)
             pos = self._avatar_pos(self._last_frame)
@@ -1091,6 +1257,11 @@ class SpatialAgent:
         """
         if state == "WIN" and self._last_action is not None:
             self._stat(self._last_action).wins += 1
+        # Episode-level credit assignment: every action, click, and
+        # newly-seen color this segment gets an outcome record (died
+        # or not). Presence — not last-action — because fatal choices
+        # often land long before the death they cause.
+        self._close_segment(died=state == "GAME_OVER")
         if self._task_context is not None:
             if state != "WIN":
                 for skill_id in self._episode_skill_ids:

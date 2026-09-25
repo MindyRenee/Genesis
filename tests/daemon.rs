@@ -12,8 +12,13 @@ use std::path::{Path, PathBuf};
 fn cleanup_all(state_path: &Path, stm_path: &Path, ltm_base: &Path) {
     let _ = std::fs::remove_file(state_path);
     let _ = std::fs::remove_file(stm_path);
-    let _ = std::fs::remove_file(ltm_base.with_extension("idx"));
+    // LTM v2 lives in three files: .bundles (mmap'd index), .meta
+    // (metadata), .dat (payloads). `.idx` is the v1 name — only present
+    // if a migration ran, but harmless to remove either way.
+    let _ = std::fs::remove_file(ltm_base.with_extension("bundles"));
+    let _ = std::fs::remove_file(ltm_base.with_extension("meta"));
     let _ = std::fs::remove_file(ltm_base.with_extension("dat"));
+    let _ = std::fs::remove_file(ltm_base.with_extension("idx"));
 }
 
 fn make_emotional_tag() -> [f32; 12] {

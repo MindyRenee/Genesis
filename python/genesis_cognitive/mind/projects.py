@@ -176,7 +176,10 @@ class ProjectsMixin:
                     text=f"Mentor notes on project '{pname}': {notes[:500]}",
                     salience=0.9,
                     emotional_tag=tag,
-                    source="mentor",
+                    # VALID_SOURCES has no "mentor" — absorbed notes are
+                    # external-source learning (docs/feedback), not
+                    # conversation or self-generation.
+                    source="learning",
                     source_confidence=0.95,
                 )
             except Exception as e:  # noqa: BLE001

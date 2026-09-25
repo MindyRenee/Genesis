@@ -60,6 +60,14 @@ logger = logging.getLogger(__name__)
 REQUEST_TIMEOUT = 2  # seconds — fail fast when sources are slow
 USER_AGENT = "Genesis-AI-Learner/1.0 (educational research)"
 
+# Cap on bytes read from any single HTTP response. A hostile or
+# misbehaving endpoint could otherwise stream arbitrarily within the
+# request timeout. Generous for the JSON/HTML/text payloads these
+# sources return; oversized responses are unusable anyway.
+_MAX_RESPONSE_BYTES = 4 * 1024 * 1024  # 4 MiB
+# Image downloads (Wikipedia lead thumbnails) get a slightly higher cap.
+_MAX_IMAGE_BYTES = 8 * 1024 * 1024  # 8 MiB
+
 # ─── Proactive offline detection ─────────────────────────────────────
 # A cheap TCP connect probe to Wikipedia's API host. If it fails,
 # we know we're offline without waiting for a full HTTP request to
@@ -337,7 +345,9 @@ def _wikipedia_search(topic: str, limit: int = 3) -> list[str]:
     try:
         req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            data = json.loads(resp.read().decode("utf-8", errors="ignore"))
+            data = json.loads(
+                resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore")
+            )
         results = data.get("query", {}).get("search", [])
         return [r["title"] for r in results if "title" in r]
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as e:
@@ -358,7 +368,9 @@ def _wikipedia_fetch(article_title: str) -> SourceResult | None:
     try:
         req = urllib.request.Request(summary_url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            data = json.loads(resp.read().decode("utf-8", errors="ignore"))
+            data = json.loads(
+                resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore")
+            )
         summary = data.get("extract", "")
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as e:
         logger.debug(repr(e))  # summary is optional
@@ -378,7 +390,9 @@ def _wikipedia_fetch(article_title: str) -> SourceResult | None:
     try:
         req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            data = json.loads(resp.read().decode("utf-8", errors="ignore"))
+            data = json.loads(
+                resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore")
+            )
         pages = data.get("query", {}).get("pages", {})
         if not pages:
             return None
@@ -435,7 +449,9 @@ def wikipedia_lead_image(article_title: str, thumb_size: int = 320) -> bytes | N
     try:
         req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            data = json.loads(resp.read().decode("utf-8", errors="ignore"))
+            data = json.loads(
+                resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore")
+            )
         pages = data.get("query", {}).get("pages", {})
         if not pages:
             return None
@@ -446,10 +462,14 @@ def wikipedia_lead_image(article_title: str, thumb_size: int = 320) -> bytes | N
         img_url = thumbnail["source"]
         if img_url.startswith("//"):
             img_url = "https:" + img_url
-        # Download the image bytes
+        # Download the image bytes — capped; an oversized response is
+        # discarded rather than returned as a truncated image.
         req2 = urllib.request.Request(img_url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req2, timeout=REQUEST_TIMEOUT) as resp2:
-            return resp2.read()
+            img = resp2.read(_MAX_IMAGE_BYTES + 1)
+        if len(img) > _MAX_IMAGE_BYTES:
+            return None
+        return img
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as e:
         logger.debug(f"Wikipedia lead image failed for '{article_title}': {e}")
         return None
@@ -1269,7 +1289,7 @@ def _duckduckgo_search(topic: str, limit: int = 5) -> list[str]:
             },
         )
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            html = resp.read().decode("utf-8", errors="ignore")
+            html = resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore")
 
         urls = _URL_RE.findall(html)
         # Filter to trusted domains and deduplicate
@@ -1365,7 +1385,9 @@ class GitHubSource:
                 "User-Agent": "Genesis-AI/1.0 (autonomous learner)",
             })
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
+                data = json.loads(
+                    resp.read(_MAX_RESPONSE_BYTES + 1).decode("utf-8", errors="ignore")
+                )
         except (urllib.error.URLError, urllib.error.HTTPError, OSError,
                 json.JSONDecodeError, TimeoutError):
             return []
@@ -1423,7 +1445,7 @@ class GitHubSource:
                 "User-Agent": "Genesis-AI/1.0 (autonomous learner)",
             })
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:
-                raw = resp.read()
+                raw = resp.read(_MAX_RESPONSE_BYTES + 1)
                 # READMEs can be base64-encoded or raw depending on
                 # the Accept header. With v3.raw we get plain text.
                 try:
@@ -1457,7 +1479,7 @@ class GitHubSource:
                 "User-Agent": "Genesis-AI/1.0 (autonomous learner)",
             })
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:
-                raw = resp.read()
+                raw = resp.read(_MAX_RESPONSE_BYTES + 1)
                 try:
                     content = raw.decode("utf-8")[:12000]
                 except UnicodeDecodeError:

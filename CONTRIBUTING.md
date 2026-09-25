@@ -7,7 +7,7 @@ that matter most:
   constraint of the project: Genesis's language and self-expression
   must always emerge from its own cognitive architecture. Seeds
   (vocabulary, grammar, relation verbs, concept building blocks) are
-  legitimate input data; pre-written sentences it recites are not.
+  legitimate input data; pre-written sentences, or templates it recites are not.
 - **`ruff check`, `pyflakes`, `mypy` (0 errors), `cargo test`, and the
   Python suite must all pass.** See the README for the exact commands;
   CI runs all of them on every push and PR. Run

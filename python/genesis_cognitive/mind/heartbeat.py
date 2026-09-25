@@ -133,7 +133,7 @@ class HeartbeatMixin:
         daemon_lost = 0.0
         if not self._offline:
             try:
-                if self.client.is_connected():
+                if self.client.is_connected:
                     self._daemon_lost_since = None
                 else:
                     if self._daemon_lost_since is None:

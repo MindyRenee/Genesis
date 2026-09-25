@@ -65,6 +65,143 @@ _TRIVIAL_WORDS: frozenset[str] = frozenset({
     "first", "last", "next", "new", "old", "long", "short",
 })
 
+# Pronouns that can carry an anaphoric reference to the discourse
+# focus. "you"/"your" are handled separately (they resolve to
+# Genesis, not the focus).
+_ANA_PRONOUN_RE = re.compile(
+    r"\b(it|this|that|they|them|he|she)\b", re.IGNORECASE
+)
+
+_WORD_TOKEN_RE = re.compile(r"[A-Za-z']+")
+
+
+def _neighbor_words(text: str, start: int, end: int) -> tuple[str, str, str]:
+    """Return (prev_word, next_word, word_after_next) around a span."""
+    before = _WORD_TOKEN_RE.findall(text[:start])
+    after = _WORD_TOKEN_RE.findall(text[end:])
+    return (
+        before[-1].lower() if before else "",
+        after[0].lower() if after else "",
+        after[1].lower() if len(after) > 1 else "",
+    )
+
+
+# Closed-class words for anaphora position checks. A pronoun whose
+# neighbour is NOT in this set is adjacent to a content word — the
+# signature of a relative clause ("mammal that likes"), a
+# zero-relative ("the pet you want"), or a determiner ("that dog").
+# Common transitive verbs are included so that demonstrative objects
+# still resolve ("like that", "do this", "I saw that").
+_ANA_FUNC_WORDS: frozenset[str] = frozenset({
+    # determiners / quantifiers / wh-words
+    "a", "an", "the", "some", "any", "all", "every", "each", "no",
+    "none", "both", "few", "several", "many", "much", "more", "most",
+    "other", "another", "such", "what", "whatever", "which",
+    "whichever", "who", "whom", "whose", "where", "when", "why", "how",
+    # pronouns (incl. contractions fragments like 's, n't, 're)
+    "i", "me", "my", "mine", "we", "us", "our", "ours", "you", "your",
+    "yours", "he", "him", "his", "she", "her", "hers", "it", "its",
+    "they", "them", "their", "theirs", "this", "that", "these", "those",
+    "there", "here", "one", "ones", "itself", "themselves", "himself",
+    "herself", "myself", "yourself", "ourselves",
+    "'s", "'re", "'ve", "'ll", "'d", "'m", "n't",
+    # auxiliaries / copula / modals
+    "is", "are", "was", "were", "am", "be", "been", "being", "do",
+    "does", "did", "done", "have", "has", "had", "having", "will",
+    "would", "can", "could", "shall", "should", "may", "might", "must",
+    "ought", "dare",
+    # prepositions
+    "of", "in", "on", "at", "to", "from", "by", "with", "about", "as",
+    "into", "onto", "upon", "through", "throughout", "against",
+    "between", "among", "under", "over", "after", "before", "without",
+    "within", "around", "across", "behind", "beyond", "during",
+    "inside", "outside", "toward", "towards", "near", "off", "out",
+    "up", "down", "for", "since", "until", "till", "per", "via",
+    "unlike", "despite", "except", "besides", "including",
+    # conjunctions / discourse markers / adverbs
+    "and", "or", "but", "so", "yet", "nor", "if", "then", "than",
+    "because", "although", "though", "while", "whereas", "unless",
+    "whether", "once", "also", "even", "just", "only", "really",
+    "very", "quite", "rather", "too", "not", "still", "already",
+    "again", "always", "never", "ever", "often", "sometimes",
+    "usually", "now", "today", "yesterday", "tomorrow", "yes", "yeah",
+    "ok", "okay", "well", "oh", "hey", "hi", "hello", "please",
+    "thanks", "maybe", "perhaps", "probably", "actually", "indeed",
+    # common transitive verbs that take demonstrative objects
+    "like", "likes", "liked", "love", "loves", "loved", "hate",
+    "hates", "hated", "want", "wants", "wanted", "need", "needs",
+    "needed", "prefer", "prefers", "preferred", "watch", "watches",
+    "watched", "enjoy", "enjoys", "enjoyed", "use", "uses", "used",
+    "get", "gets", "got", "gotten", "take", "takes", "took", "taken",
+    "make", "makes", "made", "give", "gives", "gave", "given", "keep",
+    "keeps", "kept", "try", "tries", "tried", "explain", "explains",
+    "explained", "describe", "describes", "described", "fix", "fixes",
+    "fixed", "build", "builds", "built", "test", "tests", "tested",
+    "choose", "chooses", "chose", "chosen", "pick", "picks", "picked",
+    "bring", "brings", "brought", "change", "changes", "changed",
+    "say", "says", "said", "tell", "tells", "told", "know", "knows",
+    "knew", "known", "think", "thinks", "thought", "see", "sees",
+    "saw", "seen", "hear", "hears", "heard", "feel", "feels", "felt",
+    "mean", "means", "meant", "show", "shows", "showed", "shown",
+    "find", "finds", "found", "remember", "remembers", "remembered",
+    "forget", "forgets", "forgot", "notice", "notices", "noticed",
+    "understand", "understands", "understood", "learn", "learns",
+    "learned", "believe", "believes", "believed", "guess", "guesses",
+    "hope", "hopes", "hoped", "wish", "wishes", "wished", "expect",
+    "expects", "expected", "suppose", "supposes", "supposed",
+    "prove", "proves", "proved", "realize", "realizes", "realized",
+    "claim", "claims", "claimed", "imagine", "imagines", "imagined",
+    "assume", "assumes", "assumed", "discover", "discovers",
+    "discovered", "consider", "considers", "considered", "discuss",
+    "discusses", "discussed", "mention", "mentions", "mentioned",
+})
+
+# Words after which "that" introduces a complement clause rather
+# than referring — verbs of communication/cognition/perception plus
+# copula and raising adjectives ("the problem is that…").
+_THAT_COMPLEMENTIZER_PRECEDERS: frozenset[str] = frozenset({
+    "say", "says", "said", "tell", "tells", "told", "think", "thinks",
+    "thought", "know", "knows", "knew", "known", "believe", "believes",
+    "believed", "mean", "means", "meant", "hear", "hears", "heard",
+    "see", "sees", "saw", "seen", "feel", "feels", "felt", "guess",
+    "guesses", "hope", "hopes", "hoped", "wish", "wishes", "wished",
+    "expect", "expects", "expected", "suppose", "supposes", "supposed",
+    "show", "shows", "showed", "shown", "prove", "proves", "proved",
+    "learn", "learns", "learned", "realize", "realizes", "realized",
+    "notice", "notices", "noticed", "remember", "remembers",
+    "remembered", "forget", "forgets", "forgot", "understand",
+    "understands", "understood", "claim", "claims", "claimed",
+    "argue", "argues", "argued", "insist", "insists", "insisted",
+    "admit", "admits", "admitted", "deny", "denies", "denied",
+    "promise", "promises", "promised", "warn", "warns", "warned",
+    "agree", "agrees", "agreed", "decide", "decides", "decided",
+    "find", "found", "discover", "discovers", "discovered", "imagine",
+    "imagines", "imagined", "assume", "assumes", "assumed", "is",
+    "are", "was", "were", "seems", "seemed", "appears", "appeared",
+    "looks", "looked", "sounds", "sounded", "remains", "remained",
+    "becomes", "became", "sure", "certain", "glad", "sad", "happy",
+    "afraid", "aware", "clear", "obvious", "likely", "unlikely",
+    "possible", "impossible", "important",
+})
+
+# "it" expletive frames — weather/time/evaluative "it" refers to
+# nothing and must not be resolved to the discourse focus.
+_IT_EXPLETIVE_VERBS: frozenset[str] = frozenset({
+    "seems", "seemed", "appears", "appeared", "looks", "looked",
+    "sounds", "sounded", "feels", "rains", "rained", "snows",
+    "snowed", "drizzles", "drizzled", "takes", "took", "depends",
+    "depended", "helps", "helped", "matters", "mattered", "turns",
+    "turned",
+})
+_IT_EXPLETIVE_PREDS: frozenset[str] = frozenset({
+    "raining", "snowing", "drizzling", "hailing", "time", "late",
+    "early", "dark", "light", "important", "possible", "impossible",
+    "necessary", "hard", "difficult", "easy", "clear", "obvious",
+    "true", "okay", "ok", "worth", "enough", "cold", "hot", "warm",
+    "cool", "sunny", "cloudy", "windy", "foggy", "humid", "night",
+    "day", "morning", "evening", "noon", "midnight", "fair",
+})
+
 
 class ResponseStyler:
     """Apply metacognitive tone adjustments and learning acknowledgments.
@@ -81,6 +218,7 @@ class ResponseStyler:
         working_memory: WorkingMemory,
         rng: Any,
         response_style_getter: Callable[[], str],
+        network: Any = None,
     ) -> None:
         """Wire the styler to its language engine, composer, and working memory."""
         self._language = language
@@ -88,6 +226,9 @@ class ResponseStyler:
         self._working_memory = working_memory
         self._rng = rng
         self._response_style_getter = response_style_getter
+        # Concept network for referent typing (animacy). Optional —
+        # without it, anaphora falls back to the single current focus.
+        self._network = network
 
     # ─── Response style application ──────────────────────────────
 
@@ -185,33 +326,195 @@ class ResponseStyler:
     def resolve_anaphora(self, user_input: str) -> str:
         """Resolve bare pronouns to the current focus of conversation.
 
-        "You" and "your" always resolve to "Genesis" — the user is
-        talking to it. Other pronouns (it, this, that, they) resolve
-        to the current attentional focus.
-        """
-        resolved = re.sub(r"\byour\b", "Genesis's", user_input, flags=re.IGNORECASE)
-        resolved = re.sub(r"\byou\b", "Genesis", resolved, flags=re.IGNORECASE)
+        "You" and "your" resolve to "Genesis" — the user is talking
+        to it — except inside zero-relative clauses where "you" is
+        generic ("a pet you can keep"). "it", "they", "them", "he",
+        "she" resolve to the current attentional focus.
 
-        lower = resolved.lower()
-        if not re.search(r"\b(it|this|that|they|them|he|she)\b", lower):
+        "this"/"that" resolve only as *demonstrative pronouns* in
+        argument position — sentence-initial ("that is cool"), after
+        a verb or preposition ("like that", "about that"), or final
+        ("what is that?"). They are left untouched as determiners
+        ("that dog"), and "that" is left untouched as a relative
+        pronoun ("a mammal that likes X") or complementizer ("I
+        think that X"). Rewriting those corrupts the sentence —
+        "a ferret is a small mammal that likes to steal" would be
+        learned verbatim as "…mammal <focus> likes to steal".
+
+        "it" is skipped in expletive frames where it refers to
+        nothing ("it seems", "it is raining", "it looks like …").
+        """
+        resolved = self._sub_matches(r"\byour\b", "Genesis's", user_input)
+        resolved = self._sub_matches(r"\byou\b", "Genesis", resolved)
+
+        target: re.Match[str] | None = None
+        for m in _ANA_PRONOUN_RE.finditer(resolved):
+            if self._is_anaphoric(resolved, m):
+                target = m
+                break
+        if target is None:
             return resolved
 
-        focus: str | None = self._working_memory.central_executive.current_focus
-        if not focus:
+        referent = self._pick_referent(target.group(0).lower())
+        if not referent:
+            return resolved
+
+        return resolved[: target.start()] + referent + resolved[target.end() :]
+
+    # Discourse participants that anaphoric it/that/this almost never
+    # refer to — those roles already have dedicated pronouns (I/you).
+    _ANA_NON_REFERENTS: frozenset[str] = frozenset({"genesis", "user", "self"})
+
+    def _pick_referent(self, word: str) -> str | None:
+        """Choose the discourse referent for an anaphoric pronoun.
+
+        Walks the executive's focus history (newest first) and filters
+        by pronoun type rather than blindly taking the single current
+        focus:
+
+        - ``he``/``she`` bind only to animate referents — binding them
+          to an inanimate focus ("the wheel fell… he") corrupts input.
+          When nothing animate is in history, the pronoun is left
+          unresolved instead of forcing a wrong referent.
+        - ``it``/``this``/``that`` skip the discourse participants
+          (genesis/user/self) — those are already "I"/"you" — and take
+          the most recent remaining entity.
+        - ``they``/``them`` prefer an animate referent but accept any
+          entity (English "they" is also plural-inanimate).
+        """
+        history = list(
+            getattr(
+                self._working_memory.central_executive, "focus_history", []
+            )
+        )
+        focus = self._working_memory.central_executive.current_focus
+        if not history and focus:
+            history = [focus]
+        if not history:
             top = self._working_memory.get_top_attention(1)
             if top:
-                focus = top[0]
-        if not focus:
-            return resolved
+                history = [top[0]]
+        if not history:
+            return None
 
-        resolved = re.sub(
-            r"\b(it|this|that|they|them|he|she)\b",
-            focus,
-            resolved,
-            count=1,
-            flags=re.IGNORECASE,
-        )
-        return resolved
+        if word in ("he", "she"):
+            for cand in history:
+                if self._is_animate(cand):
+                    return cand
+            return None
+        if word in ("they", "them"):
+            for cand in history:
+                if self._is_animate(cand):
+                    return cand
+            return history[0]
+        # it / this / that — most recent entity that isn't a participant.
+        for cand in history:
+            if cand.lower() not in self._ANA_NON_REFERENTS:
+                return cand
+        return history[0]
+
+    # Small person/creature set for the is_a fallback check — covers
+    # referents whose category detection hasn't classified them yet.
+    _ANIMATE_HEADS: frozenset[str] = frozenset({
+        "person", "human", "people", "man", "woman", "friend", "user",
+        "creator", "animal", "mammal", "creature", "bird", "fish",
+        "insect", "cat", "dog", "pet",
+    })
+
+    def _is_animate(self, name: str) -> bool:
+        """Whether a focus candidate refers to an animate entity.
+
+        Uses the concept network when available: LIVING category, or an
+        is_a edge into a LIVING/person-ish target. Unknown concepts are
+        not animate.
+        """
+        if self._network is None:
+            return False
+        concept = self._network.get_concept(name)
+        if concept is None:
+            return False
+        if getattr(concept.category, "value", concept.category) == "living":
+            return True
+        for edge in self._network.get_edges(concept.id, "out"):
+            if getattr(edge.relation, "value", edge.relation) != "is_a":
+                continue
+            if edge.target in self._ANIMATE_HEADS:
+                return True
+            target = self._network.get_concept(edge.target)
+            if target is not None and (
+                getattr(target.category, "value", target.category) == "living"
+            ):
+                return True
+        return False
+
+    def _sub_matches(self, pattern: str, repl: str, text: str) -> str:
+        """Replace every match that sits in anaphoric position."""
+        out: list[str] = []
+        last = 0
+        for m in re.finditer(pattern, text):
+            if not self._is_anaphoric(text, m):
+                continue
+            out.append(text[last : m.start()])
+            out.append(repl)
+            last = m.end()
+        out.append(text[last:])
+        return "".join(out)
+
+    @staticmethod
+    def _is_anaphoric(text: str, m: re.Match[str]) -> bool:
+        """Whether a pronoun match occupies an anaphoric position.
+
+        Decides from the neighbouring words: a pronoun between two
+        content words is embedded in a clause ("mammal that likes",
+        "the pet you want"), not a reference to the discourse focus.
+        Function words are a closed class, so any neighbour outside
+        _ANA_FUNC_WORDS is a content word.
+        """
+        word = m.group(0).lower()
+        prev, nxt, nxt2 = _neighbor_words(text, m.start(), m.end())
+
+        # "you"/"your": generic in zero-relative clauses — "the pet
+        # you want", "a thing your friend said". The pronoun follows
+        # a noun (content word) directly.
+        if word in ("you", "your"):
+            return not (prev and prev not in _ANA_FUNC_WORDS)
+
+        # "it": skip expletive frames — "it seems", "it looks like",
+        # "it is raining", "it was time".
+        if word == "it":
+            if nxt in _IT_EXPLETIVE_VERBS:
+                return False
+            if nxt in ("is", "was", "'s") and nxt2 in _IT_EXPLETIVE_PREDS:
+                return False
+            return True
+
+        # they/them/he/she are unambiguously anaphoric.
+        if word in ("they", "them", "he", "she"):
+            return True
+
+        # this/that — demonstrative only in argument position.
+        if word in ("this", "that"):
+            if nxt and nxt not in _ANA_FUNC_WORDS:
+                # Followed by a content word — determiner ("that
+                # dog"), relative pronoun ("mammal that likes"),
+                # or complementizer ("think that ferrets…").
+                return False
+            if prev and prev not in _ANA_FUNC_WORDS:
+                # Preceded by a content word — the head noun of a
+                # relative clause ("a mammal that was…").
+                return False
+            if nxt in ("i", "you", "he", "she", "it", "we", "they") and nxt2:
+                # A subject pronoun right after "that" starts a
+                # complement clause ("told you that he left") — a
+                # demonstrative can never take that position.
+                return False
+            if word == "that" and nxt and prev in _THAT_COMPLEMENTIZER_PRECEDERS:
+                # "think that it…", "the thing is that it…" —
+                # "that" introduces a clause, it doesn't refer.
+                return False
+            return True
+
+        return True
 
     # ─── Learning acknowledgment ─────────────────────────────────
 

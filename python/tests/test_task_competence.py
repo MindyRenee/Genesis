@@ -1421,7 +1421,7 @@ class TestAssemblyCompetenceAdapter:
         ]
         assert placement
         assert all(
-            set(s.parameters) == {"fits", "mean_cost"}
+            set(s.parameters) == {"fits", "support", "mean_cost"}
             for s in placement
         )
 
