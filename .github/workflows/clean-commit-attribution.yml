@@ -24,19 +24,16 @@ jobs:
           set -euo pipefail
 
           git config user.name "Mindy Beatty"
-          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          git config user.email "84985687+MindyRenee@users.noreply.github.com"
 
-          FILTER_SCRIPT='
-            /Generated with \[Devin\](https:\/\/devin\.ai)/d
-            /Co-Authored-By: Devin <158243242+devin-ai-integration\[bot\]@users\.noreply\.github\.com>/d
-          '
-
-          FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --msg-filter "sed -e \"/Generated with \\\\[Devin\\\\\\](https:\\\/\\\/devin\\\\\\.ai)/d\" -e \"/Co-Authored-By: Devin <158243242+devin-ai-integration\\\\[bot\\\\]@users\\\\.noreply\\\\.github\\\\.com>/d\"" -- --all
+          FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --msg-filter '
+            sed -e "/Generated with \\[Devin\\](https:\\/\\/devin\\.ai)/d" \
+                -e "/Co-Authored-By: Devin </d"
+          ' -- --all
 
           git push origin --force --all
 
-          # The workflow is only a temporary maintenance tool. Remove it
-          # from the rewritten tip after the history rewrite completes.
+          # Remove this temporary maintenance workflow from the final tree.
           git rm -f .github/workflows/clean-commit-attribution.yml
           git commit -m "Remove temporary history maintenance workflow"
           git push origin --force main
