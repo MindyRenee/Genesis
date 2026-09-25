@@ -2965,6 +2965,50 @@ def test_typed_relations_still_work() -> None:
     facts = sm.extract_facts("Fire causes heat.")
     assert _find(facts, "fire", "causes", "heat")
 
+
+def test_reporting_prefix_trimmed_from_subject() -> None:
+    """"I think that ferrets are cute" must not mint 'i think that
+    ferrets' — the evidential prefix is framing, not the subject.
+
+    Regression: the unbounded subject group in _IS_A_PLURAL_RE captured
+    whole clause prefixes, minting junk concepts like
+    'i think that ferrets' (observed in live state).
+    """
+    sm = SemanticMemory()
+    facts = sm.extract_facts("i think that ferrets are cute")
+    assert _find(facts, "ferrets", "is_a", "cute")
+    assert not any("think" in f.subject or "i " in f.subject for f in facts)
+
+
+def test_said_that_prefix_trimmed() -> None:
+    """"She said that cats are nice" → is_a(cats, nice)."""
+    sm = SemanticMemory()
+    facts = sm.extract_facts("she said that cats are nice")
+    assert _find(facts, "cats", "is_a", "nice")
+
+
+def test_pronoun_subject_rejected() -> None:
+    """"They are here" / "it is raining" produce no facts."""
+    sm = SemanticMemory()
+    assert not sm.extract_facts("they are here")
+    assert not sm.extract_facts("it is raining")
+
+
+def test_relative_clause_subject_keeps_head() -> None:
+    """"The cat that sat" reduces to head 'cat', not 'cat that sat'."""
+    sm = SemanticMemory()
+    facts = sm.extract_facts("the cat that sat is a fluffy animal")
+    assert _find(facts, "cat", "is_a", "fluffy animal")
+    assert not any("that" in f.subject for f in facts)
+
+
+def test_compound_subject_survives() -> None:
+    """"cats and dogs" is a real compound subject — not trimmed."""
+    sm = SemanticMemory()
+    facts = sm.extract_facts("cats and dogs are pets")
+    assert _find(facts, "cats and dogs", "is_a", "pets")
+
+
 # ======================================================================
 # From tests/test_prune_dead_concepts.py
 # ======================================================================

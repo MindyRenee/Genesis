@@ -2339,6 +2339,35 @@ def test_normalize_extended_not_plural(word: str):
 # ─── Integration: full extraction pipeline ────────────────────
 
 
+def test_is_meaningful_rejects_internal_namespaces():
+    """Colon-namespaced IDs are internal machinery, not concepts.
+
+    Utterance seeds (``_cat:``, ``_utt:``), code symbols
+    (``python:``, ``rust:``), and task markers (``skill:``,
+    ``goal:``, ``domain:``, ``spatial:``, ``var:``, ``type:``)
+    must never be minted as user-facing concepts — sanitizing one
+    into a name produced ``catcauseguarded_cortisol`` in live state.
+    """
+    net = ConceptNetwork()
+    learner = SelfDirectedLearner(net)
+    for word in (
+        "_cat:cause:guarded_cortisol",
+        "_utt:hello",
+        "python:genesis_cognitive.concepts",
+        "rust:daemon::tick",
+        "skill:sorter",
+        "goal:explore",
+        "domain:grid",
+        "spatial:cell",
+        "var:threshold",
+        "type:marker",
+    ):
+        assert not learner._is_meaningful(word), word
+    # Ordinary user concepts remain meaningful.
+    assert learner._is_meaningful("ferret")
+    assert learner._is_meaningful("small mammal")
+
+
 def test_integration_is_a_creates_edge():
     """Full pipeline: 'A dog is a mammal' creates IS_A edge."""
     net = ConceptNetwork()

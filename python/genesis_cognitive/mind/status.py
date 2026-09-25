@@ -48,7 +48,13 @@ class StatusMixin:
         placeholders for a future push mechanism.
         """
         while self._running:
-            time.sleep(10.0)
+            # Sleep in small increments so shutdown's bounded join
+            # (5s) always wins — a monolithic 10s sleep outlasts the
+            # join budget and falsely reports an incomplete shutdown.
+            waited = 0.0
+            while waited < 10.0 and self._running:
+                time.sleep(1.0)
+                waited += 1.0
             if not self._running:
                 break
             try:

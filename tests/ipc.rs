@@ -112,8 +112,11 @@ impl Drop for IpcTestSystem {
         }
         let _ = std::fs::remove_file(&self.state_path);
         let _ = std::fs::remove_file(&self.stm_path);
-        let _ = std::fs::remove_file(self.ltm_base.with_extension("idx"));
+        // LTM v2 files: .bundles, .meta, .dat (.idx is the v1 name).
+        let _ = std::fs::remove_file(self.ltm_base.with_extension("bundles"));
+        let _ = std::fs::remove_file(self.ltm_base.with_extension("meta"));
         let _ = std::fs::remove_file(self.ltm_base.with_extension("dat"));
+        let _ = std::fs::remove_file(self.ltm_base.with_extension("idx"));
         let _ = std::fs::remove_file(&self.socket_path);
     }
 }
@@ -1516,7 +1519,9 @@ fn test_ipc_shutdown_waits_for_active_handler() {
 
     let _ = std::fs::remove_file(&state_path);
     let _ = std::fs::remove_file(&stm_path);
-    let _ = std::fs::remove_file(ltm_base.with_extension("idx"));
+    let _ = std::fs::remove_file(ltm_base.with_extension("bundles"));
+    let _ = std::fs::remove_file(ltm_base.with_extension("meta"));
     let _ = std::fs::remove_file(ltm_base.with_extension("dat"));
+    let _ = std::fs::remove_file(ltm_base.with_extension("idx"));
     let _ = std::fs::remove_file(&socket_path);
 }

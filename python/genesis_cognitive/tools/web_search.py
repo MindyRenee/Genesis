@@ -402,7 +402,11 @@ def search(query: str, limit: int = 5) -> list[WebSearchResult]:
             },
         )
         with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-            html_text = resp.read().decode("utf-8", errors="ignore")
+            # Bounded read — a hostile endpoint could otherwise stream
+            # a huge body inside the timeout window.
+            html_text = resp.read(2 * 1024 * 1024 + 1).decode(
+                "utf-8", errors="ignore"
+            )
     except (OSError, ValueError, RuntimeError) as e:
         logger.debug(f"web search failed for {query!r}: {e}")
         return []
@@ -476,7 +480,9 @@ def fetch(url: str) -> WebFetchResult | None:
             content_type = resp.headers.get("Content-Type", "")
             if "text/html" not in content_type and "text/plain" not in content_type:
                 return None
-            raw = resp.read().decode("utf-8", errors="ignore")
+            raw = resp.read(MAX_TEXT_LENGTH * 10 + 1).decode(
+                "utf-8", errors="ignore"
+            )
     except (urllib.error.URLError, urllib.error.HTTPError, OSError, ValueError) as e:
         logger.debug(f"web fetch failed for {url}: {e}")
         return None

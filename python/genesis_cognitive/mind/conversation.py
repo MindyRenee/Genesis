@@ -41,7 +41,9 @@ class ConversationMixin:
         it learned autonomously). Must be thread-safe.
         """
         self._live_thought_listeners.append(listener)
-    def _emit_live_thought(self, kind: str, content: str) -> None:
+    def _emit_live_thought(
+        self, kind: str, content: str, *, meta: dict | None = None
+    ) -> None:
         """Notify all live-thought listeners and broadcast to the workspace.
 
         Live thoughts are Genesis's agentic output — things it does,
@@ -69,6 +71,13 @@ class ConversationMixin:
         Thread-safe: volition actions run in background threads, and
         the workspace uses an internal lock.
         """
+        # Journal the event first — the durable record of its inner
+        # life. The journal swallows its own errors; it can never block
+        # or break the broadcast and listeners below.
+        journal = getattr(self, "journal", None)
+        if journal is not None:
+            journal.record(kind, content, **(meta or {}))
+
         # Broadcast to the global workspace so volition content enters
         # the cognitive field. Best-effort — workspace errors must not
         # block the live thought from reaching CLI listeners.
@@ -248,12 +257,19 @@ class ConversationMixin:
         is_question = intent == "question" or thought.trigger == "social"
         is_expression = intent == "expression"
         is_distress = intent == "distress"
+        is_dream = getattr(thought, "is_dream", False)
         if is_question:
             kind = "question"
         elif is_distress:
             kind = "distress"
         elif is_expression:
             kind = "expression"
+        elif is_dream:
+            # Dream content gets its own kind so the live stream and the
+            # cognitive journal can tell it apart from waking thought —
+            # it used to be labeled "thought" and was indistinguishable.
+            chain_pos = getattr(thought, "chain_position", 0)
+            kind = f"dream:{chain_pos}" if chain_pos > 0 else "dream"
         elif hasattr(thought, "chain_position") and thought.chain_position > 0:
             kind = f"thought:{thought.chain_position}"
         else:
@@ -271,7 +287,24 @@ class ConversationMixin:
         except Exception:
             logger.debug("thought rendering failed, using raw content", exc_info=True)
             text = thought.content
-        self._emit_live_thought(kind, text)
+        # A thought whose entire text is a single internal identifier
+        # (``_cat:emotion:excited``, ``python:foo.bar``) is a namespace
+        # leak, not a thought — suppress it rather than speak it.
+        bare = text.strip()
+        if bare and " " not in bare:
+            from ..concepts.classify import is_world_concept
+            if not is_world_concept(bare):
+                logger.debug(f"suppressed internal-id thought: {bare}")
+                return
+        self._emit_live_thought(
+            kind,
+            text,
+            meta={
+                "trigger": getattr(thought, "trigger", ""),
+                "chain_id": getattr(thought, "chain_id", 0),
+                "is_lucid": getattr(thought, "is_lucid", False),
+            },
+        )
         try:
             self.client.store_event(
                 timestamp=int(time.time() * 1000),

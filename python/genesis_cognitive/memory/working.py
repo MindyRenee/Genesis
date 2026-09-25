@@ -60,6 +60,7 @@ WorkingMemory holds:
 from __future__ import annotations
 
 import time
+from collections import deque
 from dataclasses import dataclass, field
 
 from genesis_client import NeuroSummary
@@ -532,6 +533,12 @@ class CentralExecutive:
         self._suppressed: set[str] = set()
         # Task-switching state: the current focus.
         self._current_focus: str | None = None
+        # Recent foci, oldest → newest. Anaphora resolution needs more
+        # than a single focus: "the dog barked; the wheel fell off; it
+        # rolled away" must bind "it" to the wheel, not whatever the
+        # single focus happens to be. Bounded — discourse referents
+        # decay fast (Baddeley & Hitch).
+        self._focus_history: deque[str] = deque(maxlen=8)
         # Counters for introspection.
         self.suppressions: int = 0
         self.task_switches: int = 0
@@ -540,6 +547,16 @@ class CentralExecutive:
     def current_focus(self) -> str | None:
         """What the executive is currently focusing attention on."""
         return self._current_focus
+
+    @property
+    def focus_history(self) -> list[str]:
+        """Recent foci, newest first."""
+        return list(reversed(self._focus_history))
+
+    def _push_focus(self, focus: str) -> None:
+        """Record a focus, deduplicating consecutive repeats."""
+        if not self._focus_history or self._focus_history[-1] != focus:
+            self._focus_history.append(focus)
 
     def direct_attention(
         self,
@@ -571,6 +588,7 @@ class CentralExecutive:
         # Set focus to the most relevant item.
         if relevant:
             self._current_focus = relevant[0]
+            self._push_focus(relevant[0])
         return result
 
     def suppress(self, item: str) -> None:
@@ -609,6 +627,7 @@ class CentralExecutive:
             self._suppressed.add(self._current_focus.lower())
             self.task_switches += 1
         self._current_focus = new_focus
+        self._push_focus(new_focus)
 
     def coordinate(
         self,

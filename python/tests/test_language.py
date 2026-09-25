@@ -1461,3 +1461,194 @@ def test_is_plural_np_dreams_still_plural() -> None:
     """'dreams' is a common plural noun and stays plural."""
     assert is_plural_np("dreams")
     assert copula("dreams") == "are"
+
+
+def test_knowledge_content_drops_tautological_facts() -> None:
+    """Facts whose target is the topic itself are dropped.
+
+    The inner-life emotional fallback emitted ("feels", "excited")
+    with topic "excited", rendering "excited feels the excited" —
+    a self-loop asserted as knowledge. The clause filter now drops
+    facts whose target display equals the topic display; when that's
+    the only fact, composition returns None (silence over noise).
+    """
+    vocab = Vocabulary(seed=42)
+    emotion = _make_emotion()
+
+    out = vocab._compose_knowledge_content(
+        {"topic": "excited", "knowledge": [("feels", "excited", 0.6)]},
+        emotion,
+    )
+    assert out is None
+
+    # A real fact about the same topic still composes.
+    out = vocab._compose_knowledge_content(
+        {
+            "topic": "excited",
+            "knowledge": [("feels", "excited", 0.6), ("is_a", "emotion", 0.8)],
+        },
+        emotion,
+    )
+    assert out is not None
+    assert "excited feels" not in out.lower()
+    assert "emotion" in out.lower()
+
+
+def test_inner_life_emotional_fallback_skips_self_topic() -> None:
+    """When the seed concept IS the emotion word, no thought is emitted."""
+    from genesis_cognitive.concepts.network import ConceptNetwork
+    from genesis_cognitive.learning.curiosity import CuriosityEngine
+    from genesis_cognitive.reasoning.engine import ReasoningEngine
+    from genesis_cognitive.self.reflection import ReflectionEngine
+    from genesis_cognitive.sleep.inner_life import InnerLife
+
+    net = ConceptNetwork()
+    net.add_concept("excited", confidence=0.8)
+    inner = InnerLife(
+        net,
+        CuriosityEngine(net, ReasoningEngine(net)),
+        ReflectionEngine(net),
+        seed=42,
+    )
+    emotion = _make_emotion(label="excited")
+
+    # find_emotion_words needs the concept tagged as an emotion word.
+    # If the network can't supply one, the thought is already None;
+    # force the path by stubbing find_emotion_words.
+    net.find_emotion_words = lambda category: ["excited"]  # type: ignore[method-assign]
+
+    thought = inner._seeded_emotional_thought(emotion, ["excited"])
+    assert thought is None
+
+
+# ── Comprehension: verb and coordination regressions ────────────
+# The intake bridge reads propositions, not raw text — these guard
+# the semantic shapes it depends on.
+
+
+def _props(text: str):
+    from genesis_cognitive.language.comprehension import (
+        ComprehensionEngine,
+    )
+
+    return ComprehensionEngine().comprehend(text)
+
+
+def test_imperative_base_verbs_parse_as_predicates() -> None:
+    """Speech-act detection and proposition extraction must agree
+    on what a verb is — "sort the shapes" is a command whose verb
+    is sort, not a copula claim about the whole clause."""
+    for text, verb in (
+        ("sort the shapes into the holes", "sort"),
+        ("drop each block into the hole it belongs in", "drop"),
+        ("place the red star in the square hole", "place"),
+        ("insert the peg into the slot", "insert"),
+    ):
+        props = _props(text).propositions
+        assert props and props[0].predicate == verb
+        assert props[0].verb_found
+
+
+def test_puzzle_domain_predicates_parse() -> None:
+    """fit/match/accept are verbs mid-clause, not noise."""
+    props = _props("a small star fits the star hole").propositions
+    assert props[0].predicate == "fits"
+    assert "star hole" in (props[0].object or "")
+    props = _props("the round hole accepts a round peg").propositions
+    assert props[0].predicate == "accepts"
+
+
+def test_verb_shaped_noun_does_not_steal_predicate() -> None:
+    """A determiner-headed NP whose head is verb-shaped still ends
+    at the copula — 'a blue square block IS...' parses block as
+    noun, and 'that place is warm' keeps place as noun."""
+    props = _props("a blue square block is on the table").propositions
+    assert props[0].predicate == "is"
+    assert "block" in props[0].subject
+    props = _props("that place is warm").propositions
+    assert props[0].predicate == "is"
+    assert props[0].object == "warm"
+    # And actual verbs in the same slot still parse as verbs.
+    props = _props("the dog bit the man").propositions
+    assert props[0].predicate == "bit"
+
+
+def test_gapped_vp_coordination_expands() -> None:
+    """"put A in B and C in D" is two instructions sharing the
+    verb — the second conjunct elides it."""
+    props = _props(
+        "put the red star in the square hole "
+        "and the blue moon in the round hole"
+    ).propositions
+    puts = [p for p in props if p.predicate == "put"]
+    assert len(puts) == 2
+    locs = [
+        str(p.roles[next(iter(p.roles))]) if p.roles else ""
+        for p in puts
+    ]
+    assert any("square" in loc for loc in locs)
+    assert any("round" in loc for loc in locs)
+
+
+def test_shared_subject_coordination_unchanged() -> None:
+    """"I came and saw the water" still expands through the VP path."""
+    props = _props("I came and saw the water").propositions
+    preds = [p.predicate for p in props]
+    assert "came" in preds and "saw" in preds
+
+
+# ── Problem-result composition ──────────────────────────────────
+# A worked sorter reports the actual placements, and modifiers land
+# in English order (size < color < shape).
+
+
+def test_sorter_result_composes_placement_report() -> None:
+    """The utterance reports which block went in which hole — the
+    world's verdict, not telemetry like 'matched100%→cost0.00'."""
+    vocab = Vocabulary(seed=42)
+    emotion = _make_emotion()
+    result = {
+        "family": "sorter",
+        "solved": True,
+        "score": 1.0,
+        "placements": [
+            {
+                "slot": {"round": "yes"},
+                "block": {"red": "yes", "round": "yes"},
+            },
+            {
+                "slot": {"square": "yes"},
+                "block": {"blue": "yes", "square": "yes"},
+            },
+        ],
+    }
+    out = vocab._compose_problem_result_content(result, emotion)
+    assert out is not None
+    assert "red round" in out and "round hole" in out
+    assert "blue square" in out and "square hole" in out
+    assert "matched" not in out and "cost" not in out
+
+
+def test_sorter_attr_name_orders_modifiers() -> None:
+    """Heard attrs are unordered — English says 'the small yellow
+    round block', not 'the round yellow small block'."""
+    out = Vocabulary._attr_name(
+        {"round": "yes", "yellow": "yes", "small": "yes"}, "block"
+    )
+    assert out == "the small yellow round block"
+    # Key/value attrs anchor the shape value as the noun.
+    out = Vocabulary._attr_name(
+        {"shape": "star", "color": "red", "size": "small"}, "block"
+    )
+    assert out == "the small red star"
+
+
+def test_sorter_result_without_placements_still_speaks() -> None:
+    """A solved sorter with no placement detail falls back to the
+    generic solved frame rather than silence."""
+    vocab = Vocabulary(seed=42)
+    out = vocab._compose_problem_result_content(
+        {"family": "sorter", "solved": True, "score": 1.0},
+        _make_emotion(),
+    )
+    assert out is not None and out.strip()

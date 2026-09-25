@@ -3283,6 +3283,11 @@ class SelfDirectedLearner:
         word = word.lower().strip()
         if not word:
             return False
+        # Colon-namespaced IDs are internal machinery (code symbols
+        # ``python:``, utterance seeds ``_cat:``/``_utt:``, task
+        # markers ``skill:``/``goal:``) — never user-facing concepts.
+        if ":" in word:
+            return False
         # Function words are grammatical, not conceptual — a misparse
         # like "is → part of → the" must not mint concepts for them.
         if word in _FUNCTION_WORDS:

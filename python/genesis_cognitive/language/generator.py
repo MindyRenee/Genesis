@@ -755,6 +755,11 @@ class GenerativeEngine(LanguageEngine):
             # "load_failed"), the vocabulary composes its report of
             # *that* instead of leaving a raw status word in the slot.
             "vision_status": thought.metadata.get("vision_status"),
+            # Problem-solving metadata — the structured outcome of a
+            # task the inner world just worked (family, solved, the
+            # answer payload). The vocabulary composes the report
+            # from the data; the practice layer never writes words.
+            "problem_result": thought.metadata.get("problem_result"),
         }
 
         # Determine how many sentences to generate

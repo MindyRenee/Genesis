@@ -162,6 +162,9 @@ fn test_iteration_order() {
     // Should be in order: oldest to newest
     assert_eq!(entries[0].text(), "Obs 0");
     assert_eq!(entries[4].text(), "Obs 4");
+
+    drop(rb);
+    cleanup(&path);
 }
 
 // ─── Persistence ──────────────────────────────────────────────

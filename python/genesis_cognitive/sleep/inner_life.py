@@ -2954,6 +2954,10 @@ class InnerLife:
         # Fall back to semantic metadata — the language engine composes
         # the actual words from the emotion word and topic.
         display = topic.replace('_', ' ')
+        # A seed that IS the emotion word would compose a tautology
+        # ("excited feels excited") — silence over noise.
+        if display.lower() == word.lower():
+            return None
         return SpontaneousThought(
             content=f"{word} {display}",
             trigger="emotional",
@@ -4335,15 +4339,17 @@ class InnerLife:
                 trigger="emotional",
                 timestamp=int(time.time() * 1000),
             )
-        # Fall back to semantic metadata — the language engine composes
-        # the actual words from the emotion word.
+        # Fall back to the bare emotion word — the language engine
+        # composes the reflection from its emotional state. No
+        # ("feels", word) knowledge pair: the topic IS the word, so
+        # that edge can only render a tautology ("excited feels the
+        # excited").
         return SpontaneousThought(
             content=word,
             trigger="emotional",
             timestamp=int(time.time() * 1000),
             metadata={
                 "topic": word,
-                "knowledge": [("feels", word, 0.6)],
                 "emotion_word": word,
             },
         )

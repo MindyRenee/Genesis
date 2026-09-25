@@ -206,6 +206,54 @@ def test_compose_about_tracks_said() -> None:
     assert composer.has_said_similar("dog", "dog is a mammal", threshold=0.3)
 
 
+def test_dedup_reasoning_ignores_sentence_punctuation() -> None:
+    """Facts already stated must filter identical conclusions.
+
+    Regression: parts ended with sentence-final periods ("Ferret is
+    a small mammal.") produced word "mammal." — which never equaled
+    the conclusion's "mammal", so a conclusion duplicating the fact
+    slipped past the overlap threshold and the response repeated the
+    same proposition ("…mammal. it follows that ferret is a small
+    mammal").
+    """
+    net = ConceptNetwork()
+    net.add_concept("ferret", confidence=0.6, origin="learned")
+    net.add_concept("small mammal", confidence=0.5)
+    net.add_edge("ferret", "small mammal", RelationType.IS_A, 0.6,
+                 origin="stated")
+    reasoner = ReasoningEngine(net)
+    results = reasoner.reason_about("ferret")
+    assert results, "expected a deductive conclusion for an is_a edge"
+
+    parts = ["Ferret is a small mammal."]
+    surviving = ThoughtComposer._dedup_reasoning(parts, results)
+    assert surviving == []
+
+
+def test_compose_about_does_not_repeat_fact_as_inference() -> None:
+    """A stated is_a fact must not be re-emitted as a deduction."""
+    net = ConceptNetwork()
+    net.add_concept(
+        "ferret",
+        confidence=0.6,
+        origin="learned",
+        properties={
+            "definition": "a small mammal that likes to steal shiny objects"
+        },
+    )
+    net.add_concept("small mammal", confidence=0.5)
+    net.add_edge("ferret", "small mammal", RelationType.IS_A, 0.6,
+                 origin="stated")
+    reasoner = ReasoningEngine(net)
+    composer = ThoughtComposer(net, reasoner, seed=42)
+    emotion = _make_emotion()
+
+    thought = composer.compose_about("ferret", emotion)
+    assert thought is not None
+    # The fact may appear once — never again as "it follows that…".
+    assert "it follows that ferret" not in thought.content.lower()
+
+
 def test_compose_about_varies() -> None:
     """Composer produces varied output for the same concept."""
     net = _make_network_with_knowledge()
