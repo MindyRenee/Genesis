@@ -1319,7 +1319,14 @@ def restore_self_improvement(engine: SelfImprovementEngine, data: dict[str, Any]
 
 
 def _serialize_network(network: ConceptNetwork) -> dict[str, Any]:
-    """Serialize a concept network to a dict."""
+    """Serialize a concept network to a dict.
+
+    When a canonical edge log is attached, it is reconciled here:
+    the log is the truth for edges and the JSON ``edges`` array
+    written below is a debugging/rollback projection of the same
+    fold — never an independent store.
+    """
+    network.sync_edge_log()
     concepts = []
     for _cid, concept in _snapshot(network._concepts.items):
         concepts.append(

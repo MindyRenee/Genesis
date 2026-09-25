@@ -1472,6 +1472,17 @@ class InnerLife:
 
         return max(0.2, min(0.95, prob))
 
+    def _neighbor_knowledge(
+        self, neighbors: list[tuple[str, RelationType, float]]
+    ) -> tuple[str, str, list[tuple[str, str, float]]]:
+        """Pick a neighbor and return (id, display, knowledge triples)
+        preserving the edge's true relation so the language engine can
+        verbalize the actual link rather than a bare concept pair."""
+        name, rel, weight = self._rng.choice(neighbors)
+        display = name.replace("_", " ")
+        rel_val = rel.value if isinstance(rel, RelationType) else str(rel or "related_to")
+        return name, display, [(rel_val, display, float(weight or 0.4))]
+
     def _dream_thought(self, emotion: EmotionalState) -> SpontaneousThought | None:
         """Generate a non-lucid dream thought.
 
@@ -1511,16 +1522,15 @@ class InnerLife:
             c1 = chosen[0]
             neighbors = self.network.get_neighbors(c1)
             if neighbors:
-                neighbor = self._rng.choice(neighbors)[0]
+                _, neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
                 display = c1.replace('_', ' ')
-                neighbor_display = neighbor.replace('_', ' ')
                 return SpontaneousThought(
                     content=f"{display} and {neighbor_display}",
                     trigger="dream",
                     timestamp=int(time.time() * 1000),
                     metadata={
                         "topic": display,
-                        "knowledge": [("related_to", neighbor_display, 0.5)],
+                        "knowledge": knowledge,
                         "dream": True,
                     },
                 )
@@ -2041,9 +2051,7 @@ class InnerLife:
         pgo_concept = pgo.visual_content if pgo and pgo.visual_content else None
 
         if neighbors and self._rng.random() < 0.6:
-            neighbor = self._rng.choice(neighbors)[0]
-            neighbor_display = neighbor.replace("_", " ")
-            knowledge: list[tuple[str, str, float]] = [("related_to", neighbor_display, 0.5)]
+            _, neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
             if pgo_concept:
                 knowledge.append(("visualizes", pgo_concept, 0.6))
             return SpontaneousThought(
@@ -2117,15 +2125,14 @@ class InnerLife:
         neighbors = self.network.get_neighbors(c1)
         display = c1.replace("_", " ")
         if neighbors:
-            neighbor = self._rng.choice(neighbors)[0]
-            neighbor_display = neighbor.replace("_", " ")
+            _, neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
             return SpontaneousThought(
                 content=f"{display} and {neighbor_display}",
                 trigger="dream",
                 timestamp=int(time.time() * 1000),
                 metadata={
                     "topic": display,
-                    "knowledge": [("related_to", neighbor_display, 0.5)],
+                    "knowledge": knowledge,
                     "dream": True,
                     "nrem": True,
                 },
@@ -2161,15 +2168,14 @@ class InnerLife:
 
         if neighbors and self._rng.random() < 0.7:
             # Follow a real connection — memory replay
-            neighbor = self._rng.choice(neighbors)[0]
-            neighbor_display = neighbor.replace("_", " ")
+            _, neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
             return SpontaneousThought(
                 content=f"{display} and {neighbor_display}",
                 trigger="dream",
                 timestamp=int(time.time() * 1000),
                 metadata={
                     "topic": display,
-                    "knowledge": [("related_to", neighbor_display, 0.5)],
+                    "knowledge": knowledge,
                     "dream": True,
                     "nrem": True,
                 },
@@ -2261,8 +2267,7 @@ class InnerLife:
                 },
             )
 
-        neighbor = self._rng.choice(neighbors)[0]
-        neighbor_display = neighbor.replace("_", " ")
+        neighbor, neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
         # Lucid dreams produce stronger insights — it's aware
         # of the connection, not just drifting through it.
         # Sometimes it forms a connection it sees clearly.
@@ -2281,7 +2286,7 @@ class InnerLife:
                 directed_concept=target,
                 metadata={
                     "topic": display,
-                    "knowledge": [("related_to", neighbor_display, 0.6)],
+                    "knowledge": [(knowledge[0][0], neighbor_display, 0.6)],
                     "dream": True,
                     "lucid": True,
                     "insight_formed": True,
@@ -2295,7 +2300,7 @@ class InnerLife:
                 directed_concept=target,
                 metadata={
                     "topic": display,
-                    "knowledge": [("related_to", neighbor_display, 0.5)],
+                    "knowledge": knowledge,
                     "dream": True,
                     "lucid": True,
                 },
@@ -2810,19 +2815,18 @@ class InnerLife:
         neighbors = self.network.get_neighbors(c1)
         if not neighbors:
             return None
-        neighbor = self._rng.choice(neighbors)[0]
+        _, neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
 
         # Pass semantic data as metadata — the language engine composes
         # the actual words, not pre-written template substitution.
         display = c1.replace('_', ' ')
-        neighbor_display = neighbor.replace('_', ' ')
         return SpontaneousThought(
             content=f"{display} and {neighbor_display}",
             trigger="connection",
             timestamp=int(time.time() * 1000),
             metadata={
                 "topic": display,
-                "knowledge": [("related_to", neighbor_display, 0.4)],
+                "knowledge": knowledge,
             },
         )
 
@@ -2871,21 +2875,19 @@ class InnerLife:
         if not neighbors:
             return display, []
 
-        neighbor = self._rng.choice(neighbors)[0]
-        neighbor_display = neighbor.replace('_', ' ')
+        neighbor, neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
         second_neighbors = self.network.get_neighbors(neighbor)
         if second_neighbors and self._rng.random() < 0.4:
-            second = self._rng.choice(second_neighbors)[0]
-            second_display = second.replace('_', ' ')
+            _, second_display, second_knowledge = self._neighbor_knowledge(second_neighbors)
+            knowledge.append((second_knowledge[0][0], second_display, 0.3))
             return (
                 f"{display} → {neighbor_display} → {second_display}",
-                [("related_to", neighbor_display, 0.4),
-                 ("related_to", second_display, 0.3)],
+                knowledge,
             )
 
         return (
             f"{display} → {neighbor_display}",
-            [("related_to", neighbor_display, 0.4)],
+            knowledge,
         )
 
     def _seeded_curiosity_thought(

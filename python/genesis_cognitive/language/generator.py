@@ -501,6 +501,12 @@ class GenerativeEngine(LanguageEngine):
                 candidates.append(candidate)
 
         if not candidates:
+            # A thought carrying semantic triples must not fall through
+            # to its placeholder content ("a and b") — that string is
+            # internal data, not speech. Unverbalized thoughts return
+            # empty and are suppressed by the caller.
+            if thought.metadata.get("knowledge") is not None:
+                return ""
             return thought.content
         return max(
             candidates,

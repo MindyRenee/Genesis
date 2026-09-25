@@ -181,6 +181,23 @@ class Edge:
     weight: float = 0.5  # 0..1, strength of the relationship
     created_at: int = field(default_factory=lambda: int(time.time() * 1000))
     origin: str = "inferred"  # "stated", "inferred", "observed"
+@dataclass(frozen=True)
+class Neighbor:
+    """A neighboring concept with the provenance of the association.
+
+    Returned by ``get_associations`` so callers can price what they
+    consume: ``exact`` edges are canonical logged facts,
+    ``holographic`` are cold-tier compressed typed associations
+    (lossy), and ``embedding`` are virtual neighbors computed live
+    from the similarity field — never persisted, relation None.
+    """
+
+    concept: str
+    relation: RelationType | None
+    weight: float
+    provenance: str  # "exact" | "holographic" | "embedding"
+
+
 @dataclass
 class Provenance:
     """A retrieved item with its origin metadata.

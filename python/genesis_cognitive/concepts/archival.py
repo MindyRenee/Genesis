@@ -7,6 +7,7 @@ import sqlite3
 from typing import TYPE_CHECKING, Any
 
 from .classify import _column_of
+from .edge_log import is_derivable_edge
 from .types import Concept, ConceptCategory, ConceptModality, Edge, RelationType
 
 logger = logging.getLogger(__name__)
@@ -116,6 +117,12 @@ class ArchivalMixin:
                 key = (e_data["source"], e_data["target"], relation)
                 if key in self._edge_key_index:
                     continue
+                # A live edge log never materializes derivable edges —
+                # they are recomputed by the similarity provider.
+                if self._edge_log is not None and is_derivable_edge(
+                    relation, e_data["origin"]
+                ):
+                    continue
                 edge = Edge(
                     source=e_data["source"],
                     target=e_data["target"],
@@ -128,6 +135,11 @@ class ArchivalMixin:
                 self._edge_index.setdefault(edge.source, []).append(edge)
                 self._reverse_index.setdefault(edge.target, []).append(edge)
                 self._edge_key_index[key] = edge
+                if self._edge_log is not None:
+                    self._edge_log.assert_edge(
+                        edge.source, edge.target, edge.relation,
+                        edge.weight, edge.origin, edge.created_at,
+                    )
             # Remove from the archive (concept + aliases).
             try:
                 self._archive.recall_concept(concept_id)
@@ -188,6 +200,13 @@ class ArchivalMixin:
         """
         edge_dicts: list[dict[str, Any]] = []
         for edge in self._edges:
+            # A live edge log never stores derivable edges anywhere —
+            # not in the archive either; the similarity provider
+            # recomputes them on demand.
+            if self._edge_log is not None and is_derivable_edge(
+                edge.relation, edge.origin
+            ):
+                continue
             if edge.source in to_spill or edge.target in to_spill:
                 edge_dicts.append({
                     "source": edge.source,
@@ -422,6 +441,11 @@ class ArchivalMixin:
             key = (e_data["source"], e_data["target"], relation)
             if key in self._edge_key_index:
                 continue  # live edge exists — skip
+            # A live edge log never materializes derivable edges.
+            if self._edge_log is not None and is_derivable_edge(
+                relation, e_data["origin"]
+            ):
+                continue
             edge = Edge(
                 source=e_data["source"],
                 target=e_data["target"],
@@ -434,6 +458,11 @@ class ArchivalMixin:
             self._edge_index.setdefault(edge.source, []).append(edge)
             self._reverse_index.setdefault(edge.target, []).append(edge)
             self._edge_key_index[key] = edge
+            if self._edge_log is not None:
+                self._edge_log.assert_edge(
+                    edge.source, edge.target, edge.relation,
+                    edge.weight, edge.origin, edge.created_at,
+                )
 
         # Invalidate caches
         self._concept_ids_cache = None

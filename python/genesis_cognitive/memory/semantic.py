@@ -1006,14 +1006,17 @@ class SemanticMemory:
         rel_type = _relation_to_edge(fact.relation)
         if rel_type is None:
             rel_type = RelationType.RELATED_TO
-        network.add_edge(
+        edge = network.add_edge(
             fact.subject,
             fact.object,
             rel_type,
             weight=min(1.0, 0.4 + fact.confidence * 0.4),
             origin="semantic",
         )
-        self.consolidations += 1
+        # Under a live edge log, derivable edges are rejected
+        # (returns None) — only count consolidations that landed.
+        if edge is not None:
+            self.consolidations += 1
 
     # ── Schema formation ─────────────────────────────────────────
 
