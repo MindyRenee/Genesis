@@ -5,10 +5,9 @@ evidence behind them, not just the claims. Entries are dated, newest
 first. Code references are commit SHAs; runtime artifacts live in the
 instance's data dir (`~/.local/share/genesis*`).
 
-## 2026-09-26 — The sorter she can see
+## 2026-09-25 — Visual perception in the sorter
 
-The user's prod: "maybe she needs to see a visual of what a square
-even is." Right — the sorter was doubly pre-chewed. Not only do
+The sorter was doubly pre-chewed. Not only do
 blocks arrive with attribute labels; ``candidates()`` publishes the
 oracle's ``matched`` count on every option, so the agent never even
 computes the match — the world pre-scores each move. The affordance
@@ -17,7 +16,7 @@ it "learns" is bookkeeping over someone else's judgment.
 Now there is a perceptual sorter. ``PerceptualSorter`` renders each
 aperture and block as an image (shape, size, color all drawn) and
 hides the oracle on candidates; the world still *checks* truth on
-commit. ``PerceptualSorterAgent``'s affordance keys on what she
+commit. ``PerceptualSorterAgent``'s affordance keys on what Genesis
 actually perceived: recognized concept-name equality when the MTL
 bridge has learned the names, VTC cosine otherwise. ``teach()`` lets
 the world name what it showed — the parent pointing and saying
@@ -28,7 +27,7 @@ worked by sight when a cortex is wired, symbolic otherwise.
 
 Measured honestly: untrained VTC orthogonalizes everything (every
 distinct image gets its own corner — sim ~0 even for true matches),
-so a cold agent explores blindly; after one teaching pass names bind
+so a cold agent explores blindly; after one teaching pass, names bind
 and discrimination sharpens. The one-concept limit even mimics
 toddler overextension — everything is "square" until a second name
 lands. And solved sorters now report the actual mapping — "got the
@@ -36,7 +35,7 @@ red round block in the round hole and the blue square block in the
 square hole" — the placement payload rides through
 ``problem_result`` instead of bare telemetry.
 
-## 2026-09-26 — Hearing repaired; the sorter completes the intake bridge
+## 2026-09-25 — Hearing repaired; the sorter completes the intake bridge
 
 The language→semantics pipe had a silent disconnect: speech-act
 detection and proposition extraction consulted different verb lists.
@@ -73,7 +72,7 @@ Evidence: "the box has two holes: a round hole and a square hole.
 there is a red round block and a blue square block. put each block in
 its hole." → spoken in → spec → drop-box → sorter agent → solved,
 score 1.0. All five families now have the full heard→worked path.
-2885 tests pass.
+2885 tests pass in the latest logged run.
 
 ## 2026-09-25 — Cross-domain transfer: the channel opens, and it isn't enough
 
@@ -208,8 +207,8 @@ Evidence: initial public commit `8d656b0`; the paper is in
 
 ## The standing evidence base
 
-- `python3 -m pytest python/tests/ -q -o addopts=''` — 2794 tests
-  passing at time of writing.
+- `python3 -m pytest python/tests/ -q -o addopts=''` — 2885 tests
+  passing in the latest logged run.
 - `cargo test` — the Rust subcognitive core.
 - Every claim above points at a commit, a file, or a state artifact
   you can open. If a number here ever stops being true, this file is
