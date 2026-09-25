@@ -1,0 +1,42 @@
+name: Clean commit attribution
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  rewrite:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Remove automated Devin attribution
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "Mindy Beatty"
+          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+
+          FILTER_SCRIPT='
+            /Generated with \[Devin\](https:\/\/devin\.ai)/d
+            /Co-Authored-By: Devin <158243242+devin-ai-integration\[bot\]@users\.noreply\.github\.com>/d
+          '
+
+          FILTER_BRANCH_SQUELCH_WARNING=1 git filter-branch -f --msg-filter "sed -e \"/Generated with \\\\[Devin\\\\\\](https:\\\/\\\/devin\\\\\\.ai)/d\" -e \"/Co-Authored-By: Devin <158243242+devin-ai-integration\\\\[bot\\\\]@users\\\\.noreply\\\\.github\\\\.com>/d\"" -- --all
+
+          git push origin --force --all
+
+          # The workflow is only a temporary maintenance tool. Remove it
+          # from the rewritten tip after the history rewrite completes.
+          git rm -f .github/workflows/clean-commit-attribution.yml
+          git commit -m "Remove temporary history maintenance workflow"
+          git push origin --force main
