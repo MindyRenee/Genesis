@@ -86,6 +86,26 @@ processes directly. Do not corrupt the mmap'd state or drive the system
 into degenerate regimes for experimentation; see the State integrity
 framework section of the README.
 
+## Edge storage — the edge log is canonical
+Relationships have ONE source of truth: `edge_log.jsonl` in the data
+dir (append-only assert/retract/snapshot events; `concepts/edge_log.py`).
+`network._edges` is a materialized fold — never persist it as truth.
+The JSON state's `edges` array is a debugging/rollback projection
+written at save time; the log's fold overwrites it at restore.
+- Derivable edges (untyped `related_to`/`bridges`/`similar_to` with
+  pipeline origins like `hub_attachment`, `semantic_bridge`,
+  `co_occurrence`) are NEVER materialized — rejected at `add_edge`,
+  filtered at `replace_edges`, archive spill, and recall. Their role
+  is served at query time by the similarity provider
+  (`get_associations`), which returns `Neighbor` records with
+  provenance (`exact` | `holographic` | `embedding`).
+- Typed relations are always canonical regardless of origin; untyped
+  edges with unlisted origins default to canonical (a false positive
+  costs decay; a false negative loses an experiential binding).
+- Edge mutations write through to the log; saves snapshot the fold;
+  the log self-compacts past 32MB. Migration from pre-log state:
+  `scripts/migrate_edges_to_log.py --data-dir DIR [--write]`.
+
 ## Persistence and lifecycle verification
 - `python3 -m pytest python/tests/ -q -o addopts=''` runs the full Python
   suite with an explicit summary. The daemon integration test uses a fresh,

@@ -37,6 +37,7 @@ from .classify import (
 )
 from .consolidation import ConsolidationMixin
 from .dynamics import DynamicsMixin
+from .edge_log import is_derivable_edge
 from .extraction import ExtractionMixin
 from .types import (
     Concept,
@@ -44,6 +45,7 @@ from .types import (
     ConceptModality,
     CorticalLayer,
     Edge,
+    Neighbor,
     Provenance,
     RelationType,
     _is_typed_relation,
@@ -362,6 +364,18 @@ class ConceptNetwork(
         # so compressed associations remain accessible after migration.
         # None = no holographic graph attached (backward-compatible).
         self._holographic_graph: Any = None  # HolographicGraph | None
+        # Canonical edge log: when attached, ``_edges`` is a
+        # materialized fold over this append-only store — the log is
+        # the truth, the list is its view. An attached log also means
+        # derivable edges (pipeline-generated geometry) are never
+        # materialized at all; the similarity provider recomputes
+        # them at query time. None = legacy JSON-edge mode.
+        self._edge_log: Any = None  # EdgeLog | None
+        # Virtual similarity layer: callable (concept_id) ->
+        # list[(neighbor_id, score)], queried lazily by
+        # ``get_associations`` only — never on the hot paths
+        # (spread_activation, has_neighbors).
+        self._similarity_provider: Any = None
     @property
     def size(self) -> int:
         """Number of concepts in the network."""
@@ -420,6 +434,15 @@ class ConceptNetwork(
         previously direct assignment to ``_edges`` followed by
         ``_rebuild_edge_indices()``.
         """
+        if self._edge_log is not None:
+            # A live log owns the edge set: derivables are stripped
+            # and the canonical remainder is snapshotted as the new
+            # fold base.
+            edges = [
+                e for e in edges
+                if not is_derivable_edge(e.relation, e.origin)
+            ]
+            self._edge_log.snapshot(edges)
         self._edges = edges
         self._rebuild_edge_indices()
     @property
@@ -458,6 +481,119 @@ class ConceptNetwork(
             hgraph: A ``HolographicGraph`` instance.
         """
         self._holographic_graph = hgraph
+    def attach_edge_log(self, log: Any) -> None:
+        """Attach the canonical edge log — the single source of truth.
+
+        If the log file already exists, its fold replaces the in-memory
+        edge list immediately (the log is authoritative; ``_edges`` is
+        its materialized view). If no log exists yet, the current
+        canonical edges are snapshotted in as the seed.
+
+        Once attached, derivable edges — pipeline-generated geometry
+        that the embedding field can recompute — are never
+        materialized: rejected at ``add_edge``, stripped from
+        ``replace_edges``, absent from the fold. Their function is
+        served by the similarity provider at query time.
+        """
+        self._edge_log = log
+        if not log.is_empty:
+            self._load_from_edge_log()
+        elif self._edges:
+            log.snapshot(self._edges)
+            self._strip_derivable_edges()
+    def _load_from_edge_log(self) -> None:
+        """Replace in-memory edges with the canonical log fold."""
+        live = self._edge_log.fold()
+        self._edges = list(live.values())
+        self._rebuild_edge_indices()
+        self._quality_concept_ids_cache = None
+    def _strip_derivable_edges(self) -> None:
+        """Drop derivable edges from memory — a live log never stores them."""
+        kept = [
+            e for e in self._edges
+            if not is_derivable_edge(e.relation, e.origin)
+        ]
+        if len(kept) != len(self._edges):
+            self._edges = kept
+            self._rebuild_edge_indices()
+            self._quality_concept_ids_cache = None
+    def sync_edge_log(self) -> None:
+        """Snapshot the current canonical edges into the log (save point).
+
+        Called from persistence during save_state. Write-through keeps
+        the log current between saves; this snapshot is the
+        reconciliation point for bulk mutations, and compacts the log
+        when it grows past the size ceiling.
+        """
+        if self._edge_log is None:
+            return
+        self._edge_log.snapshot(list(self._edges))
+        try:
+            if self._edge_log.path.stat().st_size > 32 * 1024 * 1024:
+                self._edge_log.compact()
+        except OSError:
+            pass
+    def attach_similarity_provider(self, provider: Any) -> None:
+        """Attach the virtual similarity layer for derivable associations.
+
+        ``provider`` is a callable ``(concept_id) -> list[(id, score)]``
+        — typically bound to the embedding store's
+        ``find_similar_concepts``. It is queried lazily by
+        :meth:`get_associations` only, never on the hot paths
+        (``spread_activation``, ``has_neighbors``, ``get_neighbors``).
+        """
+        self._similarity_provider = provider
+    def get_associations(
+        self,
+        concept: str,
+        relation: RelationType | None = None,
+        k_virtual: int = 8,
+    ) -> list[Neighbor]:
+        """Return provenance-tagged associations for a concept.
+
+        Unlike :meth:`get_neighbors` — which returns untyped tuples
+        mixing exact edges and holographic similarity scores — this
+        returns :class:`Neighbor` records carrying the tier each
+        association came from:
+
+        - ``exact`` — canonical logged edges (earned facts)
+        - ``holographic`` — cold-tier compressed typed associations
+          (lossy; score is a similarity, not an edge weight)
+        - ``embedding`` — virtual neighbors computed live from the
+          similarity field (relation ``None``; never persisted)
+
+        Callers that reason about knowledge should price by
+        provenance instead of consuming a blended weight blind.
+        """
+        cid = self._resolve(concept)
+        if not cid:
+            return []
+        neighbors: list[Neighbor] = []
+        for edge in self._edge_index.get(cid, []):
+            if relation is None or edge.relation == relation:
+                neighbors.append(
+                    Neighbor(edge.target, edge.relation, edge.weight, "exact")
+                )
+        for edge in self._reverse_index.get(cid, []):
+            if relation is None or edge.relation == relation:
+                neighbors.append(
+                    Neighbor(edge.source, edge.relation, edge.weight, "exact")
+                )
+        if self._holographic_graph is not None:
+            for target, rel, sim in self._query_holographic_neighbors(cid, relation):
+                neighbors.append(Neighbor(target, rel, sim, "holographic"))
+        if (
+            self._similarity_provider is not None
+            and relation in (None, RelationType.SIMILAR_TO)
+        ):
+            try:
+                for target, score in self._similarity_provider(cid)[:k_virtual]:
+                    neighbors.append(
+                        Neighbor(target, None, float(score), "embedding")
+                    )
+            except Exception:  # noqa: BLE001
+                logger.debug("similarity provider failed for %r", cid)
+        return neighbors
     def replace_contents(self, other: ConceptNetwork) -> None:
         """Adopt another network's content while keeping this object's identity.
 
@@ -487,6 +623,13 @@ class ConceptNetwork(
         self._concept_ids_cache = None
         self._world_concept_ids_cache = None
         self._quality_concept_ids_cache = None
+        # The edge log outranks transplanted edges: once a canonical
+        # log exists, its fold is the edge set — whatever the staged
+        # network deserialized (legacy JSON projections included) is
+        # overridden. Concepts and aliases keep the staged data; edges
+        # come from the log alone.
+        if self._edge_log is not None and not self._edge_log.is_empty:
+            self._load_from_edge_log()
     def concept_quality(self, concept_id: str) -> float:
         """Structural quality score for a concept (0.0 to 1.0).
 
@@ -929,7 +1072,19 @@ class ConceptNetwork(
         existing = self._edge_key_index.get(key)
         if existing is not None:
             existing.weight = min(1.0, existing.weight + 0.2)
+            if self._edge_log is not None:
+                self._edge_log.assert_edge(
+                    src_id, tgt_id, relation,
+                    existing.weight, existing.origin, existing.created_at,
+                )
             return existing
+
+        # A live edge log never materializes derivable edges — they
+        # are recomputed by the similarity provider at query time.
+        # Concepts were still auto-created above (they are canonical),
+        # only the edge is rejected.
+        if self._edge_log is not None and is_derivable_edge(relation, origin):
+            return None
 
         # Create new edge
         edge = Edge(
@@ -943,6 +1098,10 @@ class ConceptNetwork(
         self._edge_index.setdefault(src_id, []).append(edge)
         self._reverse_index.setdefault(tgt_id, []).append(edge)
         self._edge_key_index[key] = edge
+        if self._edge_log is not None:
+            self._edge_log.assert_edge(
+                src_id, tgt_id, relation, weight, origin, edge.created_at,
+            )
         # Edge counts affect quality scores — invalidate the cache.
         self._quality_concept_ids_cache = None
         return edge
@@ -2235,6 +2394,8 @@ class ConceptNetwork(
             self._reverse_index[tgt_id] = [
                 e for e in self._reverse_index[tgt_id] if e is not edge
             ]
+        if self._edge_log is not None:
+            self._edge_log.retract_edge(src_id, tgt_id, relation)
         # Edge counts affect quality scores — invalidate the cache.
         self._quality_concept_ids_cache = None
         return True

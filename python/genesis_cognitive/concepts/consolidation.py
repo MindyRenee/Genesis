@@ -219,6 +219,10 @@ class ConsolidationMixin:
            emotion→emotion.EmotionalState). Optimized by indexing
            code concept names by their component words.
         """
+        # Under the canonical edge log, bridge geometry is computed by
+        # the similarity provider at query time — never materialized.
+        if self._edge_log is not None:
+            return 0
         bridges_created = 0
 
         # Method 1: Manual semantic mapping
@@ -684,6 +688,10 @@ class ConsolidationMixin:
         enough to have meaningful neighbors). Skips pairs that already
         have any edge between them.
         """
+        # Under the canonical edge log, bridge geometry is computed by
+        # the similarity provider at query time — never materialized.
+        if self._edge_log is not None:
+            return 0
         if self.size < 10:
             return 0
 
@@ -770,6 +778,10 @@ class ConsolidationMixin:
         word match get connected to super hubs (top 20 by degree)
         to guarantee global connectivity.
         """
+        # Under the canonical edge log, hub-attachment geometry is
+        # computed by the similarity provider — never materialized.
+        if self._edge_log is not None:
+            return 0
         if self.size < 50:
             return 0
 
@@ -930,7 +942,13 @@ class ConsolidationMixin:
         of the network core. No caps, no limits.
 
         Connects concepts with ≤5 edges to 3 super hubs each.
+        Under the canonical edge log this is a no-op: super-hub
+        attachment edges are pipeline geometry (origin
+        ``global_connect`` → derivable), and reachability is served
+        by the similarity provider instead of materialized edges.
         """
+        if self._edge_log is not None:
+            return 0
         if self.size < 50:
             return 0
 

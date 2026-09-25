@@ -181,6 +181,7 @@ class Mind(
         # lets spreading activation and priming propagate through its
         # actual knowledge graph.
         from ..concepts import ConceptNetwork, open_archive
+        from ..concepts.edge_log import open_edge_log
 
         shared_network = ConceptNetwork()
         # Attach the long-term archive (SQLite-backed dormant concept
@@ -188,6 +189,12 @@ class Mind(
         # concepts spill to disk instead of being pruned, and can be
         # recalled transparently when referenced.
         shared_network.attach_archive(open_archive(self.data_dir))
+        # Attach the canonical edge log — the single source of truth
+        # for relationships. When the file exists, its fold is the
+        # edge set (the JSON state's edge array is only a projection);
+        # derivable edges are never materialized while it lives.
+        self._edge_log = open_edge_log(self.data_dir)
+        shared_network.attach_edge_log(self._edge_log)
 
         # Memory engine — wired with the shared network and an emotion
         # callback so emotional memory tagging and spreading activation
@@ -227,6 +234,15 @@ class Mind(
         # here after both are initialized.
         if hasattr(self.cognition, "embeddings") and self.cognition.embeddings is not None:
             self.language.set_embeddings(self.cognition.embeddings)
+            # Wire the embedding field as the network's virtual
+            # similarity layer: derivable associations are computed
+            # from the latent space at query time (get_associations),
+            # never stored as edges.
+            shared_network.attach_similarity_provider(
+                lambda cid: self.cognition.embeddings.find_similar_concepts(
+                    cid, k=12, threshold=0.55
+                )
+            )
 
         # Wire the self-composer and reflection engine into the
         # language engine so the self_reflection_clause grammar slot

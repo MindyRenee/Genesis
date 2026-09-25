@@ -559,6 +559,15 @@ class LifecycleMixin:
                 logger.debug(repr(e))
                 clean_shutdown = False
 
+        # Close the canonical edge log — already fsynced at save, this
+        # just releases the file handle.
+        edge_log = getattr(self.cognition.network, "_edge_log", None)
+        if edge_log is not None:
+            try:
+                edge_log.close()
+            except (OSError, RuntimeError) as e:
+                logger.debug(repr(e))
+
         # Deregister cognitive modules from the manifest
         for module_id in (
             MODULE_SENSORY,

@@ -291,6 +291,10 @@ class ConversationMixin:
         # (``_cat:emotion:excited``, ``python:foo.bar``) is a namespace
         # leak, not a thought — suppress it rather than speak it.
         bare = text.strip()
+        # A thought the language engine could not verbalize stays
+        # sub-verbal — recorded internally, never emitted as speech.
+        if not bare:
+            return
         if bare and " " not in bare:
             from ..concepts.classify import is_world_concept
             if not is_world_concept(bare):

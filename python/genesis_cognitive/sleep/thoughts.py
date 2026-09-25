@@ -109,5 +109,13 @@ class SpontaneousThought:
                 confidence=0.6,
                 metadata=meta,
             )
-            return language_engine.render(thought, emotion)
+            text = language_engine.render(thought, emotion)
+            # All speech comes from the engine. When it was given real
+            # semantic triples and could only echo the placeholder
+            # content back unchanged, the thought stays sub-verbal —
+            # an association the mind made but could not articulate —
+            # rather than surfacing raw concept pairs as utterances.
+            if meta.get("knowledge") and text.strip() == self.content.strip():
+                return ""
+            return text
         return self.content
