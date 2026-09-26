@@ -74,6 +74,7 @@ from .learning import (
     TDLearner,
     TDTransition,
 )
+from .learning.synapses import SynapticStore
 from .memory import (
     AttractorNetwork,
     AttractorPattern,
@@ -169,6 +170,7 @@ def save_state(
     task_competence: TaskCompetence | None = None,
     spaced_repetition: SpacedRepetitionScheduler | None = None,
     td_learner: TDLearner | None = None,
+    synapses: SynapticStore | None = None,
     emotional_memory: EmotionalMemorySystem | None = None,
     attractor: AttractorNetwork | None = None,
     error_monitor: ErrorMonitor | None = None,
@@ -236,6 +238,7 @@ def save_state(
         task_competence=task_competence,
         spaced_repetition=spaced_repetition,
         td_learner=td_learner,
+        synapses=synapses,
         emotional_memory=emotional_memory,
         attractor=attractor,
         error_monitor=error_monitor,
@@ -341,6 +344,7 @@ def _add_optional_state(
     task_competence: TaskCompetence | None = None,
     spaced_repetition: SpacedRepetitionScheduler | None = None,
     td_learner: TDLearner | None = None,
+    synapses: SynapticStore | None = None,
     emotional_memory: EmotionalMemorySystem | None = None,
     attractor: AttractorNetwork | None = None,
     error_monitor: ErrorMonitor | None = None,
@@ -375,6 +379,8 @@ def _add_optional_state(
         state["spaced_repetition"] = _serialize_spaced_repetition(spaced_repetition)
     if td_learner is not None:
         state["td_learner"] = _serialize_td_learner(td_learner)
+    if synapses is not None:
+        state["synapses"] = synapses.save_state()
     if emotional_memory is not None:
         state["emotional_memory"] = _serialize_emotional_memory(emotional_memory)
     if attractor is not None:
@@ -1137,6 +1143,11 @@ def restore_td_learner(td_learner: TDLearner, data: dict[str, Any]) -> None:
     td_learner._traces = {
         str(k): float(v) for k, v in data.get("traces", {}).items()
     }
+
+
+def restore_synapses(synapses: SynapticStore, data: dict[str, Any]) -> None:
+    """Restore learned synaptic efficacies from saved state."""
+    synapses.load_state(data)
 
 
 def restore_emotional_memory(emotional_memory: EmotionalMemorySystem, data: dict[str, Any]) -> None:
