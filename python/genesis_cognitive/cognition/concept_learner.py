@@ -26,6 +26,7 @@ from ..perception import Perception
 
 if TYPE_CHECKING:
     from ..concepts import ConceptNetwork
+    from ..learning import SynapticStore
 
 __all__ = ["ConceptLearner"]
 
@@ -41,9 +42,12 @@ class ConceptLearner:
     SIMILAR_TO edges so it learns that "content" and "calm" are related.
     """
 
-    def __init__(self, network: ConceptNetwork) -> None:
-        """Wire the learner to its concept network."""
+    def __init__(
+        self, network: ConceptNetwork, synapses: SynapticStore | None = None
+    ) -> None:
+        """Wire the learner to semantic and learned synaptic substrates."""
         self._network = network
+        self._synapses = synapses
 
     # ─── Word labeling ───────────────────────────────────────────
 
@@ -250,6 +254,20 @@ class ConceptLearner:
                 amount=0.3,
                 column_context=context_columns if context_columns else None,
             )
+
+            # Learned synapses provide a separate associative read path.
+            # Their efficacy is learned by STDP and consumed here as
+            # activation, without changing semantic graph relationships.
+            if self._synapses is not None:
+                for target, activation in self._synapses.propagate(
+                    perception.topics, amount=0.3
+                ).items():
+                    concept = self._network.get_concept(target)
+                    if concept is not None:
+                        concept.activation = min(
+                            1.0, (concept.activation or 0.0) + activation
+                        )
+                        self._network._mark_active(target)
 
         column_activations = self._network.apply_lateral_inhibition(
             context_columns=context_columns if context_columns else None,
