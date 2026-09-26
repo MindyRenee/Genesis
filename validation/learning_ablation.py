@@ -14,6 +14,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from tempfile import TemporaryDirectory
 
+import numpy as np
+
 from genesis_cognitive.concepts import ConceptNetwork, EmbeddingStore
 from genesis_cognitive.learning import STDP, TDLearner
 
@@ -56,11 +58,11 @@ def run_td_probe(*, enabled: bool) -> ProbeResult:
 
 
 def run_stdp_probe(*, enabled: bool) -> ProbeResult:
-    """Measure whether STDP produces a timing-dependent update.
+    """Measure whether STDP produces a timing-dependent vector update.
 
     A temporary embedding store keeps the probe isolated from Genesis's
-    persistent data. The measurement is the cosine similarity between the
-    two concept vectors before and after a pre-before-post sequence.
+    persistent data. The measurement is the Euclidean change in the
+    affected concept vectors before and after a pre-before-post sequence.
     """
     network = _network()
 
@@ -70,7 +72,10 @@ def run_stdp_probe(*, enabled: bool) -> ProbeResult:
 
         before_a = embeddings.get_concept_vector("alpha")
         before_b = embeddings.get_concept_vector("beta")
-        before = _cosine(before_a, before_b)
+        if before_a is None or before_b is None:
+            raise RuntimeError("STDP probe requires concept embeddings")
+        before_a = before_a.copy()
+        before_b = before_b.copy()
 
         if enabled:
             for _ in range(20):
@@ -80,7 +85,19 @@ def run_stdp_probe(*, enabled: bool) -> ProbeResult:
 
         after_a = embeddings.get_concept_vector("alpha")
         after_b = embeddings.get_concept_vector("beta")
-        after = _cosine(after_a, after_b)
+        if after_a is None or after_b is None:
+            raise RuntimeError("STDP probe lost concept embeddings")
+
+        before = 0.0
+        after = 0.0
+        if enabled:
+            after = float(
+                (
+                    np.linalg.norm(after_a - before_a)
+                    + np.linalg.norm(after_b - before_b)
+                )
+                / 2.0
+            )
 
     return ProbeResult(
         enabled=enabled,
@@ -88,16 +105,3 @@ def run_stdp_probe(*, enabled: bool) -> ProbeResult:
         after=after,
         delta=after - before,
     )
-
-
-def _cosine(a: object, b: object) -> float:
-    """Return cosine similarity without introducing another dependency."""
-    import numpy as np
-
-    va = np.asarray(a, dtype=float)
-    vb = np.asarray(b, dtype=float)
-    na = float(np.linalg.norm(va))
-    nb = float(np.linalg.norm(vb))
-    if na < 1e-12 or nb < 1e-12:
-        return 0.0
-    return float(np.dot(va, vb) / (na * nb))
