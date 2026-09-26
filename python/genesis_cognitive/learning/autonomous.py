@@ -60,6 +60,7 @@ from ..tools.source_registry import SourceRegistry, SourceResult
 from .curiosity import CuriosityEngine
 from .dual import DualSystemLearner
 from .stdp import STDP
+from .synapses import SynapticStore
 from .td import TDLearner
 
 __all__ = [
@@ -696,6 +697,7 @@ class AutonomousLearner:
         get_plasticity_profile=None,
         get_brain_waves=None,
         force_offline: bool = False,
+        synapses: SynapticStore | None = None,
     ) -> None:
         """Initialize the autonomous learner."""
         self.network = network
@@ -711,6 +713,7 @@ class AutonomousLearner:
         self._init_stats()
         self._init_sources()
         self._init_queues()
+        self._synapses = synapses or SynapticStore()
         self._init_learning_systems()
         self._init_posture()
 
@@ -943,12 +946,10 @@ class AutonomousLearner:
         self._embeddings = None
 
         # ─── Advanced learning systems ──────────────────────────────
-        # STDP — Spike-Timing-Dependent Plasticity. Strengthens
-        # connections between concepts activated in sequence (temporal
-        # causality), which is more biologically grounded than simple
-        # co-occurrence counting. Requires embeddings; the instance is
-        # created when embeddings are set via the `embeddings` property.
-        self._stdp: STDP | None = None
+        # STDP — Spike-Timing-Dependent Plasticity over the shared
+        # synaptic efficacy substrate. Embeddings remain a separate
+        # representational system and are never modified by STDP.
+        self._stdp: STDP = STDP(self._synapses, self.network)
 
         # Dual-system learning — hippocampal fast store + neocortical
         # slow store. New knowledge goes into the fast (hippocampal)
@@ -1073,11 +1074,6 @@ class AutonomousLearner:
         # Keep the dual-system's embeddings reference in sync so it
         # can use semantic features for pattern separation and retrieval.
         self.dual_system.embeddings = store
-        # Create the STDP engine now that embeddings are available.
-        # STDP operates on embedding vectors, so it can only be
-        # instantiated once the embedding store exists.
-        if store is not None:
-            self._stdp = STDP(store, self.network)
 
     def _emit(self, kind: str, content: str) -> None:
         """Send a live thought to the listener (if connected)."""
@@ -3923,7 +3919,7 @@ class AutonomousLearner:
             stdp.record_spike(obj, t)
             t += 2.5
 
-        # Apply the pending STDP updates to the embedding vectors
+        # Apply the pending timing-dependent synaptic updates.
         stdp.apply_updates()
 
     def _update_td(
@@ -4032,12 +4028,7 @@ class AutonomousLearner:
         except Exception as e:  # noqa: BLE001
             logger.debug(repr(e))
 
-        # 3. STDP: renormalize embeddings after updates
-        if self._stdp is not None and self._embeddings is not None:
-            try:
-                self._stdp.renormalize()
-            except Exception as e:  # noqa: BLE001
-                logger.debug(repr(e))
+        # 3. STDP efficacy is already bounded; no embedding normalization is needed.
 
     def _review_due_concepts(self, limit: int = 5) -> int:
         """Review concepts due for spaced repetition.
