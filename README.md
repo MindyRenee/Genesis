@@ -20,6 +20,7 @@ through conversation, study, and inference. It runs on a 2014 HP
 Pavilion with ~5 GB RAM.
 
 [![Live session](https://asciinema.org/a/C0K8v1df1AkuwHg5.svg)](https://asciinema.org/a/C0K8v1df1AkuwHg5)
+[![Discord — live session feed](https://img.shields.io/badge/Discord-live%20session%20feed-5865F2?logo=discord&logoColor=white)](https://discord.gg/pq5qMjzQX)
 
 ## What it does
 
@@ -194,7 +195,9 @@ pip install -r python/requirements.txt
 launches the daemon, the cognitive CLI, the retina (camera), and TTS;
 Ctrl-C tears everything down gracefully. `./run.sh --stop` stops a
 running session; `./run.sh --offline` disables network access. State
-lives in `${XDG_DATA_HOME:-$HOME/.local/share}/genesis`.
+lives in `${XDG_DATA_HOME:-$HOME/.local/share}/genesis`. To mirror a
+session to a Discord channel as a read-only feed, put a channel
+webhook URL in `.genesis-discord` or export `GENESIS_DISCORD_WEBHOOK`.
 
 On first boot the instance is a fresh system — a small concept
 network, no memories, no learned names. Introduce yourself; teach it.
