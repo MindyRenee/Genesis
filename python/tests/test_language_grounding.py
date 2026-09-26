@@ -78,3 +78,52 @@ def test_comprehension_output_can_be_grounded_without_reparsing() -> None:
     assert grounded
     assert grounded[0].subject.concept_id == "dog"
     assert grounded[0].object.concept_id == "water"
+
+
+def test_grounder_uses_utterance_context_for_polysemy() -> None:
+    network = ConceptNetwork()
+    network.add_concept(
+        "bank",
+        confidence=0.9,
+        properties={"definition": "a financial institution"},
+    )
+    network.add_concept(
+        "bank",
+        confidence=0.8,
+        properties={"definition": "the edge of a river"},
+    )
+    grounder = SemanticGrounder(network)
+
+    grounded = grounder.ground(
+        Proposition(subject="bank", predicate="is"),
+        context="The bank approved my loan at the financial institution.",
+    )
+
+    assert grounded.subject.concept_id == "bank"
+
+
+def test_grounder_context_changes_selected_sense() -> None:
+    network = ConceptNetwork()
+    network.add_concept(
+        "bank",
+        confidence=0.9,
+        properties={"definition": "a financial institution"},
+    )
+    network.add_concept(
+        "bank",
+        confidence=0.8,
+        properties={"definition": "the edge of a river"},
+    )
+    grounder = SemanticGrounder(network)
+
+    financial = grounder.ground(
+        Proposition(subject="bank", predicate="exists"),
+        context="The bank approved the loan.",
+    )
+    river = grounder.ground(
+        Proposition(subject="bank", predicate="exists"),
+        context="The bank was beside the river.",
+    )
+
+    assert financial.subject.concept_id == "bank"
+    assert river.subject.concept_id == "bank#2"
