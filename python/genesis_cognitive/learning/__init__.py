@@ -1,20 +1,8 @@
 """Learning bundle — all learning systems with a single public API.
 
-This package bundles Genesis's learning subsystems into a coherent
-unit. Consumers import from here rather than individual modules.
-
-Subsystems:
-    AutonomousLearner — self-directed web learning
-    CuriosityEngine, CuriosityType, Question — curiosity-driven learning
-    DualSystemLearner, HippocampalEpisode, NeocorticalMemory —
-        dual-system memory consolidation
-    STDP, SpikeEvent — spike-timing-dependent plasticity
-    TDLearner, TDTransition — temporal-difference learning
-    ActiveInferenceReader, SelfModelReading, DyadicState, etc. —
-        active inference self-model
-    PredictiveCodingLayer, Prediction, PredictionError, PredictionContext —
-        predictive coding
-    HebbianPlasticity — Hebbian learning
+The learning systems are kept distinct by what they modify: TD learns
+value, Hebbian learning adapts representations/associations, and STDP
+changes the independent synaptic-efficacy substrate.
 """
 
 from __future__ import annotations
@@ -45,6 +33,7 @@ from .predictive import (
     PredictiveCodingLayer,
 )
 from .stdp import STDP, SpikeEvent
+from .synapses import SynapticStore
 from .td import TDLearner, TDTransition
 
 __all__ = [
@@ -70,6 +59,7 @@ __all__ = [
     "SelfModelState",
     "SiteRequest",
     "SpikeEvent",
+    "SynapticStore",
     "TDLearner",
     "TDTransition",
     "TransferResult",
