@@ -22,17 +22,21 @@ jobs:
 
   python:
     runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        # Oldest supported + current stable.
+        python-version: ["3.12", "3.14"]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
       - name: System deps (pycairo)
         run: sudo apt-get update && sudo apt-get install -y libcairo2-dev pkg-config
       - uses: actions/cache@v6
         with:
           path: ~/.cache/pip
-          key: pip-${{ hashFiles('python/requirements*.txt') }}
+          key: pip-${{ matrix.python-version }}-${{ hashFiles('python/requirements*.txt') }}
       - run: pip install -r python/requirements-dev.txt
       - run: python3 -c "import nltk; nltk.download('wordnet', quiet=True); nltk.download('punkt_tab', quiet=True)"
       - run: ruff check

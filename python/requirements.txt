@@ -2,15 +2,15 @@
 # Pinned for reproducibility. Update with intent.
 
 # Core
-numpy==2.5.2
+numpy==2.5.3
 nltk==3.10.3
 orjson==3.12.0
-psutil==5.9.8
+psutil==7.2.2
 
 # Image processing (visual cortex + canvas)
-Pillow==10.2.0
+Pillow==12.3.0
 opencv-python-headless==5.0.0.93
-pycairo==1.25.1
+pycairo==1.29.1
 
 # Optional: voice / ambient listening (Vosk offline STT + microphone)
 # Install separately if you want voice:
