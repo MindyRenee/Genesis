@@ -12,7 +12,6 @@ mechanism is supposed to cause?
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from genesis_cognitive.concepts import ConceptNetwork, EmbeddingStore
@@ -66,7 +65,7 @@ def run_stdp_probe(*, enabled: bool) -> ProbeResult:
     network = _network()
 
     with TemporaryDirectory(prefix="genesis-validation-") as tmp:
-        embeddings = EmbeddingStore(network, data_dir=Path(tmp))
+        embeddings = EmbeddingStore(network, data_dir=tmp)
         stdp = STDP(embeddings, network)
 
         before_a = embeddings.get_concept_vector("alpha")
