@@ -57,7 +57,8 @@ not — those must be generated, not recited.
   `sudo apt install libclang-dev linux-libc-dev`).
 - Test: `cargo test`
 - Run examples: `cargo run --example <name>`
-- Python 3.12, dependencies pinned in `python/requirements.txt`
+- Python 3.12+ (CI tests 3.12 and 3.14), dependencies pinned in
+  `python/requirements.txt`
   (runtime) and `python/requirements-dev.txt` (lint + test). Install
   with: `pip install -r python/requirements-dev.txt`
 - Lint: `ruff check` and `pyflakes` (both must pass)
