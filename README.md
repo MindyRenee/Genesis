@@ -19,7 +19,7 @@ Language is composed from a semantic graph the system builds itself —
 through conversation, study, and inference. It runs on a 2014 HP
 Pavilion with ~5 GB RAM.
 
-[![First boot](https://asciinema.org/a/TABFwLwo9fCWOW5J.svg)](https://asciinema.org/a/TABFwLwo9fCWOW5J)
+[![Live session](https://asciinema.org/a/C0K8v1df1AkuwHg5.svg)](https://asciinema.org/a/C0K8v1df1AkuwHg5)
 
 ## What it does
 
