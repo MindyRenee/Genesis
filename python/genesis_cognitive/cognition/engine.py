@@ -3478,7 +3478,8 @@ class CognitionEngine:
         # reasoning. Grounding is read-only; unknown words remain visible
         # to the learning system instead of becoming fabricated concepts.
         comprehension_result.grounded = self.semantic_grounder.ground_all(
-            comprehension_result.propositions
+            comprehension_result.propositions,
+            context=user_input,
         )
 
         # If a metaphor was detected, interpret it so Genesis
