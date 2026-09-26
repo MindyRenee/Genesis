@@ -60,6 +60,10 @@ Commands (typed during conversation):
     /quit        — exit
 
 Spontaneous thoughts appear live as genesis~ lines while you are idle.
+
+Set GENESIS_DISCORD_WEBHOOK to a Discord channel webhook URL to
+mirror the whole session there as a read-only feed (a webhook can
+only post — it cannot read the channel).
 """
 
 from __future__ import annotations
@@ -85,6 +89,7 @@ from collections.abc import Callable
 from pathlib import Path
 from types import FrameType
 
+from discord_feed import DiscordFeed, FeedLogHandler, StderrTee
 from genesis_client.ltm_index import scan_ltm_index
 from genesis_client.protocol import PHASE_ACTIVE, PHASE_ALERT, PHASE_NREM, PHASE_REM
 from genesis_cognitive.ambient import AmbientListener, contains_wake_word, strip_wake_word
@@ -128,6 +133,9 @@ DEFAULT_DAEMON_SOCKET = "genesis.sock"
 
 # File descriptor for the per-data-dir CLI singleton lock.
 _CLI_LOCK_FD: int | None = None
+
+# Optional Discord mirror of the session (GENESIS_DISCORD_WEBHOOK).
+_DISCORD_FEED: DiscordFeed | None = None
 
 # PID file paths — written so run.sh --stop and the EXIT trap can
 # kill exact processes instead of using broad pkill patterns that
@@ -2978,6 +2986,10 @@ def _run_interactive_loop(
                 break
             if not user_input:
                 continue
+            # Typed input never reaches the log — echo it to the feed
+            # explicitly so the Discord mirror shows both sides.
+            if _DISCORD_FEED is not None:
+                _DISCORD_FEED.post_user(user_input)
 
             # Always drain any thoughts that arrived while the user was typing
             _print_idle_thoughts(
@@ -3249,6 +3261,19 @@ def main() -> int:
     # failure cannot orphan the daemon/retina.
     shutting_down = threading.Event()
     _setup_signal_handlers(shutting_down)
+
+    # Optional Discord mirror — every logged line, stderr notice, and
+    # typed input is posted to the webhook from a background thread.
+    global _DISCORD_FEED
+    _DISCORD_FEED = DiscordFeed.from_env()
+    feed_handler: FeedLogHandler | None = None
+    real_stderr = None
+    if _DISCORD_FEED is not None:
+        feed_handler = FeedLogHandler(_DISCORD_FEED)
+        logging.getLogger().addHandler(feed_handler)
+        real_stderr = sys.stderr
+        sys.stderr = StderrTee(real_stderr, _DISCORD_FEED)  # type: ignore[assignment]
+
     daemon_proc: subprocess.Popen | None = None
     retina_proc: subprocess.Popen | None = None
     mind: Mind | None = None
@@ -3318,6 +3343,12 @@ def main() -> int:
             data_dir, auditory_cortex,
         ):
             exit_code = 1
+        if feed_handler is not None:
+            logging.getLogger().removeHandler(feed_handler)
+        if real_stderr is not None:
+            sys.stderr = real_stderr
+        if _DISCORD_FEED is not None:
+            _DISCORD_FEED.close()
     return exit_code
 
 
