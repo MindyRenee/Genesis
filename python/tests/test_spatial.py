@@ -294,11 +294,10 @@ class TestSpatialAgent:
     def test_death_attribution_prefers_safe_actions(self):
         """An action present only in dying episodes is avoided.
 
-        Fatal choices are often delayed — a doomed pick can precede
-        the death by many steps — so blame accrues per-episode
-        presence, not last-action. After enough deaths the lethal
-        action drops out of the choice pool while the innocent one
-        remains choosable.
+        Fatal choices are often delayed — a doomed pick can precede the death
+        by many steps — so blame accrues per-episode presence, not last-action.
+        After enough deaths the lethal action drops out of the choice pool while
+        the innocent one remains choosable.
         """
         from genesis_cognitive.spatial import SpatialAgent
 
@@ -576,3 +575,20 @@ class TestSchemaInduction:
         if sol2.solved:
             assert sol2.hypothesis is not None
             assert sol2.hypothesis.describe() != first
+
+    def test_prediction_key_prunes_repeated_behavior(self):
+        # The behavioral exclusion must block an answer even when its
+        # rule description is not excluded. A different exact rule may
+        # still be selected if it produces a different prediction.
+        inp = _grid([[1, 0], [0, 0]])
+        out = _grid([[0, 1], [0, 0]])
+        test = _grid([[0, 0], [0, 1]])
+        reasoner = SpatialReasoner()
+        first = reasoner.solve([(inp, out)], [test])
+        assert first.solved and first.predictions
+        blocked = reasoner.prediction_key(first.predictions)
+        second = reasoner.solve(
+            [(inp, out)], [test], exclude_predictions={blocked}
+        )
+        if second.solved:
+            assert reasoner.prediction_key(second.predictions) != blocked
