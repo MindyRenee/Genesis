@@ -4,14 +4,6 @@ This module deliberately sits between linguistic parsing and cognition.
 It does not create concepts or mutate the network: comprehension names
 are resolved against the existing semantic substrate, while unresolved
 words remain unresolved for the learning system to handle.
-
-The boundary is:
-
-    Proposition (language) -> GroundedProposition (cognition-ready)
-
-A predicate remains lexical here. Mapping verbs to RelationType is a
-separate decision because many verbs are context-sensitive and should
-not be collapsed into a graph relation prematurely.
 """
 
 from __future__ import annotations
@@ -59,12 +51,9 @@ class GroundedProposition:
 
 
 class SemanticGrounder:
-    """Resolve comprehension arguments against an existing ConceptNetwork.
+    """Resolve comprehension arguments against an existing ConceptNetwork."""
 
-    Grounding is read-only. Unknown language does not become a fabricated
-    concept merely because it was spoken. Learning remains responsible
-    for deciding when and how an unknown concept should be added.
-    """
+    _LEADING_DETERMINERS = frozenset({"the", "a", "an"})
 
     def __init__(self, network: ConceptNetwork) -> None:
         self.network = network
@@ -77,25 +66,34 @@ class SemanticGrounder:
         if not text:
             return GroundedArgument("", None, 0.0)
 
-        if context:
-            concept_id = self.network.resolve_in_context(text, context)
-            concept = (
-                self.network.get_concept(concept_id)
-                if concept_id is not None
-                else None
-            )
-        else:
-            concept = self.network.get_concept(text)
-        if concept is None:
-            return GroundedArgument(text, None, 0.0)
+        candidates = [text]
+        parts = text.split(maxsplit=1)
+        if len(parts) == 2 and parts[0].lower() in self._LEADING_DETERMINERS:
+            candidates.append(parts[1])
 
-        concept_id = getattr(concept, "id", None)
-        if not isinstance(concept_id, str) or not concept_id:
-            return GroundedArgument(text, None, 0.0)
+        for candidate in candidates:
+            if context:
+                concept_id = self.network.resolve_in_context(candidate, context)
+                concept = (
+                    self.network.get_concept(concept_id)
+                    if concept_id is not None
+                    else None
+                )
+            else:
+                concept = self.network.get_concept(candidate)
 
-        confidence = float(getattr(concept, "confidence", 0.0))
-        confidence = max(0.0, min(1.0, confidence))
-        return GroundedArgument(text, concept_id, confidence)
+            if concept is None:
+                continue
+
+            concept_id = getattr(concept, "id", None)
+            if not isinstance(concept_id, str) or not concept_id:
+                continue
+
+            confidence = float(getattr(concept, "confidence", 0.0))
+            confidence = max(0.0, min(1.0, confidence))
+            return GroundedArgument(text, concept_id, confidence)
+
+        return GroundedArgument(text, None, 0.0)
 
     def ground(
         self, proposition: Proposition, *, context: str = ""
