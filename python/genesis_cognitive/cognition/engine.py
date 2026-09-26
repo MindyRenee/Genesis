@@ -80,6 +80,7 @@ from ..emotion import EmotionalState, assess_emotion
 from ..executive import ExecutiveFunction, TaskState
 from ..global_workspace import GlobalWorkspace, WorkspaceItem
 from ..language import ComprehensionEngine, LanguageEngine, SelfMonitor, Thought
+from ..language.grounding import SemanticGrounder
 from ..learning import (
     STDP,
     CuriosityEngine,
@@ -436,6 +437,7 @@ class CognitionEngine:
         """Initialize intelligence modules."""
         # Intelligence modules
         self.network = network or ConceptNetwork()
+        self.semantic_grounder = SemanticGrounder(self.network)
         self.reasoning = reasoning or ReasoningEngine(self.network)
         self.reflection = reflection or ReflectionEngine(self.network)
         self.curiosity = curiosity or CuriosityEngine(self.network, self.reasoning)
@@ -3470,6 +3472,13 @@ class CognitionEngine:
         comprehension_result = self.comprehension.comprehend(
             user_input,
             context={"recent_entities": self.comprehension.recent_entities},
+        )
+
+        # Bind language arguments to the same persistent concepts used by
+        # reasoning. Grounding is read-only; unknown words remain visible
+        # to the learning system instead of becoming fabricated concepts.
+        comprehension_result.grounded = self.semantic_grounder.ground_all(
+            comprehension_result.propositions
         )
 
         # If a metaphor was detected, interpret it so Genesis
