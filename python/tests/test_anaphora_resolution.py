@@ -248,3 +248,42 @@ def test_they_accepts_inanimate_fallback() -> None:
     """'they' prefers animate but accepts plural-inanimate referents."""
     styler = _make_styler(foci=["wheel"], network=_network_with_animacy())
     assert styler.resolve_anaphora("they fell off") == "wheel fell off"
+
+
+# ─── resolve_referents: pronouns inside routed target phrases ──
+#
+# The metacognitive router captures its target phrase from the user's
+# literal words — "what does it eat?" routes to consumes(it). The
+# resolved utterance exists upstream but the captured phrase never
+# saw it, so the phrase itself needs focus substitution.
+
+
+def test_resolve_referents_bare_pronoun() -> None:
+    styler = _make_styler("ferret")
+    assert styler.resolve_referents("it") == "ferret"
+    assert styler.resolve_referents("they") == "ferret"
+
+
+def test_resolve_referents_embedded_phrase() -> None:
+    """Multi-word targets keep the rest of the phrase intact."""
+    styler = _make_styler("ferret")
+    assert styler.resolve_referents("it|||wheel") == "ferret|||wheel"
+    assert styler.resolve_referents("about it") == "about ferret"
+
+
+def test_resolve_referents_leaves_grammatical_pronouns() -> None:
+    """Determiners and expletives are not referents."""
+    styler = _make_styler("ferret")
+    assert styler.resolve_referents("that dog") == "that dog"
+    assert styler.resolve_referents("it is raining") == "it is raining"
+
+
+def test_resolve_referents_no_focus_unchanged() -> None:
+    styler = _make_styler(None)
+    assert styler.resolve_referents("it") == "it"
+
+
+def test_resolve_referents_she_requires_animate() -> None:
+    """Gendered pronouns stay unresolved without an animate referent."""
+    styler = _make_styler(foci=["wheel"], network=_network_with_animacy())
+    assert styler.resolve_referents("she") == "she"

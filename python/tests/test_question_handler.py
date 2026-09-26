@@ -14,6 +14,7 @@ from genesis_cognitive.cognition.question_handler import (
 )
 from genesis_cognitive.concepts import ConceptNetwork, RelationType
 from genesis_cognitive.emotion import EmotionalState
+from genesis_cognitive.language import Thought
 from genesis_cognitive.memory.engine import MemoryContext
 from genesis_cognitive.perception import Intent, Perception, QuestionType
 from genesis_cognitive.self import SelfComposer, SelfModel
@@ -145,6 +146,112 @@ def test_what_does_subject_eat():
     assert meta["direction"] == "outgoing"
     assert meta["relation"] == "depends_on"
     assert meta["objects"] == ["food"]
+
+
+# ─── Anaphora-resolved text reaches the relation walk ───────────
+
+
+def test_relation_query_parses_resolved_text():
+    """'What does it eat?' — 'it' was bound to the focus upstream.
+
+    Perception stores the user's literal words, so the referent
+    exists only in the resolved utterance; the relation query must
+    parse that form, not the pronoun.
+    """
+    handler = _handler(_network())
+    thought = handler.question_relation_query(
+        _perception("What does it eat?", QuestionType.WHAT),
+        _emotion(),
+        resolved_text="What does a glip eat?",
+    )
+    assert thought is not None
+    meta = thought.metadata.get("relation_answer")
+    assert meta is not None
+    assert meta["objects"] == ["food"]
+
+
+def test_relation_query_unresolved_pronoun_finds_nothing():
+    """Without resolved_text, 'it' is not a concept — no relation answer."""
+    handler = _handler(_network())
+    thought = handler.question_relation_query(
+        _perception("What does it eat?", QuestionType.WHAT),
+        _emotion(),
+    )
+    assert thought is None
+
+
+def test_handle_question_threads_resolved_text():
+    """handle_question passes resolved_text through to the relation walk."""
+    handler = _handler(_network())
+    thought = handler.handle_question(
+        _perception("What does it eat?", QuestionType.WHAT),
+        _emotion(),
+        MemoryContext(),
+        resolved_text="What does a glip eat?",
+    )
+    meta = thought.metadata.get("relation_answer")
+    assert meta is not None
+    assert meta["objects"] == ["food"]
+
+
+# ─── Memory enrichment ─────────────────────────────────────────
+
+
+def _memory_context(ep_text: str):
+    """A MemoryContext with one highly-relevant episode + retriever."""
+    from types import SimpleNamespace
+
+    from genesis_client.types import SimilarEpisode
+
+    ctx = MemoryContext()
+    ctx.retrieved.append(
+        SimilarEpisode(
+            episode_id=7, hamming_distance=5, timestamp=1, salience=0.9
+        )
+    )
+    episode = SimpleNamespace(text=ep_text)
+    return ctx, lambda _eid: episode
+
+
+def _bare_thought() -> Thought:
+    return Thought(
+        content="mammal", intent="inform", emotion="calm",
+        confidence=0.9, topics=["mammal"],
+    )
+
+
+def test_enrich_with_memory_rejects_questions():
+    """A recalled question is not knowledge to weave into an answer.
+
+    Live regression: her own "I'm not sure about quoll tell me more?"
+    reply was stored, recalled, and spoken back as "I recall ...".
+    """
+    handler = _handler(_network())
+    memory, retrieve = _memory_context(
+        "User: what is a quoll? | Genesis: I'm not sure about quoll tell me more?"
+    )
+    thought = handler._enrich_with_memory(
+        _bare_thought(),
+        _perception("tell me about mammals", QuestionType.NONE),
+        memory,
+        retrieve,
+    )
+    assert "memory" not in thought.metadata
+
+
+def test_enrich_with_memory_prefers_user_fact():
+    """Enrichment recalls what the user taught, not Genesis's reply."""
+    handler = _handler(_network())
+    memory, retrieve = _memory_context(
+        "User: a quoll eats insects | Genesis: Quoll requires insect."
+    )
+    thought = handler._enrich_with_memory(
+        _bare_thought(),
+        _perception("tell me about quolls", QuestionType.NONE),
+        memory,
+        retrieve,
+    )
+    assert thought.metadata["memory"] == "a quoll eats insects"
 
 
 def test_produced_passive_is_incoming():

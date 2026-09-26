@@ -317,7 +317,7 @@ class SourceCache:
 # disk cache instead. Cached Wikipedia articles remain readable
 # offline; this only stops new network fetches. Flip back to True to
 # re-enable — nothing is removed.
-WIKIPEDIA_ENABLED = False
+WIKIPEDIA_ENABLED = True
 
 _WIKIPEDIA_API = "https://en.wikipedia.org/w/api.php"
 _WIKIPEDIA_REST = "https://en.wikipedia.org/api/rest_v1/page/summary/"
@@ -1304,7 +1304,11 @@ def _duckduckgo_search(topic: str, limit: int = 5) -> list[str]:
                 # Skip non-content URLs
                 if not any(
                     skip in url.lower()
-                    for skip in (".pdf", ".jpg", ".png", ".gif", ".css", ".js", "duckduckgo")
+                    for skip in (
+                        ".pdf", ".jpg", ".png", ".gif", ".css", ".js",
+                        ".dtd", ".xml", ".rss", ".json", ".ico", ".svg",
+                        ".woff", ".woff2", "duckduckgo",
+                    )
                 ):
                     seen.add(url)
                     trusted.append(url)

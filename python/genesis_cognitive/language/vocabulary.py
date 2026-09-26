@@ -40,6 +40,31 @@ __all__ = ["Vocabulary"]
 logger = logging.getLogger(__name__)
 
 
+# Function words and text fragments. A multiword concept name built
+# ENTIRELY from these is scrape noise, not a concept — "those words",
+# "words often", "the thing it". Single words are exempt (concepts
+# like "will" or "change" are legitimate).
+_FRAGMENT_NAME_WORDS = frozenset({
+    "the", "a", "an", "this", "that", "these", "those",
+    "word", "words", "thing", "things", "something", "anything",
+    "everything", "nothing", "one", "ones", "some", "any", "all",
+    "both", "each", "other", "another", "such", "same",
+    "said", "says", "say", "often", "also", "just", "even",
+    "only", "very", "much", "many", "more", "most", "less",
+    "few", "several", "it", "its", "they", "them", "their",
+    "there", "here", "then", "than", "so", "too", "not", "no",
+    "yes", "of", "in", "on", "at", "to", "for", "with", "about",
+    "from", "by", "as", "and", "or", "but", "if", "because",
+    "is", "are", "was", "were", "be", "been", "being",
+    "do", "does", "did", "have", "has", "had",
+    "can", "could", "will", "would", "shall", "should",
+    "may", "might", "must",
+    "i", "me", "my", "we", "us", "our", "you", "your",
+    "he", "him", "his", "she", "her", "who", "what", "which",
+    "when", "where", "why", "how",
+})
+
+
 class Vocabulary:
     """Context-sensitive word selection for Genesis.
 
@@ -3118,7 +3143,26 @@ class Vocabulary:
         state" repeats the same content. This filters clauses whose
         significant words overlap with the definition text.
         """
-        def_words = set(definition.lower().split())
+        # Normalize hyphenated compounds to separate tokens on both
+        # sides — "warm-blooded animal" and "warm blooded animal" are
+        # the same content, and the definition commonly hyphenates
+        # where the edge target does not. Articles are excluded from
+        # the target set: "the brain" vs "brain" is the same fact.
+        _ARTICLES = {"a", "an", "the"}
+
+        def _tokens(text: str) -> set[str]:
+            """Normalize to content tokens: hyphens split, articles
+            dropped, simple plurals stemmed so "living things" and
+            "living thing" compare equal."""
+            words = set(re.split(r"[\s\-]+", text.lower())) - _ARTICLES
+            words |= {
+                w[:-1]
+                for w in words
+                if len(w) > 2 and w.endswith("s") and not w.endswith("ss")
+            }
+            return words
+
+        def_words = _tokens(definition)
         if not def_words:
             return clauses
         filtered: list[str] = []
@@ -3126,7 +3170,11 @@ class Vocabulary:
             # Extract the target (last word(s) of the clause, after the verb)
             clause_words = clause.lower().split()
             # The target is typically the last 1-3 words
-            target_words = set(clause_words[-3:]) if len(clause_words) >= 3 else set(clause_words)
+            target_words = _tokens(
+                " ".join(clause_words[-3:])
+                if len(clause_words) >= 3
+                else clause
+            )
             # If most target words appear in the definition, it's tautological
             if target_words and def_words:
                 overlap = len(target_words & def_words) / len(target_words)
@@ -3591,6 +3639,13 @@ class Vocabulary:
         # Reject possessive fragments ("unesco's memory", "phone's memory")
         if any("'" in w for w in words):
             return False
+        # Reject multiword names built entirely from function words —
+        # "those words", "words often", "the thing it" are scrape
+        # fragments, not concepts.
+        if len(words) >= 2 and all(
+            w.lower() in _FRAGMENT_NAME_WORDS for w in words
+        ):
+            return False
         # Reject names that look like sentence fragments starting
         # with lowercase words (real concepts are usually nouns)
         if len(words) >= 3 and all(w[0].islower() for w in words):
@@ -3683,12 +3738,20 @@ class Vocabulary:
         # Common count nouns that happen to end in a mass-noun suffix
         if n in cls._COUNT_NOUN_EXCEPTIONS:
             return False
-        # Suffix heuristics for mass nouns
-        if n.endswith("ness"):  # cognition, awareness, happiness
+        # The head noun (last word) decides the phrase's class —
+        # "deep sleep" is mass because "sleep" is; "living thing" is
+        # count because "thing" is. Suffix heuristics and the mass-noun
+        # list apply to the head, not the phrase's last characters.
+        head = n.split()[-1] if n.split() else n
+        if head in cls._COUNT_NOUN_EXCEPTIONS:
+            return False
+        if head in cls._MASS_NOUNS:
             return True
-        if n.endswith("ing"):  # learning, thinking, processing
+        if head.endswith("ness"):  # cognition, awareness, happiness
             return True
-        if n.endswith("ity"):  # complexity, simplicity, unity
+        if head.endswith("ing"):  # learning, thinking, processing
+            return True
+        if head.endswith("ity"):  # complexity, simplicity, unity
             return True
         return False
 

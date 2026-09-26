@@ -361,6 +361,42 @@ class ResponseStyler:
 
         return resolved[: target.start()] + referent + resolved[target.end() :]
 
+    def resolve_referents(self, text: str) -> str:
+        """Resolve discourse-referring pronouns inside a captured phrase.
+
+        Unlike :meth:`resolve_anaphora`, which rewrites a whole
+        utterance (including "you" → the addressee), this substitutes
+        only third-person/demonstrative referents — "it", "this",
+        "that", "they", "them", "he", "she" — inside a short phrase
+        such as a routed question target ("it" → "ferret"). The
+        metacognitive router captures targets from the user's literal
+        words, so the referent that exists only in the resolved input
+        would otherwise never reach the composers.
+
+        Returns the text unchanged when a pronoun has no referent or
+        sits in a non-anaphoric position (determiner "that dog",
+        expletive "it is raining").
+        """
+        if not text:
+            return text
+        out: list[str] = []
+        last = 0
+        changed = False
+        for m in _ANA_PRONOUN_RE.finditer(text):
+            if not self._is_anaphoric(text, m):
+                continue
+            referent = self._pick_referent(m.group(0).lower())
+            if not referent:
+                continue
+            out.append(text[last : m.start()])
+            out.append(referent)
+            last = m.end()
+            changed = True
+        if not changed:
+            return text
+        out.append(text[last:])
+        return "".join(out)
+
     # Discourse participants that anaphoric it/that/this almost never
     # refer to — those roles already have dedicated pronouns (I/you).
     _ANA_NON_REFERENTS: frozenset[str] = frozenset({"genesis", "user", "self"})
