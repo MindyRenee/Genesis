@@ -133,6 +133,15 @@ class ConversationMixin:
         """Whether its sleep was user-initiated (not auto-wakeable)."""
         return self._is_sleeping and self._user_initiated_sleep
     @property
+    def awaiting_question_answer(self) -> bool:
+        """True while a popped question is still awaiting its answer.
+
+        The pending marker is cleared when the user's next input is
+        consumed as the answer — until then the exchange counts as an
+        open turn and volition stays held.
+        """
+        return bool(self.cognition._pending_question_concepts)
+    @property
     def is_teaching(self) -> bool:
         """Whether it is currently in teaching/training mode."""
         return self._is_teaching
@@ -840,10 +849,24 @@ class ConversationMixin:
         except Exception as e:  # noqa: BLE001
             logger.debug(f"post-conversation self-invoke check failed: {e}")
     def _resume_inner_life(self) -> None:
-        """Resume inner life after the conversation focus period ends."""
-        if self._is_meditating or self._is_sleeping:
+        """Resume inner life and volition once the user has gone quiet.
+
+        Deferred after the conversation focus window; if the user is
+        still actively talking when it fires (rapid exchange, a
+        pending question awaiting an answer), it re-checks after the
+        remaining window rather than interrupting the exchange.
+        """
+        if self._is_meditating or self._is_sleeping or self._is_teaching:
             return
-        self.inner_life.resume()
+        idle = time.time() - self._last_interaction_time
+        if idle >= self.CONVERSATION_FOCUS_SECONDS:
+            self._suppress_volition = False
+            self.inner_life.resume()
+        else:
+            self._defer(
+                self.CONVERSATION_FOCUS_SECONDS - idle,
+                self._resume_inner_life,
+            )
     def _resume_background(self) -> None:
         """Resume background processes after conversation.
 
@@ -865,20 +888,11 @@ class ConversationMixin:
             return
         self.learner.resume()
         self.cognition.self_learner.resume()
-        self._suppress_volition = False
-        # Only resume inner life if the user has gone quiet — if
-        # they're still actively talking to its (teaching, rapid
-        # conversation), it should focus on them, not on its own
-        # thoughts and questions.
-        idle = time.time() - self._last_interaction_time
-        if idle >= self.CONVERSATION_FOCUS_SECONDS:
-            self.inner_life.resume()
-        else:
-            # Re-check after the remaining focus period
-            self._defer(
-                self.CONVERSATION_FOCUS_SECONDS - idle,
-                self._resume_inner_life,
-            )
+        # Volition and inner life wait for the user to go quiet — while
+        # they're actively talking (teaching, rapid conversation,
+        # answering its questions), it should focus on them, not
+        # wander into bug scans, drawing, or puzzles.
+        self._resume_inner_life()
     def see(self) -> str:
         """Look through the retina, store the observation, and report it.
 
@@ -1067,7 +1081,10 @@ class ConversationMixin:
         self.cognition.teaching_topic = ""
 
         self.learner.resume()
-        self.inner_life.resume()
+        # Inner life and volition resume once the user goes quiet —
+        # exiting teaching mid-conversation shouldn't flood the
+        # exchange with stray urges.
+        self._resume_inner_life()
     def pop_queued_question(self) -> dict[str, str] | None:
         """Pop the next queued question.
 
@@ -1079,6 +1096,12 @@ class ConversationMixin:
         q = self.cognition.pop_next_question()
         if q and q.get("target_concept"):
             self.cognition._pending_question_concepts[q["target_concept"]] = q["text"]
+        if q is not None:
+            # A question is now out for an answer — an open turn. Hold
+            # volition until the user goes quiet; if no answer ever
+            # comes, the deferred release restores autonomy on its own.
+            self._suppress_volition = True
+            self._defer(self.CONVERSATION_FOCUS_SECONDS, self._resume_inner_life)
         return q
     def clear_queued_questions(self) -> None:
         """Clear all queued questions."""

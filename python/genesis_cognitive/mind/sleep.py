@@ -879,6 +879,9 @@ class SleepMixin:
             return
         self._is_sleeping = False
         self._user_initiated_sleep = False
+        # Waking starts a new epoch — any volition suppression still
+        # latched from a conversation turn lapses here.
+        self._suppress_volition = False
         # Reset the commitment boundaries so the next wake period
         # announces drowsiness and commits to sleep on fresh
         # crossings, not stale latched state.
@@ -1137,6 +1140,9 @@ class SleepMixin:
         if not self._is_meditating:
             return
         self._is_meditating = False
+        # Any volition suppression latched by a conversation turn
+        # before meditating lapses on exit.
+        self._suppress_volition = False
         self.client.set_zone(ZONE_CONVERSATION)
 
         # Resume inner life — spontaneous thoughts can flow again

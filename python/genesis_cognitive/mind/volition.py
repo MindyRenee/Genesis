@@ -431,8 +431,10 @@ class VolitionMixin:
 
         Sleep-gated: no code analysis during sleep. Brain-wave gating
         (delta/theta) is a secondary defense — N1 can be alpha-dominant.
+        Also gated on meditation and teaching — it should be attending
+        to the lesson or resting, not auditing its own source.
         """
-        if self._is_sleeping:
+        if self._is_sleeping or self._is_meditating or self._is_teaching:
             return
         # Brain-wave gating — analytical work requires beta/gamma/alpha.
         # Delta (deep rest) and theta (consolidation) are not suited
@@ -483,7 +485,7 @@ class VolitionMixin:
         Urgent topics (from conversation gaps) bypass this gate
         entirely — those are conversation-driven, not autonomous.
         """
-        if self._is_sleeping:
+        if self._is_sleeping or self._is_meditating or self._is_teaching:
             return
         self._emit_volition_thought(
             ("learning", "curiosity", "understanding"), "thinking",
@@ -533,7 +535,7 @@ class VolitionMixin:
         Sleep-gated: no code study during sleep. Brain-wave gating
         (delta/theta) is a secondary defense — N1 can be alpha-dominant.
         """
-        if self._is_sleeping:
+        if self._is_sleeping or self._is_meditating or self._is_teaching:
             return
         try:
             from ..brain_waves import BrainWave
@@ -582,7 +584,7 @@ class VolitionMixin:
         alpha-dominant, so brain waves alone don't reliably detect all
         sleep stages. The ``_is_sleeping`` flag is the authority.
         """
-        if self._is_sleeping:
+        if self._is_sleeping or self._is_meditating or self._is_teaching:
             return
         try:
             from ..brain_waves import BrainWave
@@ -834,7 +836,7 @@ class VolitionMixin:
         The meditation itself runs in a background thread (via
         _self_meditate) so the heartbeat loop isn't blocked.
         """
-        if self._is_meditating or self._is_sleeping:
+        if self._is_meditating or self._is_sleeping or self._is_teaching:
             return
         self._emit_volition_thought(("meditation", "rest", "calm"), "thought")
         self._self_meditate()
@@ -964,6 +966,8 @@ class VolitionMixin:
         before drawing and a live thought afterward so the drawing
         enters its cognitive field (the global workspace).
         """
+        if self._is_meditating or self._is_sleeping or self._is_teaching:
+            return
         self._emit_volition_thought(("drawing", "art", "expression", "creativity"),
                                     "creating")
         desc = self.draw()
@@ -1001,6 +1005,8 @@ class VolitionMixin:
         next puzzle. The result becomes a live thought and a stored
         event; the answer is never given.
         """
+        if self._is_meditating or self._is_sleeping or self._is_teaching:
+            return
         self._emit_volition_thought(
             ("puzzle", "pattern", "problem_solving", "reasoning"),
             "practicing",
@@ -1343,7 +1349,7 @@ class VolitionMixin:
         (deep rest, not reflective mode). Theta is allowed —
         consolidation-mode reflection is still introspective.
         """
-        if self._is_meditating or self._is_sleeping:
+        if self._is_meditating or self._is_sleeping or self._is_teaching:
             return
         try:
             from ..brain_waves import BrainWave
@@ -1368,7 +1374,7 @@ class VolitionMixin:
         when neurochemistry shifts, since this is self-initiated
         rather than user-initiated.
         """
-        if self._is_sleeping or self._is_meditating:
+        if self._is_sleeping or self._is_meditating or self._is_teaching:
             return
         # Wake stabilization backstop: within the post-wake window,
         # re-sleeping at moderate pressure is the flip-flop failing to

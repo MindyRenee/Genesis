@@ -3012,7 +3012,10 @@ def _run_interactive_loop(
                     )
                 finally:
                     state.suppress_thoughts = False
-                    mind._suppress_volition = False
+                    # Don't release volition while a popped question is
+                    # still awaiting its answer — the open turn holds
+                    # it until the reply lands or the quiet window lapses.
+                    mind._suppress_volition = mind.awaiting_question_answer
                     # Drain any thoughts that buffered during the command
                     # so they don't flood the next prompt.
                     buffered = thought_collector.get_all()
