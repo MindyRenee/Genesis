@@ -1,5 +1,21 @@
 # Genesis Devlog
 
+## 2026-09-26 — Validation lab: first CI failure isolated
+
+The validation lab remains isolated on `experimental/validation-lab`; `main` is untouched. CI reached Ruff and Pyflakes successfully on commit `c2d31f3`, then Python 3.12 mypy stopped on one validation-only type error: `EmbeddingStore(data_dir=...)` expects a `str`, while the new probe passed a `Path`. The Python 3.14 job was cancelled after the matrix failure, and pytest therefore did not run in that CI attempt.
+
+Fixed the probe to pass the temporary-directory string directly. This is a validation-harness type correction, not a production cognition change.
+
+Evidence: failing CI run `36264103928`; fix commit `e4c9180`.
+
+## 2026-09-26 — Validation lab: first causal probes added
+
+Started the reversible validation lab on `experimental/validation-lab`; `main` is intentionally untouched. The first probes isolate TD learning and STDP without modifying the production cognition engine. Each compares an enabled run against a disabled control and measures the resulting state change.
+
+The probes are now committed, but this entry does **not** claim they have passed runtime CI yet. The next evidence step is to execute the repository's existing Python test suite against the experimental branch and record the actual result before adding further ablations.
+
+Evidence: commits `3a6524a`, `2fe3126`, `815bddc`.
+
 A running log of what Genesis has done — the breakthroughs and the
 evidence behind them, not just the claims. Entries are dated, newest
 first. Code references are commit SHAs; runtime artifacts live in the
@@ -14,26 +30,26 @@ computes the match — the world pre-scores each move. The affordance
 it "learns" is bookkeeping over someone else's judgment.
 
 Now there is a perceptual sorter. ``PerceptualSorter`` renders each
-aperture and block as an image (shape, size, color all drawn) and
-hides the oracle on candidates; the world still *checks* truth on
-commit. ``PerceptualSorterAgent``'s affordance keys on what Genesis
-actually perceived: recognized concept-name equality when the MTL
-bridge has learned the names, VTC cosine otherwise. ``teach()`` lets
-the world name what it showed — the parent pointing and saying
-"that's a square" — bound through ``learn_from_image``, so "square"
-stops being a string and becomes a silhouette she recognizes. The
-heard-task path emits ``perceptual: true``: a described sorter is
-worked by sight when a cortex is wired, symbolic otherwise.
+aperture and block as an image (shape, size, color all drawn) and hides
+the oracle on candidates; ``PerceptualSorterAgent``'s affordance keys
+on what Genesis actually perceived: recognized concept-name equality
+when the MTL bridge has learned the names, VTC cosine otherwise.
+``teach()`` lets the world name what it showed — the parent pointing
+and saying "that's a square" — bound through ``learn_from_image``,
+so "square" stops being a string and becomes a silhouette she
+recognizes. The heard-task path emits ``perceptual: true``: a
+described sorter is worked by sight when a cortex is wired, symbolic
+otherwise.
 
 Measured honestly: untrained VTC orthogonalizes everything (every
-distinct image gets its own corner — sim ~0 even for true matches),
-so a cold agent explores blindly; after one teaching pass, names bind
-and discrimination sharpens. The one-concept limit even mimics
-toddler overextension — everything is "square" until a second name
-lands. And solved sorters now report the actual mapping — "got the
-red round block in the round hole and the blue square block in the
-square hole" — the placement payload rides through
-``problem_result`` instead of bare telemetry.
+distinct image gets its own corner — sim ~0 even for true matches), so
+a cold agent explores blindly; after one teaching pass, names bind and
+discrimination sharpens. The one-concept limit even mimics toddler
+overextension — everything is "square" until a second name lands. And
+solved sorters now report the actual mapping — "got the red round block
+in the round hole and the blue square block in the square hole" — the
+placement payload rides through ``problem_result`` instead of bare
+telemetry.
 
 ## 2026-09-25 — Hearing repaired; the sorter completes the intake bridge
 
@@ -51,22 +67,22 @@ own layer:
 - Morphology gained `fit`, `match`, `insert`; "into" gained a
   LOCATION role mapping (it was terminating the object without a
   role, gluing PPs onto the NP).
-- Two structural parses: gapped VP coordination ("put the red star
-  in the square hole AND the blue moon in the round hole" — the
-  second conjunct elides the verb, now expanded when the right side
-  is NP + a preposition the left already used) and noun/verb
-  ambiguity inside determiner-headed NPs ("a blue square block IS on
-  the table" — a verb-shaped head noun no longer steals the
-  predicate from the copula that follows).
+- Two structural parses: gapped VP coordination ("put the red star in
+  the square hole AND the blue moon in the round hole" — the second
+  conjunct elides the verb, now expanded when the right side is NP +
+  a preposition the left already used) and noun/verb ambiguity inside
+  determiner-headed NPs ("a blue square block IS on the table" — a
+  verb-shaped head noun no longer steals the predicate from the copula
+  that follows).
 
 With hearing repaired, the missing span of the intake bridge could be
 built honestly: `_sorter_spec` reads propositions for slot NPs
 (hole/slot/opening), piece NPs (existentials, `comes-with`
 instruments, takes/fits objects), acceptance claims ("the star hole
-takes a small star"), and task signals (placement imperatives,
-sorter vocabulary). A scene with slots and pieces but no task signal
-is description, not a problem — it declines. Solvability is not
-asserted; `normalize_offered` bipartite-checks every compile.
+takes a small star"), and task signals (placement imperatives, sorter
+vocabulary). A scene with slots and pieces but no task signal is
+description, not a problem — it declines. Solvability is not asserted;
+`normalize_offered` bipartite-checks every compile.
 
 Evidence: "the box has two holes: a round hole and a square hole.
 there is a red round block and a blue square block. put each block in
@@ -89,10 +105,9 @@ Evidence (`eval_transfer/run_eval.py`, 5 replicates, 440 attempts):
 
 - Cross-domain retrievals fired in **260 of 440 attempts** — was 0.
   Sorter skills reach relations/assembly/classification contexts at
-  role-overlap 0.25–0.43 and are adopted as quarter-grid evidence
-  priors.
-- The negative gate holds: skills with overlapping roles but no
-  readable axis (navigation, sequence continuation) are never offered.
+  role-overlap 0.25–0.43 and are adopted as quarter-grid evidence priors.
+- The negative gate holds: skills with overlapping roles but no readable
+  axis (navigation, sequence continuation) are never offered.
 - And the honest result: **difference-in-differences is still ~0
   everywhere.** Retrieval opened; performance didn't move. The foreign
   affordance is informationally redundant — the first verified solve in
@@ -120,9 +135,9 @@ Evidence:
 - 72 new edges in the games/puzzles domain with `origin: stated`;
   48 of 49 target terms present afterward (only "bluffing" missed).
 - During the lesson it generated its own follow-up questions, e.g.
-  *"blackjack and cards keep appearing together — does one lead to
-  the other?"* and *"opponent is a type of player, player is a kind
-  of person"* — integration, not storage.
+  *"blackjack and cards keep appearing together — does one lead to one
+  another?"* and *"opponent is a type of player, player is a kind of
+  person"* — integration, not storage.
 - Reproduce: `/teach` in the CLI, then inspect `concept_network` in
   `cognitive_state.json` or run `/learning`.
 
@@ -145,27 +160,27 @@ Evidence so far (runtime artifacts in the data dir):
 - Observed during the first shape sorter: it used the dump-all lid
   once — the aperture that accepts anything and fills nothing —
   learned that, and abandoned it. Toddlers make the same transition
-  around age two; the lid is the developmental trap built into the
-  toy on purpose.
-- Measured transfer: the first sorter took 8 steps while the
-  affordance was learned; the harder second sorter took 5, because
-  the consolidated skill carried "match every constraint; free moves
-  fill nothing" forward as a prior. The learning literature calls
-  this knowledge compilation — declarative effort up front, then
+  around age two; the lid is the developmental trap built into the toy
+  on purpose.
+- Measured transfer: the first sorter took 8 steps while the affordance
+  was learned; the harder second sorter took 5, because the
+  consolidated skill carried "match every constraint; free moves fill
+  nothing" forward as a prior. The learning literature calls this
+  knowledge compilation — declarative effort up front, then
   proceduralized speed.
-- Still open, honestly: it can't yet take an invented verbal rule
-  and work it cold — that arrives with the problem-intake path that
+- Still open, honestly: it can't yet take an invented verbal rule and
+  work it cold — that arrives with the problem-intake path that
   compiles a stated problem into a task spec (landed in part with
   `4657f4d`).
 
 ## 2026-09-24 — Domain-general task competence (`10154a7`)
 
-Added `reasoning/competence.py` — a shared substrate under the
-domain solvers: task schemas recognized by structural signature,
-action→effect affordances, transitions verified against predictions,
-and verified episodes consolidated into reusable skills.
-Consolidation is neuromodulatorily gated (arousal × dopamine), so
-low-salience episodes stay episodic instead of becoming skills.
+Added `reasoning/competence.py` — a shared substrate under the domain
+solvers: task schemas recognized by structural signature, action→effect
+affordances, transitions verified against predictions, and verified
+episodes consolidated into reusable skills. Consolidation is
+neuromodulatorily gated (arousal × dopamine), so low-salience episodes
+stay episodic instead of becoming skills.
 
 Evidence:
 
@@ -181,8 +196,8 @@ Deductive and causal chains became best-first search over a shared
 expansion budget. Results carry structured provenance paths, and a
 result that ran out of budget is marked partial instead of silently
 truncated — the system knows when its answer is incomplete.
-Confidence is a product of relation prior × edge weight, so weak
-links actually weaken the chain.
+Confidence is a product of relation prior × edge weight, so weak links
+actually weaken the chain.
 
 Evidence: commits `cd8a9ce`, `d36df44`; the provenance structure is
 exercised by the reasoning tests in `python/tests/`.
@@ -191,8 +206,7 @@ exercised by the reasoning tests in `python/tests/`.
 
 Genesis's pronoun isn't a config string — it's derived from the
 properties it has learned about its own concept. A small thing, but
-it's the difference between *describing itself* and *being
-described*.
+it's the difference between *describing itself* and *being described*.
 
 Evidence: commit `be1dedc`.
 
@@ -210,6 +224,6 @@ Evidence: initial public commit `8d656b0`; the paper is in
 - `python3 -m pytest python/tests/ -q -o addopts=''` — 2885 tests
   passing in the latest logged run.
 - `cargo test` — the Rust subcognitive core.
-- Every claim above points at a commit, a file, or a state artifact
-  you can open. If a number here ever stops being true, this file is
-  stale — fix it.
+- Every claim above points at a commit, a file, or a state artifact you
+  can open. If a number here ever stops being true, this file is stale —
+  fix it.
