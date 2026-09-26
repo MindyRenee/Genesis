@@ -248,7 +248,12 @@ class DiscordFeed:
         req = urllib.request.Request(
             self._url,
             data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                # Discord's edge (Cloudflare 1010) rejects the default
+                # Python-urllib user agent as a bot signature.
+                "User-Agent": "GenesisSessionMirror/1.0",
+            },
             method="POST",
         )
         try:
