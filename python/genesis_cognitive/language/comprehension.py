@@ -677,7 +677,7 @@ class ComprehensionResult:
     raw_text: str = ""
     speech_act: SpeechActType = SpeechActType.STATEMENT
     propositions: list[Proposition] = field(default_factory=list)
-    key_concepts: list[ConceptRole] = field(default_factory=list)
+    # Grounded semantic bindings are populated by the cognition layer.\n    # Kept separate from propositions so linguistic parsing remains language-only.\n    grounded: list[Any] = field(default_factory=list)\n    key_concepts: list[ConceptRole] = field(default_factory=list)
     resolved_references: dict[str, str] = field(default_factory=dict)
     is_negated: bool = False
     is_question: bool = False
