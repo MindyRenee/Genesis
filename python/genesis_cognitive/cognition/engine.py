@@ -87,6 +87,7 @@ from ..learning import (
     PredictionContext,
     PredictiveCodingLayer,
     Question,
+    SynapticStore,
     TDLearner,
 )
 from ..memory import (
@@ -383,7 +384,9 @@ class CognitionEngine:
             last_memory_mode_getter=lambda: self._last_memory_mode,
         )
         # Concept learner — extracted subsystem for word labeling.
-        self._concept_learner = ConceptLearner(network=self.network)
+        self._concept_learner = ConceptLearner(
+            network=self.network, synapses=self.synapses
+        )
         self._init_state()
         self._seed_initial_concepts()
 
@@ -752,7 +755,8 @@ class CognitionEngine:
     def _init_learning_systems(self) -> None:
         """Initialize learning, plasticity, and inference systems (13-16)."""
         # 13. STDP — spike-timing-dependent plasticity for Hebbian learning.
-        self.stdp = STDP(self.embeddings, self.network)
+        self.synapses = SynapticStore()
+        self.stdp = STDP(self.synapses, self.network)
 
         # 14. Spaced repetition — schedules concept reviews for retention.
         self.spaced_repetition = SpacedRepetitionScheduler(self.network)
@@ -5693,7 +5697,7 @@ class CognitionEngine:
         # modulatory effect lags the reward signal, so the RPE from
         # the last interaction gates learning in the current one
         # (Pawlak et al., 2010; Frémaux & Gerstner, 2016).
-        if self.embeddings.has_embeddings and perception.topics:
+        if perception.topics:
             # Set the modulator from the previous turn's dopamine signal.
             # Rescale to [0, 2] range: 1.0 = no gating, 0 = suppress, 2 = amplify.
             prev_dopamine = self.td_learner.get_dopamine_signal()
@@ -5726,10 +5730,15 @@ class CognitionEngine:
         reward = thought.confidence * 0.5 + max(0.0, emotion.valence) * 0.3
         if prediction_error.magnitude > 0.5:
             reward += 0.2  # novelty bonus for surprising inputs
+        # Learn the action actually selected by the decision engine.
+        # The decision engine queries the same action-conditioned value
+        # on later turns, closing the experience → reward → action-value
+        # → selection loop.
         td_rpe = self.td_learner.update(
             state=perception.topics,
             reward=reward,
             next_state=thought.topics or perception.topics,
+            action=thought.intent,
         )
         # Apply dopamine signal from TD learning
         dopamine_signal = self.td_learner.get_dopamine_signal()
