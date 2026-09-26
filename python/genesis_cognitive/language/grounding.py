@@ -69,13 +69,23 @@ class SemanticGrounder:
     def __init__(self, network: ConceptNetwork) -> None:
         self.network = network
 
-    def ground_argument(self, surface: str) -> GroundedArgument:
-        """Resolve a surface phrase through the network's public lookup."""
+    def ground_argument(
+        self, surface: str, *, context: str = ""
+    ) -> GroundedArgument:
+        """Resolve a surface phrase through the network, using context for polysemy."""
         text = surface.strip()
         if not text:
             return GroundedArgument("", None, 0.0)
 
-        concept = self.network.get_concept(text)
+        if context:
+            concept_id = self.network.resolve_in_context(text, context)
+            concept = (
+                self.network.get_concept(concept_id)
+                if concept_id is not None
+                else None
+            )
+        else:
+            concept = self.network.get_concept(text)
         if concept is None:
             return GroundedArgument(text, None, 0.0)
 
@@ -87,26 +97,28 @@ class SemanticGrounder:
         confidence = max(0.0, min(1.0, confidence))
         return GroundedArgument(text, concept_id, confidence)
 
-    def ground(self, proposition: Proposition) -> GroundedProposition:
+    def ground(
+        self, proposition: Proposition, *, context: str = ""
+    ) -> GroundedProposition:
         """Ground one proposition without changing linguistic information."""
         roles = {
-            role: self.ground_argument(value)
+            role: self.ground_argument(value, context=context)
             for role, value in proposition.roles.items()
             if value
         }
         return GroundedProposition(
             source=proposition,
-            subject=self.ground_argument(proposition.subject),
+            subject=self.ground_argument(proposition.subject, context=context),
             predicate=proposition.predicate,
-            object=self.ground_argument(proposition.object),
+            object=self.ground_argument(proposition.object, context=context),
             roles=roles,
         )
 
     def ground_all(
-        self, propositions: list[Proposition]
+        self, propositions: list[Proposition], *, context: str = ""
     ) -> list[GroundedProposition]:
         """Ground a complete comprehension result's propositions."""
-        return [self.ground(proposition) for proposition in propositions]
+        return [self.ground(proposition, context=context) for proposition in propositions]
 
 
 __all__ = [
