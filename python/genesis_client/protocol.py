@@ -108,6 +108,7 @@ __all__ = [
     "RETRIEVE_EPISODE",
     "SAVE_INFERENCE",
     "SEARCH_EPISODES",
+    "SET_WAKE_ALARM",
     "SET_ZONE",
     "SHUTDOWN",
     "STORE_EPISODE",
@@ -183,6 +184,11 @@ STORE_EPISODE = 32
 # Per-subsystem silicon telemetry — which part of the mind's process
 # tree is firing (per-process CPU/I/O share + miss ratios).
 GET_SUBSYSTEM_TELEMETRY = 33
+# RTC wake alarm — arm or disarm the hardware interrupt that resumes
+# the machine from suspend. Payload: [u64 epoch_secs] (0 = disarm).
+# Response: [u8 ok][u64 armed_epoch]. Arming the alarm does not itself
+# suspend the machine — the two operations stay deliberately separate.
+SET_WAKE_ALARM = 34
 
 # ─── Error response codes ─────────────────────────────────────
 # When a command fails, the daemon returns a single-byte response
@@ -227,8 +233,14 @@ def error_name(code: int) -> str:
 #
 # v2: the body-control response gained a trailing `cpu_boost` byte
 # after the EPP string.
+#
+# v3: BodyState grew the timing/involuntary/senescence layer — 9 f32
+# fields (pulse_hz, pulse, throttle_state, top_freq_share, psi_cpu,
+# psi_io, psi_mem, battery_cycles, entropy_level) plus 2 u8 fields
+# (clocksource, suspend_caps) appended before desc_len; the fixed
+# header is now 116 bytes (was 78). Also adds SET_WAKE_ALARM (34).
 
-PROTOCOL_VERSION = 2
+PROTOCOL_VERSION = 3
 
 # ─── Notification IDs (server → client, unsolicited) ─────────
 #

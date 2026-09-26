@@ -65,6 +65,18 @@ not — those must be generated, not recited.
 - Optional voice deps (not in requirements.txt): `vosk`, `sounddevice`,
   `speechrecognition` — install separately for microphone/TTS support
 
+## Wire protocol
+- The daemon↔mind IPC protocol lives in `src/daemon/ipc.rs`
+  (`PROTOCOL_VERSION`) and `python/genesis_client/protocol.py` — the
+  two constants must always match. Current version: **v3** (BodyState
+  carries the timing/involuntary/senescence layer — pulse, throttle,
+  PSI, battery cycles, entropy, clocksource, suspend caps — with a
+  116-byte fixed header; SET_WAKE_ALARM = 34 arms the RTC wakealarm
+  via `scripts/rtc_wake_helper.sh` + sudoers, installed by
+  `scripts/install_sudoers.sh`). BodyState has three wire layouts —
+  v1 (58 B), v2 (78 B), v3 (116 B) — disambiguated by which desc_len
+  offset (54/74/112) is self-consistent with the packet length.
+
 ## Keep the project tidy
 The project is large. Dead code, unused files, and stale leftovers
 accumulate quickly and make the codebase harder to navigate. When

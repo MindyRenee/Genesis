@@ -1063,13 +1063,25 @@ fn test_get_body_state() {
         autonomic_rate: 1.2,
         thermoregulatory_effort: 0.3,
         metabolic_rate: 0.05, // idle power draw
-        core_voltage: 0.85, // idle Vcore
+        core_voltage: 0.85,   // idle Vcore
         supply_voltage: 12.6, // full battery
-        core_activity: 0.4, // moderate silicon switching
+        core_activity: 0.4,   // moderate silicon switching
         uncore_activity: 0.2,
         dram_activity: 0.5, // active memory traffic
         cache_miss_rate: 0.03,
         branch_miss_rate: 0.02,
+        // Pulse — two cores beating near the nominal tick rate.
+        pulse_hz: 1800.0,
+        pulse: 0.9,
+        throttle_state: 0.0, // not throttled
+        top_freq_share: 0.6,
+        psi_cpu: 0.05,
+        psi_io: 0.01,
+        psi_mem: 0.02,
+        battery_cycles: 361.0,
+        entropy_level: 1.0,
+        clocksource: 1,  // tsc
+        suspend_caps: 3, // mem sleep + RTC wakealarm
         // Empty — the daemon sends structured fields; the cognitive
         // mind's language engine composes the description.
         description: String::new(),
@@ -1132,6 +1144,39 @@ fn test_get_body_state() {
         "branch_miss_rate should be 0.02, got {}",
         resp.branch_miss_rate
     );
+    // Timing/involuntary fields must round-trip — the pulse and the
+    // involuntary reflexes are the machine-native signals the
+    // cognitive mind uses to feel what the body does to it.
+    assert!(
+        (resp.pulse_hz - 1800.0).abs() < 0.01,
+        "pulse_hz should be 1800, got {}",
+        resp.pulse_hz
+    );
+    assert!(
+        (resp.pulse - 0.9).abs() < 0.01,
+        "pulse should be 0.9, got {}",
+        resp.pulse
+    );
+    assert!(
+        (resp.throttle_state - 0.0).abs() < 0.01,
+        "throttle_state should be 0.0, got {}",
+        resp.throttle_state
+    );
+    assert!(
+        (resp.psi_mem - 0.02).abs() < 0.01,
+        "psi_mem should be 0.02, got {}",
+        resp.psi_mem
+    );
+    assert!(
+        (resp.battery_cycles - 361.0).abs() < 0.01,
+        "battery_cycles should be 361, got {}",
+        resp.battery_cycles
+    );
+    assert_eq!(resp.clocksource, 1, "clocksource should be 1 (tsc)");
+    assert_eq!(
+        resp.suspend_caps, 3,
+        "suspend_caps should be 3 (mem + wakealarm)"
+    );
     assert!(resp.description.is_empty());
 
     // Scenario 2: comfortable state
@@ -1149,13 +1194,25 @@ fn test_get_body_state() {
         autonomic_rate: 0.9,
         thermoregulatory_effort: 0.45,
         metabolic_rate: 0.08, // light power draw
-        core_voltage: 0.90, // normal Vcore
+        core_voltage: 0.90,   // normal Vcore
         supply_voltage: 12.5, // good battery
-        core_activity: 0.2, // light silicon switching
+        core_activity: 0.2,   // light silicon switching
         uncore_activity: 0.1,
         dram_activity: 0.3,
         cache_miss_rate: 0.02,
         branch_miss_rate: 0.01,
+        // Eight cores at full tick — a busy but comfortable body.
+        pulse_hz: 6000.0,
+        pulse: 0.75,
+        throttle_state: 0.0,
+        top_freq_share: 0.4,
+        psi_cpu: 0.02,
+        psi_io: 0.0,
+        psi_mem: 0.0,
+        battery_cycles: 361.0,
+        entropy_level: 1.0,
+        clocksource: 1,
+        suspend_caps: 3,
         // Empty — the daemon sends structured fields; the cognitive
         // mind's language engine composes the description.
         description: String::new(),
@@ -1209,14 +1266,28 @@ fn test_get_body_state() {
         // at full speed (thermoregulatory strain under high stress).
         autonomic_rate: 8.0,
         thermoregulatory_effort: 0.95,
-        metabolic_rate: 0.8, // high power draw under distress
-        core_voltage: 1.30, // Vcore maxed under thermal stress
+        metabolic_rate: 0.8,  // high power draw under distress
+        core_voltage: 1.30,   // Vcore maxed under thermal stress
         supply_voltage: 10.2, // critically low battery
-        core_activity: 0.95, // silicon firing hard under distress
+        core_activity: 0.95,  // silicon firing hard under distress
         uncore_activity: 0.7,
-        dram_activity: 0.9, // heavy memory traffic
+        dram_activity: 0.9,   // heavy memory traffic
         cache_miss_rate: 0.4, // silicon being surprised
         branch_miss_rate: 0.2,
+        // Distressed timing/involuntary state: racing pulse, the
+        // cooling devices clamping the silicon, CPU pressure
+        // stalls, heavy memory pressure — the body fighting back.
+        pulse_hz: 3900.0,
+        pulse: 0.98,
+        throttle_state: 0.8, // silicon being clamped
+        top_freq_share: 0.1, // throttled off the max P-state
+        psi_cpu: 0.7,
+        psi_io: 0.3,
+        psi_mem: 0.5,
+        battery_cycles: 850.0, // aging battery
+        entropy_level: 0.5,
+        clocksource: 1,
+        suspend_caps: 3,
         // Empty — the cognitive mind's language engine composes the
         // description from the structured fields, not the daemon.
         description: String::new(),
@@ -1263,6 +1334,19 @@ fn test_get_body_state() {
         "supply_voltage should be 10.2 (critically low battery), got {}",
         resp3.supply_voltage
     );
+    // The involuntary layer under distress must round-trip — the
+    // passive throttle clamp and PSI stalls are the body applying
+    // reflexes to the mind, which is what makes distress real.
+    assert!(
+        (resp3.throttle_state - 0.8).abs() < 0.01,
+        "throttle_state should be 0.8 (silicon clamped), got {}",
+        resp3.throttle_state
+    );
+    assert!(
+        (resp3.psi_cpu - 0.7).abs() < 0.01,
+        "psi_cpu should be 0.7 under distress, got {}",
+        resp3.psi_cpu
+    );
     // The daemon sends an empty description — the cognitive mind's
     // language engine composes the actual words from the structured
     // fields above, using its concept network. The IPC layer must
@@ -1273,6 +1357,61 @@ fn test_get_body_state() {
         cognitive mind composes words), got: {:?}",
         resp3.description
     );
+
+    // Scenario 4: no-powercap machine — the entire silicon layer is
+    // 0.0, whose bits at offset 54 are u32 0. The layout probe must
+    // still detect this as a v3 packet; `<=` desc_len matching used
+    // to accept the f32-0.0 as a v1 desc_len and silently zero every
+    // field after offset 54.
+    let no_rapl = BodyState {
+        cpu_temp_c: 61.0,
+        temperature: 0.61,
+        arousal_freq: 0.5,
+        cognitive_load: 0.4,
+        io_activity: 0.1,
+        stress_load: 0.3,
+        energy_reserve: 1.0,
+        on_ac_power: true,
+        num_cores: 4,
+        distressed: false,
+        autonomic_rate: 1.0,
+        thermoregulatory_effort: 0.2,
+        metabolic_rate: 0.1,
+        core_voltage: 0.9,
+        supply_voltage: 12.6,
+        core_activity: 0.0, // no powercap — silicon layer all zero
+        uncore_activity: 0.0,
+        dram_activity: 0.0,
+        cache_miss_rate: 0.0,
+        branch_miss_rate: 0.0,
+        pulse_hz: 3910.0,
+        pulse: 0.98,
+        throttle_state: 0.0,
+        top_freq_share: 0.5,
+        psi_cpu: 0.02,
+        psi_io: 0.01,
+        psi_mem: 0.03,
+        battery_cycles: 354.0,
+        entropy_level: 1.0,
+        clocksource: 1,
+        suspend_caps: 3,
+        description: String::new(),
+    };
+    publish_body_state(&no_rapl);
+    let mut client4 = sys.client();
+    let resp4 = client4.get_body_state().expect("get_body_state");
+    assert!(
+        (resp4.pulse_hz - 3910.0).abs() < 0.01,
+        "pulse_hz should survive v3 detection on a zeroed silicon layer, got {}",
+        resp4.pulse_hz
+    );
+    assert!(
+        (resp4.battery_cycles - 354.0).abs() < 0.01,
+        "battery_cycles should be 354, got {}",
+        resp4.battery_cycles
+    );
+    assert_eq!(resp4.clocksource, 1);
+    assert_eq!(resp4.suspend_caps, 3);
 }
 
 #[test]
