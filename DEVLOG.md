@@ -1,5 +1,13 @@
 # Genesis Devlog
 
+## 2026-09-26 — Validation lab: first causal probes added
+
+Started the reversible validation lab on `experimental/validation-lab`; `main` is intentionally untouched. The first probes isolate TD learning and STDP without modifying the production cognition engine. Each compares an enabled run against a disabled control and measures the resulting state change.
+
+The probes are now committed, but this entry does **not** claim they have passed runtime CI yet. The next evidence step is to execute the repository's existing Python test suite against the experimental branch and record the actual result before adding further ablations.
+
+Evidence: commits `3a6524a`, `2fe3126`, `815bddc`.
+
 A running log of what Genesis has done — the breakthroughs and the
 evidence behind them, not just the claims. Entries are dated, newest
 first. Code references are commit SHAs; runtime artifacts live in the
