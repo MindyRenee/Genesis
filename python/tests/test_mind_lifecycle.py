@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 import tempfile
+import time
 
 import pytest
 
@@ -314,18 +315,45 @@ def test_resume_background_does_not_resume_during_teaching():
 
 
 def test_exit_teaching_mode_resumes_background():
-    """exit_teaching_mode() should resume learner and inner_life."""
+    """exit_teaching_mode() resumes learner; inner_life and volition
+    resume via the quiet-window path (idle user → immediately)."""
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_mind(data_dir)
         mind.enter_teaching_mode("history")
         assert mind.inner_life._paused
         assert mind.learner._paused
 
+        # No active conversation — the focus window has lapsed.
+        mind._last_interaction_time -= mind.CONVERSATION_FOCUS_SECONDS + 1
         mind.exit_teaching_mode()
 
         assert not mind.is_teaching
         assert not mind.learner._paused, "learner should resume after teaching"
         assert not mind.inner_life._paused, "inner_life should resume after teaching"
+        assert not mind._suppress_volition, "volition should release after teaching"
+
+
+def test_exit_teaching_mode_holds_background_while_engaged():
+    """Exiting teaching mid-conversation shouldn't unleash stray urges —
+    inner life and volition wait for the user to go quiet."""
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_mind(data_dir)
+        mind.enter_teaching_mode("history")
+        mind._suppress_volition = True
+        mind._last_interaction_time = time.time()  # user just spoke
+
+        mind.exit_teaching_mode()
+
+        assert not mind.is_teaching
+        assert not mind.learner._paused, "learner still resumes on exit"
+        assert mind.inner_life._paused, "inner_life waits for quiet"
+        assert mind._suppress_volition, "volition stays held while engaged"
+
+        # Once they go quiet, the deferred check releases both.
+        mind._last_interaction_time -= mind.CONVERSATION_FOCUS_SECONDS + 1
+        mind._resume_inner_life()
+        assert not mind.inner_life._paused
+        assert not mind._suppress_volition
 
 
 def test_teaching_mode_updates_topic_when_already_teaching():
