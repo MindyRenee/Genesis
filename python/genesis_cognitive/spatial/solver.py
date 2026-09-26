@@ -744,6 +744,11 @@ class SpatialReasoner:
         """Segment a grid into objects and spatial relations."""
         return perceive(grid, background=background)
 
+    @staticmethod
+    def prediction_key(predictions: list[Grid]) -> str:
+        """Stable fingerprint of a predicted test-output set."""
+        return repr(tuple(tuple(tuple(row) for row in grid.to_lists()) for grid in predictions))
+
     def solve(
         self,
         examples: list[Example],
@@ -755,6 +760,7 @@ class SpatialReasoner:
         time_budget: float = 30.0,
         num_guesses: int = 2,
         exclude_rules: set[str] | None = None,
+        exclude_predictions: set[str] | None = None,
     ) -> SpatialSolution:
         """Search for a transform sequence explaining the examples.
 
@@ -773,8 +779,13 @@ class SpatialReasoner:
                 rules can't be selected as solutions or near-misses, so
                 a retry explores genuinely different hypotheses instead
                 of re-deriving the same failure.
+            exclude_predictions: fingerprints of held-out test outputs
+                already disproven on this task. This is behavioral pruning:
+                semantically equivalent hypotheses making the same wrong
+                prediction are excluded without banning an entire family.
         """
         excluded = exclude_rules or set()
+        excluded_predictions = exclude_predictions or set()
         scenes = [perceive(inp) for inp, _ in examples]
         if not examples:
             return SpatialSolution(solved=False, hypothesis=None, scenes=scenes)
@@ -816,11 +827,14 @@ class SpatialReasoner:
             # Keep the most accurate candidates; prefer shorter
             # sequences on ties (Occam prior over explanations).
             candidates.sort(key=lambda h: (-h.score, len(h.transforms)))
-            exact_hits = [
-                h for h in candidates
-                if h.exact == len(examples)
-                and h.describe() not in excluded
-            ]
+            exact_hits = []
+            for h in candidates:
+                if h.exact != len(examples) or h.describe() in excluded:
+                    continue
+                predictions = self._predict_all(h, tests)
+                if self.prediction_key(predictions) in excluded_predictions:
+                    continue
+                exact_hits.append(h)
             if exact_hits:
                 solved_hyps = self._select_exact(exact_hits, num_guesses)
                 break
