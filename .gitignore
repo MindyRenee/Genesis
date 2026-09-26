@@ -8,6 +8,7 @@ __pycache__/
 genesis_data/
 python/genesis_data/
 .genesis-data-dir
+.genesis-discord
 python/voices/
 launch/
 paper/*.pdf

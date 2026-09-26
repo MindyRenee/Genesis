@@ -9,6 +9,10 @@
 #        ./run.sh --stop   (stop a running Genesis)
 #        ./run.sh --offline  (start in offline mode)
 # Flags can be combined in any order: ./run.sh --offline --stop
+#
+# Optional: put a Discord channel webhook URL in .genesis-discord
+# (gitignored) or export GENESIS_DISCORD_WEBHOOK to mirror the whole
+# terminal session to Discord as a read-only feed.
 
 set -m
 
@@ -22,6 +26,15 @@ cd "$(dirname "$0")" || exit 1
 if [ -z "${GENESIS_DATA_DIR:-}" ] && [ -z "${XDG_DATA_HOME:-}" ] && [ -f .genesis-data-dir ]; then
     GENESIS_DATA_DIR=$(head -n1 .genesis-data-dir)
     export GENESIS_DATA_DIR
+fi
+
+# Same pattern for the Discord mirror: an uncommitted, gitignored
+# .genesis-discord file holds the webhook URL so the secret stays out
+# of the repo and shell history. Explicit GENESIS_DISCORD_WEBHOOK
+# always wins.
+if [ -z "${GENESIS_DISCORD_WEBHOOK:-}" ] && [ -f .genesis-discord ]; then
+    GENESIS_DISCORD_WEBHOOK=$(head -n1 .genesis-discord)
+    export GENESIS_DISCORD_WEBHOOK
 fi
 
 DATA_DIR=$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' \
