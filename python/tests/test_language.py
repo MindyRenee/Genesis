@@ -1652,3 +1652,125 @@ def test_sorter_result_without_placements_still_speaks() -> None:
         _make_emotion(),
     )
     assert out is not None and out.strip()
+
+
+# ======================================================================
+# Composed-knowledge rendering — utterance integrity
+# ======================================================================
+#
+# Live-session regression: a knowledge answer came out as
+#   "Mammal is a warm-blooded animal with fur. Related to crisp, and
+#    it is a kind of warm blooded animal It has to do with the crisp
+#    and is a kind of warm blooded animal. It also relates to words
+#    often and those words. I recall I'm not sure about quoll tell me
+#    more? Does that land for you?. And that's because that's what my
+#    reasoning tells me."
+# Three defects under test here: hyphenated definitions defeated the
+# tautology filter (the same is_a fact rendered twice), grammar frames
+# glued declarative tails onto multi-sentence content, and scrape
+# fragment concept names surfaced in latent discovery.
+
+
+def _knowledge_engine() -> GenerativeEngine:
+    """Engine over a network mirroring the live failure's edges."""
+    model = _make_self_model()
+    net = ConceptNetwork()
+    for name in ("mammal", "warm blooded animal", "crisp"):
+        net.add_concept(name, confidence=0.8)
+    net.add_edge(
+        "mammal", "warm blooded animal", RelationType.IS_A, 0.9
+    )
+    net.add_edge("mammal", "crisp", RelationType.RELATED_TO, 0.5)
+    # "crisp" needs its own content to be speakable (unspeakable
+    # targets — no definition, no outgoing edges — are filtered as
+    # scrape garbage).
+    crisp = net.get_concept("crisp")
+    assert crisp is not None
+    crisp.properties["definition"] = "a brittle texture"
+    return GenerativeEngine(model, seed=42, network=net)
+
+
+def test_knowledge_content_dedupes_hyphenated_definition() -> None:
+    """'warm-blooded animal' (definition) and 'warm blooded animal'
+    (edge target) are the same fact — render it once."""
+    engine = _knowledge_engine()
+    thought = Thought(
+        content="mammal",
+        intent="inform",
+        emotion="calm",
+        confidence=0.9,
+        topics=["mammal"],
+        metadata={
+            "topic": "mammal",
+            "definition": "a warm-blooded animal with fur",
+            "knowledge": [
+                ("is_a", "warm blooded animal", 0.9),
+                ("related_to", "crisp", 0.5),
+            ],
+        },
+    )
+    out = engine.render(thought, _make_emotion())
+    occurrences = re.findall(r"warm[- ]blooded animal", out.lower())
+    assert len(occurrences) == 1
+    # The non-tautological edge still speaks.
+    assert "crisp" in out.lower()
+
+
+def test_knowledge_content_no_glued_tail() -> None:
+    """A composed paragraph must not get a declarative frame tail.
+
+    The CAUSAL frame "{content} {causal_connector} {reason_clause}."
+    assumes {content} is one clause — wrapping a multi-sentence
+    knowledge statement produced "...for you?. And that's because
+    that's what my reasoning tells me."
+    """
+    engine = _knowledge_engine()
+    thought = Thought(
+        content="mammal",
+        intent="inform",
+        emotion="calm",
+        confidence=0.9,
+        topics=["mammal"],
+        metadata={
+            "topic": "mammal",
+            "definition": "a warm-blooded animal with fur",
+            "knowledge": [("is_a", "warm blooded animal", 0.9)],
+            "memory": "quolls eat insects",
+        },
+    )
+    out = engine.render(thought, _make_emotion())
+    assert "?." not in out
+    assert "reasoning tells" not in out.lower()
+    assert "land for you" not in out.lower()
+
+
+def test_is_valid_concept_name_rejects_fragment_names() -> None:
+    """All-function-word names are scrape text, not concepts."""
+    assert not Vocabulary._is_valid_concept_name("those words")
+    assert not Vocabulary._is_valid_concept_name("words often")
+    assert not Vocabulary._is_valid_concept_name("the thing it")
+    # Real compound concepts still pass.
+    assert Vocabulary._is_valid_concept_name("alert cognitive state")
+    assert Vocabulary._is_valid_concept_name("warm blooded animal")
+    # Single function-ish words stay valid — "will"/"change" are
+    # legitimate concept names.
+    assert Vocabulary._is_valid_concept_name("will")
+
+
+def test_tautology_filter_matches_plural_forms() -> None:
+    """'living things' (definition) must dedupe 'living thing' (edge)."""
+    clauses = Vocabulary._filter_tautological_clauses(
+        ["is living thing", "relates to cat"],
+        "a living thing that moves and eats other living things",
+    )
+    assert clauses == ["relates to cat"]
+
+
+def test_with_article_checks_head_noun() -> None:
+    """'living thing' is a count noun — the mass-noun suffix heuristic
+    must check the head word, not the phrase's last characters."""
+    assert Vocabulary._with_article("is", "living thing") == "the living thing"
+    # Real mass nouns still take no article.
+    assert Vocabulary._with_article("needs", "sleep") == "sleep"
+    # And a mass-noun phrase keeps working via its head.
+    assert Vocabulary._with_article("needs", "deep sleep") == "deep sleep"

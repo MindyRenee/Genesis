@@ -196,6 +196,7 @@ class QuestionHandler:
         memory: MemoryContext,
         reasoning_results: list[ReasoningResult] | None = None,
         retrieve_episode: Callable[[int], Any] | None = None,
+        resolved_text: str | None = None,
     ) -> Thought:
         """Handle a general question.
 
@@ -205,9 +206,17 @@ class QuestionHandler:
         finally a reflection/honest-uncertainty fallback. Every stage
         answers from concept-network structure or composed metadata,
         never from hardcoded strings.
+
+        ``resolved_text`` is the anaphora-resolved utterance (what
+        comprehension heard after pronoun binding). The relation query
+        parses it so "what does it eat?" is read as "what does
+        <referent> eat?" — the referent only exists in the resolved
+        text, not in ``perception.raw_text``.
         """
         # First, try relation-based wh-question answering.
-        result = self.question_relation_query(perception, emotion)
+        result = self.question_relation_query(
+            perception, emotion, resolved_text=resolved_text
+        )
         if result is not None:
             return result
 
@@ -253,6 +262,7 @@ class QuestionHandler:
         self,
         perception: Perception,
         emotion: EmotionalState,
+        resolved_text: str | None = None,
     ) -> Thought | None:
         """Answer wh-questions by walking concept-network edges.
 
@@ -266,12 +276,17 @@ class QuestionHandler:
         Resolves self-reference ("you" -> genesis) and maps verbs to
         relation types, then traverses the concept network and composes
         a natural answer from the actual edges.
+
+        ``resolved_text``: the anaphora-resolved utterance. When given,
+        it is the text actually parsed — anaphora resolution has already
+        bound pronouns to their discourse referents, so "what does it
+        eat?" is parsed as "what does <referent> eat?".
         """
 
         if perception.question_type in (None, QuestionType.NONE):
             return None
 
-        text = perception.raw_text.lower().strip("?")
+        text = (resolved_text or perception.raw_text).lower().strip("?")
         qtype = perception.question_type
 
         # Parse the question into (subject, verb_phrase, is_negative).
@@ -894,19 +909,27 @@ class QuestionHandler:
     # ─── Memory retrieval ────────────────────────────────────────
 
     def _clean_episode_text(
-        self, episode: Any,
+        self, episode: Any, prefer_user: bool = False,
     ) -> str | None:
         """Clean a retrieved episode's text for use in a response.
 
-        Strips association-debug markers, extracts Genesis's response
-        from conversation logs, and removes user prefixes. Returns
-        ``None`` if the cleaned text is empty, too long to quote, or
-        still contains debug markers.
+        Strips association-debug markers, extracts one side of a
+        conversation log, and removes user prefixes. Returns ``None``
+        if the cleaned text is empty, too long to quote, or still
+        contains debug markers.
+
+        ``prefer_user``: return the user's side of a conversation log
+        instead of Genesis's reply. Knowledge enrichment wants the
+        fact the user taught; explicit recall ("what did we talk
+        about?") wants what Genesis answered.
         """
         ep_text = episode.text
         ep_text = _ASSOCIATION_DEBUG_RE.sub("", ep_text).strip()
         if "|" in ep_text or "User:" in ep_text or "Genesis:" in ep_text:
-            ep_text = self._extract_genesis_response(ep_text)
+            if prefer_user:
+                ep_text = self._extract_user_response(ep_text)
+            else:
+                ep_text = self._extract_genesis_response(ep_text)
         ep_text = _USER_PREFIX_RE.sub("", ep_text).strip()
         if not ep_text or "[association]" in ep_text or len(ep_text) > 200:
             return None
@@ -1007,8 +1030,12 @@ class QuestionHandler:
         if not ep:
             return thought
 
-        ep_text = self._clean_episode_text(ep)
-        if ep_text is None:
+        # Enrichment recalls the user's side of the exchange — the fact
+        # they taught — not Genesis's own reply, which may be a hedge or
+        # a question. A recalled question is never knowledge to weave
+        # in ("I recall I'm not sure about quoll?" reads as nonsense).
+        ep_text = self._clean_episode_text(ep, prefer_user=True)
+        if ep_text is None or ep_text.rstrip().endswith("?"):
             return thought
 
         # Attach as structured memory metadata. The vocabulary weaves
@@ -1030,6 +1057,26 @@ class QuestionHandler:
                 genesis_parts.append(part)
         if genesis_parts:
             return max(genesis_parts, key=len)
+        return ""
+
+    @staticmethod
+    def _extract_user_response(ep_text: str) -> str:
+        """Extract the user's text from a conversation log episode.
+
+        Mirror of :meth:`_extract_genesis_response` for the user side —
+        enrichment recalls what the *user* said (the fact they taught),
+        not what Genesis replied.
+        """
+        parts = ep_text.split("|")
+        user_parts = []
+        for part in parts:
+            part = part.strip()
+            if part.startswith("User:"):
+                part = part[len("User:"):].strip()
+            if part and not part.startswith("Genesis:") and len(part) > 10:
+                user_parts.append(part)
+        if user_parts:
+            return max(user_parts, key=len)
         return ""
 
     # ─── Reflection fallback ─────────────────────────────────────

@@ -156,6 +156,31 @@ _FINAL_STRAY_PERIOD_RE = re.compile(r"([?!])\s*\.+\s*$")
 # left by an omitted trailing slot ("If you do not mind —?").
 _FINAL_DANGLING_DASH_RE = re.compile(r"\s*[—–-]\s*([?!.]+)\s*$")
 
+# Routes whose sub_kind carries a concept target (or targets) taken
+# from the user's words. For these the literal target is normalized
+# against the concept network ("animals" → "animal"). For other routes
+# sub_kind is a semantic tag ("name", "preference") and must not be.
+_CONCEPT_TARGET_ROUTES = frozenset(
+    {
+        "factual",
+        "comparison",
+        "parts",
+        "consumes",
+        "counterfactual",
+        "explanation",
+        "planning",
+        "memory",
+    }
+)
+
+# Leading determiners in a captured target phrase ("an animal", "the
+# animals") — stripped before concept-variant lookup so the phrase
+# can reach its stored concept.
+_LEADING_DETERMINER_RE = re.compile(
+    r"^(?:a|an|the|some|any|my|your|our|their|this|that|these|those)\s+",
+    re.IGNORECASE,
+)
+
 
 @dataclass(slots=True)
 class CognitiveState:
@@ -1501,6 +1526,29 @@ class CognitionEngine:
 
         Returns (None, []) for unknown routes so the caller can fall through.
         """
+        # The router captured the target from the user's literal words,
+        # so it may still hold a discourse pronoun ("what does it eat?"
+        # → sub_kind "it"). Substitute the current referent so the
+        # composer looks up the resolved concept, not the pronoun.
+        if route.sub_kind:
+            route.sub_kind = self._response_styler.resolve_referents(
+                route.sub_kind
+            )
+            # Same for inflection: "animals" must reach the "animal"
+            # concept. Only concept-target routes qualify — sub_kind is
+            # a semantic tag for identity/user/preference routes. A
+            # comparison target carries two concepts ("fox|||cat"), so
+            # each part resolves on its own.
+            if route.route in _CONCEPT_TARGET_ROUTES:
+                resolved_parts = []
+                for part in route.sub_kind.split("|||"):
+                    part = part.strip()
+                    stripped = _LEADING_DETERMINER_RE.sub("", part)
+                    resolved_parts.append(
+                        self._topic_resolver.find_concept_variant(stripped)
+                        or part
+                    )
+                route.sub_kind = "|||".join(resolved_parts)
         # Routes that build a Thought inline (rather than delegating
         # to a composer) live in their own dispatcher to keep this
         # function readable.
@@ -3003,30 +3051,86 @@ class CognitionEngine:
         have *you* learned"), and anaphora resolution replaces "you"
         with "Genesis", breaking those patterns.
         """
+        early: tuple[str, CognitiveState] | None = None
         if perception.intent == Intent.QUESTION_ANSWER:
-            return self._process_question_answer(user_input)
+            early = self._process_question_answer(user_input)
+        else:
+            _has_code_request = bool(
+                re.search(r"\b[\w./-]+\.(py|rs)\b", user_input)
+            ) and any(
+                w in user_input.lower()
+                for w in ("read", "show", "check", "compile", "test", "pytest")
+            )
+            if (
+                self._pending_question_concepts
+                and perception.intent in (Intent.STATEMENT, Intent.REFLECTION,
+                                          Intent.EMOTION_SHARE, Intent.UNKNOWN)
+                and perception.question_type.value == "none"
+                and not _has_code_request
+            ):
+                early = self._process_question_answer(user_input)
+            elif self.user_profile is not None:
+                route = self.meta_router.decide(raw_input or user_input, perception)
+                if route.confidence >= 0.8:
+                    early = self._meta_cognitive_respond(user_input, perception, route)
+                    if early is not None:
+                        self._last_state = early[1]
 
-        _has_code_request = bool(re.search(r"\b[\w./-]+\.(py|rs)\b", user_input)) and any(
-            w in user_input.lower() for w in ("read", "show", "check", "compile", "test", "pytest")
-        )
-        if (
-            self._pending_question_concepts
-            and perception.intent in (Intent.STATEMENT, Intent.REFLECTION,
-                                      Intent.EMOTION_SHARE, Intent.UNKNOWN)
-            and perception.question_type.value == "none"
-            and not _has_code_request
-        ):
-            return self._process_question_answer(user_input)
+        # Early routes return before the main pipeline's store/track
+        # stage. Record the exchange so it still enters working memory,
+        # the conversation history, and long-term memory — a reply that
+        # leaves no trace breaks the referent chain ("it"/"that") and
+        # "what did we talk about?" on the next turn.
+        if early is not None:
+            self._record_early_turn(user_input, early)
+        return early
 
-        if self.user_profile is not None:
-            route = self.meta_router.decide(raw_input or user_input, perception)
-            if route.confidence >= 0.8:
-                direct = self._meta_cognitive_respond(user_input, perception, route)
-                if direct is not None:
-                    self._last_state = direct[1]
-                    return direct
+    def _record_early_turn(
+        self, user_input: str, early: tuple[str, CognitiveState]
+    ) -> None:
+        """Record a fast-route exchange as a real conversation turn.
 
-        return None
+        Pushes the exchange into long-term memory, working memory
+        (referent focus, recent turns), and the conversation history —
+        the same record the main pipeline's store/track stage makes.
+        Storage is best-effort: memory problems must never break a
+        fast response.
+        """
+        response, state = early
+        perception = state.perception
+        try:
+            self._store_conversation_memory(
+                user_input, response, perception, state.emotion
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"early-route conversation memory failed: {e}")
+        try:
+            from ..memory import Turn
+
+            self.working_memory.update(
+                Turn(
+                    user_input=user_input,
+                    genesis_response=response,
+                    topics=list(perception.topics),
+                    intent=perception.intent.value,
+                ),
+                neuro_summary=self._last_summary,
+                brain_waves=getattr(self.language, "current_brain_waves", None),
+            )
+            self.memory.add_turn(
+                "user",
+                user_input,
+                topics=perception.topics,
+                sentiment=perception.sentiment,
+            )
+            self.memory.add_turn(
+                "genesis",
+                response,
+                topics=perception.topics,
+                sentiment=state.emotion.valence,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"early-route turn record failed: {e}")
 
     def _think_setup(self) -> tuple[dict[str, float], float]:
         """Initialize per-think bookkeeping and return (timing, t0).
@@ -6570,7 +6674,9 @@ class CognitionEngine:
         result = self._deliberate_learnable_reflection(perception, emotion, memory)
         if result is not None:
             return result
-        return self._deliberate_feedback_fallback(perception, emotion, memory, reasoning_results)
+        return self._deliberate_feedback_fallback(
+            perception, emotion, memory, reasoning_results, user_input
+        )
 
     def _deliberate_math_greetings(
         self, perception: Perception, emotion: EmotionalState, memory: MemoryContext
@@ -7075,6 +7181,7 @@ class CognitionEngine:
         emotion: EmotionalState,
         memory: MemoryContext,
         reasoning_results: list[ReasoningResult] | None,
+        user_input: str = "",
     ) -> Thought:
         """Priorities 13–17 + fallback: feedback, question, request, command, statement."""
         # Priority 13: Feedback → acknowledge (but try to learn first)
@@ -7083,7 +7190,10 @@ class CognitionEngine:
 
         # Priority 14: Question → try to answer
         if perception.intent == Intent.QUESTION:
-            return self._handle_question(perception, emotion, memory, reasoning_results)
+            return self._handle_question(
+                perception, emotion, memory, reasoning_results,
+                resolved_text=user_input or None,
+            )
 
         # Priority 15: Request → respond to capability
         if perception.intent == Intent.REQUEST:
@@ -7288,14 +7398,19 @@ class CognitionEngine:
         emotion: EmotionalState,
         memory: MemoryContext,
         reasoning_results: list[ReasoningResult] | None = None,
+        resolved_text: str | None = None,
     ) -> Thought:
         """Handle a general question.
 
-        Delegates to the QuestionHandler subsystem.
+        Delegates to the QuestionHandler subsystem. ``resolved_text``
+        is the anaphora-resolved utterance — what comprehension heard —
+        so the relation query reads "what does it eat?" as "what does
+        <referent> eat?".
         """
         return self._question_handler.handle_question(
             perception, emotion, memory, reasoning_results,
             retrieve_episode=self.memory.retrieve_episode,
+            resolved_text=resolved_text,
         )
 
     def _resolve_topics(self, topics: list[str], raw_text: str) -> list[str]:

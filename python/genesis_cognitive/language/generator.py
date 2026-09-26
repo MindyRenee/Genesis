@@ -67,6 +67,29 @@ _INCOMPLETE_COPULA_BOUNDARY_RE = re.compile(
     re.IGNORECASE,
 )
 
+
+def _is_plain_content_frame(structure: SentenceStructure) -> bool:
+    """True when a structure is just ``{content}`` plus punctuation.
+
+    Frames that place real words or other slots around the content
+    ("I am {content}.", "{content} and that's because
+    {reason_clause}.") assume the slot holds a single clause.
+    Composed content — knowledge statements, memory-woven answers —
+    is already a complete multi-sentence utterance; wrapping it in
+    another frame glues declarative tails onto internal sentence
+    breaks ("...land for you?. And that's because...").
+    """
+    has_content = False
+    for seg in structure.segments:
+        if isinstance(seg, Slot):
+            if seg.name == "content":
+                has_content = True
+            else:
+                return False
+        elif isinstance(seg, Literal) and seg.text.strip(" .?!,;:—-()"):
+            return False
+    return has_content
+
 # Function words excluded from content-word overlap comparison in the
 # near-duplicate dedup. These are pronouns, articles, and short
 # function words that vary freely between near-identical sentences
@@ -784,6 +807,24 @@ class GenerativeEngine(LanguageEngine):
                 self.grammar.get_structures(intent),
                 context["self_fragments"],
             )
+
+        # Composed knowledge content is already a complete
+        # multi-sentence statement — definition, relationship clauses,
+        # discovery, memory, and a confidence closing are composed
+        # inside the vocabulary. Frames that glue a tail onto
+        # {content} ("{content} and that's because {reason_clause}.")
+        # assume the slot is a single clause, and follow-up sentences
+        # would stack hedges onto a finished paragraph. Restrict to a
+        # plain carrier so the composed text stands on its own.
+        if context.get("knowledge") or context.get("definition"):
+            plain = [
+                s
+                for s in (pool or self.grammar.get_structures(intent))
+                if _is_plain_content_frame(s)
+            ]
+            if plain:
+                pool = plain
+                num_sentences = 1
 
         # Select the first (content-bearing) sentence structure
         emotion_weight = emotion.creativity * 0.5 + emotion.openness_to_engage * 0.5

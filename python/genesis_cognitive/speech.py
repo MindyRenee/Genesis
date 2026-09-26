@@ -39,8 +39,38 @@ logger = logging.getLogger(__name__)
 # ─── Paths ────────────────────────────────────────────────────────
 _VOICES_DIR = Path(__file__).parent.parent / "voices"
 _PIPER_BIN = _VOICES_DIR / "piper"
-_PIPER_MODEL = _VOICES_DIR / "amy-medium.onnx"
-_PIPER_MODEL_FALLBACK = _VOICES_DIR / "amy-low.onnx"
+
+# Voice models in preference order. Models live in the voices dir
+# (gitignored — large binaries fetched separately). Set GENESIS_VOICE
+# to a model filename or stem (e.g. "en_US-kristin-medium") to choose
+# a specific installed voice; otherwise the first available wins.
+_PIPER_MODEL_PREFERENCE = (
+    "amy-medium.onnx",
+    "en_US-hfc_female-medium.onnx",
+    "en_US-kristin-medium.onnx",
+    "en_GB-cori-medium.onnx",
+    "en_GB-semaine-medium.onnx",
+    "amy-low.onnx",
+)
+
+
+def _select_piper_model() -> Path | None:
+    """Choose the Piper voice model: GENESIS_VOICE override first,
+    then the preference order, then any installed .onnx as a last
+    resort. Returns None when no model file is installed."""
+    requested = os.environ.get("GENESIS_VOICE", "").strip()
+    if requested:
+        name = requested if requested.endswith(".onnx") else f"{requested}.onnx"
+        model = _VOICES_DIR / name
+        if model.exists():
+            return model
+        logger.warning(f"GENESIS_VOICE={requested}: {name} not found in {_VOICES_DIR}")
+    for filename in _PIPER_MODEL_PREFERENCE:
+        model = _VOICES_DIR / filename
+        if model.exists():
+            return model
+    models = sorted(_VOICES_DIR.glob("*.onnx"))
+    return models[0] if models else None
 
 VOSK_MODEL_DIR = Path.home() / ".local" / "share" / "vosk-models"
 VOSK_MODEL_NAME = "vosk-model-small-en-us-0.15"
@@ -119,13 +149,7 @@ class Voice:
         """Detect available TTS backends and load the Piper voice model."""
         self._piper_available = self._check_piper()
         self._espeak_available = self._check_espeak()
-        self._model = (
-            _PIPER_MODEL
-            if _PIPER_MODEL.exists()
-            else _PIPER_MODEL_FALLBACK
-            if _PIPER_MODEL_FALLBACK.exists()
-            else None
-        )
+        self._model = _select_piper_model()
         self._sample_rate = 22050
         if self._model is not None:
             config_path = self._model.with_name(self._model.name + ".json")

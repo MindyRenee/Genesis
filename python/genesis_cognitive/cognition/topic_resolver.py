@@ -98,6 +98,17 @@ class TopicResolver:
                 candidates.append(word[:-1])
             if net.get_concept(word[:-2]):
                 candidates.append(word[:-2])
+        # Try singular (ves → f/fe: wolves → wolf, knives → knife)
+        if word.endswith("ves"):
+            if net.get_concept(word[:-3] + "f"):
+                candidates.append(word[:-3] + "f")
+            if net.get_concept(word[:-3] + "fe"):
+                candidates.append(word[:-3] + "fe")
+        # Try plural (f/fe → ves: wolf → wolves, knife → knives)
+        if word.endswith("fe") and net.get_concept(word[:-2] + "ves"):
+            candidates.append(word[:-2] + "ves")
+        if word.endswith("f") and net.get_concept(word[:-1] + "ves"):
+            candidates.append(word[:-1] + "ves")
         # Try verb inflections (-ing)
         if word.endswith("ing"):
             if net.get_concept(word[:-3]):
