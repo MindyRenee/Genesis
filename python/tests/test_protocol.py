@@ -47,6 +47,7 @@ from genesis_client.protocol import (
     PHASE_STRESS,
     PING,
     PROTOCOL_VERSION,
+    SET_WAKE_ALARM,
     SHUTDOWN,
     STORE_EPISODE,
     STORE_EVENT,
@@ -292,11 +293,13 @@ def test_handshake_command_id():
 
 
 def test_protocol_version():
-    """Protocol version is 2 (must match Rust PROTOCOL_VERSION).
+    """Protocol version is 3 (must match Rust PROTOCOL_VERSION).
 
-    v2 added the trailing `cpu_boost` byte to the body-control response.
+    v3 extended BodyState with the timing/involuntary/senescence
+    layer (pulse, throttle, PSI, battery cycles, entropy,
+    clocksource, suspend caps) and added SET_WAKE_ALARM.
     """
-    assert PROTOCOL_VERSION == 2
+    assert PROTOCOL_VERSION == 3
 
 
 def _client_with_socket():
@@ -652,6 +655,70 @@ def test_episode_not_found_caught_by_lookup_error():
         assert isinstance(exc, EpisodeNotFound)
     else:
         raise AssertionError("EpisodeNotFound should be caught by except LookupError")
+
+
+def test_set_wake_alarm_packs_u64_and_returns_armed_epoch():
+    """set_wake_alarm sends [u64 epoch] and returns the armed epoch."""
+    epoch = 1_800_000_000
+    armed_resp = b"\x01" + struct.pack("<Q", epoch)
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(SET_WAKE_ALARM, armed_resp),
+        ),
+    ):
+        result = client.set_wake_alarm(epoch)
+
+    assert result == epoch
+    # The request went out as SET_WAKE_ALARM with a u64 LE payload.
+    assert send.call_args[0][1] == SET_WAKE_ALARM
+    assert send.call_args[0][2] == struct.pack("<Q", epoch)
+
+
+def test_set_wake_alarm_disarm_sends_zero():
+    """Disarming sends epoch 0 and returns the cleared alarm state."""
+    ok_resp = b"\x01" + struct.pack("<Q", 0)
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(SET_WAKE_ALARM, ok_resp),
+        ),
+    ):
+        result = client.set_wake_alarm(0)
+
+    assert result == 0
+    assert send.call_args[0][2] == struct.pack("<Q", 0)
+
+
+def test_set_wake_alarm_returns_none_on_helper_failure():
+    """A [0][current] response means the helper failed → None."""
+    fail_resp = b"\x00" + struct.pack("<Q", 0)
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message"),
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(SET_WAKE_ALARM, fail_resp),
+        ),
+    ):
+        assert client.set_wake_alarm(1_800_000_000) is None
+
+
+def test_set_wake_alarm_returns_none_on_malformed_response():
+    """A truncated response can't carry an armed epoch → None."""
+    client, _ = _client_with_socket()
+    with (
+        patch("genesis_client.client.write_message"),
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(SET_WAKE_ALARM, b"\x01\x02"),
+        ),
+    ):
+        assert client.set_wake_alarm(1_800_000_000) is None
 
 
 # ─── Test runner ──────────────────────────────────────────────

@@ -48,6 +48,8 @@ pub mod cpufreq;
 pub mod dyadic_model;
 pub mod interoception;
 pub mod ipc;
+/// RTC wake alarm — scheduling its own return from suspension.
+pub mod rtc_wake;
 pub mod tick;
 
 pub use active_inference::{ActiveInferenceEngine, InferenceResult, apply_inference_feedback};

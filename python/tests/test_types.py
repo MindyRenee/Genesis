@@ -581,6 +581,194 @@ def test_body_state_unpack_too_short() -> None:
         BodyState.unpack(b"\x00\x00\x00")
 
 
+def test_body_state_unpack_v3_pulse_layer() -> None:
+    """A v3 packet (pulse/involuntary/senescence fields) unpacks correctly.
+
+    The v3 layout appends 9 f32 + 2 u8 between branch_miss_rate and
+    desc_len (offset 112). Older tiers must still parse: this test
+    also guards that a full packet's desc_len at 112 isn't mistaken
+    for the v1 desc_len at 54 or the v2 desc_len at 74.
+    """
+    data = bytearray()
+    data.extend(_F32.pack(63.0))    # cpu_temp_c
+    data.extend(_F32.pack(0.63))    # temperature
+    data.extend(_F32.pack(0.8))     # arousal_freq
+    data.extend(_F32.pack(0.5))     # cognitive_load
+    data.extend(_F32.pack(0.3))     # io_activity
+    data.extend(_F32.pack(0.6))     # stress_load
+    data.extend(_F32.pack(0.9))     # energy_reserve
+    data.append(1)                  # on_ac_power
+    data.extend(_U32.pack(4))       # num_cores
+    data.append(0)                  # distressed
+    data.extend(_F32.pack(2.0))     # autonomic_rate
+    data.extend(_F32.pack(0.3))     # thermoregulatory_effort
+    data.extend(_F32.pack(0.15))    # metabolic_rate
+    data.extend(_F32.pack(0.92))    # core_voltage
+    data.extend(_F32.pack(12.5))    # supply_voltage
+    # v2 silicon layer
+    data.extend(_F32.pack(0.4))     # core_activity
+    data.extend(_F32.pack(0.2))     # uncore_activity
+    data.extend(_F32.pack(0.5))     # dram_activity
+    data.extend(_F32.pack(0.03))    # cache_miss_rate
+    data.extend(_F32.pack(0.02))    # branch_miss_rate
+    # v3 timing/involuntary/senescence layer
+    data.extend(_F32.pack(4100.0))  # pulse_hz — cores beating
+    data.extend(_F32.pack(0.9))     # pulse (normalized)
+    data.extend(_F32.pack(0.25))    # throttle_state — mild throttle
+    data.extend(_F32.pack(0.55))    # top_freq_share
+    data.extend(_F32.pack(0.12))    # psi_cpu
+    data.extend(_F32.pack(0.04))    # psi_io
+    data.extend(_F32.pack(0.08))    # psi_mem
+    data.extend(_F32.pack(361.0))   # battery_cycles
+    data.extend(_F32.pack(1.0))     # entropy_level
+    data.append(1)                  # clocksource = tsc
+    data.append(3)                  # suspend_caps = mem + wakealarm
+    desc = "Pulse steady, mild throttle."
+    data.extend(_U32.pack(len(desc)))  # desc_len at offset 112
+    data.extend(desc.encode("utf-8"))
+
+    body = BodyState.unpack(bytes(data))
+    assert approx_equal(body.cpu_temp_c, 63.0)
+    assert approx_equal(body.core_activity, 0.4)
+    assert approx_equal(body.branch_miss_rate, 0.02)
+    # The v3 fields arrive intact.
+    assert approx_equal(body.pulse_hz, 4100.0)
+    assert approx_equal(body.pulse, 0.9)
+    assert approx_equal(body.throttle_state, 0.25)
+    assert approx_equal(body.top_freq_share, 0.55)
+    assert approx_equal(body.psi_cpu, 0.12)
+    assert approx_equal(body.psi_mem, 0.08)
+    assert approx_equal(body.battery_cycles, 361.0)
+    assert approx_equal(body.entropy_level, 1.0)
+    assert body.clocksource == 1
+    assert body.suspend_caps == 3
+    assert body.description == "Pulse steady, mild throttle."
+
+
+def test_body_state_unpack_v3_with_zeroed_silicon_fields() -> None:
+    """A v3 packet whose f32 at offset 54 is 0.0 must still parse as v3.
+
+    Regression: the v1/v2/v3 probes used to accept a candidate
+    desc_len with `<=` trailer length. On machines without powercap
+    the silicon layer is all 0.0 — whose bits are u32 0, satisfying
+    `<=` for ANY length — so v3 packets on such hardware were
+    misdetected as v1 and every post-offset-54 field was zeroed.
+    Exact `==` matching prevents the collision.
+    """
+    data = bytearray()
+    data.extend(_F32.pack(61.0))    # cpu_temp_c
+    data.extend(_F32.pack(0.61))    # temperature
+    data.extend(_F32.pack(0.5))     # arousal_freq
+    data.extend(_F32.pack(0.4))     # cognitive_load
+    data.extend(_F32.pack(0.1))     # io_activity
+    data.extend(_F32.pack(0.3))     # stress_load
+    data.extend(_F32.pack(1.0))     # energy_reserve
+    data.append(1)                  # on_ac_power
+    data.extend(_U32.pack(4))       # num_cores
+    data.append(0)                  # distressed
+    data.extend(_F32.pack(1.0))     # autonomic_rate
+    data.extend(_F32.pack(0.2))     # thermoregulatory_effort
+    data.extend(_F32.pack(0.1))     # metabolic_rate
+    data.extend(_F32.pack(0.9))     # core_voltage
+    data.extend(_F32.pack(12.6))    # supply_voltage
+    # Silicon layer entirely 0.0 — the no-powercap machine. Its
+    # first field sits at offset 54 where the v1 probe reads a
+    # candidate desc_len: f32 0.0 == u32 0 used to falsely match.
+    data.extend(_F32.pack(0.0))     # core_activity   (offset 54)
+    data.extend(_F32.pack(0.0))     # uncore_activity
+    data.extend(_F32.pack(0.0))     # dram_activity
+    data.extend(_F32.pack(0.0))     # cache_miss_rate
+    data.extend(_F32.pack(0.0))     # branch_miss_rate
+    # v3 layer — nonzero so detection is proven by these fields.
+    data.extend(_F32.pack(3910.0))  # pulse_hz
+    data.extend(_F32.pack(0.98))    # pulse
+    data.extend(_F32.pack(0.0))     # throttle_state
+    data.extend(_F32.pack(0.5))     # top_freq_share
+    data.extend(_F32.pack(0.02))    # psi_cpu
+    data.extend(_F32.pack(0.01))    # psi_io
+    data.extend(_F32.pack(0.03))    # psi_mem
+    data.extend(_F32.pack(354.0))   # battery_cycles
+    data.extend(_F32.pack(1.0))     # entropy_level
+    data.append(1)                  # clocksource = tsc
+    data.append(3)                  # suspend_caps
+    data.extend(_U32.pack(0))       # desc_len = 0 at offset 112
+
+    body = BodyState.unpack(bytes(data))
+    assert approx_equal(body.pulse_hz, 3910.0)
+    assert approx_equal(body.battery_cycles, 354.0)
+    assert body.clocksource == 1
+    assert body.suspend_caps == 3
+
+
+def test_body_state_unpack_v2_with_zeroed_silicon_fields() -> None:
+    """A v2 packet with all-zero silicon fields must still parse as v2.
+
+    Same regression class as the v3 case: f32 0.0 at offset 54 must
+    not be mistaken for the v1 desc_len.
+    """
+    data = bytearray()
+    data.extend(_F32.pack(50.0))
+    data.extend(_F32.pack(0.5))
+    data.extend(_F32.pack(0.6))
+    data.extend(_F32.pack(0.4))
+    data.extend(_F32.pack(0.1))
+    data.extend(_F32.pack(0.2))
+    data.extend(_F32.pack(1.0))
+    data.append(1)
+    data.extend(_U32.pack(4))
+    data.append(0)
+    data.extend(_F32.pack(2.0))
+    data.extend(_F32.pack(0.3))
+    data.extend(_F32.pack(0.1))
+    data.extend(_F32.pack(0.9))
+    data.extend(_F32.pack(12.6))
+    data.extend(_F32.pack(0.0))     # core_activity — 0.0, offset 54
+    data.extend(_F32.pack(0.0))
+    data.extend(_F32.pack(0.0))
+    data.extend(_F32.pack(0.0))
+    data.extend(_F32.pack(0.0))     # branch_miss_rate (offset 70)
+    desc = "quiet silicon"
+    data.extend(_U32.pack(len(desc)))  # desc_len at offset 74
+    data.extend(desc.encode("utf-8"))
+
+    body = BodyState.unpack(bytes(data))
+    # Parses as v2: silicon fields zero, description intact, and the
+    # v3 fields default to zero.
+    assert body.description == "quiet silicon"
+    assert body.pulse_hz == 0.0
+    assert body.clocksource == 0
+
+
+def test_body_state_unpack_v2_fields_default_on_v1() -> None:
+    """v1 packets unpack with zeroed v2/v3 fields (graceful default)."""
+    data = bytearray()
+    data.extend(_F32.pack(52.0))
+    data.extend(_F32.pack(0.52))
+    data.extend(_F32.pack(0.7))
+    data.extend(_F32.pack(0.4))
+    data.extend(_F32.pack(0.1))
+    data.extend(_F32.pack(0.2))
+    data.extend(_F32.pack(1.0))
+    data.append(1)
+    data.extend(_U32.pack(4))
+    data.append(0)
+    data.extend(_F32.pack(3.5))
+    data.extend(_F32.pack(0.6))
+    data.extend(_F32.pack(0.2))
+    data.extend(_F32.pack(0.92))
+    data.extend(_F32.pack(12.6))
+    data.extend(_U32.pack(0))  # desc_len = 0 at offset 54
+
+    body = BodyState.unpack(bytes(data))
+    assert body.pulse_hz == 0.0
+    assert body.pulse == 0.0
+    assert body.throttle_state == 0.0
+    assert body.psi_cpu == 0.0
+    assert body.battery_cycles == 0.0
+    assert body.clocksource == 0
+    assert body.suspend_caps == 0
+
+
 # ─── BodyControlState tests ───────────────────────────────────
 
 

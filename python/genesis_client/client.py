@@ -109,6 +109,7 @@ from .protocol import (
     RETRIEVE_EPISODE,
     SAVE_INFERENCE,
     SEARCH_EPISODES,
+    SET_WAKE_ALARM,
     SET_ZONE,
     SHUTDOWN,
     STORE_EPISODE,
@@ -492,6 +493,24 @@ class GenesisClient:
         """
         resp = self._request(GET_SUBSYSTEM_TELEMETRY, timeout=timeout)
         return SubsystemReport.unpack(resp)
+
+    def set_wake_alarm(
+        self, epoch_secs: int, *, timeout: float | None = None
+    ) -> int | None:
+        """Arm or disarm the RTC wake alarm — when the machine exists next.
+
+        ``epoch_secs`` is a Unix timestamp; 0 disarms. Returns the
+        alarm epoch the hardware reports afterward (0 = none armed),
+        or ``None`` if the daemon could not arm it (helper missing or
+        sudo not installed — see ``scripts/install_sudoers.sh``).
+
+        This only schedules the wake interrupt; it does NOT suspend
+        the machine. Suspending stays a separate deliberate act.
+        """
+        resp = self._request(SET_WAKE_ALARM, _U64.pack(epoch_secs), timeout=timeout)
+        if len(resp) < 9 or resp[0] != 1:
+            return None
+        return _U64.unpack(resp[1:9])[0]
 
     def get_body_control(self, *, timeout: float | None = None) -> BodyControlState:
         """Get the body control state — what Genesis is doing to its body.

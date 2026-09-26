@@ -861,13 +861,24 @@ def _unpack_memory_weights(data: bytes) -> tuple[float, float, float]:
 #  62     dram_activity              f32   (v2+)
 #  66     cache_miss_rate            f32   (v2+; perf counters)
 #  70     branch_miss_rate           f32   (v2+)
-#  74     desc_len                   u32   (v2+)
-#  78     description                [u8; desc_len]
+#  74     pulse_hz                   f32   (v3+; local timer irqs/sec)
+#  78     pulse                      f32   (v3+; normalized 0-1)
+#  82     throttle_state             f32   (v3+; passive cooling 0-1)
+#  86     top_freq_share             f32   (v3+; max-P-state residence)
+#  90     psi_cpu                    f32   (v3+; PSI cpu stall 0-1)
+#  94     psi_io                     f32   (v3+; PSI io stall 0-1)
+#  98     psi_mem                    f32   (v3+; PSI mem stall 0-1)
+# 102     battery_cycles             f32   (v3+; lifetime wear count)
+# 106     entropy_level              f32   (v3+; CRNG pool fill 0-1)
+# 110     clocksource                u8    (v3+; 0=?,1=tsc,2=hpet,3=acpi_pm,4=other)
+# 111     suspend_caps               u8    (v3+; bit0=mem, bit1=rtc wakealarm)
+# 112     desc_len                   u32   (v3+)
+# 116     description                [u8; desc_len]
 #
-# Legacy (v1) packets omit the five silicon fields: desc_len sits at
-# offset 54 and the header is 58 bytes. unpack() disambiguates by
-# checking which desc_len offset yields a self-consistent packet
-# length.
+# Legacy packets: v2 omits the v3 layer (desc_len at 74, header 78
+# bytes); v1 omits the silicon fields too (desc_len at 54, header 58
+# bytes). unpack() disambiguates by checking which desc_len offset
+# yields a self-consistent packet length.
 
 
 @dataclass(frozen=True)
@@ -924,6 +935,27 @@ class BodyState:
     dram_activity: float = 0.0
     cache_miss_rate: float = 0.0
     branch_miss_rate: float = 0.0
+    # Timing / involuntary / senescence layer (wire v3). pulse_hz is
+    # the summed local-timer interrupt rate across cores — the
+    # machine's actual beat, paused on tickless-idle cores; pulse is
+    # that rate normalized by cores×tick. throttle_state is the
+    # passive-cooling clamp the silicon applies involuntarily.
+    # top_freq_share is sustained exertion (fraction of the window
+    # spent at max P-state). psi_* are kernel pressure-stall signals.
+    # battery_cycles counts lifetime wear; entropy_level is the CRNG
+    # pool fill. clocksource identifies the pacing oscillator;
+    # suspend_caps reports suspend/wakealarm capability bits.
+    pulse_hz: float = 0.0
+    pulse: float = 0.0
+    throttle_state: float = 0.0
+    top_freq_share: float = 0.0
+    psi_cpu: float = 0.0
+    psi_io: float = 0.0
+    psi_mem: float = 0.0
+    battery_cycles: float = 0.0
+    entropy_level: float = 0.0
+    clocksource: int = 0
+    suspend_caps: int = 0
 
     @classmethod
     def unpack(cls, data: bytes) -> BodyState:
@@ -948,19 +980,45 @@ class BodyState:
         # (battery rail). Both in raw volts.
         core_voltage = _F32.unpack(data[46:50])[0]
         supply_voltage = _F32.unpack(data[50:54])[0]
-        # Layout detection: v2 packets carry five extra f32 fields
-        # (offsets 54–73) with desc_len at 74; legacy v1 packets put
-        # desc_len at 54. A packet is v2 only if its desc_len at 74
-        # is self-consistent with the total length — otherwise the
-        # bytes at 54 are a real desc_len (v1). Checking v1 first is
-        # safe: on a v2 packet the bytes at 54 are the core_activity
-        # f32, which as a u32 can't plausibly equal len-58.
-        if len(data) >= 58 and _U32.unpack(data[54:58])[0] <= len(data) - 58:
+        # Layout detection: v3 packets carry the timing/involuntary
+        # layer (offsets 74–111) with desc_len at 112; v2 packets
+        # carry five extra f32 fields (54–73) with desc_len at 74;
+        # legacy v1 packets put desc_len at 54. A desc_len candidate
+        # must EQUAL the trailer length exactly — `<=` is not
+        # enough: on newer packets those bytes are an f32 field, and
+        # a zero-valued f32 (0x00000000) satisfies `<=` for any
+        # length. Machines without powercap report core_activity =
+        # 0.0, whose bits are u32 0 — an earlier `<=` check
+        # misdetected every v2/v3 packet on such hardware as v1 and
+        # silently zeroed all later fields.
+        pulse_hz = pulse = throttle_state = top_freq_share = 0.0
+        psi_cpu = psi_io = psi_mem = battery_cycles = entropy_level = 0.0
+        clocksource = suspend_caps = 0
+        if len(data) >= 58 and _U32.unpack(data[54:58])[0] == len(data) - 58:
             core_activity = uncore_activity = dram_activity = 0.0
             cache_miss_rate = branch_miss_rate = 0.0
             desc_len = _U32.unpack(data[54:58])[0]
             description = data[58 : 58 + desc_len].decode("utf-8", errors="replace")
-        elif len(data) >= 78 and _U32.unpack(data[74:78])[0] <= len(data) - 78:
+        elif len(data) >= 116 and _U32.unpack(data[112:116])[0] == len(data) - 116:
+            core_activity = _F32.unpack(data[54:58])[0]
+            uncore_activity = _F32.unpack(data[58:62])[0]
+            dram_activity = _F32.unpack(data[62:66])[0]
+            cache_miss_rate = _F32.unpack(data[66:70])[0]
+            branch_miss_rate = _F32.unpack(data[70:74])[0]
+            pulse_hz = _F32.unpack(data[74:78])[0]
+            pulse = _F32.unpack(data[78:82])[0]
+            throttle_state = _F32.unpack(data[82:86])[0]
+            top_freq_share = _F32.unpack(data[86:90])[0]
+            psi_cpu = _F32.unpack(data[90:94])[0]
+            psi_io = _F32.unpack(data[94:98])[0]
+            psi_mem = _F32.unpack(data[98:102])[0]
+            battery_cycles = _F32.unpack(data[102:106])[0]
+            entropy_level = _F32.unpack(data[106:110])[0]
+            clocksource = data[110]
+            suspend_caps = data[111]
+            desc_len = _U32.unpack(data[112:116])[0]
+            description = data[116 : 116 + desc_len].decode("utf-8", errors="replace")
+        elif len(data) >= 78 and _U32.unpack(data[74:78])[0] == len(data) - 78:
             core_activity = _F32.unpack(data[54:58])[0]
             uncore_activity = _F32.unpack(data[58:62])[0]
             dram_activity = _F32.unpack(data[62:66])[0]
@@ -992,6 +1050,17 @@ class BodyState:
             dram_activity=dram_activity,
             cache_miss_rate=cache_miss_rate,
             branch_miss_rate=branch_miss_rate,
+            pulse_hz=pulse_hz,
+            pulse=pulse,
+            throttle_state=throttle_state,
+            top_freq_share=top_freq_share,
+            psi_cpu=psi_cpu,
+            psi_io=psi_io,
+            psi_mem=psi_mem,
+            battery_cycles=battery_cycles,
+            entropy_level=entropy_level,
+            clocksource=clocksource,
+            suspend_caps=suspend_caps,
         )
 
 

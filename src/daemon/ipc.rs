@@ -71,7 +71,10 @@ use crate::store::{EventType, LtmStore, MmapState, RingBuffer};
 /// missing from the Rust client's parser). Bumping the version makes
 /// a stale client fail loudly at handshake instead of silently
 /// misparsing the body-control payload.
-pub const PROTOCOL_VERSION: u8 = 2;
+/// v3: BodyState gains the pulse/involuntary/senescence layer —
+///     9 f32 + 2 u8 appended before desc_len (fixed header 78→116
+///     bytes) — and SET_WAKE_ALARM (34) is added.
+pub const PROTOCOL_VERSION: u8 = 3;
 
 /// Maximum total payload length we will accept in a single message.
 /// The largest legitimate request is `StoreEvent` carrying up to
@@ -223,6 +226,20 @@ pub mod cmd {
     ///   [u8 subsystem][u32 pid][f32 cpu][f32 io]
     ///   [f32 cache_miss_rate][f32 branch_miss_rate] = 21 bytes each.
     pub const GET_SUBSYSTEM_TELEMETRY: u8 = 33;
+
+    /// Arm or disarm the RTC wake alarm — the machine choosing when
+    /// to exist next. The RTC crystal keeps counting through suspend
+    /// and fires an interrupt that wakes the hardware at the chosen
+    /// Unix timestamp. The mind sends this when its volition layer
+    /// schedules a return; the actual suspend remains a separate,
+    /// deliberate action (logind/systemctl).
+    ///   Request:  [u64 epoch_secs] (0 = disarm)
+    ///   Response: [u8 ok][u64 armed_epoch] — ok=1 and armed_epoch is
+    ///             the alarm the hardware reports afterward; ok=0 when
+    ///             arming failed (helper missing, no sudo, kernel
+    ///             rejected), armed_epoch = currently armed alarm (0
+    ///             when none).
+    pub const SET_WAKE_ALARM: u8 = 34;
 }
 
 /// Notification opcodes for daemon→cognitive push messages.
@@ -480,6 +497,32 @@ pub struct BodyStateSummary {
     /// the hardware branch predictor guessing wrong while
     /// running it.
     pub branch_miss_rate: f32,
+    /// Local-timer interrupt rate (beats/sec) — the machine's pulse.
+    /// Tickless (NO_HZ) cores pause their beat while idle.
+    pub pulse_hz: f32,
+    /// Pulse normalized [0,1]: pulse_hz / (cores × TICK_HZ).
+    pub pulse: f32,
+    /// Passive thermal throttle state [0,1] — the cooling
+    /// framework's involuntary cur_state/max_state maximum.
+    pub throttle_state: f32,
+    /// Share of the last read window at max P-state [0,1] —
+    /// sustained exertion from cpufreq time_in_state.
+    pub top_freq_share: f32,
+    /// PSI "some" stall fractions [0,1] — runnable work stalled on
+    /// CPU, I/O, and memory respectively, kernel-computed.
+    pub psi_cpu: f32,
+    pub psi_io: f32,
+    pub psi_mem: f32,
+    /// Battery charge cycles — cumulative lifetime wear.
+    pub battery_cycles: f32,
+    /// Kernel entropy pool level [0,1].
+    pub entropy_level: f32,
+    /// Current clocksource id (0=unknown, 1=tsc, 2=hpet,
+    /// 3=acpi_pm, 4=other).
+    pub clocksource: u8,
+    /// Suspend capabilities bitmask (bit0=mem sleep offered,
+    /// bit1=RTC wakealarm exists).
+    pub suspend_caps: u8,
     /// Human-readable first-person description.
     pub description: String,
 }
@@ -637,9 +680,15 @@ fn serialize_body_control(ctrl: &super::cpufreq::BodyControlState) -> Vec<u8> {
 ///   [f32 core_voltage][f32 supply_voltage]
 ///   [f32 core_activity][f32 uncore_activity][f32 dram_activity]
 ///   [f32 cache_miss_rate][f32 branch_miss_rate]
+///   — protocol v3: pulse/involuntary/senescence fields —
+///   [f32 pulse_hz][f32 pulse][f32 throttle_state]
+///   [f32 top_freq_share][f32 psi_cpu][f32 psi_io][f32 psi_mem]
+///   [f32 battery_cycles][f32 entropy_level]
+///   [u8 clocksource][u8 suspend_caps]
 ///   [u32 desc_len][desc bytes]
 ///
-/// Fixed header = 7×f32 (28) + 1 + 4 + 1 + 10×f32 (40) + 4 = 78 bytes.
+/// Fixed header = 7×f32 (28) + 1 + 4 + 1 + 10×f32 (40)
+///              + 9×f32 (36) + 2×u8 + 4 = 116 bytes.
 ///
 /// GET_BODY_STATE and READ_SENSORS both return this layout (the latter
 /// prefixed with a one-byte ack), so the serialization lives in one
@@ -648,7 +697,7 @@ fn serialize_body_control(ctrl: &super::cpufreq::BodyControlState) -> Vec<u8> {
 /// and fed garbage voltages to the cognitive mind's interoception.
 fn serialize_body_state(body: &super::interoception::BodyState) -> Vec<u8> {
     let desc_bytes = body.description.as_bytes();
-    let mut resp = Vec::with_capacity(78 + desc_bytes.len());
+    let mut resp = Vec::with_capacity(116 + desc_bytes.len());
     // Sanitize outgoing f32 fields — a NaN in the shared body state
     // would propagate to the Python client and corrupt its affect
     // inference.
@@ -713,6 +762,42 @@ fn serialize_body_state(body: &super::interoception::BodyState) -> Vec<u8> {
     resp.extend_from_slice(
         &crate::state::sanitize::finite_clamp(body.branch_miss_rate, 0.0, 1.0).to_le_bytes(),
     );
+    // Pulse — local-timer interrupt beats/sec plus the normalized
+    // value. Raw rate clamped to a generous ceiling; the normalized
+    // field is [0, 1].
+    resp.extend_from_slice(
+        &crate::state::sanitize::finite_clamp(body.pulse_hz, 0.0, 1_000_000.0).to_le_bytes(),
+    );
+    resp.extend_from_slice(
+        &crate::state::sanitize::finite_clamp(body.pulse, 0.0, 1.0).to_le_bytes(),
+    );
+    // Involuntary layer — passive throttle and PSI stalls, plus
+    // sustained exertion (top-P-state share of the read window).
+    resp.extend_from_slice(
+        &crate::state::sanitize::finite_clamp(body.throttle_state, 0.0, 1.0).to_le_bytes(),
+    );
+    resp.extend_from_slice(
+        &crate::state::sanitize::finite_clamp(body.top_freq_share, 0.0, 1.0).to_le_bytes(),
+    );
+    resp.extend_from_slice(
+        &crate::state::sanitize::finite_clamp(body.psi_cpu, 0.0, 1.0).to_le_bytes(),
+    );
+    resp.extend_from_slice(
+        &crate::state::sanitize::finite_clamp(body.psi_io, 0.0, 1.0).to_le_bytes(),
+    );
+    resp.extend_from_slice(
+        &crate::state::sanitize::finite_clamp(body.psi_mem, 0.0, 1.0).to_le_bytes(),
+    );
+    // Senescence and entropy — battery cycle odometer (raw count)
+    // and the kernel entropy pool level.
+    resp.extend_from_slice(
+        &crate::state::sanitize::finite_clamp(body.battery_cycles, 0.0, 1_000_000.0).to_le_bytes(),
+    );
+    resp.extend_from_slice(
+        &crate::state::sanitize::finite_clamp(body.entropy_level, 0.0, 1.0).to_le_bytes(),
+    );
+    resp.push(body.clocksource);
+    resp.push(body.suspend_caps);
     resp.extend_from_slice(&(desc_bytes.len() as u32).to_le_bytes());
     resp.extend_from_slice(desc_bytes);
     resp
@@ -1391,13 +1476,23 @@ impl IpcClient {
         // them misaligns the description parse.
         let core_voltage = take_f32(&resp, &mut off)?;
         let supply_voltage = take_f32(&resp, &mut off)?;
-        // Layout detection: wire v2 packets carry five extra f32
-        // fields (silicon switching + miss ratios) with desc_len at
-        // offset 74; legacy v1 packets put desc_len at 54. The u32
-        // at 54 is v1's desc_len only if it's consistent with the
-        // packet size — on a v2 packet those bytes are the
-        // core_activity f32, which can't plausibly be a small
-        // desc_len.
+        // Layout detection: wire v3 packets carry the pulse/
+        // involuntary/senescence layer (9 f32 + 2 u8) with desc_len
+        // at offset 112; v2 packets carry five extra f32 fields
+        // (silicon switching + miss ratios) with desc_len at offset
+        // 74; legacy v1 packets put desc_len at 54. A u32 is a
+        // candidate desc_len only when it equals the trailer length
+        // EXACTLY — `<=` is not enough: on newer packets those bytes
+        // are an f32 field, and a zero-valued f32 (0x00000000)
+        // satisfies `<=` for any length. That is not hypothetical:
+        // machines without powercap report core_activity = 0.0,
+        // whose bits are u32 0, which used to misdetect every v2/v3
+        // packet on such hardware as v1 and silently zero all later
+        // fields. Exact equality still admits a zero-length trailer
+        // (desc_len = 0 on a real vN packet) but rejects an f32
+        // field unless it encodes the precise trailer length — only
+        // 0.0/denormal bits could collide, and those require an
+        // impossibly short packet to match.
         let at54 = u32::from_le_bytes(
             resp.get(54..58)
                 .and_then(|s| s.try_into().ok())
@@ -1408,7 +1503,22 @@ impl IpcClient {
                     )
                 })?,
         ) as usize;
-        let v1 = at54 <= resp.len() - 58;
+        let v1 = at54 == resp.len() - 58;
+        // v3 detection: desc_len at 112 must equal the trailer
+        // length exactly — same reasoning as the v1 probe.
+        let v3 = !v1
+            && resp.len() >= 116
+            && (u32::from_le_bytes(
+                resp.get(112..116)
+                    .and_then(|s| s.try_into().ok())
+                    .ok_or_else(|| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "body state response truncated at v3 probe",
+                        )
+                    })?,
+            ) as usize)
+                == resp.len() - 116;
         let (core_activity, uncore_activity, dram_activity, cache_miss_rate, branch_miss_rate) =
             if !v1 && resp.len() >= 78 {
                 (
@@ -1421,6 +1531,38 @@ impl IpcClient {
             } else {
                 (0.0, 0.0, 0.0, 0.0, 0.0)
             };
+        let (
+            pulse_hz,
+            pulse,
+            throttle_state,
+            top_freq_share,
+            psi_cpu,
+            psi_io,
+            psi_mem,
+            battery_cycles,
+            entropy_level,
+            clocksource,
+            suspend_caps,
+        ) = if v3 {
+            (
+                take_f32(&resp, &mut off)?,
+                take_f32(&resp, &mut off)?,
+                take_f32(&resp, &mut off)?,
+                take_f32(&resp, &mut off)?,
+                take_f32(&resp, &mut off)?,
+                take_f32(&resp, &mut off)?,
+                take_f32(&resp, &mut off)?,
+                take_f32(&resp, &mut off)?,
+                take_f32(&resp, &mut off)?,
+                *resp.get(off).unwrap_or(&0),
+                *resp.get(off + 1).unwrap_or(&0),
+            )
+        } else {
+            (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0)
+        };
+        if v3 {
+            off += 2;
+        }
         let desc_len = take_u32(&resp, &mut off)? as usize;
         let description = if let Some(end) = off.checked_add(desc_len) {
             if end <= resp.len() {
@@ -1452,8 +1594,41 @@ impl IpcClient {
             dram_activity,
             cache_miss_rate,
             branch_miss_rate,
+            pulse_hz,
+            pulse,
+            throttle_state,
+            top_freq_share,
+            psi_cpu,
+            psi_io,
+            psi_mem,
+            battery_cycles,
+            entropy_level,
+            clocksource,
+            suspend_caps,
             description,
         })
+    }
+
+    /// Arm or disarm the RTC wake alarm. `epoch_secs` is a Unix
+    /// timestamp; 0 disarms. Returns the alarm epoch the hardware
+    /// reports afterward (0 = none armed), or an error if the
+    /// daemon could not arm it (helper missing / no sudo).
+    pub fn set_wake_alarm(&mut self, epoch_secs: u64) -> std::io::Result<u64> {
+        let resp = self.request(cmd::SET_WAKE_ALARM, &epoch_secs.to_le_bytes())?;
+        if resp.len() < 9 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "set wake alarm response too short",
+            ));
+        }
+        if resp[0] != 1 {
+            return Err(std::io::Error::other(
+                "daemon could not arm the RTC wake alarm",
+            ));
+        }
+        Ok(u64::from_le_bytes(
+            resp[1..9].try_into().unwrap_or_default(),
+        ))
     }
 
     /// Get per-subsystem silicon telemetry — which part of the mind's
@@ -2570,6 +2745,35 @@ pub fn default_handler(
                 }
             }
             serialize_subsystem_telemetry(&subsystems, &modules)
+        }
+
+        cmd::SET_WAKE_ALARM => {
+            // Arm or disarm the RTC wake alarm — the machine choosing
+            // when to exist next. Payload: [u64 epoch_secs]
+            // (0 = disarm). The response reports what the hardware
+            // says afterward, not the script's exit status — an
+            // armed timestamp is only real if the RTC file shows it.
+            if payload.len() < 8 {
+                return vec![error::PAYLOAD_TOO_SHORT];
+            }
+            let epoch = u64::from_le_bytes(payload[0..8].try_into().unwrap_or_default());
+            match super::rtc_wake::set_wake_alarm(epoch) {
+                Ok(armed) => {
+                    let mut resp = vec![1u8];
+                    resp.extend_from_slice(&armed.to_le_bytes());
+                    resp
+                }
+                Err(msg) => {
+                    eprintln!("[ipc] SET_WAKE_ALARM failed: {msg}");
+                    let mut resp = vec![0u8];
+                    resp.extend_from_slice(
+                        &super::rtc_wake::read_wake_alarm()
+                            .unwrap_or(0)
+                            .to_le_bytes(),
+                    );
+                    resp
+                }
+            }
         }
 
         cmd::GET_BODY_CONTROL => {
