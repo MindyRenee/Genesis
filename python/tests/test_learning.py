@@ -5,9 +5,7 @@ plasticity, three-factor STDP.
 """
 
 import logging
-import sys
 import time
-from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -19,6 +17,7 @@ from genesis_client.types import (
     LEARNING_POSTURE_RECOVERING,
     PlasticityProfile,
 )
+from genesis_cognitive.cognition.concept_learner import ConceptLearner
 from genesis_cognitive.concepts import ConceptNetwork, EmbeddingStore, NetworkTopology, RelationType
 from genesis_cognitive.emotion import EmotionalState
 from genesis_cognitive.learning import (
@@ -30,6 +29,7 @@ from genesis_cognitive.learning import (
     HippocampalEpisode,
     NeocorticalMemory,
     SpikeEvent,
+    SynapticStore,
     TDLearner,
     TDTransition,
 )
@@ -529,30 +529,12 @@ def test_concept_list_input(learner) -> None:
 # From tests/test_stdp.py
 # ======================================================================
 
-def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
-    """Cosine similarity — the correct metric for Oja-normalized updates.
-
-    The Oja rule shrinks vector norms (that's its purpose — preventing
-    unbounded growth). Raw dot product conflates alignment and magnitude,
-    so it can decrease even when vectors become more aligned. Cosine
-    similarity isolates the directional alignment.
-    """
-    na = np.linalg.norm(a)
-    nb = np.linalg.norm(b)
-    if na < 1e-12 or nb < 1e-12:
-        return 0.0
-    return float(np.dot(a, b) / (na * nb))
-
-
 @pytest.fixture
 def network_stdp() -> ConceptNetwork:
     """Network stdp."""
     net = ConceptNetwork()
     for name in ("tree", "plant", "flower", "garden", "dog", "cat", "animal"):
         net.add_concept(name, confidence=0.9, origin="test")
-        c = net.get_concept(name)
-        if c:
-            c.properties["definition"] = f"a thing called {name}"
     net.add_edge("tree", "plant", RelationType.IS_A, 0.9, origin="test")
     net.add_edge("flower", "plant", RelationType.IS_A, 0.9, origin="test")
     net.add_edge("dog", "animal", RelationType.IS_A, 0.9, origin="test")
@@ -561,15 +543,15 @@ def network_stdp() -> ConceptNetwork:
 
 
 @pytest.fixture
-def embeddings(network_stdp, tmp_path) -> EmbeddingStore:
-    """Embeddings."""
-    return EmbeddingStore(network_stdp, data_dir=str(tmp_path))
+def synapses() -> SynapticStore:
+    """Independent synaptic efficacy substrate."""
+    return SynapticStore()
 
 
 @pytest.fixture
-def stdp(embeddings, network_stdp) -> STDP:
-    """Stdp."""
-    return STDP(embeddings, network_stdp)
+def stdp(synapses, network_stdp) -> STDP:
+    """STDP operating on synaptic efficacy, not embeddings."""
+    return STDP(synapses, network_stdp)
 
 
 def test_stdp_weight_positive_delta_is_potentiation(stdp) -> None:
@@ -588,14 +570,13 @@ def test_stdp_weight_zero_delta_is_max_potentiation(stdp) -> None:
     """Δt = 0 (co-firing) → maximum LTP."""
     w_zero = stdp.compute_stdp_window(0.0)
     w_small = stdp.compute_stdp_window(1.0)
-    assert w_zero > w_small  # decay with increasing Δt
+    assert w_zero > w_small
 
 
 def test_stdp_exponential_decay(stdp) -> None:
     """LTP decays exponentially with Δt."""
     w1 = stdp.compute_stdp_window(5.0)
     w2 = stdp.compute_stdp_window(10.0)
-    # exp(-10/20) / exp(-5/20) = exp(-5/20) ≈ 0.78
     ratio = w2 / w1
     expected = np.exp(-5.0 / stdp.tau_plus)
     assert abs(ratio - expected) < 0.01
@@ -605,79 +586,34 @@ def test_stdp_depressive_bias(stdp) -> None:
     """A_minus > A_plus → net depressive bias at symmetric |Δt|."""
     w_pos = stdp.compute_stdp_window(10.0)
     w_neg = stdp.compute_stdp_window(-10.0)
-    assert abs(w_neg) > w_pos  # |LTD| > LTP
+    assert abs(w_neg) > w_pos
 
 
-def test_stdp_record_spike_potentiates(embeddings, stdp) -> None:
-    """Pre before post → embeddings move closer (potentiation).
-
-    Uses cosine similarity (not raw dot product) because the Oja
-    normalization rule shrinks vector norms — that's its purpose
-    (preventing unbounded growth). Raw dot product conflates alignment
-    and magnitude, so it can decrease even when vectors become more
-    aligned. The tolerance accounts for the Oja damping shrinking the
-    experiential slice relative to the unchanged spectral components,
-    which slightly shifts the full-vector direction.
-    """
-    v_tree_before = embeddings.get_concept_vector("tree").copy()
-    v_dog_before = embeddings.get_concept_vector("dog").copy()
-    sim_before = _cosine_similarity(v_tree_before, v_dog_before)
-
-    # tree spikes, then dog spikes 5ms later (pre before post → LTP)
+def test_stdp_record_spike_potentiates(stdp) -> None:
+    """Pre before post increases the corresponding synaptic efficacy."""
+    before = stdp.get_synaptic_weight("tree", "dog")
     stdp.record_spike("tree", 0.0)
     stdp.record_spike("dog", 5.0)
-
-    v_tree_after = embeddings.get_concept_vector("tree")
-    v_dog_after = embeddings.get_concept_vector("dog")
-    sim_after = _cosine_similarity(v_tree_after, v_dog_after)
-
-    assert sim_after >= sim_before - 1e-3
+    after = stdp.get_synaptic_weight("tree", "dog")
+    assert after > before
 
 
-def test_stdp_record_spike_depresses(embeddings, stdp) -> None:
-    """Post before pre → embeddings move apart (depression).
-
-    LTD occurs when the post spike fires BEFORE the pre spike
-    (Δt = t_post − t_pre < 0). In sequential recording, this is
-    achieved by recording the pre spike with an *earlier* logical
-    timestamp than an already-recorded post spike.
-    """
-    # First, potentiate tree-dog via causal LTP (tree pre before dog post)
-    for _ in range(20):
-        stdp.record_spike("tree", 0.0)
-        stdp.record_spike("dog", 5.0)
-    stdp.renormalize()
-    sim_before = _cosine_similarity(
-        embeddings.get_concept_vector("tree"),
-        embeddings.get_concept_vector("dog"),
-    )
-
-    # Clear history to prevent cross-phase interference (co-firing
-    # pairs from the LTP phase producing LTP at Δt=0 during LTD phase).
-    stdp.clear_history()
-
-    # Now trigger LTD: record tree (post) at t=5 ONCE, then dog (pre)
-    # at t=0 many times. Each dog spike looks back at tree at t=5,
-    # Δt = 0 − 5 = −5 < 0 → post (tree) fired before pre (dog) → LTD.
-    # We only record tree once to avoid generating LTP pairs (tree at 5
-    # looking back at dog at 0 would produce LTP).
-    stdp.record_spike("tree", 5.0)  # post at t=5
-    for _ in range(50):
-        stdp.record_spike("dog", 0.0)  # pre at t=0 → LTD
-    stdp.renormalize()
-    sim_after = _cosine_similarity(
-        embeddings.get_concept_vector("tree"),
-        embeddings.get_concept_vector("dog"),
-    )
-
-    assert sim_after <= sim_before + 1e-6
+def test_stdp_record_spike_depresses(stdp) -> None:
+    """Post before pre decreases an existing synaptic efficacy."""
+    stdp.synapses.set_weight("tree", "dog", 0.5)
+    before = stdp.get_synaptic_weight("tree", "dog")
+    stdp.record_spike("tree", 5.0)
+    stdp.record_spike("dog", 0.0)
+    after = stdp.get_synaptic_weight("tree", "dog")
+    assert after < before
 
 
 def test_stdp_statistics(stdp) -> None:
     """Statistics track potentiation and depression counts."""
+    stdp.synapses.set_weight("tree", "dog", 0.5)
+    stdp.synapses.set_weight("dog", "cat", 0.5)
     stdp.record_spike("tree", 0.0)
-    stdp.record_spike("dog", 5.0)  # tree pre, dog post, Δt=5 > 0 → LTP
-    # Record cat at t=2: dog is in history at t=5, Δt = 2−5 = −3 < 0 → LTD
+    stdp.record_spike("dog", 5.0)
     stdp.record_spike("cat", 2.0)
     stats = stdp.get_statistics()
     assert stats["total_potentiated"] >= 1
@@ -691,40 +627,20 @@ def test_spike_event_dataclass() -> None:
     assert ev.time_ms == 42.0
 
 
-def test_stdp_window_outside_range_skipped(embeddings, stdp) -> None:
+def test_stdp_window_outside_range_skipped(stdp) -> None:
     """Spikes outside the learning window produce no update."""
     stdp.record_spike("tree", 0.0)
-    # dog spikes 100ms later — outside the 40ms window
     stdp.record_spike("dog", 100.0)
     stats = stdp.get_statistics()
-    # No potentiation should have occurred (outside window)
     assert stats["total_potentiated"] == 0
 
 
-def test_stdp_non_monotonic_timestamps_finds_in_window_pairs(
-    embeddings, stdp
-) -> None:
-    """Spikes within the window are not skipped when out-of-window
-    entries appear earlier in the reversed deque.
-
-    The deque is ordered by insertion order, not by timestamp. When
-    timestamps are non-monotonic (e.g., the autonomous learner resets
-    its logical clock to t=0 each session), a recently-inserted spike
-    may have a larger t_other than an older-inserted one. The scan
-    must skip out-of-window entries with ``continue`` rather than
-    ``break``, otherwise valid in-window pairs are missed.
-    """
-    # tree spikes at t=0, 5, 100, 105 — simulating two sessions
-    # with non-monotonic logical clocks (0-5, then 100-105).
+def test_stdp_non_monotonic_timestamps_finds_in_window_pairs(stdp) -> None:
+    """Non-monotonic timestamps still find all in-window pairs."""
     for t in (0.0, 5.0, 100.0, 105.0):
         stdp.record_spike("tree", t)
-    # dog spikes at t=10 — within the 40ms window of tree's t=0 and t=5
-    # but outside the window of tree's t=100 and t=105.
     stdp.record_spike("dog", 10.0)
     stats = stdp.get_statistics()
-    # tree at t=0 (Δt=10) and t=5 (Δt=5) are within the 40ms window
-    # and should produce LTP. Without the fix, the break at t=105
-    # (Δt=-95, outside window) would skip both.
     assert stats["total_potentiated"] >= 2, (
         f"Expected >= 2 potentiated pairs from in-window spikes, "
         f"got {stats['total_potentiated']}"
@@ -732,8 +648,9 @@ def test_stdp_non_monotonic_timestamps_finds_in_window_pairs(
 
 
 # ======================================================================
-# From tests/test_td_learning.py
+# TD learning tests
 # ======================================================================
+
 
 @pytest.fixture
 def network_td_learning() -> ConceptNetwork:
@@ -1535,213 +1452,144 @@ class TestNetworkTopology:
 # ======================================================================
 
 
-def _make_mock_embeddings(concepts: list[str]) -> MagicMock:
-    """Create a mock EmbeddingStore with a concept matrix."""
-    n = len(concepts)
-    # Each concept gets a random unit vector in 16-dim space
-    rng = np.random.default_rng(42)
-    matrix = rng.standard_normal((n, 16))
-    norms = np.linalg.norm(matrix, axis=1, keepdims=True)
-    norms[norms < 1e-8] = 1.0
-    matrix = matrix / norms
-
-    emb = MagicMock()
-    emb.has_embeddings = True
-    emb._concept_matrix = matrix
-    emb._concept_to_idx = {c: i for i, c in enumerate(concepts)}
-    emb._spectral_dim = 0
-    emb._tfidf_offset = 0
-
-    def _get_vec(c) -> np.ndarray | None:
-        """Look up a concept's embedding vector, or None if unknown."""
-        if c in emb._concept_to_idx:
-            return matrix[emb._concept_to_idx[c]]
-        return None
-
-    emb.get_concept_vector = _get_vec
-    return emb
+def _make_stdp(concepts: list[str]) -> tuple[STDP, SynapticStore]:
+    """Create an isolated STDP instance with a real synaptic substrate."""
+    net = ConceptNetwork()
+    for concept in concepts:
+        net.add_concept(concept, confidence=0.9, origin="test")
+    synapses = SynapticStore()
+    return STDP(synapses, net, learning_rate=0.01), synapses
 
 
-def _make_mock_network(concepts: list[str]) -> MagicMock:
-    """Create a mock ConceptNetwork."""
-    net = MagicMock()
-    net._resolve = lambda c: c
-    return net
+def test_default_modulator_is_one() -> None:
+    """Default modulator should be 1.0."""
+    stdp, _ = _make_stdp(["a", "b"])
+    assert stdp.get_modulator() == 1.0
 
 
-def _make_stdp(concepts: list[str]) -> tuple[STDP, MagicMock, MagicMock]:
-    """Create an STDP instance with mock embeddings and network_plasticity."""
-    emb = _make_mock_embeddings(concepts)
-    net = _make_mock_network(concepts)
-    stdp = STDP(emb, net, learning_rate=0.01)
-    return stdp, emb, net
-
-
-def test_default_modulator_is_one():
-    """Default modulator should be 1.0 (no gating)."""
-    stdp, _, _ = _make_stdp(["a", "b"])
-    mod = stdp.get_modulator()
-    assert mod == 1.0, f"Default modulator should be 1.0, got {mod}"
-    print("  PASS  default modulator is 1.0")
-
-
-def test_set_modulator():
-    """set_modulator should update the modulator value."""
-    stdp, _, _ = _make_stdp(["a", "b"])
+def test_set_modulator() -> None:
+    """set_modulator should update the third factor."""
+    stdp, _ = _make_stdp(["a", "b"])
     stdp.set_modulator(1.5)
-    assert stdp.get_modulator() == 1.5, f"Modulator should be 1.5, got {stdp.get_modulator()}"
+    assert stdp.get_modulator() == 1.5
     stdp.set_modulator(0.0)
-    assert stdp.get_modulator() == 0.0, f"Modulator should be 0.0, got {stdp.get_modulator()}"
-    print("  PASS  set_modulator updates value")
+    assert stdp.get_modulator() == 0.0
 
 
-def test_modulator_zero_suppresses_plasticity():
-    """modulator=0 should suppress all STDP updates."""
-    stdp, emb, _ = _make_stdp(["a", "b"])
-    initial_matrix = emb._concept_matrix.copy()
-
+def test_modulator_zero_suppresses_plasticity() -> None:
+    """A zero modulator should suppress STDP efficacy changes."""
+    stdp, synapses = _make_stdp(["a", "b"])
+    before = synapses.get_weight("a", "b")
     stdp.set_modulator(0.0)
-    # Record spikes: a before b → should produce LTP, but modulator=0 suppresses it
     stdp.record_spike("a", 100.0)
-    stdp.record_spike("b", 110.0)  # 10ms after a → LTP
-    result = stdp.apply_updates()
-
-    pot = result["potentiated"]
-    assert pot == 0, f"Should potentiate 0 with modulator=0, got {pot}"
-    # Matrix should be unchanged
-    assert np.allclose(
-        emb._concept_matrix, initial_matrix
-    ), "Matrix should be unchanged with modulator=0"
-    print("  PASS  modulator=0 suppresses plasticity")
+    stdp.record_spike("b", 110.0)
+    after = synapses.get_weight("a", "b")
+    assert after == before
+    assert stdp.get_statistics()["total_gated"] > 0
 
 
-def test_modulator_one_applies_standard_stdp():
-    """modulator=1 should apply standard STDP (no gating)."""
-    stdp, emb, _ = _make_stdp(["a", "b"])
-    initial_matrix = emb._concept_matrix.copy()
-
+def test_modulator_one_applies_standard_stdp() -> None:
+    """A unit modulator should permit normal LTP."""
+    stdp, synapses = _make_stdp(["a", "b"])
+    before = synapses.get_weight("a", "b")
     stdp.set_modulator(1.0)
     stdp.record_spike("a", 100.0)
-    stdp.record_spike("b", 110.0)  # LTP — applied immediately inside record_spike
-    stdp.apply_updates()
-
-    stats = stdp.get_statistics()
-    tp = stats["total_potentiated"]
-    assert tp > 0, f"Should potentiate with modulator=1, got total_potentiated={tp}"
-    # Matrix should have changed
-    assert not np.allclose(
-        emb._concept_matrix, initial_matrix
-    ), "Matrix should change with modulator=1"
-    print("  PASS  modulator=1 applies standard STDP")
+    stdp.record_spike("b", 110.0)
+    after = synapses.get_weight("a", "b")
+    assert after > before
+    assert stdp.get_statistics()["total_potentiated"] > 0
 
 
-def test_modulator_two_amplifies_plasticity():
-    """modulator=2 should amplify STDP (larger weight change)."""
-    # Run two separate STDP instances to compare
-    stdp1, emb1, _ = _make_stdp(["a", "b"])
-    stdp2, emb2, _ = _make_stdp(["a", "b"])
-
-    # Same initial matrix (seeded identically)
-    assert np.allclose(emb1._concept_matrix, emb2._concept_matrix)
+def test_modulator_two_amplifies_plasticity() -> None:
+    """A larger positive modulator should produce a larger efficacy change."""
+    stdp1, synapses1 = _make_stdp(["a", "b"])
+    stdp2, synapses2 = _make_stdp(["a", "b"])
 
     stdp1.set_modulator(1.0)
     stdp2.set_modulator(2.0)
+    for stdp in (stdp1, stdp2):
+        stdp.record_spike("a", 100.0)
+        stdp.record_spike("b", 110.0)
 
-    stdp1.record_spike("a", 100.0)
-    stdp1.record_spike("b", 110.0)
-    stdp1.apply_updates()
-
-    stdp2.record_spike("a", 100.0)
-    stdp2.record_spike("b", 110.0)
-    stdp2.apply_updates()
-
-    # The change with modulator=2 should be larger
-    change1 = np.abs(emb1._concept_matrix - emb2._concept_matrix).sum()
-    # Actually, compare each against their own initial state
-    # We need to recompute. Let's just check that modulator=2 produced a bigger shift.
-    # Since both started identical, the difference between them reflects the amplification.
-    assert change1 > 1e-6, (
-        f"modulator=2 should produce different result than modulator=1, diff={change1}"
-    )
-    print(f"  PASS  modulator=2 amplifies plasticity (diff={change1:.6f})")
+    change1 = synapses1.get_weight("a", "b")
+    change2 = synapses2.get_weight("a", "b")
+    assert change2 > change1 > 0.0
 
 
-def test_negative_modulator_reverses_plasticity():
-    """modulator<0 should reverse LTP→LTD (potentiation becomes depression)."""
-    stdp, _emb, _ = _make_stdp(["a", "b"])
-
+def test_negative_modulator_reverses_plasticity() -> None:
+    """A negative modulator should reverse an otherwise potentiating rule."""
+    stdp, synapses = _make_stdp(["a", "b"])
+    synapses.set_weight("a", "b", 0.5)
     stdp.set_modulator(-1.0)
-    # a before b → normally LTP, but with modulator=-1 it becomes LTD
     stdp.record_spike("a", 100.0)
     stdp.record_spike("b", 110.0)
-    stdp.apply_updates()
-
+    assert synapses.get_weight("a", "b") < 0.5
     stats = stdp.get_statistics()
-    td = stats["total_depressed"]
-    tp = stats["total_potentiated"]
-    assert td > 0, f"Negative modulator should reverse LTP to LTD, got total_depressed={td}"
-    assert tp == 0, f"Negative modulator should not potentiate, got total_potentiated={tp}"
-    print("  PASS  negative modulator reverses LTP→LTD")
+    assert stats["total_depressed"] > 0
+    assert stats["total_potentiated"] == 0
 
 
-def test_statistics_include_modulator():
-    """get_statistics should include the modulator and gated count."""
-    stdp, _, _ = _make_stdp(["a", "b"])
+def test_statistics_include_modulator() -> None:
+    """STDP statistics expose the third-factor state."""
+    stdp, _ = _make_stdp(["a", "b"])
     stdp.set_modulator(0.5)
-
     stats = stdp.get_statistics()
-
-    assert "modulator" in stats, "Statistics should include modulator"
-    assert "total_gated" in stats, "Statistics should include total_gated"
-    assert stats["modulator"] == 0.5, f"Modulator in stats should be 0.5, got {stats['modulator']}"
-    print("  PASS  statistics include modulator and gated count")
+    assert stats["modulator"] == 0.5
+    assert "total_gated" in stats
+    assert "expressed_synapses" in stats
 
 
-def test_gated_updates_counted():
-    """Updates suppressed by modulator≈0 should be counted in total_gated."""
-    stdp, _, _ = _make_stdp(["a", "b"])
+def test_gated_updates_counted() -> None:
+    """Updates suppressed by a zero modulator should be counted."""
+    stdp, _ = _make_stdp(["a", "b"])
     stdp.set_modulator(0.0)
-
     stdp.record_spike("a", 100.0)
     stdp.record_spike("b", 110.0)
-    stdp.apply_updates()
-
-    stats = stdp.get_statistics()
-    assert stats["total_gated"] > 0, f"Gated count should be > 0, got {stats['total_gated']}"
-    print(f"  PASS  gated updates counted ({stats['total_gated']})")
+    assert stdp.get_statistics()["total_gated"] > 0
 
 
-def main() -> None:
-    """Main."""
-    tests = [
-        test_default_modulator_is_one,
-        test_set_modulator,
-        test_modulator_zero_suppresses_plasticity,
-        test_modulator_one_applies_standard_stdp,
-        test_modulator_two_amplifies_plasticity,
-        test_negative_modulator_reverses_plasticity,
-        test_statistics_include_modulator,
-        test_gated_updates_counted,
-    ]
-    passed = 0
-    failed = 0
-    for test in tests:
-        try:
-            test()
-            passed += 1
-        except Exception as e:  # noqa: BLE001
-            import traceback
-            print(f"  FAIL  {test.__name__}: {e}")
-            traceback.print_exc()
-            failed += 1
-    print(f"\n{'='*60}")
-    print(f"Three-factor STDP tests: {passed} passed, {failed} failed")
-    if failed > 0:
-        sys.exit(1)
+def test_synaptic_efficacy_is_consumed_downstream() -> None:
+    """STDP-learned efficacy changes downstream activation."""
+    network = ConceptNetwork()
+    for concept in ("a", "b"):
+        network.add_concept(concept, confidence=0.9, origin="test")
+        node = network.get_concept(concept)
+        assert node is not None
+        node.activation = 0.0
+
+    synapses = SynapticStore()
+    stdp = STDP(synapses, network)
+    learner = ConceptLearner(network, synapses=synapses)
+
+    before = network.get_concept("b")
+    assert before is not None
+    assert before.activation == 0.0
+
+    stdp.record_spike("a", 0.0)
+    stdp.record_spike("b", 5.0)
+    learned_weight = synapses.get_weight("a", "b")
+    assert learned_weight > 0.0
+
+    learner.learn_concepts(
+        type(
+            "PerceptionStub",
+            (),
+            {"topics": ["a"], "is_about_genesis": False, "is_about_code": False},
+        )()
+    )
+
+    after = network.get_concept("b")
+    assert after is not None
+    assert after.activation > 0.0
 
 
-if __name__ == "__main__":
-    main()
+def test_synaptic_store_state_round_trip() -> None:
+    """Synaptic efficacy persists independently of embeddings and semantics."""
+    store = SynapticStore()
+    store.set_weight("a", "b", 0.37)
+    restored = SynapticStore()
+    restored.load_state(store.save_state())
+    assert restored.get_weight("a", "b") == 0.37
 
 
 # ======================================================================

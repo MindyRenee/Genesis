@@ -719,9 +719,11 @@ class DecisionEngine:
         if self.td_learner is None:
             return 0.0
         # The state is the topics plus the action type.
-        state = [*topics, candidate.action_type.value]
+        state = list(topics)
         try:
-            return self.td_learner.predict_value(state)
+            return self.td_learner.predict_value(
+                state, action=candidate.action_type.value,
+            )
         except Exception:  # noqa: BLE001
             return 0.0
 

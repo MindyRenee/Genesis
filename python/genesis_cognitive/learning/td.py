@@ -215,6 +215,10 @@ class TDLearner:
         # at 1.0 (confidence alone determines value).
         self._weights: dict[str, float] = {}
 
+        # Action-conditioned value weights used by decision selection.
+        # Plain state-value weights remain available to existing callers.
+        self._action_weights: dict[tuple[str, str], float] = {}
+
         # Eligibility traces (one per concept). Decays by γλ per step;
         # set to the gradient value for active concepts (replacing
         # traces). Traces below _TRACE_PRUNE_THRESHOLD are pruned to
@@ -236,7 +240,7 @@ class TDLearner:
 
     # ─── Public API ─────────────────────────────────────────────
 
-    def predict_value(self, state: list[str]) -> float:
+    def predict_value(self, state: list[str], action: str | None = None) -> float:
         """Predict the value of a state.
 
         The value is a weighted sum of the confidences of the active
@@ -245,8 +249,15 @@ class TDLearner:
 
         V(s) = Σ_i w_i · confidence(concept_i)
 
+        When ``action`` is supplied, the value is action-conditioned
+        so different actions in the same state can acquire different
+        learned values. Without it, the original state-value behavior
+        is unchanged.
+
         Args:
             state: A list of concept names (the active concepts).
+            action: Optional selected action used for action-conditioned
+                value lookup.
 
         Returns:
             The predicted value of the state.
@@ -262,7 +273,11 @@ class TDLearner:
             c = self.network.get_concept(cid)
             if c is None:
                 continue
-            w = self._weights.get(cid, 1.0)
+            w = (
+                self._action_weights.get((cid, action), self._weights.get(cid, 1.0))
+                if action is not None
+                else self._weights.get(cid, 1.0)
+            )
             total += w * c.confidence
             count += 1
         # Normalize by count to keep value in a stable range
@@ -273,6 +288,8 @@ class TDLearner:
         state: list[str],
         reward: float,
         next_state: list[str],
+        action: str | None = None,
+        next_action: str | None = None,
     ) -> float:
         """Apply a TD(λ) update and return the reward prediction error.
 
@@ -302,12 +319,14 @@ class TDLearner:
             state: The current state (active concepts).
             reward: The reward received.
             next_state: The resulting state.
+            action: Optional action selected in the current state.
+            next_action: Optional action associated with the next state.
 
         Returns:
             The reward prediction error δ (the dopamine signal).
         """
-        v_s = self.predict_value(state)
-        v_sp = self.predict_value(next_state)
+        v_s = self.predict_value(state, action=action)
+        v_sp = self.predict_value(next_state, action=next_action)
         rpe = reward + self.discount * v_sp - v_s
 
         # ── Eligibility trace update (backward view) ──────────────
@@ -345,8 +364,13 @@ class TDLearner:
         if self._traces:
             alpha_delta = self.learning_rate * rpe
             for tc, trace in self._traces.items():
-                current = self._weights.get(tc, 1.0)
-                self._weights[tc] = current + alpha_delta * trace
+                if action is None:
+                    current = self._weights.get(tc, 1.0)
+                    self._weights[tc] = current + alpha_delta * trace
+                else:
+                    key = (tc, action)
+                    current = self._action_weights.get(key, self._weights.get(tc, 1.0))
+                    self._action_weights[key] = current + alpha_delta * trace
 
         # Record history
         self._history.append(
@@ -450,6 +474,7 @@ class TDLearner:
             "last_rpe": self._last_rpe,
             "dopamine_signal": self.get_dopamine_signal(),
             "tracked_weights": len(self._weights),
+            "tracked_action_weights": len(self._action_weights),
             "active_traces": len(self._traces),
             "lambda": self.lam,
             "history_length": len(self._history),
