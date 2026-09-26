@@ -702,6 +702,10 @@ class SpatialPractice:
     # genuinely new hypothesis space instead of re-deriving the same
     # failure. This is the persistent half of learning from mistakes.
     failed: dict[str, list[str]] = field(default_factory=dict)
+    # Test-output fingerprints already disproven for this task. Unlike
+    # rule strings, these prune semantically equivalent hypotheses that
+    # make the same wrong prediction through different representations.
+    failed_predictions: dict[str, list[str]] = field(default_factory=dict)
     # The visual cortex, when the Mind wires one in — perceptual
     # tasks (a sorter you must look at) need it; symbolic ones don't.
     cortex: Any = None
@@ -729,6 +733,10 @@ class SpatialPractice:
                 str(k): [str(r) for r in v]
                 for k, v in data.get("failed", {}).items()
             }
+            self.failed_predictions = {
+                str(k): [str(r) for r in v]
+                for k, v in data.get("failed_predictions", {}).items()
+            }
         except (OSError, json.JSONDecodeError, ValueError):
             self.mastery = {}
             self.attempts = {}
@@ -742,6 +750,7 @@ class SpatialPractice:
                     "mastery": self.mastery,
                     "attempts": self.attempts,
                     "failed": self.failed,
+                    "failed_predictions": self.failed_predictions,
                 },
                 indent=2,
             ))
@@ -928,6 +937,7 @@ class SpatialPractice:
             tests,
             time_budget=time_budget,
             exclude_rules=set(self.failed.get(name, [])),
+            exclude_predictions=set(self.failed_predictions.get(name, [])),
         )
 
         guess_sets = (
@@ -968,6 +978,16 @@ class SpatialPractice:
                 if rule not in known:
                     known.append(rule)
             del known[32:]
+            # Learn from the observed wrong answer, not just its rule
+            # spelling. Different hypotheses can be behaviorally equivalent
+            # on the held-out test; the next attempt must move past that
+            # prediction without excluding the whole transform family.
+            bad_predictions = self.failed_predictions.setdefault(name, [])
+            for guesses in sol.guesses:
+                key = reasoner.prediction_key(guesses)
+                if key not in bad_predictions:
+                    bad_predictions.append(key)
+            del bad_predictions[32:]
             if sol.verified_rules:
                 failure = (
                     f"overfit: {sol.verified_rules[0]} verified on "
