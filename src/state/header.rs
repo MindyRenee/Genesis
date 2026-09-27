@@ -78,7 +78,11 @@ pub struct CoreStateHeader {
     pub heartbeat: u64,
     /// Seqlock counter — odd during a write, even when stable.
     pub seq_lock: u64,
-    /// Unique identifier for this state instance (process).
+    /// Identifier for this state instance. Currently a constant (1)
+    /// from the daemon's single production call site; it is covered by
+    /// the CRC, so it is at least stable across restarts. It is not
+    /// unique per process despite the field name — do not read it as
+    /// a way to tell two daemons apart.
     pub instance_id: u64,
 }
 

@@ -794,22 +794,37 @@ def test_record_question_outcome_failure() -> None:
 
 
 def test_get_capability_summary_empty() -> None:
-    """get_capability_summary returns default when no data."""
+    """get_capability_summary stays silent when nothing is measured.
+
+    It used to return the fixed string "still building self-awareness".
+    That was wrapped as a `clause` fragment — the verbatim recitation
+    channel — so asking "what do you know" on a fresh system recited
+    that sentence. Silence is the honest output.
+    """
     network = ConceptNetwork()
     engine = SelfAssessmentEngine(network)
     summary = engine.get_capability_summary()
-    assert isinstance(summary, str)
-    assert len(summary) > 0
+    assert summary == []
 
 
 def test_get_capability_summary_with_data() -> None:
-    """get_capability_summary includes strengths and weaknesses."""
+    """get_capability_summary returns typed fragments, not a report.
+
+    Fragments (kind, text) rather than a finished English string, so
+    the language engine — not this module — realizes the surface form.
+    """
     network = ConceptNetwork()
     engine = SelfAssessmentEngine(network)
     engine.record_question_outcome("what", success=True, topic="dogs")
     engine.record_question_outcome("why", success=False, topic="unknown")
     summary = engine.get_capability_summary()
-    assert "confident" in summary.lower() or "learning" in summary.lower()
+    assert summary
+    assert all(
+        isinstance(kind, str) and isinstance(text, str) and text
+        for kind, text in summary
+    )
+    joined = " ".join(text for _kind, text in summary)
+    assert "dogs" in joined or "learning" in joined
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1217,28 +1232,35 @@ def test_emotional_state_fragments_no_plasticity_marker_when_healthy() -> None:
 
 
 def test_capability_fragments() -> None:
-    """Composer selects capability fragments.
+    """Composer returns no fragments when it has learned no capabilities.
 
-    Without learned capabilities or a concept network, the fragment
-    discloses honestly — no hardcoded capability list.
+    Previously this asserted the presence of a fixed fallback sentence
+    ("still discovering my capabilities"). That was a violation of the
+    no-hardcoding rule in AGENTS.md, not a demonstration of honesty: it
+    was a developer-authored English utterance standing in for a claim
+    the system had no basis for, and it reached speech verbatim through
+    the `comp` fragment slot. The project's standard for "no basis" is
+    silence, so silence is what is asserted here.
+    """
+    composer = SelfComposer(seed=42)
+    sm = _make_self_model()
+
+    assert composer.capability_fragments(sm) == []
+
+
+def test_capability_fragments_honest_without_learning() -> None:
+    """Without learned capabilities, no specific abilities are claimed.
+
+    The stronger form of the same contract: it must not name *any*
+    ability, including in a hedged placeholder. See
+    `test_capability_fragments` for why the previous placeholder was a
+    rule violation rather than an honest disclosure.
     """
     composer = SelfComposer(seed=42)
     sm = _make_self_model()
 
     fragments = composer.capability_fragments(sm)
-    assert fragments
-    texts = " ".join(t for _, t in fragments).lower()
-    assert "discovering" in texts or "capabilities" in texts
-
-
-def test_capability_fragments_honest_without_learning() -> None:
-    """Without learned capabilities, no specific abilities are claimed."""
-    composer = SelfComposer(seed=42)
-    sm = _make_self_model()
-
-    fragments = composer.capability_fragments(sm)
-    texts = " ".join(t for _, t in fragments).lower()
-    assert "discovering" in texts or "capabilities" in texts
+    assert not any(text.strip() for _kind, text in fragments)
 
 
 # ─── Self reflection tests ───────────────────────────────────

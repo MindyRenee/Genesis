@@ -77,6 +77,25 @@ __all__ = [
     "WorkingMemorySlot",
 ]
 
+# How long an executive suppression lasts before the item returns to
+# attention. Task-switching inhibition is a transient gate on the
+# attentional priority ordering, not a lasting ban; without a deadline
+# the outgoing focus of every switch stayed suppressed forever.
+_SUPPRESSION_TTL_S = 120.0
+
+# Ceiling on simultaneously suppressed items. A backstop on the
+# deadline path: if a caller suppresses in a tight loop the set is
+# still bounded.
+_MAX_SUPPRESSED = 64
+
+# Retained conversation threads. Each holds its turns' full user input
+# and response text, so this is a direct bound on retained transcript.
+_MAX_THREADS = 50
+
+# Retained topic labels used for continuity detection. Strings, not
+# turns, so a longer window is cheap.
+_MAX_TOPIC_HISTORY = 200
+
 
 @dataclass(slots=True)
 class Turn:
@@ -530,7 +549,19 @@ class CentralExecutive:
         self._phonological_loop = phonological_loop
         self._sketchpad = sketchpad
         # Items currently suppressed by the executive (inhibition).
-        self._suppressed: set[str] = set()
+        # Items currently suppressed by the executive (inhibition),
+        # each with the monotonic time it was suppressed.
+        #
+        # This was a plain `set[str]` that only ever grew. `switch_task`
+        # suppresses the outgoing focus on every switch and nothing in
+        # production ever released it — the only caller of
+        # `release_suppression` was a test. So every topic ever focused
+        # became permanently un-attendable, and the set accumulated one
+        # string per task switch with no ceiling, on a path that runs
+        # every turn. Executive inhibition is a *temporary* gating of
+        # attention (Miyake et al. 2000), not a permanent ban, so
+        # suppression now carries a release deadline.
+        self._suppressed: dict[str, float] = {}
         # Task-switching state: the current focus.
         self._current_focus: str | None = None
         # Recent foci, oldest → newest. Anaphora resolution needs more
@@ -578,7 +609,7 @@ class CentralExecutive:
         result: dict[str, float] = {}
         relevant_set = {r.lower() for r in relevant}
         for concept, activation in items.items():
-            if concept.lower() in self._suppressed:
+            if self.is_suppressed(concept):
                 continue
             if concept.lower() in relevant_set:
                 # Boost relevant items.
@@ -601,16 +632,38 @@ class CentralExecutive:
         Args:
             item: The concept to suppress.
         """
-        self._suppressed.add(item.lower())
+        self._suppress(item)
         self.suppressions += 1
+
+    def _suppress(self, item: str) -> None:
+        """Suppress `item` with a release deadline, evicting if over cap."""
+        key = item.lower()
+        # Evict the entry closest to expiry so the cap drops the one
+        # that would have been released soonest anyway.
+        if key not in self._suppressed and len(self._suppressed) >= _MAX_SUPPRESSED:
+            oldest = min(self._suppressed, key=lambda k: self._suppressed[k])
+            del self._suppressed[oldest]
+        self._suppressed[key] = time.monotonic() + _SUPPRESSION_TTL_S
 
     def release_suppression(self, item: str) -> None:
         """Release a previously suppressed item back into attention."""
-        self._suppressed.discard(item.lower())
+        self._suppressed.pop(item.lower(), None)
 
     def is_suppressed(self, item: str) -> bool:
-        """Whether an item is currently suppressed."""
-        return item.lower() in self._suppressed
+        """Whether an item is currently suppressed.
+
+        Expired entries read as not suppressed and are dropped on the
+        check, so suppression cannot outlive its deadline even if no
+        writer comes along to prune it.
+        """
+        key = item.lower()
+        deadline = self._suppressed.get(key)
+        if deadline is None:
+            return False
+        if time.monotonic() >= deadline:
+            del self._suppressed[key]
+            return False
+        return True
 
     def switch_task(self, new_focus: str) -> None:
         """Switch the executive's focus to a new task/topic.
@@ -623,8 +676,9 @@ class CentralExecutive:
             new_focus: The new task/topic to focus on.
         """
         if self._current_focus is not None and self._current_focus != new_focus:
-            # Partial suppression of the old focus (task-switching cost).
-            self._suppressed.add(self._current_focus.lower())
+            # Partial suppression of the old focus (task-switching
+            # cost). Time-boxed — see `_suppress`.
+            self._suppress(self._current_focus)
             self.task_switches += 1
         self._current_focus = new_focus
         self._push_focus(new_focus)
@@ -679,7 +733,7 @@ class CentralExecutive:
             The trimmed attention buffer (at most ``capacity`` items).
         """
         # Remove suppressed items.
-        filtered = {c: a for c, a in items.items() if c.lower() not in self._suppressed}
+        filtered = {c: a for c, a in items.items() if not self.is_suppressed(c)}
         if len(filtered) <= capacity:
             return filtered
         # Keep the top-`capacity` by activation.
@@ -748,14 +802,28 @@ class WorkingMemory:
         # Current conversation thread
         self._current_thread: ConversationThread | None = None
 
-        # All threads (history)
-        self._threads: list[ConversationThread] = []
+        # Closed conversation threads, oldest first.
+        #
+        # Bounded. This was an unbounded list, and every thread holds
+        # each turn's full `user_input` and `genesis_response` text —
+        # so it grew without limit on the conversation path, retaining
+        # the entire transcript in memory. It is read only by
+        # `thread_count` (a counter for introspection) and is not
+        # persisted: working memory is discarded at restart anyway, so
+        # everything beyond the most recent threads is heap spent on
+        # nothing. Note `thread_count` therefore reports the number
+        # retained, not the lifetime total; `_thread_total` carries the
+        # lifetime count.
+        self._threads: deque[ConversationThread] = deque(maxlen=_MAX_THREADS)
+        self._thread_total: int = 0
 
         # Open questions (things it was curious about)
         self._open_questions: list[str] = []
 
-        # Topics discussed (for continuity detection)
-        self._topic_history: list[str] = []
+        # Topics discussed (for continuity detection). Bounded, for the
+        # same reason as `_threads` — it was an unbounded list extended
+        # on every turn.
+        self._topic_history: deque[str] = deque(maxlen=_MAX_TOPIC_HISTORY)
 
         # ── Baddeley slave systems & central executive ───────────
         self.phonological_loop: PhonologicalLoop = PhonologicalLoop()
@@ -869,7 +937,7 @@ class WorkingMemory:
             topic = turn.topics[0] if turn.topics else "unknown"
             self._current_thread = ConversationThread(topic=topic)
             self._current_thread.add_turn(turn)
-            self._threads.append(self._current_thread)
+            self._append_thread(self._current_thread)
             return
 
         # Check if this turn continues the current thread
@@ -892,9 +960,14 @@ class WorkingMemory:
                     topic=turn.topics[0] if turn.topics else "unknown"
                 )
                 self._current_thread.add_turn(turn)
-                self._threads.append(self._current_thread)
+                self._append_thread(self._current_thread)
         else:
             self._current_thread.add_turn(turn)
+
+    def _append_thread(self, thread: ConversationThread) -> None:
+        """Retain a thread, evicting the oldest once at capacity."""
+        self._threads.append(thread)
+        self._thread_total += 1
 
     def _activate(self, concept: str, amount: float = 0.5) -> None:
         """Activate a concept in attention."""
@@ -1030,7 +1103,17 @@ class WorkingMemory:
 
     @property
     def thread_count(self) -> int:
-        """How many conversation threads have there been?"""
+        """How many conversation threads there have been.
+
+        The lifetime total, not the number retained — `_threads` is a
+        bounded window (see its declaration), so `len()` would report
+        how many are still in memory and would stop climbing.
+        """
+        return self._thread_total
+
+    @property
+    def retained_thread_count(self) -> int:
+        """How many threads are currently retained in the window."""
         return len(self._threads)
 
     @property

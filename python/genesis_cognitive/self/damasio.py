@@ -506,10 +506,17 @@ class AutobiographicalSelf:
             plasticity=episode.post_state.plasticity,
         )
 
+        # Record the episode as a structured event. `summary` and
+        # `significance` used to be pre-written English sentences
+        # ("Experienced X from Y", "Proto-self shifted by Z"), which
+        # flowed into the narrative and were read aloud verbatim. Store
+        # the episode's own fields instead; the readout formats them.
         self.narrative.record_event(
-            summary=f"Experienced {episode.feeling_label} from {episode.trigger}",
-            significance=f"Proto-self shifted by {episode.change_magnitude:.2f} "
-            f"(salience: {episode.salience:.2f})",
+            summary=f"{episode.feeling_label} / {episode.trigger}",
+            significance=(
+                f"proto-self shift {episode.change_magnitude:.2f}, "
+                f"salience {episode.salience:.2f}"
+            ),
             emotion=emotion,
         )
 

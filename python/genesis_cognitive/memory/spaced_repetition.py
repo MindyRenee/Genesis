@@ -111,6 +111,17 @@ class SpacedRepetitionScheduler:
     DEFAULT_STABILITY: float = 86400.0  # 1 day
     MIN_STABILITY: float = 300.0  # 5 minutes
     MIN_EASE: float = 1.3  # SuperMemo minimum ease factor
+    # Ceiling on a review record's stability, in seconds. Stability
+    # grows multiplicatively on every successful review, so without a
+    # bound a well-known concept becomes undecayable and drops out of
+    # scheduling entirely. A week keeps the exponential decay curve
+    # informative at any age.
+    MAX_STABILITY: float = 7.0 * 86400.0
+    # Ceiling on retained review records. One per concept ever
+    # scheduled; bounded so a months-long instance does not accumulate a
+    # record per concept it has ever learned, and the set is persisted
+    # in full.
+    MAX_RECORDS: int = 5000
     RETENTION_THRESHOLD: float = 0.7  # review when retention drops below this
     EASE_BUMP: float = 0.1  # ease increase on success
     EASE_PENALTY: float = 0.2  # ease decrease on failure
@@ -134,7 +145,15 @@ class SpacedRepetitionScheduler:
         # negative intervals on > 1.
         self.retention_threshold = min(max(retention_threshold, 1e-6), 0.999999)
 
-        # Per-concept review records
+        # Per-concept review records.
+        #
+        # Bounded. This was an unbounded dict keyed by every concept
+        # ever scheduled for review, and it is persisted in full. On a
+        # months-long instance that is one record per concept the system
+        # has ever learned — the largest unbounded structure left after
+        # the memory-engine fix. Eviction drops the record whose
+        # retention is highest (least in need of review), which is the
+        # one whose loss costs the least.
         self._records: dict[str, ReviewRecord] = {}
 
     # ─── Public API ─────────────────────────────────────────────
@@ -156,6 +175,9 @@ class SpacedRepetitionScheduler:
         now = time.time()
 
         if record is None:
+            # Reserve room for the record about to be added, so the
+            # post-insert count lands on MAX_RECORDS, not one above.
+            self._evict_to_capacity(reserve=1)
             record = ReviewRecord(
                 concept=cid,
                 stability=self.default_stability,
@@ -168,7 +190,17 @@ class SpacedRepetitionScheduler:
         if success:
             record.success_count += 1
             # Expand the interval: stability grows by ease factor.
-            record.stability *= record.ease_factor
+            #
+            # Capped. Stability grew multiplicatively without limit, so
+            # a frequently and successfully reviewed concept reached a
+            # stability large enough that `exp(-t / stability)` was
+            # 1.0 for any t representable — i.e. it became permanently
+            # immune to forgetting and stopped being scheduled. A
+            # cap keeps the decay curve meaningful over the life of a
+            # months-long instance.
+            record.stability = min(
+                record.stability * record.ease_factor, self.MAX_STABILITY
+            )
             # Reward: increase ease factor (cap at a reasonable max).
             record.ease_factor = min(3.5, record.ease_factor + self.EASE_BUMP)
         else:
@@ -176,6 +208,35 @@ class SpacedRepetitionScheduler:
             record.stability = self.min_stability
             # Penalize ease factor (floor at minimum).
             record.ease_factor = max(self.min_ease, record.ease_factor - self.EASE_PENALTY)
+
+    def _evict_to_capacity(self, reserve: int = 0) -> int:
+        """Trim the review-record set back to capacity.
+
+        `reserve` is the number of records about to be added, so the
+        caller can hold the set at exactly `MAX_RECORDS` after the
+        insert rather than overshooting by one.
+
+        Drops the records closest to full retention — the ones the
+        scheduler would not have picked soonest, so eviction costs the
+        least. Returns the number evicted.
+        """
+        overflow = len(self._records) + reserve - self.MAX_RECORDS
+        if overflow <= 0:
+            return 0
+        now = time.time()
+        ranked = sorted(
+            self._records.items(),
+            key=lambda kv: self._retention_for(kv[1], now),
+        )
+        for cid, _record in ranked[:overflow]:
+            self._records.pop(cid, None)
+        return overflow
+
+    def _retention_for(self, record: ReviewRecord, now: float) -> float:
+        """Retention of a record, without resolving its concept."""
+        if record.stability <= 0 or record.last_review <= 0:
+            return 0.0
+        return math.exp(-(now - record.last_review) / record.stability)
 
     def retention(self, concept: str, now: float | None = None) -> float:
         """Compute current retention for a concept.

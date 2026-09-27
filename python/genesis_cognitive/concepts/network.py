@@ -2252,8 +2252,21 @@ class ConceptNetwork(
         if not cid:
             return False
 
-        # Remove all edges involving this concept
+        # Remove all edges involving this concept.
+        #
+        # The log is canonical, so filtering the fold alone is not
+        # enough: the deleted edges would still be in `edge_log.jsonl`,
+        # and any later `_load_from_edge_log()` would reinstate them —
+        # anchored to a concept that no longer exists. Because
+        # `remove_edge` needs `_resolve` on both endpoints, such a
+        # phantom edge could never be removed again, and the next
+        # `sync_edge_log()` snapshot would promote it from a stale
+        # entry to explicitly canonical. Retract each one.
+        removed_edges = [
+            e for e in self._edges if e.source == cid or e.target == cid
+        ]
         self._edges = [e for e in self._edges if e.source != cid and e.target != cid]
+        self._retract_edges_from_log(removed_edges)
 
         # Also remove archived edges for this concept (permanent deletion)
         if self._archive is not None:
@@ -2319,11 +2332,22 @@ class ConceptNetwork(
         if removed == 0:
             return 0
 
-        # Filter edges in a single pass
+        # Filter edges in a single pass.
+        #
+        # Retract them from the log first — see `remove_concept`. Without
+        # this, any unclean shutdown resurrects every edge deleted here,
+        # and the next save promotes those phantoms to canonical. This
+        # path is on the sleep cycle (`clean_noise` routes through it), so
+        # the exposure is every pruning pass, not a rare manual delete.
+        removed_edges = [
+            e for e in self._edges
+            if e.source in cids or e.target in cids
+        ]
         self._edges = [
             e for e in self._edges
             if e.source not in cids and e.target not in cids
         ]
+        self._retract_edges_from_log(removed_edges)
 
         # Also remove archived edges for permanently deleted concepts
         if self._archive is not None:
@@ -2399,6 +2423,34 @@ class ConceptNetwork(
         # Edge counts affect quality scores — invalidate the cache.
         self._quality_concept_ids_cache = None
         return True
+
+    def _retract_edges_from_log(self, edges: list) -> None:
+        """Write retraction events for edges already dropped from the fold.
+
+        Bulk deletion paths (`remove_concept`, `remove_concepts_batch`)
+        cannot route through `remove_edge`: it resolves both endpoints by
+        name, and a bulk path has already popped the concept — so the
+        resolve fails and the edge can never be retracted. Those are
+        exactly the edges most at risk of becoming permanent phantoms,
+        because the canonical log would still assert them and the next
+        fold would reinstate them on top of a missing concept.
+
+        Best-effort by design, matching the other log write-throughs: a
+        retraction that cannot be written must not abort the deletion the
+        caller asked for, and the failure surfaces via `sync_edge_log`.
+        """
+        if self._edge_log is None or not edges:
+            return
+        for edge in edges:
+            try:
+                self._edge_log.retract_edge(edge.source, edge.target, edge.relation)
+            except (OSError, ValueError) as e:
+                logger.warning(
+                    f"edge log retraction failed for "
+                    f"{edge.source}->{edge.target}: {e}"
+                )
+        # Edge counts affect quality scores — invalidate the cache.
+        self._quality_concept_ids_cache = None
     def clean_noise(self, min_confidence: float = 0.5, min_edges: int = 1) -> list[str]:
         """Remove noise concepts from the network.
 

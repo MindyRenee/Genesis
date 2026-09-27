@@ -163,8 +163,22 @@ class EdgeLog:
     # ─── Writes ─────────────────────────────────────────────────
 
     def _write(self, event: dict[str, Any]) -> None:
-        assert self._fh is not None
-        self._fh.write(json.dumps(event, separators=(",", ":")) + "\n")
+        # Self-heal rather than assert. A handle can be present but
+        # closed: `compact` closes it before `os.replace` so the new
+        # file is the one we append to, and if the rename (or the
+        # reopen that follows it) fails, `_fh` is left non-None and
+        # closed. An `assert` would pass in that state and then raise
+        # "I/O operation on closed file" from the write itself — and
+        # `assert` is stripped entirely under `python -O`. Reopening
+        # here keeps a single transient ENOSPC/EACCES from permanently
+        # breaking all relationship learning.
+        fh = self._fh
+        if fh is None or fh.closed:
+            self._open()
+            fh = self._fh
+            if fh is None:  # pragma: no cover - _open raises on failure
+                raise OSError("edge log handle unavailable")
+        fh.write(json.dumps(event, separators=(",", ":")) + "\n")
 
     def assert_edge(
         self,
@@ -353,7 +367,13 @@ class EdgeLog:
                     os.unlink(tmp)
                 except OSError:
                     pass
-                if self._fh is None:
+                # Test for *closed*, not just None. The handle was
+                # closed above before the rename, so on a rename
+                # failure it is still a live reference to a closed file
+                # and `is None` is False — leaving the log permanently
+                # unable to accept a write. `_write` also self-heals,
+                # but repair it here so `fold()` works too.
+                if self._fh is None or self._fh.closed:
                     self._open()
                 raise
         return len(edges)

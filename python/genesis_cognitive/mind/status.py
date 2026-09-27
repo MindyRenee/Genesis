@@ -167,8 +167,13 @@ class StatusMixin:
     def get_state(self) -> CognitiveState | None:
         """Return the last cognitive state (for introspection)."""
         return self.cognition._last_state
-    def learning_status(self) -> str:
-        """Get a description of what it's been learning autonomously."""
+    def learning_status(self) -> str | None:
+        """Get a description of what it's been learning autonomously.
+
+        ``None`` when it has not learned anything on its own yet — an
+        introspection surface should report "nothing to report" rather
+        than a placeholder sentence.
+        """
         return self.learner.describe_recent_learning()
     def inner_life_status(self) -> str:
         """Get a description of its recent spontaneous thoughts."""

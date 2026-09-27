@@ -3241,10 +3241,19 @@ class SelfDirectedLearner:
     # Introspection
     # ═══════════════════════════════════════════════════════════════
 
-    def describe_recent_learning(self, n: int = 10) -> str:
-        """Structural description of recent learning for metadata."""
+    def describe_recent_learning(self, n: int = 10) -> str | None:
+        """Structural description of recent learning, for introspection.
+
+        Returns ``None`` when there is nothing to describe. The caller
+        used to pass this string through the ``clause`` fragment kind,
+        which is the verbatim channel — so the totals and the
+        newline-indented developer log lines below were read aloud as
+        speech, and an empty log produced the recited placeholder "no
+        self-directed learning yet". Returning ``None`` lets the caller
+        stay silent instead.
+        """
         if not self._learning_log:
-            return "no self-directed learning yet"
+            return None
 
         recent = list(self._learning_log)[-n:]
         parts = [

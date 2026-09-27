@@ -800,12 +800,19 @@ class FeelingReporter:
         # metadata. The language engine composes the acknowledgment
         # and connection from this real data.
         reasoning = [understanding]
+        # Semantic fragments, not sentences. These reached the
+        # language engine as `reasoning` text and were realized
+        # verbatim — so "knows something about that herself right now"
+        # was spoken as a fixed clause, complete with a hardcoded
+        # gendered pronoun for whoever it was talking to. Name the
+        # condition; let the engine and its concept network pick the
+        # words.
         if sentiment < -0.2 and emotion.valence < -0.1:
-            reasoning.append("knows something about that herself right now")
+            reasoning.append("recognise that difficulty")
         elif sentiment < -0.2 and emotion.valence > 0.2:
-            reasoning.append("sorry you're going through that")
+            reasoning.append("want to offer comfort")
         elif sentiment > 0.2 and emotion.valence > 0.2:
-            reasoning.append("feels it too")
+            reasoning.append("share that feeling")
 
         return Thought(
             content=emotion_word,

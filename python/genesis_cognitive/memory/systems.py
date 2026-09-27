@@ -38,6 +38,17 @@ __all__ = [
     "SpreadingActivation",
 ]
 
+# Default ceiling on retained attractor patterns.
+#
+# This is a GROWTH bound, not a fidelity bound — see
+# `AttractorNetwork.store` for why those are different concerns and why
+# capacity (~0.138 * N, i.e. 8 at the production size of 64) is the
+# wrong number to cap on: production stores one pattern per stored
+# memory, so an 8-pattern ceiling would make the subsystem useless
+# after a morning's use. Sized to keep association and mood-congruent
+# tagging useful over a large recent window while still being bounded.
+_DEFAULT_MAX_PATTERNS = 512
+
 
 # ─── Item 6: Emotional memory system (amygdala-dependent) ────────────
 
@@ -426,9 +437,17 @@ class AttractorNetwork:
     Capacity: ~0.138 * N patterns for N units (Amit et al., 1985).
     """
 
-    def __init__(self, size: int = 64) -> None:
-        """Initialize the attractor network with a square weight matrix."""
+    def __init__(
+        self, size: int = 64, max_patterns: int = _DEFAULT_MAX_PATTERNS
+    ) -> None:
+        """Initialize the attractor network with a square weight matrix.
+
+        Args:
+            size: Number of units (square weight matrix).
+            max_patterns: Retention ceiling. See `_DEFAULT_MAX_PATTERNS`.
+        """
         self._size = size
+        self._max_patterns = max(1, max_patterns)
         # Weight matrix W[i][j] — symmetric, zero diagonal.
         self._weights: list[list[float]] = [[0.0] * size for _ in range(size)]
         self._patterns: dict[str, AttractorPattern] = {}
@@ -460,11 +479,48 @@ class AttractorNetwork:
     def store(self, pattern_id: str, vector: list[float]) -> None:
         """Store a pattern using Hebbian learning (outer product rule).
 
+        The pattern set is capped. Two distinct problems were being
+        solved by one unbounded structure, and they need different
+        answers.
+
+        **Growth.** The set grew by one entry per stored memory with no
+        ceiling, and the whole thing is persisted. Both `_match_pattern`
+        and `auto_associate` scan it in full, on the retrieval hot
+        path, so at 20k memories that is two 1.28M-element scans per
+        turn. The ceiling below fixes that and makes the state file
+        bounded. Eviction is least-recently-retrieved first, falling
+        back to oldest, so a pattern still being recalled survives.
+
+        **Fidelity.** A Hopfield network stores ~``0.138 * N`` patterns
+        *reliably*; past that, `retrieve()` converges to *spurious*
+        attractors — stable states matching no stored pattern — which
+        are then surfaced as a confident completion. That is a real
+        correctness problem, and it is deliberately NOT solved by
+        capping the set at capacity. Production is `size=64`, so
+        capacity is 8, and one pattern is stored per memory; an
+        8-pattern ceiling would disable the subsystem within a morning
+        and would also break the association path, which does
+        bit-exact similarity rather than attractor convergence and does
+        not care about Hopfield capacity at all.
+
+        So the two are separated: the set is bounded generously, and
+        `over_capacity` reports when completions have become unreliable
+        so a caller can weigh them accordingly. The weight matrix is
+        also not un-learned on eviction (that needs the evicted
+        pattern's contribution removed; a decaying rebuild is simpler
+        and safer), which is a second reason completions drift over
+        time — see `over_capacity`.
+
         Args:
             pattern_id: Identifier for the pattern.
             vector: Feature vector (values ≥0.5 map to +1, else -1).
                 Will be padded/truncated to the network size.
         """
+        if pattern_id in self._patterns:
+            return
+        # Reserve room for the entry about to be added, so the post-insert
+        # count lands exactly on target rather than target + 1.
+        self._evict_to_capacity(reserve=1)
         bipolar = self._to_bipolar(vector)
         # Hebbian: W += (1/N) * x * x^T
         n = self._size
@@ -480,6 +536,38 @@ class AttractorNetwork:
             timestamp=int(time.time() * 1000),
         )
         self._storage_count += 1
+
+    @property
+    def over_capacity(self) -> bool:
+        """Whether the set exceeds the network's reliable capacity.
+
+        True means `retrieve()`'s pattern completions can converge to
+        spurious attractors, so a returned `matched_pattern_id` should
+        be treated as a suggestion rather than a confident recall. The
+        bit-exact `_match_pattern` and `auto_associate` paths are
+        unaffected — they do not iterate the update rule.
+        """
+        return len(self._patterns) > self.capacity
+
+    def _evict_to_capacity(self, reserve: int = 0) -> int:
+        """Trim the pattern set back to `max_patterns`.
+
+        `reserve` is the number of entries about to be added, so the
+        caller can hold the set at exactly `max_patterns` after the
+        insert rather than overshooting by one.
+
+        Returns the number evicted.
+        """
+        overflow = len(self._patterns) + reserve - self._max_patterns
+        if overflow <= 0:
+            return 0
+        # Least-recently-retrieved first; oldest as the tiebreak.
+        ranked = sorted(
+            self._patterns.values(), key=lambda p: (p.retrieval_count, p.timestamp)
+        )
+        for victim in ranked[:overflow]:
+            self._patterns.pop(victim.id, None)
+        return overflow
 
     def retrieve(
         self,
@@ -499,6 +587,14 @@ class AttractorNetwork:
         Returns:
             A tuple of (converged_vector, matched_pattern_id). The
             pattern id is ``None`` if no stored pattern matches.
+
+        NOTE: once the set exceeds Hopfield capacity (~0.138 * N, i.e.
+        8 at the production size of 64 — which it does in normal
+        operation, see `store`) the update rule can converge to a
+        *spurious* attractor that matches no stored pattern. Check
+        `over_capacity` before treating a returned id as a confident
+        recall. This is a known, disclosed limitation rather than a
+        silent one.
         """
         state = self._to_bipolar(cue)
         n = self._size

@@ -829,11 +829,23 @@ class EmergentIdentity:
         )
 
     def _compose_description(self) -> None:
-        """Compose a self-description from all sources.
+        """Join the source observations into a description string.
 
-        Weaves together observations from all sources into a coherent
-        first-person narrative. The description is ordered by source
-        weight (most significant sources first).
+        NOTE ON STATUS: this is an *introspection readout*, not
+        composed speech. The observations are developer-authored
+        sentence patterns selected by thresholds over measured
+        quantities (concept counts, question counts, drift), and this
+        method concatenates the first of each source. It is persisted
+        to state, shown in the CLI, and recorded as a narrative event;
+        it is **not** routed through the language engine, and must not
+        be passed to a `clause` fragment, which is the verbatim
+        recitation channel. Speak about identity through
+        `self/composer.py`, which returns typed fragments composed from
+        the graph.
+
+        Empty when no source has an observation — there is nothing to
+        say, and a placeholder such as "still discovering" would be a
+        recited sentence about itself.
         """
         # Sort sources by weight (most significant first)
         sorted_sources = sorted(self.sources, key=lambda s: s.weight, reverse=True)
@@ -846,10 +858,7 @@ class EmergentIdentity:
             # Take the most significant observation from each source
             parts.append(source.observations[0])
 
-        if parts:
-            self.self_description = ". ".join(parts) + "."
-        else:
-            self.self_description = "still discovering"
+        self.self_description = ". ".join(parts) + "." if parts else ""
 
     def _compute_confidence(self) -> None:
         """Compute confidence in the emergent identity.
@@ -888,10 +897,12 @@ class EmergentIdentity:
         self.coherence = contributing / len(self.sources)
 
     def describe_self(self) -> str:
-        """Return the emergent self-description.
+        """Return the emergent self-description readout.
 
-        This is the primary output — a first-person description of
-        who Genesis is, synthesized from its actual experience.
+        An introspection string assembled from the source observations
+        (see [`_compose_description`]) — empty when there is nothing to
+        report. This is not composed language and must not be spoken
+        directly; use the self-composer's typed fragments for that.
         """
         return self.self_description
 

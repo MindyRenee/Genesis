@@ -330,8 +330,14 @@ impl RuntimeManifest {
         }
 
         self.active_count = active;
-        self.total_cpu_load = cpu.min(1.0);
-        self.total_mem_mb = mem;
+        // Route the aggregates through the NaN primitive. `f32::min`
+        // returns the *non-NaN* operand, so `NaN.min(1.0) == 1.0` —
+        // an accumulator poisoned by one bad `cpu_share` would yield a
+        // plausible-looking 1.0 while the NaN stays persisted in the
+        // module entry. The per-module values are scrubbed separately
+        // by `GenesisCoreState::scrub_non_finite`.
+        self.total_cpu_load = crate::state::sanitize::finite_clamp(cpu, 0.0, 1.0);
+        self.total_mem_mb = crate::state::sanitize::finite_or(mem, 0.0);
     }
 }
 

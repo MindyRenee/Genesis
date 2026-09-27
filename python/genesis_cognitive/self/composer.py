@@ -563,8 +563,16 @@ class SelfComposer:
                 discovered.append(target.replace("_", " "))
 
         if not discovered:
-            # It hasn't learned its capabilities yet — honest disclosure
-            return [("comp", "still discovering my capabilities")]
+            # Nothing learned, nothing discovered — so it has no basis
+            # for a claim here, and per the project's own rule it
+            # returns silence rather than a developer-authored
+            # sentence. A fallback like "still discovering my
+            # capabilities" has exactly the shape of the removed
+            # `"I am written in {body.language}"` template: a fixed
+            # English utterance standing in for something the system
+            # does not actually know. The caller's `[]` path composes a
+            # response from the graph, or says nothing.
+            return []
 
         # Group the discovered ability names under a single capability
         # predicate — the language engine composes the surface form.
@@ -612,7 +620,14 @@ class SelfComposer:
         creator_name = self._discover_creator_name(self_model, network)
 
         if not creator_name:
-            return [("pred", "don't know who made me yet")]
+            # No `CREATES` edge in the graph means no basis for any
+            # claim about its creator. Returning a fixed sentence here
+            # made "I don't know who made me yet" the first thing a
+            # fresh install says about the person who started it —
+            # recited, not composed. Silence is the honest output; the
+            # caller composes from the graph if there is anything to
+            # say, and otherwise says nothing.
+            return []
 
         # Each part tagged with sensitivity
         parts: list[tuple[str, str, float]] = []

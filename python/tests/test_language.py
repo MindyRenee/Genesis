@@ -1774,3 +1774,98 @@ def test_with_article_checks_head_noun() -> None:
     assert Vocabulary._with_article("needs", "sleep") == "sleep"
     # And a mass-noun phrase keeps working via its head.
     assert Vocabulary._with_article("needs", "deep sleep") == "deep sleep"
+
+
+# ─── Single-writer architecture ───────────────────────────────────────
+#
+# AGENTS.md's no-hardcoding rule requires that the language engine owns
+# surface realization. These tests pin that architecture, because it is
+# easy to regress: cognition can always "helpfully" join f-strings into
+# a finished sentence and hand it over as `Thought.content`, and the
+# system will speak it — the violation wearing a different hat.
+
+
+def test_knowledge_metadata_composes_rather_than_passes_content_through() -> None:
+    """Structured knowledge wins over the Thought's own prose.
+
+    This is the load-bearing property. `thought_composer` assembles a
+    readable string in `Thought.content`, and it is tempting to read
+    that as the utterance. It is not: the language engine composes from
+    the `knowledge` tuples, and the composed sentence differs from the
+    assembler's string. If this test starts failing because the two
+    converge, the pass-through has won.
+    """
+    from genesis_cognitive.cognition.thought_composer import ThoughtComposer
+    from genesis_cognitive.reasoning.engine import ReasoningEngine
+
+    network = ConceptNetwork()
+    network.add_concept("dog", confidence=0.9)
+    network.add_concept("animal", confidence=0.8)
+    network.add_edge("dog", "animal", relation=RelationType.IS_A, weight=0.9)
+
+    composer = ThoughtComposer(
+        network=network, reasoner=ReasoningEngine(network=network), seed=1
+    )
+    thought = composer.compose_about("dog", _make_emotion())
+    assert thought is not None
+
+    # The composer supplied structured knowledge...
+    assert thought.metadata.get("knowledge"), "composer must emit knowledge tuples"
+
+    engine = GenerativeEngine(_make_self_model(), seed=7, network=network)
+    spoken = engine.render(thought, _make_emotion())
+
+    assert spoken, "engine produced nothing"
+    # ...and the spoken surface form is the engine's, not the
+    # assembler's. The assembler's phrasing is "is_a"-style; the
+    # engine's is a real sentence.
+    assert "is_a" not in spoken, f"raw relation verb spoken: {spoken!r}"
+    assert "kind of" in spoken or "type of" in spoken or "sort of" in spoken, (
+        f"expected an engine-composed surface form, got {spoken!r}"
+    )
+
+
+def test_verbatim_fallback_is_last_resort_and_not_used_by_composer_paths() -> None:
+    """The pass-through exists, is documented, and is not the default.
+
+    `Vocabulary._verbatim_fallback` is the only route by which a
+    cognition-authored string reaches speech un-realized. It must stay
+    reachable (a Thought with nothing to compose from still needs to
+    say *something*) but it must not be the path a composition route
+    takes. Asserted directly so the branch cannot grow unnoticed.
+    """
+    from genesis_cognitive.cognition.thought_composer import ThoughtComposer
+    from genesis_cognitive.reasoning.engine import ReasoningEngine
+
+    network = ConceptNetwork()
+    network.add_concept("dog", confidence=0.9)
+    network.add_concept("animal", confidence=0.8)
+    network.add_edge("dog", "animal", relation=RelationType.IS_A, weight=0.9)
+
+    emotion = _make_emotion()
+
+    # Use the metadata the composer really emits, rather than a
+    # hand-rolled approximation — `_compose_knowledge_content` composes
+    # from the conjunction of knowledge, definition and reasoning, and a
+    # thinner dict legitimately falls through.
+    composer = ThoughtComposer(
+        network=network, reasoner=ReasoningEngine(network=network), seed=1
+    )
+    thought = composer.compose_about("dog", emotion)
+    assert thought is not None
+    context = dict(thought.metadata)
+    context["content"] = thought.content
+
+    vocab = Vocabulary(seed=3, network=network)
+    composed = vocab._get_content_slot(context, emotion)
+    assert composed
+    assert "is_a" not in " ".join(composed), (
+        f"fallthrough used despite composer metadata: {composed!r}"
+    )
+
+    # With no metadata at all, the fallback does fire — and is explicit
+    # about being the degraded path.
+    assert vocab._verbatim_fallback("only prose here", {"intent": "inform"}) == [
+        "only prose here"
+    ]
+    assert vocab._verbatim_fallback("", {"intent": "inform"}) == []

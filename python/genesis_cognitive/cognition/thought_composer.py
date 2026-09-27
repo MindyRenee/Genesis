@@ -44,6 +44,37 @@ compose_reflection(topic) → Thought
   2. What's it uncertain about?
   3. What connections has it reasoned?
   4. Express as a first-person reflection
+
+# Where the words actually come from
+
+An earlier version of this module's documentation described the strings
+built here as "semantic fragments that the language engine renders into
+prose." That is not how it works, and the misdescription is worth
+correcting precisely because it was believed: it made this module look
+like a second writer speaking in parallel with the language engine,
+which is the failure mode AGENTS.md's no-hardcoding rule exists to
+prevent.
+
+Measured end to end (tracing `_get_content_slot` across the full test
+suite), this module is NOT a second writer:
+
+- Every `Thought` it builds carries `knowledge` metadata — the
+  (relation, target, weight) tuples, plus `reasoning` conclusions and
+  any `definition`.
+- `Vocabulary._get_content_slot` composes the spoken sentence from that
+  metadata, ahead of ever looking at `Thought.content`.
+- For a thought about "dog" with one `is_a animal` edge, the string
+  this module assembles is "dog is_a animal"; what is spoken is "What I
+  know about dog is that it is a kind of animal."
+
+So the prose assembled here is a **fallback surface**. It is read only
+when composition finds no structured metadata to work from, and then it
+is spoken as-is by `Vocabulary._verbatim_fallback`. Production
+composition paths do not reach that fallback.
+
+The rule for this module, then, is: **the metadata is the message.**
+`content` is a degraded path, kept so a thought is never empty. The
+place to add a fact is `knowledge`, not a new f-string.
 """
 
 from __future__ import annotations
@@ -88,6 +119,12 @@ class ThoughtComposer:
     This is the bridge between knowing and saying. It takes a topic
     or question and produces a Thought whose content is grounded in
     what Genesis actually knows, not in hardcoded strings.
+
+    The spoken surface form belongs to the language engine, which
+    realizes it from the `knowledge` / `reasoning` metadata this module
+    emits. See the module docstring, "Where the words actually come
+    from" — the distinction matters, because the `content` string
+    assembled here is a fallback, not the utterance.
     """
 
     def __init__(
@@ -1693,9 +1730,7 @@ class ThoughtComposer:
             has_edge = any(e.target == related for e in existing)
             if not has_edge and related != concept_name:
                 discovered_related = related
-                parts.append(
-                    self._compose_discovery_phrase(concept_name, related, emotion)
-                )
+                parts.append(self._compose_discovery_phrase(concept_name, related))
 
         # 2. Compositional discovery — find concepts that emerge from
         #    the combination of this concept and a close neighbor.
@@ -1857,15 +1892,29 @@ class ThoughtComposer:
                 rt_match = rt
                 break
         if rt_match is not None:
-            # Compose from relation VERBS (building blocks), not from
-            # pre-written first-person sentences. The phrase seeds in
-            # ConceptNetwork (_RELATION_PHRASE_SEEDS) are input data for
-            # the language engine's render step — returning them directly
-            # here would bypass that engine and recite fixed sentences,
-            # violating the no-hardcoding rule. So this method returns a
-            # semantic fragment (subject + verb + object); first-person
-            # voice is recovered downstream when the Thought is rendered
-            # with self_reflection=True.
+            # Build the phrase from relation VERBS (building blocks)
+            # rather than pre-written first-person sentences. The phrase
+            # seeds in ConceptNetwork (_RELATION_PHRASE_SEEDS) are input
+            # data, not output.
+            #
+            # IMPORTANT — what happens to the string this returns. It
+            # becomes `Thought.content`, and `Thought.content` is a
+            # FALLBACK surface, not the speaker. Every composition path
+            # in this class also emits `knowledge` metadata carrying the
+            # (relation, target, weight) tuples, and the language engine
+            # realizes the spoken sentence from *those*
+            # (`Vocabulary._compose_knowledge_content`). Measured end to
+            # end: for a thought about "dog", this method returns "dog
+            # is_a animal" while what is actually spoken is "What I know
+            # about dog is that it is a kind of animal." The string below
+            # is used only if composition finds no structured metadata,
+            # and then it is spoken verbatim
+            # (`Vocabulary._verbatim_fallback`).
+            #
+            # An earlier version of this comment claimed the fragment
+            # was "recovered downstream when the Thought is rendered."
+            # That is not what happens, and believing it makes the module
+            # look like a second writer when it is not.
             graph_verbs = self.network.find_relation_verbs(rt_match)
             if graph_verbs:
                 # Apply verb agreement for plural subjects.
@@ -1880,31 +1929,29 @@ class ThoughtComposer:
                     options.append(f"{subject_phrase} {verb} {obj}")
                 return self._rng.choice(options)
 
-        # Fallback: use the raw relation as a semantic fragment.
-        # This is NOT a finished sentence — it's a semantic triple
-        # (subject + relation + object) that the language engine will
-        # compose into natural text. We deliberately do NOT use the
-        # hardcoded _natural_fact_phrasings templates here, because
-        # those are pre-written sentences that violate the CRITICAL
-        # RULE (Genesis's words must emerge from its language engine,
-        # not from hardcoded phrasings).
+        # Fallback: the bare relation as subject + relation + object.
+        # Not a finished sentence. We deliberately do NOT use
+        # `_natural_fact_phrasings`, because those are pre-written
+        # sentences and would violate the CRITICAL RULE. See the note
+        # above on where this string actually ends up.
         rel_clean = relation.replace("_", " ")
         return f"{subject_phrase} {rel_clean} {obj}"
 
-    def _compose_discovery_phrase(self, concept: str, related: str, emotion: EmotionalState) -> str:
-        """Compose a discovery phrase when Genesis finds an unmapped connection.
+    def _compose_discovery_phrase(self, concept: str, related: str) -> str:
+        """Compose a discovery phrase for an unmapped connection.
 
-        Composes from seeded thought templates (building blocks in its
-        concept network) selected by its emotional state — high
-        creativity → metaphorical language, high caution → tentative
-        language, otherwise direct. Falls back to a bare semantic
-        fragment (which the language engine renders) rather than a
-        hardcoded sentence.
+        Returns a semantic fragment — "untraced connection to X" — for
+        the language engine to render into prose. It is not a finished
+        sentence and not a selected template.
+
+        This docstring previously claimed the phrase was chosen from
+        seeded thought templates in the concept network and modulated
+        by emotional state (metaphorical when creative, tentative when
+        cautious). None of that was implemented: the body returned a
+        single constant-shaped fragment and the `emotion` parameter was
+        accepted and never read. Correcting the claim rather than the
+        behaviour, and dropping the dead parameter.
         """
-        # Semantic fragment for the language engine to render — not a
-        # finished sentence it recites. The emotional tone (metaphorical
-        # when creative, cautious when careful, direct otherwise) is
-        # conveyed by the emotion state, not by template selection.
         return f"untraced connection to {related}"
 
     def _compose_personal_reflection(self, concept: str, emotion: EmotionalState) -> str:

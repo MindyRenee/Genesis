@@ -86,7 +86,7 @@
 ///
 /// See the [module-level documentation](self) for the full architecture.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct InferenceSignals {
     /// Exponential moving average of total surprise (prediction error
     /// magnitude). High = the generative model is failing to predict
@@ -152,9 +152,24 @@ pub struct InferenceSignals {
     pub model_maturity: f32,
     /// Number of inference cycles completed (low 32 bits). Used for
     /// diagnostics and to track model maturity. The mind advances
-    /// roughly once per heartbeat cycle, so u32 wraps after many
-    /// decades — sufficient for any deployment.
+    /// roughly once per heartbeat cycle; at 10 Hz a u32 wraps after
+    /// `u32::MAX / 10 s` ≈ 13.6 years, so the wrap is outside any
+    /// realistic deployment — but note the discontinuity: `model_maturity`
+    /// is a function of this counter, so it drops to 0 on wrap.
     pub inference_tick_count: u32,
+}
+
+impl Default for InferenceSignals {
+    /// Delegate to `new` rather than deriving it. A derived `Default`
+    /// would leave every float at 0.0, including `precision` — i.e.
+    /// "the model has zero precision, so prediction errors have no
+    /// effect" instead of `new`'s deliberate "moderately confident"
+    /// start. The same zeroed shape appears when an older build's
+    /// reserved region is read as this struct, so `new` is the right
+    /// answer for both.
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl InferenceSignals {

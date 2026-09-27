@@ -53,16 +53,35 @@
 //!   a continuous action space.
 //! - Epistemic value is approximated as the uncertainty-weighted
 //!   novelty of the predicted observation relative to the current
-//!   belief, not the full expected Bayesian surprise. This is not
-//!   merely a simplification — it is a theoretical necessity. In
-//!   linear-Gaussian models with additive controls, the formal
-//!   epistemic term of the expected free energy is policy-independent
-//!   (van der Himst & Lanillos, 2021), rendering active inference
-//!   equivalent to KL control with no exploratory drive. The
-//!   uncertainty-weighted novelty restores the epistemic drive by
-//!   using the principle that information gain is proportional to
-//!   current uncertainty (Shannon), directing exploration toward
-//!   dimensions where the posterior is most uncertain.
+//!   belief, not the full expected Bayesian surprise. The
+//!   substituted quantity is a **heuristic, not an equivalent
+//!   reformulation**, and it does not satisfy the formal definition
+//!   of epistemic value as expected information gain
+//!   `I(s;o|π) = E_q[D_KL(q(s|o) ‖ q(s))]`, which for a
+//!   linear-Gaussian model is a function of posterior *covariance
+//!   reduction*. The substitution inverts the criterion in two
+//!   respects: motion along an axis already pinned down scores full
+//!   value (true information gain: zero), and standing still where
+//!   the posterior is most uncertain scores none (true information
+//!   gain: maximal). The uncertainty weight moves in the right
+//!   direction; what it multiplies is the wrong quantity.
+//!
+//!   There is a real result behind the attempt, but it is narrower
+//!   than "necessary": in linear-Gaussian state-space models driven
+//!   by **additive** controls, the epistemic terms of the expected
+//!   free energy are **constant** with respect to policy, so plain
+//!   EFE minimisation reduces to KL control with no exploratory
+//!   drive (Koudahl, Kouw & de Vries, 2021). The constancy is a
+//!   property of that specific model class and control parameterisation,
+//!   not of epistemic value in general: multiplicative controls (e.g.
+//!   switching transition matrices) do admit an epistemic drive in the
+//!   same model class, and generalized Bayesian filtering reinstates
+//!   it by making observation precision policy-dependent
+//!   (Millidge, Tschantz & Buckley, 2021). Genesis uses additive
+//!   controls and does not implement precision-modulated policies, so
+//!   it does fall inside the degenerate case — and a different fix
+//!   (multiplicative or precision-weighted policies) is available
+//!   than the one taken here.
 //!
 //! These simplifications make the implementation tractable at 10 Hz
 //! on a single machine while preserving the core mathematical
@@ -213,10 +232,21 @@
 //! to explore). This is the precision-weighted policy selection of
 //! active inference (Friston et al., 2010; Schwartenbeck et al., 2015).
 //!
-//! Policy selection is always active. When the system is in a
-//! predictable regime, the "noop" policy wins (doing nothing is
-//! optimal). When the system is stressed, a corrective policy wins.
-//! This is continuous active inference, not just emergency intervention.
+//! Policy selection runs every inference cycle. The intent was that in
+//! a predictable regime the "noop" policy wins (doing nothing is
+//! optimal) and under stress a corrective policy wins.
+//!
+//! That intent is not what the current constants produce, and the
+//! docstring used to assert it as fact. Two things get in the way. The
+//! epistemic term outweighs the homeostatic term by one to two orders
+//! of magnitude, so ranking is close to ranking-by-novelty and noop
+//! does not win merely for being predictable. And `precision`
+//! saturates at 1.0 within seconds of continuous running, so the
+//! `precision > EXPLOITATION_PRECISION_THRESHOLD` branch is the one
+//! always taken and the stochastic exploration branch is dead in
+//! practice. Treat the policy repertoire as a set of candidate
+//! neuromodulatory interventions scored by a heuristic, not as a
+//! converged active-inference arbitration.
 //!
 //! References:
 //! - Friston, K. (2010). The free-energy principle. Nat Rev Neurosci.
@@ -232,11 +262,17 @@
 //!   Arch Intern Med.
 //! - Pezzulo, G., Rigoli, F. & Friston, K. (2015). Active inference,
 //!   homeostatic and allostatic control. Prog Neurobiol.
-//! - van der Himst, T. & Lanillos, P. (2021). On epistemics in expected
-//!   free energy for linear Gaussian state space models. Entropy,
-//!   23(12), 1565.
+//! - Friston, K., Rigoli, F., Ognibene, D., Mathys, C., Fitzgerald, T.
+//!   & Pezzulo, G. (2015). Active inference and epistemic value.
+//!   Cognitive Neuroscience, 6(4), 187–214.
+//! - Koudahl, M. T., Kouw, W. M. & de Vries, B. (2021). On epistemics in
+//!   expected free energy for linear Gaussian state space models.
+//!   Entropy, 23(12), 1565.
 //! - Särkkä, S. (2013). Bayesian Filtering and Smoothing. Cambridge
 //!   University Press.
+//! - Millidge, T. S., Tschantz, A. & Buckley, C. L. (2021). A
+//!   whack-a-mole re-derivation of the FEP, and how to pound the
+//!   hole. Neural Computation, 33(2), 447–482.
 
 use std::path::Path;
 
@@ -529,6 +565,14 @@ static POLICIES: &[Policy] = &[
 /// The number of policies in the repertoire.
 const NUM_POLICIES: usize = 9;
 
+// `NUM_POLICIES` sizes the fixed-size `evaluations` and `weights` arrays
+// used in the selection loop, and `POLICIES` is the list they index.
+// Nothing tied the two together, so adding or removing a policy
+// desynchronised them and the mismatch surfaced as a runtime index
+// panic inside the 5 Hz tick loop — the worst possible place to
+// discover a count that should have been a compile error. Pin it here.
+const _: () = assert!(POLICIES.len() == NUM_POLICIES);
+
 /// The result of policy evaluation — the selected policy and its
 /// expected free energy.
 struct PolicyEvaluation {
@@ -542,6 +586,22 @@ struct PolicyEvaluation {
 /// policy selection in Friston's framework — high precision →
 /// exploitative, low precision → exploratory.
 const POLICY_SOFTMAX_TEMPERATURE: f32 = 0.5;
+
+/// Symmetric magnitude bound applied to a policy's expected free energy.
+///
+/// This exists solely to reject non-finite values. It must be far wider
+/// than any real score: `selected_policy_efe` is published in
+/// `InferenceSignals` and consumers may compare it against it, so
+/// saturating it would silently flatten the signal. See the selection
+/// loop for why a non-negative lower bound is wrong here.
+const EFE_SCORE_LIMIT: f32 = 1.0e6;
+
+/// Engine confidence above which policy selection is exploitative
+/// (argmin) rather than exploratory (softmax sample).
+///
+/// Hand-tuned, not derived. See the selection loop for why it is not
+/// the Bayesian policy prior precision it is analogous to.
+const EXPLOITATION_PRECISION_THRESHOLD: f32 = 0.8;
 
 // The homeostatic target for expected free energy computation.
 // Policies that push the system toward its homeostatic baseline
@@ -1692,7 +1752,8 @@ impl ActiveInferenceEngine {
             // current belief) have higher epistemic value because the
             // resulting observation would be more informative. This is
             // the information-seeking component of active inference
-            // (Friston, Rigoli & Sengupta, 2015) — the system prefers
+            // (Friston, Rigoli, Ognibene, Mathys, Fitzgerald &
+            // Pezzulo, 2015) — the system prefers
             // policies that reduce uncertainty about its own state.
             let mut dist_sq = 0.0f32;
             for i in 0..DIM {
@@ -1700,6 +1761,18 @@ impl ActiveInferenceEngine {
                 dist_sq += diff * diff;
             }
             let expected_surprise = dist_sq / DIM as f32;
+            // NOTE: `uncertainty` depends only on `self.precision` and a
+            // constant — it is identical for every policy. That makes
+            // it invariant under the argmin, and the max-subtraction in
+            // the softmax below removes exactly such a common shift. So
+            // this term has **no effect on which policy is selected**;
+            // its only observable consequence is on the
+            // `selected_policy_efe` value that gets published. It is
+            // retained because a policy-independent term is legitimate
+            // in an expected-free-energy decomposition, but it must not
+            // be read as doing arbitration work — the exploration /
+            // exploitation balance is carried entirely by
+            // `epistemic_value` and the softmax temperature.
             let uncertainty = (1.0 - self.precision) * UNCERTAINTY_WEIGHT;
 
             // Epistemic value: uncertainty-weighted novelty of the
@@ -1708,7 +1781,8 @@ impl ActiveInferenceEngine {
             // The epistemic value of a policy is its expected information
             // gain — how much the resulting observation would reduce
             // uncertainty about the hidden state. In active inference
-            // (Friston, Rigoli & Sengupta, 2015), this is the
+            // (Friston, Rigoli, Ognibene, Mathys, Fitzgerald &
+            // Pezzulo, 2015), this is the
             // information-seeking component of policy selection: the
             // system prefers policies that would take it to regions
             // where observations are maximally informative.
@@ -1751,22 +1825,60 @@ impl ActiveInferenceEngine {
                 0.5, // cap at 0.5 so it doesn't dominate pragmatic cost
             );
 
-            // EFE = pragmatic + uncertainty - epistemic
-            // Lower EFE is better. Epistemic value is subtracted
+            // EFE = pragmatic + uncertainty - epistemic.
+            // Lower EFE is better; epistemic value is subtracted
             // because information gain reduces EFE.
+            //
+            // The bound here is a **finiteness guard, not a range
+            // constraint**, and must not be narrowed to a
+            // non-negative interval. EFE is a relative score with an
+            // arbitrary zero: a policy that beats the others by a
+            // hair yields a raw value of -1e-4, and a lower bound of
+            // 0.0 maps every such policy to exactly 0.0. Clamping to
+            // [0, 2] therefore destroyed the ordering information the
+            // argmin and the softmax depend on. In the converged
+            // regime — precision saturated, so `uncertainty` is 0 and
+            // `epistemic_value` exceeds the tiny `expected_surprise` —
+            // the raw value is negative for all nine policies, every
+            // one clamped to 0.0, `min_by` returning the first minimum
+            // (index 0 = `noop`), and the softmax degenerate to
+            // uniform. The inference loop was inert in exactly the
+            // regime it exists to run in. A wide symmetric bound
+            // rejects non-finite values while preserving order.
             let efe = crate::state::sanitize::finite_clamp(
                 expected_surprise + uncertainty - epistemic_value,
-                0.0,
-                2.0,
+                -EFE_SCORE_LIMIT,
+                EFE_SCORE_LIMIT,
             );
 
             evaluations[idx] = (efe, policy);
         }
 
-        // Softmax selection: precision-weighted temperature
-        // High precision → low temperature → exploitative (pick best)
-        // Low precision → high temperature → exploratory (explore)
-        let temp = POLICY_SOFTMAX_TEMPERATURE * (2.0 - self.precision);
+        // Softmax selection: precision-weighted temperature.
+        // High precision → low temperature → exploitative (pick best).
+        // Low precision → high temperature → exploratory (sample).
+        //
+        // The temperature is additionally floored at the observed
+        // spread of the scores. A fixed temperature is only meaningful
+        // relative to the scale of what is being exponentiated: the
+        // EFE differences between policies here are on the order of
+        // 1e-3, while `POLICY_SOFTMAX_TEMPERATURE` is ~0.5. Dividing
+        // by a temperature two to three orders of magnitude larger
+        // than the signal collapses the distribution to uniform
+        // (max/min weight ratio 1.03), making the "sampling" branch a
+        // uniform random draw over all nine policies — including ones
+        // that inject cortisol or melatonin. Flooring the temperature
+        // at the actual spread keeps the precision-dependence while
+        // guaranteeing the distribution is not degenerate.
+        let efe_spread = evaluations
+            .iter()
+            .map(|&(efe, _)| efe)
+            .fold(0.0f32, f32::max)
+            - evaluations
+                .iter()
+                .map(|&(efe, _)| efe)
+                .fold(f32::MIN, f32::min);
+        let temp = (POLICY_SOFTMAX_TEMPERATURE * (2.0 - self.precision)).max(efe_spread);
 
         // Compute softmax weights (negative EFE → higher probability)
         let mut weights = [0.0f32; NUM_POLICIES];
@@ -1795,10 +1907,22 @@ impl ActiveInferenceEngine {
             }
         }
 
-        // Select: sample from the softmax distribution
-        // Use a deterministic selection (argmax) when precision is high
-        // (> 0.8), and stochastic sampling when precision is low.
-        let selected_idx = if self.precision > 0.8 {
+        // Select: sample from the softmax distribution.
+        // Use a deterministic selection (argmax) when precision is high,
+        // and stochastic sampling when precision is low.
+        //
+        // `precision` here is this engine's own Bayesian confidence in
+        // its predictions (it gates `obs_var` and the learning rate) —
+        // it is *not* the Bayesian policy prior precision β of
+        // Friston et al. (2015), which is what a policy softmax
+        // temperature formally corresponds to. The threshold below is a
+        // hand-tuned switch between the two modes, not a derived
+        // quantity.
+        //
+        // Note that `precision` saturates at 1.0 within ~25 s of
+        // continuous running (recovery is 0.004/tick at dt_scale = 2),
+        // so in steady state this branch is effectively always taken.
+        let selected_idx = if self.precision > EXPLOITATION_PRECISION_THRESHOLD {
             // High precision: pick the best policy (exploitative)
             evaluations
                 .iter()

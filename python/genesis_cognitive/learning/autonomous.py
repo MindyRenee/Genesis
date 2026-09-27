@@ -158,6 +158,16 @@ MAX_TEXT_LENGTH = 50000  # don't process pages longer than this
 # large enough to meaningfully reduce CPU load (from ~8s to ~40s between
 # fetches) while still allowing curiosity-driven learning to continue.
 THROTTLED_DELAY_MULTIPLIER = 5.0
+# Retained learning results. Every consumer of the log looks at a
+# recent window (introspection, `get_recent_learning`, the status
+# readout), and the log is serialized in full on each autosave, so an
+# unbounded list is pure growth. Roughly a day of the 50-page-per-
+# session maximum.
+_MAX_LEARNING_LOG = 500
+# Queued curiosity topics. A bounded FIFO — a topic queued long ago is
+# not what it is curious about now, and the queue is persisted, so
+# depth costs disk as well as memory.
+_MAX_TOPIC_QUEUE = 200
 
 # ─── Source awareness ───────────────────────────────────────────────
 # Genesis should understand what each source provides and route its
@@ -802,8 +812,15 @@ class AutonomousLearner:
 
     def _init_stats(self) -> None:
         """Initialize learning statistics trackers."""
-        # Track what it's learned
-        self._learning_log: list[LearningResult] = []
+        # Track what it's learned.
+        #
+        # Bounded. This was an unbounded list appended to on every
+        # successful learning operation, read only by `learning_log`,
+        # `get_recent_learning`, and `describe_recent_learning` — all
+        # of which look at a recent window — and serialized in full on
+        # every autosave. It grew without limit on the learner's own
+        # long-running fetch path.
+        self._learning_log: deque[LearningResult] = deque(maxlen=_MAX_LEARNING_LOG)
         self._pages_fetched = 0  # cumulative (persisted, for stats)
         self._session_pages = 0  # per-session (resets on start(), for limit)
         self._concepts_learned = 0
@@ -897,8 +914,15 @@ class AutonomousLearner:
 
     def _init_queues(self) -> None:
         """Initialize topic, curiosity, and site-request queues."""
-        # Topics it's curious about right now
-        self._topic_queue: list[str] = []
+        # Topics it's curious about right now.
+        #
+        # Bounded. This was an unbounded list that is also *persisted*
+        # and popped from the front (`pop(0)`), so it both grew without
+        # limit and made every dequeue O(N). Curiosity is a short-lived
+        # disposition: a topic queued weeks ago is not what it is
+        # curious about now, so a deep backlog is stale by construction,
+        # not a resource worth preserving.
+        self._topic_queue: deque[str] = deque(maxlen=_MAX_TOPIC_QUEUE)
         self._topics_searched: set[str] = set()
 
         # Urgent topics — from conversation gaps ("I don't know what
@@ -1651,7 +1675,13 @@ class AutonomousLearner:
             self._relationships_learned = data.get("relationships_learned", 0)
             self._emotion_skips = data.get("emotion_skips", 0)
             self._posture_skips = data.get("posture_skips", 0)
-            self._topic_queue = list(data.get("topic_queue", []))
+            # Rebuild as a bounded deque, keeping the *most recent*
+            # entries if the saved queue is longer than the cap (the
+            # tail is the live work; the head is stale backlog).
+            self._topic_queue = deque(
+                data.get("topic_queue", [])[-_MAX_TOPIC_QUEUE:],
+                maxlen=_MAX_TOPIC_QUEUE,
+            )
             self._curiosity_queue = deque(
                 data.get("curiosity_queue", []), maxlen=50
             )
@@ -2214,7 +2244,9 @@ class AutonomousLearner:
         # Try the manual queue next
         with self._queue_lock:
             if self._topic_queue:
-                return self._topic_queue.pop(0)
+                # FIFO, and O(1) — `pop(0)` was O(N) on the list this
+                # used to be.
+                return self._topic_queue.popleft()
 
         # Generate from curiosity — pick isolated or uncertain concepts.
         # Take a snapshot of _topics_searched so the concept scan can run
@@ -3398,14 +3430,16 @@ class AutonomousLearner:
 
     def get_recent_learning(self, n: int = 5) -> list[LearningResult]:
         """Get the most recent learning results."""
-        return self._learning_log[-n:]
+        # `list()` first: `_learning_log` is a deque, which does not
+        # support slicing.
+        return list(self._learning_log)[-n:]
 
     def describe_recent_learning(self) -> str:
         """Structural description of recent learning for metadata."""
         if not self._learning_log:
             return "no autonomous learning yet"
 
-        recent = self._learning_log[-5:]
+        recent = list(self._learning_log)[-5:]
         parts = [
             f"{self._pages_fetched} pages, "
             f"{self._concepts_learned} concepts, "

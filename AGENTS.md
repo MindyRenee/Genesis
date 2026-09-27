@@ -96,8 +96,8 @@ like scaffolded work-in-progress; if unsure, ask rather than deleting.
 Genesis is a long-running stateful system. Always shut down via
 `./run.sh --stop` (or Ctrl-C in the running terminal) — never kill
 processes directly. Do not corrupt the mmap'd state or drive the system
-into degenerate regimes for experimentation; see the State integrity
-framework section of the README.
+into degenerate regimes for experimentation; see the "Operational notes"
+section of the README.
 
 ## Edge storage — the edge log is canonical
 Relationships have ONE source of truth: `edge_log.jsonl` in the data

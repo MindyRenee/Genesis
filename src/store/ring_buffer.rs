@@ -212,7 +212,12 @@ pub struct RingBufferEntry {
     /// Higher = more important. Used by consolidation to prioritise.
     pub salience: f32,
     /// Snapshot of effective neurochemical levels at insertion time.
-    /// Order matches [`NeurochemicalId::all()`].
+    ///
+    /// Order matches the 12-element emotional tag on the IPC wire (see
+    /// `ipc.rs` PUSH_EVENT), **not** [`NeurochemicalId::all()`] — the
+    /// six v3 chemicals are not carried here.
+    /// `consolidation::expand_emotional_tag` maps this into the full
+    /// 18-chemical LTM tag.
     pub emotional_tag: [f32; EMOTIONAL_TAG_SIZE],
     /// Length of the UTF-8 text payload (bytes).
     pub text_len: u16,
@@ -253,7 +258,12 @@ impl RingBufferEntry {
             flags: 0,
             _pad: 0,
             salience: crate::state::sanitize::finite_clamp(salience, 0.0, 1.0),
-            emotional_tag,
+            // Sanitise the tag here rather than relying on every call
+            // site: the value is persisted, and a NaN in it silently
+            // poisons the SDR/SimHash encoding used by LTM associative
+            // retrieval, with no error anywhere downstream.
+            emotional_tag: emotional_tag
+                .map(|v| crate::state::sanitize::finite_clamp(v, 0.0, 1.0)),
             text_len: len as u16,
             _pad2: [0; 2],
             text: text_buf,
@@ -336,6 +346,22 @@ pub enum RingBufferError {
         /// The maximum allowed capacity.
         max: u32,
     },
+    /// The header's cursor fields are outside the buffer's own bounds.
+    ///
+    /// `head` and `tail` are full `u64`s used directly to compute slot
+    /// offsets, so a value ≥ `capacity` would address outside the
+    /// mapping. The header carries no integrity check of its own, so
+    /// these fields are untrusted on open.
+    CorruptHeader {
+        /// The out-of-range `head` found.
+        head: u64,
+        /// The out-of-range `tail` found.
+        tail: u64,
+        /// The out-of-range `count` found.
+        count: u64,
+        /// The capacity the other fields were checked against.
+        capacity: u32,
+    },
 }
 
 impl std::fmt::Display for RingBufferError {
@@ -359,6 +385,18 @@ impl std::fmt::Display for RingBufferError {
             }
             Self::CapacityTooLarge { found, max } => {
                 write!(f, "capacity {found} exceeds maximum {max}")
+            }
+            Self::CorruptHeader {
+                head,
+                tail,
+                count,
+                capacity,
+            } => {
+                write!(
+                    f,
+                    "corrupt STM header: head={head} tail={tail} count={count} \
+                     outside capacity {capacity}"
+                )
             }
         }
     }
@@ -416,12 +454,27 @@ pub struct RingBuffer {
 unsafe impl Send for RingBuffer {}
 unsafe impl Sync for RingBuffer {}
 
-/// Maximum capacity of the ring buffer. This prevents `usize` overflow
-/// on 32-bit targets when computing `capacity * ENTRY_SIZE` (the mmap
-/// region size). On 64-bit targets the limit is effectively unreachable
-/// (16M entries × 256 bytes = 4 GB), but it also guards against
-/// absurd user-supplied values that would trigger a huge allocation.
-pub const MAX_CAPACITY: u32 = 16_777_216; // 2^24 — 4 GB at 256 bytes/entry
+/// Maximum capacity of the ring buffer.
+///
+/// Two independent limits apply, and this is the smaller of them:
+///
+/// 1. `capacity * ENTRY_SIZE` must fit in a `usize`, so the slot array
+///    is addressable at all. On a 32-bit target this binds (the 2^24
+///    cap below is reached at exactly 2^32 bytes).
+/// 2. A 4 GB ceiling, so a corrupt or absurd caller-supplied value
+///    cannot request an enormous mapping.
+pub const MAX_CAPACITY: u32 = {
+    // `usize::MAX / ENTRY_SIZE` saturates to `u64::MAX` on 64-bit, so
+    // compare in u64 before narrowing back to u32.
+    let by_address_space = ((usize::MAX - core::mem::size_of::<RingBufferHeader>()) / ENTRY_SIZE)
+        as u64;
+    let ceiling = 1u64 << 24;
+    if by_address_space > ceiling {
+        ceiling as u32
+    } else {
+        by_address_space as u32
+    }
+};
 
 impl RingBuffer {
     /// Create a new ring buffer file with the given capacity.
@@ -503,7 +556,15 @@ impl RingBuffer {
             std::ptr::write_bytes(entries_start, 0, capacity as usize * ENTRY_SIZE);
         }
 
-        Self::do_msync(ptr, mmap_len)?;
+        // `file` was forgotten above, so `fd` and `ptr` are ours alone
+        // from here: a failed flush must release both rather than leak
+        // them.
+        if let Err(e) = Self::do_msync(ptr, mmap_len) {
+            // SAFETY: `ptr` is a live mapping of `mmap_len` bytes and
+            // `fd` is live, both exclusively owned.
+            unsafe { Self::discard_mapping(ptr, mmap_len, fd) };
+            return Err(e);
+        }
 
         Ok(Self {
             ptr,
@@ -543,24 +604,24 @@ impl RingBuffer {
         let ptr = Self::do_mmap(fd, len)?;
         std::mem::forget(file);
 
-        // Verify header
+        // Verify header.
+        //
+        // `RingBufferHeader` is `Copy` and has no implicit padding, so
+        // reading it *by value* yields an owned snapshot. That matters:
+        // the remapping path below `munmap`s this mapping, and the
+        // capacity handed back to the caller must be read from our own
+        // copy, not from unmapped memory.
         // SAFETY: `ptr` is a valid mmap'd region of `len` bytes,
         // len ≥ size_of::<RingBufferHeader>() (checked above).
-        let header: &RingBufferHeader = unsafe { &*(ptr as *const RingBufferHeader) };
+        let header: RingBufferHeader = unsafe { *(ptr as *const RingBufferHeader) };
         if !header.verify_magic() {
             // SAFETY: `ptr` and `fd` are valid and exclusively owned.
-            unsafe {
-                munmap(ptr as *mut c_void, len);
-                close(fd);
-            }
+            unsafe { Self::discard_mapping(ptr, len, fd) };
             return Err(RingBufferError::BadMagic);
         }
         if header.version != STM_SCHEMA_VERSION {
             // SAFETY: `ptr` and `fd` are valid and exclusively owned.
-            unsafe {
-                munmap(ptr as *mut c_void, len);
-                close(fd);
-            }
+            unsafe { Self::discard_mapping(ptr, len, fd) };
             return Err(RingBufferError::VersionMismatch {
                 expected: STM_SCHEMA_VERSION,
                 found: header.version,
@@ -568,21 +629,41 @@ impl RingBuffer {
         }
         if header.capacity == 0 {
             // SAFETY: `ptr` and `fd` are valid and exclusively owned.
-            unsafe {
-                munmap(ptr as *mut c_void, len);
-                close(fd);
-            }
+            unsafe { Self::discard_mapping(ptr, len, fd) };
             return Err(RingBufferError::InvalidCapacity { found: 0 });
         }
         if header.capacity > MAX_CAPACITY {
             // SAFETY: `ptr` and `fd` are valid and exclusively owned.
-            unsafe {
-                munmap(ptr as *mut c_void, len);
-                close(fd);
-            }
+            unsafe { Self::discard_mapping(ptr, len, fd) };
             return Err(RingBufferError::CapacityTooLarge {
                 found: header.capacity,
                 max: MAX_CAPACITY,
+            });
+        }
+        let capacity = header.capacity;
+
+        // Validate the cursor fields against the capacity.
+        //
+        // The header has no integrity check of its own (unlike the core
+        // state, which is CRC-protected), so `head`, `tail` and `count`
+        // are untrusted: bit-rot in the first page, a foreign/older
+        // writer, or a page-tearing writeback can set them to
+        // anything. `head` and `tail` are full `u64`s that are used
+        // directly to compute slot offsets, so an out-of-range value
+        // would read or write outside the mapping. `push` in
+        // particular trusts `head` — this check is what makes its
+        // SAFETY argument true.
+        if header.head >= capacity as u64
+            || header.tail >= capacity as u64
+            || header.count > capacity as u64
+        {
+            // SAFETY: `ptr` and `fd` are valid and exclusively owned.
+            unsafe { Self::discard_mapping(ptr, len, fd) };
+            return Err(RingBufferError::CorruptHeader {
+                head: header.head,
+                tail: header.tail,
+                count: header.count,
+                capacity,
             });
         }
 
@@ -590,13 +671,10 @@ impl RingBuffer {
         // Without this, a truncated file could pass the header check but
         // cause out-of-bounds access when `push` or `iter` compute
         // `entry_ptr(index)` beyond the actual file length.
-        let expected = file_size(header.capacity);
+        let expected = file_size(capacity);
         if len < expected {
             // SAFETY: `ptr` and `fd` are valid and exclusively owned.
-            unsafe {
-                munmap(ptr as *mut c_void, len);
-                close(fd);
-            }
+            unsafe { Self::discard_mapping(ptr, len, fd) };
             return Err(RingBufferError::FileTooSmall {
                 expected: expected as u64,
                 found: len as u64,
@@ -607,11 +685,13 @@ impl RingBuffer {
         // backed by the file. Files created by older versions of this
         // code may have a non-page-aligned size. We extend the file to
         // the page-aligned mmap size and re-mmap if necessary.
-        let needed_mmap_len = mmap_size(header.capacity);
+        let needed_mmap_len = mmap_size(capacity);
         let (final_ptr, final_mmap_len) = if len < needed_mmap_len {
             // The file is smaller than the page-aligned size. We need
             // to unmap, ftruncate, fsync, and re-mmap.
             // SAFETY: `ptr` and `fd` are valid and exclusively owned.
+            // `header` is an owned copy, so nothing refers to the
+            // mapping after this point.
             unsafe {
                 munmap(ptr as *mut c_void, len);
             }
@@ -631,8 +711,16 @@ impl RingBuffer {
                     return Err(RingBufferError::FsyncFailed);
                 }
             }
-            // Re-mmap with the page-aligned size.
-            let new_ptr = Self::do_mmap(fd, needed_mmap_len)?;
+            // Re-mmap with the page-aligned size. On failure the mapping
+            // is already gone, so only `fd` is left to release.
+            let new_ptr = match Self::do_mmap(fd, needed_mmap_len) {
+                Ok(p) => p,
+                Err(e) => {
+                    // SAFETY: `fd` is valid and no mapping is live.
+                    unsafe { close(fd) };
+                    return Err(e);
+                }
+            };
             (new_ptr, needed_mmap_len)
         } else {
             // File is already large enough (page-aligned or larger).
@@ -643,7 +731,7 @@ impl RingBuffer {
         Ok(Self {
             ptr: final_ptr,
             fd,
-            capacity: header.capacity,
+            capacity,
             file_len: final_mmap_len,
             access_lock: std::sync::Mutex::new(()),
         })
@@ -798,18 +886,22 @@ impl RingBuffer {
         let slot = header.head;
         let cap = header.capacity as u64;
 
-        // Guard against corrupted header with capacity == 0.
+        // Guard against a corrupt header. `open` rejects out-of-range
+        // cursors, and every push below maintains `head < cap` by
+        // modular arithmetic — but this is the one place a bad `head`
+        // turns directly into an out-of-bounds 256-byte write via
+        // `entry_ptr`, so re-check rather than trust the invariant.
         // Return a sentinel (u64::MAX) instead of slot 0 so callers
         // cannot mistake the no-op for a successful write to slot 0.
-        if cap == 0 {
-            debug_assert!(false, "ring buffer capacity is 0 (corrupt header)");
+        if cap == 0 || slot >= cap {
+            debug_assert!(false, "ring buffer head out of range (corrupt header)");
             return u64::MAX;
         }
 
         // Write the entry
-        // SAFETY: `slot` is `header.head` which is always < `cap`
-        // (maintained by modular arithmetic on every push), so
-        // `entry_ptr(slot)` points within the mmap'd entry slot array.
+        // SAFETY: `slot` is `header.head`, and the guard above plus the
+        // validated capacity guarantee `slot < cap`, so `entry_ptr(slot)`
+        // points within the mmap'd entry slot array.
         // We use `write_volatile` to ensure the compiler does not
         // reorder or elide this store, which is critical for mmap
         // persistence — the entry must reach the page cache before
@@ -1007,6 +1099,22 @@ impl RingBuffer {
             return Err(RingBufferError::MsyncFailed);
         }
         Ok(())
+    }
+
+    /// Release a mapping and descriptor on a failed `open`/`create`
+    /// path, so an error return does not leak either.
+    ///
+    /// # Safety
+    /// `ptr` must be a live mapping of exactly `len` bytes and `fd` a
+    /// live descriptor, both exclusively owned by the caller and not
+    /// referenced anywhere else.
+    unsafe fn discard_mapping(ptr: *mut u8, len: usize, fd: i32) {
+        // SAFETY (unsafe fn): the caller guarantees both are live and
+        // exclusively owned, per the contract above.
+        unsafe {
+            munmap(ptr as *mut c_void, len);
+            close(fd);
+        }
     }
 }
 

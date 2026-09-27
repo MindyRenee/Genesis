@@ -566,6 +566,14 @@ class Vocabulary:
             )
             if composed:
                 return [composed]
+        # If a code-test result is present, compose the report from the
+        # structured outcome — path, pass/fail, and the runner's own
+        # tail — rather than the caller having pre-written a sentence.
+        test_result = context.get("test_result")
+        if test_result and isinstance(test_result, dict):
+            composed = self._compose_test_result_content(test_result, emotion)
+            if composed:
+                return [composed]
         # If relation answer metadata is present, compose a response
         # from the structured relation data the question handler
         # traversed. This is how it answers "who created you?" or
@@ -629,7 +637,48 @@ class Vocabulary:
             composed = self._compose_from_topic(content, emotion)
             if composed:
                 return [composed]
-        return [str(content)] if content else []
+        return self._verbatim_fallback(content, context)
+
+    def _verbatim_fallback(self, content: str, context: dict[str, Any]) -> list[str]:
+        """Last resort: speak ``content`` as given, or say nothing.
+
+        This is the **only** remaining route by which a
+        cognition-authored string can reach speech un-realized. Every
+        other branch above composes surface form here, in the language
+        layer, from structured metadata — `knowledge`,
+        `self_fragments`, `reasoning`, `relation_answer`, and so on.
+
+        It exists because a `Thought` may legitimately arrive with
+        prose that is already the intended utterance, and because
+        returning `[]` would leave the grammar with nothing to put in
+        its content slot. That is a real case, but it is a *narrow* one.
+
+        What it must not become is the default route for cognition
+        writing its own sentences. When `thought_composer` (or any
+        other producer) hands over an f-string that was joined into
+        finished English, this branch speaks it verbatim — which is the
+        no-hardcoding violation in AGENTS.md, wearing a different hat.
+
+        The rule for producers: **emit structure, not prose.** Put
+        `knowledge` / `self_fragments` / `reasoning` in the metadata and
+        this function is never reached. `Thought.content` is a fallback
+        surface, not the speaker.
+
+        Logged at debug because it should be rare, and because it was
+        previously invisible — an unmonitored escape hatch is how a
+        second writer grows up unnoticed. Measured across the full
+        suite, this fires only for caller-supplied fixtures
+        (`test_language.py`, `test_self_extras.py`); no production
+        composition path reaches it.
+        """
+        if not content:
+            return []
+        logger.debug(
+            "vocabulary: verbatim content fallback (no composition "
+            "matched; keys=%s)",
+            ",".join(sorted(k for k in context if k != "content")) or "-",
+        )
+        return [str(content)]
 
     def _get_greeting_word_slot(
         self, context: dict[str, Any], emotion: EmotionalState
@@ -810,25 +859,32 @@ class Vocabulary:
     def _compose_emotion_opener(self, emotion: EmotionalState) -> list[str]:
         """Compose an emotion opener, from its cognitive mode.
 
-        When it has learned mode words, it uses them to describe how
-        it's processing. When it hasn't, it falls back to a generic
-        frame ('there's a feeling here —') that doesn't assert a
-        specific state — a building block, not a canned claim.
+        Uses learned mode words to describe how it's processing. When
+        it has none, it returns ``[]`` — silence — which is this
+        module's documented standard for a state it has no words for
+        (see the "State-composed clause methods" note above and
+        `_get_self_report_opener`). An unfilled slot is omitted by
+        construction, so the `{emotion_opener} {content}` structure
+        degrades cleanly to the content alone.
+
+        This previously returned the generic frame "there's a feeling
+        here —". That asserted a feeling it had no learned word for, in
+        exactly the way the standard forbids, and the docstring here
+        used to describe it as acceptable.
         """
         mw = self._state_mode_words(emotion)
-        if mw:
-            w = self._rng.choice(mw)
-            # These openers are complete clauses that lead into the
-            # content slot ("{emotion_opener} {content}."). They must
-            # end with a dash so the clause connects to what follows —
-            # without it, the grammar's space join produces run-ons
-            # like "something in me is stable I feel optimistic."
-            return [
-                f"something in me is {w} —",
-                f"there's {indefinite_article(w)} {w} quality to this —",
-            ]
-        # Generic frame — a building block, not a state assertion.
-        return ["there's a feeling here —"]
+        if not mw:
+            return []
+        w = self._rng.choice(mw)
+        # These openers are complete clauses that lead into the
+        # content slot ("{emotion_opener} {content}."). They must
+        # end with a dash so the clause connects to what follows —
+        # without it, the grammar's space join produces run-ons
+        # like "something in me is stable I feel optimistic."
+        return [
+            f"something in me is {w} —",
+            f"there's {indefinite_article(w)} {w} quality to this —",
+        ]
 
     def _compose_meaning_clause(self, emotion: EmotionalState) -> list[str]:
         """Compose what something means to it, from its actual state.
@@ -2101,6 +2157,42 @@ class Vocabulary:
         if word.endswith("y") and len(word) > 1 and word[-2] not in "aeiou":
             return word[:-1] + "ies"
         return word + "s"
+
+    def _compose_test_result_content(
+        self,
+        result: dict[str, Any],
+        emotion: EmotionalState,
+    ) -> str | None:
+        """Compose the content slot from a code test run's outcome.
+
+        The code-tools layer supplies structured data — the target
+        path, whether the run passed, and the runner's own tail line —
+        and this composes a *predicate* from it. The candidate phrasings
+        are grammar seeds (building blocks) selected by emotional state;
+        the verdict and the path are always the runner's actual output,
+        never a sentence pre-written by the caller.
+        """
+        path = str(result.get("path", "")).strip()
+        if not path:
+            return None
+        detail = str(result.get("detail", "")).strip()
+
+        if result.get("passed"):
+            candidates = [
+                f"getting the tests for {path} passing",
+                f"finding the tests for {path} pass",
+                f"having the tests for {path} green",
+            ]
+        else:
+            candidates = [
+                f"not getting the tests for {path} to pass",
+                f"finding the tests for {path} failing",
+                f"having the tests for {path} break",
+            ]
+        composed = self._pick_problem_frame(candidates, emotion)
+        if detail and composed:
+            composed = f"{composed} — {detail}"
+        return composed
 
     def _compose_problem_result_content(
         self,
