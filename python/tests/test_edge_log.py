@@ -254,3 +254,100 @@ class TestNetworkWiring:
         log.close()
         assert all(n.relation == RelationType.IS_A for n in assoc)
         assert all(n.provenance == "exact" for n in assoc)
+
+
+class TestLegacyJsonMigration:
+    """Pre-log state migration must not reintroduce derivable geometry.
+
+    `_restore_edges` appends directly to `network._edges`, bypassing both
+    `add_edge` and `replace_edges`, so the derivable-edge rule has to be
+    enforced on the restore path too. It was not, and the missing-origin
+    default made it worse: it used "inferred", a listed derivable origin,
+    which inverted the documented "unknown provenance defaults to
+    canonical" rule and silently deleted real legacy edges.
+    """
+
+    def test_unknown_origin_is_canonical(self):
+        # Unlisted provenance defaults to canonical: losing an
+        # experiential binding is irrecoverable, a false positive only
+        # costs decay bandwidth.
+        assert not is_derivable_edge(RelationType.RELATED_TO, "")
+        assert not is_derivable_edge(RelationType.RELATED_TO, "dream_replay")
+        # An origin that IS listed stays derivable when explicitly
+        # present in the data — that is the rule working, not a bug.
+        assert is_derivable_edge(RelationType.RELATED_TO, "inferred")
+
+    def test_restore_keeps_legacy_edge_without_origin(self, tmp_path):
+        from genesis_cognitive.persistence import _restore_edges
+
+        net = ConceptNetwork()
+        for n in ("a", "b"):
+            net.add_concept(n, confidence=0.8)
+        # No "origin" key at all — the common legacy shape.
+        _restore_edges(
+            net,
+            [{"source": "a", "target": "b",
+              "relation": RelationType.RELATED_TO.value, "weight": 0.6}],
+            {"a": "a", "b": "b"},
+        )
+        assert net.edge_count == 1, (
+            "legacy edge with no origin was dropped as if it were derivable"
+        )
+
+    def test_restore_drops_derivable_legacy_edge(self, tmp_path):
+        from genesis_cognitive.persistence import _restore_edges
+
+        net = ConceptNetwork()
+        for n in ("a", "b"):
+            net.add_concept(n, confidence=0.8)
+        _restore_edges(
+            net,
+            [{"source": "a", "target": "b",
+              "relation": RelationType.RELATED_TO.value, "weight": 0.6,
+              "origin": "semantic_bridge"}],
+            {"a": "a", "b": "b"},
+        )
+        assert net.edge_count == 0
+
+    def test_restore_keeps_typed_edge_with_pipeline_origin(self, tmp_path):
+        from genesis_cognitive.persistence import _restore_edges
+
+        net = ConceptNetwork()
+        for n in ("a", "b"):
+            net.add_concept(n, confidence=0.8)
+        # Typed relations are always canonical facts, whatever the origin.
+        _restore_edges(
+            net,
+            [{"source": "a", "target": "b",
+              "relation": RelationType.IS_A.value, "weight": 0.6,
+              "origin": "inferred"}],
+            {"a": "a", "b": "b"},
+        )
+        assert net.edge_count == 1
+
+    def test_migration_does_not_seed_log_with_derivables(self, tmp_path):
+        """The canonical log must be seeded with canonical edges only.
+
+        The old order snapshotted the incoming list first and stripped
+        memory second, leaving the log holding edges the network had
+        already discarded.
+        """
+        log = open_edge_log(tmp_path)
+        net = ConceptNetwork()
+        for n in ("a", "b", "c", "d"):
+            net.add_concept(n, confidence=0.8)
+        # Pre-log state: one canonical edge, one derivable leftover.
+        net._edges = [
+            Edge(source="a", target="b", relation=RelationType.IS_A,
+                 weight=0.7, origin="stated"),
+            Edge(source="c", target="d", relation=RelationType.RELATED_TO,
+                 weight=0.6, origin="co_occurrence"),
+        ]
+        net._rebuild_edge_indices()
+
+        net.attach_edge_log(log)
+        live = log.fold()
+        log.close()
+
+        assert len(live) == 1, "derivable edge was written to the canonical log"
+        assert net.edge_count == 1

@@ -703,9 +703,17 @@ def _restore_edges(
     edges: list[dict[str, Any]],
     id_remap: dict[str, str],
 ) -> None:
-    """Restore edge entries from saved data."""
-    from .concepts import _normalize_id
+    """Restore edge entries from saved data.
 
+    This appends straight to ``network._edges``, bypassing both
+    ``add_edge`` and ``replace_edges``, so the derivable-edge rule has
+    to be enforced here. It was not, which let pre-log state smuggle
+    pipeline geometry back into the canonical set.
+    """
+    from .concepts import _normalize_id
+    from .concepts.edge_log import is_derivable_edge
+
+    skipped_derivable = 0
     for e_data in edges:
         try:
             relation = RelationType(e_data["relation"])
@@ -726,13 +734,31 @@ def _restore_edges(
         if key in network._edge_key_index:
             continue
 
+        # Unknown provenance defaults to CANONICAL, per the documented
+        # rule in `is_derivable_edge`. This used to default to
+        # "inferred", which is itself a listed derivable origin — so
+        # every legacy edge with an untyped relation and no `origin`
+        # field was classified as derivable and silently dropped during
+        # the edge-log migration. That is the false negative the rule
+        # exists to avoid: a lost experiential binding is
+        # irrecoverable, while a false positive only costs decay
+        # bandwidth. `""` is the established unknown-origin sentinel
+        # (see `EdgeLog` load) and is treated as canonical.
+        origin = e_data.get("origin", "")
+
+        # Legacy JSON predates the rule, so it can carry derivable
+        # edges. Drop them here, exactly as `replace_edges` does.
+        if is_derivable_edge(relation, origin):
+            skipped_derivable += 1
+            continue
+
         edge = Edge(
             source=source,
             target=target,
             relation=relation,
             weight=e_data.get("weight", 0.5),
             created_at=e_data.get("created_at", 0),
-            origin=e_data.get("origin", "inferred"),
+            origin=origin,
         )
         network._edges.append(edge)
         # Rebuild indices
@@ -743,6 +769,13 @@ def _restore_edges(
             network._reverse_index[edge.target] = []
         network._reverse_index[edge.target].append(edge)
         network._edge_key_index[key] = edge
+
+    if skipped_derivable:
+        logger.info(
+            "restore: dropped %d derivable edge(s) from legacy state "
+            "(recomputable at query time by the similarity provider)",
+            skipped_derivable,
+        )
 
 
 def restore_reflection(reflection: ReflectionEngine, data: dict[str, Any]) -> None:
