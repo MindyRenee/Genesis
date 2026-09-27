@@ -1,18 +1,18 @@
 """Tests for persistence — saving and loading Genesis's cognitive state."""
 
+import logging
 import os
 import sys
 import tempfile
+from collections import deque
 from unittest.mock import patch
 
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import logging
-from collections import deque
-
 from genesis_cognitive.concepts import ConceptNetwork, RelationType
+from genesis_cognitive.learning.synapses import SynapticStore
 from genesis_cognitive.narrative import NarrativeEngine
 from genesis_cognitive.persistence import (
     load_state,
@@ -21,6 +21,7 @@ from genesis_cognitive.persistence import (
     restore_reflection,
     restore_self_directed_learner,
     restore_self_model,
+    restore_synapses,
     save_state,
 )
 from genesis_cognitive.self import (
@@ -98,6 +99,36 @@ def test_save_creates_file():
 
         path = os.path.join(d, "cognitive_state.json")
         assert os.path.exists(path)
+
+
+def test_synaptic_efficacy_persistence():
+    """Learned synaptic efficacy survives save/load round-trip."""
+    net = _make_network()
+    synapses = SynapticStore()
+    synapses.set_weight("dog", "mammal", 0.73)
+    synapses.set_weight("mammal", "animal", 0.41)
+
+    with tempfile.TemporaryDirectory() as d:
+        save_state(
+            d,
+            net,
+            _make_reflection(),
+            _make_narrative(),
+            _make_self_model(),
+            synapses=synapses,
+        )
+        data = load_state(d)
+
+        assert data["synapses"] == {
+            "dog\tmammal": 0.73,
+            "mammal\tanimal": 0.41,
+        }
+
+        fresh = SynapticStore()
+        restore_synapses(fresh, data["synapses"])
+        assert fresh.get_weight("dog", "mammal") == pytest.approx(0.73)
+        assert fresh.get_weight("mammal", "animal") == pytest.approx(0.41)
+        assert fresh.get_weight("missing", "connection") == 0.0
 
 
 def test_load_returns_none_if_no_file():
