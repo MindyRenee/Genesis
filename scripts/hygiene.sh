@@ -37,9 +37,27 @@ ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT"
 
 # Runtime data directory (where Genesis stores its live state + artifacts).
-# Same resolution as run.sh: XDG_DATA_HOME (or ~/.local/share), with
-# GENESIS_DATA_DIR kept as a manual override.
-RUNTIME_DIR="${GENESIS_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/genesis}"
+# Must resolve the same way run.sh does, or this script measures and
+# cleans a different tree than the instance that is actually running.
+# Precedence, mirroring run.sh exactly:
+#   1. GENESIS_DATA_DIR  — explicit env always wins
+#   2. XDG_DATA_HOME     — set means explicit env config; wins
+#   3. .genesis-data-dir — uncommitted per-checkout pin. Its contents
+#      ARE the data dir (run.sh assigns it straight to
+#      GENESIS_DATA_DIR); it is not a parent directory.
+#   4. ~/.local/share/genesis
+# The `.genesis-data-dir` case was previously missing, so a checkout
+# pinned to its own state directory had hygiene report "no runtime
+# directory", or clean a different tree entirely.
+if [ -n "${GENESIS_DATA_DIR:-}" ]; then
+    RUNTIME_DIR="$GENESIS_DATA_DIR"
+elif [ -n "${XDG_DATA_HOME:-}" ]; then
+    RUNTIME_DIR="$XDG_DATA_HOME/genesis"
+elif [ -f ".genesis-data-dir" ]; then
+    RUNTIME_DIR=$(head -n1 .genesis-data-dir)
+else
+    RUNTIME_DIR="$HOME/.local/share/genesis"
+fi
 
 # ── Colors ────────────────────────────────────────────────────────────
 if [ -t 1 ]; then
@@ -634,10 +652,19 @@ clean_runtime() {
         return
     fi
 
-    # Orphaned backup files — not created by any current code path.
-    # These are stale leftovers from past restores, cleanups, and
-    # prune operations.  The live state files (cognitive_state.json,
+    # Orphaned backup files — leftovers from past restores and
+    # cleanups.  The live state files (cognitive_state.json,
     # ltm_store.*, concept_archive.db, etc.) are NEVER touched.
+    #
+    # NOTE: `*.pre-prune-backup*` is deliberately NOT in this list.
+    # `scripts/prune_dead_concepts.py` writes
+    # `<state>.pre-prune-backup.<stamp>.xz` as the ONLY rollback for a
+    # destructive prune of the concept graph. An earlier version of
+    # this cleanup did delete those, under a comment claiming they were
+    # "not created by any current code path" — which was false, and
+    # meant running hygiene discarded the only way to undo a prune.
+    # Prune backups are small, timestamped, and are recovery material;
+    # remove them deliberately, not as housekeeping.
     while IFS= read -r f; do
         local b
         b=$(stat -c%s "$f" 2>/dev/null || echo 0)
@@ -648,7 +675,6 @@ clean_runtime() {
         -name "*.pre-restore-backup" \
         -o -name "*.pre-cleanup*" \
         -o -name "*.pre-proposal*" \
-        -o -name "*.pre-prune-backup*" \
         -o -name "core_state.bin.bak.*" \
     \) 2>/dev/null)
 

@@ -376,7 +376,20 @@ def test_perceive_topics():
 
 
 def find_daemon_binary() -> str | None:
-    """Find daemon binary."""
+    """Find daemon binary, or fail loudly rather than skip.
+
+    This test is the only end-to-end check that the Rust daemon and the
+    Python mind actually talk to each other. It previously returned
+    None when no binary was present and the caller did a bare
+    `return`, which pytest records as a PASS. The Python CI job never
+    ran `cargo build`, so the binary was never present there and all
+    eight assertions were skipped on every run — CI was green partly
+    because the most valuable test in the suite did not execute.
+
+    Now a missing binary is a failure unless the operator explicitly
+    opts out with GENESIS_SKIP_DAEMON_TEST=1 (for a Python-only
+    checkout, or a machine with no Rust toolchain).
+    """
     candidates = [
         os.path.join(os.path.dirname(__file__), "..", "..", "target", "release", "genesis-daemon"),
         os.path.join(os.path.dirname(__file__), "..", "..", "target", "debug", "genesis-daemon"),
@@ -385,7 +398,16 @@ def find_daemon_binary() -> str | None:
         path = os.path.abspath(path)
         if os.path.isfile(path) and os.access(path, os.X_OK):
             return path
-    return None
+    if os.environ.get("GENESIS_SKIP_DAEMON_TEST") == "1":
+        logger.info("  SKIP  daemon binary absent; skipping opted-out")
+        return None
+    raise AssertionError(
+        "genesis-daemon binary not found in target/release or target/debug. "
+        "This test is the only end-to-end check of the daemon<->mind "
+        "integration, so it fails rather than silently passing. Build it "
+        "with `cargo build --release`, or set GENESIS_SKIP_DAEMON_TEST=1 "
+        "to opt out deliberately."
+    )
 
 
 def _run_mind_tests(mind) -> None:
@@ -480,7 +502,8 @@ def test_integration_mind():
     """Integration test: start daemon, talk to Genesis, verify responses."""
     daemon_path = find_daemon_binary()
     if daemon_path is None:
-        logger.info("  SKIP  daemon binary not found")
+        # Only reachable via the explicit opt-out above.
+        logger.info("  SKIP  daemon integration test (opted out)")
         return
 
     data_home = tempfile.mkdtemp(prefix="genesis_mind_test_")

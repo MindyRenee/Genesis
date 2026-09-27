@@ -616,6 +616,11 @@ class Mind(
         self._autosave_failures = 0
         self._last_threat_snapshot = 0.0
         self._think_recovery_active = False
+        # Monotonic time at which a think() worker was found still
+        # running after the recovery join expired, or None. Distinguishes
+        # a wedged thinker from ordinary slowness — see
+        # conversation._schedule_think_recovery.
+        self._think_wedged_since: float | None = None
         self._speech_queue: deque[str] = deque(maxlen=20)
         # Protects _speech_queue — offer_utterance (CLI thread) and
         # _perform_speech (volition thread) both access it, and the

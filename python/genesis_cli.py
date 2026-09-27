@@ -126,6 +126,13 @@ logger = logging.getLogger(__name__)
 # instantly via notify; this is only a spurious-wakeup safety ceiling.
 LIVE_THOUGHT_POLL_INTERVAL = 2.0
 
+# How long to wait for a child after SIGKILL before giving up on it and
+# continuing shutdown anyway. Kept short: if the process is still
+# present after this, it is in uninterruptible I/O and waiting longer
+# only delays the rest of the teardown. The mind has already saved
+# state by this point, so continuing is the safer failure mode.
+_KILL_GRACE_S = 5.0
+
 # Default data directory (XDG-compliant, persists across reboots).
 # Resolved via GENESIS_DATA_DIR → $XDG_DATA_HOME/genesis —
 # this instance's state is never shared with any other Genesis.
@@ -2664,7 +2671,22 @@ def _setup_auditory_cortex(
 
 
 def _setup_signal_handlers(shutting_down: threading.Event) -> None:
-    """Install SIGTERM/SIGINT handlers that set *shutting_down*."""
+    """Install SIGTERM/SIGINT handlers that set *shutting_down*.
+
+    Signals arriving *after* shutdown has begun are ignored, and that is
+    deliberate. The state save is in progress at that point, and a
+    second Ctrl-C that reached it would leave the mmap'd state and its
+    JSON projection inconsistent — precisely the corruption the
+    project's operational notes exist to prevent. An impatient
+    operator pressing Ctrl-C again must not be able to abort a save.
+    Covered by
+    `test_repeated_shutdown_signal_does_not_interrupt_save`.
+
+    Shutdown is still guaranteed to terminate: the child-stopping path
+    escalates on its own (SIGTERM, bounded wait, then SIGKILL), so a
+    wedged daemon cannot make this process unkillable regardless of
+    what the signal handler does.
+    """
 
     def handle_signal(signum: int, frame: FrameType | None) -> None:
         """Signal handler that sets the shutdown flag and raises on SIGINT."""
@@ -3163,12 +3185,57 @@ def _handle_conversation(
 
 
 def _stop_child(proc: subprocess.Popen, name: str, timeout: float) -> bool:
+    """Stop a child process, escalating rather than blocking forever.
+
+    The previous version called `proc.wait()` with no timeout once the
+    first wait expired. A child that hung — a daemon blocked on a dead
+    socket, a retina wedged on a camera — therefore made shutdown
+    uninterruptible: the process could not be ended by Ctrl-C, because
+    the signal handler was already consumed, and not by SIGTERM, for
+    the same reason. The only exit was `kill -9`, which AGENTS.md and
+    the README both forbid, precisely because it can lose unconsolidated
+    memory and leave on-disk state inconsistent.
+
+    So: SIGTERM, wait up to `timeout`, then SIGKILL, then wait a short
+    bounded period. SIGKILL is the last resort, reached only after a
+    graceful request has demonstrably failed, and it says so on stderr.
+    Returning False makes the caller report an incomplete shutdown
+    rather than pretending everything went well.
+
+    Note this is not the same as advising `kill -9` at the shell: the
+    graceful path is still tried first, and the escalation is bounded
+    and reported.
+    """
+    if proc.poll() is not None:
+        return proc.returncode == 0
+
     proc.terminate()
     try:
         proc.wait(timeout=timeout)
+        return proc.returncode == 0
     except subprocess.TimeoutExpired:
-        print(f"[genesis] Waiting for {name} to finish safely...", file=sys.stderr)
-        proc.wait()
+        pass
+
+    print(
+        f"[genesis] {name} did not stop within {timeout:g}s after SIGTERM; "
+        f"escalating to SIGKILL.",
+        file=sys.stderr,
+    )
+    try:
+        proc.kill()
+    except OSError:
+        pass
+    try:
+        proc.wait(timeout=_KILL_GRACE_S)
+    except subprocess.TimeoutExpired:
+        print(
+            f"[genesis] {name} could not be killed — it may be stuck in "
+            f"uninterruptible I/O. Continuing shutdown; the state file was "
+            f"already saved by the mind above.",
+            file=sys.stderr,
+        )
+        return False
+
     if proc.returncode != 0:
         print(
             f"[genesis] {name} exited with status {proc.returncode}.",
@@ -3176,6 +3243,45 @@ def _stop_child(proc: subprocess.Popen, name: str, timeout: float) -> bool:
         )
         return False
     return True
+
+
+def _request_daemon_shutdown(data_dir: str) -> bool:
+    """Ask the daemon to stop itself over IPC. True if it acknowledged.
+
+    Falls back silently to the signal path (via the caller's
+    ``_stop_child``) if the socket is gone, the protocol mismatches, or
+    the daemon does not answer — shutdown must not depend on this
+    succeeding.
+    """
+    if not data_dir:
+        return False
+    socket_path = os.path.join(data_dir, "genesis.sock")
+    if not os.path.exists(socket_path):
+        return False
+    try:
+        from genesis_client import GenesisClient
+
+        client = GenesisClient(socket_path)
+        client.connect()
+        try:
+            return bool(client.shutdown())
+        finally:
+            _close_client_quietly(client)
+    except Exception as e:  # noqa: BLE001 - shutdown must not fail here
+        logger.debug(f"daemon IPC shutdown unavailable ({e}); using signal path")
+        return False
+
+
+def _close_client_quietly(client: object) -> None:
+    """Close a GenesisClient if it exposes a close/shutdown method."""
+    for attr in ("close", "disconnect"):
+        fn = getattr(client, attr, None)
+        if callable(fn):
+            try:
+                fn()
+            except Exception:  # noqa: BLE001
+                pass
+            return
 
 
 def _shutdown(
@@ -3202,7 +3308,13 @@ def _shutdown(
         clean_shutdown = bool(mind.stop())
     if daemon_proc is not None:
         print("[genesis] Stopping subcognitive daemon...", file=sys.stderr)
-        clean_shutdown &= _stop_child(daemon_proc, "subcognitive daemon", 5)
+        # Ask over IPC first. The daemon implements SHUTDOWN and
+        # performs its own ordered flush ("Subcognitive stopped.
+        # Goodnight."), which is a genuinely graceful stop — whereas
+        # SIGTERM relies on its handler and the same flush. `client.shutdown()`
+        # was implemented on both sides and never called from here.
+        if not _request_daemon_shutdown(data_dir):
+            clean_shutdown &= _stop_child(daemon_proc, "subcognitive daemon", 5)
     if retina_proc is not None:
         print("[genesis] Stopping retina...", file=sys.stderr)
         clean_shutdown &= _stop_child(retina_proc, "retina", 3)

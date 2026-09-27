@@ -8,6 +8,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from .classify import _BRIDGE_ORIGINS, _column_of, _strip_prefix
+from .edge_log import is_derivable_edge
 from .types import Concept, Edge, RelationType
 
 logger = logging.getLogger(__name__)
@@ -493,6 +494,15 @@ class ConsolidationMixin:
         # Collect edges involving dormant concepts
         edge_dicts: list[dict[str, Any]] = []
         for edge in self._edges:
+            # Skip derivable edges, matching `_archive_spilled_edges`.
+            # A live edge log never stores them anywhere, so archiving
+            # one is noise; without this filter the pre-spill pass wrote
+            # rows the spill pass would have skipped, and the two passes
+            # disagreed about what "the edges of a dormant concept" are.
+            if self._edge_log is not None and is_derivable_edge(
+                edge.relation, edge.origin
+            ):
+                continue
             if edge.source in dormant_ids or edge.target in dormant_ids:
                 edge_dicts.append({
                     "source": edge.source,

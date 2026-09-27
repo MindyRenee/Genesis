@@ -22,6 +22,13 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# How long the recovery thread waits for a timed-out think() worker to
+# exit before declaring it wedged. Python cannot kill a thread, so this
+# only bounds the *wait*; the point is that the wait terminates, the
+# condition gets reported, and `_think_recovery_active` is cleared so
+# the state is observable rather than silently permanent.
+_THINK_RECOVERY_JOIN_S = 30.0
+
 
 class ConversationMixin:
     """Mixin for :class:`Mind` — see module docstring."""
@@ -29,6 +36,14 @@ class ConversationMixin:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see the package's core module).
         _interaction_count: int
+        # Declared here rather than via inline annotations inside
+        # methods: an inline `x: T = v` in one function body only types
+        # that function, so every other reader inferred `None`. These
+        # are the attributes the think()-recovery path coordinates on.
+        _active_think_worker: threading.Thread | None
+        _think_recovery_active: bool
+        _think_wedged_since: float | None
+        _think_worker_lock: threading.Lock
         def __getattr__(self, name: str) -> Any: ...
 
 
@@ -529,15 +544,41 @@ class ConversationMixin:
             worker = self._active_think_worker
             if worker is None or self._think_recovery_active:
                 return
-            self._think_recovery_active: bool = True
+            self._think_recovery_active = True
 
         def _recover() -> None:
-            worker.join()
+            # Bounded join. A thread cannot be killed in Python, so if
+            # think() is genuinely wedged — not slow, wedged, e.g.
+            # blocked on a dead socket — `join()` with no timeout
+            # blocks this recovery thread forever and
+            # `_think_recovery_active` never clears. Since `respond()`
+            # gates on that flag, every subsequent message returned the
+            # same generic timeout for the rest of the process's life,
+            # with no recovery short of a restart. The gate stays set
+            # (starting a second concurrent thinker risks corrupting
+            # cognitive state), but the wait is bounded, the condition
+            # is reported, and it becomes visible in status instead of
+            # looking like ordinary slowness.
+            worker.join(timeout=_THINK_RECOVERY_JOIN_S)
+            still_alive = worker.is_alive()
             with self._think_worker_lock:
                 if self._active_think_worker is worker:
-                    self._active_think_worker: threading.Thread | None = None
+                    self._active_think_worker = None
                 self.cognition._last_state = None
                 self._think_recovery_active = False
+                self._think_wedged_since = (
+                    time.monotonic() if still_alive else None
+                )
+            if still_alive:
+                logger.error(
+                    "think() worker still running %.0fs after timeout; "
+                    "responding is gated until it exits. A second thinker "
+                    "is not started because concurrent cognition could "
+                    "corrupt state. This usually means think() is blocked "
+                    "on I/O (a dead daemon socket, a hung subprocess).",
+                    _THINK_RECOVERY_JOIN_S,
+                )
+                return
             self._defer(10.0, self._resume_background)
 
         threading.Thread(
@@ -660,8 +701,22 @@ class ConversationMixin:
         with self._think_worker_lock:
             active_worker = self._active_think_worker
             recovery_active = self._think_recovery_active
+            wedged_since = self._think_wedged_since
         if active_worker is not None:
             if active_worker.is_alive() or recovery_active:
+                # Distinguish a wedged thinker from ordinary slowness.
+                # Both return the same fallback text, but the operator
+                # is told which they are looking at — otherwise a
+                # permanently-gated conversation layer is
+                # indistinguishable from a slow one.
+                if wedged_since is not None:
+                    stuck = time.monotonic() - wedged_since
+                    logger.error(
+                        "conversation is still gated by a wedged think() "
+                        "worker (%.0fs). Messages will not be processed "
+                        "until it exits; restart with ./run.sh --stop if "
+                        "it does not.", stuck,
+                    )
                 return self._said(self._respond_timeout(user_input, timeout))
             with self._think_worker_lock:
                 if self._active_think_worker is active_worker:
