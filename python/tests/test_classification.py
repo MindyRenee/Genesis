@@ -19,6 +19,11 @@ from genesis_cognitive.classification import (
     eval_predicate,
     valid_predicate,
 )
+from genesis_cognitive.memory.semantic import (
+    Fact,
+    SemanticMemory,
+    _restore_schema_relations,
+)
 from genesis_cognitive.reasoning import TaskCompetence
 from genesis_cognitive.spatial.practice import (
     SpatialPractice,
@@ -745,3 +750,71 @@ class TestSorterIntake:
         assert practice.offer(task) is not None
         result = practice.attempt(reasoner, task=task)
         assert result is not None and result.solved
+
+
+class TestSchemaRelationTargets:
+    """A schema is multi-parent; each relation must hold every target.
+
+    `Schema.relations` was `dict[str, str]` — one target per relation —
+    so a second `is_a` silently overwrote the first. The schema kept
+    whichever parent happened to be learned last and discarded the rest,
+    which for a taxonomy is most of it: a dog is an animal, a mammal
+    and a canine, and only one survived.
+    """
+
+    @staticmethod
+    def _fact(subject: str, relation: str, obj: str) -> Fact:
+        return Fact(
+            subject=subject,
+            relation=relation,
+            object=obj,
+            source_count=1,
+            confidence=0.8,
+        )
+
+    def test_multiple_is_a_targets_coexist(self) -> None:
+        mem = SemanticMemory()
+        mem.form_schemas([
+            self._fact("dog", "is_a", "animal"),
+            self._fact("dog", "is_a", "mammal"),
+            self._fact("dog", "is_a", "canine"),
+        ])
+        schema = next(iter(mem._schemas.values()))
+        assert schema.relations["is_a"] == {"animal", "mammal", "canine"}
+
+    def test_relates_to_targets_coexist(self) -> None:
+        mem = SemanticMemory()
+        mem.form_schemas([
+            self._fact("dog", "relates_to", "owner"),
+            self._fact("dog", "relates_to", "kennel"),
+        ])
+        schema = next(iter(mem._schemas.values()))
+        assert schema.relations["relates_to"] == {"owner", "kennel"}
+
+    def test_relations_round_trip_through_json(self) -> None:
+        mem = SemanticMemory()
+        mem.form_schemas([
+            self._fact("dog", "is_a", "animal"),
+            self._fact("dog", "is_a", "mammal"),
+        ])
+        payload = mem.to_dict()
+        json.dumps(payload)  # sets are not JSON-serializable
+        restored = SemanticMemory()
+        restored.restore(payload)
+        schema = next(iter(restored._schemas.values()))
+        assert schema.relations["is_a"] == {"animal", "mammal"}
+
+    def test_legacy_single_string_format_still_loads(self) -> None:
+        """State written by the old dict[str, str] must keep loading."""
+        assert _restore_schema_relations({"is_a": "animal"}) == {
+            "is_a": {"animal"}
+        }
+        assert _restore_schema_relations({"is_a": ["a", "b"]}) == {
+            "is_a": {"a", "b"}
+        }
+
+    def test_malformed_relation_values_are_dropped(self) -> None:
+        assert _restore_schema_relations({"is_a": None}) == {}
+        assert _restore_schema_relations({"is_a": []}) == {}
+        assert _restore_schema_relations(None) == {}
+        assert _restore_schema_relations("nonsense") == {}
