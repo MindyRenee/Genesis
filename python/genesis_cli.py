@@ -97,6 +97,7 @@ from genesis_cognitive.auditory import AuditoryCortex, SoundEvent
 from genesis_cognitive.concepts import RelationType
 from genesis_cognitive.config import default_data_dir
 from genesis_cognitive.mind import Mind
+from genesis_cognitive.mind.thresholds import AUTO_WAKE_MIN_SLEEP_S
 from genesis_cognitive.speech import Voice, VoiceInput
 
 # Script directory — used to locate the project root. Python already
@@ -2689,7 +2690,7 @@ def _start_sleep_watcher(mind: Mind, shutting_down: threading.Event) -> None:
     # whole point of sleep. When the watcher autonomously puts it to
     # sleep, let it rest long enough for at least one N3 cycle.
     import time as _time
-    min_sleep_seconds = 1800.0  # 30 minutes — covers N1+N2+N3
+    min_sleep_seconds = AUTO_WAKE_MIN_SLEEP_S  # 30 minutes — covers N1+N2+N3
     autonomous_sleep_start: float = 0.0
 
     def _sleep_watcher() -> None:

@@ -33,6 +33,7 @@ from .thresholds import (
     AUTO_SLEEP_MIN_IDLE,
     AUTO_WAKE_ADENOSINE,
     AUTO_WAKE_CYCLE_ADENOSINE,
+    AUTO_WAKE_MIN_SLEEP_S,
     DROWSINESS_ADENOSINE,
     DROWSINESS_CONFIRM_S,
     DROWSINESS_EXIT,
@@ -145,6 +146,7 @@ class SleepMixin:
         """
         self._is_sleeping = False
         self._user_initiated_sleep = False
+        self._sleep_start_time: float = 0.0
         self._last_wake_time: float = time.time()
         self._last_wake_reinforce: float = 0.0
         self._sleep_start_cycles: int = 0
@@ -526,6 +528,17 @@ class SleepMixin:
                     except Exception as e:  # noqa: BLE001
                         logger.warning(f"auto-wake failed: {e}")
                     return
+            # Minimum sleep duration: "wakes when rested" must not mean
+            # "wakes instantly when already rested". When /sleep (or
+            # auto-sleep) is entered with adenosine already at/below the
+            # wake threshold — the common case on a well-rested system —
+            # this check would fire on the very next heartbeat without a
+            # floor. Require the sleep to reach the first N3 deep-sleep
+            # consolidation before auto-wake is allowed. The restored-sleep
+            # path leaves _sleep_start_time at 0, so elapsed time since
+            # epoch always passes — a resumed sleep is never blocked here.
+            if time.time() - self._sleep_start_time < AUTO_WAKE_MIN_SLEEP_S:
+                return
             if adenosine <= AUTO_WAKE_ADENOSINE:
                 logger.info(
                     f"Auto-wake: adenosine={adenosine:.2f} "
@@ -556,6 +569,7 @@ class SleepMixin:
                     self.wake()
                 except Exception as e:  # noqa: BLE001
                     logger.warning(f"auto-wake failed: {e}")
+
     def _announce_drowsiness(self) -> None:
         """Announce that it's getting sleepy, before falling asleep.
 
@@ -612,6 +626,7 @@ class SleepMixin:
         self._is_sleeping = True
         self._user_initiated_sleep = user_initiated
         self._nap_mode = nap
+        self._sleep_start_time = time.time()
         cycle = self.inner_life.sleep_cycle
         self._sleep_start_cycles = (
             cycle.cycles_completed if cycle is not None else 0
@@ -890,6 +905,7 @@ class SleepMixin:
         # Clear nap mode — the next sleep is a full sleep unless
         # explicitly set as a nap again.
         self._nap_mode = False
+        self._sleep_start_time = 0.0
         self.client.set_zone(ZONE_CONVERSATION)
 
         # Send neurochemical wake impulses to push the emergent phase

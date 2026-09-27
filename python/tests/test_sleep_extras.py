@@ -1135,8 +1135,13 @@ class _WakeReadinessMockClient(_MockClient):
         @_dc_dataclass
         class _MockState:
             chemicals: dict[str, float]
+            phase_name: str = "active"
 
         return _MockState(chemicals={"adenosine": self._adenosine})
+
+    def get_recent_episodes(self, **kwargs) -> list:
+        """No persisted dreams — wake() queries this for residues."""
+        return []
 
     def get_plasticity_profile(self) -> _MockPlasticityProfile:
         """Return the configured plasticity profile."""
@@ -1261,6 +1266,70 @@ def test_wake_readiness_ready_with_no_sleep_cycle():
         ready, reason = mind.wake_readiness()
         assert ready is True
         assert reason == "ready"
+
+
+# ======================================================================
+# Auto-wake minimum sleep window — /sleep on an already-rested system
+# must not trigger an immediate auto-wake on the next heartbeat.
+# ======================================================================
+
+
+def test_auto_wake_blocked_inside_min_sleep_window():
+    """Auto-wake must not fire right after sleep onset on low adenosine.
+
+    Regression test: /sleep enters self-initiated (auto-wakeable) sleep,
+    and the heartbeat's _auto_sleep_wake called wake() on the next tick
+    whenever effective adenosine was already <= AUTO_WAKE_ADENOSINE —
+    which is the normal state right after startup (the startup wake
+    cascade pins adenosine near its 0.15-0.20 baseline) or after any
+    recent wake (the wake cascade sends -0.30). Every /sleep on a
+    well-rested system woke ~1s after the command.
+    """
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1)
+        mind.sleep(user_initiated=False)
+        assert mind.is_sleeping
+
+        # The next heartbeat — adenosine already below the wake
+        # threshold — must not wake it; sleep just started.
+        mind._check_auto_sleep()
+
+        assert mind.is_sleeping, (
+            "auto-wake fired inside the minimum sleep window — "
+            "a rested system put to bed should stay asleep"
+        )
+
+
+def test_auto_wake_fires_after_min_sleep_window():
+    """Auto-wake still fires once the minimum sleep window has elapsed."""
+    import time as _time
+
+    from genesis_cognitive.mind.thresholds import AUTO_WAKE_MIN_SLEEP_S
+
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1)
+        mind.sleep(user_initiated=False)
+        # Simulate a sleep that has already run past the minimum window.
+        mind._sleep_start_time = _time.time() - AUTO_WAKE_MIN_SLEEP_S - 1.0
+
+        mind._check_auto_sleep()
+
+        assert not mind.is_sleeping, (
+            "auto-wake did not fire after the minimum sleep window "
+            "with adenosine drained"
+        )
+
+
+def test_auto_wake_window_does_not_block_user_initiated_sleep():
+    """User-initiated sleep is never auto-wakeable regardless."""
+    with tempfile.TemporaryDirectory() as data_dir:
+        mind = _make_wake_readiness_mind(data_dir, adenosine=0.1)
+        mind.sleep(user_initiated=True)
+        mind._sleep_start_time = 0.0  # long past any window
+
+        mind._check_auto_sleep()
+
+        assert mind.is_sleeping
 
 
 # ======================================================================

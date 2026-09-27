@@ -2462,8 +2462,12 @@ impl NeurochemicalVector {
             // rate, giving the correct hours-timescale sleep duration.
             let is_adenosine = i == NeurochemicalId::Adenosine as usize;
             let current_phase = MentalPhase::from_u8(self.emergent_phase);
-            let is_sleeping =
-                current_phase == MentalPhase::NREM || current_phase == MentalPhase::REM;
+            // The zone is the cognitive layer's authority on sleep
+            // state: when it says Sleeping, sleep-mode handling applies
+            // even if the emergent phase hasn't crossed the thresholds.
+            let is_sleeping = current_phase == MentalPhase::NREM
+                || current_phase == MentalPhase::REM
+                || params.zone_sleeping;
             if is_adenosine && is_sleeping {
                 // Zero residual velocity from the last wakeful tick
                 // so it doesn't push the level back up on the next
@@ -2852,7 +2856,15 @@ impl NeurochemicalVector {
         self.recompute_derived_with_dt(dt_scale);
         let adn_idx = NeurochemicalId::Adenosine as usize;
         let current_phase = self.compute_phase();
-        if current_phase == MentalPhase::NREM || current_phase == MentalPhase::REM {
+        // The zone is the cognitive layer's authority on sleep state:
+        // zone Sleeping means glymphatic clearance runs even when the
+        // emergent phase hasn't crossed the sleep thresholds — e.g.
+        // /sleep entered at low pressure, where the phase would stay
+        // Active and adenosine would wrongly accumulate for ~days.
+        if current_phase == MentalPhase::NREM
+            || current_phase == MentalPhase::REM
+            || params.zone_sleeping
+        {
             // Sleep: glymphatic clearance directly reduces the adenosine
             // LEVEL (the extracellular concentration drops as the
             // glymphatic system flushes adenosine from the brain).
@@ -3762,6 +3774,17 @@ pub struct NeuroTickParams {
     /// cognitive or physical effort shortens sleep latency by increasing
     /// adenosine (Porkka-Heiskanen et al., 2011).
     pub adenosine_activity_coupling: f32,
+    /// When true, the cognitive zone is Sleeping — the mind explicitly
+    /// put the system to sleep (/sleep, /nap, or a synced auto-sleep).
+    /// The zone is the cognitive layer's authority on sleep state (see
+    /// `CoreState::sync_neurochemistry_to_state`), so the adenosine
+    /// sleep-pressure mechanism must treat the system as asleep even
+    /// when the emergent neurochemical phase hasn't crossed the sleep
+    /// thresholds yet. Without this, /sleep entered at low sleep
+    /// pressure *accumulates* adenosine (the emergent phase stays
+    /// Active) and sleep can persist for ~days instead of draining
+    /// what little pressure exists.
+    pub zone_sleeping: bool,
     /// Endocannabinoid activity-coupled synthesis rate.
     ///
     /// Endocannabinoids are synthesized on demand by postsynaptic neurons
@@ -3907,6 +3930,7 @@ impl NeuroTickParams {
         noise_amplitude: 0.002,             // gentle stochastic fluctuations
         noise_seed: 0,                      // daemon increments each tick
         receptor_resensitization_rate: 0.0, // set by daemon during sleep
+        zone_sleeping: false,               // set by daemon when zone == Sleeping
     };
 
     /// Compressed-time parameters for testing and fast iteration.

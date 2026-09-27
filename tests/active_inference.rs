@@ -13,11 +13,12 @@
 //! - Integration: inference signals written to core state
 
 use genesis::daemon::active_inference::{
-    ActiveInferenceEngine, DyadicSignals, apply_inference_feedback,
+    ActiveInferenceEngine, DyadicSignals, InferenceResult, apply_inference_feedback,
 };
 use genesis::daemon::dyadic_model::{DyadicAffectModel, UserAffectObservation};
 use genesis::state::InferenceSignals;
 use genesis::state::neurochemical::{NEUROCHEMICAL_COUNT, NeurochemicalId, NeurochemicalVector};
+use genesis::state::zones::MentalPhase;
 
 // ─── InferenceSignals layout ──────────────────────────────────
 
@@ -633,7 +634,7 @@ fn test_apply_inference_feedback_dopamine_impulse() {
     // Apply feedback to a neurochemical vector
     let mut neuro = NeurochemicalVector::new(0);
     let da_level_before = neuro.effective(NeurochemicalId::Dopamine);
-    apply_inference_feedback(&mut neuro, &result, 0);
+    apply_inference_feedback(&mut neuro, &result, 0, false);
     let da_level_after = neuro.effective(NeurochemicalId::Dopamine);
 
     // If there was a DA impulse, the level should have changed
@@ -692,13 +693,53 @@ fn test_apply_inference_feedback_dopamine_negative_dip() {
     // Applying the feedback should decrease the effective DA level
     let mut neuro = NeurochemicalVector::new(0);
     let da_before = neuro.effective(NeurochemicalId::Dopamine);
-    apply_inference_feedback(&mut neuro, &result, 0);
+    apply_inference_feedback(&mut neuro, &result, 0, false);
     let da_after = neuro.effective(NeurochemicalId::Dopamine);
     assert!(
         da_after < da_before,
         "DA level should decrease after negative PE dip: before={}, after={}",
         da_before,
         da_after
+    );
+}
+
+#[test]
+fn test_apply_inference_feedback_skips_adenosine_during_zone_sleep() {
+    // When the cognitive zone is Sleeping — e.g. /sleep entered while
+    // sleep pressure is low — the emergent phase is still Active, but
+    // adenosine impulses from a "rest" policy must be skipped anyway.
+    // Otherwise the impulse pumps the same sleep pressure glymphatic
+    // clearance is draining, so adenosine *rises* during sleep — the
+    // opposite of recovery (extracellular adenosine declines during
+    // sleep: Porkka-Heiskanen et al., Science 1997; metabolite
+    // clearance during sleep: Xie et al., Science 2013).
+    let mut neuro = NeurochemicalVector::new(0);
+    let phase = MentalPhase::from_u8(neuro.emergent_phase);
+    assert!(
+        phase != MentalPhase::NREM && phase != MentalPhase::REM,
+        "precondition: fresh vector should not already be in a sleep phase"
+    );
+
+    let result = InferenceResult {
+        impulses: vec![(NeurochemicalId::Adenosine as u8, 0.30)],
+        ..InferenceResult::default()
+    };
+    let adn_before = neuro.get(NeurochemicalId::Adenosine).unwrap().level;
+
+    // Zone Sleeping: the adenosine impulse is skipped.
+    apply_inference_feedback(&mut neuro, &result, 0, true);
+    let adn_zone_sleeping = neuro.get(NeurochemicalId::Adenosine).unwrap().level;
+    assert_eq!(
+        adn_zone_sleeping, adn_before,
+        "adenosine impulse must be skipped while the zone is Sleeping"
+    );
+
+    // Zone awake: the same impulse applies — wake behavior unchanged.
+    apply_inference_feedback(&mut neuro, &result, 0, false);
+    let adn_awake = neuro.get(NeurochemicalId::Adenosine).unwrap().level;
+    assert!(
+        adn_awake > adn_before,
+        "adenosine impulse should apply while awake: {adn_before} -> {adn_awake}"
     );
 }
 

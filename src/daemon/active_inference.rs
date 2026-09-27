@@ -2332,13 +2332,19 @@ pub fn apply_inference_feedback(
     neuro: &mut NeurochemicalVector,
     result: &InferenceResult,
     now_ms: u64,
+    zone_sleeping: bool,
 ) {
     // Apply neurochemical impulses. During sleep, skip adenosine
     // impulses: a "rest" policy selected while already in NREM/REM
     // would pump the same sleep pressure the glymphatic mechanism is
-    // clearing — a self-defeating impulse that stalls clearance.
+    // clearing — a self-defeating impulse that stalls clearance. The
+    // zone is the cognitive layer's authority on sleep state: when it
+    // says Sleeping the impulse is skipped even while the emergent
+    // phase is still Active (/sleep entered at low sleep pressure).
+    // Extracellular adenosine declines during sleep (Porkka-Heiskanen
+    // et al., Science 1997) — it must not be pumped back up.
     let phase = MentalPhase::from_u8(neuro.emergent_phase);
-    let sleeping = phase == MentalPhase::NREM || phase == MentalPhase::REM;
+    let sleeping = phase == MentalPhase::NREM || phase == MentalPhase::REM || zone_sleeping;
     for &(chem_id, magnitude) in &result.impulses {
         if sleeping && chem_id == NeurochemicalId::Adenosine as u8 {
             continue;
