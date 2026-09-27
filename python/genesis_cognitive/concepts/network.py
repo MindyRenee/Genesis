@@ -53,6 +53,20 @@ from .types import (
 
 logger = logging.getLogger(__name__)
 
+# Size past which the canonical edge log is compacted at the save
+# point. An append-only log of assert/retract events outgrows its live
+# fold quickly, since retracted and superseded edges stay on disk.
+_COMPACT_THRESHOLD_BYTES = 32 * 1024 * 1024
+
+# How many consecutive compaction failures to report before throttling.
+# The condition is persistent by nature (nothing retries a failed
+# compaction but the next save), so warning on every save would bury
+# the first, most diagnostic message.
+_COMPACT_WARN_EVERY = 64
+
+# Report the first few failures in full before throttling kicks in.
+_COMPACT_WARN_EVERY_STARTUP = 4
+
 
 class ConceptNetwork(
     ArchivalMixin,
@@ -371,6 +385,9 @@ class ConceptNetwork(
         # materialized at all; the similarity provider recomputes
         # them at query time. None = legacy JSON-edge mode.
         self._edge_log: Any = None  # EdgeLog | None
+        # Consecutive edge-log compaction failures, for throttled
+        # reporting. See sync_edge_log.
+        self._compact_failures = 0
         # Virtual similarity layer: callable (concept_id) ->
         # list[(neighbor_id, score)], queried lazily by
         # ``get_associations`` only — never on the hot paths
@@ -524,6 +541,31 @@ class ConceptNetwork(
             self._edges = kept
             self._rebuild_edge_indices()
             self._quality_concept_ids_cache = None
+    def _warn_compact_failure(
+        self, size: int, exc: OSError, what: str
+    ) -> None:
+        """Report a failed edge-log compaction, throttled.
+
+        The condition is persistent, so warning on every save would
+        bury the first message. The first few failures and then every
+        `_COMPACT_WARN_EVERY`-th are reported; success resets the count.
+        """
+        self._compact_failures += 1
+        n = self._compact_failures
+        if n > _COMPACT_WARN_EVERY_STARTUP and (
+            n - 1
+        ) % _COMPACT_WARN_EVERY != 0:
+            return
+        logger.warning(
+            "edge log %s (%d bytes, over the %d-byte threshold): %s. "
+            "The log is still correct but will keep growing; this "
+            "recurs until the cause is resolved.",
+            what,
+            size,
+            _COMPACT_THRESHOLD_BYTES,
+            exc,
+        )
+
     def sync_edge_log(self) -> None:
         """Snapshot the current canonical edges into the log (save point).
 
@@ -535,11 +577,35 @@ class ConceptNetwork(
         if self._edge_log is None:
             return
         self._edge_log.snapshot(list(self._edges))
+        # Compaction is best-effort, but a failure must not be silent.
+        #
+        # This used to be `except OSError: pass`, which hid the stat()
+        # call as well as compact() itself. A log that cannot be
+        # compacted — read-only filesystem, ENOSPC, a permissions
+        # change — then grew without bound, and every subsequent save
+        # re-triggered the same condition and swallowed it again. The
+        # only symptom was a slowly ballooning file, which is exactly
+        # the kind of degradation that is discovered when it is too
+        # late to act on.
+        #
+        # Failing soft is still correct here: the log is append-only and
+        # remains correct, just large, and `sync_edge_log` runs inside
+        # save_state. Raising would turn a disk-space problem into a
+        # lost save. So the failure is reported instead of swallowed,
+        # with the size and the error, and throttled so a persistently
+        # oversized log does not emit a warning on every save.
         try:
-            if self._edge_log.path.stat().st_size > 32 * 1024 * 1024:
+            size = self._edge_log.path.stat().st_size
+        except OSError as exc:
+            self._warn_compact_failure(0, exc, "stat failed")
+            return
+        if size > _COMPACT_THRESHOLD_BYTES:
+            try:
                 self._edge_log.compact()
-        except OSError:
-            pass
+            except OSError as exc:
+                self._warn_compact_failure(size, exc, "compaction failed")
+            else:
+                self._compact_failures = 0
     def attach_similarity_provider(self, provider: Any) -> None:
         """Attach the virtual similarity layer for derivable associations.
 
@@ -1078,13 +1144,9 @@ class ConceptNetwork(
         key = (src_id, tgt_id, relation)
         existing = self._edge_key_index.get(key)
         if existing is not None:
-            existing.weight = min(1.0, existing.weight + 0.2)
-            if self._edge_log is not None:
-                self._edge_log.assert_edge(
-                    src_id, tgt_id, relation,
-                    existing.weight, existing.origin, existing.created_at,
-                )
-            return existing
+            return self.set_edge_weight(
+                src_id, tgt_id, relation, min(1.0, existing.weight + 0.2)
+            )
 
         # A live edge log never materializes derivable edges — they
         # are recomputed by the similarity provider at query time.
@@ -1112,6 +1174,39 @@ class ConceptNetwork(
         # Edge counts affect quality scores — invalidate the cache.
         self._quality_concept_ids_cache = None
         return edge
+    def set_edge_weight(
+        self,
+        source: str,
+        target: str,
+        relation: RelationType,
+        weight: float,
+    ) -> Edge | None:
+        """Set an existing edge's weight, writing through to the log.
+
+        Takes and returns concept IDs, not names, so callers that
+        already hold an `Edge` do not have to re-resolve.
+
+        The edge log is the canonical source of truth for
+        relationships, so a weight change is only real once it reaches
+        it. Mutating `edge.weight` in place updates the in-memory fold
+        only: `fold()` keeps reporting the old weight, and the change
+        is lost outright if the process exits before the next save.
+        Every weight change goes through here so that invariant holds
+        in exactly one place.
+
+        Returns the edge, or None if it does not exist.
+        """
+        edge = self._edge_key_index.get((source, target, relation))
+        if edge is None:
+            return None
+        edge.weight = min(1.0, max(0.0, weight))
+        if self._edge_log is not None:
+            self._edge_log.assert_edge(
+                source, target, relation,
+                edge.weight, edge.origin, edge.created_at,
+            )
+        return edge
+
     def get_concept(self, name: str) -> Concept | None:
         """Get a concept by name or alias."""
         cid = self._resolve(name)
