@@ -188,7 +188,11 @@ class EmbeddingStore:
         self._concept_cache: OrderedDict[str, np.ndarray | None] = OrderedDict()
 
         self._loaded = False
-        self._lock = threading.Lock()
+        # Reentrant, not a plain Lock. `refresh()` holds this across a
+        # full rebuild and calls private builders that in turn reach
+        # public read accessors; an RLock makes that class of
+        # self-deadlock impossible rather than merely unlikely.
+        self._lock = threading.RLock()
 
         # Dimensionality (set at build time)
         self._dim = 0
@@ -325,15 +329,22 @@ class EmbeddingStore:
 
         The vector combines spectral (graph structure), TF-IDF (text),
         and GloVe (distributional) components.
+
+        Takes `self._lock` so the matrix and the index map come from the
+        same generation. `refresh()` rebinds both, so an unsynchronised
+        read could look a concept up in the new map and index the old
+        matrix — a wrong vector, silently. See `refresh`.
         """
         self._ensure_loaded()
-        if self._concept_matrix is None:
-            return None
+        with self._lock:
+            matrix = self._concept_matrix
+            if matrix is None:
+                return None
 
-        # Check the precomputed index first
-        idx = self._concept_to_idx.get(concept_name)
-        if idx is not None:
-            return self._concept_matrix[idx]
+            # Check the precomputed index first
+            idx = self._concept_to_idx.get(concept_name)
+            if idx is not None:
+                return matrix[idx]
 
         # Check the ad-hoc cache
         if concept_name in self._concept_cache:
@@ -403,8 +414,19 @@ class EmbeddingStore:
         Returns:
             List of (concept_name, similarity) pairs, sorted by
             similarity descending.
+
+        Locked: the search walks the concept names, the matrix, and the
+        dimension together, so they must all come from the same
+        generation. `refresh()` (sleep thread) rebinds all three.
         """
         self._ensure_loaded()
+        with self._lock:
+            return self._find_similar_concepts_locked(concept_name, k, threshold)
+
+    def _find_similar_concepts_locked(
+        self, concept_name: str, k: int, threshold: float
+    ) -> list[tuple[str, float]]:
+        """Body of `find_similar_concepts`; caller must hold the lock."""
         if self._concept_matrix is None:
             return []
 
@@ -565,13 +587,22 @@ class EmbeddingStore:
         threshold: float = 0.5,
         query_has_spectral: bool = True,
     ) -> list[tuple[str, float]]:
-        """Find concepts similar to a given vector."""
+        """Find concepts similar to a given vector.
+
+        Locked for the duration of the search. This is the entry point
+        the sleep thread's edge proposer uses, so it runs concurrently
+        with the conversation thread and, before the fix, with
+        `refresh()`. `_search_concept_matrix` walks the concept names,
+        the matrix, and the dimension together, so all three have to
+        come from the same generation.
+        """
         self._ensure_loaded()
-        if self._concept_matrix is None:
-            return []
-        return self._search_concept_matrix(
-            vector, k, threshold, query_has_spectral=query_has_spectral
-        )
+        with self._lock:
+            if self._concept_matrix is None:
+                return []
+            return self._search_concept_matrix(
+                vector, k, threshold, query_has_spectral=query_has_spectral
+            )
 
     def find_concepts_related_to_both(
         self,
@@ -705,8 +736,21 @@ class EmbeddingStore:
         vectors computed from scratch; existing concepts retain their
         Hebbian-adapted vectors.
         """
-        self._refresh_preserve_experiential()
-        self._concept_cache.clear()
+        # Thread safety: the whole rebuild runs under `self._lock`.
+        # This used to be unlocked, and the sleep thread calls it while
+        # the conversation thread queries. A rebuild rebinds
+        # `_concept_matrix`, `_concept_names`, `_concept_to_idx` and
+        # `_dim` at different points, and fills the new matrix in place,
+        # so a concurrent reader could pair the NEW index map with the
+        # OLD matrix, or read a half-filled one, and get silently wrong
+        # similarities. Those scores are exactly what
+        # `edge_proposer.discover_and_accept()` turns into new edges in
+        # the concept graph — so the race did not merely return bad
+        # search results, it wrote invented relationships into the
+        # network.
+        with self._lock:
+            self._refresh_preserve_experiential()
+            self._concept_cache.clear()
 
     def _restore_hebbian_experiential(
         self,
