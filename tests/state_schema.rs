@@ -1292,6 +1292,72 @@ fn test_adenosine_clearance_rate_during_sleep() {
 }
 
 #[test]
+fn test_zone_sleeping_runs_adenosine_clearance() {
+    // When the cognitive zone is Sleeping (the mind called /sleep), the
+    // adenosine sleep-pressure mechanism must treat the system as asleep
+    // even though the emergent neurochemical phase is still Active — the
+    // zone is the cognitive layer's authority on sleep state
+    // (CoreState::sync_neurochemistry_to_state forces the reported phase
+    // to NREM). Without zone_sleeping, /sleep on a rested system
+    // *accumulates* adenosine toward the exhaustion override (~0.90),
+    // so the sleep can persist for ~days instead of draining what
+    // little pressure exists.
+    let mut state = GenesisCoreState::new(1, 1000);
+    let params = NeuroTickParams {
+        metaplasticity_rate: 0.0,
+        zone_sleeping: true,
+        ..NeuroTickParams::COMPRESSED
+    };
+
+    // Rested chemistry: moderate adenosine (0.30), normal histamine —
+    // the emergent phase stays Active; only the zone says Sleeping.
+    unsafe { state.write_begin(0) };
+    state
+        .neurochemicals
+        .get_mut(NeurochemicalId::Adenosine)
+        .unwrap()
+        .level = 0.30;
+    state
+        .neurochemicals
+        .get_mut(NeurochemicalId::Histamine)
+        .unwrap()
+        .level = 0.40;
+    state.write_end();
+
+    let mut lowest_adn = f32::MAX;
+    for _ in 0..100 {
+        // SAFETY: single-threaded test — exclusive access to a live state struct.
+        unsafe { state.write_begin(0) };
+        // Hold histamine high so the emergent phase can never enter
+        // sleep on its own — isolates the zone_sleeping pathway.
+        state
+            .neurochemicals
+            .get_mut(NeurochemicalId::Histamine)
+            .unwrap()
+            .level = 0.40;
+        state.neuro_tick_with_params(&params);
+        let adn = state
+            .neurochemicals
+            .get(NeurochemicalId::Adenosine)
+            .unwrap()
+            .level;
+        lowest_adn = lowest_adn.min(adn);
+        state.write_end();
+    }
+
+    let phase = MentalPhase::from_u8(state.neurochemicals.emergent_phase);
+    assert!(
+        phase != MentalPhase::NREM && phase != MentalPhase::REM,
+        "precondition failed: emergent phase entered {phase:?} without zone authority"
+    );
+    assert!(
+        lowest_adn < 0.30,
+        "zone_sleeping should drain adenosine via glymphatic clearance, \
+         but the level never fell below 0.30 (min={lowest_adn})"
+    );
+}
+
+#[test]
 fn test_cholinergic_rebound_during_sustained_nrem() {
     // During sustained NREM, once adenosine has cleared below 0.65,
     // acetylcholine should rebound toward 0.65 (above the 0.50 REM

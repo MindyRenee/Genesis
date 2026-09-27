@@ -54,6 +54,15 @@ AUTO_WAKE_ADENOSINE = 0.20
 # When a full N1→REM cycle completes, a relaxed pressure threshold
 # applies — high residual pressure still means another cycle.
 AUTO_WAKE_CYCLE_ADENOSINE = 0.40
+# Minimum time asleep before auto-wake may fire. /sleep and auto-sleep
+# are both self-initiated, so the heartbeat wakes it once adenosine
+# drops below AUTO_WAKE_ADENOSINE — but adenosine at/below the wake
+# threshold at sleep *onset* means "not tired", not "finished sleeping".
+# Without this floor, /sleep on a well-rested system auto-wakes on the
+# next heartbeat (~1s later). 30 minutes covers the first N1+N2+N3
+# descent so sleep reaches deep-sleep consolidation before a wake is
+# allowed — the same window the CLI sleep watcher uses.
+AUTO_WAKE_MIN_SLEEP_S = 1800.0
 AUTO_SLEEP_MIN_AWAKE = 300.0  # 5 minutes
 # Drowsiness threshold — below the sleep threshold. When adenosine
 # crosses this level, it announces it's getting sleepy before

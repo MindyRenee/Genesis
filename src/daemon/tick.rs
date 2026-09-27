@@ -313,8 +313,11 @@ impl TickLoop {
                 || p == MentalPhase::REM
                 || s.zones.zone() == CognitiveZone::Sleeping
         });
+        let zone_sleeping_pre = pre_snapshot
+            .as_ref()
+            .is_some_and(|s| s.zones.zone() == CognitiveZone::Sleeping);
 
-        let neuro_params = if is_sleeping_pre {
+        let mut neuro_params = if is_sleeping_pre {
             let mut p = NeuroTickParams::DEFAULT;
             p.bdnf_recovery_rate *= SLEEP_BDNF_RECOVERY_MULTIPLIER;
             // During sleep, receptors resensitize unconditionally.
@@ -326,6 +329,7 @@ impl TickLoop {
         } else {
             NeuroTickParams::DEFAULT
         };
+        neuro_params.zone_sleeping = zone_sleeping_pre;
 
         // Scale the dynamics dt to the actual wall-clock tick interval.
         // NeuroTickParams::DEFAULT.dt is DT (0.1s = 100ms), but the daemon
@@ -333,7 +337,6 @@ impl TickLoop {
         // dt_scale inside the dynamics would be 1.0, making every rate
         // constant run at half real-time speed (circadian period ~48h,
         // adenosine sleep threshold ~38h, all pharmacodynamics 2× slow).
-        let mut neuro_params = neuro_params;
         neuro_params.dt = (TICK_INTERVAL_MS as f32) / 1000.0;
 
         // Compute HPA axis maturation from accumulated experience.
@@ -481,7 +484,13 @@ impl TickLoop {
             // Apply inference feedback (impulses, cortisol baseline
             // adjustment). Metaplasticity boost is applied on the
             // next tick via self.metaplasticity_boost.
-            apply_inference_feedback(&mut state.neurochemicals, &inference_result, now_ms);
+            let zone_sleeping = state.zones.zone() == CognitiveZone::Sleeping;
+            apply_inference_feedback(
+                &mut state.neurochemicals,
+                &inference_result,
+                now_ms,
+                zone_sleeping,
+            );
 
             // Apply dyadic model impulses (oxytocin bonding, empathic
             // cortisol). chem_id comes from the dyadic model, not IPC —
@@ -955,6 +964,9 @@ impl TickLoop {
                 || p == MentalPhase::REM
                 || s.zones.zone() == CognitiveZone::Sleeping
         });
+        let zone_sleeping_pre = pre_snapshot
+            .as_ref()
+            .is_some_and(|s| s.zones.zone() == CognitiveZone::Sleeping);
 
         let mut neuro_params = if is_sleeping_pre {
             let mut p = NeuroTickParams::DEFAULT;
@@ -964,6 +976,7 @@ impl TickLoop {
         } else {
             NeuroTickParams::DEFAULT
         };
+        neuro_params.zone_sleeping = zone_sleeping_pre;
         neuro_params.dt = dt;
 
         // HPA maturation from accumulated experience.
@@ -1068,7 +1081,13 @@ impl TickLoop {
         // inference cycle already ran (just couldn't write back), and
         // the next advance_neuro will retry the heartbeat.
         if let Err(e) = mmap.modify(now_ms, |state| {
-            apply_inference_feedback(&mut state.neurochemicals, &inference_result, now_ms);
+            let zone_sleeping = state.zones.zone() == CognitiveZone::Sleeping;
+            apply_inference_feedback(
+                &mut state.neurochemicals,
+                &inference_result,
+                now_ms,
+                zone_sleeping,
+            );
             for &(chem_id, magnitude) in &dyadic_impulses {
                 if chem_id as usize >= crate::state::neurochemical::NEUROCHEMICAL_COUNT {
                     continue;
