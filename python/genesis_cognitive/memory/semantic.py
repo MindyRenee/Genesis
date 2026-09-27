@@ -302,6 +302,27 @@ class Fact:
         return f"{self.subject} {self.relation.replace('_', ' ')} {self.object}"
 
 
+def _restore_schema_relations(raw: Any) -> dict[str, set[str]]:
+    """Rebuild a schema's relation targets, tolerating the old format.
+
+    `Schema.relations` used to be `dict[str, str]` — one target per
+    relation — and is now `dict[str, set[str]]`. Saved state written by
+    the older code holds a bare string, which has to keep loading: a
+    single-target relation is valid, it just has one member.
+    """
+    out: dict[str, set[str]] = {}
+    if not isinstance(raw, dict):
+        return out
+    for key, value in raw.items():
+        if isinstance(value, str):
+            out.setdefault(str(key), set()).add(value)
+        elif isinstance(value, (list, tuple, set, frozenset)):
+            targets = {str(v) for v in value if v is not None}
+            if targets:
+                out.setdefault(str(key), set()).update(targets)
+    return out
+
+
 @dataclass(slots=True)
 class Schema:
     """A structured grouping of facts about a concept.
@@ -319,7 +340,14 @@ class Schema:
             (e.g., "hippocampus", "amygdala").
         properties: Attributes of the concept (e.g., "soft", "gray").
         functions: What the concept does (e.g., "memory", "emotion").
-        relations: Typed relations to other concepts.
+        relations: Typed relations to other concepts, mapped to the
+            set of targets for each. A schema is multi-parent by
+            nature — a dog is an animal, a mammal and a canine — so
+            each relation holds a *set* of targets. This used to be
+            `dict[str, str]`, which could hold only one target per
+            relation: a second `is_a` silently overwrote the first, so
+            the schema kept whichever parent happened to be learned
+            last and quietly discarded the rest.
         instances: How many distinct episodes contributed to this
             schema. More instances → more abstract / prototype-like.
         abstraction_level: How abstract the schema is [0..1]. Grows
@@ -332,7 +360,7 @@ class Schema:
     parts: set[str] = field(default_factory=set)
     properties: set[str] = field(default_factory=set)
     functions: set[str] = field(default_factory=set)
-    relations: dict[str, str] = field(default_factory=dict)
+    relations: dict[str, set[str]] = field(default_factory=dict)
     instances: int = 0
     abstraction_level: float = 0.0
     created_at: int = 0
@@ -1111,13 +1139,13 @@ class SemanticMemory:
             obj = f.object
             if rel in ("has_property", "is_a"):
                 if rel == "is_a":
-                    schema.relations["is_a"] = obj
+                    schema.relations.setdefault("is_a", set()).add(obj)
                 else:
                     schema.properties.add(obj)
             elif rel in ("causes", "enables"):
                 schema.functions.add(obj)
             elif rel == "relates_to":
-                schema.relations["relates_to"] = obj
+                schema.relations.setdefault("relates_to", set()).add(obj)
 
         # Track instances: number of distinct source episodes is
         # approximated by the sum of source counts of the facts
@@ -1220,7 +1248,9 @@ class SemanticMemory:
                     "parts": sorted(s.parts),
                     "properties": sorted(s.properties),
                     "functions": sorted(s.functions),
-                    "relations": dict(s.relations or {}),
+                    "relations": {
+                        k: sorted(v) for k, v in (s.relations or {}).items()
+                    },
                     "instances": s.instances,
                     "abstraction_level": s.abstraction_level,
                     "created_at": s.created_at,
@@ -1274,10 +1304,7 @@ class SemanticMemory:
                     parts=set(raw.get("parts") or ()),
                     properties=set(raw.get("properties") or ()),
                     functions=set(raw.get("functions") or ()),
-                    relations={
-                        str(k): str(v)
-                        for k, v in (raw.get("relations") or {}).items()
-                    },
+                    relations=_restore_schema_relations(raw.get("relations")),
                     instances=int(raw.get("instances", 0)),
                     abstraction_level=float(raw.get("abstraction_level", 0.0)),
                     created_at=int(raw.get("created_at", 0)),

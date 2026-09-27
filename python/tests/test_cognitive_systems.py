@@ -2627,15 +2627,54 @@ class TestHabitBias:
                 bias_from_pm.confidence_boost
             )
 
-    def test_execute_skill_reinforces(self, pm: ProceduralMemory) -> None:
-        """execute_skill should reinforce the skill (practice with success)."""
+    def test_execute_skill_does_not_claim_success(self, pm: ProceduralMemory) -> None:
+        """execute_skill must not record an outcome it never observed.
+
+        It used to count every execution as a successful practice trial.
+        Nothing at the call site knows whether the skill worked, so that
+        drove `success_count / practice_count` toward 1.0 for any skill
+        Genesis merely attempted, and fed the success_rate EMA — which
+        weights the habit bias — unearned reinforcement. Execution now
+        records the attempt only.
+        """
         pm.learn_skill("s1", "question", "factual", "curious", initial_strength=0.5)
         skill = _get_skill(pm, "question")
-        s0 = skill.strength
+        rate0 = skill.strategy.success_rate
+
         pm.execute_skill(skill)
-        s1 = _get_skill(pm, "question").strength
-        assert s1 > s0
+
+        after = _get_skill(pm, "question")
         assert pm.executions == 1
+        # The attempt is recorded...
+        assert after.practice_count == 1
+        # ...but no outcome is invented.
+        assert after.strength == 0.5
+        assert after.success_count == 0
+        assert after.failure_count == 0
+        assert after.strategy.success_rate == rate0
+
+    def test_execute_skill_does_not_drift_success_rate(self, pm: ProceduralMemory) -> None:
+        """Repeated execution must not trend success_rate toward 1.0.
+
+        The EMA is what weights the habit bias
+        (`strength * success_rate * dominance`), so this is load-bearing.
+        """
+        pm.learn_skill("s1", "question", "factual", "curious", initial_strength=0.9)
+        skill = _get_skill(pm, "question")
+        for _ in range(50):
+            pm.execute_skill(skill)
+        assert _get_skill(pm, "question").strategy.success_rate == 0.5
+        assert _get_skill(pm, "question").success_count == 0
+
+    def test_observed_outcome_still_reinforces(self, pm: ProceduralMemory) -> None:
+        """The acquisition curve survives on the path with real evidence."""
+        pm.learn_skill("s1", "question", "factual", "curious", initial_strength=0.5)
+        s0 = _get_skill(pm, "question").strength
+        pm.practice_skill("s1", success=True)
+        after = _get_skill(pm, "question")
+        assert after.strength > s0
+        assert after.success_count == 1
+        assert after.strategy.success_rate > 0.5
 
 
 # ─── Persistence ──────────────────────────────────────────────────────
@@ -2752,10 +2791,9 @@ class TestNoCannedResponses:
         """
         pm.learn_skill("s1", "question", "factual", "curious", initial_strength=0.5)
         skill = _get_skill(pm, "question")
-        # execute_skill returns None — it only reinforces the skill.
+        # execute_skill returns None — it only records the attempt.
         pm.execute_skill(skill)
-        # The skill should have been reinforced (strength increased).
-        assert _get_skill(pm, "question").strength > 0.5
+        assert _get_skill(pm, "question").practice_count == 1
 
     def test_get_habit_bias_returns_bias_not_string(self, pm: ProceduralMemory) -> None:
         """get_habit_bias should return a HabitBias or None, never a string."""
