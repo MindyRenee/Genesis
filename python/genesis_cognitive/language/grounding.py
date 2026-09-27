@@ -4,14 +4,6 @@ This module deliberately sits between linguistic parsing and cognition.
 It does not create concepts or mutate the network: comprehension names
 are resolved against the existing semantic substrate, while unresolved
 words remain unresolved for the learning system to handle.
-
-The boundary is:
-
-    Proposition (language) -> GroundedProposition (cognition-ready)
-
-A predicate remains lexical here. Mapping verbs to RelationType is a
-separate decision because many verbs are context-sensitive and should
-not be collapsed into a graph relation prematurely.
 """
 
 from __future__ import annotations
@@ -83,12 +75,7 @@ class GroundedProposition:
 
 
 class SemanticGrounder:
-    """Resolve comprehension arguments against an existing ConceptNetwork.
-
-    Grounding is read-only. Unknown language does not become a fabricated
-    concept merely because it was spoken. Learning remains responsible
-    for deciding when and how an unknown concept should be added.
-    """
+    """Resolve comprehension arguments against an existing ConceptNetwork."""
 
     def __init__(self, network: ConceptNetwork) -> None:
         self.network = network
