@@ -109,12 +109,19 @@ def test_synaptic_efficacy_persistence():
     synapses.set_weight("mammal", "animal", 0.41)
 
     with tempfile.TemporaryDirectory() as d:
-        save_state(\n            d,\n            net,\n            _make_reflection(),\n            _make_narrative(),\n            _make_self_model(),\n            synapses=synapses,\n        )
+        save_state(
+            d,
+            net,
+            _make_reflection(),
+            _make_narrative(),
+            _make_self_model(),
+            synapses=synapses,
+        )
         data = load_state(d)
 
         assert data["synapses"] == {
-            "dog\\tmammal": 0.73,
-            "mammal\\tanimal": 0.41,
+            "dog\tmammal": 0.73,
+            "mammal\tanimal": 0.41,
         }
 
         fresh = SynapticStore()
