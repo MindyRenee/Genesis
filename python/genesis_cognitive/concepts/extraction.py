@@ -683,9 +683,18 @@ class ExtractionMixin:
         self.add_concept(subject, confidence=confidence, origin=origin)
         self.add_concept(obj, confidence=confidence, origin=origin)
         edge = self.add_edge(subject, obj, relation, origin=origin)
-        if edge:
-            edge.weight = max(edge.weight, confidence)
-        return edge
+        if edge is not None:
+            # Write the taught confidence through to the edge log.
+            # This used to assign `edge.weight` directly, which changed
+            # only the in-memory fold: `fold()` kept reporting the
+            # original weight and the boost was lost if the process
+            # exited before the next save. `set_edge_weight` is the
+            # single write-through path for weight changes.
+            return self.set_edge_weight(
+                edge.source, edge.target, relation,
+                max(edge.weight, confidence),
+            )
+        return None
     def teach_concept(
         self,
         name: str,

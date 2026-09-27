@@ -351,3 +351,125 @@ class TestLegacyJsonMigration:
 
         assert len(live) == 1, "derivable edge was written to the canonical log"
         assert net.edge_count == 1
+
+
+class TestWeightWriteThrough:
+    """Weight changes must reach the log, not just the in-memory fold.
+
+    The edge log is the canonical source of truth for relationships. A
+    weight assigned straight onto an `Edge` object updates the fold's
+    materialization only — `fold()` keeps reporting the old weight, and
+    the change is lost if the process exits before the next save.
+    """
+
+    def test_taught_confidence_reaches_the_log(self, tmp_path):
+        log = open_edge_log(tmp_path)
+        net = ConceptNetwork()
+        net.attach_edge_log(log)
+        edge = net.teach("dog", RelationType.IS_A, "animal", confidence=0.9)
+        assert edge is not None
+        log.close()
+        assert edge.weight == 0.9
+        # The log must agree, not just the returned object.
+        reloaded = open_edge_log(tmp_path).fold()
+        assert len(reloaded) == 1
+        assert next(iter(reloaded.values())).weight == 0.9
+
+    def test_taught_confidence_survives_no_resave(self, tmp_path):
+        """The boost must be durable immediately, not at the next save.
+
+        A direct attribute assignment is only folded in by the next
+        `sync_edge_log` snapshot. Reopening the log without one shows
+        the difference.
+        """
+        log = open_edge_log(tmp_path)
+        net = ConceptNetwork()
+        net.attach_edge_log(log)
+        net.teach("dog", RelationType.IS_A, "animal", confidence=0.9)
+        log.close()
+
+        net2 = ConceptNetwork()
+        net2.attach_edge_log(open_edge_log(tmp_path))
+        assert net2.edge_count == 1
+        assert next(iter(net2._edges)).weight == 0.9
+
+    def test_taught_edge_with_existing_weak_edge(self, tmp_path):
+        """Teaching over a weak pre-existing edge must still write through."""
+        log = open_edge_log(tmp_path)
+        net = ConceptNetwork()
+        net.attach_edge_log(log)
+        net.add_edge("dog", "animal", RelationType.IS_A, weight=0.2,
+                     origin="stated")
+        net.teach("dog", RelationType.IS_A, "animal", confidence=0.9)
+        log.close()
+        reloaded = open_edge_log(tmp_path).fold()
+        assert next(iter(reloaded.values())).weight >= 0.9
+
+    def test_set_edge_weight_on_missing_edge_is_none(self, tmp_path):
+        log = open_edge_log(tmp_path)
+        net = ConceptNetwork()
+        net.attach_edge_log(log)
+        net.add_concept("dog", confidence=0.8)
+        net.add_concept("cat", confidence=0.8)
+        assert net.set_edge_weight("dog", "cat", RelationType.IS_A, 0.9) is None
+        log.close()
+
+    def test_add_edge_reinforcement_reaches_the_log(self, tmp_path):
+        """Re-adding an edge raises it by 0.2 — and the log must see that."""
+        log = open_edge_log(tmp_path)
+        net = ConceptNetwork()
+        net.attach_edge_log(log)
+        net.add_edge("dog", "animal", RelationType.IS_A, weight=0.5,
+                     origin="stated")
+        net.add_edge("dog", "animal", RelationType.IS_A, origin="stated")
+        log.close()
+        reloaded = open_edge_log(tmp_path).fold()
+        assert next(iter(reloaded.values())).weight == 0.7
+
+
+class TestCompactionFailureIsReported:
+    """A log that cannot be compacted must not fail silently.
+
+    `sync_edge_log` previously swallowed OSError from both the size
+    check and the compaction, so an uncompactable log grew without
+    bound with no signal — the exact failure the warning exists to
+    surface.
+    """
+
+    def test_compaction_failure_is_logged_not_swallowed(self, tmp_path, caplog):
+        log = open_edge_log(tmp_path)
+        net = ConceptNetwork()
+        net.attach_edge_log(log)
+        net.add_edge("a", "b", RelationType.IS_A, 0.5, "stated")
+
+        real = log.compact
+
+        def boom() -> int:
+            raise OSError(28, "No space left on device")
+
+        log.compact = boom  # type: ignore[method-assign]
+        # Force the threshold so compaction is attempted.
+        import genesis_cognitive.concepts.network as nmod
+        original = nmod._COMPACT_THRESHOLD_BYTES
+        nmod._COMPACT_THRESHOLD_BYTES = 0
+        try:
+            with caplog.at_level("WARNING"):
+                net.sync_edge_log()
+        finally:
+            nmod._COMPACT_THRESHOLD_BYTES = original
+            log.compact = real  # type: ignore[method-assign]
+            log.close()
+
+        assert any("compaction failed" in r.message for r in caplog.records), (
+            "compaction OSError was swallowed silently"
+        )
+
+    def test_failure_counter_resets_on_success(self, tmp_path):
+        log = open_edge_log(tmp_path)
+        net = ConceptNetwork()
+        net.attach_edge_log(log)
+        net.add_edge("a", "b", RelationType.IS_A, 0.5, "stated")
+        assert net._compact_failures == 0
+        net.sync_edge_log()
+        assert net._compact_failures == 0
+        log.close()
