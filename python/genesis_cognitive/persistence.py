@@ -82,6 +82,7 @@ from .memory import (
     EmotionalMemorySystem,
     ProceduralMemory,
     ReviewRecord,
+    SemanticMemory,
     Skill,
     SkillStrategy,
     SpacedRepetitionScheduler,
@@ -172,6 +173,7 @@ def save_state(
     td_learner: TDLearner | None = None,
     synapses: SynapticStore | None = None,
     emotional_memory: EmotionalMemorySystem | None = None,
+    semantic_memory: SemanticMemory | None = None,
     attractor: AttractorNetwork | None = None,
     error_monitor: ErrorMonitor | None = None,
     emergent_identity: EmergentIdentity | None = None,
@@ -207,6 +209,10 @@ def save_state(
         spaced_repetition: The review schedule for concepts.
         td_learner: The value function and reward history.
         emotional_memory: Emotional tags associated with memories.
+        semantic_memory: The neocortical fact/schema store. Omitting it
+            loses every consolidated fact, because those edges are
+            rejected by the canonical edge log (see
+            `_serialize_semantic_memory`).
         attractor: The stored patterns in the attractor network.
         error_monitor: The error history and adjusted thresholds.
         emergent_identity: The synthesized emergent identity.
@@ -240,6 +246,7 @@ def save_state(
         td_learner=td_learner,
         synapses=synapses,
         emotional_memory=emotional_memory,
+        semantic_memory=semantic_memory,
         attractor=attractor,
         error_monitor=error_monitor,
         emergent_identity=emergent_identity,
@@ -346,6 +353,7 @@ def _add_optional_state(
     td_learner: TDLearner | None = None,
     synapses: SynapticStore | None = None,
     emotional_memory: EmotionalMemorySystem | None = None,
+    semantic_memory: SemanticMemory | None = None,
     attractor: AttractorNetwork | None = None,
     error_monitor: ErrorMonitor | None = None,
     emergent_identity: EmergentIdentity | None = None,
@@ -383,6 +391,8 @@ def _add_optional_state(
         state["synapses"] = synapses.save_state()
     if emotional_memory is not None:
         state["emotional_memory"] = _serialize_emotional_memory(emotional_memory)
+    if semantic_memory is not None:
+        state["semantic_memory"] = _serialize_semantic_memory(semantic_memory)
     if attractor is not None:
         state["attractor"] = _serialize_attractor(attractor)
     if error_monitor is not None:
@@ -1168,6 +1178,21 @@ def restore_emotional_memory(emotional_memory: EmotionalMemorySystem, data: dict
     emotional_memory.extinction_count = data.get("extinction_count", 0)
 
 
+def restore_semantic_memory(
+    semantic_memory: SemanticMemory, data: dict[str, Any]
+) -> None:
+    """Restore the semantic fact/schema store from persisted state.
+
+    Never raises: a corrupt or partial payload costs the learned facts,
+    not the ability to start. `SemanticMemory.restore` does the
+    per-record validation.
+    """
+    try:
+        semantic_memory.restore(data)
+    except Exception as e:  # noqa: BLE001 - restore must never block startup
+        logger.warning(f"semantic memory restore failed ({e}); continuing")
+
+
 def restore_attractor(attractor: AttractorNetwork, data: dict[str, Any]) -> None:
     """Restore attractor network from saved data."""
     # Restore size first — it determines the weight matrix dimensions
@@ -1683,6 +1708,21 @@ def _serialize_emotional_memory(
         "conditioning_count": emotional_memory.conditioning_count,
         "extinction_count": emotional_memory.extinction_count,
     }
+
+
+def _serialize_semantic_memory(semantic_memory: SemanticMemory) -> dict[str, Any]:
+    """Serialize the semantic fact/schema store.
+
+    This store previously had no durable representation at all. Its
+    consolidated facts are labelled ``origin="semantic"``, which is in
+    ``DERIVABLE_ORIGINS``, so the canonical edge log rejects them — the
+    correct treatment of a *derivable* edge, but the wrong label for a
+    proposition extracted from a sentence, which is earned knowledge and
+    not recomputable geometry. The net effect was that facts learned
+    into semantic memory existed only in RAM and were lost on every
+    restart. See `SemanticMemory.to_dict` for the same reasoning.
+    """
+    return semantic_memory.to_dict()
 
 
 def _serialize_attractor(attractor: AttractorNetwork) -> dict[str, Any]:

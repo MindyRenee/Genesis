@@ -49,6 +49,7 @@ References:
 
 from __future__ import annotations
 
+import logging
 import re
 import time
 from dataclasses import dataclass, field
@@ -56,6 +57,8 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover — import only for type checkers
     from ..concepts import ConceptNetwork, RelationType
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["Fact", "Schema", "SemanticMemory"]
 
@@ -1180,6 +1183,121 @@ class SemanticMemory:
         return list(self._schemas.values())
 
     # ── Introspection ────────────────────────────────────────────
+
+    # ── Persistence ──────────────────────────────────────────────
+    #
+    # This store used to have no serialisation at all, which combined
+    # with `origin="semantic"` being in `DERIVABLE_ORIGINS` to make
+    # every consolidated fact unrecoverable: the canonical edge log
+    # rejects those edges (correctly — they are labelled derivable), and
+    # the in-memory `_facts` dict died with the process. A fact learned
+    # from conversation survived only as long as the session. Given that
+    # the developmental record is the system, that was the most severe
+    # data-loss path in the project.
+    #
+    # Facts are stored as a list, not a mapping, because the key is a
+    # tuple and JSON object keys must be strings. The key is rebuilt
+    # from the Fact on restore, so it cannot drift from the payload.
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize the semantic store for persistence."""
+        return {
+            "facts": [
+                {
+                    "subject": f.subject,
+                    "relation": f.relation,
+                    "object": f.object,
+                    "confidence": f.confidence,
+                    "source_count": f.source_count,
+                    "extracted_at": f.extracted_at,
+                    "last_reinforced": f.last_reinforced,
+                }
+                for f in self._facts.values()
+            ],
+            "schemas": [
+                {
+                    "concept": s.concept,
+                    "parts": sorted(s.parts),
+                    "properties": sorted(s.properties),
+                    "functions": sorted(s.functions),
+                    "relations": dict(s.relations or {}),
+                    "instances": s.instances,
+                    "abstraction_level": s.abstraction_level,
+                    "created_at": s.created_at,
+                    "last_updated": s.last_updated,
+                }
+                for s in self._schemas.values()
+            ],
+            "facts_extracted": self.facts_extracted,
+            "schemas_formed": self.schemas_formed,
+            "consolidations": self.consolidations,
+            # Priming is a transient cognitive state, deliberately not
+            # persisted: restoring a stale priming set would bias
+            # retrieval toward concepts that were salient in a previous
+            # session. See `receive_broadcast`.
+        }
+
+    def restore(self, data: dict[str, Any]) -> None:
+        """Restore the semantic store from persisted state.
+
+        Tolerates a missing or partial payload: this is a
+        never-throw path, because a corrupt semantic store should cost
+        the learned facts, not prevent the process from starting.
+        """
+        facts = data.get("facts") or []
+        restored = 0
+        for raw in facts:
+            if not isinstance(raw, dict):
+                continue
+            try:
+                fact = Fact(
+                    subject=str(raw["subject"]),
+                    relation=str(raw["relation"]),
+                    object=str(raw["object"]),
+                    confidence=float(raw.get("confidence", 0.5)),
+                    source_count=int(raw.get("source_count", 1)),
+                    extracted_at=int(raw.get("extracted_at", 0)),
+                    last_reinforced=int(raw.get("last_reinforced", 0)),
+                )
+            except (KeyError, TypeError, ValueError) as e:
+                logger.warning(f"skipping malformed persisted fact: {e}")
+                continue
+            self._facts[fact.key] = fact
+            restored += 1
+
+        for raw in data.get("schemas") or []:
+            if not isinstance(raw, dict) or "concept" not in raw:
+                continue
+            try:
+                self._schemas[str(raw["concept"])] = Schema(
+                    concept=str(raw["concept"]),
+                    parts=set(raw.get("parts") or ()),
+                    properties=set(raw.get("properties") or ()),
+                    functions=set(raw.get("functions") or ()),
+                    relations={
+                        str(k): str(v)
+                        for k, v in (raw.get("relations") or {}).items()
+                    },
+                    instances=int(raw.get("instances", 0)),
+                    abstraction_level=float(raw.get("abstraction_level", 0.0)),
+                    created_at=int(raw.get("created_at", 0)),
+                    last_updated=int(raw.get("last_updated", 0)),
+                )
+            except (TypeError, ValueError) as e:
+                logger.warning(f"skipping malformed persisted schema: {e}")
+
+        self.facts_extracted = int(data.get("facts_extracted", restored))
+        self.schemas_formed = int(
+            data.get("schemas_formed", len(self._schemas))
+        )
+        self.consolidations = int(data.get("consolidations", 0))
+        # Priming is intentionally not restored.
+        self._primed_concepts = {}
+        if restored:
+            logger.info(
+                f"restored {restored} semantic facts and "
+                f"{len(self._schemas)} schemas"
+            )
 
     @property
     def fact_count(self) -> int:
