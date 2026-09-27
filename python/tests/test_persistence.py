@@ -21,6 +21,7 @@ from genesis_cognitive.persistence import (
     restore_reflection,
     restore_self_directed_learner,
     restore_self_model,
+    restore_semantic_memory,
     restore_synapses,
     save_state,
 )
@@ -491,6 +492,102 @@ def test_restore_preserves_conflicting_senses_with_undefined_base():
 
 
 # ─── Test runner ────────────────────────────────────────────
+
+
+# ─── Semantic memory durability ──────────────────────────────────────
+#
+# SemanticMemory previously had no serialisation at all, and its
+# consolidated facts are labelled origin="semantic", which is in
+# DERIVABLE_ORIGINS — so the canonical edge log rejects them. The two
+# together meant every fact learned into semantic memory was lost on
+# restart: no graph edge, no saved state. These pin that facts and
+# schemas now survive a round trip.
+
+
+def test_semantic_memory_facts_survive_a_round_trip(tmp_path):
+    """Facts consolidated into semantic memory must persist.
+
+    Regression test for silent data loss: nothing was written, and the
+    edge log cannot hold these edges, so a fact learned from a
+    conversation previously existed only in RAM.
+    """
+    from genesis_cognitive.memory.semantic import Fact, SemanticMemory
+
+    network = ConceptNetwork()
+    network.add_concept("dog", confidence=0.9)
+    network.add_concept("animal", confidence=0.9)
+
+    dog_fact = Fact("dog", "is_a", "animal", 0.8, 3, 111, 222)
+    water_fact = Fact("water", "is_a", "liquid", 0.6)
+    sem = SemanticMemory(network=network)
+    sem._facts[dog_fact.key] = dog_fact
+    sem._facts[water_fact.key] = water_fact
+    sem.facts_extracted = 2
+
+    sm = SelfModel()
+    save_state(
+        data_dir=str(tmp_path),
+        network=network,
+        reflection=ReflectionEngine(network),
+        narrative=NarrativeEngine(sm, network),
+        self_model=sm,
+        semantic_memory=sem,
+    )
+
+    loaded = load_state(str(tmp_path))
+    assert loaded is not None
+    assert "semantic_memory" in loaded, "semantic_memory was not persisted"
+
+    restored = SemanticMemory(network=network)
+    restore_semantic_memory(restored, loaded["semantic_memory"])
+
+    assert restored.fact_count == 2
+    assert restored.facts_extracted == 2
+    facts = {(f.subject, f.relation, f.object): f for f in restored._facts.values()}
+    assert ("dog", "is_a", "animal") in facts
+    got = facts[("dog", "is_a", "animal")]
+    assert got.confidence == pytest.approx(0.8)
+    assert got.source_count == 3
+    assert got.extracted_at == 111
+    assert got.last_reinforced == 222
+
+
+def test_semantic_memory_restore_tolerates_corrupt_payload():
+    """A corrupt payload costs the facts, not the ability to start."""
+    from genesis_cognitive.memory.semantic import SemanticMemory
+
+    network = ConceptNetwork()
+    sem = SemanticMemory(network=network)
+    sem.restore(
+        {
+            "facts": [
+                {"subject": "ok", "relation": "is_a", "object": "thing"},
+                {"relation": "is_a"},
+                "not-a-dict",
+                {"subject": "b", "relation": "is_a", "object": "c", "confidence": "x"},
+            ],
+            "schemas": [{"no_concept_key": True}],
+        }
+    )
+    assert sem.fact_count == 1
+    assert any(f.subject == "ok" for f in sem._facts.values())
+
+
+def test_semantic_memory_does_not_restore_stale_priming():
+    """Priming is transient and must not survive a restart.
+
+    Restoring a previous session's priming set would bias retrieval
+    toward concepts that were salient then, which is not what semantic
+    priming models.
+    """
+    from genesis_cognitive.memory.semantic import SemanticMemory
+
+    network = ConceptNetwork()
+    sem = SemanticMemory(network=network)
+    sem._primed_concepts["dog"] = 0.9
+    sem.restore({"facts": []})
+    assert sem._primed_concepts == {}
+
 
 
 def run_all():
