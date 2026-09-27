@@ -272,10 +272,11 @@ class Mind(
             get_plasticity_profile=self._get_plasticity_profile,
             get_brain_waves=self.brain_waves,
             force_offline=self._offline,
+            synapses=self.cognition.synapses,
         )
-        # Wire the embedding store into the learner so it can use
-        # semantic similarity for concept connection at birth, STDP
-        # on embedding vectors, and deep expectation generation.
+        # Wire the embedding store into the learner for semantic
+        # similarity and deep expectation generation. STDP uses the
+        # shared synaptic substrate supplied above, not embeddings.
         self.learner.embeddings = self.cognition.embeddings
 
         # Inner life — spontaneous thoughts between interactions.
