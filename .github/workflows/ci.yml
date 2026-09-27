@@ -31,8 +31,18 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
-      - name: System deps (pycairo)
-        run: sudo apt-get update && sudo apt-get install -y libcairo2-dev pkg-config
+      - name: System deps (pycairo, v4l bindgen)
+        # libcairo2-dev/pkg-config: the canvas.
+        # libclang-dev/linux-libc-dev: the daemon build links v4l2-sys,
+        # which runs bindgen against <linux/videodev2.h>. The python job
+        # needs these because it builds genesis-daemon for the
+        # end-to-end integration test — without it that test has no
+        # binary and (previously) reported PASS while asserting nothing.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcairo2-dev pkg-config libclang-dev linux-libc-dev
+      - name: Build daemon binary for the integration test
+        run: cargo build --release
       - uses: actions/cache@v6
         with:
           path: ~/.cache/pip

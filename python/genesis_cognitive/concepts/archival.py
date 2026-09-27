@@ -221,6 +221,31 @@ class ArchivalMixin:
                 self._archive.archive_edges_batch(edge_dicts)
             except (sqlite3.Error, RuntimeError) as e:
                 logger.debug(f"edge archive during spill failed: {e}")
+            # Retract from the canonical log. The archive now holds a
+            # durable copy, and `persistence._restore_edges` drops
+            # edges whose concept is absent, so the JSON and the log
+            # have to agree or the divergence is permanent and
+            # self-reinforcing: the log would still assert the edges,
+            # `replace_contents` would let the log fold overwrite the
+            # pruned fold, and the next `sync_edge_log` snapshot would
+            # re-promote them to canonical — anchoring them to
+            # concepts that no longer exist. `remove_edge` cannot do
+            # this for us because it resolves both endpoints by name and
+            # the concept has already been popped.
+            if self._edge_log is not None:
+                for edge_dict in edge_dicts:
+                    try:
+                        self._edge_log.retract_edge(
+                            edge_dict["source"],
+                            edge_dict["target"],
+                            edge_dict["relation"],
+                        )
+                    except (OSError, ValueError) as e:
+                        logger.warning(
+                            f"edge log retraction during spill failed for "
+                            f"{edge_dict['source']}->{edge_dict['target']}: {e}"
+                        )
+
     def _remove_spilled_from_working_memory(self, to_spill: set[str]) -> None:
         """Remove spilled concepts from working memory (concepts + aliases)."""
         for cid in to_spill:

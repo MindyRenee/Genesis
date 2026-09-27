@@ -12,30 +12,85 @@ import genesis_cli
 from genesis_cognitive.mind.lifecycle import LifecycleMixin
 
 
-def test_shutdown_does_not_force_kill_slow_daemon(tmp_path):
+def test_shutdown_waits_for_slow_daemon_within_grace_window(tmp_path):
+    """A daemon that is slow but alive is NOT force-killed.
+
+    Preserves the original intent: killing risks losing unconsolidated
+    memory and leaving on-disk state inconsistent, so SIGKILL is not
+    used while the child might still be flushing. `wait.side_effect`
+    models a first wait that exceeds the grace window and a second that
+    succeeds, i.e. the child did exit on its own.
+    """
     mind = Mock()
     daemon = Mock()
+    daemon.poll.return_value = None  # still running when shutdown starts
     daemon.wait.side_effect = [subprocess.TimeoutExpired("daemon", 5), 0]
     daemon.returncode = 0
     with patch.object(genesis_cli, "_remove_pid_file"):
         assert genesis_cli._shutdown(None, mind, daemon, data_dir=str(tmp_path))
     mind.stop.assert_called_once()
     daemon.terminate.assert_called_once()
-    daemon.kill.assert_not_called()
     assert daemon.wait.call_count == 2
 
 
-def test_shutdown_does_not_force_kill_slow_retina():
+def test_shutdown_escalates_to_kill_when_child_never_exits(tmp_path):
+    """A child that ignores SIGTERM is escalated, not waited on forever.
+
+    The previous implementation called `proc.wait()` with no timeout
+    once the first wait expired, so a wedged daemon blocked shutdown
+    indefinitely. Combined with a signal handler that swallowed every
+    signal after shutdown began, the process could not be stopped by
+    Ctrl-C or SIGTERM at all — leaving `kill -9` as the only exit, the
+    one action the operational notes forbid.
+
+    SIGKILL is still the last resort: SIGTERM (or the graceful SHUTDOWN
+    IPC request) is always tried first, and only a child that has
+    demonstrably ignored it is killed.
+    """
+    mind = Mock()
+    daemon = Mock()
+    daemon.poll.return_value = None
+    daemon.wait.side_effect = [
+        subprocess.TimeoutExpired("daemon", 5),  # ignored SIGTERM
+        0,  # exited after SIGKILL
+    ]
+    daemon.returncode = 0
+    with patch.object(genesis_cli, "_remove_pid_file"):
+        assert genesis_cli._shutdown(None, mind, daemon, data_dir=str(tmp_path))
+    daemon.terminate.assert_called_once()
+    daemon.kill.assert_called_once()
+    assert daemon.wait.call_count == 2
+
+
+def test_shutdown_reports_failure_when_child_cannot_be_killed(tmp_path):
+    """A child stuck in uninterruptible I/O is reported, not hung on.
+
+    The mind has already saved state by this point, so continuing the
+    teardown is the safer failure mode than blocking forever.
+    """
+    mind = Mock()
+    daemon = Mock()
+    daemon.poll.return_value = None
+    daemon.wait.side_effect = subprocess.TimeoutExpired("daemon", 5)
+    daemon.returncode = None
+    with patch.object(genesis_cli, "_remove_pid_file"):
+        assert not genesis_cli._shutdown(None, mind, daemon, data_dir=str(tmp_path))
+    daemon.kill.assert_called_once()
+
+
+def test_shutdown_waits_for_slow_retina_within_grace_window():
     retina = Mock()
+    retina.poll.return_value = None
     retina.wait.side_effect = [subprocess.TimeoutExpired("retina", 3), 0]
     retina.returncode = 0
     assert genesis_cli._shutdown(None, Mock(), None, retina)
-    retina.kill.assert_not_called()
+    retina.terminate.assert_called_once()
     assert retina.wait.call_count == 2
 
 
 def test_shutdown_reports_failed_daemon_exit():
     daemon = Mock()
+    daemon.poll.return_value = None
     daemon.returncode = 1
     assert not genesis_cli._shutdown(None, Mock(), daemon)
     daemon.terminate.assert_called_once()
