@@ -37,11 +37,34 @@
 //!
 //! Instead, the read API ([`read`] and [`read_consistent`]) performs
 //! volatile byte copies through raw pointers, returning an **owned**
-//! `GenesisCoreState` on the stack. No reference to the mmap'd memory
-//! is ever created, so there is no aliasing. The write API ([`modify`])
-//! holds an in-process `Mutex` that serialises writers, and the `&mut`
-//! reference it creates is the sole reference within this process for
-//! the duration of the closure.
+//! `GenesisCoreState` on the stack. Readers therefore create no
+//! reference to the mmap'd memory at all.
+//!
+//! ### The writer does create a `&mut` — and that is unsound
+//!
+//! [`modify`] holds `write_lock` (and an `flock`, for cross-process
+//! exclusion) while it materialises a `&mut GenesisCoreState` into the
+//! shared mapping for the whole transaction. Exclusion makes the
+//! *access* well-defined, but it does not make the *aliasing* defined:
+//! under Stacked/Tree Borrows, creating the `&mut` invalidates every
+//! other pointer derived from `self.ptr` for its duration, so a
+//! concurrent `read`'s `read_volatile` load is UB — `read_volatile`
+//! stops the compiler eliding the load, not the borrow from
+//! invalidating the pointer.
+//!
+//! This is currently latent rather than live: volatile loads are never
+//! dead, so LLVM cannot exploit the `noalias` on the `&mut` to delete
+//! them, and the emitted code is correct. But the invariant as written
+//! above is false, Miri flags it, and the obvious "optimisation" —
+//! replacing `read_volatile` with a plain `ptr::read` in the reader —
+//! would turn it into a real miscompilation.
+//!
+//! The fix is to stop forming a reference to the mapping at all: keep
+//! the transaction on a stack copy and publish it with a single
+//! `write_volatile`. That is deliberately not done here because it
+//! changes the panic/rollback path and needs a test run to validate;
+//! until then, treat "no `&mut` into the mapping" as a known gap, not
+//! a guarantee.
 //!
 //! ## File layout
 //!
@@ -50,8 +73,10 @@
 //! offset 3288:  (unused, padding to page boundary)
 //! ```
 //!
-//! The file is exactly one page (4096 bytes) — the OS maps it as a
-//! single page, and the state struct sits at the start.
+//! The state struct is 3288 bytes and the file is page-aligned, so the
+//! mapping is at least one page and the state sits at its start. (On a
+//! host with a 64 KiB page — aarch64, for instance — `page_align_up`
+//! expands the file to 64 KiB, not 4 KiB.)
 
 use std::fs::OpenOptions;
 use std::os::unix::io::AsRawFd;
@@ -60,7 +85,8 @@ use std::path::Path;
 use core::sync::atomic::{AtomicU64, Ordering, fence};
 
 use libc::{
-    LOCK_EX, LOCK_NB, LOCK_UN, MAP_FAILED, MAP_SHARED, MS_SYNC, PROT_READ, PROT_WRITE, c_void,
+    LOCK_EX, LOCK_NB, LOCK_UN, MAP_FAILED, MAP_SHARED, MS_ASYNC, MS_SYNC, PROT_READ, PROT_WRITE,
+    c_void,
     close, fdatasync, flock, ftruncate, mmap, msync, munmap,
 };
 
@@ -179,10 +205,16 @@ pub struct MmapState {
 // The safety of concurrent access is ensured by:
 //   - Reads: `read`/`read_consistent` use volatile byte copies through
 //     raw pointers — no Rust references to the mmap'd memory are
-//     created, so no aliasing with writers.
+//     created, so readers never alias a writer's reference.
 //   - Writes: `modify` acquires `write_lock` before creating the
 //     `&mut GenesisCoreState`, ensuring no other thread in this
 //     process has a competing reference.
+//
+// Note: the second bullet gives *exclusion*, not sound aliasing. See
+// the module-level "The writer does create a `&mut`" section — a
+// reader's `read_volatile` on bytes covered by a live `&mut` is still
+// UB under Stacked/Tree Borrows, and this impl is only correct today
+// because volatile loads cannot be optimised away.
 unsafe impl Send for MmapState {}
 unsafe impl Sync for MmapState {}
 
@@ -215,12 +247,28 @@ impl MmapState {
 
         let fd = file.as_raw_fd();
 
+        // Take the open-time lock immediately, for the same reason
+        // `open` does: between `ftruncate` and the initialising store
+        // below there is a window in which the file exists, is the
+        // right size, and is entirely zeros. `open` locks, so a second
+        // daemon starting in that window would read the zeros and fail
+        // with `BadMagic`. `create_new` has already succeeded, so the
+        // EEXIST path is unaffected.
+        // SAFETY: `fd` is a valid open file descriptor.
+        unsafe { Self::lock_file(fd) }?;
+
         // Set the file size
         // SAFETY: ftruncate is a POSIX call on a valid, owned fd. The fd is
         // obtained from `file.as_raw_fd()` and `file` is kept alive (forgotten
         // later) so the fd remains valid. FILE_SIZE is a small constant.
         unsafe {
             if ftruncate(fd, mapped_len() as i64) != 0 {
+                // This call created the file. Leaving a zero-filled stub
+                // behind would make every subsequent `open_or_create`
+                // fail with `BadMagic` until it was deleted by hand —
+                // turning one transient error into a permanent manual
+                // repair. Unlink it on every failure path below.
+                let _ = std::fs::remove_file(path);
                 return Err(StateFileError::FtruncateFailed);
             }
         }
@@ -228,10 +276,19 @@ impl MmapState {
         // this, a crash after ftruncate but before the inode is
         // flushed can leave a zero-length file. `msync` only flushes
         // data pages, not the inode's i_size.
-        Self::do_fsync(fd)?;
+        if let Err(e) = Self::do_fsync(fd) {
+            let _ = std::fs::remove_file(path);
+            return Err(e);
+        }
 
         // mmap the file
-        let ptr = Self::do_mmap(fd)?;
+        let ptr = match Self::do_mmap(fd) {
+            Ok(p) => p,
+            Err(e) => {
+                let _ = std::fs::remove_file(path);
+                return Err(e);
+            }
+        };
 
         // Initialise the state
         let mut state = GenesisCoreState::new(instance_id, now_ms);
@@ -272,6 +329,8 @@ impl MmapState {
             unsafe {
                 munmap(ptr as *mut c_void, mapped_len());
             }
+            // See above: unlink the stub this call created.
+            let _ = std::fs::remove_file(path);
             return Err(e);
         }
 
@@ -507,6 +566,89 @@ impl MmapState {
                 close(fd);
             }
             return Err(StateFileError::VerificationFailed(e));
+        }
+
+        // Scrub any non-finite float before the state is published to
+        // any reader. The CRC cannot catch this: a state file that
+        // legitimately contains NaN is byte-exact and passes both
+        // `verify` and `verify_checksum`. The per-tick circuit breaker
+        // would fix most of it on the first tick, but between here and
+        // then a lock-free IPC read would hand NaN to the cognitive
+        // mind.
+        // SAFETY: same invariant as the reads above — `ptr` is a valid,
+        // mmap'd, page-aligned region of exactly `FILE_SIZE` bytes, the
+        // flock is held, and no `MmapState` exists yet, so this is the
+        // sole reference.
+        if unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) }.scrub_non_finite() {
+            let now_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
+            // SAFETY: as above — the `&mut` is the sole reference.
+            let state_mut: &mut GenesisCoreState = unsafe { &mut *(ptr as *mut GenesisCoreState) };
+            // SAFETY: the open-time flock is held.
+            unsafe { state_mut.write_begin(now_ms) };
+            state_mut.scrub_non_finite();
+            state_mut.write_end();
+            // SAFETY: valid ptr/len; flock held so no writer can be
+            // mid-transaction.
+            if let Err(msync_err) = Self::do_msync(ptr, mapped_len()) {
+                // SAFETY: unlock before munmap/close on valid ptr/fd
+                // that we own exclusively.
+                unsafe {
+                    Self::unlock_file(fd);
+                    munmap(ptr as *mut c_void, mapped_len());
+                    close(fd);
+                }
+                return Err(msync_err);
+            }
+        }
+
+        // Repair an inverted seqlock parity.
+        //
+        // `header.seq_lock` is excluded from the CRC (it changes on
+        // every write), and the write order is: data -> checksum store
+        // -> `seq_lock` to even. A crash, or a partial page writeback —
+        // the kernel offers no atomicity for a 4 KiB page and walks it
+        // in address order, so bytes 40..48 can reach disk while bytes
+        // 3224..3228 have not — can therefore leave a disk image that
+        // is fully written, CRC-valid, and holding an ODD `seq_lock`.
+        // Nothing in `verify()`/`verify_checksum()` looks at it.
+        //
+        // The consequence is severe and permanent. `read_consistent`
+        // rejects an odd `seq_lock`, so every `GET_STATE` /
+        // `GET_NEURO_SUMMARY` / `PING` fails until a write happens. Then
+        // the first `write_begin` increments an odd value to an even
+        // one, which readers read as "stable" — publishing a torn
+        // snapshot mid-transaction — and `write_end` increments that to
+        // odd again, blinding every reader for the rest of the process.
+        //
+        // Repair the parity while the flock is held. No checksum
+        // recomputation is needed: `seq_lock` is outside the CRC.
+        // SAFETY: `ptr` is a valid, mmap'd, page-aligned region of
+        // exactly `FILE_SIZE` bytes; the flock is held and no
+        // `MmapState` has been returned to the caller, so this is the
+        // sole reference and it does not alias.
+        if unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) }
+            .header
+            .seq_lock
+            & 1
+            == 1
+        {
+            let state_mut: &mut GenesisCoreState = unsafe { &mut *(ptr as *mut GenesisCoreState) };
+            state_mut.header.seq_lock = state_mut.header.seq_lock.wrapping_add(1);
+            // SAFETY: `ptr`/`len` are a valid mmap'd region; the flock
+            // is held so no writer in any process can be mid-transaction.
+            if let Err(msync_err) = Self::do_msync(ptr, mapped_len()) {
+                // SAFETY: unlock before munmap/close on valid ptr/fd
+                // that we own exclusively. No other references exist.
+                unsafe {
+                    Self::unlock_file(fd);
+                    munmap(ptr as *mut c_void, mapped_len());
+                    close(fd);
+                }
+                return Err(msync_err);
+            }
         }
 
         // Sanity-check created_at: early versions of the daemon passed
@@ -865,6 +1007,36 @@ impl MmapState {
         // SAFETY: `self.fd` is valid and we hold the lock.
         unsafe { Self::unlock_file(self.fd) };
         result
+    }
+
+    /// Periodic (non-critical) flush.
+    ///
+    /// `sync` uses `msync(MS_SYNC)`, which blocks until the pages have
+    /// actually reached the device — tens to hundreds of milliseconds
+    /// on a journaled filesystem, and a full fsync stall under load.
+    /// The 5 Hz tick performs a dozen-plus `modify` transactions, each
+    /// running a full coupled-ODE integration, so blocking the tick
+    /// thread on a disk flush also delays every IPC write behind it and
+    /// widens the window in which `read_consistent` exhausts its
+    /// retries.
+    ///
+    /// For the periodic path, flush without blocking and without
+    /// waiting for a writer to finish: a transaction in flight is
+    /// already dirty, and the next flush will carry it. Use `sync` on
+    /// the shutdown path, where durability must be confirmed.
+    pub fn sync_async(&self) -> Result<(), StateFileError> {
+        // `try_lock` rather than `lock`: skipping a flush is always
+        // safe here, blocking the tick loop is not.
+        let Ok(_guard) = self.write_lock.try_lock() else {
+            return Ok(());
+        };
+        // SAFETY: `self.ptr` is a valid mmap'd region of
+        // `mapped_len()` bytes, for the lifetime of `self`.
+        let rc = unsafe { msync(self.ptr as *mut c_void, mapped_len(), MS_ASYNC) };
+        if rc != 0 {
+            return Err(StateFileError::MsyncFailed);
+        }
+        Ok(())
     }
 
     /// Whether this file was created (vs opened from existing).

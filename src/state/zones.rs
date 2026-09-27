@@ -404,6 +404,14 @@ impl ActiveZones {
 
     /// Deregister a subcognitive background task by ID (no-op if not found).
     pub fn deregister_task(&mut self, task_id: u64) {
+        // 0 is the "unused slot" sentinel, and `register_task` rejects
+        // it. Without this guard the search below matches the first
+        // *empty* slot, zeroes it (a no-op) and still decrements the
+        // count — permanently desynchronising `subcognitive_task_count`
+        // from the number of occupied slots, with no repair path.
+        if task_id == 0 {
+            return;
+        }
         if let Some(slot) = self
             .subcognitive_task_ids
             .iter_mut()

@@ -143,8 +143,19 @@ pub struct BodyControlState {
 ///
 /// Checks in order:
 /// 1. `GENESIS_CPUFREQ_HELPER` env var (explicit override)
-/// 2. `scripts/cpufreq_helper.sh` relative to CWD
-/// 3. `scripts/cpufreq_helper.sh` relative to the compile-time project root
+/// 2. `/usr/local/libexec/genesis/cpufreq_helper.sh` — where
+///    `scripts/install_sudoers.sh` installs the root-owned copy
+/// 3. `scripts/cpufreq_helper.sh` relative to CWD
+/// 4. `scripts/cpufreq_helper.sh` relative to the compile-time project root
+///
+/// The libexec path is preferred deliberately. The sudoers rule grants
+/// NOPASSWD on an exact path and sudo does not verify that the target is
+/// root-owned or unwritable, so a rule pointing into the operator's
+/// checkout is a root-escalation primitive for anything that can write
+/// there — which includes Genesis itself. The installer copies the
+/// helper there for that reason. The in-tree paths remain as fallbacks
+/// so an unprivileged local install still works, but they will not match
+/// the installed sudoers rule.
 ///
 /// Returns `None` if the script cannot be found, in which case cpufreq
 /// control silently no-ops (graceful degradation).
@@ -157,12 +168,17 @@ fn helper_path() -> Option<&'static str> {
         {
             return Some(p);
         }
-        // 2. Relative to CWD (run.sh cds to project root)
+        // 2. Root-owned privileged install (matches the sudoers rule)
+        let libexec_path = "/usr/local/libexec/genesis/cpufreq_helper.sh";
+        if std::path::Path::new(libexec_path).exists() {
+            return Some(libexec_path.to_string());
+        }
+        // 3. Relative to CWD (run.sh cds to project root)
         let cwd_path = "scripts/cpufreq_helper.sh";
         if std::path::Path::new(cwd_path).exists() {
             return Some(cwd_path.to_string());
         }
-        // 3. Relative to compile-time project root
+        // 4. Relative to compile-time project root
         let manifest_path = concat!(env!("CARGO_MANIFEST_DIR"), "/scripts/cpufreq_helper.sh");
         if std::path::Path::new(manifest_path).exists() {
             return Some(manifest_path.to_string());

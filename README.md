@@ -6,13 +6,21 @@
 ### A machine-native cognitive architecture — persistent state, modeled neurochemistry, active inference — running on one machine, without a pretrained generative model.
 
 Genesis is a long-running program, not a function. A Rust daemon —
-the *subcognitive layer* — owns a memory-mapped core state and runs a
-5 Hz loop integrating neurochemical dynamics, memory consolidation,
-and a generative model that predicts the system's own next state. A
-Python *cognitive layer* handles perception, reasoning, language,
+the *subcognitive layer* — owns a memory-mapped core state and
+executes the neurochemical dynamics, memory consolidation, and
+generative-model work the cognitive mind requests over a Unix socket.
+A Python *cognitive layer* handles perception, reasoning, language,
 introspection, and self-modeling. The two share a checksummed,
 versioned binary state file (3,288 bytes, schema pinned by layout
 asserts) and a Unix socket.
+
+The daemon is reactive, not autonomous: it is a bus that carries
+information and executes requests, and it never initiates work on a
+schedule. The cadence comes from the mind's 1 Hz heartbeat, which calls
+`ADVANCE_NEURO`, `CONSOLIDATE`, `ASSOCIATE`, `DREAM`, `READ_SENSORS`
+and friends. Neurochemistry therefore advances at the heartbeat's
+rate, not at an independent physiological rate — if the mind is
+stopped, the physiology is too.
 
 There is no transformer and no pretrained weights anywhere in it.
 Language is composed from a semantic graph the system builds itself —
@@ -33,9 +41,15 @@ Pavilion with ~5 GB RAM.
   grew the network from 1122 to 1239 concepts with 72 new edges — and
   it asked its own follow-up questions.
 - **Learns on its own.** Between conversations, autonomous urges send
-  it to curated web sources, the local filesystem, and its own source
+  it to **the open web**, the local filesystem, and its own source
   code — which it reads structurally, files bug reports on, and drafts
-  self-improvement experiment proposals for.
+  self-improvement experiment proposals for. There is no domain
+  allow-list: `ALLOW_ALL_DOMAINS` is `True` and both allow-lists are
+  empty, so the per-site approval flow is currently dead code. The one
+  real filter is an adult/malware *content* filter on the `tools/`
+  fetch path. Run with `./run.sh --offline` if you want the network
+  closed. See [SECURITY.md](SECURITY.md) before pointing it at a
+  machine you care about.
 - **Practices tasks.** Puzzle specs dropped into its world are picked
   up by an internal urge and worked end to end — attempt, evaluation,
   feeling, consolidation — and skills transfer to harder tasks. A
@@ -81,11 +95,13 @@ The measured record for these claims is in [DEVLOG.md](DEVLOG.md).
 
 ### Two layers
 
-**Subcognitive (Rust daemon).** The 5 Hz owner of the core state:
+**Subcognitive (Rust daemon).** The owner of the core state:
 neurochemical dynamics, short→long-term memory consolidation, the
 active-inference generative model, replay-sequence synthesis during
 sleep, and interoception — hardware sensors (CPU temperature, load,
-memory pressure) read as bodily signals.
+memory pressure) read as bodily signals. All of it is invoked by the
+mind over IPC; the daemon has no loop of its own (it prints
+"Reactive mode — mind-driven, no tick loop" at startup).
 
 **Cognitive mind (Python).** Perception, memory retrieval,
 deliberation, language composition, and self-modeling — organized
@@ -113,7 +129,9 @@ low-level design reflects it:
   of the continuous dynamics so a bad value can't poison the loop.
 - **SDR/LogHD memory indexing.** The append-only episodic store is
   indexed by sparse distributed representations; short-term memory is
-  a fixed-capacity ring buffer. Everything that grows is bounded.
+  a fixed-capacity ring buffer. Everything that grows is bounded; the
+  bounds are enumerated under "Growth bounds" below rather than claimed
+  away.
 - **State as introspection surface.** Zones track what's attended vs
   background; a runtime manifest records which modules are live and
   what they're doing — the state file is observable, not opaque.
@@ -134,16 +152,69 @@ HPA-style cascade, adenosine, orexin, histamine, BDNF, and others —
 coupled through a matrix describing how each influences the rest.
 Modeled receptor adaptation downregulates under sustained
 overstimulation and resensitizes during sleep; metaplasticity lets the
-coupling matrix itself adapt under sustained regimes. Phase
-transitions (active, flow, stress, drowsy, NREM, REM, overwhelmed)
-emerge from the dynamics rather than being scripted.
+coupling matrix itself adapt under sustained regimes.
+
+The underlying chemistry is a genuine 18-dimensional dynamical system
+integrated with a semi-implicit (unconditionally stable) scheme, and
+its arousal subsystem is genuinely bistable. The *mental phases*
+(active, flow, stress, drowsy, NREM, REM, overwhelmed) are not however
+emergent in the strong sense: they are read off that dynamics by a
+fixed threshold classifier with per-phase hysteresis
+(`compute_phase_with_hysteresis` in `src/state/neurochemical.rs`).
+No ODE quantity sets any phase boundary. Two of the phases, NREM and
+REM, go further — ACh is held out of the integration during sleep and
+driven to a literal target value, so the sleep-stage ACh rebound is
+scripted rather than simulated. Sleep onset is also gated harder than
+the rest: in a 48-hour simulation with no input, the system spends 3%
+of its time Active, 76% Drowsy, 21% NREM in one-tick bursts, and
+**never** reaches REM without an external `/sleep` command. Treat
+"emerges from the dynamics" as aspirational; the honest description is
+"classified from the coupled dynamics by a fixed threshold rule, with
+a scripted sleep-stage override."
 
 ### Active inference
 
-The daemon's generative model predicts its next state and selects
-regulation that minimizes expected free energy — epistemic foraging
-when uncertain, exploitation when confident. Surprise, precision,
-allostatic load, and model maturity are first-class quantities.
+The daemon runs a learned linear model of the system's own
+neurochemical trajectory, updated with a Kalman filter, and scores nine
+fixed regulation policies against a homeostatic set point. What is
+real: the generative model, the posterior update, surprise, precision
+weighting of observations, and allostatic load are computed and
+persisted properly.
+
+**The selection loop used to be inert, and was not.** Each policy's
+expected free energy was clamped to `[0, 2]`, but EFE is a relative
+score with an arbitrary zero, so a policy that beat the others by a
+hair scored slightly negative — and a `0.0` floor mapped that to
+exactly `0.0`. In the converged state (`precision` saturates within
+~25 s, so the policy-independent uncertainty term goes to zero while
+the epistemic term still exceeds the tiny expected surprise) *all nine*
+policies clamped to `0.0`, the argmin returned the first minimum, and
+index 0 is `noop`. The loop chose `noop` on every cycle, forever. The
+bound is now a symmetric finiteness guard, which preserves the
+ordering, and the softmax temperature is floored at the observed score
+spread rather than a constant ~300× larger. Policy selection is
+consequently live — which also means the characterisation below now
+describes behaviour that actually happens.
+
+What this section previously overstated, now stated accurately: the
+scored objective is **not** an expected free energy in the formal
+sense. Its "epistemic" term is an uncertainty-weighted novelty
+heuristic, not expected information gain, and it outweighs the
+homeostatic term by one to two orders of magnitude, so the resulting
+policy ranking is close to a novelty ranking. That was harmless while
+the loop returned `noop` regardless; now it determines the outcome.
+Two further limits are unchanged and still true: because `precision`
+saturates at 1.0, the `precision > 0.8` exploitative branch is the one
+actually taken, so the stochastic exploration branch is effectively
+dead in practice; and `model_maturity` is a stopwatch —
+`1 − exp(−ticks/500)` — independent of model quality, despite the state
+schema telling the cognitive mind to treat it as a trust signal.
+
+The self-model and its feedback loop are worth the code. The FEP
+vocabulary attached to them is not, and the arbitration constants are
+the thing to revisit first: the epistemic/homeostatic ratio is a
+unit mismatch (a squared displacement added to a first-power one), so
+it is not a tuning problem.
 
 ### Embodiment
 
@@ -175,9 +246,23 @@ templates.
 ### The no-hardcoding rule
 
 All language Genesis produces is composed by its own architecture.
-Seeds — vocabulary, grammar, relation verbs — are legitimate input
-data; pre-written sentences the system recites are not. Enforced as a
-project rule and tested in the suite.
+Seeds — vocabulary, grammar, relation verbs, narrative templates — are
+legitimate input data; pre-written sentences the system recites are
+not. The test is whether a string is a *building block the engine
+composes from* or *the thing it says*.
+
+Enforcement is currently partial and should not be over-trusted. The
+rule is documented in `AGENTS.md` and one test
+(`test_language.py::test_utterance_variability`) checks that a
+composed response is not a single fixed string. There is no lint rule
+and no test that would catch a newly added hardcoded sentence
+anywhere else in the tree; a September 2026 audit found several
+(`self/identity.py`'s 23-entry description table, two fallbacks in
+`self/composer.py`, and a test-result sentence in
+`cognition/code_tools.py`) that reached speech verbatim. The
+underlying pattern — composing from the graph, passing structure to the
+engine, and returning silence rather than a canned fallback when the
+network is empty — is followed well nearly everywhere.
 
 ## Getting started
 
@@ -208,8 +293,9 @@ Optional voice dependencies (not in `requirements.txt`): `vosk`,
 ### Operational notes
 
 Designed to run for days at a time: event streams, working memory,
-presence models, and queues are all bounded; threads are
-semaphore-limited; logs rotate at startup.
+presence models, and queues are bounded; threads are semaphore-limited;
+`daemon.log` and `retina.log` rotate at startup. See "Growth bounds"
+for the specific ceilings and the two known-unresolved cases.
 
 - **Shut down gracefully, every time.** The core state is
   memory-mapped; a hard kill can lose unconsolidated memory or leave
@@ -220,11 +306,45 @@ semaphore-limited; logs rotate at startup.
 - **Restart occasionally.** Log rotation happens at startup; a
   months-long single session will grow them.
 - **Disk grows slowly by design.** The episodic store is append-only
-  (<1 KB per episode, bench-verified linear growth). Expect
-  months-to-years scale, but watch small volumes.
+  (<1 KB per episode, linear growth). Expect months-to-years scale,
+  but watch small volumes. The "bench-verified" claim this used to
+  carry is not backed by anything in the repository — there is no
+  benchmark harness here to re-run. The one structure that could have
+  outgrown that estimate, the per-episode Python metadata, was
+  unbounded and is now evicted (see Growth bounds).
 - **It does real background work.** Autonomous urges consume real
   CPU; interoception dampens heavy work under thermal strain, but
   keep an eye on marginal hardware.
+
+### Growth bounds
+
+Everything that grows is bounded, and the bounds are now explicit rather
+than assumed. An earlier revision of this file claimed the same thing
+while seven structures grew without a cap; those were found and fixed.
+
+| Structure | File | Bound |
+|---|---|---|
+| Episodic records | `memory/engine.py` | Forgotten records are evicted after a 1 h grace period. `forget()` also runs in O(N log N) — it was O(N²) with two full list copies per record, holding the GIL on the autosave/think threads. |
+| Attractor patterns | `memory/systems.py` | Trimmed to 60% of the Hopfield capacity (~0.138·N), least-recently-retrieved first. Over-capacity networks converge to spurious attractors that were being returned as confident retrievals. Also trimmed on load, so an already-bloated state file self-heals. |
+| Executive suppression | `memory/working.py` | 64 entries, each with a 120 s release deadline. Previously permanent: every topic ever focused became un-attendable, since nothing released them outside tests. |
+| Conversation threads | `memory/working.py` | 50 retained (lifetime total still reported). Each holds full turn text and is not persisted. |
+| Topic history | `memory/working.py` | 200 entries. |
+| Learning results | `learning/autonomous.py` | 500 retained, oldest evicted; serialized in full on each autosave. |
+| Curiosity queue | `learning/autonomous.py` | 200-entry FIFO, persisted. Also fixed from `pop(0)` (O(N)) to `popleft()` (O(1)). |
+| Review records | `memory/spaced_repetition.py` | 5,000, evicting the highest-retention records. `stability` is capped at 7 days so a well-reviewed concept cannot become permanently undecayable. |
+| Ad-hoc vector cache | `concepts/embeddings.py` | 4,096 dense vectors, LRU. |
+
+Two further unbounded-growth findings were investigated and deliberately
+*not* changed, because the fix is a design decision rather than a patch:
+
+- `semantic.py` consolidation labels its edges with `origin="semantic"`,
+  which is in `DERIVABLE_ORIGINS` and therefore rejected — so
+  `relates_to`/`similar_to` facts extracted by the semantic layer have no
+  durable representation anywhere. Per the edge-log rule this is
+  technically correct, but an extracted proposition is earned, not
+  recomputable geometry; this wants a non-listed origin.
+- `concepts/embeddings.py` builds a dense 5000² SVD (~100 MB, O(n³))
+  on a 4.7 GB machine. Correct, but the dominant memory spike.
 
 ### Tests and lint
 

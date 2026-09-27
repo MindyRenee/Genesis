@@ -1179,6 +1179,20 @@ def restore_attractor(attractor: AttractorNetwork, data: dict[str, Any]) -> None
             retrieval_count=p_data.get("retrieval_count", 0),
         )
         attractor._patterns[pattern.id] = pattern
+    # Trim to the retention ceiling. `store()` caps on write, but a
+    # state file written before the cap existed will restore with an
+    # unbounded set — read, parsed, and kept in full, with both scan
+    # paths degrading to O(patterns x N) on every retrieval. Trimming
+    # here makes an already-bloated state file self-heal on the next
+    # start rather than needing a manual repair.
+    evicted = attractor._evict_to_capacity()
+    if evicted:
+        logger.info(
+            "attractor network restored %d patterns, trimmed %d to %d",
+            evicted + len(attractor._patterns),
+            evicted,
+            attractor._max_patterns,
+        )
     attractor._retrieval_count = data.get("retrieval_count", 0)
     attractor._storage_count = data.get("storage_count", 0)
 

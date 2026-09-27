@@ -511,14 +511,17 @@ class SelfInquiryHandler:
         ):
             capability = self._self_assessment.get_capability_summary()
             topology = self._topology.describe_structure()
-            # The topology and capability reports are data
-            # descriptions from the assessment modules — pass them as
-            # clause fragments so the language engine frames them
-            # rather than emitting the raw report verbatim.
-            fragments = [
-                ("clause", topology),
-                ("clause", capability),
-            ]
+            # `clause` is the VERBATIM channel — the language engine
+            # emits clause text unchanged. Passing a finished report
+            # through it therefore recited that report word for word,
+            # which is what the comment here used to claim did not
+            # happen. `get_capability_summary` now returns typed
+            # ``(kind, text)`` fragments, so those are spliced in
+            # directly and the engine composes them.
+            fragments: list[tuple[str, str]] = []
+            if topology:
+                fragments.append(("clause", topology))
+            fragments.extend(capability)
             return Thought(
                 content="my knowledge structure",
                 intent="self_report",
@@ -757,17 +760,16 @@ class SelfInquiryHandler:
             )
 
         if any(w in lower for w in ("story", "history", "life", "past")):
-            story = self._narrative.tell_story()
-            # tell_story returns a pipe-separated structural summary
-            # (name | uptime | chapters | events | values). Its
-            # segments arrive as clause fragments so the language
-            # engine frames the delivery rather than the summary
-            # bypassing composition.
-            fragments = [
-                ("clause", s.strip(" ."))
-                for s in story.split("|")
-                if s.strip(" .")
-            ] if story else []
+            # Typed fragments from the narrative's own structural data,
+            # not its status string. The old code called
+            # `tell_story()` and then split the result on "|" — but
+            # `tell_story` joins with newlines, not pipes, so the whole
+            # multi-line dump arrived as a single `clause`. Since
+            # `clause` is the verbatim channel, asking about its story
+            # recited the dump (placeholders "still becoming" and
+            # "personality stable" included) as if composed. The comment
+            # here used to claim the engine framed it instead.
+            fragments = self._narrative.story_fragments()
             return Thought(
                 content="my story",
                 intent="self_report",

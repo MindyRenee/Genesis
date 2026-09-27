@@ -58,11 +58,19 @@ import math
 import os
 import sqlite3
 import threading
+from collections import OrderedDict
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+# Ceiling on the ad-hoc per-concept vector cache. Each entry is one
+# dense float32 vector at the store's dimensionality, and the cache
+# is not invalidated on refresh, so an unbounded dict here is a
+# per-concept permanent allocation on the similarity-query path.
+# Sized for roughly a quarter of a typical concept count.
+_MAX_CONCEPT_CACHE = 4096
 
 if TYPE_CHECKING:
     from .network import ConceptNetwork
@@ -167,8 +175,15 @@ class EmbeddingStore:
         self._tfidf_vocab: dict[str, int] = {}
         self._idf: np.ndarray | None = None
 
-        # Per-concept cache for ad-hoc queries
-        self._concept_cache: dict[str, np.ndarray | None] = {}
+        # Per-concept cache for ad-hoc queries.
+        #
+        # Bounded. This was an unbounded dict holding one dense float32
+        # vector per concept ever queried ad-hoc (hot or archived), and
+        # it was never invalidated on refresh or rebuild. At the store's
+        # dimensionality that is a per-concept permanent allocation on a
+        # path reached by ordinary similarity queries. Ordered so the
+        # oldest insertion is evicted first.
+        self._concept_cache: OrderedDict[str, np.ndarray | None] = OrderedDict()
 
         self._loaded = False
         self._lock = threading.Lock()
@@ -331,12 +346,21 @@ class EmbeddingStore:
             full = np.zeros(self._dim, dtype=np.float32)
             flat_start = self._spectral_dim + self._experiential_dim
             full[flat_start:] = self._archive_matrix[archive_idx]
-            self._concept_cache[concept_name] = full
-            return full
+            return self._cache_concept(concept_name, full)
 
         # Compute on the fly
         vec = self._compute_concept_vector(concept_name)
-        self._concept_cache[concept_name] = vec
+        return self._cache_concept(concept_name, vec)
+
+    def _cache_concept(
+        self, concept_name: str, vec: np.ndarray | None
+    ) -> np.ndarray | None:
+        """Store a concept vector in the bounded ad-hoc cache."""
+        cache = self._concept_cache
+        cache[concept_name] = vec
+        cache.move_to_end(concept_name)
+        while len(cache) > _MAX_CONCEPT_CACHE:
+            cache.popitem(last=False)
         return vec
 
     def cosine_similarity(self, v1: np.ndarray, v2: np.ndarray) -> float:

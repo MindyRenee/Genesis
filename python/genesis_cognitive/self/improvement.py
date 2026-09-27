@@ -81,6 +81,7 @@ import os
 import py_compile
 import re
 import subprocess
+import sys
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -1129,8 +1130,14 @@ class SelfImprovementEngine:
         module_name = self._module_name_for(rel_path)
         if module_name:
             try:
+                # `sys.executable`, not "python3" from PATH — see the
+                # note in `tools/framework.py::run_pytest`. Importing
+                # in a different interpreter than the one running the
+                # suite means this gate validates the wrong
+                # environment, so a module can pass here and fail at
+                # runtime, or the reverse.
                 import_result = subprocess.run(
-                    ["python3", "-c", f"import {module_name}"],
+                    [sys.executable, "-c", f"import {module_name}"],
                     cwd=os.path.join(self.project_root, "python"),
                     capture_output=True,
                     text=True,

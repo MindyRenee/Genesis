@@ -899,8 +899,8 @@ class GraphWalkGenerator:
         )
         frame = self._rng.choice([
             f"what I know about {seed_display} is that {seed_pron} {verb_obj}",
-            f"from what I've learned, {first.lower()} {verb_obj}",
             f"as far as I understand, {first.lower()} {verb_obj}",
+            f"one thing I can say about {seed_display} is that {seed_pron} {verb_obj}",
         ])
         # Capitalize the first word of the frame for sentence start
         return frame[0].upper() + frame[1:] + "."

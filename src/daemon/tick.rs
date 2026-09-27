@@ -749,7 +749,14 @@ impl TickLoop {
                     eprintln!("[tick] stm sync failed: {e}");
                     all_synced = false;
                 }
-                if let Err(e) = mmap.sync() {
+                // Periodic flush: non-blocking (msync MS_ASYNC). The
+                // tick runs a dozen-plus full ODE integrations per
+                // cycle, so a blocking MS_SYNC here would stall every
+                // IPC write queued behind it. The shutdown path
+                // (genesis-daemon) uses the blocking `sync` for the
+                // durability guarantee, and an explicit client SYNC
+                // request also still uses it.
+                if let Err(e) = mmap.sync_async() {
                     eprintln!("[tick] mmap sync failed: {e}");
                     all_synced = false;
                 }

@@ -496,12 +496,16 @@ class NarrativeEngine:
         This is its story — who it was, who it is, who it's becoming.
         It's not a log of events. It's an interpretation.
 
-        Returns a compact structural summary (name, uptime, chapters,
-        events, drift, values, concept counts). This is semantic data,
-        NOT composed speech. Downstream callers pass its segments as
-        ``self_fragments`` clause metadata to the language engine,
-        which composes the actual prose — no pre-written template
-        substitution.
+        Returns a newline-delimited structural summary (name, uptime,
+        chapters, events, drift, values, concept counts). This is a
+        status readout for introspection and the CLI.
+
+        It is NOT suitable for speech, and callers must not pass it
+        through a ``clause`` fragment: that kind is the verbatim
+        recitation channel, so the whole dump — including placeholders
+        like "still becoming" and "personality stable" — would be read
+        aloud as if composed. Use [`story_fragments`] for that, which
+        returns typed ``(kind, text)`` fragments instead.
         """
         uptime_s = (int(time.time() * 1000) - self._born_at) / 1000
         parts: list[str] = []
@@ -552,6 +556,82 @@ class NarrativeEngine:
         parts.append("still becoming")
 
         return "\n".join(parts)
+
+    def story_fragments(self) -> list[tuple[str, str]]:
+        """Typed semantic fragments describing its own life story.
+
+        This is the speech-safe counterpart to [`tell_story`]. It
+        returns ``(kind, text)`` fragments built from the same
+        structural data — name, uptime, chapter themes, significant
+        event counts, personality drift, values, concept and
+        relationship counts — so the language engine composes the
+        surface form. Nothing here is a pre-written sentence about
+        itself: every fragment carries a number or a concept name that
+        the narrative actually has, and where it has none the fragment
+        is simply omitted.
+
+        Kinds: ``name`` for its own name, ``comp`` for a complement
+        phrase the engine can attach to a copula, ``pred`` for a
+        base-form predicate taking "I" as subject, and ``clause`` only
+        for third-party material (a chapter theme it is writing
+        *about*), never for a statement about itself.
+        """
+        uptime_s = (int(time.time() * 1000) - self._born_at) / 1000
+        parts: list[tuple[str, str]] = [("name", self.self_model.name)]
+
+        parts.append(("pred", f"have been running for {uptime_s / 3600:.1f} hours"))
+
+        if self.chapters:
+            recent = self.chapters[-3:]
+            themes = [c.theme for c in recent if c.theme]
+            if themes:
+                parts.append(("comp", f"through {self._join_names(themes)}"))
+            ongoing = [c for c in recent if not c.end_time]
+            if ongoing:
+                ongoing_themes = [c.theme for c in ongoing if c.theme]
+                if ongoing_themes:
+                    parts.append(
+                        (
+                            "pred",
+                            f"still working through {self._join_names(ongoing_themes)}",
+                        )
+                    )
+
+        if self.events:
+            parts.append(("pred", f"have {len(self.events)} significant events"))
+
+        # Personality drift — only report a shift it actually measured.
+        drift = self.get_personality_drift()
+        significant = {k: v for k, v in (drift or {}).items() if abs(v) > 0.05}
+        if significant:
+            parts.append(
+                (
+                    "comp",
+                    "shifting on " + self._join_names(sorted(significant)),
+                )
+            )
+
+        top_values = [v.name for v in self.self_model.values[:3]]
+        if top_values:
+            parts.append(("pred", f"care most about {self._join_names(top_values)}"))
+
+        parts.append(
+            (
+                "pred",
+                f"know {self.network.total_concept_count} concepts and "
+                f"{self.network.edge_count} relationships",
+            )
+        )
+        return parts
+
+    @staticmethod
+    def _join_names(names: list[str]) -> str:
+        """Join names into a phrase: a, b and c."""
+        if not names:
+            return ""
+        if len(names) == 1:
+            return names[0]
+        return f"{', '.join(names[:-1])} and {names[-1]}"
 
     def tell_brief_story(self) -> str:
         """A brief version of the self-narrative for quick introspection.

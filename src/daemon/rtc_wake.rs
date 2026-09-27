@@ -28,8 +28,16 @@ use std::sync::OnceLock;
 ///
 /// Checks in order:
 /// 1. `GENESIS_RTC_WAKE_HELPER` env var (explicit override)
-/// 2. `scripts/rtc_wake_helper.sh` relative to CWD
-/// 3. `scripts/rtc_wake_helper.sh` relative to the compile-time project root
+/// 2. `/usr/local/libexec/genesis/rtc_wake_helper.sh` — where
+///    `scripts/install_sudoers.sh` installs the root-owned copy
+/// 3. `scripts/rtc_wake_helper.sh` relative to CWD
+/// 4. `scripts/rtc_wake_helper.sh` relative to the compile-time project root
+///
+/// The libexec path is preferred deliberately. The sudoers rule grants
+/// NOPASSWD on an exact path and sudo does not verify that the target is
+/// root-owned or unwritable, so a rule pointing into the operator's
+/// checkout is a root-escalation primitive. See the matching note in
+/// `cpufreq::helper_path`.
 ///
 /// Returns `None` if the script cannot be found — arming then fails
 /// gracefully, like cpufreq control without sudo.
@@ -40,6 +48,10 @@ fn helper_path() -> Option<&'static str> {
             && std::path::Path::new(&p).exists()
         {
             return Some(p);
+        }
+        let libexec_path = "/usr/local/libexec/genesis/rtc_wake_helper.sh";
+        if std::path::Path::new(libexec_path).exists() {
+            return Some(libexec_path.to_string());
         }
         let cwd_path = "scripts/rtc_wake_helper.sh";
         if std::path::Path::new(cwd_path).exists() {

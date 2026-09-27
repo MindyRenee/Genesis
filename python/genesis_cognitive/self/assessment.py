@@ -626,28 +626,42 @@ class SelfAssessmentEngine:
             if topic:
                 self.remember_gap(topic.lower())
 
-    def get_capability_summary(self) -> str:
-        """Get a human-readable summary of its capabilities.
+    def get_capability_summary(self) -> list[tuple[str, str]]:
+        """Structured summary of what it knows well and what it lacks.
 
-        This is what Genesis would say if asked "what do you know
-        well?" or "what are you struggling with?"
+        Returns ``(kind, text)`` semantic fragments for the language
+        engine to compose from, not a finished report. This used to
+        return a single English string ("confident about: X. handles Y
+        questions well (80% success). …") that the caller wrapped as a
+        ``clause`` fragment — and because ``clause`` is the verbatim
+        recitation channel, asking "what do you know" recited that
+        report word for word. Handing back typed fragments keeps
+        surface realization in the language engine.
+
+        Returns an empty list when there is nothing measured yet, so
+        the caller stays silent rather than reciting a placeholder.
         """
-        parts: list[str] = []
+        parts: list[tuple[str, str]] = []
 
         # Strengths
+        confident: set[str] = set()
         if self.profile.confident_topics:
-            confident = sorted(self.profile.confident_topics)[:10]
-            parts.append(f"confident about: {', '.join(confident)}")
+            confident = set(sorted(self.profile.confident_topics)[:10])
+            parts.append(
+                ("pred", f"know {self._join_fragments(sorted(confident))} well")
+            )
 
         # Weaknesses — don't list a gap if it's already a strength.
         if self.profile.known_gaps:
             gaps = [
                 g
                 for g in sorted(self.profile.known_gaps)
-                if g not in set(confident)
+                if g not in confident
             ][:10]
             if gaps:
-                parts.append(f"still learning about: {', '.join(gaps)}")
+                parts.append(
+                    ("pred", f"still learn {self._join_fragments(gaps)}")
+                )
 
         # Question type performance
         for qtype, stats in self.profile.question_type_stats.items():
@@ -655,19 +669,27 @@ class SelfAssessmentEngine:
             if total > 0:
                 rate = stats["success"] / total
                 if rate > 0.7:
-                    parts.append(f"handles {qtype} questions well ({rate:.0%} success)")
+                    parts.append(("comp", f"strong at {qtype} questions"))
                 elif rate < 0.4:
-                    parts.append(f"struggles with {qtype} questions ({rate:.0%} success)")
+                    parts.append(("comp", f"still learning {qtype} questions"))
 
         # Recently learned
         if self.profile.recently_learned:
             recent = list(self.profile.recently_learned)[-5:]
-            parts.append(f"recently learned about: {', '.join(recent)}")
+            parts.append(
+                ("pred", f"recently learn about {self._join_fragments(recent)}")
+            )
 
-        if not parts:
-            return "still building self-awareness"
+        return parts
 
-        return ". ".join(parts) + "."
+    @staticmethod
+    def _join_fragments(items: list[str]) -> str:
+        """Join concept names into a phrase the engine can slot."""
+        if not items:
+            return ""
+        if len(items) == 1:
+            return items[0]
+        return f"{', '.join(items[:-1])} and {items[-1]}"
 
     def get_confidence_for_topic(self, topic: str) -> float:
         """Get cached confidence for a topic, or assess it fresh."""

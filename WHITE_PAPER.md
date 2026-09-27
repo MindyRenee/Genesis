@@ -12,8 +12,9 @@ semantic graph the system builds itself — through inference, study,
 conversation, and definitions synthesized from first principles.
 
 The architecture pairs a Rust daemon — the *subcognitive layer* —
-running a 5 Hz loop that manages neurochemistry, memory
-consolidation, and dream synthesis, with a Python *cognitive layer*
+owning the memory-mapped core state and executing neurochemistry,
+memory consolidation, and dream synthesis on request, with a Python
+*cognitive layer*
 that handles perception, reasoning, language, introspection, and
 self-modeling. The two communicate through a memory-mapped
 binary state file (schema v3, 3,288 bytes — see `src/state/core_state.rs`
@@ -104,17 +105,28 @@ integrity framework in `README.md`).
 └───────────────▲──────────────────────────────▲──────────────┘
                 │ mmap state (read/write)       │ Unix socket IPC
 ┌───────────────▼──────────────────────────────▼──────────────┐
-│              Subcognitive layer (Rust daemon, 5 Hz)         │
+│           Subcognitive layer (Rust daemon, reactive)        │
 │  neurochemistry · consolidation · dreams · interoception    │
 │  active inference · association · dyadic model · cpufreq    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-The split mirrors a functional division: the daemon owns everything
-that must run continuously regardless of what the mind is doing —
-the physiology. The Python layer owns everything episodic and
-deliberative — the cognition. Neither is a driver of the other;
-they are coupled dynamical systems sharing one state.
+The split mirrors a functional division of labour: the daemon owns
+the *implementation* of the physiology — the neurochemical integrator,
+the consolidator, the interoceptive sensors — and the Python layer
+owns everything episodic and deliberative, including the *decision* to
+advance any of it.
+
+This is worth stating precisely, because the daemon is **reactive,
+not autonomous**. It has no loop of its own: it prints "Reactive
+mode — mind-driven, no tick loop" at startup and then services
+requests. The mind's 1 Hz heartbeat calls `ADVANCE_NEURO`,
+`CONSOLIDATE`, `ASSOCIATE`, `DREAM` and `READ_SENSORS`. The two
+layers are therefore *not* independent dynamical systems — the Python
+layer is the driver, and the physiology advances at the heartbeat's
+rate. A long `think()` does not leave the organism living on its own;
+if the heartbeat stalls or dies, neurochemistry freezes, short-term
+memory stops draining to long-term, and no volitional action fires.
 
 ### 3.1 Shared state
 
@@ -139,23 +151,32 @@ Readers use a seqlock for lock-free reads; writers go through the
 daemon. The checksum is the integrity boundary: a corrupted state
 is detected, not trusted.
 
-### 3.2 The 5 Hz tick
+### 3.2 The reactive tick
 
-The daemon's tick loop is the heartbeat. Every 200 ms it advances
-neurochemical dynamics, runs interoception, performs memory
-consolidation, evaluates active inference, and emits dream content
-when the system is asleep. Cognition is not synchronous with this
-loop — the Python layer reads state when it needs it — so the
-organism keeps "living" while the mind is thinking, idle, or
-conversing.
+There is no free-running daemon tick. `TICK_INTERVAL_MS` (200 ms) is
+*not* a loop cadence — it is used only to set the nominal `dt` for an
+in-process neurochemical step and to normalise a tick counter for
+telemetry. The only real cadence is the mind's 1 Hz heartbeat
+(`mind/heartbeat.py`), which issues one `ADVANCE_NEURO` per second;
+that call advances neurochemical dynamics by a caller-supplied `dt`,
+and the remaining functions are invoked on their own commands when the
+mind asks for them.
+
+The honest consequence, stated because it matters for the
+architecture's claims: Genesis has no physiological autonomy. Its
+"background life" is a function of the foreground mind still ticking.
+Making the physiology genuinely independent would mean giving the
+daemon its own timer thread and letting it own the cadence — a real
+design change, not a parameter tweak.
 
 ## 4. Neurochemical dynamics
 
 Eighteen chemicals are modeled as a coupled dynamical system:
-dopamine, serotonin, norepinephrine, acetylcholine, cortisol, CRH,
-ACTH (via the HPA cascade), oxytocin, endorphin, endocannabinoid,
-histamine, melatonin, orexin, adenosine, GABA, glutamate, BDNF,
-and vasopressin.
+dopamine, serotonin, norepinephrine, acetylcholine, GABA, glutamate,
+cortisol, oxytocin, endorphin, histamine, adenosine, BDNF,
+endocannabinoid, vasopressin, CRH, orexin, epinephrine, and
+melatonin. ACTH is not one of the eighteen — it is a scalar
+(`acth_level`) intermediate in the CRH → ACTH → cortisol cascade.
 
 Key properties:
 
@@ -213,6 +234,38 @@ The implementation deliberately uses tractable approximations —
 a diagonal posterior, a linear generative model, fixed discrete
 policies. These simplifications are visible in the source and are
 part of the honest accounting of what the system does.
+
+One further caveat belongs here rather than in a footnote, because
+the FEP vocabulary is easy to over-read. The scored objective is
+**not** an expected free energy in the formal sense. The linear
+generative model and its Kalman filter are real, and surprise,
+observation precision and allostatic load are computed and persisted
+properly. But the "epistemic" term is an uncertainty-weighted novelty
+heuristic rather than expected information gain, and it exceeds the
+homeostatic term by one to two orders of magnitude, so the resulting
+policy ranking is close to a novelty ranking. `model_maturity` is a
+`1 − exp(−ticks/500)` stopwatch, independent of model quality.
+
+Policy selection was also inert until recently, and the defect is worth
+recording because it was invisible. Scores were clamped to `[0, 2]`,
+but expected free energy is a relative quantity with an arbitrary zero,
+so a policy that beat the others narrowly scored negative and the
+`0.0` floor flattened all nine to an identical `0.0`; the argmin then
+returned index 0, which is `noop`, on every cycle. The clamp is now a
+symmetric finiteness guard. Two consequences: selection is live for the
+first time, so the novelty-dominance above is now load-bearing rather
+than theoretical; and because `precision` saturates at 1.0 within
+seconds of continuous running, the exploitative branch is the one
+always taken, leaving the stochastic exploration branch dead in
+practice.
+
+The defensible description is *a learned linear self-model of its own
+neurochemistry, driven by thresholded neuromodulation and a
+precision-gated homeostatic reflex* — with active-inference framing
+applied to it, not a faithful implementation of the formalism. The
+arbitration constants are where to look first: the epistemic term is a
+first-power quantity added to a squared one, which is a unit mismatch
+rather than a tuning error.
 
 ## 7. The cognitive layer
 
@@ -337,11 +390,19 @@ understanding before operating it:
 
 - **Unix socket IPC** between CLI, daemon, and retina
 - **Optional ambient audio** via offline STT
-- **Web fetching** by the autonomous learner, through a read-only
-  tool with a curated domain blocklist
-- **A privileged helper** (`scripts/cpufreq_helper.sh`) gated by a
-  scoped sudoers rule — review `scripts/genesis-sudoers` before
-  installing
+- **Web fetching** by the autonomous learner — **the open web, with
+  no domain allow-list.** `ALLOW_ALL_DOMAINS` is `True` and both
+  allow-lists are empty, so the per-site approval flow is dead code
+  and any page it reaches is ingested. The only real filter is an
+  adult/malware *content* filter on the separate `tools/` fetch path.
+  `./run.sh --offline` is the effective control
+- **Two privileged helpers** (`scripts/cpufreq_helper.sh` and
+  scripts/rtc_wake_helper.sh`) gated by a scoped sudoers rule —
+  review `scripts/genesis-sudoers` and `scripts/install_sudoers.sh`
+  before installing. Note that `NOPASSWD` on a script inside a
+  user-writable checkout is a root-escalation primitive for anything
+  that can write to that tree, which includes Genesis itself. Install
+  the helpers root-owned outside the checkout.
 - **The mmap'd state file** — filesystem permissions are the
   boundary
 - **Self-modification paths** — it can read, reason about, and

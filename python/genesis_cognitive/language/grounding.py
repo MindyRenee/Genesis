@@ -16,6 +16,8 @@ not be collapsed into a graph relation prematurely.
 
 from __future__ import annotations
 
+import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -23,6 +25,28 @@ from .comprehension import Proposition, SemanticRole
 
 if TYPE_CHECKING:
     from ..concepts.network import ConceptNetwork
+
+
+# Leading determiners that carry no content and are never part of a
+# stored concept name.
+_DETERMINER_RE = re.compile(
+    r"^(?:the|a|an|this|that|these|those|some|any|each|every|"
+    r"my|your|his|her|its|our|their)\s+",
+    re.IGNORECASE,
+)
+# Possessive / plural endings: "alice's" -> "alice", "dogs" handled by
+# the caller's own normalization.
+_POSSESSIVE_RE = re.compile(r"['’]s$", re.IGNORECASE)
+
+
+def _strip_determiner(text: str) -> str:
+    """Drop a leading determiner, if present."""
+    return _DETERMINER_RE.sub("", text, count=1)
+
+
+def _strip_possessive(text: str) -> str:
+    """Drop a possessive clitic, if present."""
+    return _POSSESSIVE_RE.sub("", text)
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,25 +101,53 @@ class SemanticGrounder:
         if not text:
             return GroundedArgument("", None, 0.0)
 
-        if context:
-            concept_id = self.network.resolve_in_context(text, context)
-            concept = (
-                self.network.get_concept(concept_id)
-                if concept_id is not None
-                else None
-            )
-        else:
-            concept = self.network.get_concept(text)
-        if concept is None:
-            return GroundedArgument(text, None, 0.0)
+        # Grounding is read-only: an unknown surface must not become a
+        # fabricated concept. The determiner fallback below respects
+        # that — it can only ever *find* a concept that already exists,
+        # never add one.
+        for candidate in self._lookup_candidates(text):
+            if context:
+                concept_id = self.network.resolve_in_context(candidate, context)
+                concept = (
+                    self.network.get_concept(concept_id)
+                    if concept_id is not None
+                    else None
+                )
+            else:
+                concept = self.network.get_concept(candidate)
+            if concept is None:
+                continue
+            concept_id = getattr(concept, "id", None)
+            if not isinstance(concept_id, str) or not concept_id:
+                continue
+            confidence = float(getattr(concept, "confidence", 0.0))
+            confidence = max(0.0, min(1.0, confidence))
+            # `surface` is reported as given, not as the stripped form
+            # that happened to match — the caller's text is unchanged.
+            return GroundedArgument(text, concept_id, confidence)
 
-        concept_id = getattr(concept, "id", None)
-        if not isinstance(concept_id, str) or not concept_id:
-            return GroundedArgument(text, None, 0.0)
+        return GroundedArgument(text, None, 0.0)
 
-        confidence = float(getattr(concept, "confidence", 0.0))
-        confidence = max(0.0, min(1.0, confidence))
-        return GroundedArgument(text, concept_id, confidence)
+    @staticmethod
+    def _lookup_candidates(text: str) -> Iterator[str]:
+        """Surface forms to try, most faithful first.
+
+        Comprehension emits noun phrases with determiners and
+        possessives attached — "The dog", "Alice's book" — while
+        concepts are stored as bare names. Looking the surface up
+        verbatim therefore failed on exactly the sentences most likely
+        to be grounded, and silently: the object of the same sentence
+        ("water") resolved while the subject ("The dog") did not.
+
+        Yields the surface as given, then determiner-stripped, then
+        possessive-stripped, deduplicated, preserving order.
+        """
+        seen: set[str] = set()
+        for form in (text, _strip_determiner(text), _strip_possessive(text)):
+            key = form.strip()
+            if key and key.casefold() not in seen:
+                seen.add(key.casefold())
+                yield key
 
     def ground(
         self, proposition: Proposition, *, context: str = ""

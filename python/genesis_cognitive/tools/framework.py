@@ -13,6 +13,7 @@ import pathlib
 import py_compile
 import re
 import subprocess
+import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -325,8 +326,18 @@ def run_pytest(target: str, project_root: str = ".") -> ToolResult:
         else:
             env["PYTHONPATH"] = project_root
     try:
+        # `sys.executable`, not a bare "python3" from PATH. The
+        # interpreter on PATH is frequently a *different* one from the
+        # one running Genesis — a system python3 while the mind runs
+        # under a venv, or a different minor version. The test suite
+        # then runs against an interpreter that may not have pytest or
+        # the project's dependencies installed, so `success` reflects
+        # the environment rather than the code under test. That is how
+        # `create_project` came to report `tests_passed=False` for a
+        # generated project whose tests pass when run with the
+        # right interpreter.
         result = subprocess.run(
-            ["python3", "-m", "pytest", str(safe), "-q"],
+            [sys.executable, "-m", "pytest", str(safe), "-q"],
             cwd=project_root,
             capture_output=True,
             text=True,

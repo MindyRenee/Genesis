@@ -563,11 +563,14 @@ class SelfModel:
     def integrate_emergent_identity(self, emergent: Any) -> None:
         """Integrate a synthesized emergent identity into the self-model.
 
-        The emergent identity is a first-person description composed
-        from its actual experience (concept network, narrative,
-        emotional regulation, curiosity, introspection). When its
-        confidence is high enough, it becomes part of its self-knowledge
-        and influences its self-descriptions.
+        The emergent identity is a structural readout computed from
+        measured quantities (concept network degree, narrative depth,
+        emotional regulation, curiosity, introspection). It is a
+        concatenation of threshold-selected observation strings, NOT
+        language the system composed, and it is not spoken — speech
+        about identity comes from the self-composer's typed fragments.
+        When its confidence is high enough it becomes part of its
+        self-knowledge.
 
         Args:
             emergent: An ``EmergentIdentity`` with ``self_description``,

@@ -484,6 +484,17 @@ impl GenesisCoreState {
         // solely on the AcqRel RMW's acquire component (which some
         // architectures implement as a no-op fence after the RMW).
         seq.fetch_add(1, Ordering::AcqRel);
+        // Self-heal an inverted parity. `fetch_add` on an odd value
+        // yields an EVEN one, which every reader interprets as "stable"
+        // — so a writer starting from a stale odd `seq_lock` would
+        // publish a half-written state to concurrent `read_consistent`
+        // callers, then `write_end` would leave the lock odd and blind
+        // them for the rest of the process. `MmapState::open` repairs
+        // the on-disk case; this covers any in-process path that
+        // reaches `write_begin` from an odd start.
+        if seq.load(Ordering::Acquire) & 1 == 0 {
+            seq.fetch_add(1, Ordering::AcqRel);
+        }
         fence(Ordering::Acquire);
         self.header.last_updated = now_ms;
         self.header.heartbeat = self.header.heartbeat.wrapping_add(1);
@@ -503,6 +514,53 @@ impl GenesisCoreState {
         // exclusive `&mut self` so no concurrent access here.
         let seq = unsafe { AtomicU64::from_ptr(core::ptr::addr_of_mut!(self.header.seq_lock)) };
         seq.fetch_add(1, Ordering::Release);
+    }
+
+    /// Replace every non-finite float in persisted state with a
+    /// documented default. Returns `true` if anything was changed.
+    ///
+    /// The per-tick circuit breaker in
+    /// `NeurochemicalVector::sanitize_and_validate` already covers each
+    /// chemical's fields, the coupling matrix, the effective levels and
+    /// the vector-level scalars. What it does not reach is the memory
+    /// gating weights and the manifest aggregates — and a tick-level
+    /// breaker only runs once the loop is going, so between `open` and
+    /// the first tick a CRC-valid but non-finite state file can still be
+    /// published to lock-free readers over IPC. `open` is the last place
+    /// that can catch it.
+    ///
+    /// Note the CRC cannot detect this: a state file that legitimately
+    /// contains NaN is byte-exact, so both `verify` and
+    /// `verify_checksum` pass it.
+    pub fn scrub_non_finite(&mut self) -> bool {
+        let mut scrubbed = false;
+        let mut fix = |v: &mut f32, default: f32| {
+            if !v.is_finite() {
+                *v = default;
+                scrubbed = true;
+            }
+        };
+
+        // Neurochemical vector scalars not covered above.
+        // `bdnf_recovery_rate` is a reserved schema field (the
+        // dynamics read it from `NeuroTickParams`), so 0.0 is correct.
+        fix(&mut self.neurochemicals.bdnf_recovery_rate, 0.0);
+
+        // Memory gating weights. 0.5 = neutral.
+        fix(&mut self.memory.encoding_weight, 0.5);
+        fix(&mut self.memory.consolidation_weight, 0.5);
+        fix(&mut self.memory.retrieval_weight, 0.5);
+        fix(&mut self.memory.plasticity_gate, 0.5);
+
+        // Manifest aggregates and per-module telemetry.
+        fix(&mut self.manifest.total_cpu_load, 0.0);
+        fix(&mut self.manifest.total_mem_mb, 0.0);
+        for m in &mut self.manifest.modules {
+            fix(&mut m.cpu_share, 0.0);
+            fix(&mut m.mem_usage_mb, 0.0);
+        }
+
+        scrubbed
     }
 
     /// Attempt a lock-free read of the state.
@@ -650,4 +708,25 @@ const _: () = {
     assert!(offset_of!(GenesisCoreState, manifest) == 2688);
     assert!(offset_of!(GenesisCoreState, checksum) == 3224);
     assert!(offset_of!(GenesisCoreState, inference_signals) == 3228);
+    // `compute_checksum` locates the checksum field as
+    // `size - RESERVED_BYTES - 4`, and region 2 as
+    // `48..(size - RESERVED_BYTES - 4)`. Nothing else ties
+    // `RESERVED_BYTES` to the layout, so pin the relation it must
+    // satisfy. If it were ever set to 0, region 2 would extend to
+    // `SIZE - 4`, the checksum would cover itself, and
+    // `verify_checksum` could never succeed — rejecting every state
+    // file at open.
+    assert!(
+        offset_of!(GenesisCoreState, inference_signals) + RESERVED_BYTES == GenesisCoreState::SIZE
+    );
+    // ...and the checksum must sit exactly 4 bytes below it, which is
+    // what makes region 2 end immediately before the checksum.
+    assert!(
+        offset_of!(GenesisCoreState, inference_signals)
+            == offset_of!(GenesisCoreState, checksum) + 4
+    );
+    assert!(
+        core::mem::size_of::<InferenceSignals>() == RESERVED_BYTES,
+        "InferenceSignals must exactly fill the reserved region"
+    );
 };

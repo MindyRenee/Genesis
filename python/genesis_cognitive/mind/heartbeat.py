@@ -615,21 +615,30 @@ class HeartbeatMixin:
         the next poll doesn't generate a flood of stale notifications.
         """
         if now - last_connectivity_time >= 10.0:
-            connected = not self.learner.is_offline
-            if self.self_model.body_model.network_connected != connected:
-                self.self_model.body_model.network_connected = connected
-            # Detect daemon reconnection: if the daemon was
-            # disconnected and is now connected again, reset the
-            # notification queue's high-water marks so the next
-            # poll doesn't flood with stale phase/episode events.
-            daemon_connected = (
-                self.regulator.interoception.last_state.daemon_connected
-                if self.regulator.interoception.last_state
-                else False
-            )
-            if daemon_connected and not getattr(self, "_was_daemon_connected", True):
-                self.notifications.reset()
-            self._was_daemon_connected = daemon_connected
+            # Guarded in its own right, in addition to the loop-level
+            # guard. This block dereferences three other subsystems
+            # (`self.learner`, `self.self_model.body_model`,
+            # `self.regulator.interoception.last_state`) that can each
+            # be absent or mid-update; an escape here used to take the
+            # whole heartbeat with it.
+            try:
+                connected = not self.learner.is_offline
+                if self.self_model.body_model.network_connected != connected:
+                    self.self_model.body_model.network_connected = connected
+                # Detect daemon reconnection: if the daemon was
+                # disconnected and is now connected again, reset the
+                # notification queue's high-water marks so the next
+                # poll doesn't flood with stale phase/episode events.
+                daemon_connected = (
+                    self.regulator.interoception.last_state.daemon_connected
+                    if self.regulator.interoception.last_state
+                    else False
+                )
+                if daemon_connected and not getattr(self, "_was_daemon_connected", True):
+                    self.notifications.reset()
+                self._was_daemon_connected = daemon_connected
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"connectivity sensing failed: {e}")
             last_connectivity_time = now
         return last_connectivity_time
     def _heartbeat_emotion(self, now: float) -> None:
@@ -813,63 +822,90 @@ class HeartbeatMixin:
         ) = self._heartbeat_init_state()
 
         while self._running:
-            # ── 1-2. Advance neurochemistry and read brain waves ──
-            (last_advance_mono, current_brain_wave_state,
-             last_learner_phase, last_learner_wave) = self._heartbeat_advance_neuro(
-                last_advance_mono, last_learner_phase, last_learner_wave,
-            )
+            # One guard for the whole cycle.
+            #
+            # Every step below has a guard for itself except the
+            # emergent-identity block, so a single unguarded helper could
+            # kill this thread outright. The consequences were silent and
+            # permanent: neurochemistry froze (so the emergent phase never
+            # transitioned), STM stopped draining to LTM, no volitional
+            # action ever fired, CPU-frequency policy was never applied, and
+            # it never slept or woke - all while `self._running` stayed
+            # True. `stop()` then joined an already-dead thread, `join`
+            # reported success, and shutdown returned
+            # `clean_shutdown = True`. One traceback on stderr was the only
+            # signal. A transient failure should cost one cycle, not every
+            # subsystem for the life of the process.
+            #
+            # The mutable 'last done at' locals are deliberately left
+            # untouched on failure: the cycle is time-thresholded, so
+            # retrying an already-overdue step next pass is the correct
+            # recovery, and it avoids replaying work that did succeed
+            # before the exception.
+            try:
+                # ── 1-2. Advance neurochemistry and read brain waves ──
+                (last_advance_mono, current_brain_wave_state,
+                 last_learner_phase, last_learner_wave) = self._heartbeat_advance_neuro(
+                    last_advance_mono, last_learner_phase, last_learner_wave,
+                )
 
-            now = time.time()
+                now = time.time()
 
-            # ── 3-4. Heartbeat modules and sensors ──
-            last_heartbeat_time, last_sensor_time = self._heartbeat_sensors(
-                now, heartbeat_modules, last_heartbeat_time, last_sensor_time,
-            )
+                # ── 3-4. Heartbeat modules and sensors ──
+                last_heartbeat_time, last_sensor_time = self._heartbeat_sensors(
+                    now, heartbeat_modules, last_heartbeat_time, last_sensor_time,
+                )
 
-            # ── 5. Body control ──
-            (last_body_control_time, last_body_control_sig,
-             last_self_priority) = self._heartbeat_body_control(
-                now, last_body_control_time, last_body_control_sig,
-                current_brain_wave_state, last_self_priority,
-            )
+                # ── 5. Body control ──
+                (last_body_control_time, last_body_control_sig,
+                 last_self_priority) = self._heartbeat_body_control(
+                    now, last_body_control_time, last_body_control_sig,
+                    current_brain_wave_state, last_self_priority,
+                )
 
-            # ── 5b. Sense network connectivity ──
-            last_connectivity_time = self._heartbeat_connectivity(
-                now, last_connectivity_time,
-            )
+                # ── 5b. Sense network connectivity ──
+                last_connectivity_time = self._heartbeat_connectivity(
+                    now, last_connectivity_time,
+                )
 
-            # ── 5c. Continuous emotional regulation ──
-            self._heartbeat_emotion(now)
+                # ── 5c. Continuous emotional regulation ──
+                self._heartbeat_emotion(now)
 
-            # ── 6. Consolidate (state-threshold-driven) ──
-            last_stm_count, last_consolidate_time = self._heartbeat_consolidate(
-                now, last_stm_count, last_consolidate_time,
-            )
+                # ── 6. Consolidate (state-threshold-driven) ──
+                last_stm_count, last_consolidate_time = self._heartbeat_consolidate(
+                    now, last_stm_count, last_consolidate_time,
+                )
 
-            # ── 7-9. Associate, dream, save inference ──
-            (last_associate_time, last_dream_time,
-             last_inference_save_time) = self._heartbeat_periodic_maintenance(
-                now, last_associate_time, last_dream_time, last_inference_save_time,
-            )
+                # ── 7-9. Associate, dream, save inference ──
+                (last_associate_time, last_dream_time,
+                 last_inference_save_time) = self._heartbeat_periodic_maintenance(
+                    now, last_associate_time, last_dream_time, last_inference_save_time,
+                )
 
-            # ── 9b. Emergent identity synthesis (every ~5 min) ──
-            # Synthesizes who it is from its actual experience and
-            # feeds it back into the self-model. This closes the loop:
-            # experience → emergent identity → self-model → behavior.
-            if now - last_identity_time >= 300.0 and not self._is_sleeping:
-                try:
-                    self.emergent_identity()
-                    last_identity_time = now
-                except Exception as e:  # noqa: BLE001
-                    logger.debug(f"emergent identity synthesis failed: {e}")
-                    last_identity_time = now
+                # ── 9b. Emergent identity synthesis (every ~5 min) ──
+                # Synthesizes who it is from its actual experience and
+                # feeds it back into the self-model. This closes the loop:
+                # experience → emergent identity → self-model → behavior.
+                if now - last_identity_time >= 300.0 and not self._is_sleeping:
+                    try:
+                        self.emergent_identity()
+                        last_identity_time = now
+                    except Exception as e:  # noqa: BLE001
+                        logger.debug(f"emergent identity synthesis failed: {e}")
+                        last_identity_time = now
 
-            # ── 10-13. Auto-sleep, volition, warn, cognition ──
-            self._heartbeat_final_steps()
+                # ── 10-13. Auto-sleep, volition, warn, cognition ──
+                self._heartbeat_final_steps()
 
-            # ── Wait for the next cycle ──
-            # The cycle runs at a natural pace determined by the
-            # brain wave oscillator's phase advancement. We wait
-            # briefly for state to evolve, then check again. If
-            # nothing changes, the functions above are all idle.
+                # ── Wait for the next cycle ──
+                # The cycle runs at a natural pace determined by the
+                # brain wave oscillator's phase advancement. We wait
+                # briefly for state to evolve, then check again. If
+                # nothing changes, the functions above are all idle.
+            except Exception as e:
+                logger.warning(
+                    f"heartbeat cycle failed "
+                    f"({type(e).__name__}: {e}); continuing",
+                    exc_info=True,
+                )
             time.sleep(1.0)

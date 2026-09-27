@@ -157,6 +157,14 @@ impl MemoryPointers {
 
     /// Remove an item from the working set (no-op if not present).
     pub fn pop_working(&mut self, item_id: u64) {
+        // 0 is the "unused slot" sentinel, and `push_working` rejects
+        // it. Without this guard the search below matches the first
+        // *empty* slot, zeroes it (a no-op) and still decrements the
+        // count — permanently desynchronising `working_set_count` from
+        // the number of occupied slots, with no repair path.
+        if item_id == 0 {
+            return;
+        }
         if let Some(slot) = self.working_set.iter_mut().find(|id| **id == item_id) {
             *slot = 0;
             self.working_set_count = self.working_set_count.saturating_sub(1);

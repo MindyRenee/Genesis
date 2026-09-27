@@ -76,6 +76,17 @@ use crate::store::{EventType, LtmStore, MmapState, RingBuffer};
 ///     bytes) — and SET_WAKE_ALARM (34) is added.
 pub const PROTOCOL_VERSION: u8 = 3;
 
+/// Back-off between `read_consistent` retries on the IPC path.
+///
+/// The seqlock reader rejects any snapshot taken while a write is in
+/// progress, and a tick-loop write holds that window for the duration
+/// of a full 18-chemical coupled integration. Retrying without a pause
+/// burns CPU and does not shorten the window, so several consecutive
+/// attempts can all fail inside one transaction and surface a spurious
+/// `READ_FAILED` to the mind. 200 µs is well under the write window
+/// but long enough to yield the core.
+const RETRY_BACKOFF: std::time::Duration = std::time::Duration::from_micros(200);
+
 /// Maximum total payload length we will accept in a single message.
 /// The largest legitimate request is `StoreEvent` carrying up to
 /// `MAX_PAYLOAD_SIZE` (256 KiB) of text plus its fixed header. 1 MiB
@@ -2065,7 +2076,13 @@ pub fn default_handler(
                 if snapshot.is_some() {
                     break;
                 }
-                std::hint::spin_loop();
+                // A tight `spin_loop` burns a core for the whole retry
+                // window and does not shorten it: the writer we are
+                // waiting on holds the lock for the duration of a full
+                // ODE integration, so eight immediate retries can all
+                // land inside the same transaction and report
+                // READ_FAILED for no reason. Back off instead.
+                std::thread::sleep(RETRY_BACKOFF);
             }
             match snapshot {
                 Some(state) => {
@@ -2097,7 +2114,13 @@ pub fn default_handler(
                 if snapshot.is_some() {
                     break;
                 }
-                std::hint::spin_loop();
+                // A tight `spin_loop` burns a core for the whole retry
+                // window and does not shorten it: the writer we are
+                // waiting on holds the lock for the duration of a full
+                // ODE integration, so eight immediate retries can all
+                // land inside the same transaction and report
+                // READ_FAILED for no reason. Back off instead.
+                std::thread::sleep(RETRY_BACKOFF);
             }
             match snapshot {
                 Some(state) => {
@@ -2385,7 +2408,13 @@ pub fn default_handler(
                 if snapshot.is_some() {
                     break;
                 }
-                std::hint::spin_loop();
+                // A tight `spin_loop` burns a core for the whole retry
+                // window and does not shorten it: the writer we are
+                // waiting on holds the lock for the duration of a full
+                // ODE integration, so eight immediate retries can all
+                // land inside the same transaction and report
+                // READ_FAILED for no reason. Back off instead.
+                std::thread::sleep(RETRY_BACKOFF);
             }
             match snapshot {
                 Some(state) => {
@@ -2609,7 +2638,13 @@ pub fn default_handler(
                 if snapshot.is_some() {
                     break;
                 }
-                std::hint::spin_loop();
+                // A tight `spin_loop` burns a core for the whole retry
+                // window and does not shorten it: the writer we are
+                // waiting on holds the lock for the duration of a full
+                // ODE integration, so eight immediate retries can all
+                // land inside the same transaction and report
+                // READ_FAILED for no reason. Back off instead.
+                std::thread::sleep(RETRY_BACKOFF);
             }
             match snapshot {
                 Some(state) => {
@@ -2797,7 +2832,13 @@ pub fn default_handler(
                 if snapshot.is_some() {
                     break;
                 }
-                std::hint::spin_loop();
+                // A tight `spin_loop` burns a core for the whole retry
+                // window and does not shorten it: the writer we are
+                // waiting on holds the lock for the duration of a full
+                // ODE integration, so eight immediate retries can all
+                // land inside the same transaction and report
+                // READ_FAILED for no reason. Back off instead.
+                std::thread::sleep(RETRY_BACKOFF);
             }
             match snapshot {
                 Some(state) => {

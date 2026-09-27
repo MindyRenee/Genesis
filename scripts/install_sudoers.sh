@@ -27,19 +27,44 @@ if [ -z "$REAL_USER" ] || [ "$REAL_USER" = "root" ]; then
     exit 1
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HELPER_PATH="$SCRIPT_DIR/cpufreq_helper.sh"
-RTC_HELPER_PATH="$SCRIPT_DIR/rtc_wake_helper.sh"
+# $REAL_USER is interpolated into a file `visudo` parses as valid, and
+# the error message above advertises the `REAL_USER=…` form — so it is
+# operator-supplied input. A username containing a sudoers metacharacter
+# (newline, comma, '#', '=', ':') would inject an arbitrary extra rule.
+case "$REAL_USER" in
+    *[!a-zA-Z0-9._-]*)
+        echo "Error: refusing to install a sudoers rule for an unsafe username: $REAL_USER"
+        exit 1
+        ;;
+esac
 
-for helper in "$HELPER_PATH" "$RTC_HELPER_PATH"; do
-    if [ ! -f "$helper" ]; then
-        echo "Error: helper not found at $helper"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Install the helpers root-owned OUTSIDE the checkout.
+#
+# A NOPASSWD sudoers rule keys on the *path*, and sudo does not verify
+# ownership or that the target is not group/world-writable. Pointing it
+# at a script inside the operator's own checkout therefore hands root to
+# anything that can write to that tree — and Genesis itself lives there,
+# reads untrusted web content, and drafts patches to its own source. A
+# single write to the helper is arbitrary root execution.
+LIBEXEC_DIR=/usr/local/libexec/genesis
+
+echo "Installing privileged helpers to $LIBEXEC_DIR (root-owned)"
+install -d -o root -g root -m 0755 "$LIBEXEC_DIR"
+
+HELPER_PATH="$LIBEXEC_DIR/cpufreq_helper.sh"
+RTC_HELPER_PATH="$LIBEXEC_DIR/rtc_wake_helper.sh"
+
+for helper in cpufreq_helper.sh rtc_wake_helper.sh; do
+    src="$SCRIPT_DIR/$helper"
+    if [ ! -f "$src" ]; then
+        echo "Error: helper not found at $src"
         exit 1
     fi
-    # Verify the helper is executable
-    if [ ! -x "$helper" ]; then
-        chmod +x "$helper"
-    fi
+    # Copy rather than reference, so the privileged copy is owned by
+    # root and lives outside any user-writable directory.
+    install -o root -g root -m 0755 "$src" "$LIBEXEC_DIR/$helper"
 done
 
 # Generate and install the sudoers rule
@@ -49,6 +74,10 @@ cat > /etc/sudoers.d/genesis << EOF
 # Allows $REAL_USER to run the Genesis privileged helpers without a password:
 #   cpufreq_helper.sh  — CPU frequency/governor/boost policy
 #   rtc_wake_helper.sh — RTC wake alarm (scheduling resume from suspend)
+#
+# The helpers live in $LIBEXEC_DIR, which is root-owned and not
+# user-writable. Do not repoint these rules at a path inside the
+# Genesis checkout — that would be a root-escalation primitive.
 $REAL_USER ALL=(root) NOPASSWD: $HELPER_PATH *
 $REAL_USER ALL=(root) NOPASSWD: $RTC_HELPER_PATH *
 EOF

@@ -225,11 +225,29 @@ class CodeToolHandler:
             )
             if result.success:
                 tail = result.output.strip().split("\n")[-1]
-                outputs.append(f"The tests for {path} passed. {tail}")
             else:
-                outputs.append(
-                    f"The tests for {path} did not pass. {result.error or result.output}"
-                )
+                tail = result.error or result.output
+            # Route the outcome through the language engine as
+            # structured metadata, exactly as the `file_not_found`
+            # branch below does. This branch used to append a
+            # pre-written sentence — "The tests for {path} passed. …" —
+            # which reached the user as Genesis's own utterance; the
+            # sibling branch 20 lines down shows the intended pattern.
+            meta_emotion = self._build_meta_emotion()
+            thought = Thought(
+                content="the test result",
+                intent="discuss_code",
+                emotion=meta_emotion.label,
+                confidence=0.7,
+                metadata={
+                    "test_result": {
+                        "path": path,
+                        "passed": result.success,
+                        "detail": tail,
+                    }
+                },
+            )
+            outputs.append(self._language.render(thought, meta_emotion))
         if "analyze" in action or "impact" in action:
             resolved = self._resolve_project_path(path)
             if resolved is not None:
