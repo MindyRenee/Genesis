@@ -499,8 +499,15 @@ class ConceptNetwork(
         if not log.is_empty:
             self._load_from_edge_log()
         elif self._edges:
-            log.snapshot(self._edges)
+            # Migration from pre-log state. Strip BEFORE snapshotting,
+            # not after. The old order wrote the incoming edge list —
+            # derivables included — into the canonical log, then removed
+            # them from memory only, leaving the log and the network
+            # holding different edge sets. Stripping first means the log
+            # is seeded with canonical edges alone, which is the whole
+            # point of the migration.
             self._strip_derivable_edges()
+            log.snapshot(self._edges)
     def _load_from_edge_log(self) -> None:
         """Replace in-memory edges with the canonical log fold."""
         live = self._edge_log.fold()
