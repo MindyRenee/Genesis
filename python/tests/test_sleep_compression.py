@@ -81,6 +81,39 @@ class TestSleepCompressor:
         assert not sc.vq_codebook.is_trained
         assert sc.holographic_graph.edge_count == 0
 
+    def test_empty_rebuild_does_not_wipe_holographic_graph(self, tmp_path):
+        """A rebuild with no bridge edges must leave the graph intact.
+
+        Regression test for silent destruction of associative memory.
+        `_maybe_rebuild_holographic_graph` runs every 10th compression
+        cycle behind a guard on the holographic graph's *pre-rebuild*
+        edge count, then called `rebuild_from_edges(all_bridge_edges)`.
+        When that list was empty the rebuild still began with
+        `clear()`, so the guard passed and the store was wiped.
+
+        Empty is the common case: most of `_BRIDGE_ORIGINS` are also in
+        `DERIVABLE_ORIGINS`, and derivable edges are never
+        materialised — the edge log rejects them at add_edge and they
+        are filtered on spill and recall. So `network.edges` rarely
+        holds any, meaning every ~10th cycle discarded the graph.
+        """
+        sc = SleepCompressor(data_dir=str(tmp_path))
+        sc.holographic_graph.add("dog", "related_to", "cat", weight=1.0)
+        assert sc.holographic_graph.edge_count == 1
+
+        net = ConceptNetwork()
+        net.add_concept("unrelated", confidence=0.9)
+        # A network with no bridge-origin edges at all.
+        for _ in range(10):
+            sc._maybe_rebuild_holographic_graph(net)
+
+        assert sc.holographic_graph.edge_count == 1, (
+            "holographic graph was wiped by a rebuild with no bridge edges"
+        )
+        assert [r[0] for r in sc.holographic_graph.query(
+            "dog", "related_to", top_k=5
+        )].count("cat") == 1
+
     def test_holographize_migrates_bridges(self, tmp_path, small_network):
         """Holographize should migrate bridge edges and keep real edges."""
         sc = SleepCompressor(data_dir=str(tmp_path))

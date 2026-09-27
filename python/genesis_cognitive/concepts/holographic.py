@@ -479,12 +479,32 @@ class HolographicGraph:
         return count
 
     def clear(self) -> None:
-        """Clear all associations from the holographic graph."""
+        """Clear all associations from the holographic graph.
+
+        Also invalidates the query cache and drops the concept/relation
+        registrations. Every other write path calls
+        `_invalidate_cache`, and `clear` did not — so after a clear,
+        `query()` short-circuited on the cache and returned the
+        pre-wipe associations out of a provably empty store. That is
+        fabricated memory, returned with the same confidence as a real
+        one, and it is reachable: `rebuild_from_edges([])` is
+        `clear()` plus nothing.
+
+        `_addresses` is dropped for the same reason. `query()` scores
+        candidates against the address map, so leaving it behind means
+        a cleared graph still enumerates concepts it no longer has any
+        association for.
+        """
         for relation in self._memory:
             self._memory[relation] = np.zeros(
                 (self.n_buckets, self.dim), dtype=np.float32,
             )
+        self._addresses = {}
+        self._roles = {}
+        self._registered_concepts = set()
+        self._registered_relations = set()
         self._edge_count = 0
+        self._invalidate_cache()
 
     def rebuild_from_edges(
         self,

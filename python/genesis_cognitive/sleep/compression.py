@@ -314,6 +314,30 @@ class SleepCompressor:
                             edge.relation, "value"
                         ) else str(edge.relation)
                         all_bridge_edges.append((edge.source, rel, edge.target, edge.weight))
+                # Do NOT rebuild from an empty set. `rebuild_from_edges`
+                # starts with `clear()`, so an empty rebuild wipes the
+                # graph — and the outer guard checks the holographic
+                # graph's *pre-rebuild* edge count, not whether any
+                # bridge edges exist, so it passes and then destroys
+                # the store.
+                #
+                # Empty is the common case, not a corner case: most of
+                # _BRIDGE_ORIGINS ("semantic_bridge", "hub_attachment",
+                # "associative_bridge", "bridge") are also in
+                # DERIVABLE_ORIGINS, and derivable edges are never
+                # materialized — the edge log rejects them at add_edge
+                # and they are filtered on spill and recall. So
+                # network.edges rarely holds any of them, and every
+                # ~10th compression cycle was discarding the
+                # holographic memory it was meant to restore.
+                if not all_bridge_edges:
+                    logger.debug(
+                        "Skipping holographic rebuild at cycle %d: no "
+                        "materialized bridge edges (derivable origins are "
+                        "never stored). Graph left intact.",
+                        self._compress_cycle,
+                    )
+                    return
                 self.holographic_graph.rebuild_from_edges(all_bridge_edges)
                 logger.info(
                     "Rebuilt holographic graph from %d edges (cycle %d)",

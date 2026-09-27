@@ -1096,6 +1096,47 @@ class TestHolographicGraph:
         targets = [r[0] for r in results]
         assert "cat" in targets
 
+    def test_clear_invalidates_query_cache(self):
+        """A cleared graph must not serve pre-wipe associations.
+
+        Regression test for fabricated memory. `clear()` zeroed the
+        memory rows but never called `_invalidate_cache`, so `query()`
+        short-circuited on the cache and returned associations out of a
+        provably empty store — with the same confidence as real ones.
+        `rebuild_from_edges([])` is `clear()` plus nothing, so the
+        empty-rebuild path reached it.
+        """
+        hg = HolographicGraph(dim=2048, n_buckets=4)
+        hg.add("dog", "related_to", "cat", weight=1.0)
+        before = hg.query("dog", "related_to", top_k=5)
+        assert before, "precondition: the association should be found"
+
+        hg.clear()
+        assert hg.edge_count == 0
+        after = hg.query("dog", "related_to", top_k=5)
+        assert after == [], f"cleared graph returned stale associations: {after}"
+
+    def test_rebuild_from_empty_edges_wipes_and_invalidates(self):
+        """rebuild_from_edges([]) is a clear, and must behave like one."""
+        hg = HolographicGraph(dim=2048, n_buckets=4)
+        hg.add("dog", "related_to", "cat", weight=1.0)
+        assert hg.query("dog", "related_to", top_k=5)
+
+        hg.rebuild_from_edges([])
+        assert hg.edge_count == 0
+        assert hg.query("dog", "related_to", top_k=5) == []
+        # Addresses are dropped too, so a cleared graph does not go on
+        # enumerating concepts it has no association for.
+        assert len(hg._addresses) == 0
+
+    def test_rebuild_from_edges_restores_associations(self):
+        """The non-empty rebuild path still works after the fix."""
+        hg = HolographicGraph(dim=2048, n_buckets=4)
+        hg.add("dog", "related_to", "cat", weight=1.0)
+        hg.rebuild_from_edges([("dog", "related_to", "cat", 1.0)])
+        results = hg.query("dog", "related_to", top_k=5)
+        assert [r[0] for r in results].count("cat") == 1
+
     def test_query_nonexistent_source(self):
         """Querying a nonexistent source should return empty."""
         hg = HolographicGraph(dim=512, n_buckets=4)
