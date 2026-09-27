@@ -75,6 +75,8 @@ from collections import OrderedDict
 
 import numpy as np
 
+from .._npz_io import load_npz, save_npz, str_array
+
 logger = logging.getLogger(__name__)
 
 
@@ -523,14 +525,14 @@ class HolographicGraph:
         else:
             role_matrix = np.zeros((0, self.dim), dtype=np.float32)
 
-        np.savez(
+        save_npz(
             path,
             dim=np.array(self.dim, dtype=np.int32),
             n_buckets=np.array(self.n_buckets, dtype=np.int32),
             edge_count=np.array(self._edge_count, dtype=np.int64),
-            concept_ids=np.array(concept_ids, dtype=object),
+            concept_ids=str_array(concept_ids),
             addr_matrix=addr_matrix,
-            relation_names=np.array(relation_names, dtype=object),
+            relation_names=str_array(relation_names),
             mem_matrix=mem_matrix,
             role_matrix=role_matrix,
         )
@@ -544,7 +546,7 @@ class HolographicGraph:
         if not os.path.exists(path):
             return False
         try:
-            data = np.load(path, allow_pickle=True)
+            data = load_npz(path)
             self.dim = int(data["dim"])
             self.n_buckets = int(data["n_buckets"])
             self._edge_count = int(data["edge_count"])

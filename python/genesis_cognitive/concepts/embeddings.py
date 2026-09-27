@@ -63,6 +63,8 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from .._npz_io import load_npz, save_npz, str_array
+
 logger = logging.getLogger(__name__)
 
 # Ceiling on the ad-hoc per-concept vector cache. Each entry is one
@@ -915,26 +917,30 @@ class EmbeddingStore:
             exp_start = self._spectral_dim if self._spectral_dim > 0 else 0
         exp_matrix = self._concept_matrix[:, exp_start:]
 
-        # Save the TF-IDF vocabulary so columns can be re-mapped on load
-        tfidf_words = np.array(
-            list(self._tfidf_vocab.keys()), dtype=object
-        ) if self._tfidf_vocab else np.array([], dtype=object)
+        # Save the TF-IDF vocabulary so columns can be re-mapped on load.
+        # Native string dtype (not `object`) so the file needs no pickle.
+        tfidf_words = (
+            str_array(self._tfidf_vocab.keys())
+            if self._tfidf_vocab
+            else str_array([])
+        )
         tfidf_indices = np.array(
             list(self._tfidf_vocab.values()), dtype=np.int32
         ) if self._tfidf_vocab else np.array([], dtype=np.int32)
 
-        try:
-            np.savez(
-                path,
-                concepts=np.array(self._concept_names, dtype=object),
-                vectors=exp_matrix.astype(np.float32),
-                spectral_dim=np.array(self._spectral_dim),
-                tfidf_dim=np.array(self._tfidf_dim),
-                tfidf_words=tfidf_words,
-                tfidf_indices=tfidf_indices,
-            )
-        except (OSError, ValueError) as e:
-            logger.debug(f"Hebbian learning save failed: {e}")
+        # Errors propagate. This used to be caught and logged at DEBUG,
+        # which is how a truncated or failed write of a large learned
+        # artifact went unnoticed — the in-memory state and the disk
+        # state simply diverged, silently, for the life of the process.
+        save_npz(
+            path,
+            concepts=str_array(self._concept_names),
+            vectors=exp_matrix.astype(np.float32),
+            spectral_dim=np.array(self._spectral_dim),
+            tfidf_dim=np.array(self._tfidf_dim),
+            tfidf_words=tfidf_words,
+            tfidf_indices=tfidf_indices,
+        )
 
     def load_experiential(self, data_dir: str | None = None) -> bool:
         """Load persisted Hebbian-adapted experiential vectors from disk.
@@ -971,7 +977,7 @@ class EmbeddingStore:
             return False
 
         try:
-            data = np.load(path, allow_pickle=True)
+            data = load_npz(path)
             saved_concepts = [str(c) for c in data["concepts"]]
             saved_vectors = data["vectors"]
         except (KeyError, ValueError, OSError):

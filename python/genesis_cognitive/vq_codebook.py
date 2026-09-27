@@ -41,6 +41,8 @@ import os
 
 import numpy as np
 
+from ._npz_io import load_npz, save_npz, str_array
+
 logger = logging.getLogger(__name__)
 
 
@@ -390,12 +392,12 @@ class VQCodebook:
         """Save the codebook to an .npz file."""
         if not self.is_trained:
             raise RuntimeError("cannot save untrained codebook")
-        np.savez(
+        save_npz(
             path,
             prototypes=self._prototypes,
             prototype_ids=self._prototype_ids,
             residuals=self._residuals,
-            concept_names=np.array(self._concept_names, dtype=object),
+            concept_names=str_array(self._concept_names),
             dim=np.array(self.dim, dtype=np.int32),
             k=np.array(self.k, dtype=np.int32),
             residual_scale=np.array(self.residual_scale, dtype=np.float32),
@@ -411,7 +413,7 @@ class VQCodebook:
         if not os.path.exists(path):
             return False
         try:
-            data = np.load(path, allow_pickle=True)
+            data = load_npz(path)
             self._prototypes = data["prototypes"].astype(np.float32)
             self._prototype_ids = data["prototype_ids"].astype(np.int32)
             self._residuals = data["residuals"].astype(np.int8)

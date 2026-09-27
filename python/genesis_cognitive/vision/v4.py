@@ -13,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .._npz_io import save_npz
 from ..config import default_data_dir
 
 logger = logging.getLogger(__name__)
@@ -325,7 +326,7 @@ class V4Model:
     def save(self, path: Path = _V4_FILE) -> None:
         """Save V4 dictionary to disk."""
         path.parent.mkdir(parents=True, exist_ok=True)
-        np.savez(
+        save_npz(
             path,
             phi4=self.phi4,
             phi4_gram=self._phi4_gram,
