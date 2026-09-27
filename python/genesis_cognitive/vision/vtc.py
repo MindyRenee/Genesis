@@ -13,6 +13,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .._npz_io import save_npz
 from ..config import default_data_dir
 
 logger = logging.getLogger(__name__)
@@ -155,7 +156,7 @@ class VTCFeatureSpace:
     def save(self, path: Path = _VTC_FILE) -> None:
         """Save VTC PCA state to disk."""
         path.parent.mkdir(parents=True, exist_ok=True)
-        np.savez(
+        save_npz(
             path,
             mean=self._mean if self._mean is not None else np.array([]),
             components=self._components if self._components is not None else np.array([]),
