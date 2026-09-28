@@ -412,6 +412,76 @@ class HolographicGraph:
 
         return results
 
+    def association_fidelity(
+        self,
+        edges: list[tuple[str, str, str, float]],
+        top_k: int = 10,
+    ) -> dict[str, float]:
+        """Measure retrieval fidelity against known associations.
+
+        Holographic memory is an approximate associative representation, so
+        exact vector MSE is not an appropriate reconstruction metric. This
+        evaluates whether stored associations survive the encode/unbind
+        transform: recall@k, mean reciprocal rank, and target similarity.
+        The supplied edges are evaluation input and are not retained.
+        """
+        if not edges or top_k < 1:
+            return {
+                "recall_at_k": 0.0,
+                "mean_reciprocal_rank": 0.0,
+                "mean_target_similarity": 0.0,
+                "n_evaluated": 0.0,
+            }
+
+        reciprocal_ranks: list[float] = []
+        target_similarities: list[float] = []
+        hits = 0
+
+        for source, relation, target, _weight in edges:
+            if source not in self._addresses or target not in self._addresses:
+                continue
+            results = self.query(source, relation, top_k=max(top_k, 1))
+            rank = next(
+                (i + 1 for i, (cid, _score) in enumerate(results) if cid == target),
+                None,
+            )
+            if rank is not None:
+                hits += 1
+                reciprocal_ranks.append(1.0 / rank)
+            else:
+                reciprocal_ranks.append(0.0)
+
+            result_ids = {cid for cid, score in results}
+            if target in result_ids:
+                target_similarities.append(
+                    next(score for cid, score in results if cid == target)
+                )
+            else:
+                role = self._roles.get(relation)
+                if role is not None:
+                    bucket = self._bucket_index(source)
+                    recovered = circular_correlate(
+                        self._memory[relation][bucket], role
+                    )
+                    target_similarities.append(
+                        float(np.dot(recovered, self._addresses[target]))
+                    )
+
+        n = len(reciprocal_ranks)
+        if n == 0:
+            return {
+                "recall_at_k": 0.0,
+                "mean_reciprocal_rank": 0.0,
+                "mean_target_similarity": 0.0,
+                "n_evaluated": 0.0,
+            }
+        return {
+            "recall_at_k": float(hits / n),
+            "mean_reciprocal_rank": float(np.mean(reciprocal_ranks)),
+            "mean_target_similarity": float(np.mean(target_similarities)),
+            "n_evaluated": float(n),
+        }
+
     # ─── Bulk operations ────────────────────────────────────────
 
     def extract_association_matrix(self) -> tuple[list[str], np.ndarray]:
