@@ -5,6 +5,50 @@ evidence behind them, not just the claims. Entries are dated, newest
 first. Code references are commit SHAs; runtime artifacts live in the
 instance's data dir (`~/.local/share/genesis*`).
 
+## 2026-09-28 — Active inference loop, three honesty fixes
+
+The arbitration loop documented its own flaws (README: novelty term
+outweighed homeostasis 10–100×, exploration branch dead, maturity a
+stopwatch) and they were all live. Fixed at the root, one per
+mechanism:
+
+- **Ranking is pragmatic now.** The novelty heuristic is replaced by
+  the proper entropy-reduction information gain — which, for
+  linear-Gaussian additive controls, is provably policy-independent
+  (Koudahl et al. 2021), so it enters the published EFE but cannot
+  arbitrate. Ranking reduces to predicted distance from homeostatic
+  target. Regression test: settled rest elects `noop` deterministically
+  (the old code elected a novelty policy there); with a known action
+  model installed, cortisol deviation elects `calm`.
+- **Precision seeks an inverse-variance target** instead of latching
+  off a fixed 0.15 threshold that resting surprise (~3e-4) could never
+  reach. Saturation at rest is now correct *and* reversible: sustained
+  surprise above ~0.01 RMS re-opens the exploratory branch within a
+  few ticks. Test drives rest → alternating disturbance → rest and
+  asserts precision 1.0 → <0.8 → 1.0.
+- **Maturity is earned, not elapsed**: `exp(−err/0.001)` over a
+  ~500-tick error EMA. Fresh engines read ~0 and stay there under
+  chronic failure; the old stopwatch read 0.63 after 100 s regardless.
+  Twin-engine test (600 ticks, perfect vs alternating-error) asserts
+  >0.8 vs <0.3 where the stopwatch gave both ~0.98. Model file is v4
+  (two appended EMAs; older files derive consistent values on load).
+
+Measured live A/B (isolated daemons, old vs new binary): resting
+variance unchanged (arousal sd 0.0029 vs 0.0026 — the old meddling
+was small impulses the homeostasis absorbed, no stability win to
+claim); maturity after 160 ticks 0.27 (old, unearned) vs ~0.00 (new,
+nothing yet demonstrated); precision reaches ~1.0 in both, but only
+the new one comes back down — single-impulse dips are correctly
+small (one surprise is not a regime), while the unit test proves
+sustained surprise re-opens exploration. Notably, alternating live
+impulses did *not* collapse precision: the action model learned the
+impulse→effect mapping through B and predicted them — the loop
+working as designed, verified rather than assumed.
+
+Full suite green: 120 lib + all integration targets (52
+active_inference incl. rewritten maturity test), clippy clean, Python
+3018 passed against the rebuilt release binary.
+
 ## 2026-09-25 — Visual perception in the sorter
 
 The sorter was doubly pre-chewed. Not only do

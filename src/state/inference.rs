@@ -145,17 +145,20 @@ pub struct InferenceSignals {
     /// Positive = serotonin was higher than predicted (unexpected
     /// wellbeing). Range [-2, 2] (effective levels span [0, 2]).
     pub prediction_error_serotonin: f32,
-    /// Model maturity — how well-trained the generative model is.
-    /// Starts at 0 and asymptotically approaches 1 as the model
-    /// accumulates inference cycles. Used by the cognitive mind to
-    /// gauge how much to trust the inference signals. Range [0, 1].
+    /// Model maturity — earned trust in the generative model.
+    /// Starts near 0 (unproven) and approaches 1 as the model
+    /// demonstrates sustained prediction accuracy over ~500 ticks.
+    /// Drops again under chronic surprise: a failing model must not
+    /// inspire confidence. Used by the cognitive mind to gauge how
+    /// much to trust the inference signals. Range [0, 1].
     pub model_maturity: f32,
     /// Number of inference cycles completed (low 32 bits). Used for
-    /// diagnostics and to track model maturity. The mind advances
-    /// roughly once per heartbeat cycle; at 10 Hz a u32 wraps after
+    /// diagnostics and PRNG seeding. The mind advances roughly once
+    /// per heartbeat cycle; at 10 Hz a u32 wraps after
     /// `u32::MAX / 10 s` ≈ 13.6 years, so the wrap is outside any
-    /// realistic deployment — but note the discontinuity: `model_maturity`
-    /// is a function of this counter, so it drops to 0 on wrap.
+    /// realistic deployment — and since maturity is now derived from
+    /// demonstrated accuracy rather than this counter, the wrap is
+    /// harmless to the trust signal.
     pub inference_tick_count: u32,
 }
 

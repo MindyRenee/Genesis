@@ -434,31 +434,36 @@ fn test_dopamine_prediction_error_negative() {
 // ─── Model maturity ───────────────────────────────────────────
 
 #[test]
-fn test_model_maturity_increases() {
-    // Model maturity should increase with more inference cycles,
-    // asymptotically approaching 1.0.
-    let mut engine = ActiveInferenceEngine::new();
+fn test_model_maturity_is_earned_by_accuracy_not_uptime() {
+    // Maturity must track demonstrated prediction accuracy, not tick
+    // count: a twin engine fed chronic unpredictable errors must read
+    // far less mature after the SAME number of ticks. (The old
+    // tick-count stopwatch read ~0.98 for both.)
+    let mut good = ActiveInferenceEngine::new();
+    let mut bad = ActiveInferenceEngine::new();
     let state = [0.5f32; NEUROCHEMICAL_COUNT];
 
-    assert!((engine.model_maturity() - 0.0).abs() < 1e-6);
+    assert!((good.model_maturity() - 0.0).abs() < 1e-6);
 
-    for _ in 0..100 {
-        engine.cycle(&state, &state, 0.1, &[0.5f32; NEUROCHEMICAL_COUNT]);
+    for t in 0..600 {
+        good.cycle(&state, &state, 1.0, &state);
+        // Alternating disturbance the delta rule cannot learn away.
+        let mut post = state;
+        post[0] = if t % 2 == 0 { 0.8 } else { 0.2 };
+        bad.cycle(&state, &post, 1.0, &state);
     }
-    let m100 = engine.model_maturity();
-    assert!(m100 > 0.0, "maturity should increase: {}", m100);
-
-    for _ in 0..400 {
-        engine.cycle(&state, &state, 0.1, &[0.5f32; NEUROCHEMICAL_COUNT]);
-    }
-    let m500 = engine.model_maturity();
+    let m_good = good.model_maturity();
+    let m_bad = bad.model_maturity();
     assert!(
-        m500 > m100,
-        "maturity should continue increasing: m100={}, m500={}",
-        m100,
-        m500
+        m_good > 0.8,
+        "accurate model should earn maturity: {}",
+        m_good
     );
-    assert!(m500 < 1.0, "maturity should be < 1.0: {}", m500);
+    assert!(
+        m_bad < 0.3,
+        "chronically surprised model must stay immature: {}",
+        m_bad
+    );
 }
 
 // ─── Model persistence ────────────────────────────────────────

@@ -1,6 +1,6 @@
 """Code learner — Genesis reads and understands its own source code.
 
-This module gives Genesis the ability to introspect on its own codebase.
+This module allows Genesis introspection on its codebase.
 It reads Python files (via the built-in ``ast`` module) and Rust files
 (via a lightweight regex parser — no external dependencies), then adds
 what it finds to its :class:`ConceptNetwork`.
@@ -35,12 +35,12 @@ from ..concepts import RelationType
 from .code_analysis import FileAnalysis, analyze_python_tree
 
 __all__ = [
+    "CodeInvestigation",
     "CodeLearner",
     "CodeLearningResult",
     "CodeSpacedRepetition",
     "FileAnalysis",
     "FileLearningResult",
-    "CodeInvestigation",
 ]
 
 logger = logging.getLogger(__name__)
@@ -126,13 +126,13 @@ class CodeSpacedRepetition:
     """
 
     # Base interval in seconds for the first review
-    _BASE_INTERVAL = 3600.0  # 1 hour
+    _BASE_INTERVAL = 3600.0  # 24 hours
 
     # Interval multiplier for subsequent reviews
     _INTERVAL_MULTIPLIER = 2.5
 
     # Minimum interval (don't re-analyze more often than this)
-    _MIN_INTERVAL = 300.0  # 5 minutes
+    _MIN_INTERVAL = 300.0  # 60 minutes
 
     def __init__(self) -> None:
         """Initialize per-file tracking dicts.
@@ -527,16 +527,17 @@ class CodeLearner:
 
         fingerprint = self._source_fingerprint(path)
         unchanged = fingerprint is not None and fingerprint == self._file_fingerprints.get(rel)
-        due = bool(self._spaced_repetition.get_due_files([rel])) if rel in self._analyzed_files else False
+        due = (
+            bool(self._spaced_repetition.get_due_files([rel]))
+            if rel in self._analyzed_files
+            else False
+        )
         if rel in self._analyzed_files and not force and unchanged and not due:
             return FileLearningResult(
                 filepath=rel,
                 language="unknown",
                 concepts_added=0,
                 relationships_added=0,
-                functions=0,
-                classes=0,
-                lines=0,
             )
 
         if rel in self._analyzed_files and not unchanged:
@@ -917,13 +918,20 @@ class CodeLearner:
                 + 0.03 * retention_pressure + 0.01 * complexity
             )
             reasons: list[str] = []
-            if novelty: reasons.append("novel")
-            if uncertainty >= 0.5: reasons.append("uncertain")
-            if dependency >= 0.5: reasons.append("dependency-impact")
-            if goal_relevance >= 0.5: reasons.append("goal-relevant")
-            if changed: reasons.append("changed")
-            if retention_pressure >= 0.5: reasons.append("retention-loss")
-            if not reasons: reasons.append("highest-information candidate")
+            if novelty:
+                reasons.append("novel")
+            if uncertainty >= 0.5:
+                reasons.append("uncertain")
+            if dependency >= 0.5:
+                reasons.append("dependency-impact")
+            if goal_relevance >= 0.5:
+                reasons.append("goal-relevant")
+            if changed:
+                reasons.append("changed")
+            if retention_pressure >= 0.5:
+                reasons.append("retention-loss")
+            if not reasons:
+                reasons.append("highest-information candidate")
             choices.append(CodeInvestigation(
                 str(path), score, ", ".join(reasons), novelty, uncertainty,
                 dependency, goal_relevance, change, retention_pressure

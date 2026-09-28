@@ -550,9 +550,14 @@ class VolitionMixin:
         except Exception as e:  # noqa: BLE001
             logger.debug(f'brain-wave gating for code learning failed: {e}')
 
-        self._emit_volition_thought(("code", "learning", "understanding"), "thinking")
+        self._emit_volition_thought(
+                "code", "learning", "understanding", "thinking"
+                )
         try:
-            learned = self.code_learner.investigate_code(max_files=5)\n            # The learner tracks files already studied during this runtime,\n            # so each autonomous urge advances through new source files rather\n            # than restarting at the first five files on every firing.
+            learned = self.code_learner.investigate_code(max_files=5)
+            # The learner tracks files already studied during this runtime,
+            # so each autonomous urge advances through new source files rather
+            # than restarting at the first five files on every firing.
             self._emit_live_thought(
                 "code",
                 f"learned from {learned.files_analyzed} of own files — "
