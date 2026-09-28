@@ -377,9 +377,12 @@ const NE_SURPRISE_THRESHOLD: f32 = 0.15;
 /// so the coupling matrix adapts faster to the unexpected regime.
 const METAPLASTICITY_BOOST: f32 = 5.0;
 
-/// The number of ticks over which model maturity asymptotes to 1.0.
-/// At 5 Hz (200ms/tick), 500 ticks = 100 seconds. The model reaches
-/// ~63% maturity after 100 seconds and ~95% after 300 seconds.
+/// Evidence accumulation timescale for model maturity.
+///
+/// Maturity is not a stopwatch: elapsed-time evidence is multiplied by
+/// predictive competence and posterior certainty. A model that runs for
+/// a long time while making poor predictions therefore does not become
+/// mature merely by surviving longer.
 const MATURITY_TIME_CONSTANT: f32 = 500.0;
 
 // ─── Variational posterior (Kalman filter) ───────────────────────
@@ -1963,8 +1966,47 @@ impl ActiveInferenceEngine {
 
     /// Update model maturity — asymptotic approach to 1.0.
     fn _update_maturity(&mut self) {
-        // 1 - exp(-tick_count / time_constant)
-        self.model_maturity = 1.0 - (-(self.tick_count as f32) / MATURITY_TIME_CONSTANT).exp();
+        // Maturity measures accumulated *evidence of a useful model*,
+        // not wall-clock age. The sample-count term prevents a handful
+        // of lucky predictions from claiming maturity, while predictive
+        // fit and posterior certainty keep a long-running but inaccurate
+        // model from becoming falsely trusted.
+        let evidence = 1.0
+            - (-(self.tick_count as f32) / MATURITY_TIME_CONSTANT).exp();
+
+        // Low prediction error is evidence that the learned transition
+        // model is tracking the observed dynamics. Use surprise rather
+        // than precision because precision is itself adaptive and can
+        // remain high immediately after a regime change.
+        let predictive_fit = crate::state::sanitize::finite_clamp(
+            1.0 - self.surprise_ema,
+            0.0,
+            1.0,
+        );
+
+        // A concentrated posterior is stronger evidence than one with
+        // large residual uncertainty.
+        let mean_belief_var = self
+            .belief_var
+            .iter()
+            .copied()
+            .sum::<f32>()
+            / DIM as f32;
+        let posterior_certainty = crate::state::sanitize::finite_clamp(
+            1.0 - (mean_belief_var / MAX_BELIEF_VAR),
+            0.0,
+            1.0,
+        );
+
+        // Uncertainty should temper, not erase, evidence of predictive
+        // competence. Full maturity requires both good prediction and
+        // a sufficiently concentrated posterior.
+        let quality = predictive_fit * (0.5 + 0.5 * posterior_certainty);
+        self.model_maturity = crate::state::sanitize::finite_clamp(
+            evidence * quality,
+            0.0,
+            1.0,
+        );
     }
 
     /// Get the current inference signals for writing to the core state.
