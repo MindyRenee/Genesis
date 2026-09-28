@@ -56,8 +56,8 @@ class VQCodebook:
     Thread-safe after training. All arrays are read-only post-fit.
     """
 
-    # Default number of prototypes. 2K is sufficient for 10-20K concepts
-    # with good reconstruction quality (>0.95 cosine similarity).
+    # Default number of prototypes. Actual fidelity is measured by the
+    # reconstruction metrics; no fixed quality claim is assumed.
     DEFAULT_K = 2048
 
     # Number of k-means iterations during training.
@@ -143,6 +143,12 @@ class VQCodebook:
         n, d = vectors.shape
         if d != self.dim:
             self.dim = d
+        if len(concept_names) != n:
+            raise ValueError("concept_names must have one entry per vector")
+        if not np.all(np.isfinite(vectors)):
+            raise ValueError("vectors must contain only finite values")
+        if not np.isfinite(self.residual_scale) or self.residual_scale <= 0.0:
+            raise ValueError("residual_scale must be finite and positive")
         if n == 0:
             # No data to train on — set empty state
             self._prototypes = np.zeros((0, d), dtype=np.float32)
@@ -150,6 +156,9 @@ class VQCodebook:
             self._residuals = np.zeros((0, d), dtype=np.int8)
             self._concept_names = []
             self._reconstruction_error = 0.0
+            self._relative_reconstruction_error = 0.0
+            self._reconstruction_cosine = 0.0
+            self._residual_saturation_fraction = 0.0
             self._training_iters = 0
             return {"final_error": 0.0, "iters": 0.0, "k": 0.0, "n": 0.0}
         k = min(self.k, n)  # can't have more prototypes than points
@@ -202,6 +211,9 @@ class VQCodebook:
 
         stats = {
             "final_error": self._reconstruction_error,
+            "relative_error": self._relative_reconstruction_error,
+            "cosine": self._reconstruction_cosine,
+            "saturation": self._residual_saturation_fraction,
             "iters": float(self._training_iters),
             "k": float(k),
             "n": float(n),
