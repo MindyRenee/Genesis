@@ -552,7 +552,7 @@ class VolitionMixin:
 
         self._emit_volition_thought(("code", "learning", "understanding"), "thinking")
         try:
-            learned = self.code_learner.learn_codebase(max_files=5)
+            learned = self.code_learner.learn_codebase(max_files=5)\n            # The learner tracks files already studied during this runtime,\n            # so each autonomous urge advances through new source files rather\n            # than restarting at the first five files on every firing.
             self._emit_live_thought(
                 "code",
                 f"learned from {learned.files_analyzed} of own files — "
