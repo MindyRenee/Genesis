@@ -22,8 +22,11 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +57,7 @@ IRRELEVANT_EXPERIENCE = [
 def make_engine(data_dir: str | None = None) -> tuple[CognitionEngine, ConceptNetwork, str]:
     data_dir = data_dir or tempfile.mkdtemp(prefix="genesis_probe_")
     client = GenesisClient(os.path.join(data_dir, "genesis.sock"))
+    client.connect()
     self_model = SelfModel()
     network = ConceptNetwork()
     memory = MemoryEngine(client, network=network, get_emotion=lambda: None)
@@ -68,6 +72,62 @@ def make_engine(data_dir: str | None = None) -> tuple[CognitionEngine, ConceptNe
         user_profile=UserProfile(),
     )
     return engine, network, data_dir
+
+
+def find_daemon_binary() -> str:
+    candidates = [
+        Path(__file__).resolve().parents[1] / "target" / "release" / "genesis-daemon",
+        Path(__file__).resolve().parents[1] / "target" / "debug" / "genesis-daemon",
+    ]
+    for candidate in candidates:
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    raise RuntimeError("genesis-daemon binary not found; build with cargo build --release")
+
+
+def wait_for_socket(socket_path: str, timeout: float = 10.0) -> None:
+    import socket
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if os.path.exists(socket_path):
+            try:
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as probe:
+                    probe.settimeout(0.5)
+                    probe.connect(socket_path)
+                return
+            except OSError:
+                pass
+        time.sleep(0.1)
+    raise RuntimeError(f"daemon socket did not become ready: {socket_path}")
+
+
+def start_daemon(data_dir: str) -> subprocess.Popen[bytes]:
+    return subprocess.Popen(
+        [
+            find_daemon_binary(),
+            "--data-dir",
+            data_dir,
+            "--stm-capacity",
+            "64",
+            "--ltm-capacity",
+            "256",
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+    )
+
+
+def stop_daemon(proc: subprocess.Popen[bytes], socket_path: str) -> None:
+    try:
+        client = GenesisClient(socket_path)
+        client.connect()
+        client.shutdown()
+        client.disconnect()
+        proc.wait(timeout=5.0)
+    except Exception:
+        proc.kill()
+        proc.wait()
 
 
 def snapshot(network: ConceptNetwork, engine: CognitionEngine) -> dict[str, Any]:
@@ -141,59 +201,67 @@ def run_condition(
     experience: list[str],
     reload_before_target: bool = False,
 ) -> dict[str, Any]:
-    engine, network, data_dir = make_engine()
-    experience_results = []
+    data_dir = tempfile.mkdtemp(prefix="genesis_probe_")
+    proc = start_daemon(data_dir)
+    socket_path = os.path.join(data_dir, "genesis.sock")
+    try:
+        wait_for_socket(socket_path)
+        engine, network, data_dir = make_engine(data_dir)
+        experience_results = []
 
-    for statement in experience:
-        response, state = engine.think(statement)
-        experience_results.append({
-            "input": statement,
-            "response": response,
-            "state": state_summary(state),
-        })
+        for statement in experience:
+            response, state = engine.think(statement)
+            experience_results.append({
+                "input": statement,
+                "response": response,
+                "state": state_summary(state),
+            })
 
-    before_target = snapshot(network, engine)
-    reload_report: dict[str, Any] | None = None
+        before_target = snapshot(network, engine)
+        reload_report: dict[str, Any] | None = None
 
-    if reload_before_target:
-        engine, network = persist_and_reload(engine, network, data_dir)
-        reloaded = snapshot(network, engine)
-        reload_report = {
-            "concept_count": reloaded["concept_count"],
-            "edge_count": reloaded["edge_count"],
-            "nib_present": reloaded["nib_present"],
-            "vesh_present": reloaded["vesh_present"],
-            "learned_edges": reloaded["learned_edges"],
-            "survived": (
-                reloaded["nib_present"]
-                and reloaded["vesh_present"]
-                and bool(reloaded["learned_edges"])
-            ),
+        if reload_before_target:
+            engine, network = persist_and_reload(engine, network, data_dir)
+            reloaded = snapshot(network, engine)
+            reload_report = {
+                "concept_count": reloaded["concept_count"],
+                "edge_count": reloaded["edge_count"],
+                "nib_present": reloaded["nib_present"],
+                "vesh_present": reloaded["vesh_present"],
+                "learned_edges": reloaded["learned_edges"],
+                "survived": (
+                    reloaded["nib_present"]
+                    and reloaded["vesh_present"]
+                    and bool(reloaded["learned_edges"])
+                ),
+            }
+
+        response, state = engine.think(TARGET)
+        after_target = snapshot(network, engine)
+
+        return {
+            "condition": name,
+            "experience": experience_results,
+            "before_target": before_target,
+            "persistence_reload": reload_report,
+            "target": {
+                "input": TARGET,
+                "response": response,
+                "state": state_summary(state),
+            },
+            "after_target": after_target,
+            "persistent_state_delta": {
+                "concept_count": after_target["concept_count"] - before_target["concept_count"],
+                "edge_count": after_target["edge_count"] - before_target["edge_count"],
+                "conversation_turns": (
+                    after_target["conversation_turns"]
+                    - before_target["conversation_turns"]
+                ),
+            },
         }
-
-    response, state = engine.think(TARGET)
-    after_target = snapshot(network, engine)
-
-    return {
-        "condition": name,
-        "experience": experience_results,
-        "before_target": before_target,
-        "persistence_reload": reload_report,
-        "target": {
-            "input": TARGET,
-            "response": response,
-            "state": state_summary(state),
-        },
-        "after_target": after_target,
-        "persistent_state_delta": {
-            "concept_count": after_target["concept_count"] - before_target["concept_count"],
-            "edge_count": after_target["edge_count"] - before_target["edge_count"],
-            "conversation_turns": (
-                after_target["conversation_turns"]
-                - before_target["conversation_turns"]
-            ),
-        },
-    }
+    finally:
+        stop_daemon(proc, socket_path)
+        shutil.rmtree(data_dir, ignore_errors=True)
 
 
 def main() -> None:
