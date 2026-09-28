@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +21,26 @@ import numpy as np
 from ..config import default_data_dir
 
 logger = logging.getLogger(__name__)
+
+
+def _write_json_atomically(path: Path, data: object) -> None:
+    """Replace a JSON state file only after its complete contents are durable."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(
+        dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", text=True
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, path)
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 _DATA_DIR = default_data_dir() / "visual_cortex"
 _MTL_FILE = _DATA_DIR / "memory_bridge.npz"
@@ -241,7 +263,6 @@ class MemoryBridge:
 
     def save(self, path: Path = _MTL_FILE) -> None:
         """Save MTL bridge to disk."""
-        path.parent.mkdir(parents=True, exist_ok=True)
         data = {
             "W": self.W.tolist() if self.W is not None else None,
             "vtc_dim": self.vtc_dim,
@@ -257,8 +278,7 @@ class MemoryBridge:
                 for ex in self._examples
             ],
         }
-        with open(path, "w") as f:
-            json.dump(data, f)
+        _write_json_atomically(path, data)
 
     def load(self, path: Path = _MTL_FILE) -> bool:
         """Load MTL bridge from disk. Returns True if loaded."""
@@ -284,8 +304,7 @@ class MemoryBridge:
                     data["embedding_dim"] = self.embedding_dim
                     data["vtc_dim"] = self.vtc_dim
                     try:
-                        with open(path, "w") as wf:
-                            json.dump(data, wf)
+                        _write_json_atomically(path, data)
                     except OSError as e:
                         logger.debug(f"MTL stale-W clear failed: {e}")
                 else:

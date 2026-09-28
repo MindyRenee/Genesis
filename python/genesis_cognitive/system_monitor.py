@@ -22,8 +22,8 @@ should know its home as well as a person knows their house.
 
 ## Safety
 
-This module is read-only. Genesis observes its environment but does
-not modify it. It doesn't kill processes, delete files, or change
+This module observes its environment and only persists its own learned
+baseline. It doesn't kill processes, delete files, or change system
 configurations. It's an observer, not an administrator — yet.
 """
 
@@ -34,6 +34,7 @@ import os
 import platform
 import socket
 import sys
+import tempfile
 import time
 from collections import deque
 from dataclasses import asdict, dataclass, field
@@ -369,8 +370,10 @@ class SystemBaseline:
         """Persist the baseline to disk so it survives restarts."""
         if not self._persist_path:
             return
+        tmp_path: str | None = None
         try:
             import json
+
             data = {
                 "version": 1,
                 "metrics": {
@@ -382,11 +385,27 @@ class SystemBaseline:
                     for name, m in self._metrics.items()
                 },
             }
-            self._persist_path.write_text(
-                json.dumps(data, indent=2), encoding="utf-8"
+            self._persist_path.parent.mkdir(parents=True, exist_ok=True)
+            fd, tmp_path = tempfile.mkstemp(
+                dir=self._persist_path.parent,
+                prefix=f".{self._persist_path.name}.",
+                suffix=".tmp",
+                text=True,
             )
-        except OSError as e:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_path, self._persist_path)
+            tmp_path = None
+        except (OSError, TypeError, ValueError) as e:
             logger.debug(f"baseline save failed: {e}")
+        finally:
+            if tmp_path is not None:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
 
     def load(self) -> None:
         """Load a previously saved baseline from disk."""

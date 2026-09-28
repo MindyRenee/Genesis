@@ -3275,7 +3275,6 @@ impl NeurochemicalVector {
 
         let ach_idx = NeurochemicalId::Acetylcholine as usize;
         if current_phase == MentalPhase::NREM || current_phase == MentalPhase::REM {
-            let adn_level = self.chemicals[adn_idx].level;
             // Target ACh level depends on sleep stage:
             // - Early NREM (adenosine > 0.65): ACh stays low (0.20)
             //   for slow-wave sleep.
@@ -3313,7 +3312,7 @@ impl NeurochemicalVector {
                 * f64::from(ach_chem.desensitization_factor)
                 * f64::from(ach_chem.internalization_factor)
                 .max(1e-3);
-            let level_target = (f64::from(ach_target) / receptor_health).clamp(0.0, 1.0);
+            let level_target = (ach_target / receptor_health).clamp(0.0, 1.0);
             let current_ach = f64::from(self.chemicals[ach_idx].level);
             let new_ach = level_target - (-ach_rate).exp() * (level_target - current_ach);
             self.chemicals[ach_idx].level =

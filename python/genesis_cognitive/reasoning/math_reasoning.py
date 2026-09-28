@@ -170,7 +170,12 @@ def _scan_ident(text: str, i: int, tokens: list[Token]) -> int:
 
 
 def tokenize(text: str) -> list[Token]:
-    """Convert a math expression string into tokens."""
+    """Convert a complete math expression string into tokens.
+
+    The tokenizer is deliberately strict.  Silently omitting an unknown
+    character changes the expression the evaluator sees, which can turn a
+    malformed request into a confident but unrelated answer.
+    """
     tokens: list[Token] = []
     i = 0
     text = text.replace("×", "*").replace("÷", "/").replace("−", "-")
@@ -199,8 +204,7 @@ def tokenize(text: str) -> list[Token]:
         if c.isalpha() or c == "_":
             i = _scan_ident(text, i, tokens)
             continue
-        # Unknown character — skip it
-        i += 1
+        raise ParseError(f"Unexpected character {c!r} at pos {i}")
     tokens.append(Token(TokenType.EOF, "", len(text)))
     return tokens
 
@@ -297,7 +301,6 @@ class Parser:
         TokenType.MINUS: 2,
         TokenType.STAR: 3,
         TokenType.SLASH: 3,
-        TokenType.CARET: 4,
     }
 
     def __init__(self, tokens: list[Token]) -> None:
@@ -338,9 +341,16 @@ class Parser:
             comp = t.value
             self.advance()
             right = self._parse_expr(0)
-            return Equation(left, right, comp)
+            result: Equation | Any = Equation(left, right, comp)
+        else:
+            result = left
 
-        return left
+        trailing = self.peek()
+        if trailing.type != TokenType.EOF:
+            raise ParseError(
+                f"Unexpected token {trailing.value!r} at pos {trailing.pos}"
+            )
+        return result
 
     def _parse_expr(self, min_prec: int) -> Any:
         """Parse an expression with operator precedence (Pratt parsing)."""
@@ -359,7 +369,12 @@ class Parser:
         return left
 
     def _parse_unary(self) -> Any:
-        """Parse a unary expression (leading +/- or primary)."""
+        """Parse a signed expression.
+
+        Exponentiation binds more tightly than a leading sign, so ``-2^2``
+        means ``-(2^2)``.  A sign is still valid on the exponent in
+        ``2^-2`` because the exponent is parsed as another unary expression.
+        """
         t = self.peek()
         if t.type == TokenType.MINUS:
             self.advance()
@@ -368,7 +383,15 @@ class Parser:
         if t.type == TokenType.PLUS:
             self.advance()
             return self._parse_unary()
-        return self._parse_primary()
+        return self._parse_power()
+
+    def _parse_power(self) -> Any:
+        """Parse a right-associative exponentiation expression."""
+        left = self._parse_primary()
+        if self.peek().type == TokenType.CARET:
+            self.advance()
+            return BinOp("^", left, self._parse_unary())
+        return left
 
     def _parse_primary(self) -> Any:
         """Parse a primary expression (number, variable, parenthesized)."""
@@ -2273,7 +2296,7 @@ def _math_fragment(lower: str) -> str:
     ):
         match = re.match(pattern, lower)
         if match:
-            return match.group(1).rstrip("?").strip()
+            return match.group(1).rstrip("?.").strip()
     return lower
 
 
@@ -2454,7 +2477,7 @@ def _try_compute(lower: str, enabled_rules: set[str] | None) -> MathResult | Non
         lower,
     )
     if compute_match:
-        expr_str = compute_match.group(1).rstrip("?")
+        expr_str = compute_match.group(1).rstrip("?.")
         # Don't treat definitions as computations
         if not _looks_like_definition(expr_str):
             try:
@@ -2484,7 +2507,7 @@ def _try_compute(lower: str, enabled_rules: set[str] | None) -> MathResult | Non
 def _try_bare_expression(lower: str) -> MathResult | None:
     """Detect bare arithmetic expressions like '2 + 2', 'sqrt(16)'."""
     if re.match(r"^[\d\s+\-*/^().,a-z_]+[?]?$", lower):
-        expr_str = lower.rstrip("?").strip()
+        expr_str = lower.rstrip("?.").strip()
         if any(c.isdigit() for c in expr_str) and any(c in "+-*/^" for c in expr_str):
             try:
                 parsed = parse_expression(expr_str)
@@ -2507,7 +2530,7 @@ def _try_solve(lower: str, enabled_rules: set[str] | None) -> MathResult | None:
         lower,
     )
     if solve_match:
-        eq_str = solve_match.group(1).rstrip("?")
+        eq_str = solve_match.group(1).rstrip("?.")
         try:
             parsed = parse_expression(eq_str)
             if isinstance(parsed, Equation):

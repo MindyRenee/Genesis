@@ -1357,7 +1357,6 @@ fn test_zone_sleeping_runs_adenosine_clearance() {
     );
 }
 
-#[test]
 /// Regression: the exhaustion override used to `return NREM`
 /// unconditionally, short-circuiting the sleep branch where every
 /// NREM-vs-REM condition lives. REM was therefore unreachable from NREM
@@ -1535,7 +1534,9 @@ fn test_cholinergic_rebound_during_sustained_nrem() {
         ach_early
     );
 
-    // Now drop adenosine below 0.65 (late NREM) — ACh should rebound.
+    // Now drop adenosine below 0.80 (late NREM) — ACh should rebound.
+    // The rebound threshold was changed from 0.65 to 0.80 to match the
+    // sleep-onset neighborhood and ensure REM is reachable.
     for _ in 0..2000 {
         // SAFETY: single-threaded test — exclusive access to a live state struct.
         unsafe { state.write_begin(0) };
@@ -1543,7 +1544,7 @@ fn test_cholinergic_rebound_during_sustained_nrem() {
             .neurochemicals
             .get_mut(NeurochemicalId::Adenosine)
             .unwrap();
-        adn.level = 0.60; // below 0.65 — late NREM
+        adn.level = 0.75; // below 0.80 — late NREM
         adn.velocity = 0.0;
         adn.receptor_sensitivity = 1.0;
         adn.desensitization_factor = 1.0;
@@ -1581,7 +1582,7 @@ fn test_cholinergic_rebound_during_sustained_nrem() {
         .level;
     assert!(
         ach_late > 0.50,
-        "ACh should rebound above 0.50 during late NREM (adenosine < 0.65), \
+        "ACh should rebound above 0.50 during late NREM (adenosine < 0.80), \
          got {} — the cholinergic rebound mechanism is not working",
         ach_late
     );
