@@ -255,7 +255,7 @@ class ExecutiveFunction:
         # world model.
         for action in possible_actions:
             plan = self._simulate_action_plan(
-                action, possible_actions, goal_words, outcome_predictor, goal
+                action, possible_actions, outcome_predictor, goal
             )
             if plan.expected_value > best_plan.expected_value:
                 best_plan = plan
@@ -267,7 +267,6 @@ class ExecutiveFunction:
         self,
         action: str,
         possible_actions: list[str],
-        goal_words: set[str],
         outcome_predictor: object | None,
         goal: str,
     ) -> ActionPlan:
