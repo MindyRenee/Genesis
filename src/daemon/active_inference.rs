@@ -31,12 +31,10 @@
 //!   heuristic.
 //! - Precision is the inverse variance of the likelihood, which
 //!   weights prediction errors in the NLL term.
-//! - Policy selection uses expected free energy with epistemic
-//!   (information gain) and pragmatic (homeostatic) components. The
-//!   epistemic value is uncertainty-weighted: policies that explore
-//!   dimensions where the posterior is uncertain (high belief_var)
-//!   receive a higher epistemic bonus, following the principle that
-//!   information gain is proportional to current uncertainty.
+//! - Policy selection minimizes a pragmatic expected-free-energy proxy
+//!   over the action-conditioned generative model. Exploration is kept
+//!   as a separate temperature-controlled sampling mechanism because
+//!   this model class has additive controls.
 //!
 //! **Is simplified (not full Friston):**
 //! - The posterior is diagonal (mean-field), not full-covariance.
@@ -1778,78 +1776,16 @@ impl ActiveInferenceEngine {
             // `epistemic_value` and the softmax temperature.
             let uncertainty = (1.0 - self.precision) * UNCERTAINTY_WEIGHT;
 
-            // Epistemic value: uncertainty-weighted novelty of the
-            // predicted observation relative to the current belief.
+            // This controller has additive actions and a linear-Gaussian
+            // transition model. In that model class, formal expected
+            // information gain is policy-invariant (Koudahl et al., 2021).
+            // Do not substitute novelty for information gain: that would
+            // be a heuristic with the wrong epistemic semantics.
             //
-            // The epistemic value of a policy is its expected information
-            // gain — how much the resulting observation would reduce
-            // uncertainty about the hidden state. In active inference
-            // (Friston, Rigoli, Ognibene, Mathys, Fitzgerald &
-            // Pezzulo, 2015), this is the
-            // information-seeking component of policy selection: the
-            // system prefers policies that would take it to regions
-            // where observations are maximally informative.
-            //
-            // The expected information gain from observing dimension i
-            // is proportional to the current posterior uncertainty about
-            // that dimension (belief_var[i]) — you gain more information
-            // from observing something you are uncertain about than
-            // something you already know (Shannon: I = -log p, maximized
-            // when p is uniform). We therefore weight the novelty of
-            // each dimension (how far the policy would move the state
-            // from the current belief mean) by the normalized posterior
-            // uncertainty of that dimension.
-            //
-            // The weight ranges over [0.5, 1.0]: a baseline of 0.5
-            // preserves the original novelty-seeking behavior for
-            // well-localized beliefs (low belief_var), while the full
-            // 1.0 weight applies when the model is maximally uncertain
-            // about that dimension. This makes the posterior variance —
-            // the defining quantity of a variational posterior —
-            // functional in policy selection: the system directs
-            // exploration toward the dimensions it is most uncertain
-            // about, which is the core principle of Bayesian
-            // active learning and epistemic value in active inference.
-            let mut novelty_sum = 0.0f32;
-            #[allow(clippy::needless_range_loop, reason = "i indexes multiple arrays")]
-            for i in 0..DIM {
-                let novelty = (predicted_after[i] - self.belief_mean[i]).abs();
-                let uncertainty_weight = crate::state::sanitize::finite_clamp(
-                    self.belief_var[i] / MAX_BELIEF_VAR,
-                    0.0,
-                    1.0,
-                );
-                novelty_sum += novelty * (0.5 + 0.5 * uncertainty_weight);
-            }
-            let novelty = novelty_sum / DIM as f32;
-            let epistemic_value = crate::state::sanitize::finite_clamp(
-                novelty * EPISTEMIC_WEIGHT,
-                0.0,
-                0.5, // cap at 0.5 so it doesn't dominate pragmatic cost
-            );
-
-            // EFE = pragmatic + uncertainty - epistemic.
-            // Lower EFE is better; epistemic value is subtracted
-            // because information gain reduces EFE.
-            //
-            // The bound here is a **finiteness guard, not a range
-            // constraint**, and must not be narrowed to a
-            // non-negative interval. EFE is a relative score with an
-            // arbitrary zero: a policy that beats the others by a
-            // hair yields a raw value of -1e-4, and a lower bound of
-            // 0.0 maps every such policy to exactly 0.0. Clamping to
-            // [0, 2] therefore destroyed the ordering information the
-            // argmin and the softmax depend on. In the converged
-            // regime — precision saturated, so `uncertainty` is 0 and
-            // `epistemic_value` exceeds the tiny `expected_surprise` —
-            // the raw value is negative for all nine policies, every
-            // one clamped to 0.0, `min_by` returning the first minimum
-            // (index 0 = `noop`), and the softmax degenerate to
-            // uniform. The inference loop was inert in exactly the
-            // regime it exists to run in. A wide symmetric bound
-            // rejects non-finite values while preserving order.
+            // Keep the EFE objective honest. Exploration is handled
+            // separately by the scale-aware policy sampler below.
             let efe = crate::state::sanitize::finite_clamp(
-                expected_surprise + uncertainty - epistemic_value,
+                expected_surprise + uncertainty,
                 -EFE_SCORE_LIMIT,
                 EFE_SCORE_LIMIT,
             );
@@ -1881,7 +1817,9 @@ impl ActiveInferenceEngine {
                 .iter()
                 .map(|&(efe, _)| efe)
                 .fold(f32::MIN, f32::min);
-        let temp = (POLICY_SOFTMAX_TEMPERATURE * (2.0 - self.precision)).max(efe_spread);
+        let temp =
+            (POLICY_SOFTMAX_TEMPERATURE * (2.0 - self.precision) * efe_spread)
+                .max(1.0e-6);
 
         // Compute softmax weights (negative EFE → higher probability)
         let mut weights = [0.0f32; NUM_POLICIES];
@@ -1910,55 +1848,19 @@ impl ActiveInferenceEngine {
             }
         }
 
-        // Select: sample from the softmax distribution.
-        // Use a deterministic selection (argmax) when precision is high,
-        // and stochastic sampling when precision is low.
-        //
-        // `precision` here is this engine's own Bayesian confidence in
-        // its predictions (it gates `obs_var` and the learning rate) —
-        // it is *not* the Bayesian policy prior precision β of
-        // Friston et al. (2015), which is what a policy softmax
-        // temperature formally corresponds to. The threshold below is a
-        // hand-tuned switch between the two modes, not a derived
-        // quantity.
-        //
-        // Note that `precision` saturates at 1.0 within ~25 s of
-        // continuous running (recovery is 0.004/tick at dt_scale = 2),
-        // so in steady state this branch is effectively always taken.
-        let selected_idx = if self.precision > EXPLOITATION_PRECISION_THRESHOLD {
-            // High precision: pick the best policy (exploitative)
-            evaluations
-                .iter()
-                .enumerate()
-                .min_by(|a, b| {
-                    a.1.0
-                        .partial_cmp(&b.1.0)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                })
-                .map(|(i, _)| i)
-                .unwrap_or(0)
-        } else {
-            // Stochastic selection based on softmax weights.
-            // Draw from the internal xorshift32 PRNG — a proper
-            // uniform random source, unlike the previous hash-based
-            // approach which had no statistical uniformity and
-            // produced the same value pattern every tick.
-            let r = self.next_uniform();
-            let mut cumulative = 0.0f32;
-            // Default to the last policy so that floating-point rounding
-            // (cumulative sum of normalized weights < 1.0) doesn't cause
-            // the loop to exit without selecting — falling back to index 0
-            // (noop) would bias the agent toward inaction.
-            let mut chosen = weights.len() - 1;
-            for (i, &w) in weights.iter().enumerate() {
-                cumulative += w;
-                if r <= cumulative {
-                    chosen = i;
-                    break;
-                }
+        // Sample continuously from the policy distribution. A hard
+        // precision threshold previously became a dead branch because
+        // precision saturated near 1.0 during steady operation.
+        let r = self.next_uniform();
+        let mut cumulative = 0.0f32;
+        let mut selected_idx = weights.len() - 1;
+        for (i, &w) in weights.iter().enumerate() {
+            cumulative += w;
+            if r <= cumulative {
+                selected_idx = i;
+                break;
             }
-            chosen
-        };
+        }
 
         let (efe, policy) = evaluations[selected_idx];
         PolicyEvaluation { policy, efe }
