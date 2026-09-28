@@ -62,18 +62,26 @@ class SynapticStore:
         not create or alter semantic graph edges or embeddings. Each
         directly connected post-unit receives seed activation multiplied
         by its learned efficacy.
+
+        Convergent inputs summate: total drive to a post-unit is the sum
+        over all active pre-units (linear synaptic integration), passed
+        through a saturating Naka–Rushton nonlinearity
+        ``act = total / (1 + total)`` (Naka & Rushton, 1966; Heeger,
+        1992; Carandini & Heeger, 2011 divisive normalization). This
+        keeps activation in [0, 1) while preserving monotonic fan-in,
+        unlike a max-take-all which undercounts convergent evidence.
         """
         if amount <= 0.0 or not seeds:
             return {}
         seed_set = set(seeds)
-        propagated: dict[str, float] = {}
+        totals: dict[str, float] = {}
         with self._lock:
             weights = dict(self._weights)
         for (pre, post), weight in weights.items():
             if pre in seed_set and weight > 0.0:
                 contribution = float(amount) * weight
-                propagated[post] = max(propagated.get(post, 0.0), contribution)
-        return propagated
+                totals[post] = totals.get(post, 0.0) + contribution
+        return {post: total / (1.0 + total) for post, total in totals.items() if total > 0.0}
 
     def has_connection(self, pre: str, post: str) -> bool:
         """Return whether this directed plastic connection has been expressed."""

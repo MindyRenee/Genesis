@@ -857,10 +857,11 @@ class PredictiveCodingLayer:
         actual_intent = actual_input.intent.value
         actual_topics = actual_input.topics
 
-        # Error-scaled learning rate: large errors → bigger updates.
-        # This is the Rescorla-Wagner / delta rule — the learning rate
-        # is modulated by the prediction error magnitude.
-        effective_lr = self.learning_rate * (0.5 + error.magnitude)
+        # Error-scaled learning rate (Rescorla–Wagner / delta rule:
+        # ΔV = α·β·(λ − V), update ∝ prediction error). A perfectly
+        # predicted input (magnitude 0) teaches nothing; a fully
+        # surprising input (magnitude 1) teaches at the full rate.
+        effective_lr = self.learning_rate * error.magnitude
 
         # ── Level 3: update topic-transition model ──
         if context.recent_topics:

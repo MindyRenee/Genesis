@@ -517,7 +517,12 @@ class V1Model:
         for group in groups.values():
             if len(group) < 2:
                 continue
-            mean_or = float(np.mean([f.orientation for f in group]))
+            # Orientation is π-periodic (0 ≡ π for edges), so the mean
+            # must be a circular mean on the doubled angle: θ̄ =
+            # arg(Σ exp(i·2θ))/2 (Mardia & Jupp, directional statistics).
+            # A linear mean would wrap 0/π to π/2 (orthogonal) artifactually.
+            doubled = np.array([2.0 * f.orientation for f in group])
+            mean_or = float(np.angle(np.mean(np.exp(1j * doubled))) / 2.0) % np.pi
             # Contour length in pixel space.
             ys = [f.y for f in group]
             xs = [f.x for f in group]

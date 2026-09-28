@@ -216,9 +216,10 @@ class PhonologicalLoop:
           sensory memory trace (Crowder, 1982).
     """
 
-    #: Decay half-life in seconds — items lose ~half their activation
-    #: per this interval without rehearsal. The phonological store
-    #: persists for ~2 seconds (Baddeley, 1992).
+    #: Exponential decay time constant τ in seconds
+    #: (activation *= exp(−dt/τ)). The phonological store persists for
+    #: ~2 s (Baddeley, 1992); the corresponding half-life is τ·ln2 ≈
+    #: 1.39 s. τ is the e-folding time, not the half-life.
     DECAY_TAU: float = 2.0
     #: Default capacity of the loop (verbal memory span).
     DEFAULT_CAPACITY: int = 4
@@ -234,7 +235,8 @@ class PhonologicalLoop:
 
         Args:
             capacity: Maximum number of verbal items to hold.
-            decay_tau: Half-life in seconds for item activation decay.
+            decay_tau: Exponential time constant τ in seconds
+                (half-life = τ·ln2 ≈ 0.693·τ).
         """
         self._capacity = max(1, capacity)
         self._decay_tau = max(0.1, decay_tau)
@@ -416,8 +418,9 @@ class VisuoSpatialSketchpad:
           without rehearsal, longer than verbal material.
     """
 
-    #: Decay time constant in seconds (visual/spatial traces persist
-    #: longer than phonological; Phillips, 1983).
+    #: Decay time constant τ in seconds (activation *= exp(−dt/τ);
+    #: half-life = τ·ln2; visual/spatial traces persist longer than
+    #: phonological; Phillips, 1983).
     DECAY_TAU: float = 4.0
     #: Below this activation, a relation is dropped.
     _DROP_THRESHOLD: float = 0.05
@@ -426,7 +429,8 @@ class VisuoSpatialSketchpad:
         """Initialize the visuospatial sketchpad with a decay time constant.
 
         Args:
-            decay_tau: Half-life in seconds for relation activation decay.
+            decay_tau: Exponential time constant τ in seconds
+                (half-life = τ·ln2).
         """
         self._decay_tau = max(0.1, decay_tau)
         self._relations: dict[tuple[str, str, str], _SpatialRelation] = {}

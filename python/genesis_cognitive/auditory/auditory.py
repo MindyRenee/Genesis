@@ -181,16 +181,27 @@ def _compute_features(
     # RMS energy (loudness)
     rms = float(np.sqrt(np.mean(samples**2)))
 
-    # Zero-crossing rate (temporal noisiness cue)
+    # Zero-crossing rate: fraction of adjacent-sample intervals that
+    # cross zero. There are n−1 intervals (not n). Samples exactly at
+    # zero carry no sign, so they are excluded rather than counted as
+    # crossings (avoids inflating ZCR during silence).
     signs = np.sign(samples)
-    zcr = float(np.sum(np.abs(np.diff(signs)) > 0)) / n
+    nonzero = signs != 0
+    if int(np.sum(nonzero)) < 2:
+        zcr = 0.0
+    else:
+        nz_signs = signs[nonzero]
+        zcr = float(np.sum(np.abs(np.diff(nz_signs)) > 0)) / (len(nz_signs) - 1)
 
     # FFT for spectral features (window and freqs are cached)
     window, freqs = _get_window_and_freqs(n, sample_rate)
     windowed = samples * window
-    spectrum = np.abs(np.fft.rfft(windowed))
+    # Power spectrum: Wiener (spectral-flatness) entropy and the
+    # centroid/rolloff energy weights are defined on power |X|², not
+    # magnitude |X| (Johnston, 1988; Peeters, 2004).
+    power = np.abs(np.fft.rfft(windowed)) ** 2
 
-    total_energy = float(np.sum(spectrum))
+    total_energy = float(np.sum(power))
     if total_energy < 1e-10:
         return {
             "rms": rms,
@@ -201,21 +212,23 @@ def _compute_features(
             "flatness": 0.0,
         }
 
-    # Spectral centroid (brightness) — weighted mean frequency
-    centroid = float(np.sum(freqs * spectrum) / total_energy)
-    # Normalize to 0-1 (8000 Hz is a reasonable max for 16kHz audio)
-    centroid_norm = min(centroid / 8000.0, 1.0)
+    # Spectral centroid (brightness) — power-weighted mean frequency
+    centroid = float(np.sum(freqs * power) / total_energy)
+    # Normalize to 0-1 by the Nyquist frequency (sample_rate/2), so the
+    # feature is sample-rate invariant (8 kHz only when sr = 16 kHz).
+    nyquist = float(sample_rate) / 2.0
+    centroid_norm = min(centroid / nyquist, 1.0) if nyquist > 0 else 0.0
 
     # Spectral rolloff — frequency below which 85% of energy lies
-    cumulative = np.cumsum(spectrum)
+    cumulative = np.cumsum(power)
     rolloff_idx = int(np.searchsorted(cumulative, 0.85 * total_energy))
     rolloff_freq = float(freqs[min(rolloff_idx, len(freqs) - 1)])
-    rolloff_norm = min(rolloff_freq / 8000.0, 1.0)
+    rolloff_norm = min(rolloff_freq / nyquist, 1.0) if nyquist > 0 else 0.0
 
     # Spectral flatness — Wiener entropy (1 = white noise, 0 = pure tone)
-    log_spectrum = np.log(spectrum + 1e-10)
-    geometric_mean = math.exp(float(np.mean(log_spectrum)))
-    arithmetic_mean = float(np.mean(spectrum))
+    log_power = np.log(power + 1e-10)
+    geometric_mean = math.exp(float(np.mean(log_power)))
+    arithmetic_mean = float(np.mean(power))
     flatness = geometric_mean / (arithmetic_mean + 1e-10) if arithmetic_mean > 1e-10 else 0.0
 
     return {

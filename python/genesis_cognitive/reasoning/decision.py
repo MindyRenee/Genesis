@@ -333,8 +333,13 @@ class DecisionEngine:
                 candidate.td_value = self._lookup_td_value(
                     candidate, topics,
                 )
-                # TD value contributes to composite score.
-                candidate.composite_score += candidate.td_value * 0.1
+                # TD value contributes to composite score. The composite
+                # is normalized to [0, 1] by _compute_composite, so the
+                # additive TD bonus is re-clipped to preserve the bound.
+                candidate.composite_score = max(
+                    0.0,
+                    min(1.0, candidate.composite_score + candidate.td_value * 0.1),
+                )
 
         # 4. Select the best candidate.
         selected = max(candidates, key=lambda c: c.composite_score)
