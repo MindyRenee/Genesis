@@ -21,6 +21,7 @@ how it works, where its complexity lives, and how its parts connect.
 from __future__ import annotations
 
 import ast
+import hashlib
 import logging
 import math
 import re
@@ -75,6 +76,21 @@ class CodeLearningResult:
     total_classes: int
     total_lines: int
     file_results: list[FileLearningResult] = field(default_factory=list)
+    investigation_reasons: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class CodeInvestigation:
+    """Inspectable evidence for an autonomous code-study decision."""
+    filepath: str
+    score: float
+    reason: str
+    novelty: float
+    uncertainty: float
+    dependency_value: float
+    goal_relevance: float
+    change_pressure: float
+    retention_pressure: float
 
 
 # ─── Code-specific spaced repetition ──────────────────────────────────
@@ -341,16 +357,12 @@ class CodeLearner:
         # File complexity scores — used by curiosity-driven exploration
         # to prioritize structurally novel or complex files
         self._file_complexity: dict[str, float] = {}
+        self._file_fingerprints: dict[str, str] = {}
+        self._file_uncertainty: dict[str, float] = {}
+        self._recover_investigation_state()
 
     def _recover_analyzed_files(self) -> set[str]:
-        """Recover code-study coverage from persisted code concepts.
-
-        The in-memory ``_analyzed_files`` set is a runtime optimization, not
-        the durable source of truth. Module concepts created by code learning
-        carry their project-relative file path, so a restarted Genesis can
-        continue through the source tree instead of re-reading the same first
-        batch.
-        """
+        """Recover durable code-study coverage from module concepts."""
         recovered: set[str] = set()
         for concept_id in self.network.concept_ids:
             if not (concept_id.startswith("python:") or concept_id.startswith("rust:")):
@@ -362,6 +374,65 @@ class CodeLearner:
             if isinstance(filepath, str) and filepath:
                 recovered.add(filepath)
         return recovered
+
+    def _recover_investigation_state(self) -> None:
+        """Restore evidence state used by the autonomous selector."""
+        for concept_id in self.network.concept_ids:
+            if not (concept_id.startswith("python:") or concept_id.startswith("rust:")):
+                continue
+            concept = self.network.get_concept(concept_id)
+            if concept is None or concept.properties.get("kind") != "module":
+                continue
+            rel = concept.properties.get("file")
+            meta = concept.properties.get("code_learning")
+            if not isinstance(rel, str) or not isinstance(meta, dict):
+                continue
+            fp = meta.get("fingerprint")
+            uncertainty = meta.get("uncertainty")
+            complexity = meta.get("complexity")
+            if isinstance(fp, str):
+                self._file_fingerprints[rel] = fp
+            if isinstance(uncertainty, (int, float)):
+                self._file_uncertainty[rel] = max(0.0, min(1.0, float(uncertainty)))
+            if isinstance(complexity, (int, float)):
+                self._file_complexity[rel] = max(0.0, min(1.0, float(complexity)))
+
+    def _source_fingerprint(self, path: Path) -> str | None:
+        """Hash contents so source changes, not timestamps, trigger relearning."""
+        try:
+            return hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            return None
+
+    def _module_concept_for(self, rel: str) -> Any | None:
+        """Find the module concept corresponding to a project-relative file."""
+        for concept_id in self.network.concept_ids:
+            if not (concept_id.startswith("python:") or concept_id.startswith("rust:")):
+                continue
+            concept = self.network.get_concept(concept_id)
+            if concept is not None and concept.properties.get("file") == rel:
+                return concept
+        return None
+
+    def _persist_investigation_state(
+        self, rel: str, fingerprint: str | None, uncertainty: float
+    ) -> None:
+        """Persist the evidence state that controls future investigation."""
+        concept = self._module_concept_for(rel)
+        if concept is None:
+            return
+        meta = concept.properties.setdefault("code_learning", {})
+        if not isinstance(meta, dict):
+            meta = {}
+            concept.properties["code_learning"] = meta
+        meta.update({
+            "fingerprint": fingerprint,
+            "uncertainty": max(0.0, min(1.0, uncertainty)),
+            "complexity": self._file_complexity.get(rel, 0.0),
+            "last_analyzed": time.time(),
+            "review_count": self._spaced_repetition._review_counts.get(rel, 1),
+        })
+
     # ── Public API ──────────────────────────────────────────────────
 
     def learn_codebase(
@@ -417,7 +488,7 @@ class CodeLearner:
             file_results=file_results,
         )
 
-    def learn_file(self, filepath: str) -> FileLearningResult:
+    def learn_file(self, filepath: str, *, force: bool = False) -> FileLearningResult:
         """Analyze a single source file and add its concepts to the network.
 
         Detects language by extension (``.py`` → Python AST, ``.rs`` →
@@ -430,7 +501,10 @@ class CodeLearner:
         except ValueError:
             rel = str(path)
 
-        if rel in self._analyzed_files:
+        fingerprint = self._source_fingerprint(path)
+        unchanged = fingerprint is not None and fingerprint == self._file_fingerprints.get(rel)
+        due = bool(self._spaced_repetition.get_due_files([rel])) if rel in self._analyzed_files else False
+        if rel in self._analyzed_files and not force and unchanged and not due:
             return FileLearningResult(
                 filepath=rel,
                 language="unknown",
@@ -463,6 +537,13 @@ class CodeLearner:
         self._record_file_complexity(rel, result.functions, result.classes, result.lines)
         importance = self._file_complexity.get(rel, 0.5)
         self._spaced_repetition.record_analysis(rel, importance=importance)
+        self._file_fingerprints[rel] = fingerprint or ""
+        self._file_uncertainty[rel] = max(
+            0.05, self._file_uncertainty.get(rel, 1.0) * 0.55
+        )
+        self._persist_investigation_state(
+            rel, fingerprint, self._file_uncertainty[rel]
+        )
 
         return result
 
@@ -758,61 +839,107 @@ class CodeLearner:
         """The spaced repetition system for scheduling re-analysis."""
         return self._spaced_repetition
 
-    def select_next_file(self) -> str | None:
-        """Select the next file to analyze based on curiosity.
+    def select_next_file(
+        self, *, goal: str | None = None, include_tests: bool = True
+    ) -> str | None:
+        """Select source by expected information value, not file size."""
+        decision = self.investigate_next(goal=goal, include_tests=include_tests)
+        return decision.filepath if decision else None
 
-        Prioritizes files that are:
-        1. Not yet analyzed (novelty)
-        2. Structurally complex (high function/class count, many lines)
-        3. Due for re-analysis (spaced repetition)
-
-        The curiosity-driven selection favors structurally novel files
-        — files with high complexity or unusual structure — because
-        these offer the most new information. Files that have already
-        been analyzed are only re-selected if they're due for
-        re-analysis according to the spaced repetition schedule.
-
-        Returns:
-            The path of the next file to analyze, or None if no
-            suitable files are found.
-        """
-        all_files = self._iter_source_files(include_tests=True)
-        if not all_files:
+    def investigate_next(
+        self, *, goal: str | None = None, include_tests: bool = True
+    ) -> CodeInvestigation | None:
+        """Choose the source whose inspection should reduce most uncertainty."""
+        files = self._iter_source_files(include_tests=include_tests)
+        if not files:
             return None
-
-        # Separate unanalyzed and analyzed files
-        unanalyzed: list[Path] = []
-        analyzed: list[Path] = []
-        for path in all_files:
+        goal_tokens = {
+            token.lower()
+            for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", goal or "")
+        }
+        choices: list[CodeInvestigation] = []
+        for path in files:
             rel = self._relative(path)
-            if rel in self._analyzed_files:
-                analyzed.append(path)
-            else:
-                unanalyzed.append(path)
+            known = rel in self._analyzed_files
+            fp = self._source_fingerprint(path)
+            changed = bool(fp and fp != self._file_fingerprints.get(rel))
+            novelty = 1.0 if not known else 0.0
+            uncertainty = self._file_uncertainty.get(
+                rel, 1.0 if not known else 0.45
+            )
+            dependency = self._dependency_value(rel)
+            goal_relevance = self._goal_relevance(rel, goal_tokens)
+            change = 1.0 if changed else 0.0
+            retention = self._spaced_repetition.retention(rel) if known else 0.0
+            retention_pressure = 1.0 - retention if known else 0.0
+            complexity = self._estimate_complexity(path)
+            score = (
+                0.30 * novelty + 0.24 * uncertainty + 0.18 * dependency
+                + 0.14 * goal_relevance + 0.10 * change
+                + 0.03 * retention_pressure + 0.01 * complexity
+            )
+            reasons: list[str] = []
+            if novelty: reasons.append("novel")
+            if uncertainty >= 0.5: reasons.append("uncertain")
+            if dependency >= 0.5: reasons.append("dependency-impact")
+            if goal_relevance >= 0.5: reasons.append("goal-relevant")
+            if changed: reasons.append("changed")
+            if retention_pressure >= 0.5: reasons.append("retention-loss")
+            if not reasons: reasons.append("highest-information candidate")
+            choices.append(CodeInvestigation(
+                str(path), score, ", ".join(reasons), novelty, uncertainty,
+                dependency, goal_relevance, change, retention_pressure
+            ))
+        choices.sort(key=lambda item: (-item.score, item.filepath))
+        return choices[0]
 
-        # Priority 1: unanalyzed files, sorted by estimated complexity
-        if unanalyzed:
-            # Estimate complexity for each unanalyzed file
-            scored: list[tuple[float, Path]] = []
-            for path in unanalyzed:
-                complexity = self._estimate_complexity(path)
-                scored.append((complexity, path))
-            # Sort by complexity descending (most complex first)
-            scored.sort(key=lambda x: -x[0])
-            return str(scored[0][1])
+    def _dependency_value(self, rel: str) -> float:
+        """Estimate downstream structural impact from the learned graph."""
+        concept = self._module_concept_for(rel)
+        if concept is None:
+            return 0.0
+        try:
+            return min(1.0, len(self.network.get_edges(concept.id, "in")) / 12.0)
+        except Exception:  # noqa: BLE001
+            return 0.0
 
-        # Priority 2: files due for re-analysis (spaced repetition)
-        if analyzed:
-            analyzed_rels = [self._relative(p) for p in analyzed]
-            due_files = self._spaced_repetition.get_due_files(analyzed_rels)
-            if due_files:
-                # Return the most overdue file
-                for path in analyzed:
-                    if self._relative(path) == due_files[0]:
-                        return str(path)
+    def _goal_relevance(self, rel: str, goal_tokens: set[str]) -> float:
+        """Use active-goal overlap only as a routing signal."""
+        if not goal_tokens:
+            return 0.0
+        tokens = {
+            token.lower()
+            for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", rel)
+        }
+        return min(1.0, len(tokens & goal_tokens) / max(1, len(goal_tokens)))
 
-        # No files to analyze
-        return None
+    def investigate_code(
+        self, *, max_files: int = 5, goal: str | None = None,
+        include_tests: bool = True
+    ) -> CodeLearningResult:
+        """Perform bounded autonomous investigation with real re-analysis."""
+        results: list[FileLearningResult] = []
+        reasons: dict[str, str] = {}
+        investigated: set[str] = set()
+        for _ in range(max(0, max_files)):
+            decision = self.investigate_next(
+                goal=goal, include_tests=include_tests
+            )
+            if decision is None or decision.filepath in investigated:
+                break
+            investigated.add(decision.filepath)
+            reasons[decision.filepath] = decision.reason
+            results.append(self.learn_file(decision.filepath, force=True))
+        return CodeLearningResult(
+            files_analyzed=len(results),
+            concepts_added=sum(r.concepts_added for r in results),
+            relationships_added=sum(r.relationships_added for r in results),
+            total_functions=sum(r.functions for r in results),
+            total_classes=sum(r.classes for r in results),
+            total_lines=sum(r.lines for r in results),
+            file_results=results,
+            investigation_reasons=reasons,
+        )
 
     def _estimate_complexity(self, path: Path) -> float:
         """Estimate the structural complexity of a file.
