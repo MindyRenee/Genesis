@@ -125,7 +125,7 @@ def stop_daemon(proc: subprocess.Popen[bytes], socket_path: str) -> None:
         client.shutdown()
         client.disconnect()
         proc.wait(timeout=5.0)
-    except Exception:
+    except Exception:  # noqa: BLE001
         proc.kill()
         proc.wait()
 
