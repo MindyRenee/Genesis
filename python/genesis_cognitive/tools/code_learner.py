@@ -330,7 +330,10 @@ class CodeLearner:
         self.network = network
         self.client = client
         self.project_root = Path(project_root).resolve()
-        self._analyzed_files: set[str] = set()
+        # Recover the files already represented in the persistent concept
+        # network. Without this, a restart reset the in-memory ledger and
+        # autonomous 5-file passes repeatedly started from the same files.
+        self._analyzed_files: set[str] = self._recover_analyzed_files()
 
         # Spaced repetition system for code concept re-analysis
         self._spaced_repetition = CodeSpacedRepetition()
@@ -339,6 +342,26 @@ class CodeLearner:
         # to prioritize structurally novel or complex files
         self._file_complexity: dict[str, float] = {}
 
+    def _recover_analyzed_files(self) -> set[str]:
+        """Recover code-study coverage from persisted code concepts.
+
+        The in-memory ``_analyzed_files`` set is a runtime optimization, not
+        the durable source of truth. Module concepts created by code learning
+        carry their project-relative file path, so a restarted Genesis can
+        continue through the source tree instead of re-reading the same first
+        batch.
+        """
+        recovered: set[str] = set()
+        for concept_id in self.network.concept_ids:
+            if not (concept_id.startswith("python:") or concept_id.startswith("rust:")):
+                continue
+            concept = self.network.get_concept(concept_id)
+            if concept is None or concept.properties.get("kind") != "module":
+                continue
+            filepath = concept.properties.get("file")
+            if isinstance(filepath, str) and filepath:
+                recovered.add(filepath)
+        return recovered
     # ── Public API ──────────────────────────────────────────────────
 
     def learn_codebase(
