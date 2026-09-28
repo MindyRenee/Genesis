@@ -3276,9 +3276,9 @@ impl NeurochemicalVector {
         let ach_idx = NeurochemicalId::Acetylcholine as usize;
         if current_phase == MentalPhase::NREM || current_phase == MentalPhase::REM {
             // Target ACh level depends on sleep stage:
-            // - Early NREM (adenosine > 0.65): ACh stays low (0.20)
+            // - Early NREM (adenosine > 0.80): ACh stays low (0.20)
             //   for slow-wave sleep.
-            // - Late NREM (adenosine ≤ 0.65): ACh rebounds toward
+            // - Late NREM (adenosine ≤ 0.80): ACh rebounds toward
             //   0.65 to trigger the NREM→REM transition.
             // - REM: ACh is held at 0.65 to maintain the REM state.
             let ach_target = if rebound_engaged { 0.65 } else { 0.20 };
