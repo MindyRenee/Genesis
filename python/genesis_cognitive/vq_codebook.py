@@ -156,7 +156,8 @@ class VQCodebook:
             seed: Random seed for reproducibility.
 
         Returns:
-            Dict with training statistics: ``final_error``, ``iters``.
+            Dict with raw/normalized reconstruction error, cosine similarity,
+            residual saturation, and training dimensions/iterations.
         """
         n, d = vectors.shape
         if d != self.dim:
@@ -495,17 +496,15 @@ class VQCodebook:
         return uncompressed / compressed if compressed > 0 else 1.0
 
     def reconstruction_quality(self) -> float:
-        """Return a proxy for reconstruction quality.
+        """Return scale-normalized reconstruction quality in [0, 1].
 
-        Since the original vectors are not retained after training, a
-        direct cosine similarity cannot be computed here. Instead, this
-        returns ``1 - mean_squared_reconstruction_error``, clamped to
-        ``[0, 1]``. Values close to 1.0 mean low reconstruction error
-        (near-lossless compression); values near 0 mean high error.
+        This is one minus the relative reconstruction error, clamped to
+        [0, 1]. The error is measured against the actual stored
+        prototype-plus-int8-residual representation from the last fit.
         """
         if not self.is_trained:
             return 0.0
-        return max(0.0, 1.0 - self._reconstruction_error)
+        return float(np.clip(1.0 - self._relative_reconstruction_error, 0.0, 1.0))
 
     def stats(self) -> dict[str, float]:
         """Return a summary of codebook statistics."""
