@@ -18,7 +18,6 @@ import json
 import os
 import sys
 import tempfile
-from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import Any
 
