@@ -52,18 +52,38 @@ class LifecycleMixin:
         this restores its concept network, reflections, and narrative
         from previous conversations.
         """
+        startup_t0 = time.perf_counter()
         self._start_connect_and_register()
+        logger.info("Startup phase connect/register: %.2fs", time.perf_counter() - startup_t0)
         try:
+            phase_t0 = time.perf_counter()
             self._start_restore_state()
+            logger.info(
+                "Startup phase restore/repair: %.2fs (concepts=%d, edges=%d, archive=%d)",
+                time.perf_counter() - phase_t0,
+                self.cognition.network.size,
+                self.cognition.network.edge_count,
+                self.cognition.network.archive_size,
+            )
         except (OSError, KeyError, TypeError, ValueError, AttributeError):
             self._running = False
             self.client.disconnect()
             raise
-        self._start_set_zone_after_restore()
-        self._start_introspect_and_train()
-        self._start_autonomous_subsystems()
-        self._start_engage_restored_sleep()
-        self._start_background_threads()
+        try:
+            phase_t0 = time.perf_counter()
+            self._start_set_zone_after_restore()
+            self._start_introspect_and_train()
+            logger.info("Startup phase identity/arousal: %.2fs", time.perf_counter() - phase_t0)
+            phase_t0 = time.perf_counter()
+            self._start_autonomous_subsystems()
+            self._start_engage_restored_sleep()
+            self._start_background_threads()
+            logger.info("Startup phase background systems: %.2fs", time.perf_counter() - phase_t0)
+            logger.info("Genesis cognitive mind ready in %.2fs", time.perf_counter() - startup_t0)
+        except Exception:
+            logger.exception("Genesis startup failed during post-restore initialization")
+            self._running = False
+            raise
     def _start_connect_and_register(self) -> None:
         """Connect to the daemon and register cognitive modules.
 
@@ -128,7 +148,14 @@ class LifecycleMixin:
         # persistence (they may have been saved before the columns field
         # existed). Also creates pioneer bridges between same-name
         # concepts across different columns.
+        repair_t0 = time.perf_counter()
         stats = self.cognition.network.backfill_columns()
+        logger.info(
+            "Startup column repair: %.2fs (%d concepts, %d bridges)",
+            time.perf_counter() - repair_t0,
+            stats["concepts_backfilled"],
+            stats["bridges_created"],
+        )
         if stats["concepts_backfilled"] > 0:
             self._emit_live_thought(
                 "learning",
@@ -147,6 +174,7 @@ class LifecycleMixin:
         The warmup is best-effort: normal cognition can still trigger the
         same resources lazily if this thread has not finished yet.
         """
+        self._warmup_stop.clear()
         self._warmup_thread = threading.Thread(
             target=self._warmup_semantic_resources,
             name="semantic-warmup",
@@ -157,6 +185,8 @@ class LifecycleMixin:
     def _warmup_semantic_resources(self) -> None:
         """Build embeddings and page the LTM index in the background."""
         try:
+            if self._warmup_stop.is_set():
+                return
             t0 = time.perf_counter()
             self.cognition.embeddings._ensure_loaded()
             logger.info("Semantic embeddings ready in %.2fs", time.perf_counter() - t0)
@@ -164,6 +194,8 @@ class LifecycleMixin:
             logger.warning("Semantic embedding warmup failed: %s", e)
 
         try:
+            if self._warmup_stop.is_set():
+                return
             t0 = time.perf_counter()
             self.cognition.memory.client.find_similar("warmup", limit=1)
             logger.info("LTM cache ready in %.2fs", time.perf_counter() - t0)
@@ -171,6 +203,8 @@ class LifecycleMixin:
             logger.warning("LTM warmup failed: %s", e)
 
         try:
+            if self._warmup_stop.is_set():
+                return
             t0 = time.perf_counter()
             self.cognition.embeddings.find_similar_to_text(
                 "warmup", k=1, threshold=0.5
@@ -544,6 +578,12 @@ class LifecycleMixin:
 
         worker = self._active_think_worker
         clean_shutdown &= self._join_shutdown_thread(worker, "think")
+
+        # Stop semantic warmup before saving/closing shared resources.
+        self._warmup_stop.set()
+        clean_shutdown &= self._join_shutdown_thread(
+            getattr(self, "_warmup_thread", None), "semantic-warmup", timeout=10.0
+        )
 
         # Save state before anything else — this is the critical step.
         # Keep cleaning up even if it fails, but report the failure to
