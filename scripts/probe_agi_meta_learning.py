@@ -120,36 +120,70 @@ def discover(
     return records
 
 
-def exploit_or_explore(
+def run_trial(
     competence: TaskCompetence,
     trial: Trial,
+    *,
+    exploration_cursor: int,
 ) -> dict[str, Any]:
+    """Run a target trial closed-loop; no correct-action oracle reaches Genesis."""
+    goal = (GoalCondition("solved", "eq", True),)
     context = context_for(competence, trial)
     state = {trial.family.feature_key: trial.feature_value}
+    records: list[dict[str, Any]] = []
 
-    predicted: list[tuple[float, str]] = []
-    for action in trial.family.actions:
-        for effect in competence.predict(context, action, state):
-            if effect.key == "solved" and effect.expected is True:
-                predicted.append((effect.confidence, action))
+    for offset in range(len(trial.family.actions)):
+        predicted: list[tuple[float, str]] = []
+        for action in trial.family.actions:
+            for effect in competence.predict(context, action, state):
+                if effect.key == "solved" and effect.expected is True:
+                    predicted.append((effect.confidence, action))
 
-    if predicted:
-        action = max(predicted, key=lambda x: x[0])[1]
-        mode = "model"
-    else:
-        action = trial.family.actions[0]
-        mode = "explore"
+        if predicted:
+            action = max(predicted, key=lambda item: (item[0], item[1]))[1]
+            mode = "model"
+        else:
+            action = trial.family.actions[
+                (exploration_cursor + offset) % len(trial.family.actions)
+            ]
+            mode = "explore"
 
-    after = step(trial.family, trial, action)
+        after = step(trial.family, trial, action)
+        check = competence.record_transition(
+            context, action, state, after, success=after["solved"]
+        )
+        records.append({
+            "action": action,
+            "mode": mode,
+            "success": after["solved"],
+            "prediction_score": check.score,
+        })
+
+        if after["solved"]:
+            competence.record_episode(
+                context,
+                steps=(
+                    ProcedureStep(
+                        action=action,
+                        parameters={"support": 1.0},
+                        family="binary-rule",
+                    ),
+                ),
+                success=True,
+                verification_score=competence.verify(goal, after),
+                goal_conditions=goal,
+                verification="external",
+            )
+            break
+
     return {
         "domain": trial.family.domain,
         "target": trial.target,
         "feature_value": trial.feature_value,
-        "mode": mode,
-        "selected_action": action,
-        "success": after["solved"],
-        "novel": context.novel,
-        "retrieved_skills": [
+        "attempts": len(records),
+        "success": records[-1]["success"],
+        "records": records,
+        "cross_domain_retrievals": [
             {
                 "skill_id": match.skill.skill_id,
                 "source_domain": match.skill.signature.domain,
@@ -160,6 +194,7 @@ def exploit_or_explore(
             if match.skill.signature.domain != trial.family.domain
         ],
     }
+
 
 def main() -> None:
     source = Family(
@@ -188,21 +223,21 @@ def main() -> None:
         make_trial(target, "mora", False),
     ]
 
-    # Baseline: no experience from the source family.
     fresh = TaskCompetence()
-    baseline_records = []
-    for trial in target_trials:
-        baseline_records.append(exploit_or_explore(fresh, trial))
+    baseline_records = [
+        run_trial(fresh, trial, exploration_cursor=index)
+        for index, trial in enumerate(target_trials)
+    ]
 
-    # Meta-learning arm: identical target tasks, but with prior experience.
     pretrained = TaskCompetence()
     source_records = discover(pretrained, source_trials)
-    pretrained_records = []
-    for trial in target_trials:
-        pretrained_records.append(exploit_or_explore(pretrained, trial))
+    pretrained_records = [
+        run_trial(pretrained, trial, exploration_cursor=index)
+        for index, trial in enumerate(target_trials)
+    ]
 
     report = {
-        "probe": "agi-trajectory-meta-learning-v1",
+        "probe": "agi-trajectory-meta-learning-v2",
         "llm_in_loop": False,
         "correct_action_exposed": False,
         "environment_rule_hidden": True,
@@ -211,40 +246,40 @@ def main() -> None:
         "fresh_target": baseline_records,
         "pretrained_target": pretrained_records,
         "measurements": {
+            "fresh_interactions": sum(e["attempts"] for e in baseline_records),
+            "pretrained_source_interactions": len(source_records),
+            "pretrained_target_interactions": sum(
+                e["attempts"] for e in pretrained_records
+            ),
+            "fresh_successes": sum(e["success"] for e in baseline_records),
+            "pretrained_successes": sum(
+                e["success"] for e in pretrained_records
+            ),
             "fresh_model_selections": sum(
-                r["mode"] == "model" for r in baseline_records
+                r["mode"] == "model"
+                for e in baseline_records for r in e["records"]
             ),
             "pretrained_model_selections": sum(
-                r["mode"] == "model" for r in pretrained_records
+                r["mode"] == "model"
+                for e in pretrained_records for r in e["records"]
             ),
-            "fresh_successes": sum(
-                r["success"] for r in baseline_records
-            ),
-            "pretrained_successes": sum(
-                r["success"] for r in pretrained_records
-            ),
-            "fresh_interactions": len(baseline_records),
-            "pretrained_source_interactions": len(source_records),
-            "pretrained_target_interactions": len(pretrained_records),
             "pretrained_cross_domain_retrievals": sum(
-                bool(r["retrieved_skills"]) for r in pretrained_records
+                bool(e["cross_domain_retrievals"]) for e in pretrained_records
             ),
             "pretrained_cross_domain_retrievals_used_for_action": 0,
         },
         "interpretation": [
-            "A pretrained advantage would be evidence that prior experience "
-            "changes learning or action selection on a novel family.",
-            "The current substrate can retrieve a cross-domain skill, but "
-            "TaskCompetence.predict() only predicts named operators already "
-            "stored in the target schema. Retrieval therefore cannot by itself "
-            "rebind the foreign procedure to new operators.",
-            "A zero pretrained advantage is a useful negative result: it "
-            "distinguishes cross-domain recognition from a reusable learning "
-            "prior.",
-            "Because the vocabularies are disjoint, simple operator-name "
-            "memorization cannot explain a target-family advantage.",
-            "This probe does not claim general intelligence; it measures one "
-            "specific prerequisite for increasingly general learning.",
+            "The fresh and pretrained arms solve the same target sequence without "
+            "being given the hidden rule or correct action.",
+            "A reduction in target interactions for the pretrained arm would be "
+            "evidence that source experience changes target learning cost.",
+            "Cross-domain retrieval is measured separately because retrieval is "
+            "not equivalent to rebinding a foreign procedure to target operators.",
+            "The current TaskCompetence.predict() API predicts effects for named "
+            "operators stored in the target schema; it does not consume a foreign "
+            "skill as an action-selection rule.",
+            "This probe therefore distinguishes stored skill retrieval from a "
+            "reusable meta-learning prior and does not claim general intelligence.",
         ],
     }
     print(json.dumps(report, indent=2, sort_keys=True))
