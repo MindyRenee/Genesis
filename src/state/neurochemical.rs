@@ -1507,7 +1507,20 @@ impl NeurochemicalVector {
             }
             NeurochemicalId::Histamine => {
                 // Daytime elevation: promotes wakefulness
-                1.0 + 0.20 * (two_pi * (phase - 0.25)).sin()
+                // Melatonin attenuates the circadian drive to the
+                // wake-promoting histamine system, which is the
+                // documented mechanism: melatonin "acts at the SCN to
+                // attenuate the wake-promoting signal of the circadian
+                // clock, thus promoting sleep" (Liu et al. 1997), and
+                // its sleep effect is "mostly ascribed to the circadian
+                // component of sleep regulation" rather than to
+                // relieving homeostatic pressure (Arbon et al. 2015 via
+                // Zisapel 2018). Melatonin previously instead lowered
+                // the homeostatic adenosine threshold, which both
+                // misassigned the mechanism and let a circadian signal
+                // drive Process S.
+                let mel = self.chemicals[NeurochemicalId::Melatonin as usize].level;
+                1.0 + 0.20 * (two_pi * (phase - 0.25)).sin() * (1.0 - 0.7 * mel)
             }
             // Melatonin is driven by the oscillator, not baseline modulation
             _ => 1.0,
@@ -1956,13 +1969,25 @@ impl NeurochemicalVector {
         // McCarley, 1975): REM-on cells (cholinergic) are active while
         // REM-off cells (noradrenergic, serotonergic) are silenced.
         let is_in_sleep = current == MentalPhase::NREM || current == MentalPhase::REM;
+        // No melatonin term here. Melatonin used to lower the *adenosine*
+        // threshold directly (-0.15 entering, -0.10 staying), which put a
+        // circadian signal on the homeostatic process. The evidence is
+        // that it does not work that way: "because melatonin does not
+        // increase the amount of SWS, which is considered a marker of
+        // the homeostatic sleep pressure, the sleep promoting effects of
+        // melatonin may be mostly ascribed to the circadian component of
+        // sleep regulation" (Arbon et al. 2015, via Zisapel 2018), and
+        // "melatonin acts at the SCN to attenuate the wake-promoting
+        // signal of the circadian clock" (Liu et al. 1997). So it belongs
+        // on the circadian drive to the arousal system, which is where it
+        // now lives — see circadian_baseline_modifier for Histamine.
+        //
+        // Orexin is legitimately a wake signal competing at the gate, so
+        // it stays.
         let sleep_adn = if is_in_sleep {
-            // Easier to stay asleep once there
-            0.65 - 0.10 * mel - 0.05 * (1.0 - ox)
+            0.65 - 0.05 * (1.0 - ox)
         } else {
-            // Entering sleep: melatonin lowers the adenosine wall;
-            // orexin makes it harder to fall asleep.
-            0.75 - 0.15 * mel - 0.05 * (1.0 - ox)
+            0.75 - 0.05 * (1.0 - ox)
         };
         let sleep_hist = if is_in_sleep {
             // More histamine is tolerable when already asleep. The
@@ -1983,11 +2008,11 @@ impl NeurochemicalVector {
             //
             // Orexin is wake-promoting, so high orexin lowers the
             // ceiling (less histamine tolerated → harder to stay asleep).
-            0.38 + 0.05 * mel - 0.05 * ox
+            0.38 - 0.05 * ox
         } else {
             // Entering: histamine must be lower, especially with high
             // orexin (wake-promoting signal resists sleep onset).
-            0.25 + 0.05 * mel - 0.05 * ox
+            0.25 - 0.05 * ox
         };
 
         // Exhaustion override: when raw adenosine (metabolic sleep
