@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
 import copy
 import logging
+import os
 import threading
 import time
 from typing import Any, cast
@@ -36,6 +37,15 @@ from genesis_client.protocol import (
 logger = logging.getLogger(__name__)
 
 
+def _rss_mb() -> float | None:
+    """Return current process RSS in MiB when the platform exposes it."""
+    try:
+        import psutil
+        return psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
+    except (ImportError, OSError, RuntimeError):
+        return None
+
+
 class LifecycleMixin:
     """Mixin for :class:`Mind` — see module docstring."""
     if TYPE_CHECKING:
@@ -58,12 +68,14 @@ class LifecycleMixin:
         try:
             phase_t0 = time.perf_counter()
             self._start_restore_state()
+            rss = _rss_mb()
             logger.info(
-                "Startup phase restore/repair: %.2fs (concepts=%d, edges=%d, archive=%d)",
+                "Startup phase restore/repair: %.2fs (concepts=%d, edges=%d, archive=%d%s)",
                 time.perf_counter() - phase_t0,
                 self.cognition.network.size,
                 self.cognition.network.edge_count,
                 self.cognition.network.archive_size,
+                f", rss={rss:.1f}MiB" if rss is not None else "",
             )
         except (OSError, KeyError, TypeError, ValueError, AttributeError):
             self._running = False
@@ -79,7 +91,12 @@ class LifecycleMixin:
             self._start_engage_restored_sleep()
             self._start_background_threads()
             logger.info("Startup phase background systems: %.2fs", time.perf_counter() - phase_t0)
-            logger.info("Genesis cognitive mind ready in %.2fs", time.perf_counter() - startup_t0)
+            rss = _rss_mb()
+            logger.info(
+                "Genesis cognitive mind ready in %.2fs%s",
+                time.perf_counter() - startup_t0,
+                f" (rss={rss:.1f}MiB)" if rss is not None else "",
+            )
         except Exception:
             logger.exception("Genesis startup failed during post-restore initialization")
             self._running = False
