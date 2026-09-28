@@ -40,6 +40,7 @@ __all__ = [
     "CodeSpacedRepetition",
     "FileAnalysis",
     "FileLearningResult",
+    "CodeInvestigation",
 ]
 
 logger = logging.getLogger(__name__)
@@ -847,7 +848,11 @@ class CodeLearner:
         return decision.filepath if decision else None
 
     def investigate_next(
-        self, *, goal: str | None = None, include_tests: bool = True
+        self,
+        *,
+        goal: str | None = None,
+        include_tests: bool = True,
+        exclude: set[str] | None = None,
     ) -> CodeInvestigation | None:
         """Choose the source whose inspection should reduce most uncertainty."""
         files = self._iter_source_files(include_tests=include_tests)
@@ -858,8 +863,11 @@ class CodeLearner:
             for token in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", goal or "")
         }
         choices: list[CodeInvestigation] = []
+        excluded = exclude or set()
         for path in files:
             rel = self._relative(path)
+            if rel in excluded:
+                continue
             known = rel in self._analyzed_files
             fp = self._source_fingerprint(path)
             changed = bool(fp and fp != self._file_fingerprints.get(rel))
@@ -923,7 +931,7 @@ class CodeLearner:
         investigated: set[str] = set()
         for _ in range(max(0, max_files)):
             decision = self.investigate_next(
-                goal=goal, include_tests=include_tests
+                goal=goal, include_tests=include_tests, exclude=investigated
             )
             if decision is None or decision.filepath in investigated:
                 break
