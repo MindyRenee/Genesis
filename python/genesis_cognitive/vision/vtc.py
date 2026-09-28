@@ -124,17 +124,23 @@ class VTCFeatureSpace:
             self._scatter = np.zeros((d, d), dtype=np.float64)
             return
 
-        # Update mean with forgetting factor
-        delta = descriptor - self._mean
-        self._mean = self.forgetting_factor * self._mean + (1 - self.forgetting_factor) * descriptor
+        # Update mean with forgetting factor α (exponentially-weighted
+        # running mean: μ ← α·μ + (1−α)·x).
+        alpha = self.forgetting_factor
+        delta_old = descriptor - self._mean
+        self._mean = alpha * self._mean + (1 - alpha) * descriptor
+        delta_new = descriptor - self._mean  # = α·δ_old
 
-        # Update scatter matrix (accumulated centered outer products).
+        # Exponentially-weighted scatter (Finch, 2009 online covariance):
+        # S ← α·S + (1−α)·δ_old·δ_newᵀ. Uses both pre- and post-update
+        # residuals with the (1−α) weight — the old code omitted (1−α)
+        # and used δ_old twice, overweighting new samples ~1/(1−α)×.
         # _scatter is always set alongside _mean (above), so it's not
         # None here — but mypy can't infer that from the early return.
         assert self._scatter is not None
         self._scatter = (
-            self.forgetting_factor * self._scatter
-            + np.outer(delta, delta)
+            alpha * self._scatter
+            + (1 - alpha) * np.outer(delta_old, delta_new)
         )
 
         # Recompute PCA every 10 samples (expensive but d is small)

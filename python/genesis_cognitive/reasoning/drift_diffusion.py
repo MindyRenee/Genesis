@@ -53,6 +53,7 @@ References:
 
 from __future__ import annotations
 
+import math
 import random
 from dataclasses import dataclass, field
 
@@ -161,26 +162,37 @@ class DriftDiffusionModel:
         non_decision_time: float = 0.0,
         decay: float = 0.0,
         rng: random.Random | None = None,
+        lateral_inhibition: float = 0.0,
     ) -> None:
         """Initialize the drift-diffusion model.
 
         Args:
             threshold: Decision boundary. Higher = more cautious.
                 Default 1.0. Typical human DDM thresholds range 0.5–2.5.
-            noise: Standard deviation of Gaussian noise added to each
-                accumulator per tick. Models neural variability.
+            noise: Diffusion coefficient σ of the Wiener process
+                (SDE: dx = drift·dt + σ·dW). Models neural variability.
                 Default 0.03.
             non_decision_time: Constant offset (in ticks) added to
                 decision time. Models perceptual/motor processing.
                 Default 0.0.
-            decay: Evidence decay rate per tick (0 = no decay).
+            decay: Leak rate λ for leaky integration
+                (dx = −λ·x·dt + …). Integrated exactly as
+                x ← x·exp(−λ·dt) so large dt can never flip the sign.
                 Models leaky integration. Default 0.0.
             rng: Optional random number generator for reproducibility.
+            lateral_inhibition: Mutual-inhibition strength β ∈ [0, 1)
+                between accumulators (Usher & McClelland, 2001 leaky
+                competing accumulator; Bogacz et al., 2006 shows mutual
+                inhibition approximates optimal multisensory integration).
+                Each accumulator loses β·(mean of others' evidence)·dt
+                per tick. Default 0.0 (independent race, backward
+                compatible).
         """
         self.threshold = threshold
         self.noise = noise
         self.non_decision_time = non_decision_time
         self.decay = decay
+        self.lateral_inhibition = max(0.0, min(0.99, lateral_inhibition))
         self._rng = rng or random.Random()
         self._accumulators: dict[str, EvidenceAccumulator] = {}
         self._elapsed: float = 0.0
@@ -276,21 +288,50 @@ class DriftDiffusionModel:
 
         winner: EvidenceAccumulator | None = None
 
-        for acc in self._accumulators.values():
+        # Lateral inhibition (LCA): each accumulator is inhibited in
+        # proportion to the mean evidence of the others. Computed from
+        # pre-tick levels so the update is symmetric.
+        inhibitions: dict[str, float] = {}
+        if self.lateral_inhibition > 0 and len(self._accumulators) > 1:
+            levels = {
+                name: acc.evidence
+                for name, acc in self._accumulators.items()
+                if not acc.decided
+            }
+            if len(levels) > 1:
+                total = sum(levels.values())
+                for name, level in levels.items():
+                    others_mean = (total - level) / (len(levels) - 1)
+                    inhibitions[name] = (
+                        self.lateral_inhibition * max(0.0, others_mean) * dt
+                    )
+
+        for name, acc in self._accumulators.items():
             if acc.decided:
                 continue
 
-            # Integrate pending drift with noise
-            noise_val = self._rng.gauss(0.0, self.noise) if self.noise > 0 else 0.0
-            drift = (acc._pending_drift + noise_val) * drift_mult
-            acc.evidence += drift * dt
+            # Euler–Maruyama discretization of dx = drift·dt + σ·dW:
+            # deterministic drift scales with dt, Wiener noise with
+            # √dt (Var[σ·ΔW] = σ²·dt). Scaling noise by dt instead
+            # would give variance ∝ dt² and vanish as dt → 0.
+            noise_val = (
+                self._rng.gauss(0.0, self.noise * math.sqrt(dt))
+                if self.noise > 0 and dt > 0
+                else 0.0
+            )
+            drift = acc._pending_drift * drift_mult
+            acc.evidence += drift * dt + noise_val
+            acc.evidence -= inhibitions.get(name, 0.0)
             acc._pending_drift = 0.0
 
-            # Apply decay (leaky integration)
+            # Exact exponential leak x ← x·exp(−λ·dt): unconditionally
+            # stable, never flips sign even for large dt.
             if self.decay > 0:
-                acc.evidence *= 1.0 - self.decay * dt
+                acc.evidence *= math.exp(-self.decay * dt)
 
-            # Prevent evidence from going negative (bounded below)
+            # Rectified below at 0 (leaky competing accumulator
+            # convention, Usher & McClelland 2001): firing rates cannot
+            # go negative; inhibition is carried by the lateral term.
             if acc.evidence < 0:
                 acc.evidence = 0.0
 
@@ -307,15 +348,29 @@ class DriftDiffusionModel:
         return None
 
     def _make_result(self, winner: EvidenceAccumulator) -> DecisionResult:
-        """Build a DecisionResult from the winning accumulator."""
-        # Confidence: how far above threshold, normalized.
+        """Build a DecisionResult from the winning accumulator.
+
+        Confidence is the normalized margin over the runner-up
+        (0.5 = tie at threshold, →1.0 as the lead grows by one
+        threshold): conf = 0.5 + (ev_win − ev_second) / (2·thr),
+        clipped to [0, 1]. This mirrors the LCA readout where choice
+        probability depends on the separation of accumulators, not on
+        how far above threshold the winner overshoots (the old
+        ev/thr form was ≈1.0 at every decision by construction).
+        """
         # Guard against threshold == 0 (defensive — add_option should
         # reject it, but a directly-constructed accumulator could have 0).
-        confidence = min(1.0, winner.evidence / winner.threshold) if winner.threshold > 0 else 1.0
-        # If evidence is well above threshold, confidence approaches 1.0
-        # If barely at threshold, confidence ~ 1.0 (it won)
-        # Add margin from second-best for confidence calibration
         all_evidence = {opt: acc.evidence for opt, acc in self._accumulators.items()}
+        runner_up = max(
+            (ev for opt, ev in all_evidence.items() if opt != winner.option),
+            default=winner.threshold,
+        )
+        margin = winner.evidence - runner_up
+        if winner.threshold > 0:
+            confidence = 0.5 + margin / (2.0 * winner.threshold)
+        else:
+            confidence = 1.0
+        confidence = max(0.0, min(1.0, confidence))
 
         return DecisionResult(
             option=winner.option,

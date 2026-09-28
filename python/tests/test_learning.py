@@ -567,10 +567,18 @@ def test_stdp_weight_negative_delta_is_depression(stdp) -> None:
 
 
 def test_stdp_weight_zero_delta_is_max_potentiation(stdp) -> None:
-    """Δt = 0 (co-firing) → maximum LTP."""
-    w_zero = stdp.compute_stdp_window(0.0)
-    w_small = stdp.compute_stdp_window(1.0)
-    assert w_zero > w_small
+    """Δt = 0 (exact simultaneity) → no change (no causal order).
+
+    Bi & Poo (1998): the STDP kernel is discontinuous at zero — LTP
+    for pre-before-post, LTD for post-before-pre. At exactly zero lag
+    there is no temporal order, so the kernel returns 0. This also
+    avoids a full-LTP artifact when simultaneous spikes are recorded
+    through sequential ``record_spike`` calls (each would otherwise see
+    the other at Δt = 0 and claim maximal causation).
+    """
+    assert stdp.compute_stdp_window(0.0) == 0.0
+    assert stdp.compute_stdp_window(1.0) > 0
+    assert stdp.compute_stdp_window(-1.0) < 0
 
 
 def test_stdp_exponential_decay(stdp) -> None:
@@ -1517,16 +1525,24 @@ def test_modulator_two_amplifies_plasticity() -> None:
 
 
 def test_negative_modulator_reverses_plasticity() -> None:
-    """A negative modulator should reverse an otherwise potentiating rule."""
+    """A negative modulator should reverse an otherwise potentiating rule.
+
+    Bidirectional STDP forms both ordered pairs: the causal edge
+    (a→b, LTP rule) times −1 depresses, while the acausal edge (b→a,
+    LTD rule) times −1 potentiates. Both reversals are the correct
+    third-factor sign flip.
+    """
     stdp, synapses = _make_stdp(["a", "b"])
     synapses.set_weight("a", "b", 0.5)
+    synapses.set_weight("b", "a", 0.5)
     stdp.set_modulator(-1.0)
     stdp.record_spike("a", 100.0)
     stdp.record_spike("b", 110.0)
     assert synapses.get_weight("a", "b") < 0.5
+    assert synapses.get_weight("b", "a") > 0.5
     stats = stdp.get_statistics()
     assert stats["total_depressed"] > 0
-    assert stats["total_potentiated"] == 0
+    assert stats["total_potentiated"] > 0
 
 
 def test_statistics_include_modulator() -> None:

@@ -100,7 +100,18 @@ class STDP:
             return self._modulator
 
     def record_spike(self, concept: str, time_ms: float) -> None:
-        """Record an activation and form STDP pairs with recent activations."""
+        """Record an activation and form STDP pairs with recent activations.
+
+        Implements bidirectional all-to-all STDP (Bi & Poo, 1998; Markram
+        et al., 1997): for each prior spike of another unit at
+        ``other_time``, the ordered pair (other → concept) potentiates
+        with Δt = time_ms − other_time ≥ 0, while the reverse ordered
+        pair (concept → other) depresses with Δt = other_time − time_ms
+        ≤ 0. Forward time therefore strengthens the causal direction
+        (pre-before-post, LTP) and weakens the acausal direction
+        (post-before-pre, LTD), as required for temporally asymmetric
+        Hebbian plasticity.
+        """
         concept = self.network._resolve(concept) or concept
         pairs: list[tuple[str, str, float, float]] = []
 
@@ -112,9 +123,16 @@ class STDP:
                     delta_t = time_ms - other_time
                     if abs(delta_t) > self.window_ms:
                         continue
+                    # Forward direction: other (pre) → concept (post).
                     weight_change = self._stdp_weight(delta_t)
                     if abs(weight_change) > 1e-12:
                         pairs.append((other, concept, delta_t, weight_change))
+                    # Reverse direction: concept (pre) → other (post) with
+                    # negated timing. At Δt_forward > 0 this yields LTD on
+                    # the acausal edge; at simultaneity both are ~0.
+                    rev_change = self._stdp_weight(-delta_t)
+                    if abs(rev_change) > 1e-12:
+                        pairs.append((concept, other, -delta_t, rev_change))
 
             self._spike_history.setdefault(
                 concept, deque(maxlen=self._max_history)
@@ -185,11 +203,15 @@ class STDP:
         """Compatibility no-op; synaptic efficacy is already bounded to [0, 1]."""
 
     def _stdp_weight(self, delta_t: float) -> float:
+        # Bi & Poo (1998): Δw = A+·exp(−Δt/τ+) for Δt > 0 (LTP),
+        # Δw = −A−·exp(Δt/τ−) for Δt < 0 (LTD). At exact simultaneity
+        # there is no causal order, so no change (avoids a full-LTP
+        # artifact when simultaneous spikes are recorded sequentially).
         if delta_t > 0:
             return self.a_plus * float(np.exp(-delta_t / self.tau_plus))
         if delta_t < 0:
             return -self.a_minus * float(np.exp(delta_t / self.tau_minus))
-        return self.a_plus
+        return 0.0
 
     def _apply_pending(self) -> dict[str, int]:
         with self._lock:

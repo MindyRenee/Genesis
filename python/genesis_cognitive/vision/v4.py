@@ -270,11 +270,22 @@ class V4Model:
         hue[mask_g] = 60.0 * (((b - r) / np.maximum(delta, 1e-8))[mask_g] + 2.0)
         hue[mask_b] = 60.0 * (((r - g) / np.maximum(delta, 1e-8))[mask_b] + 4.0)
 
+        # Hue is circular (0° ≡ 360°, both red): use the circular mean
+        # θ̄ = arg(Σ exp(iθ)) (Mardia & Jupp). A linear mean would place
+        # a red cluster split across 0°/360° at ~180° (cyan) artifactually.
+        hue_rad = np.deg2rad(hue)
+        mean_hue = float(np.angle(np.mean(np.exp(1j * hue_rad))) % (2.0 * np.pi)) / (
+            2.0 * np.pi
+        )
+        # Circular std: σ = √(−2 ln R), R = |Σ exp(iθ)|/n.
+        resultant = float(np.abs(np.mean(np.exp(1j * hue_rad))))
+        hue_std = float(np.sqrt(max(0.0, -2.0 * np.log(max(resultant, 1e-8)))) / (2.0 * np.pi))
+
         return np.array([
-            np.mean(hue) / 360.0,
+            mean_hue,
             np.mean(s),
             np.mean(v),
-            np.std(hue) / 360.0,
+            min(hue_std, 0.5),
             np.std(s),
             np.std(v),
         ])

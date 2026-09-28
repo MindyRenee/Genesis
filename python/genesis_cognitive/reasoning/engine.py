@@ -475,8 +475,14 @@ class ReasoningEngine:
                     f"{concept_id} enables {target} (weight={enables_targets[target]:.2f})",
                     f"{concept_id} prevents {target} (weight={prevents_targets[target]:.2f})",
                 ]
-                # Confidence proportional to the combined weight
-                conf = min(1.0, enables_targets[target] + prevents_targets[target])
+                # Confidence proportional to the combined weight.
+                # Noisy-OR (Pearl, 1988): P = 1 − (1−w1)(1−w2), the
+                # probability that at least one independent cause is
+                # active. A raw sum would exceed 1 and double-count
+                # redundant evidence.
+                conf = 1.0 - (1.0 - enables_targets[target]) * (
+                    1.0 - prevents_targets[target]
+                )
                 results.append(
                     ReasoningResult(
                         conclusion=conclusion,

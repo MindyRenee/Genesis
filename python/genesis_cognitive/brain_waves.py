@@ -517,7 +517,7 @@ def compute_gamma_synchrony(
     state: BrainWaveState,
     plasticity: float = 0.5,
 ) -> GammaSynchrony:
-    """Compute gamma-band synchrony across brain regions.
+    """Compute a gamma-synchrony proxy across brain regions.
 
     Gamma synchrony is modelled from the global gamma power (the
     "ignition" signal) gated by plasticity (which determines whether
@@ -527,18 +527,25 @@ def compute_gamma_synchrony(
     Herrmann & Demiralp, 2012).
 
     Each region receives a gamma power drawn from the global gamma
-    power with small region-specific variation. The phase-locking
-    value (PLV) across regions is the global gamma power scaled by
-    plasticity — high gamma + high plasticity → high PLV → cognitive
-    access; low gamma or low plasticity → low PLV → noncognitive.
+    power with small region-specific variation. The synchrony index
+    across regions is the global gamma power scaled by plasticity —
+    high gamma + high plasticity → high synchrony → cognitive
+    access; low gamma or low plasticity → low synchrony.
+
+    Note: this is a heuristic proxy, NOT a true phase-locking value.
+    A true PLV is PLV = |⟨exp(i·Δφ)⟩| over phase samples (Lachaux
+    et al., 1999; Canolty & Knight, 2010) and has no universal 0.5
+    threshold. Global-neuronal-workspace ignition (Dehaene, 2014) is a
+    nonlinear dynamical transition, not a fixed PLV cutoff; the 0.5
+    cutoff below is an operational heuristic for this synthetic model.
 
     Args:
         state: The current brain wave state.
         plasticity: Neurochemical plasticity gate [0,1].
 
     Returns:
-        A ``GammaSynchrony`` with per-region powers, PLV, and a
-        cognitive-access prediction.
+        A ``GammaSynchrony`` with per-region powers, synchrony proxy,
+        and a cognitive-access prediction.
     """
     gamma = state.powers[BrainWave.GAMMA]
     # Long-range phase locking requires both gamma drive and the
@@ -560,8 +567,9 @@ def compute_gamma_synchrony(
         power = max(0.0, min(1.0, gamma + hub_boost * gamma))
         region_powers[region] = power
 
-    # Cognitive access threshold: PLV > 0.5 predicts cognitive access
-    # (Dehaene, 2014 — the "ignition" threshold).
+    # Cognitive-access heuristic: synchrony proxy > 0.5 predicts access.
+    # Operational cutoff for this synthetic model only — not a
+    # neuroscientific constant (see docstring).
     cognitive = plv > 0.5
 
     if cognitive:
