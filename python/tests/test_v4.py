@@ -67,5 +67,5 @@ def test_learning_returns_code_for_current_dictionary():
 
     pooled, _ = model._pool_v1(v1, 2, 2)
     X = np.hstack([pooled, np.zeros((pooled.shape[0], model.color_dims))])
-    np.testing.assert_allclose(z @ model.phi4.T, X - (X - z @ model.phi4.T))
+    np.testing.assert_allclose(z, model._infer_latents(X))
     np.testing.assert_allclose(model._phi4_gram, model.phi4.T @ model.phi4)
