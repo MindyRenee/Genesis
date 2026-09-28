@@ -149,8 +149,17 @@ def exploit_or_explore(
         "selected_action": action,
         "success": after["solved"],
         "novel": context.novel,
+        "retrieved_skills": [
+            {
+                "skill_id": match.skill.skill_id,
+                "source_domain": match.skill.signature.domain,
+                "similarity": match.similarity,
+                "score": match.score,
+            }
+            for match in context.skills
+            if match.skill.signature.domain != trial.family.domain
+        ],
     }
-
 
 def main() -> None:
     source = Family(
@@ -217,13 +226,22 @@ def main() -> None:
             "fresh_interactions": len(baseline_records),
             "pretrained_source_interactions": len(source_records),
             "pretrained_target_interactions": len(pretrained_records),
+            "pretrained_cross_domain_retrievals": sum(
+                bool(r["retrieved_skills"]) for r in pretrained_records
+            ),
+            "pretrained_cross_domain_retrievals_used_for_action": 0,
         },
         "interpretation": [
             "A pretrained advantage would be evidence that prior experience "
             "changes learning or action selection on a novel family.",
-            "No advantage is informative: it marks a boundary between stored "
-            "skills and reusable meta-learning priors.",
-            "Because the two vocabularies are disjoint, simple operator-name "
+            "The current substrate can retrieve a cross-domain skill, but "
+            "TaskCompetence.predict() only predicts named operators already "
+            "stored in the target schema. Retrieval therefore cannot by itself "
+            "rebind the foreign procedure to new operators.",
+            "A zero pretrained advantage is a useful negative result: it "
+            "distinguishes cross-domain recognition from a reusable learning "
+            "prior.",
+            "Because the vocabularies are disjoint, simple operator-name "
             "memorization cannot explain a target-family advantage.",
             "This probe does not claim general intelligence; it measures one "
             "specific prerequisite for increasingly general learning.",
