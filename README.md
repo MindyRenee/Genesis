@@ -206,9 +206,10 @@ the loop returned `noop` regardless; now it determines the outcome.
 Two further limits are unchanged and still true: because `precision`
 saturates at 1.0, the `precision > 0.8` exploitative branch is the one
 actually taken, so the stochastic exploration branch is effectively
-dead in practice; and `model_maturity` is a stopwatch —
-`1 − exp(−ticks/500)` — independent of model quality, despite the state
-schema telling the cognitive mind to treat it as a trust signal.
+dead in practice. `model_maturity` is now evidence-based: elapsed
+experience is tempered by predictive fit and posterior certainty, so
+a long-running but inaccurate model does not become trusted merely
+because time passed.
 
 The self-model and its feedback loop are worth the code. The FEP
 vocabulary attached to them is not, and the arbitration constants are
