@@ -52,6 +52,7 @@ class LifecycleMixin:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see the package's core module).
         _autosave_cycle: int
+        _warmup_thread: threading.Thread | None
         def __getattr__(self, name: str) -> Any: ...
 
 
