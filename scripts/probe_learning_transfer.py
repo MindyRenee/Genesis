@@ -136,7 +136,11 @@ def persist_and_reload(
     return reloaded_engine, reloaded_network
 
 
-def run_condition(name: str, experience: list[str], reload_before_target: bool = False) -> dict[str, Any]:
+def run_condition(
+    name: str,
+    experience: list[str],
+    reload_before_target: bool = False,
+) -> dict[str, Any]:
     engine, network, data_dir = make_engine()
     experience_results = []
 
@@ -184,7 +188,10 @@ def run_condition(name: str, experience: list[str], reload_before_target: bool =
         "persistent_state_delta": {
             "concept_count": after_target["concept_count"] - before_target["concept_count"],
             "edge_count": after_target["edge_count"] - before_target["edge_count"],
-            "conversation_turns": after_target["conversation_turns"] - before_target["conversation_turns"],
+            "conversation_turns": (
+                after_target["conversation_turns"]
+                - before_target["conversation_turns"]
+            ),
         },
     }
 
