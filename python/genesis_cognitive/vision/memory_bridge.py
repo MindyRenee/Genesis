@@ -114,6 +114,12 @@ class MemoryBridge:
         # Concept embedding cache (updated when W is refit)
         self._concept_embeddings: dict[str, np.ndarray] = {}
 
+        self._embedding_reconstruction_mse = 0.0
+        self._embedding_reconstruction_relative_error = 0.0
+        self._embedding_reconstruction_cosine = 0.0
+        self._vtc_cycle_reconstruction_mse = 0.0
+        self._vtc_cycle_reconstruction_relative_error = 0.0
+
     def learn_association(
         self,
         vtc_vector: np.ndarray,
@@ -245,12 +251,56 @@ class MemoryBridge:
         VtV = V.T @ V  # (vtc_dim, vtc_dim)
         reg = self.ridge_lambda * np.eye(self.vtc_dim)
         try:
-            W = E.T @ V @ np.linalg.inv(VtV + reg)
-            self.W = W
-            # Compute pseudo-inverse for generative path
-            self._W_pinv = np.linalg.pinv(W)  # (vtc_dim, embedding_dim)
+            self.W = np.linalg.solve(VtV + reg, V.T @ E).T
+            self._W_pinv = np.linalg.pinv(self.W)
+            self._update_reconstruction_metrics(V, E)  # (vtc_dim, embedding_dim)
         except np.linalg.LinAlgError:
             logger.debug("MTL bridge refit failed — singular matrix")
+
+    def _update_reconstruction_metrics(self, V: np.ndarray, E: np.ndarray) -> None:
+        """Measure fidelity of both learned directions on training pairs."""
+        if self.W is None or V.size == 0:
+            return
+        predicted_e = V @ self.W.T
+        e_error = E - predicted_e
+        self._embedding_reconstruction_mse = float(np.mean(e_error ** 2))
+        self._embedding_reconstruction_relative_error = (
+            self._embedding_reconstruction_mse / max(float(np.mean(E ** 2)), 1e-12)
+        )
+        e_norm = np.linalg.norm(E, axis=1)
+        p_norm = np.linalg.norm(predicted_e, axis=1)
+        denom = e_norm * p_norm
+        valid = denom > 1e-12
+        cosine = np.zeros_like(denom)
+        cosine[valid] = np.sum(E[valid] * predicted_e[valid], axis=1) / denom[valid]
+        self._embedding_reconstruction_cosine = float(np.mean(cosine))
+
+        reconstructed_v = E @ self._W_pinv.T
+        v_error = V - reconstructed_v
+        self._vtc_cycle_reconstruction_mse = float(np.mean(v_error ** 2))
+        self._vtc_cycle_reconstruction_relative_error = (
+            self._vtc_cycle_reconstruction_mse / max(float(np.mean(V ** 2)), 1e-12)
+        )
+
+    @property
+    def embedding_reconstruction_mse(self) -> float:
+        return self._embedding_reconstruction_mse
+
+    @property
+    def embedding_reconstruction_relative_error(self) -> float:
+        return self._embedding_reconstruction_relative_error
+
+    @property
+    def embedding_reconstruction_cosine(self) -> float:
+        return self._embedding_reconstruction_cosine
+
+    @property
+    def vtc_cycle_reconstruction_mse(self) -> float:
+        return self._vtc_cycle_reconstruction_mse
+
+    @property
+    def vtc_cycle_reconstruction_relative_error(self) -> float:
+        return self._vtc_cycle_reconstruction_relative_error
 
     @staticmethod
     def _cosine_sim(a: np.ndarray, b: np.ndarray) -> float:
