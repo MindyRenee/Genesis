@@ -9,7 +9,6 @@ if TYPE_CHECKING:
 
 import copy
 import logging
-import os
 import threading
 import time
 from typing import Any, cast
@@ -37,22 +36,12 @@ from genesis_client.protocol import (
 logger = logging.getLogger(__name__)
 
 
-def _rss_mb() -> float | None:
-    """Return current process RSS in MiB when the platform exposes it."""
-    try:
-        import psutil
-        return psutil.Process(os.getpid()).memory_info().rss / (1024 * 1024)
-    except (ImportError, OSError, RuntimeError):
-        return None
-
-
 class LifecycleMixin:
     """Mixin for :class:`Mind` — see module docstring."""
     if TYPE_CHECKING:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see the package's core module).
         _autosave_cycle: int
-        _warmup_thread: threading.Thread | None
         def __getattr__(self, name: str) -> Any: ...
 
 
@@ -63,45 +52,18 @@ class LifecycleMixin:
         this restores its concept network, reflections, and narrative
         from previous conversations.
         """
-        startup_t0 = time.perf_counter()
         self._start_connect_and_register()
-        logger.info("Startup phase connect/register: %.2fs", time.perf_counter() - startup_t0)
         try:
-            phase_t0 = time.perf_counter()
             self._start_restore_state()
-            rss = _rss_mb()
-            logger.info(
-                "Startup phase restore/repair: %.2fs (concepts=%d, edges=%d, archive=%d%s)",
-                time.perf_counter() - phase_t0,
-                self.cognition.network.size,
-                self.cognition.network.edge_count,
-                self.cognition.network.archive_size,
-                f", rss={rss:.1f}MiB" if rss is not None else "",
-            )
         except (OSError, KeyError, TypeError, ValueError, AttributeError):
             self._running = False
             self.client.disconnect()
             raise
-        try:
-            phase_t0 = time.perf_counter()
-            self._start_set_zone_after_restore()
-            self._start_introspect_and_train()
-            logger.info("Startup phase identity/arousal: %.2fs", time.perf_counter() - phase_t0)
-            phase_t0 = time.perf_counter()
-            self._start_autonomous_subsystems()
-            self._start_engage_restored_sleep()
-            self._start_background_threads()
-            logger.info("Startup phase background systems: %.2fs", time.perf_counter() - phase_t0)
-            rss = _rss_mb()
-            logger.info(
-                "Genesis cognitive mind ready in %.2fs%s",
-                time.perf_counter() - startup_t0,
-                f" (rss={rss:.1f}MiB)" if rss is not None else "",
-            )
-        except Exception:
-            logger.exception("Genesis startup failed during post-restore initialization")
-            self._running = False
-            raise
+        self._start_set_zone_after_restore()
+        self._start_introspect_and_train()
+        self._start_autonomous_subsystems()
+        self._start_engage_restored_sleep()
+        self._start_background_threads()
     def _start_connect_and_register(self) -> None:
         """Connect to the daemon and register cognitive modules.
 
@@ -166,14 +128,7 @@ class LifecycleMixin:
         # persistence (they may have been saved before the columns field
         # existed). Also creates pioneer bridges between same-name
         # concepts across different columns.
-        repair_t0 = time.perf_counter()
         stats = self.cognition.network.backfill_columns()
-        logger.info(
-            "Startup column repair: %.2fs (%d concepts, %d bridges)",
-            time.perf_counter() - repair_t0,
-            stats["concepts_backfilled"],
-            stats["bridges_created"],
-        )
         if stats["concepts_backfilled"] > 0:
             self._emit_live_thought(
                 "learning",
@@ -181,59 +136,39 @@ class LifecycleMixin:
                 f"{stats['bridges_created']} bridges"
             )
 
-        # Expensive semantic/LTM initialization must not block interactive
-        # startup. Embedding construction can take seconds and the first
-        # LTM lookup can page a large index from disk. Both are safe to
-        # initialize lazily, so schedule them after the mind is usable.
-        self._start_warmup_thread()
-    def _start_warmup_thread(self) -> None:
-        """Warm expensive semantic resources without blocking startup.
+        # Eagerly load the embedding matrix. The first perceive() call
+        # in think() would otherwise trigger a lazy _build() that takes
+        # 8+ seconds (spectral SVD over 20K+ concepts), blowing past
+        # the 15s cognition timeout on the first conversation turn.
+        # Loading here moves that cost to startup, where it's hidden
+        # by the rest of the initialization sequence.
+        self.cognition.embeddings._ensure_loaded()
 
-        The warmup is best-effort: normal cognition can still trigger the
-        same resources lazily if this thread has not finished yet.
-        """
-        self._warmup_stop.clear()
-        self._warmup_thread = threading.Thread(
-            target=self._warmup_semantic_resources,
-            name="semantic-warmup",
-            daemon=True,
-        )
-        self._warmup_thread.start()
-
-    def _warmup_semantic_resources(self) -> None:
-        """Build embeddings and page the LTM index in the background."""
+        # Pre-warm the daemon's LTM cache and the embeddings search.
+        # The first find_similar call pages in the entire LTM index
+        # (300K+ episodes) from disk — cold-cache I/O takes 20+ seconds
+        # and blows past the 15s cognition timeout. Similarly, the first
+        # embeddings search touches the full concept matrix. Running
+        # both here moves those costs to startup.
+        import time as _warmup_time
+        _warmup_t0 = _warmup_time.perf_counter()
         try:
-            if self._warmup_stop.is_set():
-                return
-            t0 = time.perf_counter()
-            self.cognition.embeddings._ensure_loaded()
-            logger.info("Semantic embeddings ready in %.2fs", time.perf_counter() - t0)
-        except Exception as e:  # noqa: BLE001
-            logger.warning("Semantic embedding warmup failed: %s", e)
-
-        try:
-            if self._warmup_stop.is_set():
-                return
-            t0 = time.perf_counter()
             self.cognition.memory.client.find_similar("warmup", limit=1)
-            logger.info("LTM cache ready in %.2fs", time.perf_counter() - t0)
-        except Exception as e:  # noqa: BLE001
-            logger.warning("LTM warmup failed: %s", e)
-
-        try:
-            if self._warmup_stop.is_set():
-                return
-            t0 = time.perf_counter()
-            self.cognition.embeddings.find_similar_to_text(
-                "warmup", k=1, threshold=0.5
-            )
             logger.debug(
-                "Embedding search warmup completed in %.2fs",
-                time.perf_counter() - t0,
+                f"LTM warmup find_similar took "
+                f"{_warmup_time.perf_counter() - _warmup_t0:.2f}s"
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug("Embedding search warmup failed: %s", e)
-
+            logger.debug(f"LTM warmup find_similar failed: {e}")
+        _embed_t0 = _warmup_time.perf_counter()
+        try:
+            self.cognition.embeddings.find_similar_to_text("warmup", k=1, threshold=0.5)
+            logger.debug(
+                f"embeddings warmup took "
+                f"{_warmup_time.perf_counter() - _embed_t0:.2f}s"
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"embeddings warmup failed: {e}")
     def _start_introspect_and_train(self) -> None:
         """Introspect on identity and clear sleep pressure if needed."""
         # Introspect — discover who it is by examining itself
@@ -596,12 +531,6 @@ class LifecycleMixin:
 
         worker = self._active_think_worker
         clean_shutdown &= self._join_shutdown_thread(worker, "think")
-
-        # Stop semantic warmup before saving/closing shared resources.
-        self._warmup_stop.set()
-        clean_shutdown &= self._join_shutdown_thread(
-            getattr(self, "_warmup_thread", None), "semantic-warmup", timeout=10.0
-        )
 
         # Save state before anything else — this is the critical step.
         # Keep cleaning up even if it fails, but report the failure to

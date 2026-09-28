@@ -346,26 +346,19 @@ class EmbeddingStore:
             if idx is not None:
                 return matrix[idx]
 
-        # Check the ad-hoc cache under the same lock used for matrix/index
-        # generations. Refresh can replace both while queries are active.
-        with self._lock:
-            cached = self._concept_cache.get(concept_name)
-            if concept_name in self._concept_cache:
-                self._concept_cache.move_to_end(concept_name)
-                return cached
-            archive_idx = self._archive_to_idx.get(concept_name)
-            archive_matrix = self._archive_matrix
-            dim = self._dim
-            spectral_dim = self._spectral_dim
+        # Check the ad-hoc cache
+        if concept_name in self._concept_cache:
+            return self._concept_cache[concept_name]
 
         # Check the cold layer — archived concepts have a flat-block
         # vector stored without the leading spectral + experiential
         # block. Expand to full width with zeros so callers can compare
         # against hot vectors; the zeros contribute nothing to cosine.
-        if archive_idx is not None and archive_matrix is not None:
-            full = np.zeros(dim, dtype=np.float32)
-            flat_start = spectral_dim + self._experiential_dim
-            full[flat_start:] = archive_matrix[archive_idx]
+        archive_idx = self._archive_to_idx.get(concept_name)
+        if archive_idx is not None and self._archive_matrix is not None:
+            full = np.zeros(self._dim, dtype=np.float32)
+            flat_start = self._spectral_dim + self._experiential_dim
+            full[flat_start:] = self._archive_matrix[archive_idx]
             return self._cache_concept(concept_name, full)
 
         # Compute on the fly
@@ -376,12 +369,11 @@ class EmbeddingStore:
         self, concept_name: str, vec: np.ndarray | None
     ) -> np.ndarray | None:
         """Store a concept vector in the bounded ad-hoc cache."""
-        with self._lock:
-            cache = self._concept_cache
-            cache[concept_name] = vec
-            cache.move_to_end(concept_name)
-            while len(cache) > _MAX_CONCEPT_CACHE:
-                cache.popitem(last=False)
+        cache = self._concept_cache
+        cache[concept_name] = vec
+        cache.move_to_end(concept_name)
+        while len(cache) > _MAX_CONCEPT_CACHE:
+            cache.popitem(last=False)
         return vec
 
     def cosine_similarity(self, v1: np.ndarray, v2: np.ndarray) -> float:

@@ -665,10 +665,6 @@ class Mind(
         self._heartbeat_thread: threading.Thread | None = None
         self._notification_thread: threading.Thread | None = None
         self._autosave_thread: threading.Thread | None = None
-        # Semantic warmup runs outside the startup critical path, but is
-        # coordinated during shutdown so it cannot touch closed resources.
-        self._warmup_thread: threading.Thread | None = None
-        self._warmup_stop: threading.Event = threading.Event()
         # Counter for periodic concept-network pruning. The autonomous
         # learner adds concepts continuously; without periodic pruning
         # the network bloats and every search becomes O(N) over 100K+
