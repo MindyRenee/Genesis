@@ -489,6 +489,29 @@ class CodeLearner:
             file_results=file_results,
         )
 
+    def _retire_stale_file_symbols(self, rel: str) -> int:
+        """Retract obsolete code symbols for a changed source file."""
+        stale: list[str] = []
+        for concept_id in self.network.concept_ids:
+            if not (concept_id.startswith("python:") or concept_id.startswith("rust:")):
+                continue
+            concept = self.network.get_concept(concept_id)
+            if concept is None:
+                continue
+            if concept.properties.get("file") != rel:
+                continue
+            if concept.properties.get("kind") == "module":
+                continue
+            stale.append(concept_id)
+        removed = 0
+        for concept_id in stale:
+            try:
+                if self.network.remove_concept(concept_id):
+                    removed += 1
+            except Exception as exc:  # noqa: BLE001
+                logger.debug("failed retiring stale code symbol %s: %s", concept_id, exc)
+        return removed
+
     def learn_file(self, filepath: str, *, force: bool = False) -> FileLearningResult:
         """Analyze a single source file and add its concepts to the network.
 
@@ -515,6 +538,9 @@ class CodeLearner:
                 classes=0,
                 lines=0,
             )
+
+        if rel in self._analyzed_files and not unchanged:
+            self._retire_stale_file_symbols(rel)
 
         suffix = path.suffix.lower()
         if suffix == ".py":
@@ -598,10 +624,10 @@ class CodeLearner:
         for node in ast.iter_child_nodes(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 functions += 1
-                self._add_python_function(node, module_concept, module_name)
+                self._add_python_function(node, module_concept, module_name, rel)
             elif isinstance(node, ast.ClassDef):
                 classes += 1
-                self._add_python_class(node, module_concept, module_name)
+                self._add_python_class(node, module_concept, module_name, rel)
 
         # Imports and calls across the whole tree. The analyzer keeps
         # lexical scope, so calls made by methods land on the method
@@ -1014,6 +1040,7 @@ class CodeLearner:
         node: ast.FunctionDef | ast.AsyncFunctionDef,
         module_concept: str,
         module_name: str,
+        rel: str,
     ) -> None:
         """Add a module-level (or method) function as a concept."""
         fn_concept = f"python:{module_name}.{node.name}"
@@ -1024,6 +1051,7 @@ class CodeLearner:
             properties={
                 "kind": "function",
                 "language": "python",
+                "file": rel,
                 "line": node.lineno,
                 "async": isinstance(node, ast.AsyncFunctionDef),
             },
@@ -1040,6 +1068,7 @@ class CodeLearner:
         node: ast.ClassDef,
         module_concept: str,
         module_name: str,
+        rel: str,
     ) -> None:
         """Add a class and its methods as concepts."""
         class_concept = f"python:{node.name}"
@@ -1050,6 +1079,7 @@ class CodeLearner:
             properties={
                 "kind": "class",
                 "language": "python",
+                "file": rel,
                 "line": node.lineno,
             },
         )
@@ -1085,6 +1115,7 @@ class CodeLearner:
                     properties={
                         "kind": "method",
                         "language": "python",
+                        "file": rel,
                         "line": child.lineno,
                         "async": isinstance(child, ast.AsyncFunctionDef),
                     },
