@@ -338,8 +338,8 @@ def _atomic_write_state(data_dir: str, state: dict[str, Any]) -> None:
         if dir_fd >= 0:
             try:
                 os.close(dir_fd)
-            except OSError:
-                pass
+            except OSError as close_err:
+                logger.debug(f"failed to close dir_fd after fsync error: {close_err}")
 
 
 def _add_optional_state(

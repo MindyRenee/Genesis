@@ -84,11 +84,11 @@ def save_npz(path: str | os.PathLike[str], **arrays: Any) -> None:
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, path)
-    except BaseException:
+    except Exception:
         try:
             os.unlink(tmp)
-        except OSError:
-            pass
+        except OSError as unlink_err:
+            logger.debug(f"failed to unlink tmp file after error: {unlink_err}")
         raise
 
 

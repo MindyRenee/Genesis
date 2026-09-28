@@ -38,6 +38,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,6 +51,26 @@ from ..config import default_data_dir
 __all__ = ["DetectedFace", "FaceRecognizer", "KnownFace"]
 
 logger = logging.getLogger(__name__)
+
+
+def _write_json_atomically(path: Path, data: object) -> None:
+    """Replace learned face data only after the complete file is durable."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(
+        dir=path.parent, prefix=f".{path.name}.", suffix=".tmp", text=True
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, path)
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def _require_cv2():  # type: ignore[no-untyped-def]
@@ -344,7 +366,6 @@ class FaceRecognizer:
         if self._faces_file is None:
             return
         try:
-            self._faces_file.parent.mkdir(parents=True, exist_ok=True)
             data = {
                 name: [
                     {
@@ -356,7 +377,6 @@ class FaceRecognizer:
                 ]
                 for name, faces in self._known_faces.items()
             }
-            with open(self._faces_file, "w") as f:
-                json.dump(data, f)
+            _write_json_atomically(self._faces_file, data)
         except Exception as e:  # noqa: BLE001
             logger.warning(f"Failed to save known faces: {e}")
