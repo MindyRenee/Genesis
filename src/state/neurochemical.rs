@@ -495,7 +495,30 @@ impl NeurochemicalId {
             Self::Oxytocin => 0.7,       // OTR trafficking is moderate-slow
             Self::Endorphin => 0.9,      // MOR internalization is moderate
             Self::Histamine => 1.0,
-            Self::Adenosine => 1.0,
+            // The somnogenic adenosine receptor is A1, and A1 is the
+            // adenosine subtype that *resists* downregulation: "the
+            // A1Rs are not (readily) phosphorylated and internalize
+            // slowly, showing a typical half-life of several hours,
+            // whereas the A2AR and A2BR undergo much faster
+            // downregulation, usually shorter than 1 h" (Klaasse et
+            // al. 2008, Pharmacol Rev / PMC2245999). A3 is faster
+            // still, "often a matter of minutes".
+            //
+            // Modelling A1 as average-trafficking (it previously shared
+            // the 1.0 "baseline reference" with AMPA/NMDA) let chronic
+            // sleep pressure collapse the receptor factors: measured
+            // over 48 h, raw adenosine sat at 0.90 while effective
+            // level fell to 0.126 with sensitivity pinned at its 0.5
+            // floor. Because the sleep gate reads a blend of effective
+            // and raw adenosine, that collapse dragged the gate value
+            // to 0.513 — under the 0.65 stay threshold — making sleep
+            // unrecoverable and latching the phase machine into a
+            // self-sustaining exhaustion loop (80,871 sleep bouts in
+            // 48 h, mean duration one tick).
+            //
+            // 0.3 encodes A1's resistance: several-hour internalization
+            // half-life against A2A/A2B's sub-hour one.
+            Self::Adenosine => 0.3,
             Self::BDNF => 0.3, // TrkB expression and BDNF synthesis are slow
             Self::Endocannabinoid => 1.0,
             Self::Vasopressin => 0.6, // V1a/V1b trafficking is slow
@@ -1979,29 +2002,127 @@ impl NeurochemicalVector {
         // (not the blended signal) because it represents the absolute
         // metabolic limit — the system cannot stay awake past this
         // point regardless of receptor state.
-        if adn_raw > 0.90 {
-            // NREM by default (exhaustion sleep is slow-wave)
-            // Only enter REM if already in REM (hysteresis)
-            if current == MentalPhase::REM && ach > 0.40 && ne < 0.35 {
+        //
+        // Hysteresis: the override releases at 0.75, not 0.90.
+        //
+        // It used to re-test `adn_raw > 0.90` on every tick, using raw
+        // to *enter* but handing control straight back to the blended
+        // gate to *stay*. That is unsound, because chronic high
+        // adenosine desensitizes its own receptors: measured over 48
+        // simulated hours, raw sat at 0.90 while effective level had
+        // collapsed to 0.126 (receptor sensitivity 0.51), so the
+        // blended signal the gate reads was 0.513 — under the 0.65
+        // stay threshold. So the override engaged, decayed adenosine
+        // by one tick's worth, dropped it just under 0.90, released,
+        // and the gate immediately declared wake. The system chattered
+        // at the sampling limit: 80,871 sleep bouts in 48 h, mean
+        // duration one tick, 4.5 h "asleep" in total, adenosine
+        // pinned at 0.90 and never clearing. REM was unreachable
+        // because the cholinergic rebound needs adenosine below 0.65,
+        // which a one-tick bout can never deliver.
+        //
+        // Releasing at 0.75 — the model's own sleep-onset threshold —
+        // makes exhaustion sleep a latch. The same argument the
+        // existing comment makes for reading raw rather than blended
+        // applies to release: while the system is pinned at its
+        // metabolic limit, receptor burnout must not be able to eject
+        // it. With a sustained bout, raw adenosine decays toward 0.20
+        // with chi_s = 4.2 h, reaching 0.75 in about an hour and 0.65 in
+        // about 50 minutes from a 0.75 onset — which is what puts the
+        // first REM period inside the first NREM bout, at 60-90 min,
+        // instead of never.
+        // REM conjuncts, defined here so the exhaustion override and the
+        // sleep branch agree on them.
+        //
+        // These compare LEVELS, not effective levels, and the reason is
+        // that the flip-flop describes REM-on/REM-off neuronal firing
+        // rather than receptor occupancy of a bulk concentration. The
+        // receptor machinery models how tissue responds to sustained
+        // concentration; it is not a measure of neuronal activity.
+        // Gating on effective level was self-defeating in practice:
+        // driving acetylcholine high enough to clear 0.50 on effective
+        // level (reaching 1.00, p75 0.93) drove its own desensitization,
+        // holding effective at 0.326 and clearing the threshold on only
+        // 4.4% of NREM ticks.
+        let rem_ach = if current == MentalPhase::REM { 0.40 } else { 0.50 };
+        let rem_ne = if current == MentalPhase::REM { 0.35 } else { 0.30 };
+        //
+        // Serotonin is deliberately *not* a conjunct here, though it does
+        // get the REM-off profile below. Monti & Jantos (2008) show
+        // dorsal raphe 5-HT is near-silent in REM, but Sakai & Crochet
+        // (2001) found "DRN serotonergic activity does not play any
+        // crucial role in PS generation" — it regulates waking and
+        // slow-wave sleep rather than driving paradoxical sleep. So
+        // serotonin is a correlate of REM, not a necessary condition for
+        // it, and gating entry on it would over-claim. Making it
+        // required also broke `test_emergent_phase_rem`, which
+        // deliberately sets only ACh and NE.
+        let ach_level = raw(NeurochemicalId::Acetylcholine);
+        let ne_level = raw(NeurochemicalId::Norepinephrine);
+        let rem_conditions_met = ach_level > rem_ach && ne_level < rem_ne;
+
+        const EXHAUSTION_ENTER: f32 = 0.90;
+        const EXHAUSTION_RELEASE: f32 = 0.75;
+        let exhaustion_hold = if current == MentalPhase::NREM || current == MentalPhase::REM {
+            adn_raw > EXHAUSTION_RELEASE
+        } else {
+            adn_raw > EXHAUSTION_ENTER
+        };
+        if exhaustion_hold {
+            // Exhaustion forces *sleep*, but it does not decide NREM
+            // versus REM: the same conjuncts decide, so REM stays
+            // reachable from NREM. NREM is the default because
+            // exhaustion sleep is slow-wave.
+            if rem_conditions_met {
                 return MentalPhase::REM;
             }
             return MentalPhase::NREM;
+            // Exhaustion forces *sleep*, not NREM specifically. It used
+            // to return NREM unconditionally, which short-circuited the
+            // sleep branch below where all the NREM/REM logic lives, and
+            // so made REM unreachable from NREM by construction: the only
+            // way to be REM was to already be REM.
+            //
+            // That was invisible because this override is the *active*
+            // path — raw adenosine stays above the 0.75 release
+            // threshold for essentially all NREM ticks (measured range
+            // 0.750-0.900), so the hold is true throughout sleep and the
+            // REM conjuncts were never even evaluated.
+            //
+            // The override now decides only sleep-versus-wake. The NREM
+            // and REM distinction belongs to the sleep branch, which
+            // the exhaustion state has already committed us to, so this
+            // falls through to it.
         }
 
         if adn > sleep_adn && hist < sleep_hist {
             // We are in sleep — determine NREM vs REM
             // REM: cholinergic high, aminergic low (noradrenergic silence)
-            let rem_ach = if current == MentalPhase::REM {
-                0.40
-            } else {
-                0.50
-            };
-            let rem_ne = if current == MentalPhase::REM {
-                0.35
-            } else {
-                0.30
-            };
-            if ach > rem_ach && ne < rem_ne {
+            // rem_ach / rem_ne / rem_srt are defined above the
+            // exhaustion override so both paths share them.
+            // Serotonin is the third REM-off population. The dorsal
+            // raphe goes near-silent in REM, and it is the aminergic
+            // system with the cleanest state profile (Monti & Jantos
+            // 2008), so it discriminates REM from NREM where NE barely
+            // moves. The threshold sits between the NREM target (0.30)
+            // and the REM target (0.10) set by the REM-off profile.
+            // rem_srt likewise.
+            // Level, not effective level, for all three REM conjuncts.
+            //
+            // The flip-flop is a statement about REM-on and REM-off
+            // *neuronal populations* and their firing, not about receptor
+            // occupancy of a bulk extracellular concentration. The
+            // receptor machinery (sensitivity, desensitization,
+            // internalization) models how tissue responds to sustained
+            // concentration; it is not a measure of cholinergic neuronal
+            // activity. Gating a state defined by neuronal activity on a
+            // receptor-scaled concentration conflates two different
+            // quantities, and it is self-defeating in practice: driving
+            // the acetylcholine level high enough to clear the threshold
+            // on effective level (which reached 1.00, p75 0.93) drove
+            // its own desensitization, holding effective at 0.326 and
+            // clearing 0.50 on only 4.4% of NREM ticks.
+            if rem_conditions_met {
                 return MentalPhase::REM;
             }
             // NREM: default sleep state — low ACh, high GABA
@@ -2476,6 +2597,26 @@ impl NeurochemicalVector {
                 self.chemicals[i].velocity = 0.0;
                 continue;
             }
+            // The trigger is 0.80, not 0.65: the two thresholds were keyed
+            // to different signals and so could never both be met inside
+            // one bout. The bout ends when *blended* adenosine
+            // (0.5*effective + 0.5*raw) falls below its stay threshold,
+            // while the rebound tested *raw* against 0.65. Effective
+            // trails raw while receptors recover, so raw is always the
+            // larger and the raw threshold was only reached after the bout
+            // had already ended -- measured at 0.0% of NREM ticks, with
+            // REM occupancy exactly 0%.
+            //
+            // The rule is that REM propensity builds as homeostatic
+            // pressure relaxes *back toward the level at which sleep was
+            // initiated*, not as it nearly bottoms out. Borbely &
+            // Achermann (1999) note REM is inhibited by Process S, so
+            // falling pressure matters, not exhausted pressure;
+            // Benington & Heller (1994) likewise found REM propensity
+            // increasing across NREM rather than at its end. 0.80 is the
+            // model's own sleep-onset neighbourhood, so the rebound runs
+            // on a timescale set by the existing architecture rather than
+            // a threshold no bout could satisfy.
             // Cholinergic rebound: during sustained NREM (adenosine
             // has cleared below 0.65, ~83 min into sleep) or during
             // REM, ACh is managed by the dedicated cholinergic rebound
@@ -2485,10 +2626,27 @@ impl NeurochemicalVector {
             // prevent ACh from ever reaching the 0.50 REM threshold.
             // See the cholinergic rebound section after the adenosine
             // sleep pressure mechanism.
+            // Serotonin: dorsal raphe 5-HT neurons are a REM-off
+            // population, so their firing — and therefore the
+            // serotonergic tone the phase gate reads — is state
+            // dependent: high in wake, reduced through NREM, and
+            // near-silent in REM (Monti & Jantos 2008; Sakai &
+            // Crochet 2001). The dedicated mechanism below owns that
+            // profile, so the homeostatic pull toward baseline (0.40)
+            // and the coupling forces are skipped during sleep exactly
+            // as they are for acetylcholine and adenosine. Left to
+            // them, serotonin measured identically in wake and NREM
+            // (0.3917 vs 0.3918 over 24 h, range 0.358-0.398), so the
+            // REM-off population was not represented at all.
+            let is_srt = i == NeurochemicalId::Serotonin as usize;
+            if is_srt && is_sleeping {
+                self.chemicals[i].velocity = 0.0;
+                continue;
+            }
             let is_ach = i == NeurochemicalId::Acetylcholine as usize;
             if is_ach && is_sleeping {
                 let adn_level = self.chemicals[NeurochemicalId::Adenosine as usize].level;
-                let in_rebound = current_phase == MentalPhase::REM || adn_level < 0.65;
+                let in_rebound = current_phase == MentalPhase::REM || adn_level < 0.80;
                 if in_rebound {
                     self.chemicals[i].velocity = 0.0;
                     continue;
@@ -2865,19 +3023,48 @@ impl NeurochemicalVector {
             || current_phase == MentalPhase::REM
             || params.zone_sleeping
         {
-            // Sleep: glymphatic clearance directly reduces the adenosine
-            // LEVEL (the extracellular concentration drops as the
-            // glymphatic system flushes adenosine from the brain).
+            // Sleep: Process S decays exponentially toward its lower
+            // asymptote, with time constant chi_s.
             //
-            // Rate is configurable via NeuroTickParams::adenosine_clearance_rate.
-            // Biological default (0.000002/tick at 10Hz): from 0.75, takes
-            // ~7.6 hours to return to 0.20, matching the ~8h human sleep
-            // period during which adenosine is cleared by the glymphatic
-            // system (Porkka-Heiskanen et al., 1997).
-            // Compressed (0.0008/tick): ~1.1 minutes for testing.
-            // Use f64 arithmetic for the slow adenosine level accumulator.
-            let new_level = f64::from(self.chemicals[adn_idx].level)
-                - f64::from(params.adenosine_clearance_rate) * f64::from(dt_scale);
+            // Daan, Beersma & Borbély (1984) derived chi_s from the
+            // exponential decline of EEG slow-wave activity across
+            // NREM-REM cycles, in baseline sleep and in recovery sleep
+            // after 40.5 h of deprivation: chi_s = 4.2 h, the time to
+            // reach 36.8% of the asymptote. The paired wake constant
+            // chi_w = 18.2 h is used in the accumulation branch below, so
+            // the two directions of Process S are now the same functional
+            // form with the published constants.
+            //
+            // This used to be a *linear* decrement, tuned to walk from
+            // 0.75 down to 0.20 over ~7.6 h. That made the two
+            // directions asymmetric — exponential up, linear down — and
+            // it set a clearance speed the model could never actually
+            // complete. The cholinergic rebound that produces REM needs
+            // adenosine below 0.65, which from a 0.90 start took ~3.5 h of
+            // *uninterrupted* sleep, and Genesis never sleeps that long
+            // in one bout. Adenosine therefore stayed pinned near its
+            // asymptote, ACh stayed held at the 0.20 suppression floor,
+            // and REM was unreachable: measured over 48 simulated hours,
+            // adenosine was below 0.65 in 0.0% of NREM ticks, ACh above
+            // 0.50 in 0.0%, and REM occupancy was exactly 0%.
+            //
+            // Exponential decay is both what the two-process model
+            // specifies and what repairs it. Being proportional to the
+            // distance above the asymptote, it clears the 0.90 -> 0.65
+            // gap in ~1.9 h, which lands inside the first or second NREM
+            // bout, so the rebound can engage on an ordinary sleep
+            // episode rather than never.
+            //
+            // The glymphatic system is what physically removes
+            // extracellular adenosine during sleep (Porkka-Heiskanen et
+            // al., 1997); the exponential form here is the
+            // phenomenological fit to that clearance.
+            let chi_s = f64::from(params.adenosine_clearance_tau_hours).max(1e-6);
+            let dt_hours = f64::from(dt_scale) * f64::from(DT) / 3600.0;
+            let lower_asymptote = 0.20; // resting level; the baseline never moves
+            let current_level = f64::from(self.chemicals[adn_idx].level);
+            let new_level = lower_asymptote
+                + (-dt_hours / chi_s).exp() * (current_level - lower_asymptote);
             self.chemicals[adn_idx].level =
                 crate::state::sanitize::finite_clamp(new_level as f32, 0.0, 1.0);
         } else {
@@ -2971,6 +3158,90 @@ impl NeurochemicalVector {
         // The main loop above skips ACh during sleep (when in
         // rebound or REM) so the homeostatic/coupling forces don't
         // fight this mechanism — see the `continue` in the main loop.
+        // REM-propensity latch, shared by the serotonin and
+        // acetylcholine profiles below.
+        //
+        // Both were previously driven by an instantaneous test of raw
+        // adenosine against 0.80. Measured over 24 h, raw adenosine
+        // during NREM spans 0.750-0.900 (p50 0.821), so that test was
+        // true on only 36% of NREM ticks. Acetylcholine's exponential
+        // ramp was then chasing a target that switched back to 0.20
+        // every time adenosine ticked above 0.80, so it never converged:
+        // effective ACh cleared the 0.50 REM threshold on 4.4% of NREM
+        // ticks and the three conjuncts never coincided.
+        //
+        // This is a stateful process, not a stateless threshold test.
+        // Benington & Heller (1994) found REM propensity building
+        // across NREM; Ji et al. (2025) identify REM pressure as the
+        // core regulator of the NREM-REM cycle, with a weak ultradian
+        // drive entraining it. Pressure accumulates and then discharges
+        // *during REM* — it does not vanish the instant its trigger
+        // relaxes. A Schmitt trigger on the acetylcholine level
+        // expresses that: once the ramp is under way it runs to
+        // completion, and only discharges in REM.
+        let ach_now = f64::from(
+            self.chemicals[NeurochemicalId::Acetylcholine as usize].level,
+        );
+        let adn_now_for_latch = f64::from(
+            self.chemicals[NeurochemicalId::Adenosine as usize].level,
+        );
+        let rebound_engaged = adn_now_for_latch < 0.80
+            || current_phase == MentalPhase::REM
+            || ach_now > 0.50;
+
+        // Serotonergic REM-off profile.
+        //
+        // Dorsal raphe 5-HT neurons show a graded state-dependent
+        // discharge: steady in wake, reduced in NREM, and virtually
+        // silent in REM (Monti & Jantos 2008, Prog Brain Res 172;
+        // Sakai & Crochet 2001, Eur J Neurosci 13:103, which found
+        // DRN serotonergic activity does not drive paradoxical sleep
+        // generation but does regulate waking and slow-wave sleep).
+        // Jouvet's original 5-HT sleep-promotion hypothesis was
+        // contradicted by these recordings — DRN discharge is
+        // positively correlated with arousal and negatively correlated
+        // with both NREM and REM.
+        //
+        // Genesis previously applied no phase dependence to serotonin
+        // at all: measured over 24 h it averaged 0.3917 in wake and
+        // 0.3918 in NREM, range 0.358-0.398 — flat. The REM gate could
+        // therefore not use it, and its two existing conjuncts were
+        // degenerate (ACh > 0.50 never true; NE < 0.30 true ~always
+        // only because NE's baseline is 0.30 and it barely moves).
+        //
+        // Targets are set from the described discharge profile rather
+        // than tuned: 0.30 in NREM (reduced but present — the raphe
+        // fires slowly in NREM, it is not silent) and 0.10 in REM
+        // (near-silence). The approach is exponential on the same
+        // ~minutes timescale as the cholinergic rebound below.
+        let srt_idx = NeurochemicalId::Serotonin as usize;
+        if current_phase == MentalPhase::NREM || current_phase == MentalPhase::REM {
+            // In NREM the target tracks REM propensity: it starts at 0.30
+            // and falls toward REM's near-silence once homeostatic
+            // pressure has relaxed to 0.80, i.e. once the cholinergic
+            // rebound has begun.
+            //
+            // A fixed 0.30 NREM target could never gate REM *entry*,
+            // because the near-silent 0.10 profile only applies once
+            // already in REM -- the same chicken-and-egg the ACh
+            // rebound had. Worse, it is not how the flip-flop works:
+            // REM-on and REM-off populations move *together*, not in
+            // sequence. Benington & Heller (1994) found REM propensity
+            // building across NREM, and Ji et al. (2025) show the
+            // NREM-REM cycle is driven by REM pressure entraining a weak
+            // ultradian rhythm, so the aminergic decline and the
+            // cholinergic rise are two expressions of one accumulating
+            // pressure. Tying both to the same 0.80 crossing makes them
+            // rise and fall together, which is the documented
+            // reciprocal-interaction structure (Lu et al. 2006).
+            let srt_target = if rebound_engaged { 0.10 } else { 0.30 };
+            let srt_rate = 0.001_f64 * f64::from(dt_scale);
+            let cur_srt = f64::from(self.chemicals[srt_idx].level);
+            let new_srt = srt_target - (-srt_rate).exp() * (srt_target - cur_srt);
+            self.chemicals[srt_idx].level =
+                crate::state::sanitize::finite_clamp(new_srt as f32, 0.0, 1.0);
+        }
+
         let ach_idx = NeurochemicalId::Acetylcholine as usize;
         if current_phase == MentalPhase::NREM || current_phase == MentalPhase::REM {
             let adn_level = self.chemicals[adn_idx].level;
@@ -2980,21 +3251,40 @@ impl NeurochemicalVector {
             // - Late NREM (adenosine ≤ 0.65): ACh rebounds toward
             //   0.65 to trigger the NREM→REM transition.
             // - REM: ACh is held at 0.65 to maintain the REM state.
-            let ach_target = if adn_level < 0.65 || current_phase == MentalPhase::REM {
-                0.65
-            } else {
-                0.20
-            };
+            let ach_target = if rebound_engaged { 0.65 } else { 0.20 };
             // Saturating exponential toward the target.
             // Rate: 0.001/tick at 10Hz = 0.01/sec → τ ≈ 100 sec
             // (biological). With dt_scale=2.0 (200ms tick), this is
             // 0.002/tick → reaches 50% of target in ~350 ticks
             // (~70 sec). For compressed tests, the same rate gives
             // faster convergence in wall-clock time.
+            // Drive the *effective* level, not the raw one.
+            //
+            // The REM gate compares `effective_level()` against 0.50, but
+            // this mechanism was steering the raw level to 0.65. With
+            // acetylcholine's receptor factors depressed — its adaptation
+            // multiplier is 1.2, the highest in the set, on the grounds
+            // that nicotinic receptors desensitize in milliseconds — an
+            // effective value above 0.50 was reached on only 0.9% of NREM
+            // ticks, so REM was unreachable no matter how high the raw
+            // level went.
+            //
+            // "Cholinergic activity is high in REM" is a statement about
+            // signalling, not about concentration, so the target is
+            // converted to the level that yields the intended effective
+            // level, given current receptor health. This is the same
+            // correction as the exhaustion override reading the signal it
+            // gates on: a mechanism that is supposed to produce a state
+            // must act on the quantity the state test measures.
             let ach_rate = 0.001_f64 * f64::from(dt_scale);
+            let ach_chem = &self.chemicals[ach_idx];
+            let receptor_health = f64::from(ach_chem.receptor_sensitivity)
+                * f64::from(ach_chem.desensitization_factor)
+                * f64::from(ach_chem.internalization_factor)
+                .max(1e-3);
+            let level_target = (f64::from(ach_target) / receptor_health).clamp(0.0, 1.0);
             let current_ach = f64::from(self.chemicals[ach_idx].level);
-            let new_ach =
-                ach_target - (-ach_rate).exp() * (ach_target - current_ach);
+            let new_ach = level_target - (-ach_rate).exp() * (level_target - current_ach);
             self.chemicals[ach_idx].level =
                 crate::state::sanitize::finite_clamp(new_ach as f32, 0.0, 1.0);
         }
@@ -3749,18 +4039,17 @@ pub struct NeuroTickParams {
     /// For compressed-time testing, use
     /// [`NeuroTickParams::COMPRESSED`] which sets this to 5.5 (100× faster).
     pub adenosine_accumulation_rate: f32,
-    /// Adenosine baseline clearance rate per tick during sleep.
-    /// The adenosine baseline drops by this amount each tick during
-    /// NREM/REM sleep (glymphatic clearance).
+    /// Time constant of adenosine decay during sleep, in hours (chi_s).
     ///
-    /// At 10 Hz, the biological default (0.000002) gives:
-    /// 0.55 / 0.000002 = 275,000 ticks = ~7.6 hours to clear from 0.75
-    /// back to 0.20, matching the human ~8h sleep period.
+    /// Process S relaxes exponentially toward its lower asymptote with
+    /// this time constant during NREM/REM sleep, mirroring the
+    /// exponential rise with chi_w during wakefulness. 4.2 h is the
+    /// value estimated by Daan, Beersma & Borbély (1984) from the
+    /// decline of EEG slow-wave activity across NREM-REM cycles.
     ///
-    /// For compressed-time testing, use
-    /// [`NeuroTickParams::COMPRESSED`] which sets this to 0.0008
-    /// (~1.1 min clearance).
-    pub adenosine_clearance_rate: f32,
+    /// For compressed-time testing, use [`NeuroTickParams::COMPRESSED`],
+    /// which shortens the decay to minutes.
+    pub adenosine_clearance_tau_hours: f32,
     /// Adenosine activity coupling factor.
     ///
     /// Adenosine is a byproduct of ATP metabolism, so its production
@@ -3922,7 +4211,7 @@ impl NeuroTickParams {
         cortisol_max: 0.80,
         ne_max: 0.90,
         adenosine_accumulation_rate: 0.055, // r' = 0.055/h (Daan et al. 1984, τ=18.2h)
-        adenosine_clearance_rate: 0.000002, // ~7.6h to clear (Porkka-Heiskanen 1997)
+        adenosine_clearance_tau_hours: 4.2, // chi_s, Daan/Beersma/Borbely 1984
         adenosine_activity_coupling: 0.5,   // sleep pressure scales with arousal
         ecb_activity_coupling: 0.01,        // activity-dependent eCB synthesis
         metaplasticity_rate: 0.000005,      // hours-timescale coupling adaptation
@@ -3943,7 +4232,7 @@ impl NeuroTickParams {
     /// circadian oscillator.
     pub const COMPRESSED: Self = Self {
         adenosine_accumulation_rate: 5.5, // 100x faster for testing (τ=0.18h ≈ 11min)
-        adenosine_clearance_rate: 0.0008, // ~1.1 min to clear
+        adenosine_clearance_tau_hours: 0.04, // ~2.4 min to clear
         metaplasticity_rate: 0.00005,     // ~10x faster for testing
         ..Self::DEFAULT
     };

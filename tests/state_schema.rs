@@ -1358,6 +1358,61 @@ fn test_zone_sleeping_runs_adenosine_clearance() {
 }
 
 #[test]
+/// Regression: the exhaustion override used to `return NREM`
+/// unconditionally, short-circuiting the sleep branch where every
+/// NREM-vs-REM condition lives. REM was therefore unreachable from NREM
+/// by construction — the only way to be REM was to already be REM — and
+/// since raw adenosine stays above the override's 0.75 release
+/// threshold for essentially all NREM ticks, that override was the
+/// active path, so the REM conditions were never evaluated at all.
+/// Measured over 48 simulated hours, REM occupancy was exactly 0%.
+#[test]
+fn test_rem_reachable_from_nrem_through_exhaustion_override() {
+    let mut v = NeurochemicalVector::new(0);
+    v.tick_default();
+    let adn = NeurochemicalId::Adenosine as usize;
+    let ach = NeurochemicalId::Acetylcholine as usize;
+    let ne = NeurochemicalId::Norepinephrine as usize;
+    let hist = NeurochemicalId::Histamine as usize;
+
+    // Phase 1: establish NREM with the cholinergic side still suppressed,
+    // holding raw adenosine inside the exhaustion band.
+    let mut in_nrem = false;
+    for _ in 0..100_000 {
+        v.chemicals[adn].level = 0.95;
+        v.chemicals[ach].level = 0.20;
+        v.chemicals[ne].level = 0.20;
+        v.chemicals[hist].level = 0.15;
+        v.tick_default();
+        if v.phase() == MentalPhase::NREM {
+            in_nrem = true;
+            break;
+        }
+    }
+    assert!(in_nrem, "expected NREM under exhaustion-band adenosine");
+
+    // Phase 2: now satisfy the cholinergic/aminergic REM conditions. REM
+    // must be reachable from that NREM state.
+    let mut reached = false;
+    for _ in 0..100_000 {
+        v.chemicals[adn].level = 0.95;
+        v.chemicals[ach].level = 0.65;
+        v.chemicals[ne].level = 0.20;
+        v.chemicals[hist].level = 0.15;
+        v.tick_default();
+        if v.phase() == MentalPhase::REM {
+            reached = true;
+            break;
+        }
+    }
+    assert!(
+        reached,
+        "REM must be reachable from NREM while the exhaustion override holds; \
+         the override must not decide NREM-vs-REM on its own"
+    );
+}
+
+#[test]
 fn test_cholinergic_rebound_during_sustained_nrem() {
     // During sustained NREM, once adenosine has cleared below 0.65,
     // acetylcholine should rebound toward 0.65 (above the 0.50 REM
