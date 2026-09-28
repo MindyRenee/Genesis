@@ -650,6 +650,58 @@ def test_relationships_are_typed():
     assert RelationType.DEFINES in relations
 
 
+
+def test_code_investigation_prefers_novel_evidence(tmp_path):
+    """Autonomous study should prefer novel evidence over arbitrary file order."""
+    first = tmp_path / "small.py"
+    second = tmp_path / "important.py"
+    first.write_text("x = 1\n", encoding="utf-8")
+    second.write_text(
+        "def important(a):\n    return a + 1\n\nclass Important:\n    pass\n",
+        encoding="utf-8",
+    )
+    learner = _make_learner(tmp_path)
+
+    decision = learner.investigate_next()
+    assert decision is not None
+    assert decision.novelty == 1.0
+    assert decision.reason
+
+
+def test_code_learning_reanalyzes_changed_source(tmp_path):
+    """A changed file must become new evidence rather than remain permanently consumed."""
+    target = tmp_path / "module.py"
+    target.write_text("def first():\n    return 1\n", encoding="utf-8")
+    learner = _make_learner(tmp_path)
+
+    first = learner.learn_file(str(target))
+    assert first.functions == 1
+
+    # The content fingerprint, not the filename, defines what has been learned.
+    target.write_text(
+        "def first():\n    return 1\n\ndef second():\n    return 2\n",
+        encoding="utf-8",
+    )
+    second = learner.learn_file(str(target))
+    assert second.language == "python"
+    assert second.functions == 2
+
+
+def test_code_learning_persists_investigation_evidence(tmp_path):
+    """A fresh learner can recover the source fingerprint and uncertainty state."""
+    target = tmp_path / "module.py"
+    target.write_text("def first():\n    return 1\n", encoding="utf-8")
+    network = ConceptNetwork()
+    learner = CodeLearner(network=network, project_root=str(tmp_path))
+    learner.learn_file(str(target))
+
+    restored = CodeLearner(network=network, project_root=str(tmp_path))
+    rel = "module.py"
+    assert rel in restored._analyzed_files
+    assert rel in restored._file_fingerprints
+    assert restored._file_uncertainty[rel] < 1.0
+
+
 def test_unsupported_extension():
     """Non-source files return an empty result."""
     learner = _make_learner()
