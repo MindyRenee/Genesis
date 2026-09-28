@@ -37,35 +37,7 @@ if [ -z "${GENESIS_DISCORD_WEBHOOK:-}" ] && [ -f .genesis-discord ]; then
     export GENESIS_DISCORD_WEBHOOK
 fi
 
-# Prefer the checkout-local virtualenv. The project requires Python >=3.12
-# and pins its runtime dependencies in python/requirements.txt. Falling
-# back to an arbitrary system python is a common source of startup failures.
-PYTHON_BIN=""
-if [ -x "$PWD/python/venv/bin/python" ]; then
-    PYTHON_BIN="$PWD/python/venv/bin/python"
-elif [ -x "$PWD/.venv/bin/python" ]; then
-    PYTHON_BIN="$PWD/.venv/bin/python"
-else
-    PYTHON_BIN="$(command -v python3 || true)"
-fi
-
-if [ -z "$PYTHON_BIN" ]; then
-    echo "[genesis] Python 3.12+ is required but python3 was not found." >&2
-    exit 1
-fi
-
-PYTHON_VERSION="$("$PYTHON_BIN" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null)" || {
-    echo "[genesis] Cannot execute Python interpreter: $PYTHON_BIN" >&2
-    exit 1
-}
-PYTHON_OK="$("$PYTHON_BIN" -c 'import sys; print(int(sys.version_info >= (3, 12)))' 2>/dev/null)" || PYTHON_OK=0
-if [ "$PYTHON_OK" != "1" ]; then
-    echo "[genesis] Python >=3.12 is required; found $PYTHON_VERSION at $PYTHON_BIN" >&2
-    echo "[genesis] Create/install the project environment in python/venv and install python/requirements.txt." >&2
-    exit 1
-fi
-
-DATA_DIR=$("$PYTHON_BIN" -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' \
+DATA_DIR=$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' \
     "${GENESIS_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/genesis}") || exit 1
 
 # ─── PID-file helpers ────────────────────────────────────────────────
@@ -307,4 +279,4 @@ export GENESIS_RUN=1
 #
 # OFFLINE_ARG was parsed from the command line above (--offline for
 # no network access).
-"$PYTHON_BIN" python/genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:-}
+python3 python/genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:-}
