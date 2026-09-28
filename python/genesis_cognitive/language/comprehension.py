@@ -672,6 +672,9 @@ class ComprehensionResult:
             cross-domain mapping).
         irony: Detected irony, if any (sentiment-context contradiction).
         idiom: Detected idiom as (idiom, meaning) tuple, if any.
+        parse_coverage: Fraction of content tokens represented structurally.
+        unresolved_tokens: Content tokens not represented by the parse.
+        diagnostics: Machine-readable parse failure signals for learning.
     """
 
     raw_text: str = ""
@@ -692,6 +695,9 @@ class ComprehensionResult:
     metaphor: Metaphor | None = None
     irony: IronyDetection | None = None
     idiom: tuple[str, str] | None = None
+    parse_coverage: float = 0.0
+    unresolved_tokens: list[str] = field(default_factory=list)
+    diagnostics: list[str] = field(default_factory=list)
 
 
 class ComprehensionEngine:
@@ -812,8 +818,16 @@ class ComprehensionEngine:
         # Determine negation
         is_negated = any(p.negated for p in propositions)
 
-        # Confidence based on how much we could parse
+        # Keep confidence (interpretation quality) separate from coverage
+        # (structural completeness). Downstream learners need the latter
+        # to identify where the parser failed.
+        parse_coverage, unresolved_tokens = self._parse_coverage(
+            raw_text, propositions, key_concepts
+        )
         confidence = self._compute_confidence(propositions, clauses, speech_act)
+        diagnostics = self._build_diagnostics(
+            raw_text, propositions, parse_coverage, unresolved_tokens
+        )
 
         # Update recent entities for future calls
         self._update_recent_entities(propositions, resolved)
@@ -842,6 +856,9 @@ class ComprehensionEngine:
             metaphor=metaphor,
             irony=irony,
             idiom=idiom,
+            parse_coverage=parse_coverage,
+            unresolved_tokens=unresolved_tokens,
+            diagnostics=diagnostics,
         )
 
         return result
@@ -2455,6 +2472,60 @@ class ComprehensionEngine:
             conf += 0.05
 
         return max(0.1, min(1.0, conf))
+
+    def _parse_coverage(
+        self,
+        text: str,
+        propositions: list[Proposition],
+        key_concepts: list[ConceptRole],
+    ) -> tuple[float, list[str]]:
+        """Expose structural parse gaps as a reusable learning signal."""
+        tokens = re.findall(r"[A-Za-z0-9']+", text.lower())
+        if not tokens:
+            return 1.0, []
+
+        represented: set[str] = set()
+        for prop in propositions:
+            for value in (
+                prop.subject, prop.predicate, prop.object, prop.focus,
+                *prop.roles.values(),
+            ):
+                represented.update(re.findall(r"[A-Za-z0-9']+", value.lower()))
+        for concept in key_concepts:
+            represented.update(re.findall(r"[A-Za-z0-9']+", concept.concept.lower()))
+
+        structural = {
+            "a", "an", "the", "and", "or", "but", "if", "then", "to",
+            "of", "in", "on", "at", "for", "with", "by", "from", "is",
+            "are", "was", "were", "be", "been", "am", "do", "does", "did",
+            "not", "no", "yes",
+        }
+        content = [t for t in tokens if t not in structural and len(t) > 1]
+        unresolved = [t for t in content if t not in represented]
+        coverage = 1.0 if not content else 1.0 - len(unresolved) / len(content)
+        return max(0.0, min(1.0, coverage)), unresolved[:32]
+
+    @staticmethod
+    def _build_diagnostics(
+        text: str,
+        propositions: list[Proposition],
+        coverage: float,
+        unresolved_tokens: list[str],
+    ) -> list[str]:
+        """Produce stable failure categories for downstream learning."""
+        diagnostics: list[str] = []
+        if not propositions:
+            diagnostics.append("no_proposition_extracted")
+        if coverage < 0.5:
+            diagnostics.append("low_parse_coverage")
+        elif coverage < 0.8:
+            diagnostics.append("partial_parse")
+        if unresolved_tokens:
+            diagnostics.append("unresolved_content_tokens")
+        sentence_count = len([x for x in re.split(r"[.!?]+", text.strip()) if x])
+        if sentence_count > len(propositions):
+            diagnostics.append("clause_underparse")
+        return diagnostics
 
     # ─── Entity tracking ────────────────────────────────────────
 
