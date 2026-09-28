@@ -732,25 +732,39 @@ class PlanningEngine:
             weight = 0.3 if step.step_type == "verify" else 1.0
             total_weight += weight
 
-            # Does the target concept exist?
+            # Start from structural knowledge, then update feasibility
+            # from the learned outcome model. Existence alone is not a
+            # prediction of success: observed operator outcomes are.
             concept = self.network.get_concept(step.target_concept)
             if concept is not None:
                 step_score = 0.8
             else:
-                # Check if it's a compound concept (e.g., "A vs B").
-                if " vs " in step.target_concept:
-                    parts = step.target_concept.split(" vs ")
-                    exists = [
-                        self.network.get_concept(p) is not None
-                        for p in parts
-                    ]
-                    step_score = 0.6 if all(exists) else 0.2
-                elif step.step_type == "verify":
-                    # Verification steps are always feasible.
-                    step_score = 0.9
-                else:
-                    # Unknown concept — low feasibility.
-                    step_score = 0.2
+                step_score = 0.2
+
+            context = plan.task_context
+            if context is not None:
+                operator = context.schema.operators.get(step.step_type)
+                if operator is not None and operator.uses:
+                    # Model-based evidence supersedes lexical/concept
+                    # overlap as evidence of executable competence.
+                    model_confidence = operator.confidence
+                    step_score = 0.45 * step_score + 0.55 * model_confidence
+                prior_count = context.schema.family_priors.get(
+                    step.step_type, 0
+                )
+                if prior_count:
+                    prior_strength = min(1.0, prior_count / 5.0)
+                    step_score = 0.75 * step_score + 0.25 * prior_strength
+            # Compound and verification steps retain structural priors.
+            if " vs " in step.target_concept and concept is None:
+                parts = step.target_concept.split(" vs ")
+                exists = [
+                    self.network.get_concept(p) is not None
+                    for p in parts
+                ]
+                step_score = max(step_score, 0.6 if all(exists) else 0.2)
+            if step.step_type == "verify":
+                step_score = max(step_score, 0.9)
 
             # Penalize too many prerequisites.
             if len(step.prerequisites) > 3:
