@@ -198,23 +198,37 @@ describes behaviour that actually happens.
 
 What this section previously overstated, now stated accurately: the
 scored objective is **not** an expected free energy in the formal
-sense. Its "epistemic" term is an uncertainty-weighted novelty
-heuristic, not expected information gain, and it outweighs the
-homeostatic term by one to two orders of magnitude, so the resulting
-policy ranking is close to a novelty ranking. That was harmless while
-the loop returned `noop` regardless; now it determines the outcome.
-Two further limits are unchanged and still true: because `precision`
-saturates at 1.0, the `precision > 0.8` exploitative branch is the one
-actually taken, so the stochastic exploration branch is effectively
-dead in practice; and `model_maturity` is a stopwatch —
-`1 − exp(−ticks/500)` — independent of model quality, despite the state
-schema telling the cognitive mind to treat it as a trust signal.
+sense. Its "epistemic" term is the proper entropy-reduction
+information gain — but for this model class (linear-Gaussian,
+additive controls) that quantity is provably policy-independent, so
+it shifts every policy's score equally and the ranking reduces to
+the pragmatic cost: predicted distance from the homeostatic target.
+At rest that elects `noop`; under deviation it elects whichever
+policy the learned action model predicts will correct fastest. The
+previous uncertainty-weighted novelty substitute was worse than a
+neutral constant: inverted relative to true information gain and
+10–100× the pragmatic term, it reduced selection to
+ranking-by-novelty. Exploration now lives where it belongs, in the
+precision-weighted softmax temperature. Two limits remain honestly
+in force: the repertoire is nine fixed policies (no continuous or
+precision-modulated actions, which is where a genuine epistemic
+drive would come from), and early in life — before the action model
+is learned — all policies predict identically and selection falls
+through to `noop` while the low-precision branch explores.
 
-The self-model and its feedback loop are worth the code. The FEP
-vocabulary attached to them is not, and the arbitration constants are
-the thing to revisit first: the epistemic/homeostatic ratio is a
-unit mismatch (a squared displacement added to a first-power one), so
-it is not a tuning problem.
+The self-model and its feedback loop are worth the code, and the
+vocabulary is now closer to earned. Three fixes landed: precision
+seeks an inverse-variance target instead of latching at 1.0 off a
+fixed threshold — saturation at rest is correct *and reversible*,
+so sustained surprise above ~0.01 RMS re-opens the exploratory
+branch; `model_maturity` is no longer a stopwatch but
+`exp(−err/0.001)` over a ~500-tick error EMA, i.e. demonstrated
+accuracy, which is what the cognitive mind was already treating it
+as; and the ranking path contains no cross-unit comparison at all
+(single pragmatic term), dissolving the old epistemic/homeostatic
+unit mismatch rather than tuning it. The remaining unit mixing
+(nats plus mean-square in the *published* EFE) is cosmetic: both
+added terms are policy-independent, so they cannot move a ranking.
 
 ### Embodiment
 

@@ -348,7 +348,9 @@ class V4Model:
         x_flat = X.reshape(-1)
         r_flat = recon.reshape(-1)
         denom = float(np.linalg.norm(x_flat) * np.linalg.norm(r_flat))
-        self._last_reconstruction_cosine = float(np.dot(x_flat, r_flat) / denom) if denom > 1e-12 else 0.0
+        self._last_reconstruction_cosine = (
+            float(np.dot(x_flat, r_flat) / denom) if denom > 1e-12 else 0.0
+        )
         self._last_sparsity = float(np.mean(Z <= 1e-12))
 
     @property

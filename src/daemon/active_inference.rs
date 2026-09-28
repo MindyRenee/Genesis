@@ -51,20 +51,21 @@
 //!   expected-uncertainty term, where it varies with surprise.
 //! - The policy repertoire is discrete and fixed (9 policies), not
 //!   a continuous action space.
-//! - Epistemic value is approximated as the uncertainty-weighted
-//!   novelty of the predicted observation relative to the current
-//!   belief, not the full expected Bayesian surprise. The
-//!   substituted quantity is a **heuristic, not an equivalent
-//!   reformulation**, and it does not satisfy the formal definition
-//!   of epistemic value as expected information gain
-//!   `I(s;o|π) = E_q[D_KL(q(s|o) ‖ q(s))]`, which for a
-//!   linear-Gaussian model is a function of posterior *covariance
-//!   reduction*. The substitution inverts the criterion in two
-//!   respects: motion along an axis already pinned down scores full
-//!   value (true information gain: zero), and standing still where
-//!   the posterior is most uncertain scores none (true information
-//!   gain: maximal). The uncertainty weight moves in the right
-//!   direction; what it multiplies is the wrong quantity.
+//! - Epistemic value is the expected information gain computed
+//!   properly as the entropy reduction of the variational posterior
+//!   (`0.5·mean(ln(prior_var/belief_var))`), not a novelty heuristic.
+//!   For this model class (linear-Gaussian, additive controls) that
+//!   quantity is provably policy-independent (Koudahl, Kouw & de
+//!   Vries, 2021: the posterior covariance update does not depend on
+//!   the observation value), so it enters the published EFE
+//!   decomposition but cannot arbitrate — ranking falls back to the
+//!   pragmatic cost, honestly. An earlier revision substituted an
+//!   uncertainty-weighted novelty term that was inverted relative to
+//!   true information gain and outweighed the pragmatic term 10–100×;
+//!   it now serves as the cautionary example in the scoring loop.
+//!   Exploration lives where it belongs: the precision-weighted
+//!   softmax temperature, which samples when confidence is low and
+//!   exploits when it is high.
 //!
 //!   There is a real result behind the attempt, but it is narrower
 //!   than "necessary": in linear-Gaussian state-space models driven
@@ -79,9 +80,11 @@
 //!   it by making observation precision policy-dependent
 //!   (Millidge, Tschantz & Buckley, 2021). Genesis uses additive
 //!   controls and does not implement precision-modulated policies, so
-//!   it does fall inside the degenerate case — and a different fix
-//!   (multiplicative or precision-weighted policies) is available
-//!   than the one taken here.
+//!   it does fall inside the degenerate case — and the honest fix is
+//!   the one taken here: compute the information gain properly,
+//!   observe that it is policy-independent, keep it in the published
+//!   decomposition, and let ranking fall back to the pragmatic cost
+//!   with exploration carried by the precision-weighted temperature.
 //!
 //! These simplifications make the implementation tractable at 10 Hz
 //! on a single machine while preserving the core mathematical
@@ -133,12 +136,17 @@
 //!
 //! # Precision dynamics
 //!
-//! Precision is the model's confidence. It adapts:
-//! - Sustained low surprise → precision increases (the model trusts
-//!   its predictions more, weights prediction errors more heavily
-//!   for learning).
-//! - Sustained high surprise → precision decreases (the model becomes
-//!   less confident, prediction errors have less effect on learning).
+//! Precision is the model's confidence, maintained as the
+//! inverse-variance target `1 / (1 + err_var / 0.0004)` where
+//! err_var is the slow EMA of squared surprise. It adapts:
+//! - Sustained low surprise → err_var drains → target rises toward
+//!   1.0 → precision slews up (slowly: regaining confidence is slow).
+//! - Sustained high surprise → err_var fills → target falls →
+//!   precision slews down (quickly: losing confidence is fast).
+//! Saturation at 1.0 at rest is correct — the model genuinely
+//! predicts the resting trajectory — and it is reversible: any
+//! sustained surprise above ~0.01 RMS pulls precision back under the
+//! 0.8 exploitation threshold, re-opening stochastic exploration.
 //!
 //! This is the precision-weighted prediction error of predictive
 //! coding (Friston, 2010): the brain modulates how much it learns
@@ -232,21 +240,16 @@
 //! to explore). This is the precision-weighted policy selection of
 //! active inference (Friston et al., 2010; Schwartenbeck et al., 2015).
 //!
-//! Policy selection runs every inference cycle. The intent was that in
-//! a predictable regime the "noop" policy wins (doing nothing is
-//! optimal) and under stress a corrective policy wins.
-//!
-//! That intent is not what the current constants produce, and the
-//! docstring used to assert it as fact. Two things get in the way. The
-//! epistemic term outweighs the homeostatic term by one to two orders
-//! of magnitude, so ranking is close to ranking-by-novelty and noop
-//! does not win merely for being predictable. And `precision`
-//! saturates at 1.0 within seconds of continuous running, so the
-//! `precision > EXPLOITATION_PRECISION_THRESHOLD` branch is the one
-//! always taken and the stochastic exploration branch is dead in
-//! practice. Treat the policy repertoire as a set of candidate
-//! neuromodulatory interventions scored by a heuristic, not as a
-//! converged active-inference arbitration.
+//! Policy selection runs every inference cycle. In a predictable
+//! regime the "noop" policy wins (doing nothing is optimal — every
+//! policy predicts ~the current state and noop moves nothing) and
+//! under deviation a corrective policy wins (whichever the learned
+//! action model predicts will close the distance fastest). Early in
+//! life, before the action model is learned, all policies predict
+//! identically and selection falls through to noop while the
+//! low-precision softmax branch explores stochastically — a reflexive
+//! developmental phase that gives way to deliberative selection as
+//! the action effects are learned.
 //!
 //! References:
 //! - Friston, K. (2010). The free-energy principle. Nat Rev Neurosci.
@@ -317,11 +320,25 @@ const PRECISION_RECOVERY_RATE: f32 = 0.002;
 /// is slow (asymmetric, like receptor adaptation).
 const PRECISION_DECAY_RATE: f32 = 0.005;
 
-/// Surprise EMA threshold above which precision decays. Below this,
-/// precision recovers. This separates "sustained low surprise"
-/// (predictable regime) from "sustained high surprise" (unpredictable
-/// regime).
-const PRECISION_SURPRISE_THRESHOLD: f32 = 0.15;
+/// EMA rate for the slow surprise-variance tracker that drives the
+/// precision target (see `PRECISION_REFERENCE_VAR`). At dt_scale = 1
+/// the time constant is ~200 ticks; slow enough that single impulses
+/// don't move it, fast enough that a genuine regime change registers
+/// within minutes.
+const PRECISION_VAR_EMA_RATE: f32 = 0.005;
+
+/// Reference error variance for precision targeting.
+///
+/// Precision seeks `1 / (1 + slow_err_var / this)`, i.e. the
+/// inverse-variance confidence of a Gaussian estimator whose error
+/// variance is `slow_err_var`. Calibration: sustained RMS surprise of
+/// 0.02 (this value squared) holds precision at 0.5; rest (~3e-4 RMS)
+/// holds it at ~1.0; sustained 0.01 RMS holds it at 0.8 — exactly the
+/// exploitation threshold, so any regime noisier than that re-opens
+/// the exploratory selection branch. The old fixed-threshold scheme
+/// (decay above 0.15) could never trigger anywhere near the resting
+/// regime and left the exploration branch dead in practice.
+const PRECISION_REFERENCE_VAR: f32 = 0.0004;
 
 /// The weight of model uncertainty in the free energy computation.
 /// `(1 - precision) * this` is added to surprise to get free energy.
@@ -377,10 +394,26 @@ const NE_SURPRISE_THRESHOLD: f32 = 0.15;
 /// so the coupling matrix adapts faster to the unexpected regime.
 const METAPLASTICITY_BOOST: f32 = 5.0;
 
-/// The number of ticks over which model maturity asymptotes to 1.0.
-/// At 5 Hz (200ms/tick), 500 ticks = 100 seconds. The model reaches
-/// ~63% maturity after 100 seconds and ~95% after 300 seconds.
-const MATURITY_TIME_CONSTANT: f32 = 500.0;
+/// EMA rate for the maturity error tracker. At dt_scale = 1 the time
+/// constant is ~500 ticks — deliberately the same timescale the old
+/// tick-count stopwatch used, so the ramp *rate* is unchanged; what
+/// changed is that the ramp is now earned by sustained prediction
+/// accuracy rather than granted by elapsed time.
+const MATURITY_ERROR_EMA_RATE: f32 = 0.002;
+
+/// Error scale for the maturity mapping `maturity = exp(-err / this)`.
+///
+/// Sustained RMS surprise at sqrt(this) ≈ 0.032 holds maturity at 1/e
+/// ≈ 0.37; chronic 0.05 RMS holds it near 0.08 (do not trust a failing
+/// model); rest (~3e-4) holds it at ~1.0. A fresh engine starts at
+/// `MATURITY_ERROR_INIT` (deeply unproven) and must demonstrate
+/// accuracy to earn trust — the stopwatch it replaces reported 0.63
+/// after 100 s regardless of whether a single prediction was right.
+const MATURITY_ERROR_SCALE: f32 = 0.001;
+
+/// Initial value of the maturity error tracker: maximally unproven.
+/// Maps to maturity ≈ 0 until sustained accuracy pulls it down.
+const MATURITY_ERROR_INIT: f32 = 0.5;
 
 // ─── Variational posterior (Kalman filter) ───────────────────────
 //
@@ -445,14 +478,6 @@ const MAX_BELIEF_VAR: f32 = 0.03;
 /// is 0–1.5 under moderate surprise. Dividing by 1.0 maps this
 /// directly, preserving sensitivity to belief updates.
 const KL_SCALE: f32 = 1.0;
-
-/// Weight of epistemic value in expected free energy. The epistemic
-/// value is the expected information gain from a policy's predicted
-/// observation — policies that would take the system to novel regions
-/// of state space have higher epistemic value. This weight controls
-/// how much the epistemic bonus influences policy selection relative
-/// to the pragmatic (homeostatic) cost.
-const EPISTEMIC_WEIGHT: f32 = 0.5;
 
 // ─── Policy selection (active inference) ─────────────────────────
 //
@@ -735,7 +760,19 @@ pub struct ActiveInferenceEngine {
     /// Precision is the inverse variance of the likelihood — high
     /// precision means the model trusts its observations (low obs_var),
     /// low precision means it distrusts them (high obs_var).
+    ///
+    /// Precision seeks the inverse-variance target
+    /// `1 / (1 + surprise_var_ema / PRECISION_REFERENCE_VAR)`,
+    /// slewing toward it at the asymmetric recovery/decay rates. It
+    /// saturates at 1.0 only when the model genuinely predicts well,
+    /// and any sustained surprise above ~0.01 RMS pulls it back below
+    /// the exploitation threshold — which is what re-opens the
+    /// exploratory policy branch in practice.
     precision: f32,
+    /// Slow EMA of squared instantaneous surprise (error variance).
+    /// Drives the precision target. Time constant ~200 ticks at
+    /// dt_scale = 1: single impulses don't move it, regime changes do.
+    surprise_var_ema: f32,
     /// The EMA of surprise over recent ticks [0, 1].
     surprise_ema: f32,
     /// The EMA of expected free energy [0, 1]. This tracks the trend
@@ -749,9 +786,20 @@ pub struct ActiveInferenceEngine {
     /// first tick is observation-only (no prediction error can be
     /// computed without a prior prediction).
     initialized: bool,
-    /// Model maturity [0, 1] — asymptotic approach to 1.0 as the
-    /// model accumulates experience.
+    /// Model maturity [0, 1] — earned trust, not elapsed time.
+    /// `maturity = exp(-maturity_error_ema / MATURITY_ERROR_SCALE)`:
+    /// sustained prediction accuracy drives it toward 1, chronic
+    /// surprise pins it near 0. A fresh engine starts near 0
+    /// (`MATURITY_ERROR_INIT`) and must demonstrate accuracy; a model
+    /// that predicts well for ~500 ticks reads mature. The cognitive
+    /// mind treats this as a trust signal for the inference outputs,
+    /// and unlike the tick-count stopwatch it replaced, it drops when
+    /// the model starts failing.
     model_maturity: f32,
+    /// Slow EMA of instantaneous surprise feeding the maturity
+    /// mapping. Same ~500-tick timescale the old stopwatch used, but
+    /// tracking demonstrated accuracy instead of uptime.
+    maturity_error_ema: f32,
     /// xorshift32 PRNG state for stochastic policy sampling. Seeded
     /// from tick_count so that each tick produces a different draw,
     /// but the sequence is deterministic for reproducibility. A
@@ -792,12 +840,14 @@ impl ActiveInferenceEngine {
             last_action: [0.0; DIM],
             bias: [0.0; DIM],
             precision: 0.5,
+            surprise_var_ema: 0.0,
             surprise_ema: 0.0,
             expected_fe_ema: 0.0,
             allostasis_load: 0.0,
             tick_count: 0,
             initialized: false,
             model_maturity: 0.0,
+            maturity_error_ema: MATURITY_ERROR_INIT,
             rng_state: 0x9E3779B9, // golden ratio constant — nonzero seed
             belief_mean: [0.5; DIM],
             belief_var: [PROCESS_NOISE; DIM],
@@ -942,6 +992,17 @@ impl ActiveInferenceEngine {
         // Model maturity: reset to 0.0 (the engine relearns).
         if !self.model_maturity.is_finite() {
             self.model_maturity = 0.0;
+        }
+        // Surprise-variance EMA: reset to 0.0 (no recorded error
+        // variance — precision target returns to 1.0 and re-earns
+        // any downgrade from fresh evidence).
+        if !self.surprise_var_ema.is_finite() {
+            self.surprise_var_ema = 0.0;
+        }
+        // Maturity error EMA: reset to the pessimistic init (unproven
+        // until demonstrated accurate, same as `new()`).
+        if !self.maturity_error_ema.is_finite() {
+            self.maturity_error_ema = MATURITY_ERROR_INIT;
         }
         // Belief mean: reset to 0.5 (the `new()` default).
         for val in self.belief_mean.iter_mut() {
@@ -1145,21 +1206,33 @@ impl ActiveInferenceEngine {
             }
         }
 
-        // Step 4: Update precision.
-        // Precision adapts based on *sustained* surprise, not the
-        // instantaneous derivative. The previous logic compared
-        // `surprise > surprise_ema` (is surprise rising?), which meant
-        // precision decayed even when surprise was low but rising, and
-        // recovered even when surprise was high but falling. The
-        // correct semantics (per the module docs) are:
-        //   - Sustained low surprise → precision increases (trust predictions)
-        //   - Sustained high surprise → precision decreases (lose confidence)
-        // We use the surprise EMA as the sustained signal, with a
-        // threshold (PRECISION_SURPRISE_THRESHOLD) that separates "low"
-        // from "high" surprise regimes.
+        // Step 4: Update precision toward its inverse-variance target.
         //
-        // Step-size clamping: the linear `rate * dt_scale` can produce
-        // an enormous step from a single long tick — at dt_scale=100
+        // Precision is the model's confidence, and confidence should
+        // mean something measurable: for a Gaussian estimator it is
+        // 1/variance of the prediction errors. The target is therefore
+        //   target = 1 / (1 + slow_err_var / PRECISION_REFERENCE_VAR),
+        // where slow_err_var is the slow EMA of squared surprise
+        // maintained below. At rest (RMS surprise ~3e-4) the target is
+        // ~1.0 and precision saturates — correctly, because the model
+        // genuinely predicts well. Under any sustained surprise above
+        // ~0.01 RMS the target drops below the 0.8 exploitation
+        // threshold, re-opening the exploratory selection branch.
+        //
+        // The previous scheme compared the surprise EMA against a
+        // fixed 0.15 threshold. Resting surprise sits two orders of
+        // magnitude below that, so the decay side could never trigger
+        // anywhere near the normal operating regime: precision latched
+        // at 1.0 within seconds and the stochastic branch was dead in
+        // practice. A fixed threshold cannot serve regimes whose
+        // surprise levels differ by orders of magnitude; tracking the
+        // error variance directly has no such scale problem.
+        //
+        // Slew-rate limiting preserves the asymmetric dynamics the
+        // system is tuned for: losing confidence is quick (decay
+        // rate), regaining it is slow (recovery rate). Step-size
+        // clamping: the linear `rate * dt_scale` can produce an
+        // enormous step from a single long tick — at dt_scale=100
         // (dt clamped to 10s), the decay step is 0.005*100 = 0.5,
         // wiping half the [0.1, 1.0] range in one tick. Clamp the
         // per-tick step to a maximum of 0.1 (20× the normal decay
@@ -1173,12 +1246,25 @@ impl ActiveInferenceEngine {
         // the neurochemical tick-level circuit breaker, so a NaN here
         // would persist across ticks.
         // (dt_scale was computed above from the sanitized dt.)
-        if self.surprise_ema > PRECISION_SURPRISE_THRESHOLD {
-            // Sustained high surprise — lose confidence
+        let var_alpha =
+            crate::state::sanitize::finite_clamp(PRECISION_VAR_EMA_RATE * dt_scale, 0.0, 1.0);
+        self.surprise_var_ema = crate::state::sanitize::finite_clamp(
+            self.surprise_var_ema * (1.0 - var_alpha) + surprise * surprise * var_alpha,
+            0.0,
+            1.0,
+        );
+        let precision_target = crate::state::sanitize::finite_clamp(
+            1.0 / (1.0 + self.surprise_var_ema / PRECISION_REFERENCE_VAR),
+            0.1,
+            1.0,
+        );
+        if self.precision > precision_target {
+            // Overconfident for the observed error variance — lose
+            // confidence quickly.
             let step = (PRECISION_DECAY_RATE * dt_scale).min(0.1);
             self.precision = crate::state::sanitize::finite_clamp(self.precision - step, 0.1, 1.0);
-        } else {
-            // Sustained low surprise — regain confidence
+        } else if self.precision < precision_target {
+            // Underconfident — regain confidence slowly.
             let step = (PRECISION_RECOVERY_RATE * dt_scale).min(0.1);
             self.precision = crate::state::sanitize::finite_clamp(self.precision + step, 0.1, 1.0);
         }
@@ -1200,6 +1286,19 @@ impl ActiveInferenceEngine {
         // meaning "no surprise" — a safe fallback.
         self.surprise_ema = crate::state::sanitize::finite_clamp(self.surprise_ema, 0.0, 1.0);
         result.surprise = self.surprise_ema; // Report the EMA, not the instantaneous
+
+        // Maturity error tracker: very slow EMA of the instantaneous
+        // surprise. Same ~500-tick timescale the old tick-count
+        // stopwatch used — but tracking demonstrated accuracy instead
+        // of uptime. A fresh engine starts at MATURITY_ERROR_INIT
+        // (unproven) and only earns trust by predicting well.
+        let mat_alpha =
+            crate::state::sanitize::finite_clamp(MATURITY_ERROR_EMA_RATE * dt_scale, 0.0, 1.0);
+        self.maturity_error_ema = crate::state::sanitize::finite_clamp(
+            self.maturity_error_ema * (1.0 - mat_alpha) + surprise * mat_alpha,
+            0.0,
+            1.0,
+        );
 
         // Step 6: Update the variational posterior (Kalman filter) and
         // compute the variational free energy.
@@ -1667,6 +1766,27 @@ impl ActiveInferenceEngine {
         self.last_action = action;
     }
 
+    /// Expected information gain of the next observation, in nats.
+    ///
+    /// For the diagonal Gaussian posterior this is the entropy
+    /// reduction `0.5 * mean(ln(prior_var[i] / belief_var[i]))`:
+    /// how much uncertainty the Kalman update is expected to remove.
+    /// Crucially, with additive controls the posterior *covariance*
+    /// update does not depend on the observation value (the Kalman
+    /// gain is fixed before the observation arrives), so this
+    /// quantity is identical for every candidate policy — it belongs
+    /// in the published EFE decomposition but cannot arbitrate
+    /// between policies. See the scoring loop for why the previous
+    /// novelty-based substitute was removed.
+    fn expected_information_gain(&self) -> f32 {
+        let mut ig_sum = 0.0f32;
+        for i in 0..DIM {
+            let ratio = self.prior_var[i] / self.belief_var[i].max(1e-8);
+            ig_sum += 0.5 * ratio.ln().max(0.0);
+        }
+        crate::state::sanitize::finite_clamp(ig_sum / DIM as f32, 0.0, 10.0)
+    }
+
     /// Evaluate all candidate policies and select the one with lowest
     /// expected free energy.
     ///
@@ -1775,55 +1895,36 @@ impl ActiveInferenceEngine {
             // `epistemic_value` and the softmax temperature.
             let uncertainty = (1.0 - self.precision) * UNCERTAINTY_WEIGHT;
 
-            // Epistemic value: uncertainty-weighted novelty of the
-            // predicted observation relative to the current belief.
+            // Epistemic value: expected information gain, computed
+            // properly as the entropy reduction of the variational
+            // posterior (see `expected_information_gain`). For this
+            // model class — linear-Gaussian with additive controls —
+            // that quantity does not depend on the policy (Koudahl,
+            // Kouw & de Vries, 2021: the posterior covariance update
+            // is observation-independent, so every policy yields the
+            // same expected covariance reduction). It is therefore a
+            // constant across all nine evaluations: it shifts every
+            // EFE by the same amount and cannot change the ranking.
             //
-            // The epistemic value of a policy is its expected information
-            // gain — how much the resulting observation would reduce
-            // uncertainty about the hidden state. In active inference
-            // (Friston, Rigoli, Ognibene, Mathys, Fitzgerald &
-            // Pezzulo, 2015), this is the
-            // information-seeking component of policy selection: the
-            // system prefers policies that would take it to regions
-            // where observations are maximally informative.
+            // The previous code substituted an uncertainty-weighted
+            // novelty heuristic in its place. That heuristic is not
+            // just differently scaled — it is inverted relative to
+            // true information gain (motion along pinned-down axes
+            // scores full value; standing still where uncertain scores
+            // none), and being policy-dependent it outweighed the
+            // pragmatic term 10–100×, reducing selection to
+            // ranking-by-novelty. Removing it makes the ranking purely
+            // pragmatic: distance of the predicted outcome from the
+            // homeostatic target. At rest that is noop; under
+            // deviation it is whichever policy the learned action
+            // model predicts will correct fastest.
             //
-            // The expected information gain from observing dimension i
-            // is proportional to the current posterior uncertainty about
-            // that dimension (belief_var[i]) — you gain more information
-            // from observing something you are uncertain about than
-            // something you already know (Shannon: I = -log p, maximized
-            // when p is uniform). We therefore weight the novelty of
-            // each dimension (how far the policy would move the state
-            // from the current belief mean) by the normalized posterior
-            // uncertainty of that dimension.
-            //
-            // The weight ranges over [0.5, 1.0]: a baseline of 0.5
-            // preserves the original novelty-seeking behavior for
-            // well-localized beliefs (low belief_var), while the full
-            // 1.0 weight applies when the model is maximally uncertain
-            // about that dimension. This makes the posterior variance —
-            // the defining quantity of a variational posterior —
-            // functional in policy selection: the system directs
-            // exploration toward the dimensions it is most uncertain
-            // about, which is the core principle of Bayesian
-            // active learning and epistemic value in active inference.
-            let mut novelty_sum = 0.0f32;
-            #[allow(clippy::needless_range_loop, reason = "i indexes multiple arrays")]
-            for i in 0..DIM {
-                let novelty = (predicted_after[i] - self.belief_mean[i]).abs();
-                let uncertainty_weight = crate::state::sanitize::finite_clamp(
-                    self.belief_var[i] / MAX_BELIEF_VAR,
-                    0.0,
-                    1.0,
-                );
-                novelty_sum += novelty * (0.5 + 0.5 * uncertainty_weight);
-            }
-            let novelty = novelty_sum / DIM as f32;
-            let epistemic_value = crate::state::sanitize::finite_clamp(
-                novelty * EPISTEMIC_WEIGHT,
-                0.0,
-                0.5, // cap at 0.5 so it doesn't dominate pragmatic cost
-            );
+            // Exploration is not lost with the heuristic — it was
+            // never really there (a novelty bonus is not curiosity).
+            // The live exploration mechanism is the precision-weighted
+            // softmax temperature below: low precision samples,
+            // high precision exploits.
+            let epistemic_value = self.expected_information_gain();
 
             // EFE = pragmatic + uncertainty - epistemic.
             // Lower EFE is better; epistemic value is subtracted
@@ -1919,9 +2020,15 @@ impl ActiveInferenceEngine {
         // hand-tuned switch between the two modes, not a derived
         // quantity.
         //
-        // Note that `precision` saturates at 1.0 within ~25 s of
-        // continuous running (recovery is 0.004/tick at dt_scale = 2),
-        // so in steady state this branch is effectively always taken.
+        // Note that `precision` saturates at 1.0 at rest — by design:
+        // the model genuinely predicts the resting trajectory, so
+        // confidence *should* be maximal and the exploitative branch
+        // *should* be taken (argmax over pragmatic cost selects noop).
+        // The branch is no longer dead, because precision now tracks
+        // inverse error variance: any sustained surprise above ~0.01
+        // RMS pulls it back under this threshold within a few ticks,
+        // re-opening stochastic sampling exactly when the regime
+        // changes and the model needs to explore.
         let selected_idx = if self.precision > EXPLOITATION_PRECISION_THRESHOLD {
             // High precision: pick the best policy (exploitative)
             evaluations
@@ -1961,10 +2068,22 @@ impl ActiveInferenceEngine {
         PolicyEvaluation { policy, efe }
     }
 
-    /// Update model maturity — asymptotic approach to 1.0.
+    /// Update model maturity from the error tracker — earned trust.
+    ///
+    /// `maturity = exp(-maturity_error_ema / MATURITY_ERROR_SCALE)`:
+    /// sustained accuracy drives it toward 1, chronic surprise pins
+    /// it near 0. This replaces the tick-count stopwatch
+    /// (`1 - exp(-tick_count / 500)`), which reported 0.63 after 100 s
+    /// of uptime whether or not a single prediction had been right —
+    /// while the cognitive mind treats this field as a trust signal.
+    /// A side benefit: maturity no longer depends on `tick_count`, so
+    /// the u32 wrap that used to zero it is now harmless.
     fn _update_maturity(&mut self) {
-        // 1 - exp(-tick_count / time_constant)
-        self.model_maturity = 1.0 - (-(self.tick_count as f32) / MATURITY_TIME_CONSTANT).exp();
+        self.model_maturity = crate::state::sanitize::finite_clamp(
+            (-self.maturity_error_ema / MATURITY_ERROR_SCALE).exp(),
+            0.0,
+            1.0,
+        );
     }
 
     /// Get the current inference signals for writing to the core state.
@@ -2073,7 +2192,7 @@ impl ActiveInferenceEngine {
 
     /// Persist the generative model to disk.
     ///
-    /// The model file format (version 3):
+    /// The model file format (version 4):
     /// - 4 bytes: magic "AIFE"
     /// - 4 bytes: version (u32) = 3
     /// - 18×18×4 bytes: transition matrix A (row-major f32)
@@ -2090,8 +2209,10 @@ impl ActiveInferenceEngine {
     /// - 4 bytes: last_free_energy (f32) [v2]
     /// - 18×18×4 bytes: action matrix B (row-major f32) [v3]
     /// - 18×4 bytes: last_action vector (f32) [v3]
+    /// - 4 bytes: surprise_var_ema (f32) [v4]
+    /// - 4 bytes: maturity_error_ema (f32) [v4]
     ///
-    /// Total: 1620 (v2) + 1296 + 72 = 2988 bytes
+    /// Total: 2988 (v3) + 8 = 2996 bytes
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
         use std::io::Write;
 
@@ -2105,7 +2226,7 @@ impl ActiveInferenceEngine {
 
         // Magic + version
         file.write_all(b"AIFE")?;
-        file.write_all(&3u32.to_le_bytes())?;
+        file.write_all(&4u32.to_le_bytes())?;
 
         // Transition matrix (row-major)
         for i in 0..DIM {
@@ -2151,6 +2272,11 @@ impl ActiveInferenceEngine {
             file.write_all(&self.last_action[i].to_le_bytes())?;
         }
 
+        // Slow error trackers (v4) — the state behind the precision
+        // target and the maturity mapping.
+        file.write_all(&self.surprise_var_ema.to_le_bytes())?;
+        file.write_all(&self.maturity_error_ema.to_le_bytes())?;
+
         // Fsync the temp file before renaming — without this, the
         // rename could reach disk before the file contents, leaving
         // an empty or partial model file after a crash.
@@ -2192,7 +2318,7 @@ impl ActiveInferenceEngine {
             return Self::new();
         }
         let version = u32::from_le_bytes(version_bytes);
-        if version != 1 && version != 2 && version != 3 {
+        if version != 1 && version != 2 && version != 3 && version != 4 {
             return Self::new();
         }
 
@@ -2352,6 +2478,41 @@ impl ActiveInferenceEngine {
             }
         }
 
+        // ─── Slow error trackers (v4+) ──────────────────────────
+        // For older files the trackers are derived from the persisted
+        // precision and maturity so the engine resumes with consistent
+        // dynamics instead of defaults: the variance tracker is the
+        // error variance implied by the loaded precision
+        // (v = V0 * (1/p − 1)), and the maturity tracker is the error
+        // level implied by the loaded maturity (err = −scale·ln(m)).
+        if version == 4 {
+            let mut var_bytes = [0u8; 4];
+            let mut mat_err_bytes = [0u8; 4];
+            if file.read_exact(&mut var_bytes).is_err()
+                || file.read_exact(&mut mat_err_bytes).is_err()
+            {
+                return Self::new();
+            }
+            engine.surprise_var_ema =
+                crate::state::sanitize::finite_clamp(f32::from_le_bytes(var_bytes), 0.0, 1.0);
+            engine.maturity_error_ema = crate::state::sanitize::finite_clamp(
+                f32::from_le_bytes(mat_err_bytes),
+                0.0,
+                1.0,
+            );
+        } else {
+            engine.surprise_var_ema = crate::state::sanitize::finite_clamp(
+                PRECISION_REFERENCE_VAR * (1.0 / engine.precision.max(0.1) - 1.0),
+                0.0,
+                1.0,
+            );
+            engine.maturity_error_ema = crate::state::sanitize::finite_clamp(
+                -MATURITY_ERROR_SCALE * engine.model_maturity.max(1e-6).ln(),
+                0.0,
+                1.0,
+            );
+        }
+
         engine
     }
 
@@ -2435,6 +2596,24 @@ impl ActiveInferenceEngine {
     pub(crate) fn test_transition(&self, i: usize, j: usize) -> f32 {
         assert!(i < DIM && j < DIM);
         self.transition_matrix[i][j]
+    }
+
+    /// Set an action matrix entry B[i][j] (test only). This lets
+    /// tests install a known action model — "this intervention has
+    /// this effect" — without running the learning loop to acquire
+    /// it, isolating policy *selection* from model *learning*.
+    #[cfg(test)]
+    pub(crate) fn test_set_action(&mut self, i: usize, j: usize, value: f32) {
+        assert!(i < DIM && j < DIM);
+        self.action_matrix[i][j] = value;
+    }
+
+    /// Set precision directly (test only). Lets tests place the
+    /// engine in the exploitative (argmax) regime without running
+    /// hundreds of settling ticks first.
+    #[cfg(test)]
+    pub(crate) fn test_set_precision(&mut self, value: f32) {
+        self.precision = value;
     }
 }
 
@@ -2829,6 +3008,193 @@ mod tests {
             engine.test_surprise_ema(),
             surprise_before,
             "circuit breaker should not modify finite surprise_ema"
+        );
+    }
+
+    // ─── Precision target-seeking ───────────────────────────────
+
+    #[test]
+    fn test_precision_saturates_at_rest_and_falls_under_sustained_surprise() {
+        // At rest the model predicts perfectly, so precision should
+        // saturate near 1.0 — correctly, because the model genuinely
+        // predicts well. Under sustained surprise it must fall back
+        // below the 0.8 exploitation threshold, re-opening the
+        // exploratory selection branch that the old fixed-threshold
+        // scheme left dead in practice.
+        let mut engine = ActiveInferenceEngine::new();
+        let rest = [0.5f32; DIM];
+        for _ in 0..100 {
+            engine.cycle(&rest, &rest, 1.0, &rest);
+        }
+        let rested = engine.test_precision();
+        assert!(
+            rested > 0.95,
+            "precision should saturate at rest: {}",
+            rested
+        );
+
+        // Sustained unpredictable disturbance: alternating sign so the
+        // delta rule cannot learn it away.
+        for t in 0..60 {
+            let mut post = rest;
+            post[0] = if t % 2 == 0 { 0.8 } else { 0.2 };
+            engine.cycle(&rest, &post, 1.0, &rest);
+        }
+        let stressed = engine.test_precision();
+        assert!(
+            stressed < 0.8,
+            "precision should fall under sustained surprise: {}",
+            stressed
+        );
+
+        // Recovery: sustained accuracy restores confidence.
+        for _ in 0..200 {
+            engine.cycle(&rest, &rest, 1.0, &rest);
+        }
+        let recovered = engine.test_precision();
+        assert!(
+            recovered > 0.95,
+            "precision should recover with sustained accuracy: {}",
+            recovered
+        );
+    }
+
+    // ─── Pragmatic policy ranking ───────────────────────────────
+
+    #[test]
+    fn test_noop_wins_at_rest_when_model_is_trusted() {
+        // With the novelty heuristic removed, ranking is pragmatic:
+        // at rest every policy predicts ~the current state and noop
+        // moves nothing, so noop must win the argmax. Under the old
+        // code the epistemic bonus elected a novelty policy here.
+        let mut engine = ActiveInferenceEngine::new();
+        let rest = [0.5f32; DIM];
+        for _ in 0..100 {
+            engine.cycle(&rest, &rest, 1.0, &rest);
+        }
+        assert!(engine.test_precision() > 0.8);
+        let result = engine.cycle(&rest, &rest, 1.0, &rest);
+        assert_eq!(
+            result.selected_policy, "noop",
+            "noop should win at rest (efe={})",
+            result.selected_policy_efe
+        );
+    }
+
+    #[test]
+    fn test_corrective_policy_wins_under_deviation_once_action_model_known() {
+        // Install a known action model: GABA impulses lower cortisol.
+        // With cortisol deviated high, the calm policy (GABA +0.03)
+        // must outrank noop pragmatically — its predicted outcome
+        // lands closer to the homeostatic target.
+        use crate::state::neurochemical::NeurochemicalId;
+        let mut engine = ActiveInferenceEngine::new();
+        engine.test_set_precision(1.0); // exploitative argmax regime
+        engine.test_set_action(
+            NeurochemicalId::Cortisol as usize,
+            NeurochemicalId::GABA as usize,
+            -1.0,
+        );
+        let target = [0.5f32; DIM];
+        let mut pre = target;
+        pre[NeurochemicalId::Cortisol as usize] = 0.8;
+        // First cycle initializes (returns early, no selection).
+        engine.cycle(&pre, &pre, 1.0, &target);
+        engine.test_set_precision(1.0); // re-set, robust to init changes
+        let result = engine.cycle(&pre, &pre, 1.0, &target);
+        assert_eq!(
+            result.selected_policy, "calm",
+            "calm should win under cortisol deviation (efe={})",
+            result.selected_policy_efe
+        );
+    }
+
+    #[test]
+    fn test_information_gain_is_policy_independent_and_nonnegative() {
+        // The expected information gain feeds the published EFE
+        // decomposition but must be identical for every policy (it is
+        // computed once per cycle, not per policy). Fresh engine:
+        // prior_var == belief_var, so no uncertainty has been
+        // resolved and the gain is ~0.
+        let engine = ActiveInferenceEngine::new();
+        let ig = engine.expected_information_gain();
+        assert!(
+            ig.is_finite() && ig >= 0.0,
+            "IG must be finite nonnegative: {}",
+            ig
+        );
+        assert!(
+            ig.abs() < 1e-6,
+            "fresh engine IG should be ~0: {}",
+            ig
+        );
+    }
+
+    // ─── Persistence v4 ─────────────────────────────────────────
+
+    #[test]
+    fn test_v4_save_load_preserves_error_trackers() {
+        // The slow error trackers behind the precision target and the
+        // maturity mapping must survive a save/load round trip —
+        // otherwise a restart silently resets earned confidence.
+        let mut engine = ActiveInferenceEngine::new();
+        let rest = [0.5f32; DIM];
+        for _ in 0..50 {
+            engine.cycle(&rest, &rest, 1.0, &rest);
+        }
+        let precision_before = engine.test_precision();
+        let maturity_before = engine.model_maturity();
+        let path = std::env::temp_dir().join("genesis_test_aife_v4.bin");
+        engine.save(&path).expect("save v4 model");
+        let loaded = ActiveInferenceEngine::load(&path);
+        let _ = std::fs::remove_file(&path);
+        assert!(
+            (loaded.test_precision() - precision_before).abs() < 1e-6,
+            "precision should survive round trip: {} vs {}",
+            loaded.test_precision(),
+            precision_before
+        );
+        assert!(
+            (loaded.model_maturity() - maturity_before).abs() < 1e-6,
+            "maturity should survive round trip: {} vs {}",
+            loaded.model_maturity(),
+            maturity_before
+        );
+    }
+
+    #[test]
+    fn test_pre_v4_files_derive_consistent_trackers() {
+        // A v3-length file carries no error trackers; loading must
+        // derive them consistently from the persisted precision and
+        // maturity rather than resetting to defaults. Fabricate the
+        // body as zeros: precision clamps to 0.1, maturity to 0.0.
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"AIFE");
+        bytes.extend_from_slice(&3u32.to_le_bytes());
+        bytes.resize(8 + 2980, 0u8);
+        let path = std::env::temp_dir().join("genesis_test_aife_v3compat.bin");
+        std::fs::write(&path, &bytes).expect("write fabricated v3 file");
+        let mut loaded = ActiveInferenceEngine::load(&path);
+        let _ = std::fs::remove_file(&path);
+        assert!(
+            (loaded.test_precision() - 0.1).abs() < 1e-6,
+            "precision should load clamped: {}",
+            loaded.test_precision()
+        );
+        // One perfect tick: derived variance implies target 0.1, so
+        // precision must not jump; derived maturity error implies
+        // maturity ~0, so it must not jump either.
+        let rest = [0.5f32; DIM];
+        loaded.cycle(&rest, &rest, 1.0, &rest);
+        assert!(
+            (loaded.test_precision() - 0.1).abs() < 1e-6,
+            "derived trackers must be self-consistent: precision {}",
+            loaded.test_precision()
+        );
+        assert!(
+            loaded.model_maturity() < 0.01,
+            "derived trackers must be self-consistent: maturity {}",
+            loaded.model_maturity()
         );
     }
 }

@@ -49,14 +49,27 @@ import math
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-import cairo
 import numpy as np
 from PIL import Image
 
 if TYPE_CHECKING:
     from .emotion import EmotionalState
+
+try:
+    import cairo  # type: ignore[import-not-found]
+except ImportError:  # headless installs without pycairo can still import the package
+    class _MissingCairo:
+        """Placeholder that fails with a helpful error only when drawing."""
+
+        def __getattr__(self, name: str) -> Any:
+            raise ImportError(
+                "pycairo is required for canvas rendering; "
+                "install pycairo or skip drawing"
+            )
+
+    cairo = _MissingCairo()  # type: ignore[no-redef]
 
 
 def _cv2():  # type: ignore[no-untyped-def]
