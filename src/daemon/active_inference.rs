@@ -597,13 +597,6 @@ const POLICY_SOFTMAX_TEMPERATURE: f32 = 0.5;
 /// loop for why a non-negative lower bound is wrong here.
 const EFE_SCORE_LIMIT: f32 = 1.0e6;
 
-/// Engine confidence above which policy selection is exploitative
-/// (argmin) rather than exploratory (softmax sample).
-///
-/// Hand-tuned, not derived. See the selection loop for why it is not
-/// the Bayesian policy prior precision it is analogous to.
-const EXPLOITATION_PRECISION_THRESHOLD: f32 = 0.8;
-
 // The homeostatic target for expected free energy computation.
 // Policies that push the system toward its homeostatic baseline
 // have lower expected free energy. This is the set point the system
@@ -1734,28 +1727,15 @@ impl ActiveInferenceEngine {
             // was trained.
             let predicted_after = self.predict_with_action(current, &policy_action);
 
-            // Expected free energy (EFE) with epistemic + pragmatic
-            // decomposition:
+            // Expected-free-energy proxy for this controller:
             //
-            // EFE = pragmatic_cost + uncertainty - epistemic_value
+            // EFE_proxy = pragmatic_cost + model_uncertainty
             //
-            // **Pragmatic cost**: expected distance from the
-            // homeostatic target. Policies that move the system toward
-            // its baselines have lower pragmatic cost.
-            //
-            // **Uncertainty**: model uncertainty (1 - precision) ×
-            // weight. A model with low precision contributes additional
-            // EFE because it can't predict well.
-            //
-            // **Epistemic value**: expected information gain from the
-            // predicted observation. Policies that would take the
-            // system to novel regions of state space (far from the
-            // current belief) have higher epistemic value because the
-            // resulting observation would be more informative. This is
-            // the information-seeking component of active inference
-            // (Friston, Rigoli, Ognibene, Mathys, Fitzgerald &
-            // Pezzulo, 2015) — the system prefers
-            // policies that reduce uncertainty about its own state.
+            // This is intentionally not labeled formal epistemic value.
+            // For additive controls in a linear-Gaussian model, the
+            // expected information-gain term is policy-invariant
+            // (Koudahl et al., 2021). Exploration is therefore handled
+            // separately by the policy sampler.
             let mut dist_sq = 0.0f32;
             for i in 0..DIM {
                 let diff = predicted_after[i] - target[i];
