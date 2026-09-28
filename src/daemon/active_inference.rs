@@ -447,14 +447,6 @@ const MAX_BELIEF_VAR: f32 = 0.03;
 /// directly, preserving sensitivity to belief updates.
 const KL_SCALE: f32 = 1.0;
 
-/// Weight of epistemic value in expected free energy. The epistemic
-/// value is the expected information gain from a policy's predicted
-/// observation — policies that would take the system to novel regions
-/// of state space have higher epistemic value. This weight controls
-/// how much the epistemic bonus influences policy selection relative
-/// to the pragmatic (homeostatic) cost.
-const EPISTEMIC_WEIGHT: f32 = 0.5;
-
 // ─── Policy selection (active inference) ─────────────────────────
 //
 // In Friston's active inference framework, the system doesn't just
