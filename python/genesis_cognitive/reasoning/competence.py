@@ -302,6 +302,7 @@ class TaskSignature:
                 "actions": sorted(self.actions),
                 "goals": sorted(self.goals),
                 "entities": sorted(self.entities),
+                "roles": sorted(self.roles),
             }
         )
 
@@ -997,6 +998,14 @@ class TaskCompetence:
             self.skills[skill_id] = skill
         if skill_id not in schema.skill_ids:
             schema.skill_ids.append(skill_id)
+        # Successful consolidation is also learning-to-search evidence:
+        # the procedure family that solved this schema becomes a prior for
+        # future proposal ordering. The prior is per schema, persistent,
+        # and updated only by verified success.
+        for step in step_tuple:
+            family = step.family.strip()
+            if family:
+                schema.family_priors[family] = schema.family_priors.get(family, 0) + 1
         self._ground_skill(context, skill)
         return skill
 
