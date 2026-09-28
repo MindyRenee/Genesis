@@ -48,6 +48,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Callable
 
 
 class TaskState(Enum):
@@ -209,7 +210,7 @@ class ExecutiveFunction:
         self,
         goal: str,
         possible_actions: list[str],
-        outcome_predictor: object | None = None,
+        outcome_predictor: Callable[[str], tuple[str, float] | str] | None = None,
     ) -> ActionPlan:
         """Simulate possible actions and select the best plan.
 
@@ -267,7 +268,7 @@ class ExecutiveFunction:
         self,
         action: str,
         possible_actions: list[str],
-        outcome_predictor: object | None,
+        outcome_predictor: Callable[[str], tuple[str, float] | str],
         goal: str,
     ) -> ActionPlan:
         """Simulate a single action sequence forward and return the plan."""
