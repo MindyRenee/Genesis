@@ -91,6 +91,9 @@ class VQCodebook:
 
         # Statistics from last training
         self._reconstruction_error: float = 0.0
+        self._relative_reconstruction_error: float = 0.0
+        self._reconstruction_cosine: float = 0.0
+        self._residual_saturation_fraction: float = 0.0
         self._training_iters: int = 0
 
     @property
@@ -107,6 +110,21 @@ class VQCodebook:
     def reconstruction_error(self) -> float:
         """Mean squared reconstruction error from last training."""
         return self._reconstruction_error
+
+    @property
+    def relative_reconstruction_error(self) -> float:
+        """Mean squared reconstruction error normalized by input energy."""
+        return self._relative_reconstruction_error
+
+    @property
+    def reconstruction_cosine(self) -> float:
+        """Mean per-vector cosine similarity of reconstructed vectors."""
+        return self._reconstruction_cosine
+
+    @property
+    def residual_saturation_fraction(self) -> float:
+        """Fraction of residual coefficients clipped by int8 quantization."""
+        return self._residual_saturation_fraction
 
     @property
     def prototypes(self) -> np.ndarray:
@@ -160,7 +178,7 @@ class VQCodebook:
             self._reconstruction_cosine = 0.0
             self._residual_saturation_fraction = 0.0
             self._training_iters = 0
-            return {"final_error": 0.0, "iters": 0.0, "k": 0.0, "n": 0.0}
+            return {"final_error": 0.0, "relative_error": 0.0, "cosine": 0.0, "saturation": 0.0, "iters": 0.0, "k": 0.0, "n": 0.0}
         k = min(self.k, n)  # can't have more prototypes than points
 
         rng = np.random.default_rng(seed)
@@ -263,10 +281,10 @@ class VQCodebook:
         # Quantize: int8 range is [-128, 127]
         # residual_int8 = clip(round(residual / scale), -128, 127)
         scale = self.residual_scale
-        residuals_int8 = np.clip(
-            np.round(residuals_f32 / scale),
-            -128, 127,
-        ).astype(np.int8)
+        quantized = np.round(residuals_f32 / scale)
+        clipped = np.clip(quantized, -128, 127)
+        self._residual_saturation_fraction = float(np.mean(quantized != clipped))
+        residuals_int8 = clipped.astype(np.int8)
 
         self._prototype_ids = prototype_ids
         self._residuals = residuals_int8
@@ -274,9 +292,21 @@ class VQCodebook:
 
         # Compute actual reconstruction error with quantized residuals
         recon = self._reconstruct_all()
-        self._reconstruction_error = float(
-            np.mean((vectors - recon) ** 2)
+        error = vectors - recon
+        self._reconstruction_error = float(np.mean(error ** 2))
+        input_energy = float(np.sum(vectors * vectors))
+        self._relative_reconstruction_error = float(
+            np.sum(error * error) / max(input_energy, 1e-12)
         )
+        vector_norms = np.linalg.norm(vectors, axis=1)
+        recon_norms = np.linalg.norm(recon, axis=1)
+        denom = vector_norms * recon_norms
+        valid = denom > 1e-12
+        if np.any(valid):
+            dots = np.sum(vectors[valid] * recon[valid], axis=1)
+            self._reconstruction_cosine = float(np.mean(dots / denom[valid]))
+        else:
+            self._reconstruction_cosine = 0.0
 
     # ─── Encoding / Decoding ────────────────────────────────────
 
@@ -414,6 +444,9 @@ class VQCodebook:
             k=np.array(self.k, dtype=np.int32),
             residual_scale=np.array(self.residual_scale, dtype=np.float32),
             reconstruction_error=np.array(self._reconstruction_error, dtype=np.float32),
+            relative_reconstruction_error=np.array(self._relative_reconstruction_error, dtype=np.float32),
+            reconstruction_cosine=np.array(self._reconstruction_cosine, dtype=np.float32),
+            residual_saturation_fraction=np.array(self._residual_saturation_fraction, dtype=np.float32),
         )
 
     def load(self, path: str) -> bool:
@@ -434,6 +467,9 @@ class VQCodebook:
             self.k = int(data["k"])
             self.residual_scale = float(data["residual_scale"])
             self._reconstruction_error = float(data["reconstruction_error"])
+            self._relative_reconstruction_error = float(data.get("relative_reconstruction_error", 0.0))
+            self._reconstruction_cosine = float(data.get("reconstruction_cosine", 0.0))
+            self._residual_saturation_fraction = float(data.get("residual_saturation_fraction", 0.0))
             return True
         except (KeyError, ValueError, OSError) as e:
             logger.warning("Failed to load VQ codebook: %s", e)
@@ -479,5 +515,8 @@ class VQCodebook:
             "dim": float(self.dim),
             "compression_ratio": self.compression_ratio(),
             "reconstruction_error": self._reconstruction_error,
+            "relative_reconstruction_error": self._relative_reconstruction_error,
+            "reconstruction_cosine": self._reconstruction_cosine,
+            "residual_saturation_fraction": self._residual_saturation_fraction,
             "residual_scale": self.residual_scale,
         }
