@@ -5,6 +5,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .venv*/
+python/venv/
 genesis_data/
 python/genesis_data/
 .genesis-data-dir
