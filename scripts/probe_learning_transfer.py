@@ -1,15 +1,19 @@
 """Diagnostic probe: does experience persist and alter later cognition?
 
 This probe does not modify Genesis's cognitive architecture. It runs the real
-CognitionEngine in three isolated in-memory conditions:
+CognitionEngine in isolated conditions:
 
 1. baseline: target question with no relevant experience
 2. relevant: teach a small novel relation, then ask a structurally related query
 3. irrelevant: teach unrelated novel relations, then ask the same target
 
+The relevant condition is also round-tripped through Genesis's persistence
+layer before the target query. This separates in-process learning from
+learned-state survival across a fresh engine/network instance.
+
 The output is intentionally diagnostic rather than a pass/fail intelligence
-score. A useful result is a difference between conditions that is traceable to
-persistent learned state.
+score. A useful result is a difference between conditions that is traceable
+to learned state and survives persistence.
 """
 
 from __future__ import annotations
@@ -31,6 +35,7 @@ from genesis_cognitive.cognition.engine import CognitionEngine
 from genesis_cognitive.concepts import ConceptNetwork
 from genesis_cognitive.language import GenerativeEngine
 from genesis_cognitive.memory import MemoryEngine
+from genesis_cognitive.persistence import load_state, restore_network, save_state
 from genesis_cognitive.self import SelfModel
 from genesis_cognitive.user_profile import UserProfile
 
@@ -46,8 +51,8 @@ IRRELEVANT_EXPERIENCE = [
 ]
 
 
-def make_engine() -> tuple[CognitionEngine, ConceptNetwork]:
-    data_dir = tempfile.mkdtemp(prefix="genesis_probe_")
+def make_engine(data_dir: str | None = None) -> tuple[CognitionEngine, ConceptNetwork, str]:
+    data_dir = data_dir or tempfile.mkdtemp(prefix="genesis_probe_")
     client = GenesisClient(os.path.join(data_dir, "genesis.sock"))
     self_model = SelfModel()
     network = ConceptNetwork()
@@ -62,7 +67,7 @@ def make_engine() -> tuple[CognitionEngine, ConceptNetwork]:
         data_dir=data_dir,
         user_profile=UserProfile(),
     )
-    return engine, network
+    return engine, network, data_dir
 
 
 def snapshot(network: ConceptNetwork, engine: CognitionEngine) -> dict[str, Any]:
@@ -109,8 +114,30 @@ def state_summary(state: Any) -> dict[str, Any]:
     }
 
 
-def run_condition(name: str, experience: list[str]) -> dict[str, Any]:
-    engine, network = make_engine()
+def persist_and_reload(
+    engine: CognitionEngine,
+    network: ConceptNetwork,
+    data_dir: str,
+) -> tuple[CognitionEngine, ConceptNetwork]:
+    """Persist cognitive state, then rebuild cognition around a fresh network."""
+    save_state(
+        data_dir,
+        network,
+        engine.reflection,
+        engine.narrative,
+        engine.self_model,
+    )
+    saved = load_state(data_dir)
+    if saved is None:
+        raise RuntimeError("persistence probe wrote no cognitive state")
+
+    reloaded_engine, reloaded_network, _ = make_engine(data_dir)
+    restore_network(reloaded_network, saved["concept_network"])
+    return reloaded_engine, reloaded_network
+
+
+def run_condition(name: str, experience: list[str], reload_before_target: bool = False) -> dict[str, Any]:
+    engine, network, data_dir = make_engine()
     experience_results = []
 
     for statement in experience:
@@ -121,35 +148,58 @@ def run_condition(name: str, experience: list[str]) -> dict[str, Any]:
             "state": state_summary(state),
         })
 
-    before = snapshot(network, engine)
+    before_target = snapshot(network, engine)
+    reload_report: dict[str, Any] | None = None
+
+    if reload_before_target:
+        engine, network = persist_and_reload(engine, network, data_dir)
+        reloaded = snapshot(network, engine)
+        reload_report = {
+            "concept_count": reloaded["concept_count"],
+            "edge_count": reloaded["edge_count"],
+            "nib_present": reloaded["nib_present"],
+            "vesh_present": reloaded["vesh_present"],
+            "learned_edges": reloaded["learned_edges"],
+            "survived": (
+                reloaded["nib_present"]
+                and reloaded["vesh_present"]
+                and bool(reloaded["learned_edges"])
+            ),
+        }
+
     response, state = engine.think(TARGET)
-    after = snapshot(network, engine)
+    after_target = snapshot(network, engine)
 
     return {
         "condition": name,
         "experience": experience_results,
-        "before_target": before,
+        "before_target": before_target,
+        "persistence_reload": reload_report,
         "target": {
             "input": TARGET,
             "response": response,
             "state": state_summary(state),
         },
-        "after_target": after,
+        "after_target": after_target,
         "persistent_state_delta": {
-            "concept_count": after["concept_count"] - before["concept_count"],
-            "edge_count": after["edge_count"] - before["edge_count"],
-            "conversation_turns": after["conversation_turns"] - before["conversation_turns"],
+            "concept_count": after_target["concept_count"] - before_target["concept_count"],
+            "edge_count": after_target["edge_count"] - before_target["edge_count"],
+            "conversation_turns": after_target["conversation_turns"] - before_target["conversation_turns"],
         },
     }
 
 
 def main() -> None:
     report = {
-        "probe": "learning-transfer-v1",
+        "probe": "learning-transfer-v2",
         "target": TARGET,
         "conditions": [
             run_condition("baseline", []),
-            run_condition("relevant_experience", RELEVANT_EXPERIENCE),
+            run_condition(
+                "relevant_experience",
+                RELEVANT_EXPERIENCE,
+                reload_before_target=True,
+            ),
             run_condition("irrelevant_experience", IRRELEVANT_EXPERIENCE),
         ],
     }
