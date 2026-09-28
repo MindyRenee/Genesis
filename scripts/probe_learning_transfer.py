@@ -14,6 +14,8 @@ persistent learned state.
 
 from __future__ import annotations
 
+# ruff: noqa: E402, I001
+
 import json
 import os
 import sys
