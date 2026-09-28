@@ -570,7 +570,9 @@ class CodeLearner:
             return self._empty_result(rel, "python")
 
         lines = source.count("\n") + (1 if source and not source.endswith("\n") else 0)
-        module_name = self._module_name(path, "python")
+        module_name = self._disambiguate_module_name(
+            path, "python", self._module_name(path, "python")
+        )
 
         concepts_before = self.network.size
         edges_before = self.network.edge_count
@@ -640,7 +642,9 @@ class CodeLearner:
             return self._empty_result(rel, "rust")
 
         lines = source.count("\n") + (1 if source and not source.endswith("\n") else 0)
-        module_name = self._module_name(path, "rust")
+        module_name = self._disambiguate_module_name(
+            path, "rust", self._module_name(path, "rust")
+        )
 
         concepts_before = self.network.size
         edges_before = self.network.edge_count
@@ -1250,6 +1254,19 @@ class CodeLearner:
             return str(path.resolve().relative_to(self.project_root))
         except ValueError:
             return str(path)
+
+    def _disambiguate_module_name(
+        self, path: Path, language: str, candidate: str
+    ) -> str:
+        """Avoid collapsing same-named modules from different directories."""
+        prefix = f"{language}:{candidate}"
+        existing = self.network.get_concept(prefix)
+        if existing is None or existing.properties.get("file") == self._relative(path):
+            return candidate
+        rel = self._relative(path)
+        stem = Path(rel).with_suffix("")
+        qualified = ".".join(stem.parts).replace("-", "_")
+        return qualified
 
     @staticmethod
     def _module_name(path: Path, language: str) -> str:
