@@ -1869,3 +1869,19 @@ def test_verbatim_fallback_is_last_resort_and_not_used_by_composer_paths() -> No
         "only prose here"
     ]
     assert vocab._verbatim_fallback("", {"intent": "inform"}) == []
+
+
+def test_comprehension_exposes_parse_failure_signals() -> None:
+    """Weak parses must expose reusable diagnostics rather than only low confidence."""
+    result = _props("the quantum mechanism blorps unexpectedly")
+    assert 0.0 <= result.parse_coverage <= 1.0
+    assert isinstance(result.unresolved_tokens, list)
+    assert isinstance(result.diagnostics, list)
+    assert result.diagnostics, "a structurally weak parse should produce diagnostics"
+
+
+def test_comprehension_full_parse_has_high_coverage() -> None:
+    """A simple well-formed proposition should not look like a parser failure."""
+    result = _props("the engine moves the piston")
+    assert result.parse_coverage >= 0.8
+    assert "low_parse_coverage" not in result.diagnostics
