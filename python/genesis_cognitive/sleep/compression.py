@@ -373,6 +373,9 @@ class SleepCompressor:
         )
         stats["vq_trained"] = 1
         stats["vq_reconstruction_error"] = train_stats["final_error"]
+        stats["vq_relative_reconstruction_error"] = train_stats["relative_error"]
+        stats["vq_reconstruction_cosine"] = train_stats["cosine"]
+        stats["vq_residual_saturation"] = train_stats["saturation"]
         stats["vq_compression_ratio"] = self.vq_codebook.compression_ratio()
 
         # Find merge candidates
