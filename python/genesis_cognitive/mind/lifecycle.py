@@ -136,39 +136,52 @@ class LifecycleMixin:
                 f"{stats['bridges_created']} bridges"
             )
 
-        # Eagerly load the embedding matrix. The first perceive() call
-        # in think() would otherwise trigger a lazy _build() that takes
-        # 8+ seconds (spectral SVD over 20K+ concepts), blowing past
-        # the 15s cognition timeout on the first conversation turn.
-        # Loading here moves that cost to startup, where it's hidden
-        # by the rest of the initialization sequence.
-        self.cognition.embeddings._ensure_loaded()
+        # Expensive semantic/LTM initialization must not block interactive
+        # startup. Embedding construction can take seconds and the first
+        # LTM lookup can page a large index from disk. Both are safe to
+        # initialize lazily, so schedule them after the mind is usable.
+        self._start_warmup_thread()
+    def _start_warmup_thread(self) -> None:
+        """Warm expensive semantic resources without blocking startup.
 
-        # Pre-warm the daemon's LTM cache and the embeddings search.
-        # The first find_similar call pages in the entire LTM index
-        # (300K+ episodes) from disk — cold-cache I/O takes 20+ seconds
-        # and blows past the 15s cognition timeout. Similarly, the first
-        # embeddings search touches the full concept matrix. Running
-        # both here moves those costs to startup.
-        import time as _warmup_time
-        _warmup_t0 = _warmup_time.perf_counter()
+        The warmup is best-effort: normal cognition can still trigger the
+        same resources lazily if this thread has not finished yet.
+        """
+        self._warmup_thread = threading.Thread(
+            target=self._warmup_semantic_resources,
+            name="semantic-warmup",
+            daemon=True,
+        )
+        self._warmup_thread.start()
+
+    def _warmup_semantic_resources(self) -> None:
+        """Build embeddings and page the LTM index in the background."""
         try:
+            t0 = time.perf_counter()
+            self.cognition.embeddings._ensure_loaded()
+            logger.info("Semantic embeddings ready in %.2fs", time.perf_counter() - t0)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Semantic embedding warmup failed: %s", e)
+
+        try:
+            t0 = time.perf_counter()
             self.cognition.memory.client.find_similar("warmup", limit=1)
-            logger.debug(
-                f"LTM warmup find_similar took "
-                f"{_warmup_time.perf_counter() - _warmup_t0:.2f}s"
-            )
+            logger.info("LTM cache ready in %.2fs", time.perf_counter() - t0)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"LTM warmup find_similar failed: {e}")
-        _embed_t0 = _warmup_time.perf_counter()
+            logger.warning("LTM warmup failed: %s", e)
+
         try:
-            self.cognition.embeddings.find_similar_to_text("warmup", k=1, threshold=0.5)
+            t0 = time.perf_counter()
+            self.cognition.embeddings.find_similar_to_text(
+                "warmup", k=1, threshold=0.5
+            )
             logger.debug(
-                f"embeddings warmup took "
-                f"{_warmup_time.perf_counter() - _embed_t0:.2f}s"
+                "Embedding search warmup completed in %.2fs",
+                time.perf_counter() - t0,
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"embeddings warmup failed: {e}")
+            logger.debug("Embedding search warmup failed: %s", e)
+
     def _start_introspect_and_train(self) -> None:
         """Introspect on identity and clear sleep pressure if needed."""
         # Introspect — discover who it is by examining itself
