@@ -1985,7 +1985,13 @@ impl NeurochemicalVector {
         // Orexin is legitimately a wake signal competing at the gate, so
         // it stays.
         let sleep_adn = if is_in_sleep {
-            0.65 - 0.05 * (1.0 - ox)
+            // Sleep pressure can fall below the entry threshold during
+            // late NREM without immediately waking the system. The
+            // cholinergic rebound is intentionally triggered below 0.65
+            // adenosine, so the NREM stay threshold must sit below that
+            // transition window. Otherwise the sleep gate exits NREM
+            // before the rebound can produce the NREM→REM transition.
+            0.55 - 0.05 * (1.0 - ox)
         } else {
             0.75 - 0.05 * (1.0 - ox)
         };
