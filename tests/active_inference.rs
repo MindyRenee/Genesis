@@ -1797,3 +1797,25 @@ fn test_engine_save_load_v3_round_trip() {
     // Clean up
     let _ = std::fs::remove_file(&path);
 }
+
+
+#[test]
+fn test_policy_selection_remains_stochastic_at_high_precision() {
+    // Precision should control distribution sharpness, not disable sampling
+    // entirely. The old threshold branch became permanently exploitative
+    // after precision saturated.
+    let mut engine = ActiveInferenceEngine::new();
+    let state = [0.5f32; NEUROCHEMICAL_COUNT];
+    let mut selected = std::collections::HashSet::new();
+
+    for _ in 0..400 {
+        let result = engine.cycle(&state, &state, 0.1, &state);
+        selected.insert(result.selected_policy);
+    }
+
+    assert!(
+        selected.len() > 1,
+        "policy sampling should explore more than one candidate; selected={:?}",
+        selected
+    );
+}
