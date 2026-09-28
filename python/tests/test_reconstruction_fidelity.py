@@ -61,3 +61,33 @@ def test_memory_bridge_reports_both_reconstruction_directions() -> None:
     predicted = V @ bridge.W.T
     expected_mse = float(np.mean((E - predicted) ** 2))
     assert bridge.embedding_reconstruction_mse == expected_mse
+
+
+def test_vq_reconstruction_metrics_survive_persistence(tmp_path) -> None:
+    rng = np.random.default_rng(19)
+    vectors = rng.normal(0.0, 0.05, (12, 5)).astype(np.float32)
+    names = [f"p{i}" for i in range(len(vectors))]
+
+    original = VQCodebook(dim=5, k=3, residual_scale=0.02)
+    original.fit(vectors, names, iters=5)
+    path = tmp_path / "vq.npz"
+    original.save(str(path))
+
+    restored = VQCodebook(dim=5, k=3)
+    assert restored.load(str(path))
+    assert restored.reconstruction_error == original.reconstruction_error
+    assert restored.relative_reconstruction_error == original.relative_reconstruction_error
+    assert restored.reconstruction_cosine == original.reconstruction_cosine
+    assert restored.residual_saturation_fraction == original.residual_saturation_fraction
+
+
+def test_vq_empty_fit_resets_all_reconstruction_metrics() -> None:
+    codebook = VQCodebook(dim=3, k=2)
+    vectors = np.ones((4, 3), dtype=np.float32)
+    codebook.fit(vectors, ["a", "b", "c", "d"], iters=2)
+    codebook.fit(np.empty((0, 3), dtype=np.float32), [])
+
+    assert codebook.reconstruction_error == 0.0
+    assert codebook.relative_reconstruction_error == 0.0
+    assert codebook.reconstruction_cosine == 0.0
+    assert codebook.residual_saturation_fraction == 0.0
