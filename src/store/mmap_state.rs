@@ -334,6 +334,12 @@ impl MmapState {
             return Err(e);
         }
 
+        // The open-time lock only protects initialization. Release it
+        // before returning the live mapping so another MmapState can open
+        // the file and contend through modify()'s writer lock.
+        // SAFETY: fd is valid and the initialization transaction is complete.
+        unsafe { Self::unlock_file(fd) };
+
         // All fallible steps succeeded. Transfer fd ownership to Self.
         std::mem::forget(file);
 
