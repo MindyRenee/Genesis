@@ -239,12 +239,8 @@
 //! epistemic term outweighs the homeostatic term by one to two orders
 //! of magnitude, so ranking is close to ranking-by-novelty and noop
 //! does not win merely for being predictable. And `precision`
-//! saturates at 1.0 within seconds of continuous running, so the
-//! `precision > EXPLOITATION_PRECISION_THRESHOLD` branch is the one
-//! always taken and the stochastic exploration branch is dead in
-//! practice. Treat the policy repertoire as a set of candidate
-//! neuromodulatory interventions scored by a heuristic, not as a
-//! converged active-inference arbitration.
+//! Policy selection uses explicit stochastic exploration with a
+//! pragmatic score; it is not presented as a complete EFE implementation.
 //!
 //! References:
 //! - Friston, K. (2010). The free-energy principle. Nat Rev Neurosci.
@@ -1744,8 +1740,7 @@ impl ActiveInferenceEngine {
             // retained because a policy-independent term is legitimate
             // in an expected-free-energy decomposition, but it must not
             // be read as doing arbitration work — the exploration /
-            // exploitation balance is carried entirely by
-            // `epistemic_value` and the softmax temperature.
+            // exploration is controlled by the softmax temperature.
             let uncertainty = (1.0 - self.precision) * UNCERTAINTY_WEIGHT;
 
             // This controller has additive actions and a linear-Gaussian
