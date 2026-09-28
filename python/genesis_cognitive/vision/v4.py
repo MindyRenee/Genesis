@@ -93,13 +93,18 @@ class V4Model:
         # Initialized random, learned via online sparse coding
         self.phi4 = self._init_dictionary()
 
-        # Gram matrix Φ4ᵀΦ4 (updated when dictionary changes)
-        self._phi4_gram = self.phi4.T @ self.phi4
+        # Gram matrix Φ4ᵀΦ4 and its Lipschitz constant for ISTA.
+        self._refresh_dictionary_cache()
 
         # Learning state
         self._learning_enabled = True
         self._samples_seen = 0
-        self._dict_update_interval = 50  # recompute Gram every N samples
+
+        # Last-batch reconstruction diagnostics.
+        self._last_reconstruction_mse = 0.0
+        self._last_relative_reconstruction_error = 0.0
+        self._last_reconstruction_cosine = 1.0
+        self._last_sparsity = 0.0
 
     def _init_dictionary(self) -> np.ndarray:
         """Initialize dictionary with random unit-norm columns."""
@@ -148,13 +153,16 @@ class V4Model:
                 np.zeros((pooled.shape[0], self.color_dims), dtype=np.float64),
             ])
 
-        # Sparse code
+        # Infer with the current dictionary.
         v4_latents = self._infer_latents(v4_input)
 
-        # Learn dictionary
+        # The dictionary update invalidates the code, so re-infer against
+        # the updated dictionary before returning.
         if learn and self._learning_enabled and v4_input.shape[0] > 0:
             self._update_dictionary(v4_input, v4_latents)
+            v4_latents = self._infer_latents(v4_input)
 
+        self._record_reconstruction_metrics(v4_input, v4_latents)
         return v4_latents
 
     def _pool_v1(
@@ -290,24 +298,74 @@ class V4Model:
             np.std(v),
         ])
 
-    def _infer_latents(self, X: np.ndarray) -> np.ndarray:
-        """Run ISTA sparse coding on V4 input.
+    def _refresh_dictionary_cache(self) -> None:
+        """Refresh quantities derived from the current dictionary."""
+        self._phi4_gram = self.phi4.T @ self.phi4
+        eigenvalues = np.linalg.eigvalsh(self._phi4_gram)
+        lipschitz = float(eigenvalues[-1]) if eigenvalues.size else 1.0
+        self._ista_lipschitz = max(lipschitz, 1e-12)
 
-        z_{t+1} = ReLU(z_t + η [Φᵀx - (ΦᵀΦ)z_t - λ])
+    def _effective_ista_step(self) -> float:
+        """Return an ISTA step bounded by the current Lipschitz constant."""
+        return min(max(float(self.step), 0.0), 0.99 / self._ista_lipschitz)
+
+    def _infer_latents(self, X: np.ndarray) -> np.ndarray:
+        """Run non-negative ISTA sparse coding on V4 input.
+
+        Approximately minimizes:
+            1/2 ||X - Z Φ4ᵀ||² + λ ||Z||₁, subject to Z >= 0.
         """
         if X.shape[0] == 0:
             return np.zeros((0, self.n_features), dtype=np.float64)
 
         Z = np.zeros((X.shape[0], self.n_features), dtype=np.float64)
         feedforward = X @ self.phi4
-        bias = self.sparsity
+        step = self._effective_ista_step()
 
         for _ in range(self.n_ista_iters):
-            Z_new = Z + self.step * (feedforward - Z @ self._phi4_gram.T - bias)
-            np.maximum(Z_new, 0.0, out=Z_new)
-            Z = 0.8 * Z + 0.2 * Z_new
+            gradient = feedforward - Z @ self._phi4_gram
+            Z += step * gradient
+            # Positive soft-thresholding is the proximal operator for
+            # L1 regularization with a non-negativity constraint.
+            np.maximum(Z - step * self.sparsity, 0.0, out=Z)
 
         return Z
+
+    def _record_reconstruction_metrics(self, X: np.ndarray, Z: np.ndarray) -> None:
+        """Record scale-aware reconstruction diagnostics for the last batch."""
+        if X.size == 0:
+            self._last_reconstruction_mse = 0.0
+            self._last_relative_reconstruction_error = 0.0
+            self._last_reconstruction_cosine = 1.0
+            self._last_sparsity = 0.0
+            return
+        recon = Z @ self.phi4.T
+        error = X - recon
+        x_sq = float(np.sum(X * X))
+        e_sq = float(np.sum(error * error))
+        self._last_reconstruction_mse = float(np.mean(error * error))
+        self._last_relative_reconstruction_error = e_sq / max(x_sq, 1e-12)
+        x_flat = X.reshape(-1)
+        r_flat = recon.reshape(-1)
+        denom = float(np.linalg.norm(x_flat) * np.linalg.norm(r_flat))
+        self._last_reconstruction_cosine = float(np.dot(x_flat, r_flat) / denom) if denom > 1e-12 else 0.0
+        self._last_sparsity = float(np.mean(Z <= 1e-12))
+
+    @property
+    def reconstruction_mse(self) -> float:
+        return self._last_reconstruction_mse
+
+    @property
+    def relative_reconstruction_error(self) -> float:
+        return self._last_relative_reconstruction_error
+
+    @property
+    def reconstruction_cosine(self) -> float:
+        return self._last_reconstruction_cosine
+
+    @property
+    def sparsity_fraction(self) -> float:
+        return self._last_sparsity
 
     def _update_dictionary(self, X: np.ndarray, Z: np.ndarray) -> None:
         """Update V4 dictionary via gradient descent on reconstruction error.
@@ -322,7 +380,7 @@ class V4Model:
         recon = Z @ self.phi4.T  # (n_samples, input_dim)
         error = X - recon  # reconstruction error
         # Gradient: E^T Z → (input_dim, n_features)
-        grad = error.T @ Z
+        grad = error.T @ Z / max(X.shape[0], 1)
         self.phi4 += lr * grad
 
         # Renormalize columns
@@ -331,8 +389,7 @@ class V4Model:
         self.phi4 = self.phi4 / norms
 
         self._samples_seen += Z.shape[0]
-        if self._samples_seen % self._dict_update_interval == 0:
-            self._phi4_gram = self.phi4.T @ self.phi4
+        self._refresh_dictionary_cache()
 
     def save(self, path: Path = _V4_FILE) -> None:
         """Save V4 dictionary to disk."""
@@ -341,6 +398,7 @@ class V4Model:
             path,
             phi4=self.phi4,
             phi4_gram=self._phi4_gram,
+            ista_lipschitz=self._ista_lipschitz,
             samples_seen=self._samples_seen,
             n_v1_features=self.n_v1_features,
             pool_size=self.pool_size,
@@ -368,7 +426,7 @@ class V4Model:
                 )
                 return False
             self.phi4 = loaded_phi4
-            self._phi4_gram = data["phi4_gram"]
+            self._refresh_dictionary_cache()
             self._samples_seen = int(data["samples_seen"])
             self.n_features = self.phi4.shape[1]
             self.input_dim = self.phi4.shape[0]
