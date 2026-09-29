@@ -2630,8 +2630,17 @@ class AllostaticLoadTracker:
         if elapsed > self.SUBSTRATE_TIMEOUT:
             self._state.substrate_connected = False
 
-        # Fallback: estimate load from cortisol when substrate is offline
-        if not self._state.substrate_connected:
+        if self._state.substrate_connected:
+            # The median requires multiple elevated domains; one isolated
+            # signal cannot define whole-system allostatic load.
+            domains = [self._state.inference_load, cortisol_level]
+            domains.sort()
+            burden = domains[0]
+            if burden > 0.3:
+                self._state.allostatic_load = min(1.0, self._state.allostatic_load + 0.0002 * (burden - 0.3) * dt)
+            elif burden < 0.2:
+                self._state.allostatic_load = max(0.0, self._state.allostatic_load - 0.0004 * dt)
+        else:
             self._fallback_update_load(cortisol_level, dt)
 
     def _fallback_update_load(self, cortisol_level: float, dt: float) -> None:
