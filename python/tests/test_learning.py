@@ -39,6 +39,35 @@ from genesis_cognitive.tools.source_registry import SourceResult
 logger = logging.getLogger(__name__)
 
 
+def test_transfer_learning_maps_roles_without_shared_vocabulary() -> None:
+    """Analogical transfer should use relational structure, not word overlap."""
+    learner = _make_learner()
+    net = learner.network
+    for concept in ("engine", "piston", "fuel", "compiler", "token", "source"):
+        net.add_concept(concept, confidence=0.9, origin="test")
+
+    net.add_edge("engine", "piston", RelationType.PART_OF, 0.9, origin="test")
+    net.add_edge("engine", "fuel", RelationType.DEPENDS_ON, 0.8, origin="test")
+    net.add_edge("compiler", "token", RelationType.PART_OF, 0.9, origin="test")
+    net.add_edge("compiler", "source", RelationType.DEPENDS_ON, 0.8, origin="test")
+
+    result = learner.transfer_learning("engine", "compiler")
+    assert result.similarity > 0.2
+    assert result.relationships_transferred >= 1
+    assert result.mappings
+    assert all(src != tgt for src, tgt in result.mappings)
+
+    target_edges = net.get_edges("compiler", direction="out")
+    transferred_targets = {
+        edge.target for edge in target_edges if edge.origin == "transferred"
+    }
+    assert {tgt for _, tgt in result.mappings} <= transferred_targets
+    assert not any(
+        edge.target == "piston" and edge.origin == "transferred"
+        for edge in target_edges
+    )
+
+
 # ======================================================================
 # From tests/test_autonomous_learner.py
 # ======================================================================
