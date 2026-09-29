@@ -1869,3 +1869,13 @@ def test_verbatim_fallback_is_last_resort_and_not_used_by_composer_paths() -> No
         "only prose here"
     ]
     assert vocab._verbatim_fallback("", {"intent": "inform"}) == []
+
+
+def test_comprehension_exposes_parse_coverage_and_diagnostics() -> None:
+    """Structural parse gaps are available as learning signals."""
+    from genesis_cognitive.language.comprehension import ComprehensionEngine
+
+    result = ComprehensionEngine().comprehend("The machine operates.")
+    assert 0.0 <= result.parse_coverage <= 1.0
+    assert isinstance(result.unresolved_tokens, list)
+    assert isinstance(result.diagnostics, list)
