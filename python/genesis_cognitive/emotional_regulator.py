@@ -2656,7 +2656,9 @@ class AllostaticLoadTracker:
             domains.sort()
             burden = domains[1]
             if burden > 0.3:
-                self._state.allostatic_load = min(1.0, self._state.allostatic_load + 0.0002 * (burden - 0.3) * dt)
+                self._state.allostatic_load = min(
+                    1.0, self._state.allostatic_load + 0.0002 * (burden - 0.3) * dt
+                )
             elif burden < 0.2:
                 self._state.allostatic_load = max(0.0, self._state.allostatic_load - 0.0004 * dt)
         else:
