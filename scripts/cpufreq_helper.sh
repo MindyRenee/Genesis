@@ -20,6 +20,51 @@ set -euo pipefail
 
 VALID_GOVERNORS="conservative ondemand userspace powersave performance schedutil"
 
+# Resolve a requested governor against the actual CPUFreq policy. Some
+# drivers (notably intel_pstate in active mode) expose P-state algorithms
+# rather than the generic governor set, so a hard-coded schedutil write can
+# fail even though the CPUFreq policy is fully controllable. The kernel
+# documents scaling_available_governors as the authoritative per-policy list.
+policy_governor() {
+    local policy="$1"
+    local requested="$2"
+    local available driver
+
+    available=$(cat "$policy/scaling_available_governors" 2>/dev/null || true)
+    if [[ " $available " == *" $requested "* ]]; then
+        echo "$requested"
+        return 0
+    fi
+
+    driver=$(cat "$policy/scaling_driver" 2>/dev/null || true)
+    # intel_pstate active mode exposes powersave/performance algorithms;
+    # its powersave algorithm is the documented adaptive counterpart to
+    # schedutil/ondemand, not the generic powersave governor.
+    if [ "$requested" = "schedutil" ] && [ "$driver" = "intel_pstate" ]         && [[ " $available " == *" powersave "* ]]; then
+        echo "powersave"
+        return 0
+    fi
+
+    # Prefer an adaptive governor when the requested one is unavailable.
+    for candidate in ondemand powersave performance; do
+        if [[ " $available " == *" $candidate "* ]]; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+policy_dirs() {
+    # CPUFreq policies are the canonical control objects. cpuX/cpufreq may
+    # be symlinks to these directories and can duplicate writes when several
+    # CPUs share one policy.
+    for policy in /sys/devices/system/cpu/cpufreq/policy[0-9]*; do
+        [ -d "$policy" ] && echo "$policy"
+    done
+}
+
 # Valid EPP profiles (the actual available profiles are read from
 # sysfs at runtime, but we validate against this superset to prevent
 # arbitrary string injection).
@@ -81,9 +126,26 @@ case "$CMD" in
         ;;
     set_governor)
         validate_governor "$VAL"
-        for cpu in /sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_governor; do
-            [ -f "$cpu" ] && echo "$VAL" > "$cpu"
-        done
+        found=0
+        applied=0
+        while IFS= read -r policy; do
+            [ -n "$policy" ] || continue
+            found=1
+            resolved=$(policy_governor "$policy" "$VAL") || {
+                echo "error: no supported governor/algorithm for policy $policy (requested '$VAL')" >&2
+                exit 1
+            }
+            if echo "$resolved" > "$policy/scaling_governor"; then
+                applied=1
+            else
+                echo "error: failed to set governor '$resolved' on $policy" >&2
+                exit 1
+            fi
+        done < <(policy_dirs)
+        if [ "$found" -eq 0 ] || [ "$applied" -eq 0 ]; then
+            echo "error: no CPUFreq policies were found" >&2
+            exit 1
+        fi
         ;;
     set_min_freq)
         validate_freq "$VAL"
