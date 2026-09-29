@@ -397,11 +397,15 @@ def test_interoception_latency_uses_observed_response_not_benchmark() -> None:
     state = intero.sense_internal_state()
     assert state.latency_observed is True
     assert 599.0 <= state.response_latency <= 601.0
+    assert 599.0 <= state.last_response_latency <= 601.0
     assert state.stress_level > 0.0
 
+    # The smoothed state retains recent history, but the causal diagnosis
+    # must be based on the current observed turn rather than stale EWMA data.
     intero.record_response_latency(100.0)
     state = intero.sense_internal_state()
     assert 100.0 < state.response_latency < 600.0
+    assert 99.0 <= state.last_response_latency <= 101.0
 
 
 def test_update_from_body_state_maps_all_fields() -> None:
