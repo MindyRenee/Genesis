@@ -32,6 +32,7 @@ prefrontal cortex modulates it.
 from __future__ import annotations
 
 import logging
+import math
 import os
 import statistics
 import threading
@@ -195,6 +196,7 @@ class InternalState:
     memory_usage: float = 0.0
     daemon_connected: bool = True
     response_latency: float = 0.0
+    latency_observed: bool = False
     stress_level: float = 0.0
     arousal_modifier: float = 0.5
     # Hardware-level interoception from the daemon (BodyState)
@@ -285,6 +287,10 @@ class InteroceptionSystem:
         # modules). Updated alongside body-state reads.
         self._last_views: tuple[Any, ...] = ()
         self._last_modules: tuple[Any, ...] = ()
+        # Observed user-turn response latency. Interoception must not
+        # benchmark a synthetic operation and call that responsiveness.
+        self._latency_lock = threading.Lock()
+        self._response_latency_ms: float | None = None
 
     def _sense_cpu_usage(self) -> float:
         """Sense CPU usage of its own processes (cognitive mind + daemon).
@@ -401,22 +407,20 @@ class InteroceptionSystem:
             _default_sock = str(default_data_dir() / "genesis.sock")
             daemon_connected = os.path.exists(_default_sock)
 
-        # Response latency — measure how long a trivial operation takes
-        # (a proxy for system responsiveness)
-        response_latency = 0.0
-        try:
-            start = time.perf_counter()
-            # Trivial operation
-            _ = sum(range(1000))
-            response_latency = (time.perf_counter() - start) * 1000
-        except OSError:
-            response_latency = 0.0
+        # Response latency is an observed interaction metric, recorded by
+        # the real conversation/request path. It is not measured here:
+        # sensing must never benchmark itself and mistake that benchmark
+        # for user-visible responsiveness.
+        with self._latency_lock:
+            response_latency = self._response_latency_ms
+        latency_observed = response_latency is not None
 
         state = InternalState(
             cpu_usage=cpu_usage,
             memory_usage=memory_usage,
             daemon_connected=daemon_connected,
-            response_latency=response_latency,
+            response_latency=response_latency if response_latency is not None else 0.0,
+            latency_observed=latency_observed,
         )
 
         # Compute derived stress and arousal modifier using the
@@ -432,7 +436,11 @@ class InteroceptionSystem:
         # Stress from high latency
         lat_thresh = cfg.latency_stress_threshold
         lat_range = cfg.latency_stress_range
-        latency_stress = max(0.0, min(1.0, (state.response_latency - lat_thresh) / lat_range))
+        latency_stress = (
+            max(0.0, min(1.0, (state.response_latency - lat_thresh) / lat_range))
+            if state.latency_observed
+            else 0.0
+        )
 
         state.stress_level = min(1.0, max(cpu_stress, mem_stress, daemon_stress, latency_stress))
 
@@ -453,6 +461,22 @@ class InteroceptionSystem:
 
         self._last_state = state
         return state
+
+    def record_response_latency(self, latency_ms: float) -> None:
+        """Record an observed user-turn response latency in milliseconds.
+
+        The sample comes from the actual request/response lifecycle, not
+        from a synthetic benchmark. An EWMA preserves recent overload
+        while preventing one transient turn from dominating interoception.
+        """
+        if not isinstance(latency_ms, (int, float)) or not math.isfinite(latency_ms):
+            return
+        sample = max(0.0, float(latency_ms))
+        with self._latency_lock:
+            previous = self._response_latency_ms
+            self._response_latency_ms = (
+                sample if previous is None else (0.3 * sample + 0.7 * previous)
+            )
 
     @property
     def last_state(self) -> InternalState | None:
