@@ -291,10 +291,10 @@ class InferenceSummary:
       generative model is failing to predict the system's own state.
     - **free_energy**: surprise + model uncertainty. The quantity the
       system minimizes through active inference.
-    - **expected_free_energy**: predicted future surprise. High = the
-      system anticipates disruption (allostatic signal).
-    - **allostasis_load**: accumulated cost of sustained prediction
-      error. Drives cortisol baseline upregulation.
+    - **expected_free_energy**: predicted future surprise and
+      anticipatory regulatory demand.
+    - **allostasis_load**: accumulated persistent multisignal
+      regulatory burden. It is distinct from anticipatory demand.
     - **precision**: model confidence. Adapts: low surprise → high
       precision (trust predictions); high surprise → low precision.
     - **attunement**: oxytocin-mediated coupling to the user's affect.
