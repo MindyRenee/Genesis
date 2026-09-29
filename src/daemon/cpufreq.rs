@@ -244,6 +244,13 @@ pub fn set_governor(governor: &str) -> bool {
     run_helper("set_governor", governor)
 }
 
+/// Read the governor currently reported by the primary CPUFreq policy.
+pub fn effective_governor() -> String {
+    std::fs::read_to_string("/sys/devices/system/cpu/cpufreq/policy0/scaling_governor")
+        .map(|s| s.trim().to_string())
+        .unwrap_or_default()
+}
+
 /// Set the minimum CPU frequency (kHz) for all cores.
 pub fn set_min_freq(freq_khz: u32) -> bool {
     run_helper("set_min_freq", &freq_khz.to_string())
