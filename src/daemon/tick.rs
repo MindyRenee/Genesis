@@ -1362,10 +1362,21 @@ impl TickLoop {
             let cognitive_nice =
                 super::cpufreq::derive_cognitive_nice(&snap.neurochemicals.effective_levels);
 
+            // Report the governor actually active after the helper resolves
+            // driver-specific requests. If it cannot be read, retain the
+            // requested value as the recommendation rather than inventing
+            // an applied state.
+            let effective_governor = super::cpufreq::effective_governor();
+            let reported_governor = if effective_governor.is_empty() {
+                policy.governor.clone()
+            } else {
+                effective_governor
+            };
+
             let control = super::cpufreq::BodyControlState {
                 cpu_min_freq_khz: policy.min_freq,
                 cpu_max_freq_khz: policy.max_freq,
-                cpu_governor: policy.governor.clone(),
+                cpu_governor: reported_governor,
                 thermally_capped,
                 thermal_cap_temp_c: if thermally_capped {
                     self.last_body_state.cpu_temp_c
