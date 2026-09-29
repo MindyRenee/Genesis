@@ -559,7 +559,7 @@ class InteroceptionSystem:
         # effort and only contributes above one full CPU-capacity unit.
         cognitive_stress = max(0.0, (cognitive_load - 0.70) / 0.30)
         cpu_overload_stress = max(0.0, min(1.0, (stress_load - 1.0) / 0.5))
-        body_stress = max(base.stress_level, cognitive_stress, cpu_overload_stress)
+        body_stress = max(cognitive_stress, cpu_overload_stress)
         self._last_state = InternalState(
             cpu_usage=base.cpu_usage,
             memory_usage=base.memory_usage,
