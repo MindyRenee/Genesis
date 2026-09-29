@@ -946,6 +946,7 @@ const _: () = assert!(core::mem::size_of::<PerfEventAttr>() == 72);
 
 // perf_event_attr flags bitfield (first 8 bits of `flags`).
 const PERF_FLAG_DISABLED: u64 = 1 << 0;
+const PERF_FLAG_INHERIT: u64 = 1 << 1;
 const PERF_FLAG_EXCLUDE_KERNEL: u64 = 1 << 5;
 const PERF_FLAG_EXCLUDE_HV: u64 = 1 << 6;
 
@@ -989,7 +990,15 @@ fn perf_open(pid: u32, hw_config: u64) -> i32 {
         // kernel work done on its behalf (page faults, syscalls)
         // is a different signal class and including it would blur
         // the prediction-error measurement with OS noise.
-        flags: PERF_FLAG_DISABLED | PERF_FLAG_EXCLUDE_KERNEL | PERF_FLAG_EXCLUDE_HV,
+        //
+        // `inherit` makes the counters follow the thread group, not
+        // just the calling thread. Without it the daemon's worker
+        // threads are invisible, and these events are meant to
+        // describe Genesis's own process tree.
+        flags: PERF_FLAG_DISABLED
+            | PERF_FLAG_EXCLUDE_KERNEL
+            | PERF_FLAG_EXCLUDE_HV
+            | PERF_FLAG_INHERIT,
         wakeup: 0,
         bp_type: 0,
         config1: 0,
@@ -2146,7 +2155,16 @@ impl Interoceptor {
             .ac_path
             .as_ref()
             .and_then(|p| fs::read_to_string(p).ok())
-            .map(|s| s.trim() == "1" || s.trim().to_lowercase().contains("on"))
+            // The power_supply `online` attribute is strictly numeric:
+            // 0 = Offline, 1 = Online (fixed line), 2 = Online
+            // (programmable, e.g. USB-PD). Only 0 means unplugged, so
+            // compare against that. The previous test also accepted
+            // anything containing "on", which is a heuristic against a
+            // numeric ABI and can only misfire — "2" is online but
+            // failed both halves, reporting the machine as unplugged
+            // and un-gating the low-battery and low-supply-voltage CRH
+            // branches.
+            .map(|s| s.trim() != "0")
             .unwrap_or(true); // default to AC if no sensor
 
         let energy = self
@@ -2168,15 +2186,53 @@ impl Interoceptor {
 /// Prefers k10temp (AMD CPU die temperature) as the most accurate
 /// measure of CPU heat. Falls back to acpitz (ACPI thermal zone)
 /// if k10temp is not available.
+/// Enumerate the hwmon class directories, yielding each device's
+/// `hwmonN` directory path.
+///
+/// Sorted numerically by N so discovery order is deterministic across
+/// runs — `read_dir` yields whatever order the filesystem gives, and
+/// several scanners below pick a *first* match.
+///
+/// This replaces fixed `0..=10` index loops. hwmon numbers are assigned
+/// dynamically, and a machine can easily have more than eleven of them —
+/// NVMe, GPU, battery, AC, SIO, USB hubs, a dock all get one. A fixed
+/// window would place the CPU or fan device past the end and miss it
+/// silently. The powercap, thermal, and power_supply scanners in this
+/// file already use `read_dir`; this makes hwmon consistent with them.
+fn hwmon_devices() -> Vec<String> {
+    let Ok(entries) = fs::read_dir("/sys/class/hwmon") else {
+        return Vec::new();
+    };
+    let mut devices: Vec<(u32, String)> = entries
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            let name = path.file_name()?.to_str()?.to_string();
+            // Directories are named hwmonN; skip anything else.
+            let index: u32 = name.strip_prefix("hwmon")?.parse().ok()?;
+            Some((index, format!("/sys/class/hwmon/{name}")))
+        })
+        .collect();
+    devices.sort_by_key(|(index, _)| *index);
+    devices.into_iter().map(|(_, path)| path).collect()
+}
+
+/// Read a hwmon device's `name` attribute (its chip name).
+fn hwmon_name(device: &str) -> Option<String> {
+    fs::read_to_string(format!("{device}/name"))
+        .ok()
+        .map(|name| name.trim().to_string())
+}
+
+/// Find the CPU die temperature sensor path (k10temp/coretemp/k8temp),
+/// falling back to the acpitz thermal zone if k10temp is not available.
 fn find_temp_sensor() -> String {
     // Look for k10temp (AMD) or coretemp (Intel) first — these
     // are the actual CPU die temperatures.
-    for hwmon in 0..=10 {
-        let name_path = format!("/sys/class/hwmon/hwmon{hwmon}/name");
-        if let Ok(name) = fs::read_to_string(&name_path) {
-            let name = name.trim();
+    for device in hwmon_devices() {
+        if let Some(name) = hwmon_name(&device) {
             if name == "k10temp" || name == "coretemp" || name == "k8temp" {
-                let temp_path = format!("/sys/class/hwmon/hwmon{hwmon}/temp1_input");
+                let temp_path = format!("{device}/temp1_input");
                 if fs::metadata(&temp_path).is_ok() {
                     return temp_path;
                 }
@@ -2265,13 +2321,34 @@ fn find_battery() -> Option<String> {
 
 /// Find the AC adapter online status path.
 fn find_ac_adapter() -> Option<String> {
-    for supply in &["ACAD", "AC", "AC0", "ADP1"] {
-        let path = format!("/sys/class/power_supply/{supply}/online");
-        if fs::metadata(&path).is_ok() {
-            return Some(path);
-        }
-    }
-    None
+    // Enumerate the power_supply class and select on `type` == "Mains"
+    // rather than probing a fixed list of names. The names are driver
+    // and platform specific — "ACAD" on HP, "AC" on many laptops, "ACPI"
+    // or "ADP1" elsewhere, and USB-C docks can register a "USB" type
+    // that carries its own `online` — so a name list silently misses
+    // adapters it does not happen to know, reporting the machine as
+    // unplugged. Matches the read_dir approach already used for
+    // battery cycles, thermal zones, and powercap.
+    let Ok(entries) = fs::read_dir("/sys/class/power_supply") else {
+        return None;
+    };
+    let mut found: Vec<String> = entries
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            let is_mains = fs::read_to_string(path.join("type"))
+                .is_ok_and(|t| t.trim() == "Mains");
+            if !is_mains {
+                return None;
+            }
+            let online = path.join("online");
+            fs::metadata(&online).is_ok().then(|| online.to_string_lossy().into_owned())
+        })
+        .collect();
+    // Deterministic order: read_dir order is filesystem-dependent and
+    // a machine can expose more than one Mains supply.
+    found.sort();
+    found.into_iter().next()
 }
 
 /// Find the fan speed sensor path — the machine's thermoregulatory
@@ -2291,8 +2368,8 @@ fn find_ac_adapter() -> Option<String> {
 ///    speed but not PWM. Normalized against a typical max of 5000 RPM.
 fn find_fan_pwm() -> Option<String> {
     // Try pwm1 first (preferred — direct drive signal).
-    for hwmon in 0..=10 {
-        let pwm_path = format!("/sys/class/hwmon/hwmon{hwmon}/pwm1");
+    for device in hwmon_devices() {
+        let pwm_path = format!("{device}/pwm1");
         if fs::metadata(&pwm_path).is_ok() {
             // Verify we can actually read it — some hwmon devices
             // expose pwm1 metadata but not a readable value.
@@ -2304,8 +2381,8 @@ fn find_fan_pwm() -> Option<String> {
         }
     }
     // Fall back to fan1_input (RPM).
-    for hwmon in 0..=10 {
-        let fan_path = format!("/sys/class/hwmon/hwmon{hwmon}/fan1_input");
+    for device in hwmon_devices() {
+        let fan_path = format!("{device}/fan1_input");
         if fs::metadata(&fan_path).is_ok()
             && let Ok(content) = fs::read_to_string(&fan_path)
             && content.trim().parse::<u32>().is_ok()
@@ -2397,15 +2474,11 @@ fn sibling_pwm_enable(pwm_path: &str) -> Option<u32> {
 fn find_power_sensors() -> Vec<String> {
     let mut found: Vec<String> = Vec::new();
     // 1. AMD fam15h_power — power1_average (μW, instantaneous)
-    for hwmon in 0..=10 {
-        let name_path = format!("/sys/class/hwmon/hwmon{hwmon}/name");
-        if let Ok(name) = fs::read_to_string(&name_path) {
-            let name = name.trim();
-            if name == "fam15h_power" {
-                let avg_path = format!("/sys/class/hwmon/hwmon{hwmon}/power1_average");
-                if fs::metadata(&avg_path).is_ok() {
-                    found.push(avg_path);
-                }
+    for device in hwmon_devices() {
+        if hwmon_name(&device).as_deref() == Some("fam15h_power") {
+            let avg_path = format!("{device}/power1_average");
+            if fs::metadata(&avg_path).is_ok() {
+                found.push(avg_path);
             }
         }
     }
@@ -2421,15 +2494,11 @@ fn find_power_sensors() -> Vec<String> {
     //    quantity as (2) — drivers/acpi/battery bridges POWER_NOW to
     //    the hwmon power1_input — so it is last and only reached if
     //    the power_supply attribute is missing.
-    for hwmon in 0..=10 {
-        let name_path = format!("/sys/class/hwmon/hwmon{hwmon}/name");
-        if let Ok(name) = fs::read_to_string(&name_path) {
-            let name = name.trim();
-            if name.starts_with("BAT") {
-                let power_path = format!("/sys/class/hwmon/hwmon{hwmon}/power1_input");
-                if fs::metadata(&power_path).is_ok() {
-                    found.push(power_path);
-                }
+    for device in hwmon_devices() {
+        if hwmon_name(&device).is_some_and(|name| name.starts_with("BAT")) {
+            let power_path = format!("{device}/power1_input");
+            if fs::metadata(&power_path).is_ok() {
+                found.push(power_path);
             }
         }
     }
@@ -2560,16 +2629,14 @@ fn find_voltage_sensors() -> (Option<String>, Option<String>) {
     let mut supply_path: Option<String> = None;
 
     // Scan hwmon devices for voltage sensors.
-    for hwmon in 0..=10 {
-        let name_path = format!("/sys/class/hwmon/hwmon{hwmon}/name");
-        let Ok(name) = fs::read_to_string(&name_path) else {
+    for device in hwmon_devices() {
+        let Some(name) = hwmon_name(&device) else {
             continue;
         };
-        let name = name.trim();
 
         // Battery-named hwmon → supply voltage (in0_input)
         if name.starts_with("BAT") && supply_path.is_none() {
-            let in0 = format!("/sys/class/hwmon/hwmon{hwmon}/in0_input");
+            let in0 = format!("{device}/in0_input");
             if fs::metadata(&in0).is_ok() {
                 supply_path = Some(in0);
             }
@@ -2577,10 +2644,15 @@ fn find_voltage_sensors() -> (Option<String>, Option<String>) {
 
         // Board-level sensors (nct6776, it87, etc.) → scan for
         // Vcore/VDD labeled voltage inputs.
+        //
+        // The channel index keeps a fixed range, unlike the device
+        // enumeration: a Super-I/O chip exposes a hardware-fixed number
+        // of channels (nct6776 has in0–in9, it87 in0–in8), so 0–10
+        // covers the chips that expose labelled rails at all.
         if core_path.is_none() {
             for idx in 0..=10 {
-                let label_path = format!("/sys/class/hwmon/hwmon{hwmon}/in{idx}_label");
-                let input_path = format!("/sys/class/hwmon/hwmon{hwmon}/in{idx}_input");
+                let label_path = format!("{device}/in{idx}_label");
+                let input_path = format!("{device}/in{idx}_input");
                 if !fs::metadata(&input_path).is_ok() {
                     continue;
                 }
@@ -2695,9 +2767,26 @@ fn read_gpe_count() -> u64 {
 }
 
 /// Nominal scheduler tick rate (CONFIG_HZ) used to normalize the
-/// pulse into [0, 1]. Ubuntu generic kernels ship CONFIG_HZ=1000;
-/// kernels configured at 250/300 will saturate the normalized field
-/// earlier — the raw `pulse_hz` stays correct regardless.
+/// pulse into [0, 1].
+///
+/// This is *not* `sysconf(_SC_CLK_TCK)`. The two are different
+/// quantities: `_SC_CLK_TCK` is USER_HZ, the reporting granularity of
+/// `/proc/<pid>/stat` (used separately, via `sysconf_clk_tck()`), and
+/// is always 100 on Linux. The `LOC` counter in `/proc/interrupts`
+/// counts real local-APIC timer expirations, which fire at CONFIG_HZ —
+/// an event rate, not a jiffies-reporting rate. Using 100 there would
+/// overstate `pulse` tenfold.
+///
+/// CONFIG_HZ has no sysfs or procfs interface, so it cannot be queried
+/// at runtime. 1000 is correct for Ubuntu/Debian desktop and server
+/// amd64 kernels, which is the deployment target. On a kernel built at
+/// 250 Hz (Debian's default for some targets, plus most ARM and
+/// embedded builds) the divisor is too large and `pulse` is
+/// permanently *under*-reported — its maximum is roughly 0.25, not
+/// saturated. The raw `pulse_hz` field is unaffected either way, and
+/// `pulse` only feeds the contentment/strain thresholds, so a
+/// conservative under-read degrades to "less busy", not to a
+/// fabricated state.
 const TICK_HZ: f32 = 1000.0;
 
 /// Read the cumulative local-timer interrupt count — the sum of the
@@ -2948,6 +3037,15 @@ fn read_total_memory_kb() -> Option<u64> {
 
 /// Check whether a PID is alive (sends signal 0).
 fn pid_alive(pid: u32) -> bool {
+    // PID 0 is not a real process. `kill(0, sig)` targets the *caller's
+    // process group*, which always exists, so it would report alive —
+    // and `perf_event_open(0, ...)` treats pid 0 as "this process",
+    // silently attributing the daemon's own counters to another
+    // subsystem. A PID file or env var that fails to parse to something
+    // non-zero must not slip through.
+    if pid == 0 {
+        return false;
+    }
     // SAFETY: kill(pid, 0) is a standard POSIX check that does not
     // send a signal — it only checks process existence and
     // permission. Signal 0 is the null signal.
@@ -3425,10 +3523,94 @@ mod tests {
 
         // `disabled` is bit 0 and `exclude_kernel`/`exclude_hv` are
         // bits 5/6 of the flags word — the values the kernel reads.
-        let flags = PERF_FLAG_DISABLED | PERF_FLAG_EXCLUDE_KERNEL | PERF_FLAG_EXCLUDE_HV;
+        let flags = PERF_FLAG_DISABLED
+            | PERF_FLAG_EXCLUDE_KERNEL
+            | PERF_FLAG_EXCLUDE_HV
+            | PERF_FLAG_INHERIT;
         assert_eq!(flags & 0b1, PERF_FLAG_DISABLED);
+        assert_eq!((flags >> 1) & 0b1, 1, "inherit must be bit 1");
         assert_eq!((flags >> 5) & 0b1, 1, "exclude_kernel must be bit 5");
         assert_eq!((flags >> 6) & 0b1, 1, "exclude_hv must be bit 6");
+        // The kernel rejects a per-process event that does not set
+        // exclude_kernel once perf_event_paranoid >= 2, so this bit is
+        // load-bearing, not cosmetic.
+        assert_ne!(flags & PERF_FLAG_EXCLUDE_KERNEL, 0);
+    }
+
+    #[test]
+    fn test_hwmon_devices_enumerates_and_sorts() {
+        // The scanners used to probe hwmon0..hwmon10, silently missing
+        // the CPU sensor on a machine with more than eleven hwmon
+        // devices. Enumeration must be by read_dir and deterministic,
+        // since find_temp_sensor and friends take the first match.
+        let devices = hwmon_devices();
+        for device in &devices {
+            assert!(
+                device.starts_with("/sys/class/hwmon/hwmon"),
+                "unexpected device path: {device}"
+            );
+        }
+        let indices: Vec<u32> = devices
+            .iter()
+            .map(|d| {
+                d.rsplit("hwmon")
+                    .next()
+                    .expect("split yields suffix")
+                    .parse()
+                    .expect("suffix is numeric")
+            })
+            .collect();
+        let mut sorted = indices.clone();
+        sorted.sort_unstable();
+        assert_eq!(
+            indices, sorted,
+            "hwmon_devices must return numeric order, not read_dir order"
+        );
+        assert!(
+            indices.windows(2).all(|w| w[0] != w[1]),
+            "no duplicate devices"
+        );
+        // If the class exists at all we must have found something.
+        if std::path::Path::new("/sys/class/hwmon").is_dir() {
+            assert!(
+                !devices.is_empty(),
+                "/sys/class/hwmon is readable but enumeration returned nothing"
+            );
+        }
+    }
+
+    #[test]
+    fn test_online_treats_only_zero_as_unplugged() {
+        // power_supply `online` is numeric: 0 = Offline, 1 = Online
+        // fixed, 2 = Online programmable (USB-PD). Only 0 is offline;
+        // the old `== "1" || contains("on")` test read "2" as offline
+        // and un-gated the battery CRH paths.
+        let read_with = |body: &str| -> bool {
+            let dir = std::env::temp_dir().join(format!("genesis-ac-{}", std::process::id()));
+            std::fs::create_dir_all(&dir).expect("create temp dir");
+            let path = dir.join("online");
+            std::fs::write(&path, body).expect("write online");
+            let value = std::fs::read_to_string(&path)
+                .expect("read back")
+                .trim()
+                .to_string();
+            let _ = std::fs::remove_dir_all(&dir);
+            value != "0"
+        };
+        assert!(!read_with("0\n"), "0 is offline");
+        assert!(read_with("1\n"), "1 is online");
+        assert!(read_with("2\n"), "2 is online (USB-PD programmable)");
+        assert!(read_with(" 1 \n"), "whitespace tolerated");
+    }
+
+    #[test]
+    fn test_pid_alive_rejects_zero() {
+        // kill(0, 0) targets the caller's process group, so PID 0 would
+        // always look alive — and perf_event_open(0, ...) means "this
+        // process", misattributing the daemon's own counters to the
+        // subsystem the PID file was supposed to name.
+        assert!(!pid_alive(0));
+        assert!(pid_alive(std::process::id()));
     }
 
     #[test]
