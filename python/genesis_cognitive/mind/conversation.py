@@ -655,6 +655,25 @@ class ConversationMixin:
         )
         return self.language.render(err_thought, self.feel())
     def respond(self, user_input: str, timeout: float = 15.0) -> str:
+        """Process one user turn and record its observed response latency.
+
+        Timing starts when the interaction enters the public response
+        boundary and ends when that boundary returns. This includes normal
+        cognition, errors, and bounded timeout fallbacks.
+        """
+        started = time.perf_counter()
+        try:
+            return self._respond_once(user_input, timeout)
+        finally:
+            elapsed_ms = (time.perf_counter() - started) * 1000.0
+            regulator = getattr(self.cognition, "regulator", None)
+            if regulator is not None:
+                try:
+                    regulator.record_response_latency(elapsed_ms)
+                except (AttributeError, TypeError, ValueError):
+                    logger.debug("failed to record response latency", exc_info=True)
+
+    def _respond_once(self, user_input: str, timeout: float = 15.0) -> str:
         """Process user input and return a response.
 
         This is the main interaction method. It:
