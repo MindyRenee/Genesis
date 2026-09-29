@@ -1052,8 +1052,8 @@ impl Interoceptor {
             Some(f) if f > 0 => f,
             _ => {
                 eprintln!(
-                    "[interoception] WARNING: CPU maximum frequency is unavailable; "
-                    "arousal frequency will report 0.0 until hardware telemetry is available"
+                    "[interoception] WARNING: CPU maximum frequency is unavailable; \
+                     arousal frequency will report 0.0 until hardware telemetry is available"
                 );
                 0
             }
@@ -2165,13 +2165,6 @@ fn read_max_freq() -> Option<u64> {
         }
     }
     None
-}
-
-/// Read the maximum CPU frequency.
-fn read_max_freq() -> Option<u64> {
-    fs::read_to_string("/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq")
-        .ok()
-        .and_then(|s| s.trim().parse::<u64>().ok())
 }
 
 /// Find the battery capacity path.
