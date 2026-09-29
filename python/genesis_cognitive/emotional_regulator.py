@@ -1162,9 +1162,11 @@ class EmotionalRegulator:
             actions.append("HPA axis releasing CRH")
             self._last_cause = "stress_cortisol"
 
-        # Record stress in the allostatic load tracker. This
-        # accumulates load during high-stress periods and recovers
-        # during calm periods.
+        # Fuse the latest computational-body interoception with the
+        # endocrine and inference domains before accumulating load.
+        body_state = self._interoception.last_state
+        if body_state is not None:
+            self._allostatic_load.set_body_stress(body_state.stress_level)
         self._allostatic_load.record_stress(cortisol_level, dt=dt)
         if self._allostatic_load.get_state().is_chronic:
             self._last_cause = "chronic_allostatic"
