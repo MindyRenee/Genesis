@@ -1052,7 +1052,7 @@ impl Interoceptor {
             Some(f) if f > 0 => f,
             _ => {
                 eprintln!(
-                    "[interoception] WARNING: CPU maximum frequency is unavailable; \"
+                    "[interoception] WARNING: CPU maximum frequency is unavailable; "
                     "arousal frequency will report 0.0 until hardware telemetry is available"
                 );
                 0
