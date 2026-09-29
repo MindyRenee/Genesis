@@ -1049,13 +1049,13 @@ impl Interoceptor {
         let temp_path = find_temp_sensor();
         let freq_paths = find_freq_sensors(num_cores);
         let max_freq_khz = match read_max_freq() {
-            Some(f) => f,
-            None => {
+            Some(f) if f > 0 => f,
+            _ => {
                 eprintln!(
-                    "[interoception] WARNING: could not read max CPU frequency, \
-                     defaulting to 2.0 GHz"
+                    "[interoception] WARNING: CPU maximum frequency is unavailable; \"
+                    "arousal frequency will report 0.0 until hardware telemetry is available"
                 );
-                2_000_000
+                0
             }
         };
         let battery_path = find_battery();
@@ -1235,14 +1235,18 @@ impl Interoceptor {
         // to the documented [0, 1] range so internal consumers (IPC,
         // emotional_regulator) never see out-of-range values.
         let avg_freq = self.read_avg_freq();
-        let arousal_freq = if self.max_freq_khz > 0 {
+        // Do not manufacture a neutral frequency when the hardware sensor
+        // is unavailable. A fabricated 0.5 would look like measured
+        // medium arousal and could drive downstream regulation. The public
+        // contract already defines 0.0 as "not available".
+        let arousal_freq = if self.max_freq_khz > 0 && avg_freq > 0 {
             crate::state::sanitize::finite_clamp(
                 (avg_freq as f32) / (self.max_freq_khz as f32),
                 0.0,
                 1.0,
             )
         } else {
-            0.5
+            0.0
         };
 
         // Collect Genesis's own process tree, tagged by subsystem.
@@ -2047,21 +2051,29 @@ impl Interoceptor {
     }
 
     /// Read average CPU frequency across all cores.
+    ///
+    /// Prefer `cpuinfo_cur_freq`, which the kernel defines as a
+    /// hardware-derived current frequency when the driver exposes it.
+    /// Fall back to `scaling_cur_freq` only when the hardware-derived
+    /// interface is unavailable. The latter is often the last requested
+    /// P-state rather than the frequency the silicon is actually running.
+    /// Never substitute an invented midpoint when no sensor can be read.
     fn read_avg_freq(&self) -> u64 {
         if self.freq_paths.is_empty() {
-            return self.max_freq_khz / 2;
+            return 0;
         }
         let mut sum: u64 = 0;
         let mut count: u64 = 0;
         for path in &self.freq_paths {
             if let Ok(content) = fs::read_to_string(path)
                 && let Ok(freq) = content.trim().parse::<u64>()
+                && freq > 0
             {
-                sum += freq;
+                sum = sum.saturating_add(freq);
                 count += 1;
             }
         }
-        sum.checked_div(count).unwrap_or(self.max_freq_khz / 2)
+        sum.checked_div(count).unwrap_or(0)
     }
 
     /// Read battery level and AC power status.
@@ -2112,10 +2124,47 @@ fn find_temp_sensor() -> String {
 }
 
 /// Find per-core CPU frequency sensor paths.
+///
+/// `cpuinfo_cur_freq` is the preferred source because Linux defines it as
+/// the current frequency obtained from hardware when the driver can
+/// determine that value. `scaling_cur_freq` is only a fallback: on many
+/// drivers it represents the last frequency requested by the scaling
+/// interface, which is not necessarily the frequency actually reached.
 fn find_freq_sensors(num_cores: u32) -> Vec<String> {
     (0..num_cores)
-        .map(|i| format!("/sys/devices/system/cpu/cpu{i}/cpufreq/scaling_cur_freq"))
+        .filter_map(|i| {
+            let base = format!("/sys/devices/system/cpu/cpu{i}/cpufreq");
+            let hardware = format!("{base}/cpuinfo_cur_freq");
+            let requested = format!("{base}/scaling_cur_freq");
+            if fs::metadata(&hardware).is_ok() {
+                Some(hardware)
+            } else if fs::metadata(&requested).is_ok() {
+                Some(requested)
+            } else {
+                None
+            }
+        })
         .collect()
+}
+
+/// Read the maximum CPU frequency.
+///
+/// Prefer `cpuinfo_max_freq`, which describes the maximum operating
+/// frequency supported by the CPUFreq policy. Fall back to
+/// `scaling_max_freq` only when the hardware limit interface is absent.
+fn read_max_freq() -> Option<u64> {
+    for path in [
+        "/sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq",
+        "/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq",
+    ] {
+        if let Ok(s) = fs::read_to_string(path)
+            && let Ok(freq) = s.trim().parse::<u64>()
+            && freq > 0
+        {
+            return Some(freq);
+        }
+    }
+    None
 }
 
 /// Read the maximum CPU frequency.
