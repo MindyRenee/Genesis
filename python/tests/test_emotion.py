@@ -16,7 +16,7 @@ from genesis_client.protocol import (
     CHEM_SEROTONIN,
 )
 from genesis_cognitive.emotion import EmotionalState
-from genesis_cognitive.emotional_regulator import EmotionalRegulator
+from genesis_cognitive.emotional_regulator import AllostaticLoadTracker, EmotionalRegulator
 from genesis_cognitive.language.sentiment import analyze_sentiment
 
 logger = logging.getLogger(__name__)
@@ -871,3 +871,27 @@ def test_stress_negation_flips():
     assert result["compound"] > 0.0, (
         f"'not stressed' should be positive: {result['compound']}"
     )
+
+
+def test_allostatic_load_requires_converging_domains() -> None:
+    tracker = AllostaticLoadTracker()
+    tracker.set_inference_load(0.9)
+    tracker.record_stress(0.0, dt=10.0)
+    assert tracker.get_allostatic_load() == 0.0
+
+    tracker.record_stress(0.9, dt=10.0)
+    assert tracker.get_allostatic_load() > 0.0
+
+
+def test_allostatic_load_recovers_when_domains_calm() -> None:
+    tracker = AllostaticLoadTracker()
+    tracker.set_inference_load(0.9)
+    for _ in range(100):
+        tracker.record_stress(0.9, dt=10.0)
+    loaded = tracker.get_allostatic_load()
+    assert loaded > 0.0
+
+    tracker.set_inference_load(0.0)
+    for _ in range(100):
+        tracker.record_stress(0.0, dt=10.0)
+    assert tracker.get_allostatic_load() < loaded
