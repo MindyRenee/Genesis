@@ -96,17 +96,13 @@ pub struct InferenceSignals {
     /// This is the quantity the system minimizes through active
     /// inference. Range [0, 1].
     pub free_energy: f32,
-    /// Expected future free energy — the model's prediction of how
-    /// much surprise it will experience in the near future, based on
-    /// the recent trend. This is the **allostatic signal**: high
-    /// expected free energy means the system anticipates disruption
-    /// and prepares. Range [0, 1].
+    /// Expected future free energy — predicted future disruption.
+    /// This is the anticipatory regulatory-demand signal, not
+    /// cumulative allostatic load. Range [0, 1].
     pub expected_free_energy: f32,
-    /// Accumulated allostatic load — the cost of sustained prediction
-    /// error over time. Accumulates when expected_free_energy is high
-    /// and decays when the system is in a predictable state. This is
-    /// the anticipatory stress signal that drives cortisol baseline
-    /// upregulation. Range [0, 1].
+    /// Accumulated allostatic load — persistent multisignal
+    /// regulatory burden integrated over time. It is distinct from
+    /// the anticipatory expected-free-energy signal. Range [0, 1].
     pub allostasis_load: f32,
     /// Precision of the generative model — confidence in its
     /// predictions. High precision = the model trusts its predictions
