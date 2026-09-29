@@ -2475,6 +2475,7 @@ class AllostaticState:
 
     allostatic_load: float = 0.0
     inference_load: float = 0.0
+    body_stress: float = 0.0
     acute_stress: float = 0.0
     is_chronic: bool = False
     stress_history: deque[float] = field(default_factory=lambda: deque(maxlen=600))
@@ -2581,6 +2582,10 @@ class AllostaticLoadTracker:
         self._state.substrate_connected = True
         self._last_substrate_update = self._time.monotonic()
 
+    def set_body_stress(self, stress: float) -> None:
+        """Record the latest computational-body stress signal."""
+        self._state.body_stress = max(0.0, min(1.0, float(stress)))
+
     def set_allostatic_load(self, load: float) -> None:
         self.set_inference_load(load)
 
@@ -2633,9 +2638,9 @@ class AllostaticLoadTracker:
         if self._state.substrate_connected:
             # The median requires multiple elevated domains; one isolated
             # signal cannot define whole-system allostatic load.
-            domains = [self._state.inference_load, cortisol_level]
+            domains = [self._state.inference_load, cortisol_level, self._state.body_stress]
             domains.sort()
-            burden = domains[0]
+            burden = domains[1]
             if burden > 0.3:
                 self._state.allostatic_load = min(1.0, self._state.allostatic_load + 0.0002 * (burden - 0.3) * dt)
             elif burden < 0.2:
