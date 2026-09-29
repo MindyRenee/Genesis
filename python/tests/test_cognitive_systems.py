@@ -3252,3 +3252,28 @@ class TestBackfillColumns:
         assert stats["concepts_backfilled"] == 0, "Should not backfill when columns are set"
         assert stats["bridges_created"] == 0, "Should not create bridges when no backfill needed"
         assert len(bridges) == 0, "No bridges should exist"
+
+
+def test_executive_planning_requires_grounded_outcome_model() -> None:
+    """Planning must not turn lexical overlap into fabricated confidence."""
+    executive = ExecutiveFunction()
+    plan = executive.plan(
+        "repair the system",
+        ["repair", "observe"],
+    )
+    assert plan.confidence == 0.0
+    assert plan.expected_value == 0.0
+    assert plan.predicted_outcomes == []
+
+
+def test_executive_planning_uses_predictor_for_action_selection() -> None:
+    """A supplied outcome model, rather than word overlap, drives planning."""
+    executive = ExecutiveFunction(planning_depth=1)
+
+    def predictor(action: str) -> tuple[str, float]:
+        return f"predicted:{action}", {"repair": 0.9, "observe": 0.1}[action]
+
+    plan = executive.plan("repair the system", ["observe", "repair"], predictor)
+    assert plan.steps == ["repair"]
+    assert plan.predicted_outcomes == ["predicted:repair"]
+    assert plan.expected_value > 0.0
