@@ -3566,73 +3566,137 @@ class AutonomousLearner:
     # ─── Transfer learning ───────────────────────────────────────
 
     def transfer_learning(self, source_domain: str, target_domain: str) -> TransferResult:
-        """Transfer knowledge from a source domain to a target domain.
+        """Transfer knowledge by relational analogy rather than name overlap.
 
-        Detects structural similarity between domains using concept
-        network topology (neighbor overlap and relation-type
-        distribution), then maps concepts from source to target via
-        analogical reasoning ("X is to A as Y is to B").
-
-        Transferred relationships are added to the target domain with
-        a reduced weight reflecting the analogical (not directly
-        learned) origin.
-
-        Args:
-            source_domain: The source concept (domain to transfer from).
-            target_domain: The target concept (domain to transfer to).
-
-        Returns:
-            A TransferResult describing the transfer.
+        The source and target domains may use disjoint vocabularies. The
+        transfer signal therefore combines relation-type profiles, local
+        degree compatibility, and (when available) embedding similarity.
+        Only the mapped target role is reinforced; source concepts are not
+        copied into the target graph.
         """
         source_neighbors = self.network.get_neighbors(source_domain)
         target_neighbors = self.network.get_neighbors(target_domain)
 
-        # Structural similarity: Jaccard overlap of neighbor sets.
+        def relation_profile(neighbors: list[tuple[Any, Any, float]]) -> dict[str, float]:
+            profile: dict[str, float] = {}
+            for _, rel, weight in neighbors:
+                key = rel.value
+                profile[key] = profile.get(key, 0.0) + max(0.0, float(weight))
+            return profile
+
+        source_profile = relation_profile(source_neighbors)
+        target_profile = relation_profile(target_neighbors)
+        relation_keys = set(source_profile) | set(target_profile)
+        dot = sum(
+            source_profile.get(k, 0.0) * target_profile.get(k, 0.0)
+            for k in relation_keys
+        )
+        source_norm = sum(v * v for v in source_profile.values()) ** 0.5
+        target_norm = sum(v * v for v in target_profile.values()) ** 0.5
+        relation_similarity = (
+            dot / (source_norm * target_norm)
+            if source_norm > 0.0 and target_norm > 0.0
+            else 0.0
+        )
+
         source_set = {n for n, _, _ in source_neighbors}
         target_set = {n for n, _, _ in target_neighbors}
-        if not source_set and not target_set:
-            similarity = 0.0
-        else:
-            union = source_set | target_set
-            similarity = len(source_set & target_set) / len(union) if union else 0.0
+        shared_name_similarity = (
+            len(source_set & target_set) / len(source_set | target_set)
+            if source_set or target_set
+            else 0.0
+        )
+        max_degree = max(len(source_set), len(target_set), 1)
+        degree_similarity = 1.0 - abs(len(source_set) - len(target_set)) / max_degree
+        similarity = max(
+            0.0,
+            min(
+                1.0,
+                0.60 * relation_similarity
+                + 0.25 * degree_similarity
+                + 0.15 * shared_name_similarity,
+            ),
+        )
 
-        # Map source concepts to target concepts by matching relation
-        # structure. For each source neighbor with a relation type,
-        # find a target neighbor with the same relation type.
+        target_by_rel: dict[str, list[str]] = {}
+        target_degrees: dict[str, int] = {}
+        for tgt, rel, _ in target_neighbors:
+            target_by_rel.setdefault(rel.value, []).append(tgt)
+            target_degrees[tgt] = len(self.network.get_neighbors(tgt))
+
+        source_degrees = {
+            src: len(self.network.get_neighbors(src))
+            for src, _, _ in source_neighbors
+        }
+
         mappings: list[tuple[str, str]] = []
         concepts_transferred: list[str] = []
         relationships_transferred = 0
-
-        # Group target neighbors by relation type for matching.
-        target_by_rel: dict[str, list[str]] = {}
-        for tgt, rel, _ in target_neighbors:
-            target_by_rel.setdefault(rel.value, []).append(tgt)
-
         used_targets: set[str] = set()
-        for src, rel, weight in source_neighbors:
-            if src in target_set:
-                # Already shared — no transfer needed.
-                continue
+
+        for src, rel, weight in sorted(
+            source_neighbors, key=lambda item: float(item[2]), reverse=True
+        ):
             candidates = target_by_rel.get(rel.value, [])
-            for cand in candidates:
-                if cand in used_targets:
+            if not candidates:
+                continue
+
+            semantic_scores: dict[str, float] = {}
+            if self._embeddings is not None:
+                try:
+                    similar = self._embeddings.find_similar_concepts(
+                        src, k=min(20, len(candidates) + 5), threshold=0.0
+                    )
+                    semantic_scores = {
+                        name: max(0.0, min(1.0, score))
+                        for name, score in similar
+                    }
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("transfer semantic match failed: %s", exc)
+
+            best_target: str | None = None
+            best_score = -1.0
+            for candidate in candidates:
+                if candidate in used_targets or candidate == src:
                     continue
-                mappings.append((src, cand))
-                used_targets.add(cand)
-                # Add the transferred concept to the network if new.
-                if self.network.get_concept(src) is None:
-                    self.network.add_concept(src, confidence=0.3, origin="transferred")
-                    concepts_transferred.append(src)
-                # Add an analogical relationship in the target domain.
-                self.network.add_edge(
-                    target_domain,
-                    src,
-                    rel,
-                    weight * similarity * 0.5,
-                    origin="transferred",
+                candidate_degree = target_degrees.get(candidate, 0)
+                source_degree = source_degrees.get(src, 0)
+                degree_match = 1.0 - abs(source_degree - candidate_degree) / max(
+                    source_degree, candidate_degree, 1
                 )
-                relationships_transferred += 1
-                break
+                semantic = semantic_scores.get(candidate, 0.0)
+                score = (
+                    0.65 * semantic + 0.35 * degree_match
+                    if semantic_scores
+                    else degree_match
+                )
+                if score > best_score:
+                    best_score = score
+                    best_target = candidate
+
+            if best_target is None or best_score < 0.25:
+                continue
+
+            transferred_weight = max(
+                0.0, min(1.0, float(weight) * similarity * best_score * 0.5)
+            )
+            if transferred_weight <= 0.0:
+                continue
+
+            mappings.append((src, best_target))
+            used_targets.add(best_target)
+            concepts_transferred.append(src)
+
+            # Reinforce the target role. Do not create a source-domain
+            # node inside the target graph.
+            self.network.add_edge(
+                target_domain,
+                best_target,
+                rel,
+                transferred_weight,
+                origin="transferred",
+            )
+            relationships_transferred += 1
 
         return TransferResult(
             source_domain=source_domain,
