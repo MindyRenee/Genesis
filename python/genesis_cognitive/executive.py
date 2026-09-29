@@ -48,6 +48,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Callable
 
 
 class TaskState(Enum):
@@ -209,7 +210,7 @@ class ExecutiveFunction:
         self,
         goal: str,
         possible_actions: list[str],
-        outcome_predictor: object | None = None,
+        outcome_predictor: Callable[[str], tuple[str, float] | str] | None = None,
     ) -> ActionPlan:
         """Simulate possible actions and select the best plan.
 
@@ -219,8 +220,9 @@ class ExecutiveFunction:
 
         The outcome predictor is a callable that takes an action string
         and returns a tuple of (predicted_outcome: str, value: float).
-        If no predictor is provided, a simple heuristic is used: actions
-        containing goal-related keywords get higher values.
+        Without a predictor, the planner returns an explicitly
+        ungrounded plan with zero confidence; lexical overlap is not
+        treated as evidence of an outcome.
 
         Args:
             goal: The goal to plan for.
@@ -233,15 +235,23 @@ class ExecutiveFunction:
         if not possible_actions:
             return ActionPlan(goal=goal, expected_value=0.0, confidence=0.0)
 
-        best_plan = ActionPlan(goal=goal, expected_value=float("-inf"))
-        goal_words = set(goal.lower().split())
+        if outcome_predictor is None or not callable(outcome_predictor):
+            return ActionPlan(
+                steps=list(possible_actions[:1]),
+                predicted_outcomes=[],
+                expected_value=0.0,
+                confidence=0.0,
+                goal=goal,
+            )
 
-        # Simple planning: evaluate each action, pick the best sequence
-        # For deeper planning, this would do a tree search; here we
-        # do a greedy forward simulation.
+        best_plan = ActionPlan(goal=goal, expected_value=float("-inf"))
+
+        # Search the supplied transition/outcome model. The executive
+        # layer owns search and value aggregation; the caller owns the
+        # world model.
         for action in possible_actions:
             plan = self._simulate_action_plan(
-                action, possible_actions, goal_words, outcome_predictor, goal
+                action, possible_actions, outcome_predictor, goal
             )
             if plan.expected_value > best_plan.expected_value:
                 best_plan = plan
@@ -253,8 +263,7 @@ class ExecutiveFunction:
         self,
         action: str,
         possible_actions: list[str],
-        goal_words: set[str],
-        outcome_predictor: object | None,
+        outcome_predictor: Callable[[str], tuple[str, float] | str],
         goal: str,
     ) -> ActionPlan:
         """Simulate a single action sequence forward and return the plan."""
@@ -268,35 +277,33 @@ class ExecutiveFunction:
             if not current_actions:
                 break
 
-            if outcome_predictor is not None and callable(outcome_predictor):
-                result = outcome_predictor(steps[-1])
-                if isinstance(result, tuple):
-                    outcome, step_value = result
-                else:
-                    outcome, step_value = str(result), 0.5
+            result = outcome_predictor(steps[-1])
+            if isinstance(result, tuple):
+                outcome, step_value = result
             else:
-                # Heuristic: actions related to goal words are better
-                action_words = set(steps[-1].lower().split())
-                overlap = len(action_words & goal_words)
-                outcome = f"result of {steps[-1]}"
-                step_value = 0.3 + 0.2 * overlap
+                outcome, step_value = str(result), 0.5
 
             outcomes.append(outcome)
             value += step_value * (0.7**depth)  # discount future
 
             # For greedy planning, pick the best next action
             if depth < self.planning_depth - 1 and current_actions:
-                best_next = max(
-                    current_actions,
-                    key=lambda a: len(set(a.lower().split()) & goal_words),
-                )
-                steps.append(best_next)
+                candidates: list[tuple[float, str]] = []
+                for candidate in current_actions:
+                    candidate_result = outcome_predictor(candidate)
+                    if isinstance(candidate_result, tuple):
+                        _, candidate_value = candidate_result
+                    else:
+                        candidate_value = 0.5
+                    candidates.append((float(candidate_value), candidate))
+                if candidates:
+                    steps.append(max(candidates, key=lambda item: item[0])[1])
 
         return ActionPlan(
             steps=steps,
             predicted_outcomes=outcomes,
             expected_value=value / max(len(steps), 1),
-            confidence=min(1.0, value / 2.0),
+            confidence=min(1.0, max(0.0, value / 2.0)),
             goal=goal,
         )
 
