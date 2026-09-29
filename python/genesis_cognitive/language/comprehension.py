@@ -818,8 +818,9 @@ class ComprehensionEngine:
         # Determine negation
         is_negated = any(p.negated for p in propositions)
 
-        # Keep interpretation confidence separate from structural
-        # coverage so downstream learning can identify parser gaps.
+        # Keep confidence (interpretation quality) separate from coverage
+        # (structural completeness). Downstream learners need the latter
+        # to identify where the parser failed.
         parse_coverage, unresolved_tokens = self._parse_coverage(
             raw_text, propositions, key_concepts
         )

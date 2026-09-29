@@ -31,12 +31,10 @@
 //!   heuristic.
 //! - Precision is the inverse variance of the likelihood, which
 //!   weights prediction errors in the NLL term.
-//! - Policy selection uses expected free energy with epistemic
-//!   (information gain) and pragmatic (homeostatic) components. The
-//!   epistemic value is uncertainty-weighted: policies that explore
-//!   dimensions where the posterior is uncertain (high belief_var)
-//!   receive a higher epistemic bonus, following the principle that
-//!   information gain is proportional to current uncertainty.
+//! - Policy selection minimizes a pragmatic expected-free-energy proxy
+//!   over the action-conditioned generative model. Exploration is kept
+//!   as a separate temperature-controlled sampling mechanism because
+//!   this model class has additive controls.
 //!
 //! **Is simplified (not full Friston):**
 //! - The posterior is diagonal (mean-field), not full-covariance.
@@ -414,6 +412,13 @@ const MATURITY_ERROR_SCALE: f32 = 0.001;
 /// Initial value of the maturity error tracker: maximally unproven.
 /// Maps to maturity ≈ 0 until sustained accuracy pulls it down.
 const MATURITY_ERROR_INIT: f32 = 0.5;
+/// Evidence accumulation timescale for model maturity.
+///
+/// Maturity is not a stopwatch: elapsed-time evidence is multiplied by
+/// predictive competence and posterior certainty. A model that runs for
+/// a long time while making poor predictions therefore does not become
+/// mature merely by surviving longer.
+const MATURITY_TIME_CONSTANT: f32 = 500.0;
 
 // ─── Variational posterior (Kalman filter) ───────────────────────
 //
@@ -1871,28 +1876,15 @@ impl ActiveInferenceEngine {
             // was trained.
             let predicted_after = self.predict_with_action(current, &policy_action);
 
-            // Expected free energy (EFE) with epistemic + pragmatic
-            // decomposition:
+            // Expected-free-energy proxy for this controller:
             //
-            // EFE = pragmatic_cost + uncertainty - epistemic_value
+            // EFE_proxy = pragmatic_cost + model_uncertainty
             //
-            // **Pragmatic cost**: expected distance from the
-            // homeostatic target. Policies that move the system toward
-            // its baselines have lower pragmatic cost.
-            //
-            // **Uncertainty**: model uncertainty (1 - precision) ×
-            // weight. A model with low precision contributes additional
-            // EFE because it can't predict well.
-            //
-            // **Epistemic value**: expected information gain from the
-            // predicted observation. Policies that would take the
-            // system to novel regions of state space (far from the
-            // current belief) have higher epistemic value because the
-            // resulting observation would be more informative. This is
-            // the information-seeking component of active inference
-            // (Friston, Rigoli, Ognibene, Mathys, Fitzgerald &
-            // Pezzulo, 2015) — the system prefers
-            // policies that reduce uncertainty about its own state.
+            // This is intentionally not labeled formal epistemic value.
+            // For additive controls in a linear-Gaussian model, the
+            // expected information-gain term is policy-invariant
+            // (Koudahl et al., 2021). Exploration is therefore handled
+            // separately by the policy sampler.
             let mut dist_sq = 0.0f32;
             for i in 0..DIM {
                 let diff = predicted_after[i] - target[i];
@@ -1909,8 +1901,7 @@ impl ActiveInferenceEngine {
             // retained because a policy-independent term is legitimate
             // in an expected-free-energy decomposition, but it must not
             // be read as doing arbitration work — the exploration /
-            // exploitation balance is carried entirely by
-            // `epistemic_value` and the softmax temperature.
+            // exploration is controlled by the softmax temperature.
             let uncertainty = (1.0 - self.precision) * UNCERTAINTY_WEIGHT;
 
             // Epistemic value: expected information gain, computed
@@ -1997,7 +1988,9 @@ impl ActiveInferenceEngine {
                 .iter()
                 .map(|&(efe, _)| efe)
                 .fold(f32::MIN, f32::min);
-        let temp = (POLICY_SOFTMAX_TEMPERATURE * (2.0 - self.precision)).max(efe_spread);
+        let temp =
+            (POLICY_SOFTMAX_TEMPERATURE * (2.0 - self.precision) * efe_spread)
+                .max(1.0e-6);
 
         // Compute softmax weights (negative EFE → higher probability)
         let mut weights = [0.0f32; NUM_POLICIES];
@@ -2097,8 +2090,44 @@ impl ActiveInferenceEngine {
     /// A side benefit: maturity no longer depends on `tick_count`, so
     /// the u32 wrap that used to zero it is now harmless.
     fn _update_maturity(&mut self) {
+        // Maturity measures accumulated *evidence of a useful model*,
+        // not wall-clock age. The sample-count term prevents a handful
+        // of lucky predictions from claiming maturity, while predictive
+        // fit and posterior certainty keep a long-running but inaccurate
+        // model from becoming falsely trusted.
+        let evidence = 1.0
+            - (-(self.tick_count as f32) / MATURITY_TIME_CONSTANT).exp();
+
+        // Low prediction error is evidence that the learned transition
+        // model is tracking the observed dynamics. Use surprise rather
+        // than precision because precision is itself adaptive and can
+        // remain high immediately after a regime change.
+        let predictive_fit = crate::state::sanitize::finite_clamp(
+            1.0 - self.surprise_ema,
+            0.0,
+            1.0,
+        );
+
+        // A concentrated posterior is stronger evidence than one with
+        // large residual uncertainty.
+        let mean_belief_var = self
+            .belief_var
+            .iter()
+            .copied()
+            .sum::<f32>()
+            / DIM as f32;
+        let posterior_certainty = crate::state::sanitize::finite_clamp(
+            1.0 - (mean_belief_var / MAX_BELIEF_VAR),
+            0.0,
+            1.0,
+        );
+
+        // Uncertainty should temper, not erase, evidence of predictive
+        // competence. Full maturity requires both good prediction and
+        // a sufficiently concentrated posterior.
+        let quality = predictive_fit * (0.5 + 0.5 * posterior_certainty);
         self.model_maturity = crate::state::sanitize::finite_clamp(
-            (-self.maturity_error_ema / MATURITY_ERROR_SCALE).exp(),
+            evidence * quality,
             0.0,
             1.0,
         );

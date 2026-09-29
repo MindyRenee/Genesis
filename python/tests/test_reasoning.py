@@ -3565,3 +3565,39 @@ def test_planning_engine_verify_step() -> None:
     # Last step should be a verify step.
     assert plan.steps[-1].step_type == "verify"
 
+
+
+def test_executive_planning_requires_outcome_model() -> None:
+    """Planning must not turn lexical goal overlap into fabricated predictions."""
+    from genesis_cognitive.executive import ExecutiveFunction
+
+    executive = ExecutiveFunction(planning_depth=2)
+    plan = executive.plan(
+        "repair the engine",
+        ["repair the engine", "inspect the piston"],
+        outcome_predictor=None,
+    )
+    assert plan.goal == "repair the engine"
+    assert plan.confidence == 0.0
+    assert plan.expected_value == 0.0
+    assert plan.predicted_outcomes == []
+
+
+def test_executive_planning_queries_the_outcome_model_for_candidates() -> None:
+    """Candidate actions are scored by predicted consequences, not wording."""
+    from genesis_cognitive.executive import ExecutiveFunction
+
+    values = {"inspect": 0.2, "repair": 0.9, "observe": 0.4}
+
+    def predictor(action: str) -> tuple[str, float]:
+        return f"predicted:{action}", values[action]
+
+    executive = ExecutiveFunction(planning_depth=2)
+    plan = executive.plan(
+        "arbitrary goal",
+        ["inspect", "repair", "observe"],
+        outcome_predictor=predictor,
+    )
+    assert plan.steps[0] == "repair"
+    assert plan.predicted_outcomes[0] == "predicted:repair"
+    assert plan.confidence > 0.0

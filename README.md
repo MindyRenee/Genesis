@@ -215,6 +215,10 @@ precision-modulated actions, which is where a genuine epistemic
 drive would come from), and early in life — before the action model
 is learned — all policies predict identically and selection falls
 through to `noop` while the low-precision branch explores.
+`model_maturity` is now evidence-based as well: elapsed experience
+is tempered by predictive fit and posterior certainty, so a
+long-running but inaccurate model does not become trusted merely
+because time passed.
 
 The self-model and its feedback loop are worth the code, and the
 vocabulary is now closer to earned. Three fixes landed: precision

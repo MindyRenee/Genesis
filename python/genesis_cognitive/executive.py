@@ -220,9 +220,10 @@ class ExecutiveFunction:
 
         The outcome predictor is a callable that takes an action string
         and returns a tuple of (predicted_outcome: str, value: float).
-        Without a predictor, the planner returns an explicitly
-        ungrounded plan with zero confidence; lexical overlap is not
-        treated as evidence of an outcome.
+        Without a predictor, the planner does not invent an outcome
+        model from lexical overlap; it returns an explicitly
+        ungrounded plan with zero confidence. Planning without a
+        transition/outcome model is not model-based planning.
 
         Args:
             goal: The goal to plan for.
@@ -236,6 +237,10 @@ class ExecutiveFunction:
             return ActionPlan(goal=goal, expected_value=0.0, confidence=0.0)
 
         if outcome_predictor is None or not callable(outcome_predictor):
+            # An action's wording is not evidence that the action will
+            # achieve the goal. Returning a lexical guess here creates
+            # systematic false confidence and prevents callers from
+            # distinguishing planning from intent matching.
             return ActionPlan(
                 steps=list(possible_actions[:1]),
                 predicted_outcomes=[],
@@ -288,6 +293,9 @@ class ExecutiveFunction:
 
             # For greedy planning, pick the best next action
             if depth < self.planning_depth - 1 and current_actions:
+                # Query every candidate through the same outcome model;
+                # never choose the next action from surface lexical
+                # similarity to the goal.
                 candidates: list[tuple[float, str]] = []
                 for candidate in current_actions:
                     candidate_result = outcome_predictor(candidate)
