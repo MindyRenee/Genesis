@@ -392,12 +392,12 @@ const NE_SURPRISE_THRESHOLD: f32 = 0.15;
 /// so the coupling matrix adapts faster to the unexpected regime.
 const METAPLASTICITY_BOOST: f32 = 5.0;
 
-/// EMA rate for the retained `maturity_error_ema` tracker. At
-/// dt_scale = 1 the time constant is ~500 ticks, matching the
-/// timescale of `MATURITY_TIME_CONSTANT` so a v4 model file's stored
-/// tracker is on the same scale as the maturity it was derived from.
-///
-/// No longer feeds `model_maturity` — see [`Self::_update_maturity`].
+/// EMA rate for the `maturity_error_ema` tracker. At dt_scale = 1 the
+/// time constant is ~500 ticks, which is the timescale on which
+/// `model_maturity` is earned: a fresh engine starts at
+/// `MATURITY_ERROR_INIT` (0.5) and sustained accuracy has to pull that
+/// down before fit approaches 1, so a handful of early predictions
+/// cannot claim maturity.
 const MATURITY_ERROR_EMA_RATE: f32 = 0.002;
 
 /// Scale for the *legacy* maturity mapping `exp(-err / this)`, retained
@@ -411,14 +411,6 @@ const MATURITY_ERROR_SCALE: f32 = 0.001;
 /// engine starts maximally unproven; the value only has to round-trip
 /// through the model file, since nothing maps it to maturity now.
 const MATURITY_ERROR_INIT: f32 = 0.5;
-
-/// Evidence accumulation timescale for model maturity.
-///
-/// Maturity is not a stopwatch: elapsed-time evidence is multiplied by
-/// predictive competence and posterior certainty. A model that runs for
-/// a long time while making poor predictions therefore does not become
-/// mature merely by surviving longer.
-const MATURITY_TIME_CONSTANT: f32 = 500.0;
 
 // ─── Variational posterior (Kalman filter) ───────────────────────
 //
@@ -1298,9 +1290,9 @@ impl ActiveInferenceEngine {
         // surprise. Retained for model-file compatibility: it is
         // serialized (format v4) and reloaded, but `_update_maturity`
         // no longer derives `model_maturity` from it. The EMA is kept
-        // on the same ~500-tick timescale as `MATURITY_TIME_CONSTANT`
-        // so a stored v4 tracker stays on the scale its stored maturity
-        // was inverted from.
+        // on the ~500-tick timescale that `model_maturity` is earned
+        // over, so a stored v4 tracker stays on the scale its stored
+        // maturity was inverted from.
         let mat_alpha =
             crate::state::sanitize::finite_clamp(MATURITY_ERROR_EMA_RATE * dt_scale, 0.0, 1.0);
         self.maturity_error_ema = crate::state::sanitize::finite_clamp(
@@ -2084,36 +2076,54 @@ impl ActiveInferenceEngine {
         PolicyEvaluation { policy, efe }
     }
 
-    /// Update model maturity from accumulated evidence — earned trust.
+    /// Update model maturity from demonstrated competence — earned trust.
     ///
-    /// `maturity = evidence * quality`, where
-    /// `evidence = 1 - exp(-tick_count / MATURITY_TIME_CONSTANT)` is the
-    /// sample-count term and `quality = predictive_fit * (0.5 + 0.5 *
-    /// posterior_certainty)` measures how well the model is actually
-    /// doing. Both factors must be high for maturity to approach 1, so a
-    /// long-running model that keeps mispredicting never becomes
-    /// trusted merely because time passed. Sustained surprise pins
-    /// `predictive_fit` toward 0 and maturity with it.
+    /// `maturity = predictive_fit * (0.5 + 0.5 * posterior_certainty)`.
+    /// Both factors must be high for maturity to approach 1, so a
+    /// long-running model that keeps mispredicting never becomes trusted
+    /// merely because time passed. Sustained surprise pins
+    /// `predictive_fit` toward 0 and maturity with it, and a diffuse
+    /// posterior holds maturity below 1 even when prediction is good.
     ///
-    /// This replaced a pure tick-count stopwatch (`evidence` alone),
-    /// which reported 0.63 after 100 s of uptime whether or not a single
-    /// prediction had been right — while the cognitive mind treats this
-    /// field as a trust signal.
+    /// There is no tick-count term. Two earlier revisions had one — a
+    /// bare `1 - exp(-tick/500)` stopwatch, then that same stopwatch
+    /// multiplied by quality. The second was described as making
+    /// maturity "evidence-based instead of time-based", but a tick
+    /// count is a stopwatch however it is scaled: it capped a *perfect*
+    /// model at ~0.70 after 600 ticks however well it predicted, so
+    /// maturity could not be earned by accuracy. The time-scaling that
+    /// matters lives in `maturity_error_ema`'s own ~500-tick constant.
     fn _update_maturity(&mut self) {
-        // Maturity measures accumulated *evidence of a useful model*,
-        // not wall-clock age. The sample-count term prevents a handful
-        // of lucky predictions from claiming maturity, while predictive
-        // fit and posterior certainty keep a long-running but inaccurate
-        // model from becoming falsely trusted.
-        let evidence = 1.0
-            - (-(self.tick_count as f32) / MATURITY_TIME_CONSTANT).exp();
-
+        // Maturity measures *demonstrated* competence, not elapsed time.
+        //
+        // There is deliberately no multiplicative `1 - exp(-tick/N)`
+        // factor here. An earlier revision of this function carried one
+        // and was described as making maturity "evidence-based instead
+        // of time-based" — but a tick-count term is a stopwatch however
+        // it is scaled, and it capped a *perfect* model at
+        // `1 - exp(-600/500)` ≈ 0.70 after 600 ticks regardless of how
+        // well it predicted. Maturity has to be earnable by accuracy.
+        //
+        // The time-scaling that actually matters is already inside the
+        // two factors below, and is better behaved than a tick counter:
+        // `maturity_error_ema` has a ~500-tick time constant and starts
+        // at `MATURITY_ERROR_INIT` (0.5, i.e. exp(-500) ≈ 0 fit), so a
+        // handful of lucky early predictions cannot claim maturity, and
+        // sustained accuracy raises it on its own schedule.
+        //
         // Low prediction error is evidence that the learned transition
-        // model is tracking the observed dynamics. Use surprise rather
-        // than precision because precision is itself adaptive and can
-        // remain high immediately after a regime change.
+        // model is tracking the observed dynamics. Use the error EMA
+        // rather than `precision` because precision is itself adaptive
+        // and can remain high immediately after a regime change.
+        //
+        // The mapping is `exp(-err / scale)`, not `1 - err`. That is
+        // load-bearing: `surprise_ema` is an RMS across all 18
+        // dimensions, so a real disturbance in a few dimensions gives a
+        // small value — a single-dimension 0.3 excursion is an RMS of
+        // only ~0.07. A linear `1 - err` would read ~0.93 "fit" for a
+        // failing model and barely separate good from bad.
         let predictive_fit = crate::state::sanitize::finite_clamp(
-            1.0 - self.surprise_ema,
+            (-self.maturity_error_ema / MATURITY_ERROR_SCALE).exp(),
             0.0,
             1.0,
         );
@@ -2136,11 +2146,7 @@ impl ActiveInferenceEngine {
         // competence. Full maturity requires both good prediction and
         // a sufficiently concentrated posterior.
         let quality = predictive_fit * (0.5 + 0.5 * posterior_certainty);
-        self.model_maturity = crate::state::sanitize::finite_clamp(
-            evidence * quality,
-            0.0,
-            1.0,
-        );
+        self.model_maturity = crate::state::sanitize::finite_clamp(quality, 0.0, 1.0);
     }
 
     /// Get the current inference signals for writing to the core state.
