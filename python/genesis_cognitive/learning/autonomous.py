@@ -3608,6 +3608,9 @@ class AutonomousLearner:
         )
         max_degree = max(len(source_set), len(target_set), 1)
         degree_similarity = 1.0 - abs(len(source_set) - len(target_set)) / max_degree
+
+        # Relation schema is the strongest signal; exact lexical overlap
+        # is deliberately weak because it rewards vocabulary coincidence.
         similarity = max(
             0.0,
             min(
@@ -3685,10 +3688,13 @@ class AutonomousLearner:
 
             mappings.append((src, best_target))
             used_targets.add(best_target)
-            concepts_transferred.append(src)
+            if src not in concepts_transferred:
+                concepts_transferred.append(src)
 
-            # Reinforce the target role. Do not create a source-domain
-            # node inside the target graph.
+            # The target graph must receive the mapped target concept,
+            # not the source-domain concept. Copying the source node
+            # into the target domain destroys the very distinction the
+            # analogy is meant to preserve.
             self.network.add_edge(
                 target_domain,
                 best_target,

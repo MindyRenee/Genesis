@@ -141,12 +141,11 @@ pub struct InferenceSignals {
     /// Positive = serotonin was higher than predicted (unexpected
     /// wellbeing). Range [-2, 2] (effective levels span [0, 2]).
     pub prediction_error_serotonin: f32,
-    /// Model maturity — earned trust in the generative model.
-    /// Starts near 0 (unproven) and approaches 1 as the model
-    /// demonstrates sustained prediction accuracy over ~500 ticks.
-    /// Drops again under chronic surprise: a failing model must not
-    /// inspire confidence. Used by the cognitive mind to gauge how
-    /// much to trust the inference signals. Range [0, 1].
+    /// Model maturity — evidence that the generative model is
+    /// predictive and internally well-constrained. Experience alone
+    /// cannot increase it: predictive fit and posterior certainty also
+    /// contribute. Used by the cognitive mind to gauge how much to
+    /// trust the inference signals. Range [0, 1].
     pub model_maturity: f32,
     /// Number of inference cycles completed (low 32 bits). Used for
     /// diagnostics and PRNG seeding. The mind advances roughly once
