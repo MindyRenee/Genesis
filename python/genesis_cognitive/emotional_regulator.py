@@ -200,6 +200,7 @@ class InternalState:
 
     cpu_usage: float = 0.0
     memory_usage: float = 0.0
+    cognitive_load: float = 0.0
     daemon_connected: bool = True
     response_latency: float = 0.0
     last_response_latency: float = 0.0
@@ -427,6 +428,7 @@ class InteroceptionSystem:
         state = InternalState(
             cpu_usage=cpu_usage,
             memory_usage=memory_usage,
+            cognitive_load=0.0,
             daemon_connected=daemon_connected,
             response_latency=response_latency if response_latency is not None else 0.0,
             last_response_latency=(
@@ -549,12 +551,22 @@ class InteroceptionSystem:
                 ``getattr`` defaults so older BodyState objects work.
         """
         base = self._last_state if self._last_state is not None else InternalState()
+        cognitive_load = max(0.0, min(1.0, float(getattr(body_state, "cognitive_load", 0.0))))
+        stress_load = max(0.0, float(getattr(body_state, "stress_load", 0.0)))
+        # Memory pressure becomes a stress signal only above the daemon's
+        # overload threshold; ordinary working-set use is cognitive activity,
+        # not distress. CPU overload is likewise distinct from sustainable
+        # effort and only contributes above one full CPU-capacity unit.
+        cognitive_stress = max(0.0, (cognitive_load - 0.70) / 0.30)
+        cpu_overload_stress = max(0.0, min(1.0, (stress_load - 1.0) / 0.5))
+        body_stress = max(base.stress_level, cognitive_stress, cpu_overload_stress)
         self._last_state = InternalState(
             cpu_usage=base.cpu_usage,
             memory_usage=base.memory_usage,
+            cognitive_load=cognitive_load,
             daemon_connected=base.daemon_connected,
             response_latency=base.response_latency,
-            stress_level=base.stress_level,
+            stress_level=min(1.0, body_stress),
             arousal_modifier=base.arousal_modifier,
             cpu_temp_c=getattr(body_state, "cpu_temp_c", 0.0),
             arousal_freq=getattr(body_state, "arousal_freq", 0.0),
