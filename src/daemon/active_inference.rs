@@ -1525,41 +1525,59 @@ impl ActiveInferenceEngine {
         self.expected_fe_ema = crate::state::sanitize::finite_clamp(self.expected_fe_ema, 0.0, 1.0);
         result.expected_free_energy = self.expected_fe_ema;
 
-        // Step 8: Update allostatic load with hysteresis.
-        // Use dt_scale for time-invariance (per-tick rate × dt_scale).
+        // Step 8: Update allostatic load from persistent multisignal
+        // dysregulation. Expected free energy remains the anticipatory
+        // demand signal; it is deliberately not treated as cumulative
+        // load by itself.
         //
-        // Hysteresis: accumulation requires expected FE above the
-        // higher threshold (0.30), but recovery begins as soon as
-        // expected FE drops below the lower threshold (0.20). In the
-        // hysteresis band (0.20–0.30), the system holds its current
-        // load — it neither accumulates nor recovers. This prevents
-        // oscillation around a single threshold and models the
-        // separate activation/deactivation thresholds of biological
-        // stress systems (HPA axis).
-        if self.expected_fe_ema > ALLOSTASIS_ACCUMULATE_THRESHOLD {
-            // Anticipating disruption — accumulate load
-            let excess = self.expected_fe_ema - ALLOSTASIS_ACCUMULATE_THRESHOLD;
+        // The four dimensions are deliberately unweighted:
+        //   1. expected future disruption (anticipatory demand),
+        //   2. prediction-error burden (surprise),
+        //   3. loss of model confidence (1 - precision),
+        //   4. deviation from the current homeostatic state.
+        //
+        // We use the median of these dimensions rather than a weighted
+        // sum. With four signals this is the mean of the two middle
+        // values, so one isolated spike cannot manufacture "multisystem"
+        // load, while persistent elevation across several dimensions
+        // can. This is a machine-native engineering construct, not a
+        // validated biological biomarker index.
+        let mut burden_components = [
+            self.expected_fe_ema,
+            self.surprise_ema,
+            1.0 - self.precision,
+            0.0f32,
+        ];
+        let mut homeostatic_error_sq = 0.0f32;
+        for i in 0..DIM {
+            let error = post[i] - target[i];
+            homeostatic_error_sq += error * error;
+        }
+        burden_components[3] = crate::state::sanitize::finite_clamp(
+            (homeostatic_error_sq / DIM as f32).sqrt(),
+            0.0,
+            1.0,
+        );
+        burden_components.sort_by(f32::total_cmp);
+        let multisignal_burden =
+            (burden_components[1] + burden_components[2]) * 0.5;
+
+        if multisignal_burden > ALLOSTASIS_ACCUMULATE_THRESHOLD {
+            let excess = multisignal_burden - ALLOSTASIS_ACCUMULATE_THRESHOLD;
             self.allostasis_load = crate::state::sanitize::finite_clamp(
                 self.allostasis_load + ALLOSTASIS_ACCUMULATION_RATE * excess * dt_scale,
                 0.0,
                 1.0,
             );
-        } else if self.expected_fe_ema < ALLOSTASIS_RECOVER_THRESHOLD {
-            // Predictable regime — recover (2× faster than accumulation)
+        } else if multisignal_burden < ALLOSTASIS_RECOVER_THRESHOLD {
             self.allostasis_load = crate::state::sanitize::finite_clamp(
                 self.allostasis_load - ALLOSTASIS_RECOVERY_RATE * dt_scale,
                 0.0,
                 1.0,
             );
         } else {
-            // In the hysteresis band: slow recovery rather than holding.
-            // The original design held the load constant in this band to
-            // prevent oscillation. However, when the load is already
-            // elevated (e.g. from a previous stressor that has since
-            // abated), holding it constant keeps cortisol ratcheting up
-            // indefinitely. A slow decay (¼ the full recovery rate)
-            // allows the system to gradually return to baseline while
-            // still resisting rapid oscillation.
+            // Transitional regime: permit slow recovery without
+            // making the load oscillate at the activation boundary.
             self.allostasis_load = crate::state::sanitize::finite_clamp(
                 self.allostasis_load - ALLOSTASIS_RECOVERY_RATE * 0.25 * dt_scale,
                 0.0,
