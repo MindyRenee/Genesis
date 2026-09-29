@@ -119,7 +119,10 @@ def test_category_detection_weights_name_over_definition() -> None:
         properties={"definition": "an animal in a software category system"},
     )
     assert concept.category == ConceptCategory.LIVING
-    assert concept.properties["category_evidence"]["living"] > concept.properties["category_evidence"]["non_living"]
+    assert (
+        concept.properties["category_evidence"]["living"]
+        > concept.properties["category_evidence"]["non_living"]
+    )
 
 
 
