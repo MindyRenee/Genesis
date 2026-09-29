@@ -533,11 +533,18 @@ class CodeLearner:
             else False
         )
         if rel in self._analyzed_files and not force and unchanged and not due:
+            # Already analyzed, source unchanged, and not due for
+            # spaced review: nothing new was learned on this pass. The
+            # counts are zero because no analysis ran — not because the
+            # file has no functions or lines.
             return FileLearningResult(
                 filepath=rel,
                 language="unknown",
                 concepts_added=0,
                 relationships_added=0,
+                functions=0,
+                classes=0,
+                lines=0,
             )
 
         if rel in self._analyzed_files and not unchanged:

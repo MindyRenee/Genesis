@@ -551,8 +551,8 @@ class VolitionMixin:
             logger.debug(f'brain-wave gating for code learning failed: {e}')
 
         self._emit_volition_thought(
-                "code", "learning", "understanding", "thinking"
-                )
+            ("code", "learning", "understanding"), "thinking",
+        )
         try:
             learned = self.code_learner.investigate_code(max_files=5)
             # The learner tracks files already studied during this runtime,

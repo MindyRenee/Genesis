@@ -3823,12 +3823,16 @@ class AutonomousLearner:
         if feedback:
             label = feedback.lower().strip()
         else:
-            labels = [
-                self.network.get_concept(cid).category.value
-                for cid in extracted
-                if self.network.get_concept(cid) is not None
-                and self.network.get_concept(cid).category.value != "unknown"
-            ]
+            # Look each concept up once: the previous comprehension
+            # called get_concept three times per id, and the
+            # `is not None` guard only narrowed the *last* call, so a
+            # concept that vanished between lookups would raise on
+            # `.category`.
+            labels: list[str] = []
+            for cid in extracted:
+                concept = self.network.get_concept(cid)
+                if concept is not None and concept.category.value != "unknown":
+                    labels.append(concept.category.value)
             if not labels:
                 return
             label = max(set(labels), key=labels.count)
