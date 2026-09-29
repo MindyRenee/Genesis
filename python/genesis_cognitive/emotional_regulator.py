@@ -481,7 +481,7 @@ class InteroceptionSystem:
         from a synthetic benchmark. An EWMA preserves recent overload
         while preventing one transient turn from dominating interoception.
         """
-        if not isinstance(latency_ms, (int, float)) or not math.isfinite(latency_ms):
+        if not isinstance(latency_ms, int | float) or not math.isfinite(latency_ms):
             return
         sample = max(0.0, float(latency_ms))
         with self._latency_lock:
