@@ -654,6 +654,8 @@ class ConversationMixin:
             metadata={"error_type": "internal", "error_detail": str(err)},
         )
         return self.language.render(err_thought, self.feel())
+
+
     def respond(self, user_input: str, timeout: float = 15.0) -> str:
         """Process one user turn and record its observed response latency.
 
