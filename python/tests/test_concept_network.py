@@ -100,6 +100,30 @@ def test_network_quality_decreases_with_low_confidence_edges() -> None:
 # ═══════════════════════════════════════════════════════════════════
 
 
+def test_category_detection_preserves_uncertainty() -> None:
+    network = ConceptNetwork()
+    concept = network.add_concept(
+        "bat",
+        properties={"definition": "an animal and a piece of sporting equipment"},
+    )
+    assert concept.category == ConceptCategory.UNKNOWN
+    evidence = concept.properties["category_evidence"]
+    assert evidence["living"] > 0
+    assert evidence["non_living"] > 0
+
+
+def test_category_detection_weights_name_over_definition() -> None:
+    network = ConceptNetwork()
+    concept = network.add_concept(
+        "cat",
+        properties={"definition": "an animal in a software category system"},
+    )
+    assert concept.category == ConceptCategory.LIVING
+    assert concept.properties["category_evidence"]["living"] > concept.properties["category_evidence"]["non_living"]
+
+
+
+
 def test_add_concept_normalizes_id() -> None:
     """add_concept normalizes the concept name."""
     network = ConceptNetwork()
