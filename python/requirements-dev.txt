@@ -7,6 +7,12 @@
 ruff==0.16.9
 pyflakes==4.0.0
 mypy==2.3.1
+# Unused-function detection. ruff's F rules and pyflakes only cover
+# unused *imports* (F401), so neither can see an unreferenced
+# function or method — the repo accumulated ~120 of them before this
+# was added. Not wired into CI as a blocking gate: there is a known
+# backlog to clear first. See scripts/hygiene.sh [3].
+vulture==2.14
 
 # Test
 pytest==9.1.1

@@ -445,17 +445,24 @@ do_check() {
     local rust_warnings
     # Use cargo check (not build) — it detects the same dead_code warnings
     # without producing a full binary, keeping target/debug small.
+    #
+    # LIMITATION: rustc never emits dead_code for `pub` items in a
+    # library crate, so an unreferenced `pub fn` is invisible here.
+    # Genesis is mostly `pub` API, so treat a clean run here as "no
+    # private dead code", not "no dead code". Catching the `pub` case
+    # needs a call-graph tool (cargo-udeps won't do it either; it is
+    # dependency-level).
     rust_warnings=$(cargo check --message-format=short 2>&1 | grep -E 'warning:.*never (used|read|constructed)|warning:.*is never used|warning:.*dead_code' || true)
     if [ -n "$rust_warnings" ]; then
         echo "$rust_warnings" | while read -r line; do echo "  ${YELLOW}⚠${NC} $line"; done
         issues=$(( issues + 1 ))
     else
-        echo "  ${GREEN}✓${NC} no Rust dead_code warnings"
+        echo "  ${GREEN}✓${NC} no Rust dead_code warnings (private items only — see note)"
     fi
     echo ""
 
     # ── 3. Python unused imports / undefined names ──
-    echo "${BOLD}[3] Python dead code (ruff + pyflakes)${NC}"
+    echo "${BOLD}[3] Python dead code (ruff + pyflakes + vulture)${NC}"
     local py_issues=""
     if command -v ruff >/dev/null 2>&1; then
         local ruff_out
@@ -475,7 +482,31 @@ do_check() {
         echo "$py_issues" | while read -r line; do echo "  ${YELLOW}⚠${NC} $line"; done
         issues=$(( issues + 1 ))
     else
-        echo "  ${GREEN}✓${NC} no Python dead code detected"
+        echo "  ${GREEN}✓${NC} no unused imports / undefined names"
+    fi
+
+    # Unreferenced functions and methods. Reported separately and NOT
+    # counted as an issue: both ruff's F rules and pyflakes only cover
+    # unused *imports*, so this is the only check here that can see an
+    # unreferenced function at all. There is a known backlog, and
+    # vulture has no way to know which names are reached dynamically
+    # (canvas dispatch tables, ast.NodeVisitor, HTMLParser, per-puzzle
+    # protocols), so its output needs review rather than a hard gate.
+    if command -v vulture >/dev/null 2>&1; then
+        local vulture_out
+        vulture_out=$(vulture python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py \
+            --min-confidence 80 2>&1 | head -20 || true)
+        if [ -n "$vulture_out" ]; then
+            local v_count
+            v_count=$(echo "$vulture_out" | grep -c . || true)
+            echo "  ${YELLOW}⚠${NC} ${v_count} high-confidence unused symbols (not a gate):"
+            echo "$vulture_out" | while read -r line; do echo "      $line"; done
+            echo "      ${DIM}review each: dynamic dispatch (getattr/visitor/parser) is not tracked${NC}"
+        else
+            echo "  ${GREEN}✓${NC} no high-confidence unused symbols"
+        fi
+    else
+        echo "  ${DIM}· vulture not installed — skipping unused-function check${NC}"
     fi
     echo ""
 

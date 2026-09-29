@@ -159,8 +159,14 @@ class Concept:
     modality: ConceptModality = ConceptModality.UNKNOWN
     # Semantic hub flag — set by detect_semantic_hubs(). Hubs are
     # high-betweenness convergence zones (Damasio) that integrate
-    # information across the network. They get stronger activation
-    # spread (1.3x) and slower decay (0.7x).
+    # information across the network.
+    #
+    # NOT ACTIVE: detect_semantic_hubs() has no callers, so nothing
+    # sets this flag and the 1.3x activation-spread / 0.7x decay
+    # multipliers in concepts/dynamics.py are unreachable. The field
+    # still round-trips through persistence, so a stale True from an
+    # older state file would silently activate those paths — see
+    # Concepts.dynamics for the branches that read it.
     is_semantic_hub: bool = False
 
     def describe(self) -> str:

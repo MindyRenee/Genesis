@@ -2013,6 +2013,10 @@ class ConceptNetwork(
         information from diverse sources and are critical for
         semantic memory retrieval.
 
+        NOT WIRED: this has no callers, so `Concept.is_semantic_hub`
+        is never set and the dynamics multipliers that read it do not
+        apply. Kept for the day the hub machinery is connected up.
+
         This method computes betweenness centrality for all concepts
         (using a sampled approximation for large networks) and marks
         the top 5% as semantic hubs. Hub concepts get:
