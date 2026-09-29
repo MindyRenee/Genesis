@@ -874,7 +874,13 @@ struct PerfEventAttr {
     config: u64,
     /// Union: sample_period / sample_freq. Unused for counting.
     sample: u64,
-    /// Which fields to include on read. 0 = raw u64 count.
+    /// Which fields to put in sample records. Unused for counting,
+    /// but it MUST be present: it occupies the u64 slot at offset 24
+    /// in the kernel's struct, and omitting it shifts every later field
+    /// by 8 bytes. See the offset assertions below.
+    sample_type: u64,
+    /// Which fields to include on read. 0 = raw u64 count, which is
+    /// what `read_counts` assumes when it reads 8 bytes per event.
     read_format: u64,
     /// Attribute bitfield: bit0 disabled, bit5 exclude_kernel,
     /// bit6 exclude_hv (see PERF_FLAG_* below).
@@ -888,6 +894,30 @@ struct PerfEventAttr {
     /// Union: bp_len / config2. Unused.
     config2: u64,
 }
+
+// `perf_event_attr` is a userspace/kernel ABI contract. `#[repr(C)]`
+// fixes the byte offsets but cannot catch a *missing* field: a struct
+// that omits `sample_type` still comes out exactly 64 bytes, so
+// `size` is accepted by the kernel while every field from `read_format`
+// onward lands at the wrong address. The kernel's flags word then
+// receives 0 (so the counter is not opened disabled and kernel/hypervisor
+// events are not excluded) and read_format receives the flag bits,
+// which request a multi-field record that the 8-byte read cannot parse.
+//
+// Offsets below are from include/uapi/linux/perf_event.h. The total is
+// PERF_ATTR_SIZE_VER1 (72), which adds config2.
+const _: () = assert!(core::mem::offset_of!(PerfEventAttr, type_) == 0);
+const _: () = assert!(core::mem::offset_of!(PerfEventAttr, size) == 4);
+const _: () = assert!(core::mem::offset_of!(PerfEventAttr, config) == 8);
+const _: () = assert!(core::mem::offset_of!(PerfEventAttr, sample) == 16);
+const _: () = assert!(core::mem::offset_of!(PerfEventAttr, sample_type) == 24);
+const _: () = assert!(core::mem::offset_of!(PerfEventAttr, read_format) == 32);
+const _: () = assert!(core::mem::offset_of!(PerfEventAttr, flags) == 40);
+const _: () = assert!(core::mem::offset_of!(PerfEventAttr, wakeup) == 48);
+const _: () = assert!(core::mem::offset_of!(PerfEventAttr, bp_type) == 52);
+const _: () = assert!(core::mem::offset_of!(PerfEventAttr, config1) == 56);
+const _: () = assert!(core::mem::offset_of!(PerfEventAttr, config2) == 64);
+const _: () = assert!(core::mem::size_of::<PerfEventAttr>() == 72);
 
 // perf_event_attr flags bitfield (first 8 bits of `flags`).
 const PERF_FLAG_DISABLED: u64 = 1 << 0;
@@ -927,6 +957,7 @@ fn perf_open(pid: u32, hw_config: u64) -> i32 {
         size: std::mem::size_of::<PerfEventAttr>() as u32,
         config: hw_config,
         sample: 0,
+        sample_type: 0,
         read_format: 0,
         // Start disabled (enabled via ioctl below for a clean
         // baseline). Measure only its user-space execution —
@@ -2136,15 +2167,36 @@ fn find_freq_sensors(num_cores: u32) -> Vec<String> {
             let base = format!("/sys/devices/system/cpu/cpu{i}/cpufreq");
             let hardware = format!("{base}/cpuinfo_cur_freq");
             let requested = format!("{base}/scaling_cur_freq");
-            if fs::metadata(&hardware).is_ok() {
+            // `cpuinfo_cur_freq` is registered 0400 (root-only) by
+            // drivers/cpufreq/cpufreq.c — cpufreq_freq_attr_ro_perm() —
+            // so `metadata()` succeeding does NOT mean it is readable.
+            // The daemon runs unprivileged, so selecting it here would
+            // pin arousal_freq at 0.0 on every core. Probe with a real
+            // read and fall back to the 0444 scaling_cur_freq, which is
+            // the last requested P-state rather than a measured
+            // frequency, but is a usable signal.
+            //
+            // A "<unknown>" body (some drivers write that instead of a
+            // number) fails the parse and falls through to the same
+            // fallback.
+            if readable_freq(&hardware) {
                 Some(hardware)
-            } else if fs::metadata(&requested).is_ok() {
+            } else if readable_freq(&requested) {
                 Some(requested)
             } else {
                 None
             }
         })
         .collect()
+}
+
+/// True when `path` can be opened *and* yields a parseable kHz value.
+///
+/// Existence is not enough: `cpuinfo_cur_freq` is world-*stat*able but
+/// root-only to read, and permission can differ per core.
+fn readable_freq(path: &str) -> bool {
+    fs::read_to_string(path)
+        .is_ok_and(|content| content.trim().parse::<u64>().is_ok())
 }
 
 /// Read the maximum CPU frequency.
@@ -3009,6 +3061,110 @@ mod tests {
         // PID 0 is never a valid kill target in this context.
         // Use a very high PID that's almost certainly not in use.
         assert!(!pid_alive(4_000_000));
+    }
+
+    #[test]
+    fn test_readable_freq_rejects_unreadable_and_malformed() {
+        // `readable_freq` exists because existence is not readability:
+        // `cpuinfo_cur_freq` is registered 0400 (root-only) by the
+        // cpufreq driver, so a stat-only probe selects an unreadable
+        // file and pins arousal_freq at 0.0 for an unprivileged daemon.
+        let dir = std::env::temp_dir().join(format!("genesis-freq-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+
+        let good = dir.join("good");
+        std::fs::write(&good, "1996169\n").expect("write good");
+        assert!(
+            readable_freq(good.to_str().expect("utf8 path")),
+            "a readable numeric kHz value must be accepted"
+        );
+
+        // Some cpufreq drivers write "<unknown>" instead of a number.
+        let unknown = dir.join("unknown");
+        std::fs::write(&unknown, "<unknown>\n").expect("write unknown");
+        assert!(
+            !readable_freq(unknown.to_str().expect("utf8 path")),
+            "a non-numeric body must be rejected so the caller falls back"
+        );
+
+        let empty = dir.join("empty");
+        std::fs::write(&empty, "").expect("write empty");
+        assert!(
+            !readable_freq(empty.to_str().expect("utf8 path")),
+            "an empty file must be rejected"
+        );
+
+        // Mode 0000: readable only by root. Assert readable_freq tracks
+        // actual read success rather than the mode bits, which holds
+        // whether or not the test runner is root.
+        let locked = dir.join("locked");
+        std::fs::write(&locked, "1000\n").expect("write locked");
+        {
+            let mut perms = std::fs::metadata(&locked).expect("stat locked").permissions();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                perms.set_mode(0o000);
+            }
+            std::fs::set_permissions(&locked, perms).expect("chmod locked");
+        }
+        let locked_path = locked.to_str().expect("utf8 path");
+        let can_read = std::fs::read_to_string(locked_path).is_ok();
+        assert_eq!(
+            readable_freq(locked_path),
+            can_read,
+            "readable_freq must track actual read success, not file mode"
+        );
+
+        // Nonexistent path.
+        assert!(
+            !readable_freq(dir.join("does-not-exist").to_str().expect("utf8 path")),
+            "a missing file must be rejected"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_find_freq_sensors_returns_readable_paths() {
+        // Every path handed to read_avg_freq() must be one we can
+        // actually read, or arousal_freq silently collapses to 0.0.
+        let sensors = find_freq_sensors(num_cpus());
+        for path in &sensors {
+            assert!(
+                readable_freq(path),
+                "find_freq_sensors returned an unreadable path: {path}"
+            );
+        }
+        if !sensors.is_empty() {
+            assert_eq!(
+                sensors.len() as u32,
+                num_cpus(),
+                "a readable cpufreq sensor was found, so all cores should report"
+            );
+        }
+    }
+
+    #[test]
+    fn test_perf_event_attr_matches_kernel_abi() {
+        // Regression guard for the struct that was missing
+        // `sample_type`. A 64-byte struct with the wrong field names
+        // still satisfies `size`, so the kernel accepted it while
+        // reading flags=0 and read_format=97 — the perf counters never
+        // worked. The module-level const asserts pin every offset;
+        // this test additionally pins the flag bit positions that
+        // `perf_open` relies on.
+        assert_eq!(core::mem::size_of::<PerfEventAttr>(), 72);
+        assert_eq!(core::mem::offset_of!(PerfEventAttr, sample_type), 24);
+        assert_eq!(core::mem::offset_of!(PerfEventAttr, read_format), 32);
+        assert_eq!(core::mem::offset_of!(PerfEventAttr, flags), 40);
+
+        // `disabled` is bit 0 and `exclude_kernel`/`exclude_hv` are
+        // bits 5/6 of the flags word — the values the kernel reads.
+        let flags = PERF_FLAG_DISABLED | PERF_FLAG_EXCLUDE_KERNEL | PERF_FLAG_EXCLUDE_HV;
+        assert_eq!(flags & 0b1, PERF_FLAG_DISABLED);
+        assert_eq!((flags >> 5) & 0b1, 1, "exclude_kernel must be bit 5");
+        assert_eq!((flags >> 6) & 0b1, 1, "exclude_hv must be bit 6");
     }
 
     #[test]
