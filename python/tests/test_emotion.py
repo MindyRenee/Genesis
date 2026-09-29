@@ -384,6 +384,26 @@ def test_puzzle_response_dampened_when_stressed() -> None:
 # ─── update_from_body_state field mapping ─────────────────────
 
 
+def test_interoception_latency_uses_observed_response_not_benchmark() -> None:
+    """Latency must come from the real interaction path, not a microbenchmark."""
+    from genesis_cognitive.emotional_regulator import InteroceptionSystem
+
+    intero = InteroceptionSystem()
+    state = intero.sense_internal_state()
+    assert state.latency_observed is False
+    assert state.response_latency == 0.0
+
+    intero.record_response_latency(600.0)
+    state = intero.sense_internal_state()
+    assert state.latency_observed is True
+    assert 599.0 <= state.response_latency <= 601.0
+    assert state.stress_level > 0.0
+
+    intero.record_response_latency(100.0)
+    state = intero.sense_internal_state()
+    assert 100.0 < state.response_latency < 600.0
+
+
 def test_update_from_body_state_maps_all_fields() -> None:
     """update_from_body_state must correctly map BodyState fields.
 
