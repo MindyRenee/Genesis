@@ -2402,9 +2402,10 @@ def _print_help() -> None:
     logger.info("    /regulate     — how it's been managing its emotions")
     logger.info("    /dreams       — see its subcognitive dream insights")
     logger.info("    /memories     — see its recent long-term memories")
-    logger.info("    /requests     — see sites it wants to access")
-    logger.info("    /approve URL  — approve a site request")
-    logger.info("    /deny URL     — deny a site request")
+    logger.info("    /requests     — INACTIVE: site approval is bypassed "
+                "(ALLOW_ALL_DOMAINS), so nothing is ever pending")
+    logger.info("    /approve URL  — INACTIVE: no requests are ever enqueued")
+    logger.info("    /deny URL     — INACTIVE: no requests are ever enqueued")
     logger.info("    /learn-code   — study its own source code")
     logger.info("    /explore [path] — explore local files and docs")
     logger.info("    /code-summary — summary of code self-knowledge")

@@ -1002,12 +1002,6 @@ impl IpcServer {
         self.shutdown_flag.clone()
     }
 
-    /// Check if the server has been shut down.
-    pub fn is_shutdown(&self) -> bool {
-        self.shutdown_flag
-            .load(std::sync::atomic::Ordering::Relaxed)
-    }
-
     /// Start the server (static method, owns the server).
     /// This blocks the calling thread — run it in a dedicated thread.
     ///

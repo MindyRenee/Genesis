@@ -795,11 +795,6 @@ impl RingBuffer {
         Some(unsafe { *self.entry_ptr(index) })
     }
 
-    /// Read the entry at the given slot index.
-    pub fn entry_at(&self, index: u64) -> Option<RingBufferEntry> {
-        self.peek(index)
-    }
-
     /// Mark the entry at `index` as consolidated to LTM.
     ///
     /// **Warning:** This marks whatever entry *currently* occupies the
@@ -971,7 +966,7 @@ impl RingBuffer {
     /// This is the atomic variant of `iter()` for callers that need
     /// slot indices (e.g. consolidation, which marks entries
     /// consolidated by slot). Without this, calling `count()`,
-    /// `header()`, `entry_at()`, and `mark_consolidated()` separately
+    /// `header()`, `peek()`, and `mark_consolidated()` separately
     /// would acquire and release `access_lock` for each operation,
     /// allowing a concurrent `push()` to change `head`/`tail` and
     /// overwrite slots mid-scan.

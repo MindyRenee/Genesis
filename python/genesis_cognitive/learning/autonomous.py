@@ -145,6 +145,15 @@ TRUSTED_EXACT_DOMAINS: set[str] = set()
 # the full World Wide Web to Genesis — it can follow any link,
 # read any page, and learn from any source. The site-request
 # approval system is bypassed.
+#
+# While this is True the approval machinery is unreachable: the
+# request/approve/deny functions, the _site_requests/_approved_sites/
+# _denied_sites state, and the /requests /approve /deny CLI commands
+# are all inert — /requests always reports nothing pending, because
+# nothing ever enqueues a request. They are kept for the case where
+# open-web access is turned back off. Flipping this to False both
+# restricts Genesis to TRUSTED_EXACT_DOMAINS plus approved sites and
+# makes that flow live again.
 ALLOW_ALL_DOMAINS = True
 USER_AGENT = "Genesis-AI-Learner/1.0 (educational research; mind.cs.example)"
 REQUEST_TIMEOUT = 10  # seconds
@@ -1554,44 +1563,6 @@ class AutonomousLearner:
         parts.append("  Word definitions → WordNet (local, no network)")
         parts.append("  System commands → local man pages")
         return "\n".join(parts)
-
-    def explain_source_choice(self, topic: str) -> str:
-        """Explain which source it would use for a given topic and why.
-
-        This gives it source awareness — it can articulate why it
-        chose a particular source, rather than blindly querying all
-        of them. It understands the epistemic hierarchy: developer
-        docs are facts, everything else is someone's opinion.
-        """
-        if self._is_code_topic(topic):
-            lang = self._code_doc_language(topic)
-            return (
-                f"'{topic}' is a programming topic. I'd check {lang} docs "
-                f"first — those are the facts. Then I'd look at GitHub for "
-                f"how people actually implement it, but only high-star repos "
-                f"— most projects aren't worth studying. I'd treat GitHub "
-                f"patterns as ideas to evaluate, not facts to copy. "
-                f"Wikipedia is a general encyclopedia — it's not the right "
-                f"source for code questions."
-            )
-        if is_programming_topic(topic):
-            return (
-                f"'{topic}' is a CS/programming concept. I'd check developer "
-                f"docs first for the ground truth, then GitHub for real-world "
-                f"implementations — filtered to high-star repos only, since "
-                f"most projects are bad. I'd cross-check anything from GitHub "
-                f"against the docs. Wikipedia has articles on these but "
-                f"they're encyclopedic, not practical — and not written by "
-                f"programmers."
-            )
-        # General knowledge
-        return (
-            f"'{topic}' is general knowledge. I'd use Wikipedia for "
-            f"orientation, but remember it's volunteer-written and can be "
-            f"wrong. The dictionary helps if it's a word definition. "
-            f"Nothing is absolute fact — humans make mistakes, and I "
-            f"should evaluate what I read critically."
-        )
 
     def _is_url_allowed(self, url: str) -> bool:
         """Check if a URL is allowed (trusted domain, user-approved, or open web)."""
