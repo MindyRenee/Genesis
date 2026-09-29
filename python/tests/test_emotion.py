@@ -895,3 +895,58 @@ def test_allostatic_load_recovers_when_domains_calm() -> None:
     for _ in range(100):
         tracker.record_stress(0.0, dt=10.0)
     assert tracker.get_allostatic_load() < loaded
+
+
+def test_body_cognitive_load_contributes_to_interoceptive_stress() -> None:
+    """High self-memory load is distress only after the overload threshold."""
+    from genesis_client.types import BodyState
+
+    regulator = EmotionalRegulator()
+    regulator.interoception.update_from_body_state(
+        BodyState(
+            cpu_temp_c=50.0,
+            temperature=0.5,
+            arousal_freq=0.5,
+            cognitive_load=0.80,
+            io_activity=0.0,
+            stress_load=0.0,
+            energy_reserve=1.0,
+            on_ac_power=True,
+            num_cores=1,
+            distressed=False,
+            autonomic_rate=0.0,
+            thermoregulatory_effort=0.0,
+            metabolic_rate=0.0,
+            core_voltage=0.0,
+            supply_voltage=0.0,
+            description="",
+        )
+    )
+    state = regulator.interoception.last_state
+    assert state is not None
+    assert state.cognitive_load == 0.80
+    assert state.stress_level > 0.0
+
+    regulator.interoception.update_from_body_state(
+        BodyState(
+            cpu_temp_c=50.0,
+            temperature=0.5,
+            arousal_freq=0.5,
+            cognitive_load=0.50,
+            io_activity=0.0,
+            stress_load=0.0,
+            energy_reserve=1.0,
+            on_ac_power=True,
+            num_cores=1,
+            distressed=False,
+            autonomic_rate=0.0,
+            thermoregulatory_effort=0.0,
+            metabolic_rate=0.0,
+            core_voltage=0.0,
+            supply_voltage=0.0,
+            description="",
+        )
+    )
+    state = regulator.interoception.last_state
+    assert state is not None
+    assert state.stress_level == 0.0
