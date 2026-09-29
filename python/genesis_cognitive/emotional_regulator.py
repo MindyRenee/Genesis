@@ -2474,6 +2474,7 @@ class AllostaticState:
     """
 
     allostatic_load: float = 0.0
+    inference_load: float = 0.0
     acute_stress: float = 0.0
     is_chronic: bool = False
     stress_history: deque[float] = field(default_factory=lambda: deque(maxlen=600))
@@ -2575,20 +2576,13 @@ class AllostaticLoadTracker:
         self._last_substrate_update: float = _time.monotonic()
         self._time = _time
 
-    def set_allostatic_load(self, load: float) -> None:
-        """Set the allostatic load from the Rust active inference engine.
-
-        Called by the Mind after ``advance_neuro`` returns the
-        inference signals. The Rust engine computes load from
-        expected free energy — the anticipatory signal. This is the
-        primary source of truth for the load value.
-
-        Args:
-            load: The allostatic load (0–1) from the Rust engine.
-        """
-        self._state.allostatic_load = max(0.0, min(1.0, load))
+    def set_inference_load(self, load: float) -> None:
+        self._state.inference_load = max(0.0, min(1.0, float(load)))
         self._state.substrate_connected = True
         self._last_substrate_update = self._time.monotonic()
+
+    def set_allostatic_load(self, load: float) -> None:
+        self.set_inference_load(load)
 
     def record_stress(self, cortisol_level: float, dt: float = 1.0) -> None:
         """Record a cortisol/stress level sample.
