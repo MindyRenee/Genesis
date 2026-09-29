@@ -1178,9 +1178,9 @@ pub struct NeurochemicalVector {
     /// Active brain region for region-specific coupling.
     /// 0 = default, 1 = striatum, 2 = pfc (prefrontal cortex).
     /// Controls the serotonin→dopamine coupling path.
-    /// This field is IPC-settable via `set_active_region()` but is not
-    /// currently driven by any daemon dynamics — it stays at `Default`
-    /// unless explicitly set by an external caller.
+    /// Not settable over IPC: no protocol command writes it, and
+    /// `set_active_region()` has no callers. It stays at `Default`
+    /// unless something calls that setter directly.
     pub active_region: u8,
     /// Alignment padding to reach 2416 bytes.
     pub _pad: [u8; 2],
