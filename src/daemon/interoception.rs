@@ -325,8 +325,19 @@ pub fn publish_body_state(state: &BodyState) {
 
 /// Read the latest published body state for IPC responses.
 /// Returns a clone of the current body state.
+///
+/// On lock poisoning this falls back to [`BodyState::neutral`] rather
+/// than `Default`. The derived `Default` yields `energy_reserve = 0.0`
+/// and `on_ac_power = false`, which is exactly the dead-battery state
+/// the neutral constructor was written to avoid: a client polling
+/// `GET_BODY_STATE` would read a machine in permanent battery-critical
+/// distress. No statement inside the guard can panic, so poisoning
+/// should not occur — but if it ever did, neutral is the safe answer.
 pub fn read_shared_body_state() -> BodyState {
-    shared_body().lock().map(|g| g.clone()).unwrap_or_default()
+    shared_body()
+        .lock()
+        .map(|g| g.clone())
+        .unwrap_or_else(|_| BodyState::neutral())
 }
 
 /// The body state — a snapshot of what Genesis feels about its machine.
@@ -404,13 +415,21 @@ pub struct BodyState {
     /// doesn't circulate anything. 0.0 = fan off, 1.0 = full speed.
     /// High fan + high temp = the body struggling to cool down.
     /// Fan off + high temp = cooling failure (dangerous).
+    ///
+    /// 0.0 is ALSO the value when no fan sensor exists, so the reading
+    /// alone cannot distinguish "fan stopped" from "no telemetry".
+    /// Every impulse keyed on this field is therefore additionally
+    /// gated on the sensor being present — see `neuro_impulses`.
     pub thermoregulatory_effort: f32,
 
     /// Metabolic rate — power draw normalized [0, 1]. How much
-    /// energy the machine is consuming right now. Read from AMD
-    /// fam15h_power, Intel RAPL, or battery power_now, depending
-    /// on available sensors. 0.0 = no power sensor found or
-    /// machine is idle/reading zero. High metabolic rate under
+    /// energy the machine is consuming right now. Read from the first
+    /// live candidate among AMD fam15h_power, battery power_now, and
+    /// the battery hwmon bridge, in that preference order. Candidates
+    /// are tried in turn, so a present-but-dead sensor (fam15h_power
+    /// reports 0 on some AMD parts) does not mask a working one.
+    /// 0.0 = every candidate unreadable or reporting zero, or the
+    /// machine is genuinely idle. High metabolic rate under
     /// high load = active exertion; low under low load = resting.
     pub metabolic_rate: f32,
 
@@ -639,10 +658,16 @@ pub struct Interoceptor {
     /// Discovered at startup by scanning hwmon for pwm1.
     fan_path: Option<String>,
 
-    /// Path to the power draw sensor (metabolic rate).
-    /// Discovered at startup by scanning hwmon for power sensors
-    /// (AMD fam15h_power, Intel RAPL, or battery power_now).
-    power_path: Option<String>,
+    /// Candidate paths to power draw sensors (metabolic rate), in
+    /// descending order of preference. Discovered at startup by
+    /// scanning hwmon for power sensors (AMD fam15h_power, battery
+    /// power_now, battery hwmon power1_input).
+    ///
+    /// A list rather than a single path: a preferred sensor can exist
+    /// yet read a dead 0 (fam15h_power does this on some AMD parts)
+    /// while a lesser candidate is live. Reading only the first match
+    /// would pin metabolic_rate at 0.0 with a working sensor ignored.
+    power_paths: Vec<String>,
 
     /// Path to the CPU core voltage sensor (Vcore/VDD).
     /// Discovered at startup by scanning hwmon for voltage sensors
@@ -1092,7 +1117,7 @@ impl Interoceptor {
         let battery_path = find_battery();
         let ac_path = find_ac_adapter();
         let fan_path = find_fan_pwm();
-        let power_path = find_power_sensor();
+        let power_paths = find_power_sensors();
         let (core_voltage_path, supply_voltage_path) = find_voltage_sensors();
         let total_memory_kb = match read_total_memory_kb() {
             Some(m) => m,
@@ -1117,7 +1142,7 @@ impl Interoceptor {
             prev_proc_io: std::collections::HashMap::new(),
             total_memory_kb,
             fan_path,
-            power_path,
+            power_paths,
             core_voltage_path,
             supply_voltage_path,
             prev_gpe_count: 0,
@@ -1327,11 +1352,7 @@ impl Interoceptor {
         // Metabolic rate: power draw (how much energy the machine
         // is consuming right now). Read from AMD fam15h_power,
         // Intel RAPL, or battery power_now. 0.0 if no sensor.
-        let metabolic_rate = self
-            .power_path
-            .as_ref()
-            .and_then(|p| read_power_draw(p))
-            .unwrap_or(0.0);
+        let metabolic_rate = read_power_draw_any(&self.power_paths).unwrap_or(0.0);
 
         // Core voltage (Vcore) — the CPU's operating voltage. On
         // acpi-cpufreq systems, the SMU controls this internally per
@@ -1883,7 +1904,10 @@ impl Interoceptor {
         //   cooldown after exertion. This is normal operation.
 
         // Fan struggling: high fan + high temp → thermal strain.
-        if body.thermoregulatory_effort > 0.3 && body.cpu_temp_c > 75.0 {
+        if self.fan_path.is_some()
+            && body.thermoregulatory_effort > 0.3
+            && body.cpu_temp_c > 75.0
+        {
             let fan_intensity = crate::state::sanitize::finite_clamp(
                 (body.thermoregulatory_effort - 0.3) / 0.7,
                 0.0,
@@ -1897,7 +1921,16 @@ impl Interoceptor {
 
         // Cooling failure: fan off + high temp → dangerous.
         // The body is hot but the cooling system isn't responding.
-        if body.thermoregulatory_effort < 0.05 && body.cpu_temp_c > 80.0 {
+        // Gated on `fan_path.is_some()`, not just the reading. With no
+        // fan sensor the effort field is 0.0 by convention, which is
+        // indistinguishable from "fan stopped" — so a machine with no
+        // fan telemetry at all would fabricate a cooling-failure
+        // response to any excursion above 80 °C. Absence of a sensor
+        // is not evidence of a stopped fan.
+        if self.fan_path.is_some()
+            && body.thermoregulatory_effort < 0.05
+            && body.cpu_temp_c > 80.0
+        {
             let intensity =
                 crate::state::sanitize::finite_clamp((body.cpu_temp_c - 80.0) / 10.0, 0.0, 1.0);
             impulses.push((NeurochemicalId::CRH, intensity * 0.006));
@@ -2287,7 +2320,15 @@ fn find_fan_pwm() -> Option<String> {
 ///
 /// If the path is a PWM file (0–255), normalizes directly. If it's
 /// an RPM file (`fan1_input`), normalizes against a typical max of
-/// 5000 RPM. A read failure or out-of-range value returns 0.0.
+/// 5000 RPM (`fanY_max` is "only rarely supported by the hardware",
+/// per the hwmon ABI, so this stays a constant). A read failure or
+/// out-of-range value returns `None`.
+///
+/// `pwm1_enable == 0` means "no fan speed control, i.e. fan at full
+/// speed" (hwmon ABI). In that mode the duty readback is not the fan
+/// speed — the fan is pinned at 100 %. Reporting the raw `pwm1` value
+/// here would invert the reading, reporting a spinning fan as zero
+/// cooling, which is what the cooling-failure impulse keys on.
 fn read_fan_pwm(path: &str) -> Option<f32> {
     let raw = fs::read_to_string(path).ok()?;
     let trimmed = raw.trim();
@@ -2301,9 +2342,34 @@ fn read_fan_pwm(path: &str) -> Option<f32> {
             1.0,
         ))
     } else {
+        // pwmY_enable sits beside pwmY. 0 = uncontrolled (fan at full
+        // speed), 1 = manual (pwmY is the duty), 2+ = automatic (pwmY
+        // still reports the current duty). Only mode 0 needs special
+        // handling; a missing attribute means we cannot tell, so trust
+        // the duty value.
+        if let Some(enable) = sibling_pwm_enable(path)
+            && enable == 0
+        {
+            return Some(1.0);
+        }
         let pwm: f32 = trimmed.parse().ok()?;
         Some(crate::state::sanitize::finite_clamp(pwm / 255.0, 0.0, 1.0))
     }
+}
+
+/// Read `pwm1_enable` given a path to `pwm1`, if it exists.
+///
+/// hwmon attributes are siblings under the same `hwmonN` directory.
+fn sibling_pwm_enable(pwm_path: &str) -> Option<u32> {
+    let enable_path = pwm_path.replace("pwm1", "pwm1_enable");
+    if enable_path == pwm_path {
+        return None;
+    }
+    fs::read_to_string(enable_path)
+        .ok()?
+        .trim()
+        .parse::<u32>()
+        .ok()
 }
 
 /// Find the power draw sensor path — the machine's metabolic rate
@@ -2327,8 +2393,9 @@ fn read_fan_pwm(path: &str) -> Option<f32> {
 /// cumulative counters are exactly what we need: the delta is the
 /// switching-activity signal.
 ///
-/// Returns `None` if no power sensor is found.
-fn find_power_sensor() -> Option<String> {
+/// Returns every candidate found, most-preferred first. Empty if none.
+fn find_power_sensors() -> Vec<String> {
+    let mut found: Vec<String> = Vec::new();
     // 1. AMD fam15h_power — power1_average (μW, instantaneous)
     for hwmon in 0..=10 {
         let name_path = format!("/sys/class/hwmon/hwmon{hwmon}/name");
@@ -2337,7 +2404,7 @@ fn find_power_sensor() -> Option<String> {
             if name == "fam15h_power" {
                 let avg_path = format!("/sys/class/hwmon/hwmon{hwmon}/power1_average");
                 if fs::metadata(&avg_path).is_ok() {
-                    return Some(avg_path);
+                    found.push(avg_path);
                 }
             }
         }
@@ -2346,11 +2413,14 @@ fn find_power_sensor() -> Option<String> {
     for supply in &["BAT0", "BAT1", "BATT"] {
         let path = format!("/sys/class/power_supply/{supply}/power_now");
         if fs::metadata(&path).is_ok() {
-            return Some(path);
+            found.push(path);
         }
     }
     // 3. Battery hwmon power1_input (some systems expose battery
-    //    power via hwmon instead of power_supply)
+    //    power via hwmon instead of power_supply). This is the same
+    //    quantity as (2) — drivers/acpi/battery bridges POWER_NOW to
+    //    the hwmon power1_input — so it is last and only reached if
+    //    the power_supply attribute is missing.
     for hwmon in 0..=10 {
         let name_path = format!("/sys/class/hwmon/hwmon{hwmon}/name");
         if let Ok(name) = fs::read_to_string(&name_path) {
@@ -2358,41 +2428,58 @@ fn find_power_sensor() -> Option<String> {
             if name.starts_with("BAT") {
                 let power_path = format!("/sys/class/hwmon/hwmon{hwmon}/power1_input");
                 if fs::metadata(&power_path).is_ok() {
-                    return Some(power_path);
+                    found.push(power_path);
                 }
             }
         }
     }
-    None
+    found
 }
 
-/// Read power draw, normalized to [0, 1].
+/// Read power draw from the first candidate that reports something,
+/// normalized to [0, 1].
+///
+/// Falls through to the next candidate when one reads zero. A sensor
+/// can exist and be permanently dead — `fam15h_power/power1_average`
+/// reports 0 on some AMD parts even under load — and latching onto the
+/// first match would report "no metabolism" while a live battery
+/// `power_now` sits unused. Returns `None` only when every candidate
+/// is unreadable or reports zero.
+fn read_power_draw_any(paths: &[String]) -> Option<f32> {
+    paths.iter().find_map(|p| read_power_draw(p))
+}
+
+/// Read one power sensor, normalized to [0, 1].
 ///
 /// Power sensors report in microwatts (μW). We normalize against a
 /// reference of 100 W (100,000,000 μW) — a reasonable upper bound
-/// for laptop CPU package power. A read failure, zero, or
-/// out-of-range value returns 0.0 (unknown metabolic rate).
+/// for laptop CPU package power. A read failure or zero returns
+/// `None` so the caller can try the next candidate.
 ///
-/// Note: battery `power_now` reads 0 when on AC power (the battery
-/// isn't discharging). This is expected — metabolic_rate will be 0.0
-/// on AC power if no CPU package power sensor is available. The
-/// metabolic rate impulses are gated by load and temperature, so a
-/// 0.0 reading simply means "no metabolic signal" rather than "no
-/// metabolism."
+/// `power_now` in the power_supply class is *signed*: the ABI
+/// documents negative values for discharging and positive for
+/// charging, and drivers/acpi/battery.c passes the ACPI `_BST` rate
+/// through as-is. Metabolic rate is a magnitude, so the sign is
+/// dropped with `abs()`; without it a discharging battery would
+/// clamp to 0.0 and read as "no metabolism" — precisely when the
+/// machine is doing the most work off-mains.
 fn read_power_draw(path: &str) -> Option<f32> {
     let raw = fs::read_to_string(path).ok()?;
     let trimmed = raw.trim();
     let microwatts: f32 = trimmed.parse().ok()?;
+    if !microwatts.is_finite() || microwatts == 0.0 {
+        return None;
+    }
     // Reference: 100 W = 100,000,000 μW. Typical laptop CPU package
     // power ranges from ~3W (idle) to ~45W (full load). Desktop CPUs
     // can reach 125W+ under load. 100W as the reference puts typical
     // laptop load at ~0.3-0.45 and idle at ~0.03.
     const REFERENCE_MICROWATTS: f32 = 100_000_000.0;
-    Some(crate::state::sanitize::finite_clamp(
-        microwatts / REFERENCE_MICROWATTS,
-        0.0,
-        1.0,
-    ))
+    let normalized = microwatts.abs() / REFERENCE_MICROWATTS;
+    if normalized <= 0.0 {
+        return None;
+    }
+    Some(crate::state::sanitize::finite_clamp(normalized, 0.0, 1.0))
 }
 
 /// Discover RAPL per-subsystem power domains.
@@ -2516,17 +2603,13 @@ fn find_voltage_sensors() -> (Option<String>, Option<String>) {
         }
     }
 
-    // Also check power_supply for battery voltage (some systems
-    // expose it here instead of hwmon).
-    if supply_path.is_none() {
-        for supply in &["BAT0", "BAT1", "BATT"] {
-            let path = format!("/sys/class/power_supply/{supply}/in0_input");
-            if fs::metadata(&path).is_ok() {
-                supply_path = Some(path);
-                break;
-            }
-        }
-    }
+    // No power_supply fallback for voltage. That class exposes
+    // `voltage_now` in microvolts and has no `in*_input` attribute at
+    // all — `in*_input` is hwmon-only. The BAT-named hwmon scan above
+    // already covers the battery rail in millivolts, which is what
+    // read_voltage expects. (Adding a `voltage_now` path here would
+    // need a /1e6 conversion; reading it through read_voltage's /1000
+    // would report ~12 kV.)
 
     (core_path, supply_path)
 }
@@ -2535,15 +2618,33 @@ fn find_voltage_sensors() -> (Option<String>, Option<String>) {
 ///
 /// hwmon voltage sensors report in millivolts (mV), so we divide
 /// by 1000. A read failure or non-finite value returns `None`.
-/// Battery voltage sensors (`BAT*/in0_input`) also report in mV.
+///
+/// Battery voltage sensors (the `BAT*` hwmon bridge's `in0_input`)
+/// also report in mV.
+///
+/// A plausibility window is applied. The supply-voltage CRH branch
+/// keys on `supply_voltage > 0.0 && supply_voltage < 10.8`, so a
+/// near-zero garbage read (a rail fault reporting ~1 mV) would pass
+/// that guard and produce a maximal, permanently repeated stress
+/// impulse. A Li-ion pack rail sits roughly in 9–13 V and a CPU core
+/// rail in 0.3–2.0 V, so both bounds are wide enough to keep real
+/// readings while rejecting the degenerate ones. Out-of-window values
+/// are treated as "no reading" rather than reported verbatim.
 fn read_voltage(path: &str) -> Option<f32> {
+    const MIN_PLAUSIBLE_V: f32 = 0.05;
+    const MAX_PLAUSIBLE_V: f32 = 20.0;
+
     let raw = fs::read_to_string(path).ok()?;
     let trimmed = raw.trim();
     let millivolts: f32 = trimmed.parse().ok()?;
     if !millivolts.is_finite() {
         return None;
     }
-    Some(millivolts / 1000.0)
+    let volts = millivolts / 1000.0;
+    if !(MIN_PLAUSIBLE_V..=MAX_PLAUSIBLE_V).contains(&volts) {
+        return None;
+    }
+    Some(volts)
 }
 
 /// Read the total GPE (General Purpose Event) count from the EC.
@@ -2748,8 +2849,16 @@ fn read_battery_cycles() -> f32 {
         }
         if let Ok(s) = fs::read_to_string(entry.path().join("cycle_count"))
             && let Ok(n) = s.trim().parse::<f32>()
+            // `f32::parse` accepts "NaN"/"inf", and the running total
+            // below would carry that into BodyState. Every other
+            // numeric reader in this module sanitizes at the producer;
+            // this one did not.
+            && n.is_finite()
+            && n >= 0.0
         {
-            total += n;
+            // finite_clamp also bounds the sum: an f32 overflow yields
+            // inf, which the clamp maps back to 0.0.
+            total = crate::state::sanitize::finite_clamp(total + n, 0.0, 1_000_000.0);
         }
     }
     total
@@ -3146,6 +3255,161 @@ mod tests {
     }
 
     #[test]
+    fn test_read_fan_pwm_enable_zero_means_full_speed() {
+        // hwmon ABI: pwm1_enable "0: no fan speed control (i.e. fan at
+        // full speed)". Reporting the raw pwm1 duty in that mode would
+        // read a fully spinning fan as zero cooling, which is what the
+        // cooling-failure impulse keys on.
+        let dir = std::env::temp_dir().join(format!("genesis-fan-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+
+        // Mode 0 with a duty readback of 0: the fan is at 100 %.
+        let hw = dir.join("hwmonX");
+        std::fs::create_dir_all(&hw).expect("create hwmon dir");
+        let pwm = hw.join("pwm1");
+        std::fs::write(&pwm, "0\n").expect("write pwm1");
+        std::fs::write(hw.join("pwm1_enable"), "0\n").expect("write enable 0");
+        assert_eq!(
+            read_fan_pwm(pwm.to_str().expect("utf8 path")),
+            Some(1.0),
+            "pwm1_enable == 0 means the fan runs at full speed"
+        );
+
+        // Mode 1 (manual): the duty value is authoritative.
+        std::fs::write(hw.join("pwm1_enable"), "1\n").expect("write enable 1");
+        assert_eq!(
+            read_fan_pwm(pwm.to_str().expect("utf8 path")),
+            Some(0.0),
+            "manual mode must report the duty readback"
+        );
+        std::fs::write(&pwm, "255\n").expect("write pwm 255");
+        assert_eq!(
+            read_fan_pwm(pwm.to_str().expect("utf8 path")),
+            Some(1.0),
+            "255 is 100 %"
+        );
+
+        // No pwm1_enable present: cannot tell, so trust the duty.
+        std::fs::remove_file(hw.join("pwm1_enable")).expect("remove enable");
+        std::fs::write(&pwm, "128\n").expect("write pwm 128");
+        let half = read_fan_pwm(pwm.to_str().expect("utf8 path")).expect("readable");
+        assert!(
+            (half - 128.0 / 255.0).abs() < 1e-6,
+            "absent pwm1_enable must not override the duty readback, got {half}"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_read_power_draw_falls_through_dead_candidate() {
+        // A present-but-dead sensor must not mask a live one. This
+        // mirrors a real host where fam15h_power/power1_average reads
+        // 0 while BAT0/power_now reads ~17 W.
+        let dir = std::env::temp_dir().join(format!("genesis-pwr-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+
+        let dead = dir.join("power1_average");
+        let live = dir.join("power_now");
+        std::fs::write(&dead, "0\n").expect("write dead");
+        std::fs::write(&live, "17476000\n").expect("write live"); // 17.476 W
+
+        let candidates = vec![
+            dead.to_string_lossy().into_owned(),
+            live.to_string_lossy().into_owned(),
+        ];
+        let rate = read_power_draw_any(&candidates).expect("a candidate should read");
+        assert!(
+            (rate - 0.17476).abs() < 1e-4,
+            "should fall through to the live candidate, got {rate}"
+        );
+
+        // All candidates dead -> None, not a fabricated 0.0.
+        let all_dead = vec![dead.to_string_lossy().into_owned()];
+        assert_eq!(read_power_draw_any(&all_dead), None);
+
+        // Empty list -> None.
+        assert_eq!(read_power_draw_any(&[]), None);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_read_power_draw_uses_magnitude_for_discharge() {
+        // power_supply's power_now is signed: negative when discharging.
+        // Metabolic rate is a magnitude; a negative value must not clamp
+        // to 0.0 ("no metabolism") while running on battery.
+        let dir = std::env::temp_dir().join(format!("genesis-pwr2-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let discharging = dir.join("power_now");
+        std::fs::write(&discharging, "-17476000\n").expect("write negative");
+        let rate = read_power_draw(discharging.to_str().expect("utf8 path")).expect("readable");
+        assert!(
+            (rate - 0.17476).abs() < 1e-4,
+            "discharge must report magnitude, got {rate}"
+        );
+        // "NaN" must not become a value.
+        std::fs::write(&discharging, "NaN\n").expect("write NaN");
+        assert_eq!(read_power_draw(discharging.to_str().expect("utf8 path")), None);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_read_voltage_rejects_implausible_readings() {
+        // The supply-voltage CRH branch keys on `> 0.0 && < 10.8`, so a
+        // near-zero garbage read would pass that guard and emit a
+        // maximal stress impulse on every tick.
+        let dir = std::env::temp_dir().join(format!("genesis-volt-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("create temp dir");
+        let v = dir.join("in0_input");
+
+        let write = |body: &str| {
+            std::fs::write(&v, body).expect("write");
+            read_voltage(v.to_str().expect("utf8 path"))
+        };
+
+        assert_eq!(write("1\n"), None, "1 mV is not a plausible rail");
+        assert_eq!(write("0\n"), None, "0 mV is not a plausible rail");
+        assert_eq!(write("-5000\n"), None, "negative is not a rail");
+        assert_eq!(write("999999\n"), None, "1000 V is not a rail");
+        assert_eq!(write("NaN\n"), None);
+
+        // Real readings survive: a ~12 V pack and a ~1.1 V core.
+        let pack = write("12094\n").expect("12 V pack should read");
+        assert!((pack - 12.094).abs() < 1e-3, "got {pack}");
+        let core = write("1188\n").expect("1.2 V core should read");
+        assert!((core - 1.188).abs() < 1e-3, "got {core}");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_battery_cycles_ignores_non_finite() {
+        // A "NaN" cycle_count would previously poison the running total,
+        // making battery_cycles NaN in BodyState.
+        let value = read_battery_cycles();
+        assert!(
+            value.is_finite() && value >= 0.0,
+            "battery_cycles must be finite and non-negative, got {value}"
+        );
+    }
+
+    #[test]
+    fn test_shared_body_state_fallback_is_neutral_not_default() {
+        // `BodyState::default()` reports energy_reserve = 0.0 and
+        // on_ac_power = false — the dead-battery state. If the shared
+        // mutex ever poisoned, a client would read permanent battery
+        // distress. The fallback must be neutral.
+        let neutral = BodyState::neutral();
+        assert_eq!(neutral.energy_reserve, 1.0);
+        assert!(neutral.on_ac_power);
+        // Documenting the contrast so the two are not silently swapped.
+        let default = BodyState::default();
+        assert_eq!(default.energy_reserve, 0.0);
+        assert!(!default.on_ac_power);
+    }
+
+    #[test]
     fn test_perf_event_attr_matches_kernel_abi() {
         // Regression guard for the struct that was missing
         // `sample_type`. A 64-byte struct with the wrong field names
@@ -3373,7 +3637,12 @@ mod tests {
     fn test_neuro_impulses_thermoregulatory_strain() {
         // High fan + high temp → CRH (thermal strain — the cooling
         // system is working hard but the body is still hot).
-        let intero = Interoceptor::new();
+        // Declare a fan sensor explicitly. The thermal-strain and
+        // cooling-failure impulses are gated on sensor presence, so
+        // without this the test would depend on whether the host
+        // running it happens to expose pwm1/fan1_input.
+        let mut intero = Interoceptor::new();
+        intero.fan_path = Some("/dev/null".to_string());
         let body = BodyState {
             cpu_temp_c: 82.0,
             temperature: 0.82,
@@ -3412,10 +3681,84 @@ mod tests {
     }
 
     #[test]
+    fn test_neuro_impulses_no_cooling_response_without_fan_sensor() {
+        // The regression this guards: with no fan sensor,
+        // thermoregulatory_effort is 0.0 by convention, which is
+        // indistinguishable from "fan stopped". Before the gate, a
+        // machine with no fan telemetry at all fabricated a
+        // cooling-failure stress response to any excursion above
+        // 80 °C. Absence of a sensor is not evidence of a stopped fan.
+        let mut intero = Interoceptor::new();
+        intero.fan_path = None;
+
+        // Hot enough to trigger both the temperature CRH and, if
+        // ungated, the cooling-failure CRH.
+        // Same body as test_neuro_impulses_cooling_failure — the only
+        // difference between the two tests is fan_path.
+        let body = BodyState {
+            cpu_temp_c: 85.0,
+            temperature: 0.85,
+            arousal_freq: 1.0,
+            cognitive_load: 0.3,
+            io_activity: 0.0,
+            stress_load: 0.1,
+            energy_reserve: 1.0,
+            on_ac_power: true,
+            num_cores: 4,
+            distressed: false,
+            autonomic_rate: 3.0, // EC active when hot
+            thermoregulatory_effort: 0.0, // fan off!
+            metabolic_rate: 0.2, // some power draw despite fan failure
+            core_voltage: 1.10, // Vcore raised
+            supply_voltage: 12.5, // battery present
+            core_activity: 0.0,
+            uncore_activity: 0.0,
+            dram_activity: 0.0,
+            cache_miss_rate: 0.0,
+            branch_miss_rate: 0.0,
+            description: String::new(),
+            ..Default::default()
+        };
+
+        let impulses = intero.neuro_impulses(&body);
+        // The temperature-driven CRH may still fire — that is a real
+        // reading. What must not fire is the *additional* cooling
+        // failure contribution, so the total must equal the
+        // temperature-only count.
+        let mut with_sensor = intero;
+        with_sensor.fan_path = Some("/dev/null".to_string());
+        let gated = impulses
+            .iter()
+            .filter(|(id, _)| *id == NeurochemicalId::CRH)
+            .map(|(_, v)| *v)
+            .sum::<f32>();
+        let ungated = with_sensor
+            .neuro_impulses(&body)
+            .iter()
+            .filter(|(id, _)| *id == NeurochemicalId::CRH)
+            .map(|(_, v)| *v)
+            .sum::<f32>();
+
+        assert!(
+            gated < ungated,
+            "without a fan sensor the cooling-failure CRH must be suppressed: \
+             gated={gated}, with-sensor={ungated}"
+        );
+        assert!(
+            gated > 0.0,
+            "the genuine high-temperature CRH must still be emitted"
+        );
+    }
+
+    #[test]
     fn test_neuro_impulses_cooling_failure() {
         // Fan off + high temp → CRH (cooling failure — dangerous,
         // like failing to sweat when overheating).
-        let intero = Interoceptor::new();
+        // Fan sensor present, reading 0.0 (the body below) — the
+        // distinction the gate depends on. See the note in
+        // test_neuro_impulses_thermal_strain.
+        let mut intero = Interoceptor::new();
+        intero.fan_path = Some("/dev/null".to_string());
         let body = BodyState {
             cpu_temp_c: 85.0,
             temperature: 0.85,
