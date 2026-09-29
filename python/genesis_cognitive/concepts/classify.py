@@ -1293,79 +1293,46 @@ _EVENT_KEYWORDS: frozenset[str] = frozenset(
         "summit",
     }
 )
-def detect_category(concept_name: str, definition: str = "") -> ConceptCategory:
-    """Detect the category of a concept from its name and optional definition.
-
-    Uses keyword matching to categorize concepts into living, non-living,
-    abstract, or event categories. This models the biological distinction
-    between how the brain processes different categories of things:
-    living things in the temporal subsystem, tools in frontoparietal regions,
-    abstract concepts in a distributed prefrontal network.
-
-    The detection is heuristic — it catches the common case. Concepts
-    that don't match any category return UNKNOWN, and can be categorized
-    later by more sophisticated methods (e.g., categorize_all()).
-
-    Args:
-        concept_name: The canonical name of the concept.
-        definition: Optional definition text for additional context.
-
-    Returns:
-        The detected ConceptCategory, or UNKNOWN if no match.
-    """
-    # Normalize: lowercase, strip prefixes (python:, rust:, identity:),
-    # take the last component after dots for code-style concept IDs.
+def category_evidence(concept_name: str, definition: str = "") -> dict[str, float]:
+    """Score category evidence from name and definition without hiding conflicts."""
     name = concept_name
     for prefix in ("python:", "rust:", "identity:", "code:"):
         if name.startswith(prefix):
-            name = name[len(prefix) :]
+            name = name[len(prefix):]
             break
     if "." in name:
         name = name.split(".")[-1]
-    # Split camelCase / snake_case to get the base word(s)
-    parts = _CAMEL_SPLIT_RE.split(name)
-    name_lower = name.lower()
-    parts_lower = [p.lower() for p in parts if p]
+    name_words = {p.lower() for p in _CAMEL_SPLIT_RE.split(name) if p}
+    definition_words = {w.lower() for w in _WORD_RE.findall(definition)}
+    groups = (
+        ("living", _LIVING_KEYWORDS),
+        ("non_living", _NON_LIVING_KEYWORDS),
+        ("abstract", _ABSTRACT_KEYWORDS),
+        ("event", _EVENT_KEYWORDS),
+    )
+    scores = {key: 0.0 for key, _ in groups}
+    for key, keywords in groups:
+        scores[key] += 3.0 * len(name_words & keywords)
+        scores[key] += 1.0 * len(definition_words & keywords)
+    if " " not in name.lower() and len(name) > 4 and name.lower() not in _NON_EVENT_STOPWORDS:
+        if any(name.lower().endswith(suffix) for suffix in _EVENT_SUFFIXES):
+            scores["event"] += 0.5
+    return scores
 
-    # Combine name and definition for keyword matching.
-    # We split into individual words to avoid false substring matches
-    # (e.g., "cat" matching inside "category", "dog" in "dogma").
-    search_words = set(parts_lower)
-    if definition:
-        search_words.update(w.lower() for w in _WORD_RE.findall(definition))
 
-    # ── Check living things ───────────────────────────────────
-    # Match if the concept name (or any of its camelCase parts) is a
-    # known living keyword, or if the definition contains living keywords.
-    if search_words & _LIVING_KEYWORDS:
-        return ConceptCategory.LIVING
+def detect_category(concept_name: str, definition: str = "") -> ConceptCategory:
+    """Return a category only when weighted evidence supports a clear winner."""
+    scores = category_evidence(concept_name, definition)
+    ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+    best, best_score = ranked[0]
+    second_score = ranked[1][1]
+    if best_score < 1.0:
+        return ConceptCategory.UNKNOWN
+    if second_score > 0.0 and best_score <= second_score + 1.0:
+        return ConceptCategory.UNKNOWN
+    return ConceptCategory(best)
 
-    # ── Check non-living things ───────────────────────────────
-    if search_words & _NON_LIVING_KEYWORDS:
-        return ConceptCategory.NON_LIVING
 
-    # ── Check abstract concepts ───────────────────────────────
-    if search_words & _ABSTRACT_KEYWORDS:
-        return ConceptCategory.ABSTRACT
-
-    # ── Check events ──────────────────────────────────────────
-    # First check explicit event keywords
-    if search_words & _EVENT_KEYWORDS:
-        return ConceptCategory.EVENT
-    # Then check suffix patterns (tion, ment, sion, ance, ence).
-    # Skip known non-event nouns that happen to end in these suffixes
-    # (nation, moment, vision, distance, evidence...). Only apply to
-    # single-word concepts — multi-word concepts are less reliably events.
-    if (
-        " " not in name_lower
-        and len(name_lower) > 4
-        and name_lower not in _NON_EVENT_STOPWORDS
-    ):
-        for suffix in _EVENT_SUFFIXES:
-            if name_lower.endswith(suffix):
-                return ConceptCategory.EVENT
-
-    return ConceptCategory.UNKNOWN
 _VISUAL_KEYWORDS: frozenset[str] = frozenset(
     {
         # colors
