@@ -3846,9 +3846,15 @@ class AutonomousLearner:
         if feedback:
             label = feedback.lower().strip()
         else:
-            # Bottom-up: use the most prominent extracted concept as
-            # the category label.
-            label = extracted[0].lower()
+            labels = [
+                self.network.get_concept(cid).category.value
+                for cid in extracted
+                if self.network.get_concept(cid) is not None
+                and self.network.get_concept(cid).category.value != "unknown"
+            ]
+            if not labels:
+                return
+            label = max(set(labels), key=labels.count)
 
         members = self._perceptual_categories.setdefault(label, set())
         for concept_name in extracted:
