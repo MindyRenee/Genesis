@@ -126,9 +126,12 @@ class InternalState:
         cpu_usage: CPU usage as a percentage (0–100).
         memory_usage: Memory usage as a percentage (0–100).
         daemon_connected: Whether its subcognitive daemon is connected.
-        response_latency: Most recent EWMA of observed user-turn response
-            latency in milliseconds. It is populated by the real request/
-            response path, not by an internal benchmark.
+        response_latency: Smoothed EWMA of observed user-turn response
+            latency in milliseconds. It is populated by the real public
+            request/response path, not by an internal benchmark.
+        last_response_latency: Most recent raw observed response latency
+            in milliseconds. This preserves the current turn signal even
+            when the smoothed state still contains earlier samples.
         latency_observed: Whether at least one real response-latency sample
             has been observed.
         stress_level: Derived stress level from internal state (0–1).
@@ -199,6 +202,7 @@ class InternalState:
     memory_usage: float = 0.0
     daemon_connected: bool = True
     response_latency: float = 0.0
+    last_response_latency: float = 0.0
     latency_observed: bool = False
     stress_level: float = 0.0
     arousal_modifier: float = 0.5
@@ -294,6 +298,7 @@ class InteroceptionSystem:
         # benchmark a synthetic operation and call that responsiveness.
         self._latency_lock = threading.Lock()
         self._response_latency_ms: float | None = None
+        self._last_response_latency_ms: float | None = None
 
     def _sense_cpu_usage(self) -> float:
         """Sense CPU usage of its own processes (cognitive mind + daemon).
@@ -416,13 +421,17 @@ class InteroceptionSystem:
         # for user-visible responsiveness.
         with self._latency_lock:
             response_latency = self._response_latency_ms
-        latency_observed = response_latency is not None
+            last_response_latency = self._last_response_latency_ms
+        latency_observed = last_response_latency is not None
 
         state = InternalState(
             cpu_usage=cpu_usage,
             memory_usage=memory_usage,
             daemon_connected=daemon_connected,
             response_latency=response_latency if response_latency is not None else 0.0,
+            last_response_latency=(
+                last_response_latency if last_response_latency is not None else 0.0
+            ),
             latency_observed=latency_observed,
         )
 
@@ -477,6 +486,7 @@ class InteroceptionSystem:
         sample = max(0.0, float(latency_ms))
         with self._latency_lock:
             previous = self._response_latency_ms
+            self._last_response_latency_ms = sample
             self._response_latency_ms = (
                 sample if previous is None else (0.3 * sample + 0.7 * previous)
             )
@@ -1375,7 +1385,10 @@ class EmotionalRegulator:
                 actions.append("slowing down my learning to reduce CPU stress")
         elif state.memory_usage > 85:
             self._last_cause = "interoception_memory"
-        elif state.response_latency > 500:
+        elif (
+            state.latency_observed
+            and state.last_response_latency > self.config.latency_stress_threshold
+        ):
             self._last_cause = "interoception_latency"
         elif state.stress_level > self.config.mild_stress_level:
             self._last_cause = "interoception_stress"
