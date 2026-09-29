@@ -143,10 +143,10 @@
 //!   1.0 → precision slews up (slowly: regaining confidence is slow).
 //! - Sustained high surprise → err_var fills → target falls →
 //!   precision slews down (quickly: losing confidence is fast).
-//! Saturation at 1.0 at rest is correct — the model genuinely
-//! predicts the resting trajectory — and it is reversible: any
-//! sustained surprise above ~0.01 RMS pulls precision back under the
-//! 0.8 exploitation threshold, re-opening stochastic exploration.
+//!   Saturation at 1.0 at rest is correct — the model genuinely
+//!   predicts the resting trajectory — and it is reversible: any
+//!   sustained surprise above ~0.01 RMS pulls precision back under the
+//!   0.8 exploitation threshold, re-opening stochastic exploration.
 //!
 //! This is the precision-weighted prediction error of predictive
 //! coding (Friston, 2010): the brain modulates how much it learns
