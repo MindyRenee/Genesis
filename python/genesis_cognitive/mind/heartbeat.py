@@ -415,14 +415,11 @@ class HeartbeatMixin:
                 # neurochemical time.
                 last_advance_mono = now_mono
                 _surprise, _free_energy, _precision, allostatic, _tick_count = result
-                # Pass the Rust allostatic load to the regulator's
-                # tracker. The Rust active inference engine is the
-                # source of truth for this value — it's driven by
-                # expected free energy (the anticipatory signal),
-                # not by current cortisol. The regulator's tracker
-                # supplements it with cortisol-duration tracking
-                # for the acute/chronic distinction.
-                self.regulator.allostatic_load_tracker.set_allostatic_load(
+                # Pass the Rust neurochemical burden domain to the
+                # regulator. Expected free energy is anticipatory
+                # demand; whole-system allostatic load is computed by
+                # the regulator from converging internal domains.
+                self.regulator.allostatic_load_tracker.set_inference_load(
                     allostatic
                 )
         except (OSError, ConnectionError) as e:
