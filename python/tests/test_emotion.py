@@ -927,6 +927,7 @@ def test_body_cognitive_load_contributes_to_interoceptive_stress() -> None:
     assert state.cognitive_load == 0.80
     assert state.stress_level > 0.0
 
+    regulator = EmotionalRegulator()
     regulator.interoception.update_from_body_state(
         BodyState(
             cpu_temp_c=50.0,
