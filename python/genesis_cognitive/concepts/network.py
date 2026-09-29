@@ -29,6 +29,7 @@ from .classify import (
     QUALITY_THRESHOLD,
     _column_of,
     _extract_trigrams,
+    category_evidence,
     _infer_concept_origin,
     _normalize_id,
     detect_category,
@@ -888,6 +889,7 @@ class ConceptNetwork(
             definition = def_val
         cat = detect_category(disambig_id, definition)
         mod = detect_modality(disambig_id, definition)
+        props.setdefault("category_evidence", category_evidence(disambig_id, definition))
         concept = Concept(
             id=disambig_id,
             aliases=aliases or set(),
@@ -939,6 +941,7 @@ class ConceptNetwork(
             definition = def_val
         cat = detect_category(name, definition)
         mod = detect_modality(name, definition)
+        props.setdefault("category_evidence", category_evidence(name, definition))
         concept = Concept(
             id=name,
             aliases=aliases or set(),
