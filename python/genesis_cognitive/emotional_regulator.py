@@ -126,8 +126,11 @@ class InternalState:
         cpu_usage: CPU usage as a percentage (0–100).
         memory_usage: Memory usage as a percentage (0–100).
         daemon_connected: Whether its subcognitive daemon is connected.
-        response_latency: Response latency in milliseconds (how long
-            it takes to respond to a request).
+        response_latency: Most recent EWMA of observed user-turn response
+            latency in milliseconds. It is populated by the real request/
+            response path, not by an internal benchmark.
+        latency_observed: Whether at least one real response-latency sample
+            has been observed.
         stress_level: Derived stress level from internal state (0–1).
             High CPU or memory, disconnection, or high latency
             increase stress.
@@ -886,6 +889,10 @@ class EmotionalRegulator:
 
         # Track time for HPA cascade ticking and allostatic accumulation
         self._last_regulate_time = time.time()
+
+    def record_response_latency(self, latency_ms: float) -> None:
+        """Record an observed user-turn latency for interoception."""
+        self._interoception.record_response_latency(latency_ms)
 
     def start(self) -> None:
         """Start background self-regulation."""
