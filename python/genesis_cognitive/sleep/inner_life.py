@@ -3187,6 +3187,10 @@ class InnerLife:
     # and content (what it thinks about). The architecture is fixed;
     # the content emerges from its state.
 
+    def executive_candidates(self, emotion: EmotionalState) -> list[dict[str, Any]]:
+        """Expose current waking mental salience to executive control."""
+        return self._collect_mental_candidates(emotion)
+
     def _collect_mental_candidates(
         self, emotion: EmotionalState
     ) -> list[dict[str, Any]]:
