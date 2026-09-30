@@ -474,7 +474,11 @@ const MAX_BELIEF_VAR: f32 = 0.03;
 /// of the variational free energy to [0, 1]. Typical KL per dimension
 /// is 0–1.5 under moderate surprise. Dividing by 1.0 maps this
 /// directly, preserving sensitivity to belief updates.
-const KL_SCALE: f32 = 1.0;
+/// Variance of the Gaussian prior preference over future effective
+/// neurochemical states. Smaller values encode a stronger homeostatic
+/// preference. This is a preference distribution, not a measured
+/// biological variance.
+const PREFERENCE_VARIANCE: f32 = 0.05;
 
 // ─── Policy selection (active inference) ─────────────────────────
 //
