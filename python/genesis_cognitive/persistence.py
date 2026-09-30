@@ -51,6 +51,7 @@ try:
 except ImportError:
     _HAS_ORJSON = False
 
+from .executive import ExecutiveFunction
 from .concepts import (
     Concept,
     ConceptCategory,
@@ -193,6 +194,7 @@ def save_state(
     dream_synthesis: Any = None,
     inner_life_state: dict[str, Any] | None = None,
     world_state: dict[str, Any] | None = None,
+    executive: ExecutiveFunction | None = None,
 ) -> None:
     """Save Genesis's cognitive state to disk.
 
@@ -227,6 +229,7 @@ def save_state(
             :meth:`MemoryEngine.serialize_records`.
         world_state: Its external world (presences, recent events,
             social clock) from :meth:`OuterWorld.to_dict`.
+        executive: Persistent executive intentions and their outcomes.
     """
     state: dict[str, Any] = {
         "version": 2,
@@ -266,6 +269,7 @@ def save_state(
         dream_synthesis=dream_synthesis.to_dict() if dream_synthesis is not None else None,
         inner_life_state=inner_life_state,
         world_state=world_state,
+        executive=executive,
     )
 
     _atomic_write_state(data_dir, state)
@@ -373,6 +377,7 @@ def _add_optional_state(
     dream_synthesis: Any = None,
     inner_life_state: dict[str, Any] | None = None,
     world_state: dict[str, Any] | None = None,
+    executive: ExecutiveFunction | None = None,
 ) -> None:
     """Add optional state fields to the state dict."""
     if predictive_coding is not None:
@@ -431,6 +436,8 @@ def _add_optional_state(
         state["inner_life_state"] = inner_life_state
     if world_state is not None:
         state["world_state"] = world_state
+    if executive is not None:
+        state["executive"] = executive.to_dict()
 
 
 def load_state(data_dir: str) -> dict[str, Any] | None:
