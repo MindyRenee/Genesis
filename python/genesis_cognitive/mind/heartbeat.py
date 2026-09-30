@@ -353,8 +353,17 @@ class HeartbeatMixin:
             candidates = self.inner_life.executive_candidates(self.feel())
             # External world changes are first-class executive inputs.
             for event in self.world.recent_events(5):
+                if not event.inbound:
+                    continue
+                topic = (
+                    event.topics[0]
+                    if event.topics
+                    else event.content.strip()
+                )
+                if not topic:
+                    continue
                 candidates.append({
-                    "topic": event.topic or event.description,
+                    "topic": topic,
                     "mode": "environment",
                     "salience": min(1.0, max(0.1, event.salience)),
                     "source": "world_event",
