@@ -1648,7 +1648,7 @@ impl ActiveInferenceEngine {
         // "noop" policy wins (doing nothing is optimal). When the
         // system is stressed, a corrective policy wins. This is
         // continuous active inference, not just emergency intervention.
-        let selected = self._select_policy(pre_tick, target, result);
+        let selected = self._select_policy(pre_tick, target, obs_var, result);
         result.selected_policy = selected.policy.name;
         result.selected_policy_efe = selected.efe;
 
@@ -1748,6 +1748,7 @@ impl ActiveInferenceEngine {
         &mut self,
         current: &[f32; DIM],
         target: &[f32; DIM],
+        obs_var: f32,
         _result: &InferenceResult,
     ) -> PolicyEvaluation {
         // The homeostatic target is the set of baseline levels passed
@@ -1797,88 +1798,53 @@ impl ActiveInferenceEngine {
             // was trained.
             let predicted_after = self.predict_with_action(current, &policy_action);
 
-            // Expected-free-energy proxy for this controller:
+            // One-step Gaussian expected free energy.
             //
-            // EFE_proxy = pragmatic_cost + model_uncertainty
+            // The generative model predicts:
+            //   s' ~ N(mu_pi, diag(P^-))
+            // and the observation model is:
+            //   o'|s' ~ N(s', diag(R)).
             //
-            // This is intentionally not labeled formal epistemic value.
-            // For additive controls in a linear-Gaussian model, the
-            // expected information-gain term is policy-invariant
-            // (Koudahl et al., 2021). Exploration is therefore handled
-            // separately by the policy sampler.
-            let mut dist_sq = 0.0f32;
+            // We encode homeostatic preferences as a Gaussian prior
+            // over preferred future states:
+            //   p*(s') = N(target, preference_variance I).
+            //
+            // For this model the formal risk+ambiguity decomposition is:
+            //
+            //   G(pi) = KL[q(s'|pi) || p*(s')]
+            //          + E_q[H[p(o'|s')]]
+            //
+            // The ambiguity term is policy-independent because R is
+            // fixed. The risk term is a proper Gaussian KL, so unlike
+            // the previous squared-distance proxy it accounts for both
+            // state uncertainty and the scale of the preference prior.
+            //
+            // State information gain is also policy-independent here:
+            // controls enter additively through B, so the covariance
+            // update does not depend on the action. That is a property
+            // of this restricted model class, not a claim that active
+            // inference lacks epistemic behaviour in general.
+            let preference_variance = PREFERENCE_VARIANCE;
+            let ambiguity = 0.5
+                * (2.0 * std::f32::consts::PI * std::f32::consts::E * obs_var)
+                    .ln();
+
+            let mut risk_sum = 0.0f32;
             for i in 0..DIM {
-                let diff = predicted_after[i] - target[i];
-                dist_sq += diff * diff;
+                let future_var = self.prior_var[i].max(1e-8);
+                let mean_diff = predicted_after[i] - target[i];
+                risk_sum += 0.5
+                    * ((preference_variance / future_var).ln()
+                        + (future_var + mean_diff * mean_diff) / preference_variance
+                        - 1.0);
             }
-            let expected_surprise = dist_sq / DIM as f32;
-            // NOTE: `uncertainty` depends only on `self.precision` and a
-            // constant — it is identical for every policy. That makes
-            // it invariant under the argmin, and the max-subtraction in
-            // the softmax below removes exactly such a common shift. So
-            // this term has **no effect on which policy is selected**;
-            // its only observable consequence is on the
-            // `selected_policy_efe` value that gets published. It is
-            // retained because a policy-independent term is legitimate
-            // in an expected-free-energy decomposition, but it must not
-            // be read as doing arbitration work — the exploration /
-            // exploitation balance is carried by the precision-gated
-            // softmax sampler below.
-            let uncertainty = (1.0 - self.precision) * UNCERTAINTY_WEIGHT;
+            let risk = risk_sum / DIM as f32;
 
-            // Epistemic value: expected information gain, computed
-            // properly as the entropy reduction of the variational
-            // posterior (see `expected_information_gain`). For this
-            // model class — linear-Gaussian with additive controls —
-            // that quantity does not depend on the policy (Koudahl,
-            // Kouw & de Vries, 2021: the posterior covariance update
-            // is observation-independent, so every policy yields the
-            // same expected covariance reduction). It is therefore a
-            // constant across all nine evaluations: it shifts every
-            // EFE by the same amount and cannot change the ranking.
-            //
-            // The previous code substituted an uncertainty-weighted
-            // novelty heuristic in its place. That heuristic is not
-            // just differently scaled — it is inverted relative to
-            // true information gain (motion along pinned-down axes
-            // scores full value; standing still where uncertain scores
-            // none), and being policy-dependent it outweighed the
-            // pragmatic term 10–100×, reducing selection to
-            // ranking-by-novelty. Removing it makes the ranking purely
-            // pragmatic: distance of the predicted outcome from the
-            // homeostatic target. At rest that is noop; under
-            // deviation it is whichever policy the learned action
-            // model predicts will correct fastest.
-            //
-            // Exploration is not lost with the heuristic — it was
-            // never really there (a novelty bonus is not curiosity).
-            // The live exploration mechanism is the precision-weighted
-            // softmax temperature below: low precision samples,
-            // high precision exploits.
-            let epistemic_value = self.expected_information_gain();
-
-            // EFE = pragmatic + uncertainty - epistemic.
-            // Lower EFE is better; epistemic value is subtracted
-            // because information gain reduces EFE.
-            //
-            // The bound here is a **finiteness guard, not a range
-            // constraint**, and must not be narrowed to a
-            // non-negative interval. EFE is a relative score with an
-            // arbitrary zero: a policy that beats the others by a
-            // hair yields a raw value of -1e-4, and a lower bound of
-            // 0.0 maps every such policy to exactly 0.0. Clamping to
-            // [0, 2] therefore destroyed the ordering information the
-            // argmin and the softmax depend on. In the converged
-            // regime — precision saturated, so `uncertainty` is 0 and
-            // `epistemic_value` exceeds the tiny `expected_surprise` —
-            // the raw value is negative for all nine policies, every
-            // one clamped to 0.0, `min_by` returning the first minimum
-            // (index 0 = `noop`), and the softmax degenerate to
-            // uniform. The inference loop was inert in exactly the
-            // regime it exists to run in. A wide symmetric bound
-            // rejects non-finite values while preserving order.
+            // The ambiguity term is a constant shift across policies;
+            // retaining it keeps the reported G mathematically defined
+            // while preserving policy ordering.
             let efe = crate::state::sanitize::finite_clamp(
-                expected_surprise + uncertainty - epistemic_value,
+                risk + ambiguity,
                 -EFE_SCORE_LIMIT,
                 EFE_SCORE_LIMIT,
             );
