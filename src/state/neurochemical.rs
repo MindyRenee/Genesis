@@ -2873,7 +2873,12 @@ impl NeurochemicalVector {
             }
             coupling_force *= coupling_scale;
 
-            // Stochastic fluctuation (Ornstein-Uhlenbeck noise).
+            // Stochastic fluctuation: continuous-time diffusion noise.
+            //
+            // This is intentionally not called Ornstein-Uhlenbeck: the
+            // state has no separate mean-reverting noise process here.
+            // For a continuous-time SDE, a diffusion increment scales
+            // with sqrt(dt), not dt.
             //
             // The brain is never static — spontaneous neural activity
             // constantly perturbs neurotransmitter levels. This noise
@@ -2895,13 +2900,22 @@ impl NeurochemicalVector {
                 let r11 = r01 * 2.0 - 1.0; // [-1, 1)
                 let deviation = (self.chemicals[i].level - homeostatic_baseline).abs();
                 let proximity = (1.0 - deviation * 2.0).max(0.0); // 1 near baseline, 0 far
-                params.noise_amplitude * r11 * proximity * dt
+                params.noise_amplitude * r11 * proximity * dt.sqrt()
             } else {
                 0.0
             };
 
             self.chemicals[i].velocity += (homeostatic_force + coupling_force) * dt + noise;
-            self.chemicals[i].velocity *= damping.powf(dt_scale);
+
+            // `damping` is the dimensionless velocity retention over the
+            // reference interval DT (100 ms). Convert that discrete
+            // parameter to a continuous-time decay rate once, then
+            // integrate it over the requested dt. This makes changing dt
+            // a change in numerical resolution rather than a change in
+            // the physical damping constant.
+            let damping_rate = -damping.max(1.0e-6).ln() / DT;
+            let damping_factor = (-damping_rate * dt).exp();
+            self.chemicals[i].velocity *= damping_factor;
             self.chemicals[i].level += self.chemicals[i].velocity * dt;
 
             // Acetylcholinesterase degradation: ACh is broken down by
