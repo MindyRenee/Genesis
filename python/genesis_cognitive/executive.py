@@ -377,12 +377,20 @@ class ExecutiveFunction:
         self._intentions[key] = intention
         return intention
 
-    def select_intention(self, candidates: list[ExecutiveIntention]) -> ExecutiveIntention | None:
+    def select_intention(
+        self, candidates: list[ExecutiveIntention]
+    ) -> ExecutiveIntention | None:
         """Select the strongest actionable intention without lexical scoring."""
         actionable = [c for c in candidates if c.status not in {"completed", "abandoned"}]
         if not actionable:
             return None
-        selected = max(actionable, key=lambda c: (c.priority * max(c.confidence, 0.05), -c.attempts))
+        selected = max(
+            actionable,
+            key=lambda c: (
+                c.priority * max(c.confidence, 0.05),
+                -c.attempts,
+            ),
+        )
         self._active_intention = selected.objective.strip().lower()
         selected.status = "active"
         return selected
@@ -408,7 +416,9 @@ class ExecutiveFunction:
             self._active_intention = None
         return error
 
-    def revise_intention(self, intention: ExecutiveIntention, *, reason: str = "") -> ExecutiveIntention:
+    def revise_intention(
+        self, intention: ExecutiveIntention, *, reason: str = ""
+    ) -> ExecutiveIntention:
         """Keep an unfinished objective alive after failure and lower confidence."""
         intention.status = "pending"
         intention.confidence = max(0.05, intention.confidence * 0.8)
