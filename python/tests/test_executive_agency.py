@@ -129,3 +129,43 @@ def test_acting_loop_arbitrates_existing_objective(tmp_path) -> None:
     assert decoded is not None
     assert decoded.kind == "learn"
     assert decoded.target == "prior-topic"
+
+
+def test_advisory_internal_signal_is_persistent_but_not_actuator_action() -> None:
+    """Internal pressure can inform the executive without becoming a fake file action."""
+    executive = ExecutiveFunction()
+    items = executive.ingest_candidates([{
+        "topic": "body_distress",
+        "mode": "distress",
+        "salience": 0.9,
+        "source": "internal_need",
+    }])
+    assert len(items) == 1
+    assert items[0].actionable is False
+    assert items[0] not in executive.actionable_intentions
+    assert executive.intentions[0].objective == "observe:body_distress"
+
+
+def test_world_and_improvement_signals_map_to_real_actuators() -> None:
+    executive = ExecutiveFunction()
+    items = executive.ingest_candidates([
+        {
+            "topic": "photosynthesis",
+            "mode": "environment",
+            "kind": "learn",
+            "salience": 0.8,
+            "source": "world_event",
+        },
+        {
+            "topic": "python/genesis_cognitive/executive.py",
+            "mode": "improvement",
+            "kind": "inspect",
+            "salience": 0.7,
+            "source": "self_improvement:review",
+        },
+    ])
+    assert {i.objective for i in items} == {
+        "learn:photosynthesis",
+        "inspect:python/genesis_cognitive/executive.py",
+    }
+    assert all(i.actionable for i in items)
