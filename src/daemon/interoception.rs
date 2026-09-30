@@ -3570,13 +3570,10 @@ mod tests {
             indices.windows(2).all(|w| w[0] != w[1]),
             "no duplicate devices"
         );
-        // If the class exists at all we must have found something.
-        if std::path::Path::new("/sys/class/hwmon").is_dir() {
-            assert!(
-                !devices.is_empty(),
-                "/sys/class/hwmon is readable but enumeration returned nothing"
-            );
-        }
+        // CI and containers can expose the hwmon class directory without
+        // exposing any sensor devices. An empty enumeration is therefore a
+        // valid host configuration; ordering and path invariants above still
+        // verify every device that is actually exposed.
     }
 
     #[test]
