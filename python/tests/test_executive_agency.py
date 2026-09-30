@@ -65,3 +65,31 @@ def test_acting_loop_registers_with_existing_executive() -> None:
         assert result.executive_intention is not None
         assert result.executive_intention.objective == "learn:photosynthesis"
         assert executive.intentions
+
+def test_executive_round_trips_persistent_intentions() -> None:
+    executive = ExecutiveFunction()
+    intention = executive.form_intention(
+        "finish:genesis",
+        reason="unfinished objective",
+        priority=0.9,
+        confidence=0.6,
+        expected_outcome="verified completion",
+    )
+    executive.select_intention([intention])
+    executive.observe_intention(
+        intention,
+        actual_outcome="blocked",
+        success=False,
+    )
+    executive.revise_intention(intention, reason="blocked")
+
+    restored = ExecutiveFunction()
+    restored.restore_from_dict(executive.to_dict())
+
+    assert restored.active_intention is None
+    assert len(restored.intentions) == 1
+    saved = restored.intentions[0]
+    assert saved.objective == "finish:genesis"
+    assert saved.status == "pending"
+    assert saved.attempts == 1
+    assert saved.last_observation == "blocked"
