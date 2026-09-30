@@ -51,7 +51,6 @@ try:
 except ImportError:
     _HAS_ORJSON = False
 
-from .executive import ExecutiveFunction
 from .concepts import (
     Concept,
     ConceptCategory,
@@ -67,6 +66,7 @@ from .emotional_regulator import (
     HPAAxis,
     HPAState,
 )
+from .executive import ExecutiveFunction
 from .growth_ledger import GrowthLedger
 from .learning import (
     AutonomousLearner,
