@@ -264,12 +264,21 @@ class ActingLoop:
     # ─── Public entry ────────────────────────────────────────────────
 
     def act_once(self) -> ActingResult | None:
-        """Form one intention and act on it. Returns None if nothing to do."""
+        """Let the executive select an objective, then execute it."""
         intention = self.propose()
         if intention is None:
             return None
-        executive_intention = self._activate_executive_intention(intention)
-        result = ActingResult(intention=intention, executive_intention=executive_intention)
+
+        selected = self._activate_executive_intention(intention)
+        if selected is not None:
+            selected_intention = self._intention_from_executive(selected)
+            if selected_intention is not None:
+                intention = selected_intention
+
+        result = ActingResult(
+            intention=intention,
+            executive_intention=selected,
+        )
         try:
             self._handlers[intention.kind](intention, result)
         except Exception as e:  # noqa: BLE001
@@ -328,17 +337,40 @@ class ActingLoop:
         return intention
 
     def _activate_executive_intention(self, intention: Intention) -> ExecutiveIntention | None:
-        """Make the selected candidate the executive active objective."""
+        """Submit the actuator candidate to the executive for arbitration."""
         if self.executive is None:
             return None
-        candidate = self.executive.form_intention(
+        self.executive.form_intention(
             f"{intention.kind}:{intention.target}",
             reason=intention.origin,
             priority=0.75 if intention.origin in {"agency", "curiosity"} else 0.35,
             confidence=0.7 if intention.origin == "agency" else 0.55,
             expected_outcome=self._expected_outcome(intention),
         )
-        return self.executive.select_intention([candidate])
+        # The executive owns the objective set. Include unfinished prior
+        # objectives so failed or interrupted work can outrank a fresh probe.
+        return self.executive.select_intention(
+            list(self.executive.actionable_intentions)
+        )
+
+    @staticmethod
+    def _intention_from_executive(
+        intention: ExecutiveIntention,
+    ) -> Intention | None:
+        """Decode an actuator-owned executive objective."""
+        try:
+            kind, target = intention.objective.split(":", 1)
+        except ValueError:
+            return None
+        if kind not in {_LEARN, _INSPECT, _EXPLORE, _OBSERVE, _MEASURE}:
+            return None
+        if not target.strip():
+            return None
+        return Intention(
+            kind=kind,
+            target=target,
+            origin=intention.reason or "executive",
+        )
 
     @staticmethod
     def _expected_outcome(intention: Intention) -> str:
