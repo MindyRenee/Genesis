@@ -4139,7 +4139,7 @@ class CognitionEngine:
         if prediction_error is not None and prediction_error.magnitude >= 0.35:
             target = perception.topics[0] if perception.topics else "current_context"
             kind = "inspect" if any(
-                re.search(r"\\.(?:py|rs|toml)$|^(?:python|rust|file):|/", topic)
+                re.search(r"\.(?:py|rs|toml)$|^(?:python|rust|file):|/", topic)
                 for topic in perception.topics
             ) else "learn"
             self.executive.form_intention(
