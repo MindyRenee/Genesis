@@ -326,6 +326,7 @@ class Mind(
             on_store_memory=self._learner_store_memory,
             on_neuro_impulse=self._learner_neuro_impulse,
             on_live_thought=self._emit_live_thought,
+            executive=self.cognition.executive,
         )
 
         # Emotional regulator — it controls its own neurochemistry
