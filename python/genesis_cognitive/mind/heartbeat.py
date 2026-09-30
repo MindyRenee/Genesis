@@ -756,10 +756,13 @@ class HeartbeatMixin:
         except Exception as e:  # noqa: BLE001
             logger.debug(f"auto-sleep check failed: {e}")
 
-        # ── 11. Volition (urge-driven) ──
+        # ── 11. Executive signal integration ──
+        self._heartbeat_feed_executive()
+
+        # ── 12. Volition (urge-driven) ──
         self._heartbeat_volition()
 
-        # ── 12. Warn (only when state changes) ──
+        # ── 13. Warn (only when state changes) ──
         try:
             # warn() internally checks if the warning changed
             self.warn(speak=True)
