@@ -93,3 +93,38 @@ def test_executive_round_trips_persistent_intentions() -> None:
     assert saved.status == "pending"
     assert saved.attempts == 1
     assert saved.last_observation == "blocked"
+
+
+def test_acting_loop_arbitrates_existing_objective(tmp_path) -> None:
+    """A stronger unfinished objective is selected over a fresh probe."""
+    from genesis_cognitive.executive import ExecutiveFunction
+    from genesis_cognitive.tools.agency import ActingLoop, Intention
+
+    executive = ExecutiveFunction()
+    prior = executive.form_intention(
+        "learn:prior-topic",
+        reason="curiosity",
+        priority=0.95,
+        confidence=0.95,
+        expected_outcome="knowledge or relationships updated",
+    )
+    loop = ActingLoop(
+        network=ConceptNetwork(),
+        curiosity=None,
+        learner=None,
+        data_dir=str(tmp_path),
+        project_root=str(tmp_path),
+        offline=True,
+        executive=executive,
+    )
+
+    candidate = Intention("observe", "growth_ledger.jsonl", "wander")
+    loop._register_intention(candidate)
+    selected = loop._activate_executive_intention(candidate)
+
+    assert selected is prior
+    assert selected.status == "active"
+    decoded = loop._intention_from_executive(selected)
+    assert decoded is not None
+    assert decoded.kind == "learn"
+    assert decoded.target == "prior-topic"
