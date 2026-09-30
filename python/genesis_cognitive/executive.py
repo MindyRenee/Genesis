@@ -495,6 +495,58 @@ class ExecutiveFunction:
             if intention.status in {"pending", "active"}
         )
 
+    def ingest_candidates(
+        self, candidates: list[dict[str, object]]
+    ) -> list[ExecutiveIntention]:
+        """Convert salient cognitive signals into persistent objectives.
+
+        Signal producers provide meaning and salience; the executive owns
+        normalization, deduplication, priority, and persistence.
+        """
+        created: list[ExecutiveIntention] = []
+        mode_kind = {
+            "curiosity": "learn",
+            "memory": "learn",
+            "activation": "explore",
+            "bug_concern": "inspect",
+            "improvement": "inspect",
+            "prediction_error": "observe",
+            "interoceptive": "observe",
+            "embodiment": "observe",
+            "body_deviation": "observe",
+            "environment": "observe",
+            "social": "observe",
+            "distress": "observe",
+            "connection": "observe",
+        }
+        for candidate in candidates:
+            topic = str(candidate.get("topic", "")).strip()
+            if not topic:
+                continue
+            mode = str(candidate.get("mode", "")).strip().lower()
+            source = str(candidate.get("source", mode)).strip() or "signal"
+            try:
+                salience = max(0.0, min(1.0, float(candidate.get("salience", 0.0))))
+            except (TypeError, ValueError):
+                continue
+            if salience <= 0.0:
+                continue
+            kind = mode_kind.get(mode, "observe")
+            objective = f"{kind}:{topic}"
+            intention = self.form_intention(
+                objective,
+                reason=source,
+                priority=salience,
+                confidence=max(0.1, min(1.0, salience)),
+                expected_outcome=(
+                    "knowledge or relationships updated"
+                    if kind == "learn"
+                    else "an observable result recorded"
+                ),
+            )
+            created.append(intention)
+        return created
+
     @property
     def active_intention(self) -> ExecutiveIntention | None:
         """The intention currently being executed, if any."""
