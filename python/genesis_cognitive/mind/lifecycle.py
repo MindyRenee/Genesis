@@ -838,6 +838,7 @@ class LifecycleMixin:
             ),
             ("memory_records", self.memory, lambda t, p: t.restore_records(p)),
             ("world_state", self.world, lambda t, p: t.restore_from_dict(p)),
+            ("executive", self.cognition.executive, lambda t, p: t.restore_from_dict(p)),
         )
         for key, target, restore in restorations:
             if key in data:
@@ -1004,6 +1005,7 @@ class LifecycleMixin:
                     "lucid_dream_count": self.inner_life.lucid_dream_count,
                 },
                 world_state=self.world.to_dict(),
+                executive=self.cognition.executive,
             )
             if not self.user_profile.save():
                 return False
