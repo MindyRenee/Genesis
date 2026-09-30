@@ -1334,82 +1334,43 @@ impl ActiveInferenceEngine {
 
         // ── Kalman predict step ──
         //
-        // Propagate the posterior variance from the last cycle forward
-        // as this cycle's prior variance. This is the standard
-        // discrete-time Kalman predict step (Welch & Bishop, 1995;
-        // Särkkä, 2013):
+        // The variational family is diagonal Gaussian, q(s)=N(mu,P).
+        // The learned transition A is dense, so the diagonal projection
+        // of the exact covariance propagation is:
         //
-        //   P_{k|k-1} = A * P_{k-1|k-1} * A^T + Q
+        //   P^-_ii = sum_j A_ij^2 P_jj + Q_i
         //
-        // The full predict step propagates the posterior covariance
-        // through the transition matrix A. For a diagonal (mean-field)
-        // approximation, this simplifies to:
+        // Using only A_ii^2 would silently discard cross-dimensional
+        // uncertainty propagation even though A itself learns
+        // cross-dimensional couplings. That is mathematically
+        // inconsistent with the stated generative model.
         //
-        //   P_{k|k-1}[i] = sum_j A[i][j]^2 * P_{k-1|k-1}[j] + Q[i]
-        //
-        // We use the diagonal-only form:
-        //
-        //   P_{k|k-1}[i] = A[i][i]^2 * P_{k-1|k-1}[i] + Q[i]
-        //
-        // This accounts for the learned self-dynamics of each
-        // dimension while neglecting cross-dimensional covariance
-        // coupling. A[i][i] is the self-persistence of dimension i —
-        // how much its current value predicts its next value. The
-        // square (A[i][i]^2) is always non-negative, correctly
-        // handling oscillating dimensions (A[i][i] < 0): variance
-        // propagation uses A^2 in P = A * P * A^T, so the sign of A
-        // doesn't affect the variance, only its magnitude.
-        //
-        // - A[i][i] > 1 (self-amplifying): uncertainty grows — the
-        //   dimension is harder to predict over time, so the prior
-        //   variance is larger. The Kalman gain increases, trusting
-        //   observations more.
-        // - A[i][i] < 1 (self-damping): uncertainty shrinks — the
-        //   dimension is more predictable, so the prior variance is
-        //   smaller. The Kalman gain decreases, trusting predictions
-        //   more.
-        // - A[i][i] ≈ 0 (no persistence): uncertainty resets to Q each
-        //   tick — the dimension is unpredictable from its own past.
-        // - A[i][i] = 1 (identity, at initialization): reduces to the
-        //   previous form (belief_var + Q).
-        //
-        // At initialization (A = I), this is exactly the previous
-        // behavior. As the model learns non-identity self-dynamics, the
-        // predict step uses them to propagate uncertainty — making the
-        // variational posterior a function of the learned model, not
-        // just the process noise. This is the standard diagonal Kalman
-        // filter (Särkkä, 2013; Ostwald et al., 2023) when cross-
-        // dimensional covariance coupling is neglected but self-
-        // dynamics are accounted for.
-        //
-        // Without this predict step, prior_var was a constant
-        // (PROCESS_NOISE), which made the Kalman gain depend only on
-        // the observation noise (precision-weighted obs_var), not on
-        // the actual estimation uncertainty. The posterior variance
-        // (belief_var) was updated each tick but never fed back into
-        // the prior, so it was dead state: computed, saved, loaded, but
-        // never consumed by any computation that affected behavior.
-        //
-        // With the predict step, the gain becomes adaptive:
-        // - Sustained predictability → belief_var shrinks → prior_var
-        //   shrinks → gain shrinks → the model trusts its predictions
-        //   more and its observations less (it has "learned" the state).
-        // - Sustained surprise → belief_var grows → prior_var grows →
-        //   gain grows → the model trusts its observations more (it
-        //   "knows" its predictions are unreliable).
-        //
-        // This is the uncertainty tracking that makes the variational
-        // posterior a real posterior, not a static-gain filter.
+        // We deliberately retain a diagonal covariance approximation
+        // for the machine budget; this is an approximation to the full
+        // Kalman filter, not an exact full-covariance update.
         for i in 0..DIM {
-            let a_diag_sq = self.transition_matrix[i][i] * self.transition_matrix[i][i];
+            let mut propagated = PROCESS_NOISE;
+            for j in 0..DIM {
+                let a = self.transition_matrix[i][j];
+                propagated += a * a * self.belief_var[j];
+            }
             self.prior_var[i] = crate::state::sanitize::finite_clamp(
-                a_diag_sq * self.belief_var[i] + PROCESS_NOISE,
+                propagated,
                 1e-8,
                 1.0,
             );
         }
 
-        // Kalman update (per dimension, diagonal)
+        // Kalman update (per dimension, diagonal).
+        //
+        // Observation model:
+        //   o = I*s + epsilon, epsilon ~ N(0, R)
+        //
+        // With diagonal P^- and R, the mean/variance update is exact
+        // for the diagonal Gaussian family:
+        //   K_i = P^-_i / (P^-_i + R_i)
+        //   mu_i = mu^-_i + K_i(o_i - mu^-_i)
+        //   P_i = (1-K_i)P^-_i
         for i in 0..DIM {
             let prior_v = self.prior_var[i];
             let gain = prior_v / (prior_v + obs_var);
@@ -1420,95 +1381,59 @@ impl ActiveInferenceEngine {
                 crate::state::sanitize::finite_clamp((1.0 - gain) * prior_v, 1e-8, 1.0);
         }
 
-        // Complexity term of the variational free energy: the squared
-        // Mahalanobis distance of the posterior mean from the prior mean,
-        // normalized by prior variance. This is the information gain —
-        // how far the belief was updated by the observation.
+        // Compute the actual Gaussian variational free energy:
         //
-        // Only the mean-shift component is used, NOT the full KL
-        // divergence. The full KL between two Gaussians includes a
-        // variance-ratio term:
-        //   0.5 * log(prior_var/belief_var) + 0.5 * belief_var/prior_var - 0.5
+        //   F(q,o) = KL[q(s)||p(s)]
+        //            + E_q[-log p(o|s)]
         //
-        // This term is strictly positive whenever the Kalman gain is
-        // nonzero (the posterior variance always shrinks below the
-        // prior: belief_var = (1-gain) * prior_var, gain > 0). It
-        // represents the intrinsic information content of an observation
-        // — the entropy reduction from prior to posterior — which is
-        // nonzero even when the observation matches the prediction
-        // perfectly, because any observation reduces uncertainty.
+        // For diagonal Gaussians and an identity observation model:
         //
-        // Crucially, this term is surprise-independent: it depends only
-        // on prior_var and belief_var (both determined before the
-        // observation), not on the observation value itself. With the
-        // predict step, it now varies slowly across ticks (as belief_var
-        // evolves), but within a tick it is the same regardless of
-        // whether the observation was surprising or not. Including it
-        // would add a surprise-independent offset to the complexity,
-        // distorting the allostatic load dynamics (which depend on the
-        // free energy crossing thresholds in response to surprise).
+        //   KL = 1/2 Σ_i [
+        //       log(P^-_i/P_i)
+        //       + (P_i + (mu_i-mu^-_i)^2)/P^-_i - 1
+        //   ]
         //
-        // The mean-shift term alone correctly captures the surprise-
-        // dependent complexity: it is zero when the observation matches
-        // the prediction (no belief update needed) and grows with the
-        // magnitude of the update. The posterior variance enters the
-        // free energy through the expected-uncertainty term (below),
-        // where it varies with both the estimation history and the
-        // current precision — the appropriate place for estimation
-        // uncertainty in the free energy decomposition.
-        let mut kl = 0.0f32;
-        #[allow(clippy::needless_range_loop, reason = "i indexes multiple arrays")]
+        //   NLL = 1/2 Σ_i [
+        //       log(2πR_i)
+        //       + (P_i + (o_i-mu_i)^2)/R_i
+        //   ]
+        //
+        // The previous implementation replaced NLL with an RMS error
+        // and discarded the variance term of the KL. Those quantities
+        // are useful engineering diagnostics, but they are not the
+        // variational free-energy functional. Keep the exact quantity
+        // internally, then project it separately to the bounded IPC
+        // diagnostic field below.
+        let mut kl_sum = 0.0f32;
+        let mut nll_sum = 0.0f32;
         for i in 0..DIM {
-            let sq_diff = (self.belief_mean[i] - predicted[i]).powi(2);
-            kl += 0.5 * sq_diff / self.prior_var[i].max(1e-10);
-        }
-        let kl_per_dim = kl / DIM as f32;
-        let complexity = crate::state::sanitize::finite_clamp(kl_per_dim / KL_SCALE, 0.0, 1.0);
+            let prior_v = self.prior_var[i].max(1e-8);
+            let post_v = self.belief_var[i].max(1e-8);
+            let mean_shift = self.belief_mean[i] - predicted[i];
 
-        // Variational free energy = accuracy + expected uncertainty + complexity.
-        //
-        // The accuracy term (surprise_ema) is the current prediction error.
-        // The expected uncertainty combines two uncertainty signals:
-        //   - (1 - precision): the model's prediction confidence. Low
-        //     precision → expects future prediction errors.
-        //   - normalized posterior variance: the actual estimation
-        //     uncertainty from the variational posterior (belief_var).
-        //     High belief_var → the model is uncertain about the true
-        //     state even if its predictions have been accurate.
-        //
-        // These are related but distinct: precision is about prediction
-        // confidence (will my next prediction be right?), while
-        // belief_var is about estimation confidence (do I know where I
-        // am?). A model can be precise but uncertain (e.g., after a
-        // large observation that moved the posterior far from the prior
-        // — the prediction was wrong, precision drops, but the
-        // posterior is now well-localized by the observation, so
-        // belief_var is low). Conversely, a model can be imprecise but
-        // confident in its estimate (sustained predictability with
-        // accumulating process noise). Averaging both signals and
-        // scaling by UNCERTAINTY_WEIGHT preserves the [0, W]
-        // calibration range while making the posterior variance — the
-        // defining quantity of a variational posterior — functional in
-        // the free energy computation.
-        //
-        // This captures the positive feedback in Friston's framework:
-        // sustained surprise erodes precision and inflates the posterior
-        // variance, both of which raise expected uncertainty, which
-        // raises free energy, which drives allostatic load.
-        //
-        // The complexity term (KL divergence) is the information cost of
-        // the belief update — how far the posterior moved from the prior.
-        let mut belief_var_sum = 0.0f32;
-        for i in 0..DIM {
-            belief_var_sum += self.belief_var[i];
+            kl_sum += 0.5
+                * ((prior_v / post_v).ln()
+                    + (post_v + mean_shift * mean_shift) / prior_v
+                    - 1.0);
+
+            let obs_residual = post[i] - self.belief_mean[i];
+            nll_sum += 0.5
+                * ((2.0 * std::f32::consts::PI * obs_var).ln()
+                    + (post_v + obs_residual * obs_residual) / obs_var);
         }
-        let mean_belief_var = belief_var_sum / DIM as f32;
-        let normalized_belief_var =
-            crate::state::sanitize::finite_clamp(mean_belief_var / MAX_BELIEF_VAR, 0.0, 1.0);
-        let expected_uncertainty =
-            ((1.0 - self.precision) + normalized_belief_var) * 0.5 * UNCERTAINTY_WEIGHT;
+
+        let variational_free_energy = (kl_sum + nll_sum) / DIM as f32;
+        let variational_free_energy = crate::state::sanitize::finite_clamp(
+            variational_free_energy,
+            -100.0,
+            100.0,
+        );
+
+        // The wire-level signal historically exposes a bounded [0,1]
+        // burden metric. Preserve that ABI, but make the projection
+        // explicit: it is NOT the variational free energy itself.
         let free_energy = crate::state::sanitize::finite_clamp(
-            self.surprise_ema + expected_uncertainty + complexity,
+            1.0 - (-variational_free_energy.max(0.0)).exp(),
             0.0,
             1.0,
         );
