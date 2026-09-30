@@ -134,6 +134,7 @@ class ExecutiveIntention:
     attempts: int = 0
     last_observation: str = ""
     actual_outcome: str = ""
+    actionable: bool = True
 
 
 @dataclass(slots=True)
@@ -354,6 +355,7 @@ class ExecutiveFunction:
         priority: float = 0.5,
         confidence: float = 0.5,
         expected_outcome: str = "",
+        actionable: bool = True,
     ) -> ExecutiveIntention:
         """Create or refresh a persistent objective."""
         key = objective.strip().lower()
@@ -367,21 +369,39 @@ class ExecutiveFunction:
                 current.reason = reason
             if expected_outcome:
                 current.expected_outcome = expected_outcome
+            current.actionable = current.actionable or actionable
             return current
         intention = ExecutiveIntention(
             objective=objective.strip(), reason=reason,
             priority=max(0.0, min(1.0, priority)),
             confidence=max(0.0, min(1.0, confidence)),
             expected_outcome=expected_outcome,
+            actionable=actionable,
         )
         self._intentions[key] = intention
         return intention
 
     def select_intention(
-        self, candidates: list[ExecutiveIntention]
+        self,
+        candidates: list[ExecutiveIntention],
+        allowed_kinds: set[str] | None = None,
     ) -> ExecutiveIntention | None:
-        """Select the strongest actionable intention without lexical scoring."""
-        actionable = [c for c in candidates if c.status not in {"completed", "abandoned"}]
+        """Select the strongest executable intention.
+
+        The executive may retain advisory objectives that no current
+        actuator can execute. An actuator can restrict arbitration to its
+        supported objective kinds so an objective is never falsely claimed
+        as executed merely because it won the global competition.
+        """
+        actionable = [
+            c for c in candidates
+            if c.actionable
+            and c.status not in {"completed", "abandoned"}
+            and (
+                allowed_kinds is None
+                or c.objective.split(":", 1)[0] in allowed_kinds
+            )
+        ]
         if not actionable:
             return None
         selected = max(
@@ -442,6 +462,7 @@ class ExecutiveFunction:
                     "attempts": i.attempts,
                     "last_observation": i.last_observation,
                     "actual_outcome": i.actual_outcome,
+                    "actionable": i.actionable,
                 }
                 for i in self._intentions.values()
             ],
@@ -471,6 +492,7 @@ class ExecutiveFunction:
                 attempts=max(0, int(item.get("attempts", 0))),
                 last_observation=str(item.get("last_observation", "")),
                 actual_outcome=str(item.get("actual_outcome", "")),
+                actionable=bool(item.get("actionable", True)),
             )
             if intention.status == "active":
                 intention.status = "pending"
@@ -492,7 +514,7 @@ class ExecutiveFunction:
         return tuple(
             intention
             for intention in self._intentions.values()
-            if intention.status in {"pending", "active"}
+            if intention.actionable and intention.status in {"pending", "active"}
         )
 
     def ingest_candidates(
@@ -505,19 +527,26 @@ class ExecutiveFunction:
         """
         created: list[ExecutiveIntention] = []
         mode_kind = {
+            # These modes produce a question/topic that the existing
+            # learning actuator can investigate.
             "curiosity": "learn",
             "memory": "learn",
-            "activation": "explore",
+            "activation": "learn",
+            "emotional": "learn",
+            "dream_reflection": "learn",
+            "prediction_error": "learn",
+            "environment": "learn",
+            "social": "learn",
+            "connection": "learn",
+            # Code-directed signals have a real inspect actuator.
             "bug_concern": "inspect",
             "improvement": "inspect",
-            "prediction_error": "observe",
+            # Internal/body pressure remains an executive advisory
+            # objective until a matching regulator actuator exists.
             "interoceptive": "observe",
             "embodiment": "observe",
             "body_deviation": "observe",
-            "environment": "observe",
-            "social": "observe",
             "distress": "observe",
-            "connection": "observe",
         }
         for candidate in candidates:
             topic = str(candidate.get("topic", "")).strip()
@@ -531,7 +560,14 @@ class ExecutiveFunction:
                 continue
             if salience <= 0.0:
                 continue
-            kind = mode_kind.get(mode, "observe")
+            kind = str(candidate.get("kind", mode_kind.get(mode, "observe"))).strip()
+            if kind not in {"learn", "inspect", "explore", "observe", "measure"}:
+                continue
+            actionable = bool(candidate.get(
+                "actionable",
+                kind in {"learn", "inspect", "explore", "observe", "measure"}
+                and mode not in {"interoceptive", "embodiment", "body_deviation", "distress"},
+            ))
             objective = f"{kind}:{topic}"
             intention = self.form_intention(
                 objective,
@@ -541,8 +577,11 @@ class ExecutiveFunction:
                 expected_outcome=(
                     "knowledge or relationships updated"
                     if kind == "learn"
+                    else "code structure observed"
+                    if kind == "inspect"
                     else "an observable result recorded"
                 ),
+                actionable=actionable,
             )
             created.append(intention)
         return created
