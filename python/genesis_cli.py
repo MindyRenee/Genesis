@@ -152,8 +152,12 @@ _PID_FILE_CLI = "genesis_cli.pid"
 _PID_FILE_DAEMON = "genesis_daemon.pid"
 _PID_FILE_RETINA = "genesis_retina.pid"
 
-# How long to wait for the daemon to start (seconds)
-DAEMON_START_TIMEOUT = 10.0
+# Maximum time to wait for the daemon's IPC socket (seconds).
+# The daemon opens its persistent state and LTM before binding the socket;
+# on a mature data directory that initialization can legitimately take
+# longer than the old 10-second watchdog. Killing it at 10s made startup
+# fail deterministically on large stores.
+DAEMON_START_TIMEOUT = 60.0
 
 # Minimum seconds between unprompted chime-ins.
 CHIME_IN_COOLDOWN = 180.0
@@ -471,9 +475,14 @@ def _start_daemon(daemon_path: str, data_dir: str, socket_path: str) -> subproce
             raise RuntimeError(f"daemon exited immediately (code {proc.returncode})")
         time.sleep(0.1)
     log_file.close()
-    _stop_child(proc, "subcognitive daemon", 5)
+    # Preserve the daemon log so the actual initialization failure is
+    # diagnosable. Do not hide a slow/failed startup behind a generic
+    # timeout message.
     _remove_pid_file(data_dir, _PID_FILE_DAEMON)
-    raise RuntimeError("daemon didn't start in time")
+    raise RuntimeError(
+        f"daemon didn't become ready within {DAEMON_START_TIMEOUT:g}s; "
+        f"see {log_path}"
+    )
 
 
 def _tail_daemon_log(data_dir: str) -> int:
