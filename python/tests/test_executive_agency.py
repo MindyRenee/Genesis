@@ -1,15 +1,24 @@
 """Tests for persistent executive ownership of autonomous actions."""
 
 from genesis_cognitive.executive import ExecutiveFunction
-from genesis_cognitive.tools.agency import Intention
 
 
 def test_executive_intention_survives_failed_episode() -> None:
     executive = ExecutiveFunction()
-    intention = executive.form_intention("learn:photosynthesis", reason="curiosity", priority=0.8, confidence=0.7, expected_outcome="knowledge or relationships updated")
+    intention = executive.form_intention(
+        "learn:photosynthesis",
+        reason="curiosity",
+        priority=0.8,
+        confidence=0.7,
+        expected_outcome="knowledge or relationships updated",
+    )
     selected = executive.select_intention([intention])
     assert selected is intention
-    error = executive.observe_intention(intention, actual_outcome="network unchanged", success=False)
+    error = executive.observe_intention(
+        intention,
+        actual_outcome="network unchanged",
+        success=False,
+    )
     assert error == 1.0
     executive.revise_intention(intention, reason="learning attempt failed")
     assert intention.status == "pending"
@@ -21,7 +30,11 @@ def test_executive_completes_grounded_success() -> None:
     executive = ExecutiveFunction()
     intention = executive.form_intention("inspect:thing", expected_outcome="code structure observed")
     executive.select_intention([intention])
-    error = executive.observe_intention(intention, actual_outcome="thing.py: 10 lines, 1 class", success=True)
+    error = executive.observe_intention(
+        intention,
+        actual_outcome="thing.py: 10 lines, 1 class",
+        success=True,
+    )
     assert error == 0.0
     assert intention.status == "completed"
     assert executive.active_intention is None
