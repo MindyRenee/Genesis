@@ -346,6 +346,54 @@ class HeartbeatMixin:
         except (OSError, ConnectionError, ValueError) as e:
             logger.debug(f"memory stats failed: {e}")
         return last_stm_count, last_consolidate_time
+    def _heartbeat_feed_executive(self) -> None:
+        """Feed independent world and internal signals into the executive."""
+        try:
+            executive = self.cognition.executive
+            candidates = self.inner_life.executive_candidates(self.feel())
+            # External world changes are first-class executive inputs.
+            for event in self.world.recent_events(5):
+                candidates.append({
+                    "topic": event.topic or event.description,
+                    "mode": "environment",
+                    "salience": min(1.0, max(0.1, event.salience)),
+                    "source": "world_event",
+                })
+
+            # Persistent self-improvement work is an objective source,
+            # not merely a volitional urge.
+            try:
+                proposals = self.self_improvement.get_pending_proposals()
+                for proposal in proposals[:5]:
+                    candidates.append({
+                        "topic": str(proposal.title),
+                        "mode": "improvement",
+                        "salience": 0.7,
+                        "source": "self_improvement",
+                    })
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(f"executive proposal feed failed: {exc}")
+
+            # Internal needs are state signals; only meaningful pressure
+            # becomes an executive objective.
+            context = self._volition_context()
+            for signal, value in context.items():
+                if not isinstance(value, (int, float)) or value < 0.65:
+                    continue
+                candidates.append({
+                    "topic": signal,
+                    "mode": "distress" if signal in {
+                        "daemon_lost", "save_failure", "telemetry_anomaly",
+                        "body_distress",
+                    } else "interoceptive",
+                    "salience": min(1.0, float(value)),
+                    "source": "internal_need",
+                })
+
+            executive.ingest_candidates(candidates)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug(f"executive signal feed failed: {exc}")
+
     def _heartbeat_volition(self) -> None:
         """Run the volition phase of the heartbeat loop.
 
