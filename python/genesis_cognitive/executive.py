@@ -477,6 +477,15 @@ class ExecutiveFunction:
         return tuple(self._intentions.values())
 
     @property
+    def actionable_intentions(self) -> tuple[ExecutiveIntention, ...]:
+        """Persistent objectives still eligible for execution."""
+        return tuple(
+            intention
+            for intention in self._intentions.values()
+            if intention.status in {"pending", "active"}
+        )
+
+    @property
     def active_intention(self) -> ExecutiveIntention | None:
         """The intention currently being executed, if any."""
         if self._active_intention is None:
