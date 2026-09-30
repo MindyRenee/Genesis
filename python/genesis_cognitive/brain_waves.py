@@ -468,13 +468,10 @@ def _cognitive_mode_for_coupling(slow: str, fast: str) -> str:
 class GammaSynchrony:
     """Gamma-band synchrony across brain regions — the 40 Hz binding model.
 
-    The 40 Hz hypothesis (Crick & Koch, 1990; Crick, 1994) proposes
-    that gamma-band (~40 Hz) synchrony *binds* distributed neural
-    representations into a unified cognitive percept. Dehaene's
-    global neuronal workspace theory extends this: cognitive access
-    occurs when gamma synchrony ignites across a distributed
-    fronto-parietal network (Dehaene & Naccache, 2001; Dehaene,
-    2014).
+    The 40 Hz binding/consciousness hypothesis is a scientific hypothesis,
+    not an established biological law. Gamma synchrony is a measurable
+    coordination phenomenon, but PLV does not by itself detect
+    consciousness or cognitive access.
 
     - **High gamma synchrony** → distributed regions fire in phase,
       binding features into a coherent representation → cognitive
@@ -483,9 +480,8 @@ class GammaSynchrony:
       processing remains local/noncognitive (subliminal).
 
     ``synchrony`` (0-1) is the phase-locking across modelled regions.
-    ``cognitive_access_prediction`` is the binary prediction derived
-    from a threshold (Dehaene, 2014): synchrony above ~0.5 predicts
-    cognitive access; below predicts noncognitive processing.
+    ``cognitive_access_signal`` is an engineering heuristic derived
+    from synchrony; it is not a consciousness detector.
     """
 
     # Per-region gamma power (0-1). Keys are region names.
@@ -494,13 +490,13 @@ class GammaSynchrony:
     # synchrony, 1 = perfect phase locking across regions.
     synchrony: float = 0.0
     # Predicted cognitive access based on the 40 Hz hypothesis.
-    cognitive_access_prediction: bool = False
+    cognitive_access_signal: float = 0.0
     # Human-readable description
     description: str = ""
 
     def describe(self) -> str:
         """Human-readable description of the gamma synchrony state."""
-        access = "cognitive access" if self.cognitive_access_prediction else "noncognitive"
+        access = f"heuristic access signal {self.cognitive_access_signal:.2f}"
         return (
             f"[gamma synchrony] PLV {self.synchrony:.2f} across "
             f"{len(self.region_powers)} regions → {access}"
@@ -582,7 +578,7 @@ def compute_gamma_synchrony(
     return GammaSynchrony(
         region_powers=region_powers,
         synchrony=plv,
-        cognitive_access_prediction=cognitive,
+        cognitive_access_signal=cognitive,
         description=description,
     )
 
