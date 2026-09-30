@@ -417,6 +417,58 @@ class ExecutiveFunction:
             intention.last_observation = reason
         return intention
 
+    def to_dict(self) -> dict[str, object]:
+        """Serialize executive control state for restart-safe persistence."""
+        return {
+            "intentions": [
+                {
+                    "objective": i.objective,
+                    "reason": i.reason,
+                    "priority": i.priority,
+                    "confidence": i.confidence,
+                    "expected_outcome": i.expected_outcome,
+                    "status": i.status,
+                    "created_at": i.created_at,
+                    "attempts": i.attempts,
+                    "last_observation": i.last_observation,
+                    "actual_outcome": i.actual_outcome,
+                }
+                for i in self._intentions.values()
+            ],
+            "active_intention": self._active_intention,
+        }
+
+    def restore_from_dict(self, data: dict[str, object]) -> None:
+        """Restore persistent intentions after validating their shape."""
+        raw = data.get("intentions", [])
+        if not isinstance(raw, list):
+            raise TypeError("executive.intentions must be a list")
+        restored: dict[str, ExecutiveIntention] = {}
+        for item in raw:
+            if not isinstance(item, dict):
+                raise TypeError("executive intention must be an object")
+            objective = str(item.get("objective", "")).strip()
+            if not objective:
+                continue
+            intention = ExecutiveIntention(
+                objective=objective,
+                reason=str(item.get("reason", "")),
+                priority=max(0.0, min(1.0, float(item.get("priority", 0.5)))),
+                confidence=max(0.0, min(1.0, float(item.get("confidence", 0.5)))),
+                expected_outcome=str(item.get("expected_outcome", "")),
+                status=str(item.get("status", "pending")),
+                created_at=int(item.get("created_at", int(time.time() * 1000))),
+                attempts=max(0, int(item.get("attempts", 0))),
+                last_observation=str(item.get("last_observation", "")),
+                actual_outcome=str(item.get("actual_outcome", "")),
+            )
+            if intention.status == "active":
+                intention.status = "pending"
+            restored[objective.lower()] = intention
+        self._intentions = restored
+        active = data.get("active_intention")
+        self._active_intention = str(active).lower() if isinstance(active, str) and active.lower() in restored else None
+
     @property
     def intentions(self) -> tuple[ExecutiveIntention, ...]:
         """Current persistent intentions."""
