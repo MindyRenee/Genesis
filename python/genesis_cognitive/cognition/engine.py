@@ -3290,7 +3290,8 @@ class CognitionEngine:
         _timing["emotion_tom"] = _time.perf_counter() - _t1
         _t1 = _time.perf_counter()
         memory_context, reasoning_results, goal = self._think_memory_reason_executive(
-            perception, emotion, brain_waves, user_input, memory_mode
+            perception, emotion, brain_waves, user_input, memory_mode,
+            prediction_error,
         )
         _timing["memory_reason"] = _time.perf_counter() - _t1
         _t1 = _time.perf_counter()
@@ -4079,6 +4080,7 @@ class CognitionEngine:
         brain_waves: BrainWaveState,
         user_input: str,
         memory_mode: str = "balanced",
+        prediction_error: PCPredictionError | None = None,
     ) -> tuple[MemoryContext, list, str]:
         """Stages 3–5.5: memory context, concept learning, reasoning, executive goal."""
         import time as _time
@@ -4129,6 +4131,24 @@ class CognitionEngine:
         if reasoning_results:
             add_brain_wave_drive(BrainWave.GAMMA, 0.15)
             add_brain_wave_drive(BrainWave.BETA, 0.1)
+
+        # ── Prediction error → executive arbitration ────────────────
+        # A mismatch is actionable information: the executive can turn
+        # substantial surprise into a persistent learning/investigation
+        # objective rather than leaving the error as telemetry only.
+        if prediction_error is not None and prediction_error.magnitude >= 0.35:
+            target = perception.topics[0] if perception.topics else "current_context"
+            kind = "inspect" if any(
+                _CODEISH_RE.search(topic) for topic in perception.topics
+            ) else "learn"
+            self.executive.form_intention(
+                f"{kind}:{target}",
+                reason="prediction_error",
+                priority=min(1.0, 0.55 + 0.4 * prediction_error.magnitude),
+                confidence=max(0.1, 1.0 - prediction_error.magnitude),
+                expected_outcome="prediction mismatch reduced or explanation learned",
+            )
+            self.attention.set_goal(target)
 
         # ── 5.5 Executive function — set goals and direct attention ──
         # The executive sets a goal based on the perceived intent, which
