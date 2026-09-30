@@ -56,6 +56,7 @@ from typing import TYPE_CHECKING, Any
 from genesis_client.protocol import CHEM_DOPAMINE
 
 from ..concepts import is_world_concept, strip_sense_suffix
+from ..executive import ExecutiveFunction, ExecutiveIntention
 from .framework import ToolRegistry, ToolResult, get_tools
 
 if TYPE_CHECKING:
@@ -144,6 +145,7 @@ class ActingResult:
     """The record of one acting episode."""
 
     intention: Intention
+    executive_intention: ExecutiveIntention | None = None
     steps: list[StepOutcome] = field(default_factory=list)
     discoveries: list[str] = field(default_factory=list)
     success: bool = False
@@ -228,6 +230,7 @@ class ActingLoop:
         on_store_memory: Callable[[str, float], None] | None = None,
         on_neuro_impulse: Callable[[int, float], None] | None = None,
         on_live_thought: Callable[[str, str], None] | None = None,
+        executive: ExecutiveFunction | None = None,
     ) -> None:
         self.network = network
         self.curiosity = curiosity
@@ -245,6 +248,7 @@ class ActingLoop:
         self.on_store_memory = on_store_memory
         self.on_neuro_impulse = on_neuro_impulse
         self.on_live_thought = on_live_thought
+        self.executive = executive
 
         self._scratch = str(Path(data_dir) / "experiments")
         self._recent: deque[tuple[str, str]] = deque(maxlen=self._RECENT_MAX)
@@ -264,7 +268,8 @@ class ActingLoop:
         intention = self.propose()
         if intention is None:
             return None
-        result = ActingResult(intention=intention)
+        executive_intention = self._activate_executive_intention(intention)
+        result = ActingResult(intention=intention, executive_intention=executive_intention)
         try:
             self._handlers[intention.kind](intention, result)
         except Exception as e:  # noqa: BLE001
@@ -286,29 +291,65 @@ class ActingLoop:
                 logger.debug(f"agency topic read failed: {e}")
                 topic = None
             if topic and not self._recently_acted(_LEARN, topic):
-                return Intention(_LEARN, topic, "agency")
+                return self._register_intention(Intention(_LEARN, topic, "agency"))
 
         question = self._curiosity_question()
         if question is not None:
             target = question.target_concept
             if _CODEISH_RE.search(target):
                 if self._resolve_code_path(target) is not None:
-                    return Intention(
+                    return self._register_intention(Intention(
                         _INSPECT, target, "curiosity",
                         question_type=question.question_type,
-                    )
+                    ))
             elif question.question_type in ("isolation", "uncertainty", "causation"):
-                return Intention(
+                return self._register_intention(Intention(
                     _LEARN, target, "curiosity",
                     question_type=question.question_type,
-                )
+                ))
 
         # Nothing pressing — wander. Rotate probes so it varies.
         for kind in (_OBSERVE, _EXPLORE, _MEASURE):
             probe_target = self._idle_target(kind)
             if probe_target and not self._recently_acted(kind, probe_target):
-                return Intention(kind, probe_target, "wander")
+                return self._register_intention(Intention(kind, probe_target, "wander"))
         return None
+
+    def _register_intention(self, intention: Intention) -> Intention:
+        """Register an actuator candidate with the persistent executive."""
+        if self.executive is not None:
+            self.executive.form_intention(
+                f"{intention.kind}:{intention.target}",
+                reason=intention.origin,
+                priority=0.75 if intention.origin in {"agency", "curiosity"} else 0.35,
+                confidence=0.7 if intention.origin == "agency" else 0.55,
+                expected_outcome=self._expected_outcome(intention),
+            )
+        return intention
+
+    def _activate_executive_intention(self, intention: Intention) -> ExecutiveIntention | None:
+        """Make the selected candidate the executive active objective."""
+        if self.executive is None:
+            return None
+        candidate = self.executive.form_intention(
+            f"{intention.kind}:{intention.target}",
+            reason=intention.origin,
+            priority=0.75 if intention.origin in {"agency", "curiosity"} else 0.35,
+            confidence=0.7 if intention.origin == "agency" else 0.55,
+            expected_outcome=self._expected_outcome(intention),
+        )
+        return self.executive.select_intention([candidate])
+
+    @staticmethod
+    def _expected_outcome(intention: Intention) -> str:
+        """State an observable expectation without inventing world facts."""
+        return {
+            _LEARN: "knowledge or relationships updated",
+            _INSPECT: "code structure observed",
+            _EXPLORE: "new project structure or text observed",
+            _OBSERVE: "persistent state observed",
+            _MEASURE: "a project measurement observed",
+        }.get(intention.kind, "an observable result recorded")
 
     # ─── Intention sources ───────────────────────────────────────────
 
@@ -672,6 +713,21 @@ class ActingLoop:
         intention = result.intention
         self._mark_acted(intention.kind, intention.target)
         summary = result.summary()
+
+        if self.executive is not None and result.executive_intention is not None:
+            try:
+                self.executive.observe_intention(
+                    result.executive_intention,
+                    actual_outcome=summary,
+                    success=result.success,
+                )
+                if not result.success:
+                    self.executive.revise_intention(
+                        result.executive_intention,
+                        reason=summary,
+                    )
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"executive outcome recording failed: {e}")
 
         self._write_field_note(result)
 
