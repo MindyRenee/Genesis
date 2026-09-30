@@ -474,8 +474,8 @@ class GammaSynchrony:
     consciousness or cognitive access.
 
     - **High gamma synchrony** → distributed regions fire in phase,
-      binding features into a coherent representation → cognitive
-      access prediction.
+      stronger coordination; this does not establish a coherent
+      percept or cognitive access.
     - **Low gamma synchrony** → regions fire independently →
       processing remains local/noncognitive (subliminal).
 
@@ -489,7 +489,8 @@ class GammaSynchrony:
     # Cross-region phase-locking value (PLV) in [0, 1]. 0 = no
     # synchrony, 1 = perfect phase locking across regions.
     synchrony: float = 0.0
-    # Predicted cognitive access based on the 40 Hz hypothesis.
+    # Continuous engineering signal derived from modeled synchrony;
+    # not a validated measure of consciousness or cognitive access.
     cognitive_access_signal: float = 0.0
     # Human-readable description
     description: str = ""
@@ -515,12 +516,9 @@ def compute_gamma_synchrony(
 ) -> GammaSynchrony:
     """Compute a gamma-synchrony proxy across brain regions.
 
-    Gamma synchrony is modelled from the global gamma power (the
-    "ignition" signal) gated by plasticity (which determines whether
-    long-range cortico-cortical connections can sustain phase locking
-    — chronic stress / low plasticity impairs gamma synchrony,
-    matching the stress-gamma reduction in the neurobiology audit;
-    Herrmann & Demiralp, 2012).
+    Gamma synchrony is modelled from global gamma power and a
+    plasticity gate. This is a synthetic coordination proxy, not a
+    physiological PLV measurement and not a consciousness detector.
 
     Each region receives a gamma power drawn from the global gamma
     power with small region-specific variation. The synchrony index
@@ -541,7 +539,7 @@ def compute_gamma_synchrony(
 
     Returns:
         A ``GammaSynchrony`` with per-region powers, synchrony proxy,
-        and a cognitive-access prediction.
+        and a continuous engineering access signal.
     """
     gamma = state.powers[BrainWave.GAMMA]
     # Long-range phase locking requires both gamma drive and the
@@ -563,17 +561,17 @@ def compute_gamma_synchrony(
         power = max(0.0, min(1.0, gamma + hub_boost * gamma))
         region_powers[region] = power
 
-    # Cognitive-access heuristic: synchrony proxy > 0.5 predicts access.
-    # Operational cutoff for this synthetic model only — not a
-    # neuroscientific constant (see docstring).
-    cognitive = plv > 0.5
+    # Map synchrony to a bounded engineering signal. There is no
+    # validated universal PLV threshold for consciousness or cognitive
+    # access, so this must remain continuous rather than binary.
+    cognitive = max(0.0, min(1.0, (plv - 0.2) / 0.6))
 
-    if cognitive:
-        description = "gamma ignition across the global workspace"
-    elif plv > 0.25:
-        description = "partial gamma coherence, subliminal processing"
+    if cognitive >= 0.67:
+        description = "high modeled gamma coordination"
+    elif cognitive >= 0.17:
+        description = "intermediate modeled gamma coordination"
     else:
-        description = "no gamma binding, local noncognitive processing"
+        description = "low modeled gamma coordination"
 
     return GammaSynchrony(
         region_powers=region_powers,
