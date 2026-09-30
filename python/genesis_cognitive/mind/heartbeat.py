@@ -363,8 +363,11 @@ class HeartbeatMixin:
                 if not topic:
                     continue
                 candidates.append({
+                    # Inbound world events are investigated through the
+                    # learning actuator, not fabricated as filesystem reads.
                     "topic": topic,
                     "mode": "environment",
+                    "kind": "learn",
                     "salience": min(1.0, max(0.1, event.salience)),
                     "source": "world_event",
                 })
@@ -375,10 +378,14 @@ class HeartbeatMixin:
                 proposals = self.self_improvement.get_pending_proposals()
                 for proposal in proposals[:5]:
                     candidates.append({
-                        "topic": str(proposal.title),
+                        # The proposal's real source file is executable by
+                        # the inspect actuator; applying the proposal still
+                        # remains behind the existing human-review boundary.
+                        "topic": str(proposal.file_path),
                         "mode": "improvement",
-                        "salience": 0.7,
-                        "source": "self_improvement",
+                        "kind": "inspect",
+                        "salience": min(1.0, max(0.1, float(proposal.confidence))),
+                        "source": f"self_improvement:{proposal.title}",
                     })
             except Exception as exc:  # noqa: BLE001
                 logger.debug(f"executive proposal feed failed: {exc}")
