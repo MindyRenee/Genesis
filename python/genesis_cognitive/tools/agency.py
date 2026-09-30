@@ -350,7 +350,8 @@ class ActingLoop:
         # The executive owns the objective set. Include unfinished prior
         # objectives so failed or interrupted work can outrank a fresh probe.
         return self.executive.select_intention(
-            list(self.executive.actionable_intentions)
+            list(self.executive.actionable_intentions),
+            allowed_kinds=set(self._handlers),
         )
 
     @staticmethod
