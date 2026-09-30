@@ -554,10 +554,10 @@ class ExecutiveFunction:
                 continue
             mode = str(candidate.get("mode", "")).strip().lower()
             source = str(candidate.get("source", mode)).strip() or "signal"
-            try:
-                salience = max(0.0, min(1.0, float(candidate.get("salience", 0.0))))
-            except (TypeError, ValueError):
+            raw_salience = candidate.get("salience", 0.0)
+            if not isinstance(raw_salience, (int, float)):
                 continue
+            salience = max(0.0, min(1.0, float(raw_salience)))
             if salience <= 0.0:
                 continue
             kind = str(candidate.get("kind", mode_kind.get(mode, "observe"))).strip()
