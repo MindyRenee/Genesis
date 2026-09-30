@@ -2913,7 +2913,8 @@ impl NeurochemicalVector {
             // integrate it over the requested dt. This makes changing dt
             // a change in numerical resolution rather than a change in
             // the physical damping constant.
-            let damping_rate = -damping.max(1.0e-6).ln() / DT;
+            let damping_base = damping.clamp(1.0e-6, 1.0);
+            let damping_rate = -damping_base.ln() / DT;
             let damping_factor = (-damping_rate * dt).exp();
             self.chemicals[i].velocity *= damping_factor;
             self.chemicals[i].level += self.chemicals[i].velocity * dt;
@@ -4051,7 +4052,9 @@ pub struct NeuroTickParams {
     /// (Homeostatic regulation: Marder & Goaillard, Annu Rev Physiol 2006;
     ///  Autoreceptor dynamics: Hashemi et al., BMC Neurosci 2020)
     pub homeostatic_rate: f32,
-    /// Velocity decay per tick (typically 0.85–0.95).
+    /// Velocity retention over the reference interval DT (typically 0.85–0.95).
+    /// Values are clamped to (0, 1] at the dynamics boundary so this
+    /// parameter cannot silently produce exponential growth.
     pub damping: f32,
     /// How fast receptor sensitivity adapts (typically 0.0001–0.001).
     pub adaptation_rate: f32,
