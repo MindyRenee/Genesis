@@ -57,8 +57,10 @@ from PIL import Image
 if TYPE_CHECKING:
     from .emotion import EmotionalState
 
+cairo: Any
 try:
-    import cairo  # type: ignore[import-not-found]
+    import cairo as _cairo  # type: ignore[import-not-found]
+    cairo = _cairo
 except ImportError:  # headless installs without pycairo can still import the package
     class _MissingCairo:
         """Placeholder that fails with a helpful error only when drawing."""
@@ -69,7 +71,7 @@ except ImportError:  # headless installs without pycairo can still import the pa
                 "install pycairo or skip drawing"
             )
 
-    cairo = _MissingCairo()  # type: ignore[no-redef]
+    cairo = _MissingCairo()
 
 
 def _cv2():  # type: ignore[no-untyped-def]
