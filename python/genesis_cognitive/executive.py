@@ -466,8 +466,10 @@ class ExecutiveFunction:
                 intention.status = "pending"
             restored[objective.lower()] = intention
         self._intentions = restored
-        active = data.get("active_intention")
-        self._active_intention = str(active).lower() if isinstance(active, str) and active.lower() in restored else None
+        # An in-flight action cannot safely survive a process boundary.
+        # Preserve the objective, but require the executive to select it
+        # again after restart.
+        self._active_intention = None
 
     @property
     def intentions(self) -> tuple[ExecutiveIntention, ...]:
