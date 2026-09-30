@@ -1,5 +1,9 @@
 """Tests for persistent executive ownership of autonomous actions."""
 
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from genesis_cognitive.concepts import ConceptNetwork
 from genesis_cognitive.executive import ExecutiveFunction
 
 
@@ -28,7 +32,9 @@ def test_executive_intention_survives_failed_episode() -> None:
 
 def test_executive_completes_grounded_success() -> None:
     executive = ExecutiveFunction()
-    intention = executive.form_intention("inspect:thing", expected_outcome="code structure observed")
+    intention = executive.form_intention(
+        "inspect:thing", expected_outcome="code structure observed"
+    )
     executive.select_intention([intention])
     error = executive.observe_intention(
         intention,
@@ -41,10 +47,6 @@ def test_executive_completes_grounded_success() -> None:
 
 
 def test_acting_loop_registers_with_existing_executive() -> None:
-    # Import lazily so the test remains independent of Mind construction.
-    from tempfile import TemporaryDirectory
-    from pathlib import Path
-    from genesis_cognitive.concepts import ConceptNetwork
     from genesis_cognitive.tools.agency import ActingLoop
     from genesis_cognitive.tools.framework import ToolRegistry
 
@@ -97,7 +99,6 @@ def test_executive_round_trips_persistent_intentions() -> None:
 
 def test_acting_loop_arbitrates_existing_objective(tmp_path) -> None:
     """A stronger unfinished objective is selected over a fresh probe."""
-    from genesis_cognitive.executive import ExecutiveFunction
     from genesis_cognitive.tools.agency import ActingLoop, Intention
 
     executive = ExecutiveFunction()
