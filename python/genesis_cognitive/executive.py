@@ -115,6 +115,28 @@ class Task:
 
 
 @dataclass(slots=True)
+class ExecutiveIntention:
+    """A persistent objective owned by the executive layer.
+
+    An intention survives an individual acting episode. It records why
+    Genesis is doing something, what she expects to happen, and what actually
+    happened so the next decision can be based on consequences rather than
+    merely repeating the last action.
+    """
+
+    objective: str
+    reason: str = ""
+    priority: float = 0.5
+    confidence: float = 0.5
+    expected_outcome: str = ""
+    status: str = "pending"
+    created_at: int = field(default_factory=lambda: int(time.time() * 1000))
+    attempts: int = 0
+    last_observation: str = ""
+    actual_outcome: str = ""
+
+
+@dataclass(slots=True)
 class InhibitionResult:
     """The result of a response inhibition check.
 
@@ -203,6 +225,8 @@ class ExecutiveFunction:
         self._current_plan: ActionPlan | None = None
         self._inhibition_count: int = 0
         self._switch_count: int = 0
+        self._intentions: dict[str, ExecutiveIntention] = {}
+        self._active_intention: str | None = None
 
     # ─── Planning ─────────────────────────────────────────────────
 
@@ -319,6 +343,91 @@ class ExecutiveFunction:
     def current_plan(self) -> ActionPlan | None:
         """The most recently generated plan."""
         return self._current_plan
+
+    # ─── Persistent intention / consequence loop ─────────────────
+
+    def form_intention(
+        self,
+        objective: str,
+        *,
+        reason: str = "",
+        priority: float = 0.5,
+        confidence: float = 0.5,
+        expected_outcome: str = "",
+    ) -> ExecutiveIntention:
+        """Create or refresh a persistent objective."""
+        key = objective.strip().lower()
+        if not key:
+            raise ValueError("objective must not be empty")
+        current = self._intentions.get(key)
+        if current is not None and current.status not in {"completed", "abandoned"}:
+            current.priority = max(current.priority, max(0.0, min(1.0, priority)))
+            current.confidence = max(0.0, min(1.0, confidence))
+            if reason:
+                current.reason = reason
+            if expected_outcome:
+                current.expected_outcome = expected_outcome
+            return current
+        intention = ExecutiveIntention(
+            objective=objective.strip(), reason=reason,
+            priority=max(0.0, min(1.0, priority)),
+            confidence=max(0.0, min(1.0, confidence)),
+            expected_outcome=expected_outcome,
+        )
+        self._intentions[key] = intention
+        return intention
+
+    def select_intention(self, candidates: list[ExecutiveIntention]) -> ExecutiveIntention | None:
+        """Select the strongest actionable intention without lexical scoring."""
+        actionable = [c for c in candidates if c.status not in {"completed", "abandoned"}]
+        if not actionable:
+            return None
+        selected = max(actionable, key=lambda c: (c.priority * max(c.confidence, 0.05), -c.attempts))
+        self._active_intention = selected.objective.strip().lower()
+        selected.status = "active"
+        return selected
+
+    def observe_intention(
+        self,
+        intention: ExecutiveIntention,
+        *,
+        actual_outcome: str,
+        success: bool,
+    ) -> float:
+        """Record an outcome and return a bounded prediction-error signal."""
+        intention.attempts += 1
+        intention.actual_outcome = actual_outcome
+        intention.last_observation = actual_outcome
+        if success:
+            intention.status = "completed"
+            error = 0.0 if intention.expected_outcome else 0.25
+        else:
+            intention.status = "pending"
+            error = 1.0
+        if self._active_intention == intention.objective.strip().lower():
+            self._active_intention = None
+        return error
+
+    def revise_intention(self, intention: ExecutiveIntention, *, reason: str = "") -> ExecutiveIntention:
+        """Keep an unfinished objective alive after failure and lower confidence."""
+        intention.status = "pending"
+        intention.confidence = max(0.05, intention.confidence * 0.8)
+        intention.priority = min(1.0, intention.priority + 0.05)
+        if reason:
+            intention.last_observation = reason
+        return intention
+
+    @property
+    def intentions(self) -> tuple[ExecutiveIntention, ...]:
+        """Current persistent intentions."""
+        return tuple(self._intentions.values())
+
+    @property
+    def active_intention(self) -> ExecutiveIntention | None:
+        """The intention currently being executed, if any."""
+        if self._active_intention is None:
+            return None
+        return self._intentions.get(self._active_intention)
 
     # ─── Response inhibition ──────────────────────────────────────
 
