@@ -293,8 +293,7 @@ impl TickLoop {
     /// Seconds since the mind last drove the daemon, or `None` if it
     /// never has (autonomous from boot).
     pub fn mind_idle_secs(&self) -> Option<f32> {
-        self.last_mind_drive
-            .map(|t| t.elapsed().as_secs_f32())
+        self.last_mind_drive.map(|t| t.elapsed().as_secs_f32())
     }
 
     /// Whether the mind's lease has expired and the autonomous
@@ -414,7 +413,10 @@ impl TickLoop {
         // `created_at` rather than this process's start time: the
         // developmental clock is the system's, and a restart must not
         // reset it back to newborn.
-        let created_at = pre_snapshot.as_ref().map(|s| s.header.created_at).unwrap_or(now_ms);
+        let created_at = pre_snapshot
+            .as_ref()
+            .map(|s| s.header.created_at)
+            .unwrap_or(now_ms);
         let elapsed_secs = now_ms.saturating_sub(created_at) as f32 / 1000.0;
         neuro_params.maturation_level =
             super::hpa_development::hpa_competence(elapsed_secs, ltm_count);
@@ -687,8 +689,7 @@ impl TickLoop {
                 // acpi-cpufreq (this system), it returns an empty
                 // string and the frequency policy already implies
                 // voltage control via the SMU.
-                let cpu_epp =
-                    super::cpufreq::derive_epp(&snap.neurochemicals.effective_levels);
+                let cpu_epp = super::cpufreq::derive_epp(&snap.neurochemicals.effective_levels);
 
                 // Turbo (boost) gate — the hardware permission to run
                 // above the base P-state. Tied to the frequency policy:
@@ -838,9 +839,7 @@ impl TickLoop {
         // 7. Update the manifest — heartbeat the subcognitive module
         //    and check cognitive modules for staleness.
         //    No LTM lock needed.
-        let check_staleness = self
-            .tick_count
-            % STALENESS_CHECK_INTERVAL_TICKS == 0;
+        let check_staleness = self.tick_count % STALENESS_CHECK_INTERVAL_TICKS == 0;
 
         // 8. Intention-driven action selection.
         //    Build a self-model from the pre-transition state, score
@@ -1154,8 +1153,7 @@ impl TickLoop {
                 0.0,
                 1.0,
             );
-            self.subcognitive_activity =
-                0.7 * self.subcognitive_activity + 0.3 * work_frac;
+            self.subcognitive_activity = 0.7 * self.subcognitive_activity + 0.3 * work_frac;
         }
         let subcognitive_share = self.subcognitive_activity;
 
@@ -1466,8 +1464,7 @@ impl TickLoop {
             let io_class = super::cpufreq::derive_io_class(snap.memory.plasticity_gate);
             let cognitive_nice =
                 super::cpufreq::derive_cognitive_nice(&snap.neurochemicals.effective_levels);
-            let cpu_epp =
-                super::cpufreq::derive_epp(&snap.neurochemicals.effective_levels);
+            let cpu_epp = super::cpufreq::derive_epp(&snap.neurochemicals.effective_levels);
             let cpu_boost = super::cpufreq::derive_boost(&policy, fmax);
 
             let control = super::cpufreq::BodyControlState {
@@ -1501,7 +1498,6 @@ impl TickLoop {
     pub fn read_sensors(&mut self, _mmap: &MmapState) -> super::interoception::BodyState {
         self.last_body_state = self.interoceptor.read();
         super::interoception::publish_body_state(&self.last_body_state);
-
 
         self.last_body_state.clone()
     }
@@ -1573,8 +1569,7 @@ impl TickLoop {
             // sysfs when the profile changes. On acpi-cpufreq
             // systems (no EPP), derive_epp returns an empty string
             // and set_epp is a no-op.
-            let cpu_epp =
-                super::cpufreq::derive_epp(&snap.neurochemicals.effective_levels);
+            let cpu_epp = super::cpufreq::derive_epp(&snap.neurochemicals.effective_levels);
             if cpu_epp != self.last_epp {
                 super::cpufreq::set_epp(&cpu_epp);
                 self.last_epp = cpu_epp.clone();

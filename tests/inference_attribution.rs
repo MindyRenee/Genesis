@@ -51,7 +51,7 @@ use genesis::daemon::active_inference::{
     ActiveInferenceEngine, apply_inference_feedback, impulse_offset_to_rate,
 };
 use genesis::state::core_state::GenesisCoreState;
-use genesis::state::neurochemical::{NeurochemicalId, NeuroTickParams, NEUROCHEMICAL_COUNT};
+use genesis::state::neurochemical::{NEUROCHEMICAL_COUNT, NeuroTickParams, NeurochemicalId};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const TRACKED: [NeurochemicalId; 6] = [
@@ -68,7 +68,9 @@ const TICKS: u32 = 14_000;
 fn effective_all(v: &GenesisCoreState) -> [f32; NEUROCHEMICAL_COUNT] {
     let mut out = [0.0f32; NEUROCHEMICAL_COUNT];
     for (i, slot) in out.iter_mut().enumerate() {
-        *slot = v.neurochemicals.effective(NeurochemicalId::from_u8(i as u8));
+        *slot = v
+            .neurochemicals
+            .effective(NeurochemicalId::from_u8(i as u8));
     }
     out
 }
@@ -146,7 +148,12 @@ fn attribute_resting_offset_to_active_inference() {
     counts.sort_by(|a, b| b.1.cmp(a.1));
     println!("\npolicy selection at rest (of {TICKS} ticks):");
     for (name, n) in &counts {
-        println!("  {:<10} {:>6}  ({:>5.1}%)", name, n, 100.0 * **n as f32 / TICKS as f32);
+        println!(
+            "  {:<10} {:>6}  ({:>5.1}%)",
+            name,
+            n,
+            100.0 * **n as f32 / TICKS as f32
+        );
     }
     println!("\ncumulative impulse per chemical over the run:");
     let mut imps: Vec<(&u8, &f32)> = impulse_totals.iter().collect();

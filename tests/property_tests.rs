@@ -1030,8 +1030,8 @@ fn prop_arousal_map_is_monotone_and_graded() {
     };
 
     let f = |arousal: f32, net_drive: f32| -> f32 {
-        let self_excitation = WC_SELF_EXCITATION
-            * ((arousal - 0.5) * WC_SELF_EXCITATION_SLOPE).tanh();
+        let self_excitation =
+            WC_SELF_EXCITATION * ((arousal - 0.5) * WC_SELF_EXCITATION_SLOPE).tanh();
         let input = AROUSAL_GAIN * (net_drive + self_excitation);
         sigmoid(input).clamp(0.0, 1.0)
     };
@@ -1067,12 +1067,10 @@ fn prop_arousal_map_is_monotone_and_graded() {
     while d <= 0.5 {
         let roots = count_roots(d);
         assert_eq!(
-            roots,
-            1,
+            roots, 1,
             "bounded self-excitation should give a unique fixed point \
              for net_drive={} (found {})",
-            d,
-            roots
+            d, roots
         );
         d += 0.01;
     }

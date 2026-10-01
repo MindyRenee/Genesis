@@ -262,8 +262,7 @@ impl RingBufferEntry {
             // site: the value is persisted, and a NaN in it silently
             // poisons the SDR/SimHash encoding used by LTM associative
             // retrieval, with no error anywhere downstream.
-            emotional_tag: emotional_tag
-                .map(|v| crate::state::sanitize::finite_clamp(v, 0.0, 1.0)),
+            emotional_tag: emotional_tag.map(|v| crate::state::sanitize::finite_clamp(v, 0.0, 1.0)),
             text_len: len as u16,
             _pad2: [0; 2],
             text: text_buf,
@@ -466,8 +465,8 @@ unsafe impl Sync for RingBuffer {}
 pub const MAX_CAPACITY: u32 = {
     // `usize::MAX / ENTRY_SIZE` saturates to `u64::MAX` on 64-bit, so
     // compare in u64 before narrowing back to u32.
-    let by_address_space = ((usize::MAX - core::mem::size_of::<RingBufferHeader>()) / ENTRY_SIZE)
-        as u64;
+    let by_address_space =
+        ((usize::MAX - core::mem::size_of::<RingBufferHeader>()) / ENTRY_SIZE) as u64;
     let ceiling = 1u64 << 24;
     if by_address_space > ceiling {
         ceiling as u32

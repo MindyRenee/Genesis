@@ -345,7 +345,9 @@ fn main() {
         config.socket_path.display()
     );
     eprintln!("[genesis] Lease mode — mind-driven when alive, autonomous fallback when silent.");
-    eprintln!("[genesis] Mind holds a 3 s lease via reactive IPC; past it the daemon drives itself.");
+    eprintln!(
+        "[genesis] Mind holds a 3 s lease via reactive IPC; past it the daemon drives itself."
+    );
 
     // The main thread is the autonomous fallback. While the mind
     // drives through IPC (lease fresh), this loop does nothing but
@@ -431,9 +433,7 @@ fn main() {
             }
             let dt = tl
                 .since_last_advance_secs()
-                .unwrap_or(
-                    genesis::daemon::tick::TICK_INTERVAL_MS as f32 / 1000.0,
-                )
+                .unwrap_or(genesis::daemon::tick::TICK_INTERVAL_MS as f32 / 1000.0)
                 .clamp(0.001, 10.0);
             tl.advance_neuro(&mmap, dt);
         }

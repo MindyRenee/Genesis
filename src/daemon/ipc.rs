@@ -855,10 +855,12 @@ fn serialize_subsystem_telemetry(
             &crate::state::sanitize::finite_clamp(subsystem.io, 0.0, 1.0).to_le_bytes(),
         );
         resp.extend_from_slice(
-            &crate::state::sanitize::finite_clamp(subsystem.cache_miss_rate, 0.0, 1.0).to_le_bytes(),
+            &crate::state::sanitize::finite_clamp(subsystem.cache_miss_rate, 0.0, 1.0)
+                .to_le_bytes(),
         );
         resp.extend_from_slice(
-            &crate::state::sanitize::finite_clamp(subsystem.branch_miss_rate, 0.0, 1.0).to_le_bytes(),
+            &crate::state::sanitize::finite_clamp(subsystem.branch_miss_rate, 0.0, 1.0)
+                .to_le_bytes(),
         );
     }
     resp.push(modules.len().min(u8::MAX as usize) as u8);
@@ -1830,8 +1832,7 @@ impl IpcClient {
         // Turbo gate — a single byte decoded to the tri-state. A
         // missing byte (truncated packet) decodes to `Unavailable`,
         // the safe default.
-        let cpu_boost =
-            super::cpufreq::BoostState::from_wire(resp.get(off).copied().unwrap_or(0));
+        let cpu_boost = super::cpufreq::BoostState::from_wire(resp.get(off).copied().unwrap_or(0));
         off += 1;
         let description = take_string(&resp, &mut off)?;
 
@@ -2357,7 +2358,8 @@ pub fn default_handler(
                     // — the same trace the old tick() method wrote.
                     // The trace is a structured log of real state
                     // values, not a hardcoded response.
-                    if zone_changed && old_zone != new_zone
+                    if zone_changed
+                        && old_zone != new_zone
                         && let Some(snap) = pre_snapshot.as_ref()
                     {
                         let model = SelfModel::from_state(snap, now);
