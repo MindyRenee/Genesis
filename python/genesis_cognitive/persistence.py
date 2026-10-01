@@ -37,6 +37,7 @@ from __future__ import annotations
 import gzip
 import json
 import logging
+import math
 import os
 import tempfile
 import zlib
@@ -65,6 +66,7 @@ from .emotional_regulator import (
     AllostaticState,
     HPAAxis,
     HPAState,
+    _clamp01,
 )
 from .executive import ExecutiveFunction
 from .growth_ledger import GrowthLedger
@@ -1351,20 +1353,30 @@ def restore_allostatic_load(allostatic_load: AllostaticLoadTracker, data: dict[s
     Handles backward compatibility with old save files that contain
     ``adjusted_baselines`` (now removed) — those entries are silently
     ignored. The ``substrate_connected`` field is always restored as
-    False; it will be set to True on the next ``set_allostatic_load``
+    False; it will be set to True on the next ``set_inference_load``
     call from the Mind's reactive cycle.
+
+    Every restored float is clamped to its valid range and non-finite
+    values are mapped to 0.0. ``load_state`` validates the save file's
+    version but not the values inside it, and the load feeds
+    ``_regulation_effectiveness`` — an unclamped value inverts the
+    regulatory relationship rather than merely saturating it (a load of
+    -3.0 yields effectiveness 2.5, amplifying every regulatory
+    impulse). Saturating to the range bound is the safe reading of a
+    corrupt or hand-edited value in either direction.
     """
     state_data = data.get("state", data)
-    history = deque(state_data.get("stress_history", []), maxlen=allostatic_load.HISTORY_WINDOW)
     allostatic_load._state = AllostaticState(
-        allostatic_load=state_data.get("allostatic_load", 0.0),
-        acute_stress=state_data.get("acute_stress", 0.0),
-        is_chronic=state_data.get("is_chronic", False),
-        stress_history=history,
+        allostatic_load=_clamp01(state_data.get("allostatic_load", 0.0)),
+        is_chronic=bool(state_data.get("is_chronic", False)),
         substrate_connected=False,
     )
-    allostatic_load._tick_count = data.get("tick_count", 0)
-    allostatic_load._elevated_stress_duration = data.get("elevated_stress_duration", 0.0)
+    # Read from the top level, matching where `_serialize_allostatic_load`
+    # writes it — not from `state_data`.
+    duration = data.get("elevated_stress_duration", 0.0)
+    allostatic_load._elevated_stress_duration = (
+        float(duration) if isinstance(duration, (int, float)) and math.isfinite(duration) else 0.0
+    )
 
 
 def restore_self_directed_learner(learner: SelfDirectedLearner, data: dict[str, Any]) -> None:
@@ -1860,11 +1872,8 @@ def _serialize_allostatic_load(
     return {
         "state": {
             "allostatic_load": s.allostatic_load,
-            "acute_stress": s.acute_stress,
             "is_chronic": s.is_chronic,
-            "stress_history": _snapshot(s.stress_history),
         },
-        "tick_count": allostatic_load._tick_count,
         "elevated_stress_duration": allostatic_load._elevated_stress_duration,
     }
 

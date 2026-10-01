@@ -212,10 +212,12 @@ class StatusMixin:
     def allostatic_load(self) -> float:
         """Return the current cumulative allostatic load (0–1).
 
-        Driven by expected free energy in the Rust active inference
-        engine — the anticipatory signal of continued disruption.
-        Values above 0.4 indicate significant strain. Values above
-        0.7 indicate severe allostatic overload.
+        The whole-system view: the regulatory burden integrated by the
+        emotional regulator across the inference, endocrine, and
+        computational-body domains. The Rust engine keeps a
+        substrate-scoped view of its own; both are calibrated to the
+        same timescale. Values above 0.4 indicate significant strain.
+        Values above 0.7 indicate severe allostatic overload.
         """
         return self.regulator.allostatic_load()
     def hpa_axis_status(self) -> dict[str, Any]:

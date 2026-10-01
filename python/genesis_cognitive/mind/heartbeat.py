@@ -645,7 +645,14 @@ class HeartbeatMixin:
             try:
                 body_state = self.client.read_sensors()
                 if body_state is not None:
+                    # The same reading serves both layers. The
+                    # interoception layer turns it into an acute
+                    # stress signal; the self-model keeps the raw
+                    # hardware so the cognitive mind knows what it is
+                    # made of and what it is short of. One IPC call,
+                    # two consumers — the fetch already happened.
                     self.regulator.interoception.update_from_body_state(body_state)
+                    self.self_model.update_hardware_body(body_state)
                 report = self.client.get_subsystem_telemetry()
                 self.regulator.interoception.update_subsystem_telemetry(report)
                 # Feed the same report into its self-model — which

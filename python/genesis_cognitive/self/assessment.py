@@ -65,6 +65,18 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
+# Confidence at or below which a concept counts as weakly connected —
+# a candidate for learning more about. See
+# `SelfAssessmentEngine.find_weak_concepts`, where the inclusive
+# boundary against a zero-relationship concept is explained.
+WEAK_CONCEPT_CONFIDENCE: float = 0.4
+
+# Ceiling on confidence for a concept with no relationships at all.
+# Knowledge that is not connected to anything is not integrated,
+# however good its definition — see
+# `SelfAssessmentEngine._compute_knowledge_confidence`.
+UNCONNECTED_CONFIDENCE_CAP: float = 0.3
+
 
 @dataclass(slots=True)
 class KnowledgeAssessment:
@@ -155,6 +167,24 @@ class SelfAssessmentEngine:
             confidence += 0.1
         if definition and len(definition) > 100:
             confidence += 0.1
+
+        # An unconnected concept is not integrated knowledge, however
+        # well it is written. Without this cap a concept with a long,
+        # polished definition and zero relationships scores up to 0.6 —
+        # enough to leave the "weakly connected" set entirely, to enter
+        # `confident_topics`, and to have its own reported gap
+        # ("No relationships for ...") ignored. The definition would be
+        # substituting for the one thing that makes knowledge usable:
+        # being connected to something else.
+        #
+        # Capping at the bare definition contribution (0.3) keeps
+        # unconnected concepts inside the weak set, which is where
+        # `find_weak_concepts` and `assess_knowledge`'s own gap list
+        # both already place them. One relationship (which does not
+        # clear `has_relationships`) can still add the properties
+        # term, and two or more lift a concept clear on their own.
+        if total_edges == 0:
+            confidence = min(confidence, UNCONNECTED_CONFIDENCE_CAP)
 
         assessment.confidence = min(1.0, confidence)
 
@@ -496,7 +526,19 @@ class SelfAssessmentEngine:
             ):
                 continue
             ka = self.assess_knowledge(cid)
-            if ka.confidence < 0.4:
+            # Inclusive of 0.4, and that boundary matters: a concept
+            # with a definition and properties but *no relationships at
+            # all* scores exactly 0.4 (0.3 definition + 0.1 properties,
+            # zero from the relationship term). That is the canonical
+            # weak concept this method exists to find — knowledge that
+            # is not integrated into anything — yet a strict `< 0.4`
+            # excluded it while `assess_knowledge` simultaneously
+            # reported `gaps=["No relationships for ..."]`. The same
+            # module was calling the same concept both gap-ridden and
+            # sound. One relationship (0.05) lifts it clear, so the
+            # cutoff cleanly separates "not connected to anything"
+            # from "connected".
+            if ka.confidence <= WEAK_CONCEPT_CONFIDENCE:
                 weak.append((cid, ka.confidence))
         weak.sort(key=lambda x: x[1])
         return weak[:limit]

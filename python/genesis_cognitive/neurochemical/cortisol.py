@@ -165,6 +165,13 @@ BDNF suppression:
     structural basis of why chronic stress impairs learning:
     plasticity_gate = BDNF * (1 - CORT * 0.5)
 
+BDNF-cortisol interaction:
+    Genesis models the chronic stress effect: cortisol suppresses BDNF (-0.20 coupling),
+    which impairs plasticity. Recent research (Molecular Brain 2025) shows that
+    CORT + BDNF can act synergistically to enhance LTP at CA3-CA1 synapses under
+    certain conditions (exercise context). However, for chronic stress modeling,
+    suppression is the dominant effect and is the mechanism implemented here.
+
 
 ════════════════════════════════════════════════════════════════════════
 MATHEMATICAL FORMULAS

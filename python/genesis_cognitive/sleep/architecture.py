@@ -5,6 +5,17 @@ the ultradian cycle tracker, synaptic homeostasis downscaler, and
 hippocampal replay. These are pure subsystems with no dependency on
 InnerLife — they operate on the concept network and sleep stage
 enum directly, and are tested independently.
+
+Recent findings (2024-2025):
+- Sleep microstructure: pupil-linked substates organize memory replay
+  (Nature, 2024) — contracted pupil substates replay recent memories,
+  dilated pupil substates replay previous memories. Genesis currently
+  models replay as a unified process; this microstructure could be
+  added as a refinement for selective consolidation.
+- NE-driven glymphatic clearance: infraslow LC NE oscillations drive
+  vasomotion and CSF flow during NREM sleep (Cell, 2025). This is
+  consistent with Genesis's neurochemical model (NE suppression during
+  sleep enables clearance).
 """
 
 from __future__ import annotations
@@ -376,9 +387,31 @@ class SynapticDownscaler:
 # transfers information from hippocampal to neocortical representation
 # (systems consolidation).
 # (Wilson & McNaughton, 1994; Stickgold, 2005; Diekelmann & Born, 2010)
-
+#
 # Replay compression factor — a 10-second experience replays in ~0.5 s.
+# Literature cites 10-20× compression (Wilson & McNaughton, 1994;
+# Skaggs & McNaughton, 1996). Genesis uses 20×, which is within the
+# accepted range. Some recent work suggests even faster compression
+# in certain contexts, but 20× remains a reasonable default.
 REPLAY_COMPRESSION = 20.0
+
+# ─── Optional future enhancements ──────────────────────────────────
+#
+# Sleep microstructure (Nature, 2024):
+# The recent discovery that NREM sleep has pupil-linked substates
+# (contracted vs dilated) that differentially process recent vs previous
+# memories could be incorporated as a refinement to the replay system.
+# This would require tracking a "pupil state" variable during NREM and
+# routing different replay queues based on state. Currently omitted for
+# simplicity, but the architecture supports this extension.
+#
+# Sleep spindle simulation (Communications Biology, 2025):
+# Recent work shows N2 sleep spindles form spiral waves that predict
+# memory consolidation. Genesis currently treats N2 as a consolidation
+# window without simulating individual spindle events. Spindle events
+# could be added as discrete events during N2 that boost consolidation
+# intensity for tagged memories, but this is not required for basic
+# functionality.
 
 
 @dataclass(slots=True)

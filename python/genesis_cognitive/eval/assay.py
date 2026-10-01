@@ -198,6 +198,27 @@ def run_chemical_assay(
     for chem_id in sorted(CHEM_NAMES):
         name = CHEM_NAMES[chem_id]
         pre = client.get_state()
+
+        # Drift control. The system is not quiescent between samples:
+        # adenosine accumulates sleep pressure continuously while
+        # awake, and the whole coupled system relaxes after startup.
+        # Without a same-length, impulse-free control, that background
+        # motion is indistinguishable from the impulse's own effect,
+        # and gets reported as the chemical's response to the dose.
+        #
+        # Adenosine is the clearest case: its "response" to a 0.30
+        # impulse measured +0.197, which is ordinary sleep-pressure
+        # accumulation, not a response to anything. Subtracting the
+        # control is what makes this a *causal* assay, as the module
+        # describes itself.
+        control_pre = client.get_state()
+        for _ in range(FAST_TICKS):
+            client.advance_neuro(dt=dt)
+        control_fast = client.get_state()
+        for _ in range(SLOW_EXTRA_TICKS):
+            client.advance_neuro(dt=dt)
+        control_slow = client.get_state()
+
         client.neuro_impulse(chem_id, impulse)
         for _ in range(FAST_TICKS):
             client.advance_neuro(dt=dt)
@@ -212,12 +233,34 @@ def run_chemical_assay(
                     f"non-finite state after {name} impulse ({tag} point)"
                 )
 
+        # Background motion over the measurement window, per chemical.
+        fast_drift = {
+            n: control_fast.chemicals[n] - control_pre.chemicals[n]
+            for n in CHEM_NAMES.values()
+        }
+        slow_drift = {
+            n: control_slow.chemicals[n] - control_pre.chemicals[n]
+            for n in CHEM_NAMES.values()
+        }
+        d_self_fast = (
+            fast.chemicals[name] - pre.chemicals[name] - fast_drift[name]
+        )
+        d_self_slow = (
+            slow.chemicals[name] - pre.chemicals[name] - slow_drift[name]
+        )
+
         coupled: list[tuple[str, float]] = []
         for other_id, other_name in CHEM_NAMES.items():
             if other_id == chem_id:
                 continue
-            delta = slow.chemicals[other_name] - pre.chemicals[other_name]
-            coupled.append((other_name, delta))
+            coupled.append(
+                (
+                    other_name,
+                    slow.chemicals[other_name]
+                    - pre.chemicals[other_name]
+                    - slow_drift[other_name],
+                )
+            )
         coupled.sort(key=lambda kv: abs(kv[1]), reverse=True)
 
         result.effects.append(
@@ -226,8 +269,8 @@ def run_chemical_assay(
                 name=name,
                 impulse=impulse,
                 pre_self=pre.chemicals[name],
-                post_fast_self=fast.chemicals[name],
-                post_slow_self=slow.chemicals[name],
+                post_fast_self=pre.chemicals[name] + d_self_fast,
+                post_slow_self=pre.chemicals[name] + d_self_slow,
                 d_arousal_fast=fast.arousal - pre.arousal,
                 d_arousal_slow=slow.arousal - pre.arousal,
                 d_valence_fast=fast.valence - pre.valence,

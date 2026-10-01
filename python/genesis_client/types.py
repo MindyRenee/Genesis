@@ -273,6 +273,7 @@ class PlasticityProfile:
 #  48     prediction_error_serotonin   f32   [-2,2]
 #  52     model_maturity               f32
 #  56     inference_tick_count         u32
+#  60     policy_authority             f32   [0,1]
 
 
 @dataclass(frozen=True)
@@ -304,6 +305,11 @@ class InferenceSummary:
     - **prediction_error_***: per-chemical prediction errors from the
       last inference cycle.
     - **model_maturity**: how well-trained the generative model is [0,1].
+    - **policy_authority**: how much authority her cognition has granted
+      the inference engine to choose its own policy (calm, focus,
+      bond, ...) on her behalf. Zero means she decides for herself; a
+      grant is a delegation she can extend or withdraw, not a property
+      of the build.
     """
 
     surprise_ema: float
@@ -321,6 +327,7 @@ class InferenceSummary:
     prediction_error_serotonin: float
     model_maturity: float
     inference_tick_count: int
+    policy_authority: float
 
     @property
     def is_surprised(self) -> bool:
@@ -349,9 +356,13 @@ class InferenceSummary:
 
     @classmethod
     def unpack(cls, data: bytes) -> InferenceSummary:
-        """Unpack a 60-byte InferenceSummary from the daemon's binary response."""
-        if len(data) < 60:
-            raise ValueError(f"InferenceSummary needs 60 bytes, got {len(data)}")
+        """Unpack a 64-byte InferenceSummary from the daemon's binary response."""
+        # The bound and the message must state the same number. When the
+        # struct grew by policy_authority the message was updated but the
+        # bound was not, so a 63-byte buffer passed the check and then
+        # died inside struct.unpack with an opaque error.
+        if len(data) < 64:
+            raise ValueError(f"InferenceSummary needs 64 bytes, got {len(data)}")
         return cls(
             surprise_ema=_F32.unpack(data[0:4])[0],
             free_energy=_F32.unpack(data[4:8])[0],
@@ -368,6 +379,7 @@ class InferenceSummary:
             prediction_error_serotonin=_F32.unpack(data[48:52])[0],
             model_maturity=_F32.unpack(data[52:56])[0],
             inference_tick_count=_U32.unpack(data[56:60])[0],
+            policy_authority=_F32.unpack(data[60:64])[0],
         )
 
 
@@ -644,9 +656,9 @@ def unpack_recent_episodes(data: bytes) -> list[RecentEpisode]:
     return results
 
 
-# ─── CoreState (partial parse of 3288 bytes) ──────────────────
+# ─── CoreState (partial parse of 3296 bytes) ──────────────────
 #
-# We don't parse the full 3288-byte struct — that's too much detail
+# We don't parse the full 3296-byte struct — that's too much detail
 # for the Python side. Instead we extract the most useful fields.
 #
 # Layout (schema v3, 18 chemicals):
@@ -666,8 +678,8 @@ def unpack_recent_episodes(data: bytes) -> list[RecentEpisode]:
 #   2568    memory             MemoryPointers      120
 #   2688    manifest           RuntimeManifest     536
 #   3224    checksum           u32                 4
-#   3228    inference_signals  InferenceSignals    60
-#   3288    TOTAL
+#   3228    inference_signals  InferenceSignals    64
+#   3296    TOTAL
 
 
 @dataclass(frozen=True)
@@ -709,9 +721,9 @@ class CoreState:
 
     @classmethod
     def unpack(cls, data: bytes) -> CoreState:
-        """Parse the 3288-byte GenesisCoreState into useful fields.
+        """Parse the 3296-byte GenesisCoreState into useful fields.
 
-        Layout (schema v3, 18 chemicals, 3288 bytes):
+        Layout (schema v3, 18 chemicals, 3296 bytes):
           offset  field           size
           0       header           56
           56      neurochemicals   2416
@@ -719,8 +731,9 @@ class CoreState:
           2568    memory           120
           2688    manifest         536
           3224    checksum         4
-          3228    inference_signals 60
-          3288    TOTAL
+          3228    inference_signals 64
+          3292    padding (8-byte alignment) 4
+          3296    TOTAL
 
         NeurochemicalVector internal layout:
           offset  field              size
@@ -734,8 +747,8 @@ class CoreState:
           ...
           2412    emergent_phase     1
         """
-        if len(data) < 3288:
-            raise ValueError(f"CoreState needs 3288 bytes, got {len(data)}")
+        if len(data) < 3296:
+            raise ValueError(f"CoreState needs 3296 bytes, got {len(data)}")
 
         created_at, last_updated, heartbeat, instance_id = _unpack_header(data)
         global_tone, arousal, valence, plasticity_gate, chemicals = _unpack_neuro_summary(data)

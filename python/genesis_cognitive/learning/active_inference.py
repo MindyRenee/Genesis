@@ -69,8 +69,9 @@ class SelfModelState(IntEnum):
     # feels something unexpected is happening internally.
     SURPRISED = 1
 
-    # The model is under sustained allostatic load — it anticipates
-    # continued disruption. Genesis feels strained, anticipatory stress.
+    # The model is under sustained allostatic load — accumulated
+    # regulatory burden across several internal signals. Genesis feels
+    # strained, worn down by its own sustained operation.
     STRAINED = 2
 
     # The model is immature — it hasn't learned enough yet. Genesis

@@ -108,6 +108,7 @@ __all__ = [
     "RETRIEVE_EPISODE",
     "SAVE_INFERENCE",
     "SEARCH_EPISODES",
+    "SET_POLICY_AUTHORITY",
     "SET_WAKE_ALARM",
     "SET_ZONE",
     "SHUTDOWN",
@@ -189,6 +190,11 @@ GET_SUBSYSTEM_TELEMETRY = 33
 # Response: [u8 ok][u64 armed_epoch]. Arming the alarm does not itself
 # suspend the machine — the two operations stay deliberately separate.
 SET_WAKE_ALARM = 34
+
+# Set how much authority the inference engine has to choose its own
+# policy on Genesis's behalf. Request: [f32 authority] in [0,1].
+# Response: [u8 ack] + [f32 applied].
+SET_POLICY_AUTHORITY = 35
 
 # ─── Error response codes ─────────────────────────────────────
 # When a command fails, the daemon returns a single-byte response
