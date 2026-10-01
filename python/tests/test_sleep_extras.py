@@ -9,6 +9,7 @@ import pytest
 
 from genesis_client.types import NeuroSummary, RecentEpisode
 from genesis_cognitive.concepts import ConceptNetwork, RelationType
+from genesis_cognitive.emotion import EmotionalState
 from genesis_cognitive.mind import Mind
 from genesis_cognitive.reasoning import ReasoningEngine, ReasoningType
 from genesis_cognitive.sleep import (
@@ -1459,4 +1460,212 @@ def test_lucid_probability_nrem_without_tracker_rem():
     # Without REM, the probability should be low (base + self-awareness)
     assert prob < 0.12, (
         f"Lucid probability without REM should be low, got {prob:.3f}"
+    )
+
+
+# ─── Dream thoughts must not recite a concept pair ────────────────
+#
+# The dream generators used to build their own utterance:
+#     content=f"{display1} and {display2}"
+# That string is what Genesis said — a pre-written sentence, which is the
+# CRITICAL RULE violation in AGENTS.md. Worse, when the paired concept
+# was one the language engine filters as noise (a long scraped name
+# like "compiler for the rust language"), composition produced nothing
+# usable and the fallback spoke the placeholder verbatim:
+#     "Cat and compiler for the rust language."
+# Two unrelated concepts, no verb, indistinguishable from a complaint
+# about the Rust compiler.
+
+
+def _make_emotion() -> EmotionalState:
+    """A neutral emotional state for baseline dream generation."""
+    return EmotionalState(
+        label="neutral",
+        cognitive_style="balanced",
+        alertness=0.5,
+        valence=0.0,
+        plasticity=0.5,
+        creativity=0.5,
+        openness_to_engage=0.5,
+        caution=0.3,
+    )
+
+
+def _make_inner_life_for_dream_composition():
+    """InnerLife over a network holding a speakable/unspeakable pair."""
+    from genesis_cognitive import (
+        ConceptNetwork,
+        CuriosityEngine,
+        ReasoningEngine,
+        ReflectionEngine,
+        RelationType,
+    )
+    from genesis_cognitive.sleep import InnerLife
+
+    net = ConceptNetwork()
+    net.add_concept(
+        "cat", confidence=0.9,
+        properties={"definition": "a small domesticated feline"},
+    )
+    # Long scraped concept name — the engine filters this as noise.
+    net.add_concept(
+        "compiler for the rust language", confidence=0.6,
+        properties={"definition": "a program that turns source into a binary"},
+    )
+    net.add_concept("feline", confidence=0.9)
+    net.add_edge("cat", "feline", RelationType.IS_A, 0.9, origin="stated")
+    reasoning = ReasoningEngine(net)
+    curiosity = CuriosityEngine(net, reasoning)
+    reflection = ReflectionEngine(net)
+    return InnerLife(net, curiosity, reflection, seed=42)
+
+
+_UNSEEDED_GENERATORS = ["_dream_thought", "_rem_dream_thought", "_nrem_dream_thought"]
+_SEEDED_GENERATORS = [
+    "_rem_seeded_dream_thought", "_nrem_seeded_dream_thought",
+]
+
+
+@pytest.mark.parametrize(
+    "method", _UNSEEDED_GENERATORS + _SEEDED_GENERATORS
+)
+def test_dream_thought_content_is_an_anchor_not_a_sentence(method):
+    """Every dream generator hands the language engine a topic anchor.
+
+    The paired concept belongs in the knowledge metadata, where the
+    engine decides whether it can actually voice it. It must never be
+    joined into `content` — that is the pre-written utterance.
+    """
+    il = _make_inner_life_for_dream_composition()
+    emotion = _make_emotion()
+
+    if method in _SEEDED_GENERATORS:
+        thought = getattr(il, method)(emotion, ["cat"])
+    else:
+        thought = getattr(il, method)(emotion)
+
+    assert thought is not None, f"{method} produced no thought"
+    assert " and " not in thought.content, (
+        f"{method} pre-joined its utterance: {thought.content!r} — the "
+        "language engine owns the surface form, not the dream generator"
+    )
+    # The association must survive as data, or the next link of the
+    # chain has nothing to follow.
+    assert thought.metadata is not None
+    assert thought.metadata.get("knowledge"), (
+        f"{method} dropped the association from its metadata"
+    )
+
+
+def test_dream_thought_chain_seeds_survive_anchor_only_content():
+    """Chain seeding reads metadata targets now that content is an anchor.
+
+    `_extract_concepts_from_thought` used to scan `content` for the
+    "X and Y" pair. With content reduced to one word a thought would
+    look like it mentions a single concept, and every chain after the
+    first link would collapse.
+    """
+    from genesis_cognitive.sleep.thoughts import SpontaneousThought
+
+    il = _make_inner_life_for_dream_composition()
+    thought = SpontaneousThought(
+        content="cat",
+        trigger="dream",
+        is_dream=True,
+        metadata={
+            "topic": "cat",
+            "knowledge": [("related_to", "feline", 0.5)],
+            "dream": True,
+        },
+    )
+
+    concepts = il._extract_concepts_from_thought(thought)
+
+    assert "cat" in concepts, "topic concept must seed the chain"
+    assert "feline" in concepts, (
+        "the paired concept comes from metadata — losing it here "
+        "collapses every dream chain after its first link"
+    )
+
+
+def test_dream_thought_speech_never_contains_the_raw_pair():
+    """The engine composes the thought; it never emits the placeholder.
+
+    Covers the case the fix was written for: the paired concept is one
+    the engine filters as noise, so composition has only the topic's own
+    definition and edges to work with.
+    """
+    import time
+
+    from genesis_cognitive import GenerativeEngine, PersonalityTraits, SelfModel
+
+    il = _make_inner_life_for_dream_composition()
+    engine = GenerativeEngine(
+        SelfModel(
+            born_at=int(time.time() * 1000),
+            personality=PersonalityTraits(
+                openness=0.85, conscientiousness=0.72, extraversion=0.55,
+                agreeableness=0.78, neuroticism=0.38,
+            ),
+        ),
+        seed=42,
+        network=il.network,
+    )
+    emotion = _make_emotion()
+
+    thought = il._dream_thought(emotion)
+    assert thought is not None
+
+    spoken = thought.rendered_text(engine, emotion)
+
+    assert spoken, "a composable topic must still produce speech"
+    assert "compiler for the rust language" not in spoken, (
+        f"an unspeakable paired concept reached speech: {spoken!r}"
+    )
+    assert " and " not in spoken, (
+        f"recited a bare concept pair: {spoken!r}"
+    )
+
+
+def test_echoed_placeholder_is_suppressed_despite_grammar_decoration():
+    """The echo guard must survive the grammar's capital and period.
+
+    When composition has nothing to work with, the engine returns the
+    anchor decorated for display. A literal string compare missed that
+    every time, which is how a bare concept name became an utterance.
+    """
+    import time
+
+    from genesis_cognitive import GenerativeEngine, PersonalityTraits, SelfModel
+    from genesis_cognitive.sleep.thoughts import SpontaneousThought
+
+    # No definition, no edges, noisy target: composition can only echo.
+    net = ConceptNetwork()
+    net.add_concept("cat", confidence=0.5)
+    net.add_concept("compiler for the rust language", confidence=0.5)
+    engine = GenerativeEngine(
+        SelfModel(
+            born_at=int(time.time() * 1000),
+            personality=PersonalityTraits(
+                openness=0.85, conscientiousness=0.72, extraversion=0.55,
+                agreeableness=0.78, neuroticism=0.38,
+            ),
+        ),
+        seed=42,
+        network=net,
+    )
+    thought = SpontaneousThought(
+        content="cat",
+        trigger="dream",
+        is_dream=True,
+        metadata={
+            "topic": "cat",
+            "knowledge": [("related_to", "compiler for the rust language", 0.5)],
+            "dream": True,
+        },
+    )
+
+    assert thought.rendered_text(engine, _make_emotion()) == "", (
+        "an association the mind could not articulate must stay "
+        "sub-verbal, not surface as a bare concept name"
     )
