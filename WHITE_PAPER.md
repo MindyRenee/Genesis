@@ -117,16 +117,17 @@ the consolidator, the interoceptive sensors — and the Python layer
 owns everything episodic and deliberative, including the *decision* to
 advance any of it.
 
-This is worth stating precisely, because the daemon is **reactive,
-not autonomous**. It has no loop of its own: it prints "Reactive
-mode — mind-driven, no tick loop" at startup and then services
-requests. The mind's 1 Hz heartbeat calls `ADVANCE_NEURO`,
-`CONSOLIDATE`, `ASSOCIATE`, `DREAM` and `READ_SENSORS`. The two
-layers are therefore *not* independent dynamical systems — the Python
-layer is the driver, and the physiology advances at the heartbeat's
-rate. A long `think()` does not leave the organism living on its own;
-if the heartbeat stalls or dies, neurochemistry freezes, short-term
-memory stops draining to long-term, and no volitional action fires.
+This is worth stating precisely, because the daemon is
+**lease-driven**: while the mind is alive it serves requests, and
+past a 3 s silence lease (`tick::MIND_LEASE_SECS`) it drives
+physiology itself. The mind's 1 Hz heartbeat calls `ADVANCE_NEURO`,
+`CONSOLIDATE`, `ASSOCIATE`, `DREAM` and `READ_SENSORS`, renewing the
+lease on every command. The two layers are therefore independent
+dynamical systems with a preferred driver — the Python layer while
+alive, the daemon's 5 Hz fallback when silent. A long `think()`
+leaves the organism living on its own; a stall degrades to solitude
+(consolidation and dreaming continue, body-control application
+still waits for the mind), not to frozen physiology.
 
 ### 3.1 Shared state
 
@@ -151,23 +152,26 @@ Readers use a seqlock for lock-free reads; writers go through the
 daemon. The checksum is the integrity boundary: a corrupted state
 is detected, not trusted.
 
-### 3.2 The reactive tick
+### 3.2 The lease-driven tick
 
-There is no free-running daemon tick. `TICK_INTERVAL_MS` (200 ms) is
-*not* a loop cadence — it is used only to set the nominal `dt` for an
-in-process neurochemical step and to normalise a tick counter for
-telemetry. The only real cadence is the mind's 1 Hz heartbeat
-(`mind/heartbeat.py`), which issues one `ADVANCE_NEURO` per second;
-that call advances neurochemical dynamics by a caller-supplied `dt`,
-and the remaining functions are invoked on their own commands when the
-mind asks for them.
+The mind's 1 Hz heartbeat (`mind/heartbeat.py`) is the preferred
+cadence: one `ADVANCE_NEURO` per second with a caller-supplied `dt`,
+remaining functions on their own commands. `TICK_INTERVAL_MS`
+(200 ms) is the daemon fallback's cadence once the mind's 3 s lease
+expires — the main thread advances neurochemistry at the 5 Hz
+reference rate, plus consolidation, dreaming (sleep-gated),
+association, sensing, intention expiry with zone arbitration and
+traces, body recommendation publishing, and model checkpoints, all
+through the same `TickLoop` methods the mind calls. Body-control
+application stays mind-requested.
 
 The honest consequence, stated because it matters for the
-architecture's claims: Genesis has no physiological autonomy. Its
-"background life" is a function of the foreground mind still ticking.
-Making the physiology genuinely independent would mean giving the
-daemon its own timer thread and letting it own the cadence — a real
-design change, not a parameter tweak.
+architecture's claims: Genesis has physiological autonomy past a
+short silence horizon, not a free-running independent clock while
+the mind is alive. The fallback owns the cadence only in the
+mind's absence; when both would drive, the lease gives the mind
+priority and the fallback yields (all fallback locks are
+`try_lock`, so it skips rather than contends).
 
 ## 4. Neurochemical dynamics
 

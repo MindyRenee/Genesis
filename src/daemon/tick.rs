@@ -64,6 +64,20 @@ use super::ipc::LtmAccess;
 /// Tick interval: 200ms (5 Hz).
 pub const TICK_INTERVAL_MS: u64 = 200;
 
+/// Mind lease: how long the daemon stays out of the way after the
+/// cognitive mind last drove it. While the mind drives at its ~1 Hz
+/// heartbeat, idle stays ~1 s and the autonomous fallback never
+/// fires. After a stall, crash, or disconnect longer than this, the
+/// daemon drives physiology itself. 3 s = ~3 missed heartbeats:
+/// fast enough that sleep/adenosine/circadian never visibly freeze,
+/// slow enough that normal jitter never double-drives a tick.
+pub const MIND_LEASE_SECS: f32 = 3.0;
+
+/// Autonomous fallback cadence when the lease expires. Matches
+/// `TICK_INTERVAL_MS` so catch-up dynamics run at the 5 Hz reference
+/// rate the pharmacodynamics were tuned for.
+pub const AUTONOMOUS_INTERVAL_MS: u64 = 200;
+
 /// Consolidation threshold: entries with a consolidation score below
 /// this are skipped (left to decay in the ring buffer).
 pub const CONSOLIDATION_THRESHOLD: f32 = 0.15;
@@ -199,6 +213,14 @@ pub struct TickLoop {
     /// so the work fraction is measured against the observed
     /// call-to-call interval instead. `None` until the second call.
     subcognitive_last_call: Option<std::time::Instant>,
+    /// Last time the cognitive mind drove the daemon through any
+    /// reactive IPC command. The autonomous fallback uses this as its
+    /// lease: while the mind is driving (idle < `MIND_LEASE_SECS`),
+    /// the daemon stays out of the way; once the lease expires, the
+    /// daemon drives physiology itself so neurochemistry, sleep, and
+    /// memory keep living instead of freezing. `None` means the mind
+    /// has never driven — autonomous from boot.
+    last_mind_drive: Option<std::time::Instant>,
 }
 
 impl TickLoop {
@@ -219,6 +241,7 @@ impl TickLoop {
             last_boost: super::cpufreq::BoostState::Unavailable,
             subcognitive_activity: 0.0,
             subcognitive_last_call: None,
+            last_mind_drive: None,
         }
     }
 
@@ -255,7 +278,40 @@ impl TickLoop {
             last_boost: super::cpufreq::BoostState::Unavailable,
             subcognitive_activity: 0.0,
             subcognitive_last_call: None,
+            last_mind_drive: None,
         }
+    }
+
+    /// Record that the cognitive mind just drove the daemon through
+    /// IPC. Renews the mind's lease; the autonomous fallback stays
+    /// idle while the lease is fresh. Called by the reactive IPC
+    /// handler on every mind-driven command.
+    pub fn note_mind_drive(&mut self) {
+        self.last_mind_drive = Some(std::time::Instant::now());
+    }
+
+    /// Seconds since the mind last drove the daemon, or `None` if it
+    /// never has (autonomous from boot).
+    pub fn mind_idle_secs(&self) -> Option<f32> {
+        self.last_mind_drive
+            .map(|t| t.elapsed().as_secs_f32())
+    }
+
+    /// Whether the mind's lease has expired and the autonomous
+    /// fallback should drive physiology. True when the mind never
+    /// drove or has been silent longer than `MIND_LEASE_SECS`.
+    pub fn mind_lease_expired(&self) -> bool {
+        match self.last_mind_drive {
+            None => true,
+            Some(t) => t.elapsed().as_secs_f32() >= MIND_LEASE_SECS,
+        }
+    }
+
+    /// Seconds since the last `advance_neuro` from any source (mind
+    /// or autonomous), or `None` if none has run yet.
+    pub fn since_last_advance_secs(&self) -> Option<f32> {
+        self.subcognitive_last_call
+            .map(|t| t.elapsed().as_secs_f32())
     }
 
     /// Save the active inference model to `data_dir/inference_model.bin`.
@@ -953,13 +1009,14 @@ impl TickLoop {
         self.tick_count
     }
 
-    // ─── Reactive methods (mind-driven, not tick-driven) ────────
+    // ─── Lease-driven methods (mind-preferred, daemon fallback) ──
     //
-    // Each of these performs one specific function that was
-    // previously part of the fixed tick loop. The cognitive mind
-    // calls them through IPC when internal state says it's time.
-    // The daemon never initiates these — it only executes them on
-    // request. All functions are idle until activated.
+    // Each of these performs one specific function. The cognitive
+    // mind calls them through IPC when internal state says it's
+    // time (renewing its lease via `note_mind_drive`); past the
+    // lease the daemon main thread calls the same methods itself.
+    // Body-control application stays mind-requested — the fallback
+    // never calls `apply_body_control`.
 
     /// Advance neurochemical dynamics by dt, run active inference,
     /// and update the dyadic model. This is the core "physics
@@ -1001,13 +1058,23 @@ impl TickLoop {
         neuro_params.zone_sleeping = zone_sleeping_pre;
         neuro_params.dt = dt;
 
-        // HPA maturation from accumulated experience.
+        // HPA maturation from the developmental clock (same as tick()).
+        // The production reactive path must not use the deprecated
+        // ltm_count/10_000 ramp: that held cortisol at zero for the
+        // first 10k lifetime episodes and disabled the primary
+        // allostatic-load mediator. Development advances on whichever
+        // of experience or elapsed lifetime is further along.
         let ltm_count = pre_snapshot
             .as_ref()
             .map(|s| s.memory.ltm_episode_count)
             .unwrap_or(0);
+        let created_at = pre_snapshot
+            .as_ref()
+            .map(|s| s.header.created_at)
+            .unwrap_or(now_ms);
+        let elapsed_secs = now_ms.saturating_sub(created_at) as f32 / 1000.0;
         neuro_params.maturation_level =
-            crate::state::sanitize::finite_clamp(ltm_count as f32 / 10_000.0, 0.0, 1.0);
+            super::hpa_development::hpa_competence(elapsed_secs, ltm_count);
         neuro_params.noise_seed = self.tick_count;
 
         // Metaplasticity boost from last inference cycle.
@@ -1251,6 +1318,179 @@ impl TickLoop {
         }
 
         dream_result.insights
+    }
+
+    /// Intention-driven zone arbitration for the autonomous fallback.
+    ///
+    /// Mirror of the zone-selection block in the integrated `tick()`
+    /// (the reference path): expire stale intentions, build a
+    /// self-model from the current snapshot, select the next zone,
+    /// and record an autobiographical trace in LTM when the zone
+    /// actually changes. The mind normally drives zone life through
+    /// conversation and volition; past the lease the daemon
+    /// arbitrates itself so intention life does not freeze with the
+    /// heartbeat.
+    ///
+    /// Unlike `tick()`, this does NOT touch `subcognitive_flags`:
+    /// the memory-phase methods (`consolidate`/`associate`/`dream`)
+    /// each set their own flags through their own transactions, and
+    /// clearing here would erase flags set earlier in the same
+    /// autonomous cycle. It heartbeats the Subcognitive module and
+    /// recomputes the manifest only.
+    ///
+    /// Lock order: the caller must already hold LTM before the
+    /// TickLoop (same as the IPC path); the trace write uses the
+    /// already-held LTM store, so no new lock is taken.
+    pub fn arbitrate_zone(&mut self, mmap: &MmapState, ltm: &mut LtmStore) {
+        let now_ms = current_ms();
+        let mut snapshot = None;
+        for _ in 0..8 {
+            snapshot = mmap.read_consistent();
+            if snapshot.is_some() {
+                break;
+            }
+            std::hint::spin_loop();
+        }
+        let state = match snapshot {
+            Some(s) => s,
+            None => return,
+        };
+
+        // Expire stale intentions first — without this, expired
+        // intentions score maximum urgency forever and dominate
+        // zone selection. Mirrors `tick()`.
+        self.intention_manager.expire(now_ms);
+        let current_zone = state.zones.zone();
+        let model = SelfModel::from_state(&state, now_ms);
+        let selected = if self.intention_manager.active.is_empty() {
+            current_zone
+        } else {
+            self.intention_manager.select_zone(&model, now_ms)
+        };
+        let top = self.intention_manager.top_intention(&model, now_ms);
+
+        let mut emotional_tag = [0.0f32; 12];
+        for (i, slot) in emotional_tag.iter_mut().enumerate() {
+            let id = NeurochemicalId::from_u8(i as u8);
+            *slot = state.neurochemicals.effective(id);
+        }
+        let cort_eff = state.neurochemicals.effective(NeurochemicalId::Cortisol);
+        let da_eff = state.neurochemicals.effective(NeurochemicalId::Dopamine);
+        let compact_tag = [model.arousal, model.valence, cort_eff, da_eff];
+        let salience =
+            crate::state::sanitize::finite_clamp(model.arousal + model.valence.abs(), 0.0, 1.0);
+
+        let top_label = top.map(|(l, _)| l).unwrap_or("none");
+        let top_score = top.map(|(_, s)| s).unwrap_or(0.0);
+        // Structured trace, not a sentence template — mirrors `tick()`.
+        let trace_text = format!(
+            "zone_transition: {} -> {} | intention: {} ({:.2}) | phase: {} | valence: {:.2} | arousal: {:.2} | sleep_pressure: {:.2} | cause: {}",
+            current_zone.label(),
+            selected.label(),
+            top_label,
+            top_score,
+            model.phase,
+            model.valence,
+            model.arousal,
+            model.sleep_pressure,
+            model.emotional_cause,
+        );
+
+        let mut zone_actually_changed = false;
+        if let Err(e) = mmap.modify(now_ms, |state| {
+            if let Some(module) = state.manifest.get_mut(ModuleId::Subcognitive) {
+                module.heartbeat(now_ms);
+                module.status = ModuleStatus::Running as u8;
+            }
+            // Respect a manual override — same guard as `tick()`.
+            zone_actually_changed =
+                state.zones.zone_override_active == 0 && selected != state.zones.zone();
+            if zone_actually_changed {
+                state.zones.transition_to(selected, now_ms);
+                state.zones.clear_override();
+            }
+            state.manifest.recompute();
+        }) {
+            eprintln!("[tick] arbitrate_zone manifest update failed: {e}");
+            return;
+        }
+
+        if zone_actually_changed {
+            let _ = ltm.store_meta(
+                now_ms,
+                salience,
+                emotional_tag,
+                compact_tag,
+                EventType::Internal as u8,
+                ModuleId::Subcognitive as u8,
+                &trace_text,
+            );
+        }
+    }
+
+    /// Compute and publish the body-control recommendation without
+    /// applying anything.
+    ///
+    /// Mirror of the body-control section of the integrated `tick()`:
+    /// derive the frequency policy, thermal cap, scheduling and
+    /// EPP/boost recommendations from neurochemistry and publish
+    /// them for the mind to read via GET_BODY_CONTROL. No sysfs
+    /// writes, no renice/ionice, no helper invocations — application
+    /// stays mind-requested via APPLY_BODY_CONTROL, preserving
+    /// cognition as the author of outward action.
+    pub fn publish_body_recommendation(&mut self, mmap: &MmapState) {
+        if let Some(snap) = mmap.read_consistent() {
+            let (fmin, fmax) = super::cpufreq::freq_range();
+
+            let mut policy = super::cpufreq::FreqPolicy::default();
+            let mut thermally_capped = false;
+            if fmax > fmin {
+                policy = super::cpufreq::derive_policy(
+                    &snap.neurochemicals.effective_levels,
+                    fmin,
+                    fmax,
+                );
+                let pre_cap = policy.max_freq;
+                super::cpufreq::apply_thermal_cap(
+                    &mut policy,
+                    self.last_body_state.cpu_temp_c,
+                    fmin,
+                    fmax,
+                );
+                thermally_capped = policy.max_freq < pre_cap;
+            }
+
+            let ach = snap.neurochemicals.effective_levels
+                [crate::state::neurochemical::NeurochemicalId::Acetylcholine as usize];
+            let daemon_nice = super::cpufreq::derive_nice(ach);
+            let io_class = super::cpufreq::derive_io_class(snap.memory.plasticity_gate);
+            let cognitive_nice =
+                super::cpufreq::derive_cognitive_nice(&snap.neurochemicals.effective_levels);
+            let cpu_epp =
+                super::cpufreq::derive_epp(&snap.neurochemicals.effective_levels);
+            let cpu_boost = super::cpufreq::derive_boost(&policy, fmax);
+
+            let control = super::cpufreq::BodyControlState {
+                cpu_min_freq_khz: policy.min_freq,
+                cpu_max_freq_khz: policy.max_freq,
+                cpu_governor: policy.governor.clone(),
+                thermally_capped,
+                thermal_cap_temp_c: if thermally_capped {
+                    self.last_body_state.cpu_temp_c
+                } else {
+                    0.0
+                },
+                daemon_nice,
+                cognitive_nice,
+                io_class: io_class.label(),
+                plasticity_gate: snap.memory.plasticity_gate,
+                controlling_cognitive: false,
+                cpu_epp,
+                cpu_boost,
+                description: String::new(),
+            };
+            super::cpufreq::publish_control_state(&control);
+        }
     }
 
     /// Read hardware sensors and publish them for Genesis to perceive.
@@ -1503,4 +1743,26 @@ pub fn current_ms() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn autonomous_from_boot_until_mind_drives() {
+        // Fresh loop: mind never drove, so the lease is expired and
+        // the fallback must drive from boot — she lives before the
+        // mind ever connects.
+        let mut tl = TickLoop::new();
+        assert!(tl.mind_lease_expired());
+        assert!(tl.mind_idle_secs().is_none());
+        assert!(tl.since_last_advance_secs().is_none());
+
+        // One mind drive renews the lease immediately.
+        tl.note_mind_drive();
+        assert!(!tl.mind_lease_expired());
+        let idle = tl.mind_idle_secs().expect("just drove");
+        assert!(idle < MIND_LEASE_SECS);
+    }
 }

@@ -260,12 +260,18 @@ pub fn encode_emotional(tag: &[f32; 12]) -> Vec<u16> {
 
 /// Encode temporal context into bits.
 ///
-/// The timestamp (ms) is hashed into `TEMPORAL_BITS` positions in
-/// the temporal region. This gives coarse temporal locality —
-/// episodes from similar times share some temporal bits.
+/// The timestamp is quantized to 1-hour bins before hashing, so
+/// episodes from the same hour share all temporal bits (coarse
+/// temporal locality). Hashing raw millisecond timestamps gives
+/// independent random bits 1 ms apart — no locality at all — which
+/// contradicts the documented claim and turns the temporal region
+/// into noise that dilutes Jaccard similarity.
 pub fn encode_temporal(timestamp_ms: u64) -> Vec<u16> {
     let mut bits = Vec::with_capacity(TEMPORAL_BITS);
-    let h = fnv1a(&timestamp_ms.to_le_bytes());
+    // 1-hour coarse bins: same-hour episodes share bits, different
+    // hours collide only by chance. 3_600_000 ms = 1 h.
+    let time_bin = timestamp_ms / 3_600_000;
+    let h = fnv1a(&time_bin.to_le_bytes());
     for i in 0..TEMPORAL_BITS {
         let pos = (TEMPORAL_BASE + (wrangle(h, i) as usize % TEMPORAL_BITS)) as u16;
         bits.push(pos);

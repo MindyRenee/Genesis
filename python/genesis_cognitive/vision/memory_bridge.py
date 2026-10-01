@@ -35,11 +35,14 @@ def _write_json_atomically(path: Path, data: object) -> None:
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp_path, path)
-    except BaseException:
+    except Exception:
+        # Atomic-write cleanup: remove the temp file, then re-raise so the
+        # caller still sees the failure (and Ctrl+C/SystemExit propagate —
+        # Exception never catches those).
         try:
             os.unlink(tmp_path)
-        except OSError:
-            pass
+        except OSError as cleanup_e:
+            logger.debug(f"memory-bridge tmp cleanup skipped: {cleanup_e}")
         raise
 
 _DATA_DIR = default_data_dir() / "visual_cortex"

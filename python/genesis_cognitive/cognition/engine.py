@@ -7665,8 +7665,9 @@ class CognitionEngine:
         arousal = 0.5
         try:
             arousal = self._build_meta_emotion().arousal
-        except Exception:  # noqa: BLE001 — meta-emotion may be
-            pass           # unavailable before first turn; neutral
+        except Exception as e:  # noqa: BLE001 — meta-emotion may be
+            # unavailable before first turn; fall back to neutral 0.5.
+            logger.debug(f"meta-emotion unavailable, using neutral arousal: {e}")
         return max(
             0.0,
             min(1.0, 0.5 * arousal + 0.5 * self._get_dopamine_level()),

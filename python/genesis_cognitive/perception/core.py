@@ -1838,8 +1838,9 @@ def _get_prototype_vectors(embeddings) -> dict[Intent, list[np.ndarray]]:
             vectors[intent] = vecs
     try:
         _intent_prototype_cache[embeddings] = vectors
-    except TypeError:
-        pass  # duck-typed stores that can't be weak-referenced just skip caching
+    except TypeError as e:
+        # duck-typed stores that can't be weak-referenced just skip caching
+        logger.debug(f"intent prototype cache skipped (unweakrefable store): {e}")
     return vectors
 
 

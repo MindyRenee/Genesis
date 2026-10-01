@@ -651,14 +651,45 @@ class _PythonBugVisitor(ast.NodeVisitor):
         self._check_mutable_defaults(node)
         self._check_function_length(node)
         self._check_missing_type_hints(node)
-        self.generic_visit(node)
+        # A `raise` inside a nested def executes later, outside the active
+        # exception context — it must not be flagged as raise-without-from.
+        # Reset except-depth across the new scope (restored afterwards).
+        saved_depth = self._except_depth
+        self._except_depth = 0
+        try:
+            self.generic_visit(node)
+        finally:
+            self._except_depth = saved_depth
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
         """Check for mutable defaults, long functions, missing type hints."""
         self._check_mutable_defaults(node)  # type: ignore[arg-type]
         self._check_function_length(node)  # type: ignore[arg-type]
         self._check_missing_type_hints(node)  # type: ignore[arg-type]
-        self.generic_visit(node)
+        saved_depth = self._except_depth
+        self._except_depth = 0
+        try:
+            self.generic_visit(node)
+        finally:
+            self._except_depth = saved_depth
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        """Reset except-depth inside a nested class scope (see above)."""
+        saved_depth = self._except_depth
+        self._except_depth = 0
+        try:
+            self.generic_visit(node)
+        finally:
+            self._except_depth = saved_depth
+
+    def visit_Lambda(self, node: ast.Lambda) -> None:
+        """Reset except-depth inside a lambda (see above)."""
+        saved_depth = self._except_depth
+        self._except_depth = 0
+        try:
+            self.generic_visit(node)
+        finally:
+            self._except_depth = saved_depth
 
     def _check_mutable_defaults(self, node: ast.FunctionDef) -> None:
         """Mutable default arguments (list, dict, set) are shared across calls."""

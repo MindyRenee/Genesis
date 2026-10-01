@@ -40,31 +40,28 @@
 //! `GenesisCoreState` on the stack. Readers therefore create no
 //! reference to the mmap'd memory at all.
 //!
-//! ### The writer does create a `&mut` — and that is unsound
+//! ### The writer never forms a reference into the mapping
 //!
-//! [`modify`] holds `write_lock` (and an `flock`, for cross-process
-//! exclusion) while it materialises a `&mut GenesisCoreState` into the
-//! shared mapping for the whole transaction. Exclusion makes the
-//! *access* well-defined, but it does not make the *aliasing* defined:
-//! under Stacked/Tree Borrows, creating the `&mut` invalidates every
-//! other pointer derived from `self.ptr` for its duration, so a
-//! concurrent `read`'s `read_volatile` load is UB — `read_volatile`
-//! stops the compiler eliding the load, not the borrow from
-//! invalidating the pointer.
+//! Every production write path — [`modify`] and the open-time
+//! repairs/migrations — runs its mutation on a **stack copy** and
+//! publishes it with `publish_stack` (seqlock odd → single
+//! `write_volatile` → seqlock even). No `&` or `&mut` into
+//! the shared mapping is ever formed, so there is no aliasing with
+//! concurrent readers under Stacked/Tree Borrows: the old pattern
+//! (a `&mut GenesisCoreState` materialised into `MAP_SHARED` for the
+//! whole transaction, which Miri flagged and which only happened to
+//! survive because volatile loads are never dead) is gone.
 //!
-//! This is currently latent rather than live: volatile loads are never
-//! dead, so LLVM cannot exploit the `noalias` on the `&mut` to delete
-//! them, and the emitted code is correct. But the invariant as written
-//! above is false, Miri flags it, and the obvious "optimisation" —
-//! replacing `read_volatile` with a plain `ptr::read` in the reader —
-//! would turn it into a real miscompilation.
+//! Consequences, kept deliberately:
 //!
-//! The fix is to stop forming a reference to the mapping at all: keep
-//! the transaction on a stack copy and publish it with a single
-//! `write_volatile`. That is deliberately not done here because it
-//! changes the panic/rollback path and needs a test run to validate;
-//! until then, treat "no `&mut` into the mapping" as a known gap, not
-//! a guarantee.
+//! - A panicking [`modify`] closure only ever saw the stack copy, so
+//!   the mapping needs no rollback — it was never touched.
+//! - `read_volatile` in the readers remains load-bearing: it stops
+//!   the compiler eliding or merging the seqlock-guarded loads, it is
+//!   not (and never was) what made concurrent access defined.
+//! - [`MmapState::state_mut`] still exists, but only single-threaded
+//!   test code calls it; grep the tree to confirm before trusting
+//!   this.
 //!
 //! ## File layout
 //!
@@ -541,21 +538,22 @@ impl MmapState {
         // mind.
         // SAFETY: same invariant as the reads above — `ptr` is a valid,
         // mmap'd, page-aligned region of exactly `FILE_SIZE` bytes, the
-        // flock is held, and no `MmapState` exists yet, so this is the
-        // sole reference.
-        if unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) }.scrub_non_finite() {
+        // flock is held, and no `MmapState` exists yet. The scrub runs
+        // on a stack copy and publishes through `publish_stack`: no
+        // reference into the mapping is formed.
+        let mut scrubbed =
+            unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) };
+        if scrubbed.scrub_non_finite() {
             let now_ms = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_millis() as u64)
                 .unwrap_or(0);
-            // SAFETY: as above — the `&mut` is the sole reference.
-            let state_mut: &mut GenesisCoreState = unsafe { &mut *(ptr as *mut GenesisCoreState) };
-            // SAFETY: the open-time flock is held.
-            unsafe { state_mut.write_begin(now_ms) };
-            state_mut.scrub_non_finite();
-            state_mut.write_end();
+            scrubbed.header.last_updated = now_ms;
+            scrubbed.header.heartbeat = scrubbed.header.heartbeat.wrapping_add(1);
+            scrubbed.checksum = scrubbed.compute_checksum();
             // SAFETY: valid ptr/len; flock held so no writer can be
             // mid-transaction.
+            unsafe { Self::publish_stack(ptr, &scrubbed) };
             if let Err(msync_err) = Self::do_msync(ptr, mapped_len()) {
                 // SAFETY: unlock before munmap/close on valid ptr/fd
                 // that we own exclusively.
@@ -589,18 +587,20 @@ impl MmapState {
         //
         // Repair the parity while the flock is held. No checksum
         // recomputation is needed: `seq_lock` is outside the CRC.
+        // The counter is driven through a raw atomic — no reference
+        // into the mapping is formed.
         // SAFETY: `ptr` is a valid, mmap'd, page-aligned region of
         // exactly `FILE_SIZE` bytes; the flock is held and no
-        // `MmapState` has been returned to the caller, so this is the
-        // sole reference and it does not alias.
+        // `MmapState` has been returned to the caller. The offset is
+        // `SEQ_LOCK_OFFSET` (layout-pinned, 8-byte aligned).
         if unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) }
             .header
             .seq_lock
             & 1
             == 1
         {
-            let state_mut: &mut GenesisCoreState = unsafe { &mut *(ptr as *mut GenesisCoreState) };
-            state_mut.header.seq_lock = state_mut.header.seq_lock.wrapping_add(1);
+            let seq = unsafe { AtomicU64::from_ptr(ptr.add(Self::SEQ_LOCK_OFFSET) as *mut u64) };
+            seq.fetch_add(1, Ordering::Release);
             // SAFETY: `ptr`/`len` are a valid mmap'd region; the flock
             // is held so no writer in any process can be mid-transaction.
             if let Err(msync_err) = Self::do_msync(ptr, mapped_len()) {
@@ -630,21 +630,20 @@ impl MmapState {
         // exactly `FILE_SIZE` bytes. `read_volatile` ensures we
         // observe the actual on-disk content. `GenesisCoreState` is
         // `#[repr(C)]` with no uninitialized padding.
-        let snapshot = unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) };
+        let mut snapshot = unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) };
         if snapshot.header.created_at < REASONABLE_EPOCH_MS {
             let now_ms = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_millis() as u64)
                 .unwrap_or(REASONABLE_EPOCH_MS);
-            // SAFETY: `ptr` is a valid mmap'd region, exclusively owned
-            // (no `MmapState` has been returned to the caller yet). The
-            // `&mut` is the sole reference and does not alias.
-            let state_mut: &mut GenesisCoreState = unsafe { &mut *(ptr as *mut GenesisCoreState) };
-            // SAFETY: the open-time flock is held; write_begin/write_end
-            // publish this repair atomically to lock-free readers.
-            unsafe { state_mut.write_begin(now_ms) };
-            state_mut.header.created_at = now_ms;
-            state_mut.write_end();
+            // Stack repair published through `publish_stack`: the
+            // open-time flock is held and the seqlock window keeps
+            // this atomic to lock-free readers. No mapping reference.
+            snapshot.header.last_updated = now_ms;
+            snapshot.header.heartbeat = snapshot.header.heartbeat.wrapping_add(1);
+            snapshot.header.created_at = now_ms;
+            snapshot.checksum = snapshot.compute_checksum();
+            unsafe { Self::publish_stack(ptr, &snapshot) };
             // Sync the repaired state to disk. Propagate the error so
             // the caller knows the state is not durable — the same
             // rationale as the migration msync above.
@@ -864,18 +863,18 @@ impl MmapState {
 
     /// Safely modify the core state within a write transaction.
     ///
-    /// This acquires the in-process writer mutex, begins the sequence
-    /// lock (`write_begin`), calls the closure with a mutable
-    /// reference, then releases the sequence lock (`write_end`).
+    /// The closure runs against a **stack copy**, never against the
+    /// mapping: no `&` or `&mut` into the mmap'd memory is formed on
+    /// any path here (see [`publish_stack`]). On success the prepared
+    /// copy is published atomically w.r.t. seqlock readers
+    /// (odd → volatile write → even) and the checksum with it; on
+    /// closure panic the mapping is untouched — there is nothing to
+    /// roll back — and the panic resumes after the flock is released.
     ///
-    /// The `&mut GenesisCoreState` handed to the closure is the sole
-    /// Rust reference to the mmap'd memory within this process for
-    /// the duration of the closure — readers use [`read`] /
-    /// [`read_consistent`] which copy bytes through raw pointers and
-    /// never create a competing `&`.
-    ///
-    /// The closure receives the current time in milliseconds so it
-    /// doesn't need to call a clock itself.
+    /// This acquires the in-process writer mutex plus the
+    /// cross-process flock (non-blocking; `FileLockBusy` when another
+    /// process is writing), stamps the heartbeat, runs the closure,
+    /// and publishes.
     ///
     /// # Errors
     ///
@@ -912,44 +911,41 @@ impl MmapState {
         // for the lifetime of this MmapState.
         unsafe { Self::lock_file(self.fd) }?;
 
-        // SAFETY: We hold `write_lock` and the flock, so we are the
-        // sole writer in this process and across all processes. No
-        // reader creates a `&` to the mmap'd memory (they use
-        // `read`/`read_consistent` which copy through raw pointers),
-        // so the `&mut` below does not alias with anything.
-        let state = unsafe { self.state_mut() };
-        // SAFETY: `state_mut` returned a valid `&mut`; `write_begin`
-        // is a seqlock acquire that atomically increments `seq_lock`
-        // to odd (write in progress) and updates the heartbeat.
-        unsafe { state.write_begin(now_ms) };
-        // Snapshot the state before the closure so that if it panics
-        // after partially mutating the mmap'd memory, we can restore
-        // the pre-write snapshot before calling write_end(). Without
-        // this, write_end() would recompute the checksum over torn
-        // data and set seq_lock even, publishing a corrupt but
-        // apparently-consistent state to all readers.
-        let snapshot = *state;
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(state)));
-        // Hold the cross-process flock until AFTER write_end has fully
-        // published the new state (seqlock flipped to even). Releasing
-        // the lock before write_end would allow another process to
-        // acquire it and call write_begin while we are still finishing
-        // our data writes and seqlock flip, producing a torn
-        // GenesisCoreState and a corrupted sequence lock.
-        if let Err(payload) = result {
-            // Restore the pre-write snapshot so readers never see
-            // partially-written state.
-            *state = snapshot;
-            state.write_end();
-            // SAFETY: `self.fd` is valid and we hold the lock.
-            unsafe { Self::unlock_file(self.fd) };
-            std::panic::resume_unwind(payload);
+        // Stack working copy: `read` copies through a raw pointer and
+        // forms no reference, so the closure's `&mut` below aliases
+        // nothing in the mapping (or anywhere else). Holding the
+        // flock additionally guarantees no other process is
+        // publishing concurrently, so this copy is coherent.
+        let mut next = self.read();
+        // Heartbeat stamp — the non-seqlock half of what
+        // `write_begin` used to do inline on the mapping.
+        next.header.last_updated = now_ms;
+        next.header.heartbeat = next.header.heartbeat.wrapping_add(1);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&mut next)));
+        match result {
+            Ok(()) => {
+                next.checksum = next.compute_checksum();
+                // Hold the flock until AFTER the publish has flipped
+                // the seqlock back to even (see `publish_stack`).
+                // Releasing earlier would let another process start
+                // its own publish mid-window, tearing the state and
+                // the sequence lock.
+                unsafe { Self::publish_stack(self.ptr, &next) };
+                // SAFETY: `self.fd` is valid and we hold the lock.
+                unsafe { Self::unlock_file(self.fd) };
+                // Don't sync every write — too slow. Caller can sync explicitly.
+                Ok(())
+            }
+            Err(payload) => {
+                // The mapping was never touched — the panicking
+                // closure only saw the stack copy. Release the flock
+                // and resume; the in-process mutex poisons via the
+                // guard's drop, as before.
+                // SAFETY: `self.fd` is valid and we hold the lock.
+                unsafe { Self::unlock_file(self.fd) };
+                std::panic::resume_unwind(payload);
+            }
         }
-        state.write_end();
-        // SAFETY: `self.fd` is valid and we hold the lock.
-        unsafe { Self::unlock_file(self.fd) };
-        // Don't sync every write — too slow. Caller can sync explicitly.
-        Ok(())
     }
 
     /// Flush dirty pages to disk. Call this after important writes
@@ -1010,6 +1006,67 @@ impl MmapState {
 
     // ─── Internal helpers ────────────────────────────────────────
 
+    /// Byte offset of `header.seq_lock` from the start of the mapping.
+    ///
+    /// Derived from the layout (`header` is the first field at offset
+    /// 0; `seq_lock` is at offset 40 within the header — both pinned
+    /// by compile-time asserts in `core_state.rs`/`header.rs`), never
+    /// from a live reference, so the seqlock can be driven without
+    /// forming any reference into the mapping.
+    const SEQ_LOCK_OFFSET: usize = core::mem::offset_of!(GenesisCoreState, header)
+        + core::mem::offset_of!(crate::state::header::CoreStateHeader, seq_lock);
+
+    /// Publish a fully-prepared stack state to the mapping.
+    ///
+    /// The integrity contract, replacing the old in-place
+    /// `write_begin`/`write_end` on a mapping reference:
+    ///
+    /// 1. Flip `seq_lock` to odd (write in progress) through a raw
+    ///    atomic — lock-free readers sample this and retry instead of
+    ///    trusting bytes written below.
+    /// 2. `write_volatile` the whole prepared struct. No `&`/`&mut`
+    ///    into the mapping is formed here or by the caller, so there
+    ///    is no aliasing with concurrent readers under Stacked/Tree
+    ///    Borrows — the previous `&mut`-into-`MAP_SHARED` pattern was
+    ///    unsound (Miri-flagged) and is now gone from every
+    ///    production path.
+    /// 3. Flip `seq_lock` back to even (write complete) with release
+    ///    ordering, publishing all preceding bytes to readers.
+    ///
+    /// The caller must hold `write_lock` and the flock, and
+    /// `prepared.checksum` must already cover `prepared` (as
+    /// `modify` and the open-time repairs ensure before calling).
+    ///
+    /// # Safety
+    ///
+    /// `ptr` must be a valid mmap'd region of at least
+    /// `GenesisCoreState::SIZE` bytes with no other writer active
+    /// (caller-held locks guarantee this).
+    unsafe fn publish_stack(ptr: *mut u8, prepared: &GenesisCoreState) {
+        // SAFETY: `ptr.add(SELF::SEQ_LOCK_OFFSET)` is the `seq_lock`
+        // u64 by the layout const above (8-byte aligned: 40 % 8 == 0).
+        // `AtomicU64::from_ptr` performs atomic RMWs without creating
+        // a reference; nothing else here creates one either.
+        let seq = unsafe { AtomicU64::from_ptr(ptr.add(Self::SEQ_LOCK_OFFSET) as *mut u64) };
+        seq.fetch_add(1, Ordering::AcqRel);
+        // Self-heal an inverted parity, mirroring the old
+        // `write_begin`: starting from a stale odd lock, one increment
+        // lands even ("stable") and would publish a torn snapshot
+        // mid-write to readers.
+        if seq.load(Ordering::Acquire) & 1 == 0 {
+            seq.fetch_add(1, Ordering::AcqRel);
+        }
+        fence(Ordering::Acquire);
+        // SAFETY: `ptr` is a valid writable mapping of at least SIZE
+        // bytes; `prepared` is a valid stack value (`Copy`, so this
+        // moves bytes without borrowing the mapping). Volatile: the
+        // compiler must emit the store.
+        unsafe { core::ptr::write_volatile(ptr as *mut GenesisCoreState, *prepared) };
+        fence(Ordering::Release);
+        // SAFETY: same atomic as above; Release publishes the bytes.
+        seq.fetch_add(1, Ordering::Release);
+    }
+
     /// Get a mutable reference to the core state.
     ///
     /// # Safety
@@ -1021,10 +1078,13 @@ impl MmapState {
     /// with the `&mut` returned here. The concern is solely preventing
     /// multiple writers.
     ///
-    /// In production code, use [`modify`] instead — it acquires the
-    /// writer mutex automatically. This method is exposed for
-    /// single-threaded test code that needs to pass `&mut GenesisCoreState`
-    /// to an engine that takes it by reference.
+    /// In production code, use [`modify`] instead — it runs the
+    /// closure on a stack copy and publishes without ever forming a
+    /// mapping reference. This method is exposed ONLY for
+    /// single-threaded test code that needs to pass
+    /// `&mut GenesisCoreState` to an engine that takes it by
+    /// reference; no production path calls it (verified: the only
+    /// in-tree callers are tests).
     #[allow(clippy::mut_from_ref)]
     pub unsafe fn state_mut(&self) -> &mut GenesisCoreState {
         // SAFETY: Caller guarantees no concurrent access. `self.ptr`
@@ -1086,30 +1146,36 @@ impl MmapState {
         fd: i32,
         migrate: impl FnOnce(&mut GenesisCoreState) -> Result<(), CoreStateError>,
     ) -> Result<GenesisCoreState, StateFileError> {
-        // SAFETY: the caller's invariants — the mapping is valid and
-        // exclusively owned (no `MmapState` has been returned yet), so
-        // this `&mut` is the sole reference and aliases nothing.
-        let state_mut: &mut GenesisCoreState = unsafe { &mut *(ptr as *mut GenesisCoreState) };
+        // Stack working copy: `read_volatile` forms no reference, so
+        // the migration's `&mut` aliases nothing in the mapping (or
+        // anywhere else). A panicking or failing migration leaves the
+        // mapping untouched — there is nothing to roll back.
+        // SAFETY: `ptr` is a valid mmap'd region of at least
+        // `GenesisCoreState::SIZE` bytes; the caller holds the flock
+        // and no `MmapState` exists yet.
+        let mut next = unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) };
         let now_ms = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis() as u64)
             .unwrap_or(0);
+        next.header.last_updated = now_ms;
+        next.header.heartbeat = next.header.heartbeat.wrapping_add(1);
         // Publish the migration through the seqlock as well as the
         // flock: the flock excludes writers, while the seqlock keeps
         // lock-free readers from observing a partially migrated state.
-        // SAFETY: the flock is held and no other `&mut` exists.
-        unsafe { state_mut.write_begin(now_ms) };
-        let pre_migration = *state_mut;
-        // A panicking migration would leave the seq_lock odd forever,
-        // which `open()` treats as a torn write — so catch, roll back,
-        // and resume.
         let migration =
-            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| migrate(state_mut)));
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| migrate(&mut next)));
         match migration {
-            Ok(Ok(())) => state_mut.write_end(),
+            Ok(Ok(())) => {
+                // Belt-and-suspenders: the migrations maintain the
+                // checksum themselves, but the publish must cover
+                // exactly what it writes — recompute over the final
+                // bytes (also covers the heartbeat stamp above).
+                next.checksum = next.compute_checksum();
+                // SAFETY: same mapping invariants as the read above.
+                unsafe { Self::publish_stack(ptr, &next) };
+            }
             Ok(Err(mig_err)) => {
-                *state_mut = pre_migration;
-                state_mut.write_end();
                 // SAFETY: release the lock before cleanup; fd/ptr are
                 // exclusively owned. No other references exist.
                 unsafe {
@@ -1120,8 +1186,6 @@ impl MmapState {
                 return Err(StateFileError::VerificationFailed(mig_err));
             }
             Err(payload) => {
-                *state_mut = pre_migration;
-                state_mut.write_end();
                 // SAFETY: release the lock before cleanup; fd/ptr are
                 // exclusively owned. No other references exist.
                 unsafe {
@@ -1150,8 +1214,9 @@ impl MmapState {
             }
             return Err(msync_err);
         }
-        // SAFETY: same as the initial read_volatile in `open()`.
-        Ok(unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) })
+        // Return the exact bytes published — no second copy, so the
+        // caller's checksum check validates what migration produced.
+        Ok(next)
     }
 
     /// Flush file metadata (especially the size change from `ftruncate`)

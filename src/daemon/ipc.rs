@@ -3187,6 +3187,7 @@ pub fn reactive_handler(
                         ];
                     }
                 };
+                tl.note_mind_drive();
                 let (surprise, free_energy, precision, allostatic, tick_count) =
                     tl.advance_neuro(mmap, dt);
                 let mut resp = vec![1u8]; // ack
@@ -3206,6 +3207,7 @@ pub fn reactive_handler(
                         return vec![error::INTERNAL_ERROR, 0, 0, 0, 0];
                     }
                 };
+                tl.note_mind_drive();
                 let count = tl.consolidate(mmap, stm, ltm);
                 let mut resp = vec![1u8];
                 resp.extend_from_slice(&count.to_le_bytes());
@@ -3220,6 +3222,7 @@ pub fn reactive_handler(
                         return vec![error::INTERNAL_ERROR, 0, 0, 0, 0];
                     }
                 };
+                tl.note_mind_drive();
                 let count = tl.associate(mmap, ltm);
                 let mut resp = vec![1u8];
                 resp.extend_from_slice(&count.to_le_bytes());
@@ -3234,6 +3237,7 @@ pub fn reactive_handler(
                         return vec![error::INTERNAL_ERROR, 0, 0, 0, 0];
                     }
                 };
+                tl.note_mind_drive();
                 let insights = tl.dream(mmap, ltm);
                 let mut resp = vec![1u8];
                 resp.extend_from_slice(&insights.to_le_bytes());
@@ -3248,6 +3252,7 @@ pub fn reactive_handler(
                         return vec![error::INTERNAL_ERROR];
                     }
                 };
+                tl.note_mind_drive();
                 let body = tl.read_sensors(mmap);
                 // Serialize with the shared BodyState layout, prefixed
                 // by a one-byte ack (same as GET_BODY_STATE otherwise).
@@ -3264,6 +3269,7 @@ pub fn reactive_handler(
                         return vec![error::INTERNAL_ERROR];
                     }
                 };
+                tl.note_mind_drive();
                 let _ = tl.apply_body_control(mmap);
                 // Return the control state — the shared layout,
                 // prefixed with a one-byte ack.
@@ -3274,13 +3280,14 @@ pub fn reactive_handler(
             }
 
             cmd::SAVE_INFERENCE => {
-                let tl = match tick_loop.lock() {
+                let mut tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
                         eprintln!("[ipc] SAVE_INFERENCE: tick_loop poisoned: {e}");
                         return vec![error::INTERNAL_ERROR];
                     }
                 };
+                tl.note_mind_drive();
                 if tl.save_inference_model(&data_dir) {
                     vec![1]
                 } else {

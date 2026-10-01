@@ -16,12 +16,15 @@ with them.
 from __future__ import annotations
 
 import json
+import logging
 import time
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from genesis_client import GenesisClient
 from genesis_client.protocol import CHEM_NAMES, PROTOCOL_VERSION
+
+logger = logging.getLogger(__name__)
 
 FORMAT_VERSION = 1
 
@@ -144,8 +147,10 @@ def capture_snapshot(
             "cognitive_style": emo.cognitive_style,
             "cause": emo.cause,
         }
-    except ImportError:
-        pass
+    except ImportError as e:
+        # Emotion module unavailable in minimal installs — baseline simply
+        # omits the resting-emotion enrichment rather than failing.
+        logger.debug(f"resting-emotion enrichment skipped: {e}")
 
     return Snapshot(
         captured_at_unix=time.time(),

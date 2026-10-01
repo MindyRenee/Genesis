@@ -16,13 +16,18 @@
 //! STM ring buffer, and LTM store. Other processes (the Python
 //! cognitive mind) communicate with it via a Unix domain socket.
 //!
-//! The daemon is **reactive**, not timer-driven: it never initiates
-//! neurochemical, memory, or body-control actions on its own. The
-//! cognitive mind requests each function through IPC when its own
-//! state (brain waves, thresholds, urges) says it's time. The only
-//! autonomous work the daemon does is staleness detection — if the
-//! cognitive mind's heartbeats stop, the daemon marks its modules
-//! Stopped so the manifest reflects reality.
+//! The daemon is **lease-driven**: the cognitive mind holds a short
+//! lease (renewed by every reactive IPC command) and drives each
+//! function through IPC while alive. Past the lease
+//! (`tick::MIND_LEASE_SECS`), the daemon drives the full loop
+//! itself — neurochemistry, consolidation, sleep-gated dreaming,
+//! association, sensing, intention expiry with zone arbitration and
+//! traces, body-control recommendation publishing, and model
+//! checkpoints — so the system keeps living instead of freezing
+//! during a stall, crash, or disconnect. Body-control *application*
+//! stays mind-requested; the fallback publishes and senses but never
+//! acts outward on its own. Staleness detection runs regardless, so
+//! a crashed mind's modules still read Stopped.
 //!
 //! ```text
 //! ┌──────────────────────────────────────────────────────────┐

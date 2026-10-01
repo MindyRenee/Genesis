@@ -305,7 +305,10 @@ class FeedLogHandler(logging.Handler):
         try:
             self._feed.post_line(self.format(record))
         except Exception:  # noqa: BLE001 — mirroring must never break logging
-            pass
+            # NOTE: must not use logger here (it would recurse into this
+            # handler). Delegate to the standard logging error handling,
+            # which writes to stderr when raiseExceptions is enabled.
+            self.handleError(record)
 
 
 class StderrTee:

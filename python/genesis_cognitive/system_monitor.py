@@ -404,8 +404,8 @@ class SystemBaseline:
             if tmp_path is not None:
                 try:
                     os.unlink(tmp_path)
-                except OSError:
-                    pass
+                except OSError as e:
+                    logger.debug(f"baseline tmp cleanup skipped: {e}")
 
     def load(self) -> None:
         """Load a previously saved baseline from disk."""
