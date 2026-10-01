@@ -19,7 +19,7 @@
 //! ## Why mmap instead of read/write?
 //!
 //! On a 4.7 GB RAM machine, we can't afford to hold copies of state
-//! in heap memory. With mmap, the OS manages paging — the 3288-byte
+//! in heap memory. With mmap, the OS manages paging — the ~3.2 KB
 //! state struct occupies a single page (4 KB), and the kernel keeps
 //! it cached or pages it out as needed. We get a direct pointer to
 //! the file's contents with zero copy.
@@ -69,11 +69,11 @@
 //! ## File layout
 //!
 //! ```text
-//! offset 0:     GenesisCoreState (3288 bytes)
-//! offset 3288:  (unused, padding to page boundary)
+//! offset 0:     GenesisCoreState (3296 bytes)
+//! offset 3296:  (unused, padding to page boundary)
 //! ```
 //!
-//! The state struct is 3288 bytes and the file is page-aligned, so the
+//! The state struct is 3296 bytes and the file is page-aligned, so the
 //! mapping is at least one page and the state sits at its start. (On a
 //! host with a 64 KiB page — aarch64, for instance — `page_align_up`
 //! expands the file to 64 KiB, not 4 KiB.)
@@ -86,13 +86,12 @@ use core::sync::atomic::{AtomicU64, Ordering, fence};
 
 use libc::{
     LOCK_EX, LOCK_NB, LOCK_UN, MAP_FAILED, MAP_SHARED, MS_ASYNC, MS_SYNC, PROT_READ, PROT_WRITE,
-    c_void,
-    close, fdatasync, flock, ftruncate, mmap, msync, munmap,
+    c_void, close, fdatasync, flock, ftruncate, mmap, msync, munmap,
 };
 
 use crate::state::{CoreStateError, GenesisCoreState};
 
-/// The logical file size — one 4K page. The state struct (3288 bytes)
+/// The logical file size — one 4K page. The state struct (3296 bytes)
 /// fits comfortably, with the rest as padding.
 const FILE_SIZE: usize = 4096;
 
@@ -407,7 +406,7 @@ impl MmapState {
 
         // Ensure the file is at least the page-aligned mapping length so
         // the mmap region is fully backed by the file. Without this, a
-        // file that is exactly 3288 bytes (state size) would be mapped
+        // file that is exactly the state size would be mapped
         // as a full page, leaving the tail unbacked — SIGBUS on access.
         if metadata.len() < mapped_len() as u64 {
             // SAFETY: `fd` is a valid open file descriptor with write
@@ -465,91 +464,50 @@ impl MmapState {
         // uninitialised.
         let mut snapshot = unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) };
         if let Err(e) = snapshot.verify() {
-            // If the version is old (but magic and size are correct),
-            // attempt migration before giving up.
-            if let crate::state::CoreStateError::VersionMismatch { found: 2, .. } = e {
-                // v2 → v3 migration: the struct layout is the same
-                // (3288 bytes), just the version label and chemical
-                // initialization need updating.
-                //
-                // SAFETY: `ptr` is a valid mmap'd region, exclusively
-                // owned (no `MmapState` has been returned to the caller,
-                // so no other thread can access it). The `&mut` is the
-                // sole reference and does not alias with anything.
-                let state_mut: &mut GenesisCoreState =
-                    unsafe { &mut *(ptr as *mut GenesisCoreState) };
-                let now_ms = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_millis() as u64)
-                    .unwrap_or(0);
-                // Publish migration through the seqlock as well as the
-                // flock: the flock excludes writers, while the seqlock
-                // keeps lock-free readers from observing a partially
-                // migrated state.
-                // SAFETY: the flock is held and no other `&mut` exists.
-                unsafe { state_mut.write_begin(now_ms) };
-                let pre_migration = *state_mut;
-                let migration = std::panic::catch_unwind(
-                    std::panic::AssertUnwindSafe(|| state_mut.migrate_state(2)),
-                );
-                match migration {
-                    Ok(Ok(())) => state_mut.write_end(),
-                    Ok(Err(mig_err)) => {
-                        *state_mut = pre_migration;
-                        state_mut.write_end();
-                        // SAFETY: unlock before munmap/close; fd/ptr are
-                        // exclusively owned. No other references exist.
-                        unsafe {
-                            Self::unlock_file(fd);
-                            munmap(ptr as *mut c_void, mapped_len());
-                            close(fd);
-                        }
-                        return Err(StateFileError::VerificationFailed(mig_err));
-                    }
-                    Err(payload) => {
-                        *state_mut = pre_migration;
-                        state_mut.write_end();
-                        // SAFETY: release the open lock before cleanup.
-                        unsafe {
-                            Self::unlock_file(fd);
-                            munmap(ptr as *mut c_void, mapped_len());
-                            close(fd);
-                        }
-                        std::panic::resume_unwind(payload);
-                    }
+            // Two kinds of mismatch are repairable in place, and the
+            // order of `verify()` decides which one we are looking at:
+            // it checks the version before the size.
+            match e {
+                // Old version label, layout still current: migrate the
+                // version (and the chemical initialization that came
+                // with it).
+                crate::state::CoreStateError::VersionMismatch { found: 2, .. } => {
+                    // SAFETY: `ptr`/`fd` are exclusively owned here — no
+                    // `MmapState` exists yet — and the flock is held.
+                    snapshot =
+                        unsafe { Self::migrate_and_snapshot(ptr, fd, |s| s.migrate_state(2))? };
                 }
-                // Sync the migrated state to disk. A failed msync here
-                // IS significant: the caller believes the migration
-                // succeeded and the state is durable, but the on-disk
-                // file may still contain the old v2 data. If the
-                // process crashes before the next explicit sync(), the
-                // migration is lost and the next open() will re-trigger
-                // it (which is safe but wasteful) or fail if the file
-                // is partially written. Propagate the error so the
-                // caller knows the state is not durable.
-                if let Err(msync_err) = Self::do_msync(ptr, mapped_len()) {
-                    // SAFETY: unlock before munmap/close; fd/ptr are
+                // Correct version, older struct size: the reserve at
+                // the end of the struct grew (see
+                // `GenesisCoreState::migrate_layout`), so no field
+                // before the signals block moved but the file is too
+                // short to read as-is.
+                crate::state::CoreStateError::SizeMismatch { found, .. } => {
+                    // SAFETY: as above.
+                    snapshot = unsafe {
+                        Self::migrate_and_snapshot(ptr, fd, |s| {
+                            s.migrate_layout(found)?;
+                            s.write_end_tail();
+                            Ok(())
+                        })?
+                    };
+                }
+                // Anything else — bad magic, a version we do not know,
+                // a size we cannot migrate from — is not a migration,
+                // it is a damaged or foreign file. Per the state
+                // integrity rules it is a startup error to be repaired
+                // explicitly, never something to paper over by starting
+                // fresh.
+                other => {
+                    // SAFETY: unlock before cleanup; fd/ptr are
                     // exclusively owned. No other references exist.
                     unsafe {
                         Self::unlock_file(fd);
                         munmap(ptr as *mut c_void, mapped_len());
                         close(fd);
                     }
-                    return Err(msync_err);
+                    return Err(StateFileError::VerificationFailed(other));
                 }
-                // Re-read the migrated state so the checksum check
-                // below validates the post-migration bytes.
-                // SAFETY: same as the initial read_volatile above.
-                snapshot = unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) };
-            } else {
-                // SAFETY: unlock before munmap/close; fd/ptr are
-                // exclusively owned. No other references exist.
-                unsafe {
-                    Self::unlock_file(fd);
-                    munmap(ptr as *mut c_void, mapped_len());
-                    close(fd);
-                }
-                return Err(StateFileError::VerificationFailed(e));
             }
         }
 
@@ -1101,6 +1059,99 @@ impl MmapState {
             return Err(StateFileError::MsyncFailed);
         }
         Ok(())
+    }
+
+    /// Run a migration against the mapped state in place, under the
+    /// flock `open()` already holds, and return the post-migration
+    /// snapshot.
+    ///
+    /// The returned snapshot is what the caller's `verify_checksum`
+    /// must run against: reading the state again afterwards is a
+    /// separate volatile copy, so the checksum check has to validate the
+    /// same bytes the migration produced.
+    ///
+    /// On any error the flock is released and the mapping and fd are
+    /// torn down before returning — the caller has no `MmapState` yet,
+    /// so nothing else owns them. A panicking migration is rolled back
+    /// the same way and then resumed.
+    ///
+    /// # Safety
+    ///
+    /// `ptr` must be a valid mmap'd region of at least
+    /// `GenesisCoreState::SIZE` bytes, `fd` the open fd for it, and the
+    /// caller must hold the flock and have no other reference to the
+    /// mapped state. On error the function consumes `fd` and `ptr`.
+    unsafe fn migrate_and_snapshot(
+        ptr: *mut u8,
+        fd: i32,
+        migrate: impl FnOnce(&mut GenesisCoreState) -> Result<(), CoreStateError>,
+    ) -> Result<GenesisCoreState, StateFileError> {
+        // SAFETY: the caller's invariants — the mapping is valid and
+        // exclusively owned (no `MmapState` has been returned yet), so
+        // this `&mut` is the sole reference and aliases nothing.
+        let state_mut: &mut GenesisCoreState = unsafe { &mut *(ptr as *mut GenesisCoreState) };
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        // Publish the migration through the seqlock as well as the
+        // flock: the flock excludes writers, while the seqlock keeps
+        // lock-free readers from observing a partially migrated state.
+        // SAFETY: the flock is held and no other `&mut` exists.
+        unsafe { state_mut.write_begin(now_ms) };
+        let pre_migration = *state_mut;
+        // A panicking migration would leave the seq_lock odd forever,
+        // which `open()` treats as a torn write — so catch, roll back,
+        // and resume.
+        let migration =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| migrate(state_mut)));
+        match migration {
+            Ok(Ok(())) => state_mut.write_end(),
+            Ok(Err(mig_err)) => {
+                *state_mut = pre_migration;
+                state_mut.write_end();
+                // SAFETY: release the lock before cleanup; fd/ptr are
+                // exclusively owned. No other references exist.
+                unsafe {
+                    Self::unlock_file(fd);
+                    munmap(ptr as *mut c_void, mapped_len());
+                    close(fd);
+                }
+                return Err(StateFileError::VerificationFailed(mig_err));
+            }
+            Err(payload) => {
+                *state_mut = pre_migration;
+                state_mut.write_end();
+                // SAFETY: release the lock before cleanup; fd/ptr are
+                // exclusively owned. No other references exist.
+                unsafe {
+                    Self::unlock_file(fd);
+                    munmap(ptr as *mut c_void, mapped_len());
+                    close(fd);
+                }
+                std::panic::resume_unwind(payload);
+            }
+        }
+        // Sync the migrated state to disk. A failed msync here IS
+        // significant: the caller believes the migration succeeded and
+        // the state is durable, but the on-disk file may still contain
+        // the old data. If the process crashes before the next explicit
+        // sync(), the migration is lost and the next open() will
+        // re-trigger it (which is safe but wasteful) or fail if the file
+        // is partially written. Propagate the error so the caller knows
+        // the state is not durable.
+        if let Err(msync_err) = Self::do_msync(ptr, mapped_len()) {
+            // SAFETY: unlock before cleanup; fd/ptr are exclusively
+            // owned. No other references exist.
+            unsafe {
+                Self::unlock_file(fd);
+                munmap(ptr as *mut c_void, mapped_len());
+                close(fd);
+            }
+            return Err(msync_err);
+        }
+        // SAFETY: same as the initial read_volatile in `open()`.
+        Ok(unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) })
     }
 
     /// Flush file metadata (especially the size change from `ftruncate`)

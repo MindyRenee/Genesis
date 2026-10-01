@@ -13,7 +13,7 @@
 //! - **Versioned**: magic bytes + schema version detect format mismatches.
 //! - **Checksummed**: CRC32 detects corruption from crashes mid-write.
 //!
-//! ## Schema v3 layout (3288 bytes)
+//! ## Schema v3 layout (3296 bytes)
 //!
 //! ```text
 //! offset  field             type                size
@@ -24,11 +24,17 @@
 //! 2568    memory            MemoryPointers      120
 //! 2688    manifest          RuntimeManifest     536
 //! 3224    checksum          u32                   4
-//! 3228    inference_signals InferenceSignals      60
-//! 3288    TOTAL                                   3288 bytes
+//! 3228    inference_signals InferenceSignals      64
+//! 3292    padding (alignment to 8 bytes)           4
+//! 3296    TOTAL                                   3296 bytes
 //! ```
 //!
-//! That's ~3.3 KB — fits in a single 4 KB page with room to spare.
+//! That's ~3.2 KB — fits in a single 4 KB page with room to spare.
+//!
+//! The tail is a reserve sized to exactly `size_of::<InferenceSignals>()`
+//! so that adding a signal field cannot shift anything else. Such a
+//! growth is a *size* migration, not a version one: see
+//! [`GenesisCoreState::migrate_layout`].
 //!
 //! ## What's new in v3
 //!
@@ -87,9 +93,29 @@ use core::sync::atomic::{AtomicU64, Ordering, fence};
 
 /// Reserved bytes at the end of the struct for future expansion
 /// within schema v3 (does not require a version bump). The
-/// [`InferenceSignals`] struct occupies this space — it is 60 bytes,
-/// matching the previous reserved region exactly.
-pub const RESERVED_BYTES: usize = 60;
+/// [`InferenceSignals`] struct occupies this space — it is 64 bytes,
+/// matching the reserved region exactly.
+///
+/// The reserve is defined as exactly `size_of::<InferenceSignals>()`
+/// (asserted at the bottom of this file) so that adding a signal field
+/// cannot shift any other field's offset. It is *not* padded out to the
+/// struct's own size: `inference_signals` ends at 3228 + 64 = 3292 and
+/// the struct rounds up to 3296 for 8-byte alignment.
+pub const RESERVED_BYTES: usize = 64;
+
+/// The struct size under schema v3 before [`InferenceSignals`] gained
+/// `policy_authority` — that field took the reserve from 60 to 64 bytes
+/// and the struct from 3288 to 3296.
+///
+/// This is a *size* migration, not a version one: the schema label
+/// stayed at 3 deliberately, because the reserve exists precisely so
+/// that growing the signals block does not move any other field. A v3
+/// state file written before the field existed therefore carries
+/// `version = 3` but `state_size = 3288`, and [`GenesisCoreState::verify`]
+/// reports [`CoreStateError::SizeMismatch`] — a variant that
+/// [`GenesisCoreState::migrate_state`] never sees, because it dispatches
+/// on version. [`GenesisCoreState::migrate_layout`] handles it.
+const LEGACY_SIZE: u32 = 3288;
 
 /// CRC32 polynomial (IEEE 802.3 — same as zlib / PNG).
 const CRC32_POLY: u32 = 0xEDB88320;
@@ -135,7 +161,7 @@ pub struct GenesisCoreState {
     /// CRC32 checksum of all preceding bytes (header.seq_lock excluded).
     pub checksum: u32,
     /// Active inference signals — the generative self-model's
-    /// projection. Lives in the former reserved region (60 bytes).
+    /// projection. Lives in the former reserved region (64 bytes).
     /// Not covered by the CRC32 checksum (derived state, recomputed
     /// every tick). See [`InferenceSignals`].
     pub inference_signals: InferenceSignals,
@@ -250,8 +276,10 @@ impl GenesisCoreState {
             // genetic defaults, fill the new coupling matrix rows/columns
             // with the default values, and recompute derived fields.
             //
-            // The struct size is the same (3288 bytes) — the v2 binary
-            // was already compiled with the full 18-chemical layout.
+            // The struct size does not change: the v2 binary was
+            // already compiled with the full 18-chemical layout. (It was
+            // 3288 bytes then; see `migrate_layout` for the later
+            // reserve growth that took it to 3296.)
             // The 6 new chemicals may be zeroed (if written by an older
             // binary that didn't initialize them) or may have valid data
             // (if written by the current binary with a stale version
@@ -358,6 +386,95 @@ impl GenesisCoreState {
         }
     }
 
+    /// Migrate a state written under a *different struct size* but the
+    /// same schema version.
+    ///
+    /// [`Self::migrate_state`] dispatches on `header.version`, so it
+    /// cannot help a file whose version label is already correct but
+    /// whose `header.state_size` predates a layout change. That is the
+    /// case the reserve was meant to make harmless: adding a field to
+    /// [`InferenceSignals`] grows the reserve, which grows the struct,
+    /// and no other field moves. The version stays 3, so
+    /// [`Self::verify`] gets past its version check and fails on size
+    /// instead.
+    ///
+    /// The one layout change handled here is the 3288 → 3296 growth
+    /// from `InferenceSignals::policy_authority`. Because every
+    /// [`InferenceSignals`] field kept its offset and only one was
+    /// appended at the end, the migration is: zero the new tail, record
+    /// the new size, and recompute the checksum. Nothing before
+    /// `inference_signals` is touched, so the header, the 18
+    /// neurochemicals, the zones, memory pointers and manifest all
+    /// survive intact.
+    ///
+    /// Zeroing is the correct value rather than merely a safe one:
+    /// `policy_authority` is the authority cognition grants the
+    /// inference engine to act on its own policy choice, and it must not
+    /// come up non-zero from a file that predates the field. The signals
+    /// block is derived state excluded from the CRC and recomputed each
+    /// tick, so the new field is zero again on the first tick either
+    /// way — this just means the file is not carrying a grant nobody
+    /// made.
+    ///
+    /// The caller must hold the flock and publish the write through the
+    /// seqlock; see the call site in `crate::store::mmap_state::open`.
+    pub fn migrate_layout(&mut self, from_size: u32) -> Result<(), CoreStateError> {
+        if from_size == Self::SIZE as u32 {
+            // Already the current layout — nothing to do.
+            return self.verify();
+        }
+        if from_size != LEGACY_SIZE {
+            return Err(CoreStateError::SizeMismatch {
+                expected: Self::SIZE as u32,
+                found: from_size,
+            });
+        }
+
+        // Appended at the tail of the signals block, so every existing
+        // field keeps its offset and value. The trailing bytes past the
+        // new field are alignment padding that the CRC does not cover;
+        // `write_end_tail` zeroes them in the mapping so the file stays
+        // byte-deterministic rather than carrying whatever the previous
+        // binary left in the slack space of the 4 KB page.
+        self.inference_signals.policy_authority = 0.0;
+
+        self.header.state_size = Self::SIZE as u32;
+        self.checksum = self.compute_checksum();
+        Ok(())
+    }
+
+    /// Zero the alignment padding between the end of `inference_signals`
+    /// and [`Self::SIZE`].
+    ///
+    /// The CRC covers offsets 0..40 and 48..`checksum`, so the padding
+    /// is outside every integrity check — but it is inside `SIZE`, and
+    /// `open()` copies the whole struct out of the mapping with
+    /// `read_volatile`. Leaving it stale would make the migrated file
+    /// differ byte-for-byte between machines for no reason. It also
+    /// guarantees `policy_authority` reads as 0.0 rather than as
+    /// whatever an older binary left at that offset.
+    ///
+    /// # Panics
+    ///
+    /// Debug builds only: if the signals block no longer ends at or
+    /// before [`Self::SIZE`], the reserve and the struct have drifted
+    /// apart and the range computed below would be meaningless.
+    pub fn write_end_tail(&mut self) {
+        let base = self as *mut Self as *mut u8;
+        let signals_end = core::mem::offset_of!(Self, inference_signals) + RESERVED_BYTES;
+        debug_assert!(signals_end <= Self::SIZE);
+        // SAFETY: `base` is derived from a unique `&mut Self`, so this
+        // is the only live pointer to the object and no other reference
+        // can alias it. The range is `signals_end..SIZE`, pinned inside
+        // the object by the debug_assert above; the caller obtained the
+        // mapping at ≥ `SIZE` bytes. The bytes written are alignment
+        // padding, which belongs to no field, so no field's value is
+        // invalidated.
+        unsafe {
+            core::ptr::write_bytes(base.add(signals_end), 0, Self::SIZE - signals_end);
+        }
+    }
+
     // ─── Checksum ────────────────────────────────────────────────
 
     /// Compute the CRC32 checksum over the struct, excluding the
@@ -365,7 +482,7 @@ impl GenesisCoreState {
     ///
     /// The checksum covers two regions:
     /// 1. offset 0..40 (magic through heartbeat)
-    /// 2. offset 48..(SIZE - RESERVED_BYTES - 4) (instance_id through manifest end)
+    /// 2. offset 48..`checksum` (instance_id through manifest end)
     ///
     /// `header.seq_lock` (offset 40..48) is excluded because it changes
     /// on every write, making the checksum unstable.
@@ -373,15 +490,22 @@ impl GenesisCoreState {
     /// end are excluded.
     pub fn compute_checksum(&self) -> u32 {
         let ptr = self as *const Self as *const u8;
-        let size = Self::SIZE;
-        let checksum_offset = size - RESERVED_BYTES - 4;
+        // Anchor to the field's actual offset rather than deriving it
+        // from `SIZE - RESERVED_BYTES - 4`. That derivation assumed the
+        // struct ends exactly at the reserve with no padding, so
+        // growing the reserve by 4 moved the derived offset to 3228
+        // while the checksum field stayed at 3224 — and region 2 then
+        // covered the checksum itself, which can never verify. Reading
+        // the offset from the layout removes that coupling entirely.
+        let checksum_offset = core::mem::offset_of!(Self, checksum);
 
         let (region1, region2) = unsafe {
             // SAFETY: `ptr` is `self as *const Self as *const u8`, pointing to
-            // a valid `GenesisCoreState` (repr(C), SIZE = 3288). The two
+            // a valid `GenesisCoreState` (repr(C)). The two
             // regions are within-bounds non-overlapping sub-slices:
             //   r1: offset 0..40  (40 bytes, before seq_lock)
-            //   r2: offset 48..checksum_offset (checksum_offset ≤ SIZE - 64)
+            //   r2: offset 48..checksum_offset (ends at the checksum,
+            //       which is 4 bytes before inference_signals)
             // Both lengths are ≥ 0 and their end offsets are ≤ SIZE.
             // Region 1: offset 0..40 (magic through heartbeat, before seq_lock)
             let r1 = core::slice::from_raw_parts(ptr, 40);
@@ -699,7 +823,13 @@ impl core::fmt::Display for CoreStateError {
 
 const _: () = {
     use core::mem::offset_of;
-    assert!(core::mem::size_of::<GenesisCoreState>() == 3288);
+    // InferenceSignals grew by 4 bytes (policy_authority) and the
+    // reserved region is defined as exactly its size, so the reserve
+    // grew with it. Nothing before the signals block moved: the
+    // reserve exists so a new signal field cannot shift the rest of
+    // the wire layout. The total rounds up to 3296 for alignment,
+    // which is why it is 4 larger than 3228 + 64.
+    assert!(core::mem::size_of::<GenesisCoreState>() == 3296);
     assert!(core::mem::size_of::<GenesisCoreState>() <= 4096);
     assert!(offset_of!(GenesisCoreState, header) == 0);
     assert!(offset_of!(GenesisCoreState, neurochemicals) == 56);
@@ -708,19 +838,17 @@ const _: () = {
     assert!(offset_of!(GenesisCoreState, manifest) == 2688);
     assert!(offset_of!(GenesisCoreState, checksum) == 3224);
     assert!(offset_of!(GenesisCoreState, inference_signals) == 3228);
-    // `compute_checksum` locates the checksum field as
-    // `size - RESERVED_BYTES - 4`, and region 2 as
-    // `48..(size - RESERVED_BYTES - 4)`. Nothing else ties
-    // `RESERVED_BYTES` to the layout, so pin the relation it must
-    // satisfy. If it were ever set to 0, region 2 would extend to
-    // `SIZE - 4`, the checksum would cover itself, and
-    // `verify_checksum` could never succeed — rejecting every state
-    // file at open.
-    assert!(
-        offset_of!(GenesisCoreState, inference_signals) + RESERVED_BYTES == GenesisCoreState::SIZE
-    );
-    // ...and the checksum must sit exactly 4 bytes below it, which is
-    // what makes region 2 end immediately before the checksum.
+    // `compute_checksum` locates the checksum field with
+    // `offset_of!(Self, checksum)` and region 2 as `48..<that offset>`
+    // — it no longer derives either from `RESERVED_BYTES`. What
+    // `RESERVED_BYTES` must still satisfy is that the reserve is
+    // exactly the signals block: too large and the signals block would
+    // leave a hole (harmless but pointless), too small and the struct
+    // would carry unowned bytes the signals do not account for.
+    // `write_end_tail` zeroes whatever gap that leaves between the end
+    // of the signals and `SIZE`.
+    // ...and the checksum must sit exactly 4 bytes below the signals,
+    // which is what makes region 2 end immediately before the checksum.
     assert!(
         offset_of!(GenesisCoreState, inference_signals)
             == offset_of!(GenesisCoreState, checksum) + 4
@@ -728,5 +856,13 @@ const _: () = {
     assert!(
         core::mem::size_of::<InferenceSignals>() == RESERVED_BYTES,
         "InferenceSignals must exactly fill the reserved region"
+    );
+    // The signals block must end inside the struct, or `write_end_tail`
+    // would compute a range outside it. Today it ends 4 bytes short of
+    // `SIZE` — the struct's 8-byte alignment — and that padding is the
+    // only slack left, which is why the reserve must never exceed the
+    // signals size (asserted above).
+    assert!(
+        offset_of!(GenesisCoreState, inference_signals) + RESERVED_BYTES <= GenesisCoreState::SIZE
     );
 };

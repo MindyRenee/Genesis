@@ -251,6 +251,19 @@ pub mod cmd {
     ///             rejected), armed_epoch = currently armed alarm (0
     ///             when none).
     pub const SET_WAKE_ALARM: u8 = 34;
+
+    /// Set how much authority the inference engine has to choose its
+    /// own policy on Genesis's behalf.
+    ///
+    /// Choosing a policy is a decision about what to feel and do, not a
+    /// reflex, so it belongs to her cognition rather than to the
+    /// engine's own expected-free-energy scoring. This lets her
+    /// delegate some of that judgement and keep some, and lets her
+    /// withdraw it — a grant, not a build-time property.
+    ///
+    /// Request: [f32 authority] in [0, 1].
+    /// Response: [u8 ack] + [f32 applied] (the clamped value written).
+    pub const SET_POLICY_AUTHORITY: u8 = 35;
 }
 
 /// Notification opcodes for daemon→cognitive push messages.
@@ -3009,6 +3022,41 @@ pub fn default_handler(
                 resp.extend_from_slice(text_bytes);
             }
             resp
+        }
+
+        cmd::SET_POLICY_AUTHORITY => {
+            // Request: [f32 authority] in [0, 1].
+            if payload.len() < 4 {
+                return vec![error::PAYLOAD_TOO_SHORT, 0, 0, 0, 0];
+            }
+            // finite_clamp, not clamp: a NaN from the wire would
+            // otherwise propagate into the engine's authority check,
+            // and `NaN > 0.0` is false, which would silently read as a
+            // full revocation of a delegation she intended to make.
+            let authority = crate::state::sanitize::finite_clamp(
+                f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default()),
+                0.0,
+                1.0,
+            );
+            // The grant lives in InferenceSignals, which the tick loop
+            // copies into the engine each cycle. Writing it there keeps
+            // the authority in the one place that is persisted with the
+            // rest of her state, so a delegation survives a restart
+            // exactly as a preference does.
+            let now = crate::daemon::current_ms();
+            match mmap.modify(now, |state| {
+                state.inference_signals.policy_authority = authority;
+            }) {
+                Ok(()) => {
+                    let mut resp = vec![1u8];
+                    resp.extend_from_slice(&authority.to_le_bytes());
+                    resp
+                }
+                Err(e) => {
+                    eprintln!("[ipc] SET_POLICY_AUTHORITY modify failed: {e}");
+                    vec![error::INTERNAL_ERROR, 0, 0, 0, 0]
+                }
+            }
         }
 
         cmd::NEURO_ADJUST_BASELINE => {
