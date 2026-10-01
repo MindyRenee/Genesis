@@ -55,7 +55,28 @@ not — those must be generated, not recited.
   and kernel V4L2 headers — `v4l2-sys-mit` runs `bindgen` against
   `<linux/videodev2.h>` at build time (Debian/Ubuntu:
   `sudo apt install libclang-dev linux-libc-dev`).
-- Test: `cargo test`
+- Test: `cargo test`. **Without a system C toolchain** (e.g. NixOS, or
+  any host with no `cc`/`gcc`), `cargo` fails at link with
+  `linker 'cc' not found` even though `cargo check` passes. Zig ships
+  a working clang; shim it so `cc` resolves:
+  ```sh
+  mkdir -p /tmp/zigshim && ZIG=/path/to/zig
+  for t in cc c++ ar ranlib; do
+    printf '#!/bin/sh\nexec %s %s "$@"\n' "$ZIG" \
+      "$(case $t in cc) echo cc;; c++) echo c++;; *) echo $t;; esac)" \
+      > /tmp/zigshim/$t && chmod +x /tmp/zigshim/$t
+  done
+  export PATH=/tmp/zigshim:$PATH
+  export LIBCLANG_PATH=/path/to/libclang/clang/native
+  Z=/path/to/zig/lib
+  export BINDGEN_EXTRA_CLANG_ARGS="-I$Z/include \
+    -I$Z/libc/include/x86-linux-gnu -I$Z/libc/include/generic-glibc \
+    -I$Z/libc/include/x86-linux-any -I$Z/libc/include/any-linux-any"
+  cargo test --release
+  ```
+  `BINDGEN_EXTRA_CLANG_ARGS` must match `zig cc -E -v -x c /dev/null`
+  exactly; a partial include set fails on `__STD_TYPE`. With this, the
+  full Rust suite is 498 tests.
 - Run examples: `cargo run --example <name>`
 - Python 3.12+ (CI tests 3.12 and 3.14), dependencies pinned in
   `python/requirements.txt`
