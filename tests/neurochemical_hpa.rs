@@ -23,7 +23,9 @@
 //! the Python cognitive mind to see a different value than the Rust
 //! daemon stores.
 
-use genesis::state::neurochemical::{NeuroTickParams, NeurochemicalId, NeurochemicalVector};
+use genesis::state::neurochemical::{
+    NeuroTickParams, Neurochemical, NeurochemicalId, NeurochemicalVector,
+};
 use genesis::state::sanitize::finite_clamp;
 
 // ─── HPA cascade maturation gating ─────────────────────────────
@@ -265,4 +267,109 @@ fn test_cortisol_hard_clamp_under_sustained_crh() {
         cortisol <= 0.80 + 0.001,
         "Cortisol must not exceed hard clamp 0.80, got {cortisol}"
     );
+}
+
+// ─── Vesicular depletion must not invert the dose-response ──────
+
+/// Driving a chemical harder must not produce *less* of it.
+///
+/// The pool was depleted on the requested dose before delivery, so an
+/// impulse the pool could not honour still emptied it. The chemical
+/// then latched off: sustained stimulation was impossible, and
+/// recovery was the only route back. Measured on CRH, driving 4x
+/// harder produced 4x less signal.
+#[test]
+fn test_stronger_impulse_is_never_weaker_response() {
+    let at = |imp: f32| -> f32 {
+        let mut nv = NeurochemicalVector::new(1);
+        let mut ms = 0u64;
+        for _ in 0..20_000u32 {
+            ms += 100;
+            nv.apply_impulse_capped(NeurochemicalId::CRH, imp, ms);
+            nv.tick_with_params(&NeuroTickParams::default());
+        }
+        nv.effective_levels[NeurochemicalId::CRH as usize]
+    };
+    let mild = at(0.0001);
+    let heavy = at(0.0005);
+    assert!(
+        heavy >= mild,
+        "a 5x stronger drive produced less signal: {mild} -> {heavy}"
+    );
+}
+
+/// An exhausted pool must recover rather than latch off.
+///
+/// This is what the depletion ordering broke: once the pool hit zero,
+/// further impulses were refused *and* kept depleting it, so nothing
+/// but the slow recharge could restore it.
+#[test]
+fn test_exhausted_vesicular_pool_recovers() {
+    let mut chem = Neurochemical::new(NeurochemicalId::CRH, 0);
+    let mut ms = 0u64;
+    // Drain it.
+    for _ in 0..500u32 {
+        ms += 100;
+        chem.apply_impulse(0.05, ms);
+    }
+    assert!(
+        chem.vesicular_pool < 0.5,
+        "pool should be drained, was {}",
+        chem.vesicular_pool
+    );
+    // A further impulse must not make progress toward permanently off.
+    //
+    // The pool is not exactly zero — a small residue remains — so a
+    // little of the next impulse is still delivered and still charged.
+    // What matters is that the drain cannot run away: the residual
+    // depletion is proportional to what was delivered, which is
+    // proportional to what was left, so it is self-limiting.
+    let drained = chem.vesicular_pool;
+    ms += 100;
+    chem.apply_impulse(0.05, ms);
+    let after = chem.vesicular_pool;
+    // The residual depletion is bounded by what was left, so repeated
+    // impulses approach zero geometrically rather than driving the pool
+    // negative. Compare against the old behaviour, which charged the
+    // full requested dose regardless of delivery and ran the pool to
+    // zero and kept it there.
+    let per_impulse = drained - after;
+    assert!(
+        per_impulse < drained * 0.05,
+        "a drained pool must barely move: {drained} -> {after} \
+         (per-impulse drain {per_impulse})"
+    );
+    // Many further impulses must not latch it off: the pool can always
+    // be driven to and held at a small positive value, never driven
+    // below zero, so the slow recharge always has somewhere to go.
+    for _ in 0..2000u32 {
+        ms += 100;
+        chem.apply_impulse(0.05, ms);
+        assert!(chem.vesicular_pool >= 0.0);
+    }
+    assert!(
+        chem.vesicular_pool > 0.0,
+        "pool latched off at exactly zero after sustained drive"
+    );
+}
+
+/// The stress axis must remain responsive to stronger drive.
+#[test]
+fn test_hpa_axis_remains_monotone_in_drive() {
+    let mut prev = 0.0f32;
+    for imp in [0.00002f32, 0.0001, 0.0005, 0.002] {
+        let mut nv = NeurochemicalVector::new(1);
+        let mut ms = 0u64;
+        for _ in 0..20_000u32 {
+            ms += 100;
+            nv.apply_impulse_capped(NeurochemicalId::CRH, imp, ms);
+            nv.tick_with_params(&NeuroTickParams::default());
+        }
+        let acth = nv.acth_level;
+        assert!(
+            acth >= prev - 1e-6,
+            "ACTH fell as drive rose at imp={imp}: {prev} -> {acth}"
+        );
+        prev = acth;
+    }
 }

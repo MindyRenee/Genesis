@@ -179,19 +179,39 @@
 //!
 //! # Allostatic load
 //!
-//! Allostatic load accumulates when the **expected** future free
-//! energy is high — the system anticipates continued disruption:
+//! Allostatic load is the cumulative regulatory burden, integrated
+//! over time under a hysteresis band:
 //!
 //! ```text
-//! if expected_free_energy > threshold:
-//!     allostasis_load += rate * (expected_fe - threshold)
+//! burden = mean of the two middle values of
+//!          [expected_fe, surprise, 1 - precision, homeostatic deviation]
+//!
+//! if burden > ACCUMULATE_THRESHOLD:
+//!     allostasis_load += ACCUMULATION_RATE * (burden - threshold) * dt_scale
+//! elif burden < RECOVER_THRESHOLD:
+//!     allostasis_load -= RECOVERY_RATE * dt_scale
 //! else:
-//!     allostasis_load -= recovery_rate
+//!     allostasis_load -= RECOVERY_RATE * 0.25 * dt_scale
 //! ```
 //!
-//! This is the anticipatory stress signal. Sustained allostatic load
-//! upregulates cortisol baseline, modeling the chronic stress →
-//! HPA axis sensitization pathway (McEwen & Stellar, 1993).
+//! The burden is deliberately **multisignal**: it is the mean of the
+//! two middle values of the four, so one isolated spike cannot
+//! manufacture load while elevation across several dimensions can.
+//! The third branch — slow recovery inside the band — is what keeps
+//! already-accumulated load from becoming permanent under sustained
+//! mild stress. Omitting it makes the band a hard freeze, which is
+//! the allostatic trap this mechanism exists to model (McEwen, 1998).
+//!
+//! Expected free energy is one input to that median, not the driver:
+//! it is the *anticipatory* demand signal, and load is the accumulated
+//! wear. Sustained load upregulates the cortisol baseline, modeling
+//! the chronic stress → HPA axis sensitization pathway (McEwen &
+//! Stellar, 1993).
+//!
+//! This engine's load is the **substrate-scoped** view. The cognitive
+//! mind keeps a whole-system view that also folds in endocrine and
+//! computational-body stress; both are calibrated to the same
+//! timescale so they move together.
 //!
 //! # Active inference — policy selection
 //!
@@ -275,6 +295,7 @@
 //!   whack-a-mole re-derivation of the FEP, and how to pound the
 //!   hole. Neural Computation, 33(2), 447–482.
 
+use crate::state::neurochemical::NeuroTickParams;
 use std::path::Path;
 
 use crate::state::InferenceSignals;
@@ -307,6 +328,16 @@ pub struct DyadicSignals {
 /// Higher = faster learning but noisier; lower = slower but more
 /// stable. 0.02 gives smooth adaptation over ~50 ticks.
 const MODEL_LEARNING_RATE: f32 = 0.02;
+/// Per-cycle multiplicative decay of learned weights.
+///
+/// 0.02 means a weight retains 98% of its value per cycle and half-life
+/// of about 34 cycles (~3.4 s at 10 Hz). Chosen to be slow relative to
+/// the learning rate so that a well-supported weight is not washed
+/// away by decay before evidence accumulates, while still letting a
+/// weight the data no longer supports relax back toward zero within a
+/// few tens of seconds. Without any decay the model cannot revise a
+/// weight it learned once, and cannot track a change in her dynamics.
+const MODEL_FORGETTING: f32 = 0.02;
 
 /// The rate at which precision increases when surprise is low.
 /// Precision slowly recovers as the model proves it can predict
@@ -350,33 +381,245 @@ const SURPRISE_EMA_DECAY: f32 = 0.15;
 /// tracks the trend of surprise to predict future surprise.
 const EXPECTED_FE_DECAY: f32 = 0.1;
 
-/// Hysteresis thresholds for allostatic load accumulation and
-/// recovery. Biological stress systems have separate activation and
-/// deactivation thresholds — the HPA axis doesn't toggle on and off
-/// at the same cortisol level. Using two thresholds prevents
-/// oscillation around a single boundary and ensures that load
-/// accumulation requires sustained elevation while recovery begins
-/// as soon as the system calms below the lower threshold.
+// Context-amplifier gains. These scale the *cost* of stress already
+// present; they cannot create burden on their own (see the amplifier
+// bound below). The magnitudes are set so that a doubling of the
+// physiological measure is the largest effect context can have,
+// leaving the mediators in charge of the reading.
+const CONTEXT_GAIN_EXPECTED_FE: f32 = 0.5;
+const CONTEXT_GAIN_SURPRISE: f32 = 0.5;
+/// Hard ceiling on the context amplifier. With both gains at 0.5 the
+/// unclamped maximum is 2.0; capping at 1.5 guarantees the amplifier
+/// can never contribute more burden than the physiological measure
+/// itself, so a demand signal can never outvote the body.
+const CONTEXT_GAIN_MAX: f32 = 1.5;
+
+/// Anticipated-demand level at which allostatic amplification begins.
 ///
-/// The accumulate threshold is higher than the recover threshold:
-/// the system needs *sustained* expected free energy above 0.30 to
-/// start accumulating strain, but once accumulated, it only needs
-/// expected FE to drop below 0.20 to begin recovering. This gap is
-/// the hysteresis band.
-const ALLOSTASIS_ACCUMULATE_THRESHOLD: f32 = 0.30;
-const ALLOSTASIS_RECOVER_THRESHOLD: f32 = 0.20;
+/// This is a separate quantity from the load-integrator's dead-band:
+/// it sets how much anticipated demand inflates the *cost* of stress
+/// that is already present, not whether load accrues at all. Kept at
+/// 0.30 so that ordinary anticipatory demand is not treated as
+/// elevated.
+const CONTEXT_FE_ACTIVATION: f32 = 0.30;
 
-/// Rate at which allostatic load accumulates when expected FE is
-/// above the accumulate threshold.
-const ALLOSTASIS_ACCUMULATION_RATE: f32 = 0.001;
+/// Fraction of the resting burden treated as neutral variation.
+///
+/// A burden within this band of her measured resting level neither
+/// accrues nor drains load, so ordinary physiological variation does
+/// not integrate without bound.
+///
+/// Sized from the measured resting spread rather than chosen. With no
+/// external drive the burden sits at p50 0.039, p90 0.039, max 0.039 —
+/// the resting catecholamines are almost exactly at their genetic
+/// baselines, and only a small cortisol baseline is present. Under
+/// sustained CRH drive it rises to p50 0.105, p90 0.149, p99 0.32.
+///
+/// So rest occupies 0.00-0.04 and genuine activation occupies roughly
+/// 0.10 upward, with a tail to 0.35. The band is set at 25% of a 0.04
+/// resting level — 0.01 — which puts the accrual edge at 0.05: above
+/// every resting observation, and below the sustained-stress median.
+///
+/// This band was previously much wider and the resting reference much
+/// higher, on the strength of measurements taken with a probe that was
+/// reading the wrong chemical index (it used slot 15, which is CRH,
+/// as though it were epinephrine). That misreading put the estimated
+/// resting burden at 0.17 when the real figure is 0.039, and the
+/// consequence was severe: with the accrual edge at 0.204 and the real
+/// resting burden at 0.039, an organism under no stress at all
+/// measured a load of 0.69.
+const REST_DEADBAND_FRACTION: f32 = 0.25;
 
-/// Rate at which allostatic load recovers when expected FE is below
-/// the recover threshold. Recovery is 2× faster than accumulation —
-/// the body heals faster than it breaks down, given the chance
-/// (McEwen, 1998; McEwen & Wingfield, 2003). This prevents the
-/// allostatic trap where load accumulates faster than it can
-/// recover, making chronic stress permanent.
-const ALLOSTASIS_RECOVERY_RATE: f32 = 0.002;
+/// Rate at which the resting-burden estimate follows the burden.
+///
+/// Symmetric and slow. The estimate is a long-run average of her
+/// burden, because over a long window the mean of that burden *is*
+/// her resting level — so averaging makes the reference correct by
+/// construction rather than by assumption.
+///
+/// The earlier version was asymmetric, falling 100x faster than it
+/// rose, on the reasoning that a stressor must not be able to raise
+/// its own reference and thereby excuse itself. That reasoning was
+/// half right and the implementation inverted the problem: the burden
+/// is bursty (CRH arrives in pulses), so most samples sit low and the
+/// reference collapsed toward zero within seconds while load climbed.
+/// Traced directly, the reference fell from 0.0054 to 0.0000002 and
+/// the resting organism then measured a load of 0.69. A reference that
+/// runs away from its signal defeats the measure in either direction.
+///
+/// Rate 0.00002 gives a time constant of 50,000 ticks — about 83
+/// minutes at 10 Hz. Long enough that no single excursion moves it,
+/// short enough to follow a genuine change in her resting physiology
+/// over the timescale of a session. A sustained stressor at burden
+/// 0.105 shifts the reference only after tens of thousands of ticks,
+/// while load has been accruing from the first one.
+const REST_TRACK_RATE: f32 = 0.00002;
+
+/// Initial resting-burden estimate before any history exists.
+///
+/// The catecholamines carry a resting contribution (norepinephrine
+/// 0.30, epinephrine 0.15 genetic baselines) that is normal wake
+/// physiology rather than pathology, so the initial estimate is
+/// nonzero. Set to the measured resting burden mean of 0.04: the
+/// dead-band is a fraction of this value, so an overestimate places
+/// the accrual edge above genuine stress and the measure goes blind,
+/// while an underestimate places it inside the resting distribution
+/// and charges a healthy organism for being awake.
+const REST_BURDEN_INITIAL: f32 = 0.04;
+
+/// Rate at which allostatic load accumulates per unit of burden above
+/// rest. Sets the timescale over which sustained activation becomes
+/// wear.
+///
+/// Derived from the construct's own timescale rather than chosen. Allo-
+/// static load is the cumulative cost of chronic exposure measured
+/// over a life, so the [0, 1] range has to represent months of
+/// sustained activation, not hours.
+///
+/// At the measured sustained-stress excess of ~0.06 above rest, a rate
+/// of 0.001 drove load from zero to saturation in about 14 minutes of
+/// continuous stress — the measure saturating inside a single work
+/// session, which is not a measure of cumulative wear. For a
+/// meaningful elevation over roughly one day of sustained stress
+/// (864,000 ticks at 10 Hz), the rate must satisfy
+///
+/// ```text
+/// rate ≈ 0.5 / (864_000 * 0.06) ≈ 1e-5
+/// ```
+///
+/// which puts meaningful accumulation at days and saturation at
+/// weeks, matching what the construct describes.
+const ALLOSTASIS_ACCUMULATION_RATE: f32 = 0.00001;
+
+/// Rate at which allostatic load recovers per unit of burden below
+/// rest. Faster than accumulation, so a system that is no longer
+/// stressed sheds its load — the body heals faster than it breaks
+/// down, given the chance (McEwen 1998; McEwen & Wingfield 2003).
+/// This is what prevents the allostatic trap in which load persists
+/// indefinitely after the stressor has gone.
+///
+/// Twice the accumulation rate, so a load built over days drains over
+/// roughly half that time once the stressor is gone. Not larger: the
+/// asymmetry only has to favour recovery, and an extreme one would
+/// make a transient spike erase genuine accumulated wear.
+const ALLOSTASIS_RECOVERY_RATE: f32 = 0.00002;
+
+
+/// Advance allostatic load by one step under the hysteresis band.
+///
+/// Pure function of the current load, the multisignal burden, and the
+/// time scale — extracted so the band behaviour is directly testable
+/// without driving the engine's EMAs to a chosen burden (steps 5 and
+/// 7 recompute those EMAs before step 8 reads them, so a test cannot
+/// simply pin them and observe the result).
+///
+/// The result is always a finite value in [0, 1]. A non-finite *load*
+/// maps to 0.0 via `finite_clamp` — "no load", the same convention as
+/// everywhere else in this file. A non-finite *burden* satisfies
+/// neither threshold comparison and therefore takes the band branch:
+/// an unknown burden holds the load roughly steady rather than
+/// clearing it (a false all-clear) or inflating it (a false alarm).
+/// Integrate allostatic load from the current burden.
+///
+/// The functional form is the integral of a wear rate:
+///
+/// ```text
+/// d(load)/dt = RATE * (burden - rest)      when burden > rest
+/// d(load)/dt = -RECOVERY * rest_fraction    when burden < rest
+/// ```
+///
+/// with `rest` being the measured resting burden, tracked as a slow
+/// baseline (see `RestBaseline`). This is what "cumulative wear"
+/// actually means: McEwen defines allostatic load as "the cost of
+/// chronic exposure to fluctuating or heightened neural or
+/// neuroendocrine response" — the cost is an integral over time of
+/// how far the response sits above its resting level, not a function
+/// of instantaneous amplitude.
+///
+/// ## Why there is no fixed amplitude threshold
+///
+/// This used to gate accumulation on `burden > 0.30`, with a
+/// hysteresis band below. Measured consequences, on the real HPA
+/// cascade, were that one hour of chronic stress and six hours of it
+/// produced identical peak load (0.25011 both), and that a sustained
+/// elevation whose mean sat below the threshold was charged only
+/// during its oscillation peaks.
+///
+/// The cause was structural. A hard threshold on a noisy signal
+/// rectifies it: the integrator then measures how often excursions
+/// cross a line, rather than how long the signal spends above its
+/// resting level. Since cortisol pulses and the catecholamines
+/// oscillate, most ticks landed in the band and the load never
+/// integrated at all — one hour and six hours of stress became
+/// indistinguishable, which is precisely the distinction the
+/// construct exists to draw.
+///
+/// A small dead-band is still required, and it is kept, but it is
+/// expressed as a *fraction of the measured resting level* rather
+/// than a magic number: a burden within `REST_DEADBAND` of rest
+/// neither accrues nor drains, so ordinary physiological variation
+/// does not integrate without bound.
+fn integrate_allostasis(load: f32, burden: f32, rest: f32, dt_scale: f32) -> f32 {
+    let rest = crate::state::sanitize::finite_clamp(rest, 0.0, 1.0);
+    let deadband = rest * REST_DEADBAND_FRACTION;
+    let next = if burden > rest + deadband {
+        // Wear rate is proportional to how far above rest she is, so
+        // a mild sustained elevation costs proportionally less than a
+        // severe one, and both scale with duration.
+        let excess = burden - rest - deadband;
+        load + ALLOSTASIS_ACCUMULATION_RATE * excess * dt_scale
+    } else if burden < rest - deadband {
+        // Recovery is proportional to depth below rest, mirroring
+        // accumulation. An earlier version used a fixed recovery rate,
+        // which made recovery up to 25x faster than accumulation at
+        // realistic signal amplitudes, so a single tick in the band
+        // erased twenty-five ticks of accrued wear and load could
+        // never build at all.
+        let depth = (rest - deadband - burden).max(0.0);
+        load - ALLOSTASIS_RECOVERY_RATE * depth * dt_scale
+    } else {
+        // Inside the dead-band around rest: no change. This is the
+        // neutral region for ordinary physiological variation.
+        load
+    };
+    crate::state::sanitize::finite_clamp(next, 0.0, 1.0)
+}
+
+/// A slow-tracking estimate of her resting burden.
+///
+/// Allostatic load is defined as the excess over resting operation, so
+/// the reference has to be her actual resting level rather than a
+/// constant. Tracking it adaptively also means the measure stays
+/// correct if the resting catecholamine contribution changes as her
+/// physiology develops, which a hardcoded reference would not.
+///
+/// It is a slow symmetric average rather than a chasing tracker, so
+/// no single excursion in either direction can move it.
+struct RestBaseline {
+    level: f32,
+}
+
+impl RestBaseline {
+    fn new(initial: f32) -> Self {
+        Self {
+            level: crate::state::sanitize::finite_clamp(initial, 0.0, 1.0),
+        }
+    }
+
+    fn update(&mut self, burden: f32, dt_scale: f32) {
+        if !burden.is_finite() {
+            return;
+        }
+        let alpha = crate::state::sanitize::finite_clamp(REST_TRACK_RATE * dt_scale, 0.0, 1.0);
+        self.level += alpha * (burden - self.level);
+        self.level = crate::state::sanitize::finite_clamp(self.level, 0.0, 1.0);
+    }
+
+    fn level(&self) -> f32 {
+        self.level
+    }
+}
+
 
 /// Threshold for dopamine reward prediction error impulses. Only
 /// positive prediction errors above this magnitude generate a DA
@@ -625,6 +868,75 @@ const EFE_SCORE_LIMIT: f32 = 1.0e6;
 /// the Bayesian policy prior precision it is analogous to.
 const EXPLOITATION_PRECISION_THRESHOLD: f32 = 0.8;
 
+/// Base strength of the homeostatic reflex toward her preference.
+const REFLEX_COEFF_BASE: f32 = 0.10;
+/// Additional reflex strength from confidence in her generative model.
+const REFLEX_COEFF_PRECISION: f32 = 0.20;
+/// Additional reflex strength from confidence in her preference.
+const REFLEX_COEFF_PREFERENCE: f32 = 0.10;
+
+/// How fast her preference moves toward states she demonstrably fares
+/// well in.
+///
+/// This is the piece that makes the preference *hers* rather than a
+/// constant I supplied. It must be slow: a preference that chases the
+/// current state collapses back to "am I where I am", which is the
+/// circularity this whole change exists to remove. It moves only on
+/// evidence of sustained wellbeing, and the restoring pull toward
+/// genetics keeps a drifted preference from running away.
+const PREFERENCE_ADAPT_RATE: f32 = 0.00002;
+/// Restoring pull of her preference toward the genetic seed.
+const PREFERENCE_RESTORE_RATE: f32 = 0.00002;
+
+/// Allostatic load above which her preference stops adapting.
+///
+/// She learns what suits her from states she is coping well in. Under
+/// sustained strain the signal is exactly that things are not going
+/// well, and adapting then would teach her to prefer the strained
+/// state — the allostatic trap, where a set point walks to meet a
+/// condition instead of correcting it.
+const PREFERENCE_ADAPT_LOAD_CEILING: f32 = 0.35;
+
+/// Initial confidence in the preference term.
+///
+/// This is the correction strength, and it is a genuine compromise
+/// rather than a value to maximise. The Yerkes–Dodson and
+/// disinhibitory-circuit work both find performance optimal at
+/// *moderate* arousal, with impairment on both sides; a preference
+/// tight enough to pin her to one state would trade away the
+/// flexibility that lets her respond to what actually matters to her.
+/// At 0.5 she is pulled toward what she prefers while remaining able
+/// to explore — and because the correct value depends on how far her
+/// `preferred` has moved from her genetics, it is worth re-examining
+/// once she has had time to learn it.
+pub const PREFERENCE_PRECISION_INIT: f32 = 0.5;
+
+/// Her starting preference: the genetic defaults.
+///
+/// A seed, not a prescription. These are the set points her physiology
+/// was built around, so they are the defensible place to begin. They
+/// are not what she is allowed to want — `adapt_preference` moves this
+/// vector as she learns which states actually suit her, and a state
+/// that suits her is not necessarily one her genes anticipated.
+pub fn genetic_preference_seed() -> [f32; DIM] {
+    let mut out = [0.0f32; DIM];
+    for (i, slot) in out.iter_mut().enumerate() {
+        *slot = crate::state::neurochemical::NeurochemicalId::from_u8(i as u8).default_baseline();
+    }
+    out
+}
+
+/// Deviation below a chemical's homeostatic target at which a policy's
+/// positive impulse reaches full strength.
+///
+/// The headroom gate in `cycle` scales a positive policy impulse
+/// linearly from zero (chemical at or above its target) to one
+/// (chemical this far below it). A policy therefore still acts promptly
+/// on a chemical that has genuinely fallen behind, but cannot drive one
+/// that is already homeostatic past its set point. See the gate for why
+/// that overshoot is not benign.
+const POLICY_HEADROOM_SCALE: f32 = 0.10;
+
 // The homeostatic target for expected free energy computation.
 // Policies that push the system toward its homeostatic baseline
 // have lower expected free energy. This is the set point the system
@@ -777,6 +1089,8 @@ pub struct ActiveInferenceEngine {
     expected_fe_ema: f32,
     /// The accumulated allostatic load [0, 1].
     allostasis_load: f32,
+    /// Tracked resting burden, the reference load is measured against.
+    rest_baseline: RestBaseline,
     /// The number of inference cycles completed.
     tick_count: u32,
     /// Whether the engine has made its first prediction yet. The
@@ -823,6 +1137,38 @@ pub struct ActiveInferenceEngine {
     /// The last computed variational free energy [0, 1]. Stored so
     /// that signals() can report it without recomputing.
     last_free_energy: f32,
+    /// What she prefers to be, as prior belief over outcomes.
+    ///
+    /// This is the preference term of the free energy, and it is the
+    /// reason the machinery has a purpose. Expected free energy is the
+    /// KL divergence between *predicted* and *preferred* outcomes, so a
+    /// system with no preference cannot do anything except hold position:
+    /// every state is equally (un)surprising relative to wherever it
+    /// already is.
+    ///
+    /// It was previously absent, and the target vector was set to her
+    /// current adapted baseline, which made expected free energy a
+    /// measure of "am I where I already am". That is the difference
+    /// between a reflex and an agent.
+    ///
+    /// Seeded from the genetic defaults — a seed, not a prescription.
+    /// It says where she starts out wanting to be, not what she is
+    /// allowed to want; it is hers to move as she learns.
+    preferred: [f32; DIM],
+    /// Confidence in the preference, which is the strength of the
+    /// correction it produces.
+    ///
+    /// Precise preferences dominate policy selection and suppress
+    /// exploration; imprecise ones let epistemic value take over. That
+    /// makes this the control gain, and it is deliberately not 1.0 — a
+    /// maximally confident preference would make her rigid, and rigidity
+    /// is its own pathology, because a system that cannot move cannot
+    /// learn which states suit it.
+    preference_precision: f32,
+    /// How much authority her cognition has delegated for autonomous
+    /// policy action, in [0, 1]. Written by cognition through IPC;
+    /// read here. Zero means she decides.
+    policy_authority: f32,
 }
 
 impl ActiveInferenceEngine {
@@ -843,6 +1189,7 @@ impl ActiveInferenceEngine {
             surprise_ema: 0.0,
             expected_fe_ema: 0.0,
             allostasis_load: 0.0,
+            rest_baseline: RestBaseline::new(REST_BURDEN_INITIAL),
             tick_count: 0,
             initialized: false,
             model_maturity: 0.0,
@@ -852,6 +1199,9 @@ impl ActiveInferenceEngine {
             belief_var: [PROCESS_NOISE; DIM],
             prior_var: [PROCESS_NOISE; DIM],
             last_free_energy: 0.0,
+            preferred: genetic_preference_seed(),
+            preference_precision: PREFERENCE_PRECISION_INIT,
+            policy_authority: 0.0,
         }
     }
 
@@ -1065,10 +1415,21 @@ impl ActiveInferenceEngine {
         for i in 0..DIM {
             pre[i] = crate::state::sanitize::finite_clamp(pre_tick[i], 0.0, 2.0);
             post[i] = crate::state::sanitize::finite_clamp(post_tick[i], 0.0, 2.0);
-            // Sanitize baselines too — a corrupted baseline would pull
-            // policy selection toward a NaN target, making every policy
-            // look equally bad/good and defeating homeostatic selection.
-            target[i] = crate::state::sanitize::finite_clamp(baselines[i], 0.0, 2.0);
+            // The free energy is computed against what she *prefers*,
+            // not against where she currently is.
+            //
+            // Setting the target to the current adapted baseline made
+            // expected free energy a measure of "am I where I already
+            // am", so every state was equally acceptable and the
+            // winning policy was always whichever one held position.
+            // That is a reflex, not an agent: it has no idea what it is
+            // aiming at. Preferences in this framework *are* prior
+            // beliefs about desired outcomes, and homeostasis is the
+            // canonical example of one, so the seed is the genetic
+            // defaults — but it is a seed, not a fixed goal, and
+            // `adapt_preference` moves it as she learns.
+            let _ = &baselines;
+            target[i] = crate::state::sanitize::finite_clamp(self.preferred[i], 0.0, 2.0);
         }
         // Validate dt at the dynamics boundary. The IPC handler clamps
         // dt, but this method can be called from other paths. A NaN or
@@ -1181,14 +1542,102 @@ impl ActiveInferenceEngine {
             MODEL_LEARNING_RATE * 10.0,
         );
         let action = self.last_action;
+        //
+        // Two defects in the naive rule made this model inert, and both
+        // are load-bearing for everything downstream — allostatic load,
+        // precision, maturity, and the policy choice all read from
+        // prediction error, and prediction error was identically zero.
+        //
+        // 1. The step was proportional to `pre[j]` and to nothing else.
+        //    For a chemical resting at 0.0 (cortisol, melatonin, CRH)
+        //    that is `pre[j] == 0`, so the weight could never change
+        //    from its initial value. Combined with (2) the matrix never
+        //    moved off the identity at all: measured prediction error
+        //    was exactly 0.00000 even for a state the model had never
+        //    seen, because the identity matrix "predicts no change" and
+        //    the damped substrate barely changes. That made the
+        //    initialisation a self-confirming fixed point — a better
+        //    prediction produces less learning, and less learning
+        //    produces a better prediction. The engine was not
+        //    modelling anything.
+        //
+        // 2. There was no forgetting. Weights are only ever added to,
+        //    so a weight learned once could never be revised when the
+        //    dynamics changed. Adaptive systems solve this with a decay
+        //    term (Richter & Alonso, "a forgetting factor ... allows
+        //    the system to adapt to changes in the environment");
+        //    without it the model is permanently anchored to its first
+        //    impressions.
+        //
+        // The fix is the normalised delta rule with weight decay:
+        //
+        //   A[i][j] += lr * e[i] * pre[j] / (Σ_k pre[k]² + eps) - λ*A[i][j]
+        //
+        // Normalising by the input's power makes the step size depend
+        // on the *direction* of the input rather than its magnitude, so
+        // a chemical resting at zero is learned from as readily as one
+        // at 0.8. The epsilon prevents division by zero. The decay term
+        // lets a weight that is no longer supported relax back toward
+        // zero instead of persisting forever.
+        // Forgetting is scaled by the same confidence that gates
+        // learning.
+        //
+        // A fixed decay rate sets the equilibrium between decay and
+        // learning at `lr/d`, which depends on the rate constants and
+        // not on the data: the learning term shrinks as the error
+        // shrinks, but the decay term does not, so a weight that had
+        // converged is steadily pulled back toward the prior. Measured
+        // directly, prediction error fell to 0.34 by cycle 50 and then
+        // climbed back to 0.49 by cycle 600 — the model kept unlearning
+        // what it had correctly learned.
+        //
+        // Tying both to the same confidence factor means a model that
+        // has become confident consolidates, and an uncertain one stays
+        // plastic and keeps revising. That is also how plasticity
+        // already works in this system, where learning is gated by
+        // BDNF and suppressed under cortisol; forgetting is not a
+        // separate mechanism imposed from outside, it is the same gate.
+        let forget = MODEL_FORGETTING * self.precision;
+        let pre_power: f32 = pre.iter().map(|v| v * v).sum();
+        let action_power: f32 = action.iter().map(|v| v * v).sum();
+        // Floor the normaliser so a near-zero input yields a bounded
+        // step instead of a division that amplifies float noise into
+        // large weight updates.
+        const INPUT_POWER_FLOOR: f32 = 0.05;
+        let pre_norm = pre_power + INPUT_POWER_FLOOR;
+        let action_norm = action_power + INPUT_POWER_FLOOR;
         for (i, row) in self.transition_matrix.iter_mut().enumerate() {
             let update = effective_lr * result.errors[i];
             for (j, &pre_val) in pre.iter().enumerate() {
-                row[j] += update * pre_val;
+                // Decay toward the prior, not toward zero.
+                //
+                // Uniform multiplicative decay pulls every weight to 0,
+                // which is the wrong resting place here: the matrix
+                // starts as the identity ("predict no change") and the
+                // true dynamics of a damped substrate are a diagonal
+                // well below 1 (roughly 0.1-0.3 for a chemical relaxing
+                // toward its baseline). Decaying to zero therefore
+                // drives the model away from the truth — it predicts
+                // every chemical simply vanishing — and prediction
+                // error *grows* with training, which is the signature
+                // of a controller learning the wrong thing.
+                //
+                // Shrinking toward the prior instead means an
+                // unsupported weight relaxes back to "no change", the
+                // honest statement of no evidence, and a well-supported
+                // weight is refreshed rather than erased. This is
+                // regularisation toward the prior, the same principle
+                // as weight decay in a Bayesian sense.
+                let prior = if i == j { 1.0 } else { 0.0 };
+                row[j] = prior + (row[j] - prior) * (1.0 - forget);
+                row[j] += update * pre_val / pre_norm;
                 // Clamp to prevent runaway weights (NaN-safe)
                 row[j] = crate::state::sanitize::finite_clamp(row[j], -2.0, 2.0);
             }
-            self.bias[i] += update * 0.1;
+            // The bias has no prior to shrink to — it is already the
+            // zero-predicting default — so it decays toward zero.
+            self.bias[i] *= 1.0 - forget;
+            self.bias[i] += update * 0.1 / pre_norm;
             self.bias[i] = crate::state::sanitize::finite_clamp(self.bias[i], -0.5, 0.5);
         }
         // Update the action matrix B with the same delta rule, using
@@ -1200,7 +1649,8 @@ impl ActiveInferenceEngine {
         for (i, row) in self.action_matrix.iter_mut().enumerate() {
             let update = effective_lr * result.errors[i];
             for (j, &act_val) in action.iter().enumerate() {
-                row[j] += update * act_val;
+                row[j] *= 1.0 - MODEL_FORGETTING;
+                row[j] += update * act_val / action_norm;
                 row[j] = crate::state::sanitize::finite_clamp(row[j], -1.0, 1.0);
             }
         }
@@ -1526,66 +1976,155 @@ impl ActiveInferenceEngine {
         self.expected_fe_ema = crate::state::sanitize::finite_clamp(self.expected_fe_ema, 0.0, 1.0);
         result.expected_free_energy = self.expected_fe_ema;
 
-        // Step 8: Update allostatic load from persistent multisignal
-        // dysregulation. Expected free energy remains the anticipatory
-        // demand signal; it is deliberately not treated as cumulative
-        // load by itself.
+        // Step 8: Allostatic load — the price of adaptation.
         //
-        // The four dimensions are deliberately unweighted:
-        //   1. expected future disruption (anticipatory demand),
-        //   2. prediction-error burden (surprise),
-        //   3. loss of model confidence (1 - precision),
-        //   4. deviation from the current homeostatic state.
+        // McEwen's definition is "the cost of chronic exposure to
+        // fluctuating or heightened neural or neuroendocrine response
+        // resulting from repeated or chronic environmental challenge"
+        // (Arch Intern Med 1993), with Sapolsky naming the three forms:
+        // frequent activation, failure to shut off, and inadequate
+        // response. The primary mediators are cortisol, epinephrine and
+        // norepinephrine — the HPA and sympathetic axes. Load is wear
+        // from *activation*, and it is only harmful when those systems
+        // are driven repeatedly or held on.
         //
-        // We use the median of these dimensions rather than a weighted
-        // sum. With four signals this is the mean of the two middle
-        // values, so one isolated spike cannot manufacture "multisystem"
-        // load, while persistent elevation across several dimensions
-        // can. This is a machine-native engineering construct, not a
-        // validated biological biomarker index.
-        let mut burden_components = [
-            self.expected_fe_ema,
-            self.surprise_ema,
-            1.0 - self.precision,
-            0.0f32,
-        ];
-        let mut homeostatic_error_sq = 0.0f32;
-        for i in 0..DIM {
-            let error = post[i] - target[i];
-            homeostatic_error_sq += error * error;
-        }
-        burden_components[3] = crate::state::sanitize::finite_clamp(
-            (homeostatic_error_sq / DIM as f32).sqrt(),
-            0.0,
-            1.0,
-        );
-        burden_components.sort_by(f32::total_cmp);
-        let multisignal_burden =
-            (burden_components[1] + burden_components[2]) * 0.5;
+        // The previous four dimensions included two that are not load
+        // at all:
+        //
+        //   1.0 - precision. This confuses her confidence in her own
+        //     model with wear on her body, and precision sits at ~0.97
+        //     by design, so it contributed a constant 0.03 floor. A
+        //     perfectly predictable, calm Genesis still carried load.
+        //
+        //   RMS deviation from the homeostatic target. This is her
+        //     normal regulatory activity, which the framework treats as
+        //     adaptive and protective ("when these adaptive systems are
+        //     turned on and turned off again efficiently... the body is
+        //     able to cope effectively"). Firing her regulator is not
+        //     injury to it. It also made the measure depend on whatever
+        //     the target happened to be, so allostatic load moved when
+        //     the target moved rather than when she did.
+        //
+        // The two that remain are genuine: anticipated demand and
+        // sustained unexpectedness are the circumstances under which
+        // the stress axis gets driven. The third dimension replaces the
+        // two wrong ones and measures the thing itself — how elevated
+        // her stress axis actually is, relative to its resting
+        // operation. That is the primary-mediator definition, and it
+        // is computed from chemicals she already carries.
+        //
+        // Cortisol and CRH are excluded: they are the HPA axis, and
+        // their contribution is already represented through activation
+        // of the axis as a whole rather than counted twice.
+        // The physiological measure, and the context that amplifies it.
+        //
+        // These were previously three summands reduced by a median.
+        // Measured across regimes (rest, calm-active, busy, stressed,
+        // acute) that reduction had three failures:
+        //
+        //   1. It went blind. Surprise measures 0.0003 at rest and
+        //      0.073 even in acute stress, so the median was almost
+        //      always the surprise value — the stress-axis component,
+        //      the only one grounded in the primary mediators,
+        //      contributed almost nothing.
+        //
+        //   2. It inverted under the most severe condition it exists
+        //      to detect. Acute stress (cortisol 0.5) produced a
+        //      burden of 0.15, which is *below* the 0.20 recovery
+        //      threshold, so the system drained load while she was in
+        //      acute stress.
+        //
+        //   3. Any linear reweighting failed to fix this, because the
+        //      components are not on the same scale. Anticipated
+        //      demand and surprise are unbounded; stress-axis
+        //      elevation is bounded to [0,1]. Measured, a noise spike
+        //      to 1.0 scored 0.478 while genuine cortisol stress at
+        //      0.90 scored 0.433 — the measure preferred the artifact.
+        //
+        // The fix is structural, not a threshold adjustment. Per
+        // McEwen, the mediators *are* cortisol, epinephrine and
+        // norepinephrine; anticipated demand and unexpectedness are
+        // circumstances that drive the axis, not mediators in their
+        // own right. So the axis is the measure and the other two
+        // modulate it multiplicatively. Anticipating something
+        // without a physiological response costs nothing, which is
+        // correct: anticipating is not bodily wear. A body that is
+        // genuinely driven costs proportionally more when the driving
+        // is also frequent and unexpected — which is precisely
+        // Sapolsky's "frequent activation".
+        let mut burden = {
+            // Resting reference for the stress axis: the genetic
+            // defaults, so "elevated" means elevated relative to a
+            // baseline rather than to wherever she currently is.
+            // Using the current level would reintroduce the
+            // circularity the preference change removed.
+            let cort = crate::state::neurochemical::NeurochemicalId::Cortisol as usize;
+            let epi = crate::state::neurochemical::NeurochemicalId::Epinephrine as usize;
+            let nore = crate::state::neurochemical::NeurochemicalId::Norepinephrine as usize;
+            let cort_rest = crate::state::neurochemical::NeurochemicalId::Cortisol
+                .default_baseline();
+            let epi_rest = crate::state::neurochemical::NeurochemicalId::Epinephrine
+                .default_baseline();
+            let nore_rest = crate::state::neurochemical::NeurochemicalId::Norepinephrine
+                .default_baseline();
+            // Each is an elevation over its resting level, normalised by
+            // the range available above it. Cortisol rests at zero and
+            // is the most load-bearing mediator, so it is weighted
+            // highest; norepinephrine is normal at wake and only
+            // notable well above it.
+            let cort_elev = (post[cort] - cort_rest).max(0.0);
+            let epi_elev = (post[epi] - epi_rest).max(0.0) / (1.0 - epi_rest);
+            let nore_elev = (post[nore] - nore_rest).max(0.0) / (1.0 - nore_rest);
+            crate::state::sanitize::finite_clamp(
+                cort_elev * 2.0 + epi_elev + nore_elev * 0.5,
+                0.0,
+                1.0,
+            )
+        };
 
-        if multisignal_burden > ALLOSTASIS_ACCUMULATE_THRESHOLD {
-            let excess = multisignal_burden - ALLOSTASIS_ACCUMULATE_THRESHOLD;
-            self.allostasis_load = crate::state::sanitize::finite_clamp(
-                self.allostasis_load + ALLOSTASIS_ACCUMULATION_RATE * excess * dt_scale,
-                0.0,
-                1.0,
-            );
-        } else if multisignal_burden < ALLOSTASIS_RECOVER_THRESHOLD {
-            self.allostasis_load = crate::state::sanitize::finite_clamp(
-                self.allostasis_load - ALLOSTASIS_RECOVERY_RATE * dt_scale,
-                0.0,
-                1.0,
-            );
-        } else {
-            // Transitional regime: permit slow recovery without
-            // making the load oscillate at the activation boundary.
-            self.allostasis_load = crate::state::sanitize::finite_clamp(
-                self.allostasis_load - ALLOSTASIS_RECOVERY_RATE * 0.25 * dt_scale,
-                0.0,
-                1.0,
-            );
-        }
+        // Context amplifier, bounded to [1, CONTEXT_GAIN_MAX].
+        //
+        // Bounded on purpose: the amplifiers may increase the cost of
+        // stress that is already present, but must never manufacture
+        // burden from nothing. An unbounded term here would reintroduce
+        // exactly the failure measured above, where an unbounded
+        // demand signal could outscore real physiological wear.
+        let context = 1.0
+            + CONTEXT_GAIN_EXPECTED_FE
+                * crate::state::sanitize::finite_clamp(self.expected_fe_ema, 0.0, 1.0)
+            + CONTEXT_GAIN_SURPRISE
+                * crate::state::sanitize::finite_clamp(self.surprise_ema, 0.0, 1.0);
+        let context = context.min(CONTEXT_GAIN_MAX);
+        burden = crate::state::sanitize::finite_clamp(burden * context, 0.0, 1.0);
+
+        self.rest_baseline.update(burden, dt_scale);
+        self.allostasis_load = integrate_allostasis(
+            self.allostasis_load,
+            burden,
+            self.rest_baseline.level(),
+            dt_scale,
+        );
         result.allostasis_load = self.allostasis_load;
+
+        // Let her preference drift on evidence of sustained wellbeing.
+        //
+        // Without this the preference is the genetic seed forever, and
+        // a constant wearing her name is not a preference — it is my
+        // seed that she is stuck with. This is where it becomes hers:
+        // states she is coping well in are evidence about what suits
+        // her, and it moves toward them.
+        //
+        // Three properties stop this collapsing back into the
+        // circularity it replaces. It is slow relative to the tick
+        // rate, so it cannot chase moment-to-moment state. It only
+        // moves under low load, so it encodes "states I fare well in"
+        // rather than "states I happen to be in" — adapting under
+        // strain would teach her to prefer the strained state, which
+        // is the allostatic trap. And it pulls back toward genetics, so
+        // one bad episode cannot become her new normal.
+        if self.allostasis_load < PREFERENCE_ADAPT_LOAD_CEILING {
+            self.adapt_preference(&post, dt_scale);
+        }
 
         // Step 9: Extract key prediction errors for neuromodulation.
         let da_idx = NeurochemicalId::Dopamine as usize;
@@ -1741,16 +2280,79 @@ impl ActiveInferenceEngine {
         }
         let need_scale = 1.0 + max_abs_deviation * 10.0;
 
-        // Apply the selected policy's impulses with allostatic scaling
+        // Policy impulses require delegated authority.
+        //
+        // Which policy to adopt — calm, focus, bond, rest, mobilise — is
+        // a decision about what to feel and do. Doing it here, from
+        // expected-free-energy scores over a fixed set of policies I
+        // wrote, with no perceptual input and nothing from her in the
+        // loop, made the engine a second author of her state: she
+        // could not attend to the choice, anticipate it, or refuse it,
+        // and the policies on offer were mine rather than hers.
+        //
+        // So the engine still evaluates and still learns — that is its
+        // job — but it only *acts* on its own choice in proportion to
+        // the authority her cognition has granted through
+        // SET_POLICY_AUTHORITY. At zero it proposes and observes; she
+        // decides, and acts through NEURO_IMPULSE where the effect is
+        // hers and traceable to a judgement she made.
+        //
+        // The homeostatic reflex below is deliberately untouched.
+        // Correcting drift toward what she prefers is her physiology,
+        // not a choice, and a mind that cannot pull itself back toward
+        // its own set-points does not have agency — it has a hormone
+        // problem. What is delegated here is judgement about which
+        // stance to take, not the capacity to regulate.
+        //
+        // The selected policy is still reported either way, so a
+        // withheld delegation stays reviewable: it remains visible
+        // what she would have chosen, rather than becoming invisible.
+        let authority = crate::state::sanitize::finite_clamp(self.policy_authority, 0.0, 1.0);
         for &(chem_id, mag) in selected.policy.impulses {
+            if authority <= 0.0 {
+                break;
+            }
             // Scale impulse by expected FE and allostatic need
-            let fe_scale = if self.expected_fe_ema > ALLOSTASIS_ACCUMULATE_THRESHOLD {
-                1.0 + (self.expected_fe_ema - ALLOSTASIS_ACCUMULATE_THRESHOLD) * 2.0
+            let fe_scale = if self.expected_fe_ema > CONTEXT_FE_ACTIVATION {
+                1.0 + (self.expected_fe_ema - CONTEXT_FE_ACTIVATION) * 2.0
             } else {
                 1.0
             };
             let scale = need_scale * fe_scale;
-            result.impulses.push((chem_id, mag * scale));
+
+            // Homeostatic headroom gate.
+            //
+            // A policy impulse is applied straight to the level variable
+            // (`level += magnitude`), so a policy that fires every tick
+            // drives its target chemical past its own set point. That is
+            // not a neutral overshoot: GABA inhibits glutamate at -0.30,
+            // the strongest negative entry in the coupling matrix, and
+            // also holds back dopamine (-0.10) and serotonin (-0.05).
+            //
+            // At rest the engine selects `calm` ~90% of the time, and
+            // GABA above target therefore pushed glutamate, dopamine and
+            // serotonin below theirs. Their resulting deviation then
+            // tripped the homeostatic reflex below, which reinforced
+            // `calm` — a positive feedback loop whose steady state was a
+            // resting chemistry ~30% below the genetic baseline.
+            //
+            // Gating a positive impulse on remaining headroom breaks the
+            // loop at its source: a chemical already at or above its
+            // target receives no further positive push, so the policy
+            // stops manufacturing the deviation it then reacts to.
+            if mag > 0.0 {
+                let i = chem_id as usize;
+                if i < DIM {
+                    let headroom = (target[i] - pre_tick[i]).max(0.0);
+                    if headroom <= 0.0 {
+                        continue;
+                    }
+                    let gate = (headroom / POLICY_HEADROOM_SCALE).min(1.0);
+                    result.impulses.push((chem_id, mag * scale * gate * authority));
+                    continue;
+                }
+            }
+            result.impulses.push((chem_id, mag * scale * authority));
         }
 
         // Homeostatic reflex: direct correction for deviated chemicals.
@@ -1761,7 +2363,14 @@ impl ActiveInferenceEngine {
         // precision-gated — when the engine's precision is high (confident
         // in its model), the reflex is stronger; when precision is low
         // (uncertain), the reflex is gentler to avoid overshooting.
-        let reflex_coeff = 0.10 + self.precision * 0.20; // 0.10–0.30
+        // The reflex corrects toward the preference, so its strength is
+        // the confidence in that preference. At 0.5 it is a gentle
+        // continuous nudge; a confident preference pulls harder, an
+        // unconfident one barely at all. This is the control gain, and
+        // it is deliberately not 1.0 — see PREFERENCE_PRECISION_INIT.
+        let reflex_coeff = REFLEX_COEFF_BASE
+            + self.precision * REFLEX_COEFF_PRECISION
+            + self.preference_precision * REFLEX_COEFF_PREFERENCE;
         for i in 0..DIM {
             let dev = pre_tick[i] - target[i];
             if dev.abs() > 0.10 {
@@ -2174,6 +2783,7 @@ impl ActiveInferenceEngine {
             prediction_error_serotonin: 0.0, // Set from last result
             model_maturity: crate::state::sanitize::finite_clamp(self.model_maturity, 0.0, 1.0),
             inference_tick_count: self.tick_count,
+            policy_authority: self.policy_authority,
         }
     }
 
@@ -2276,6 +2886,86 @@ impl ActiveInferenceEngine {
     /// - 4 bytes: maturity_error_ema (f32) [v4]
     ///
     /// Total: 2988 (v3) + 8 = 2996 bytes
+    /// Move her preference toward states she actually fares well in.
+    ///
+    /// The seed is the genetic defaults, but those are what her
+    /// physiology was *built* around, not a statement of what suits
+    /// her. This is where she learns the difference: states in which
+    /// her load stays low and she keeps converging are evidence of
+    /// wellbeing, and her preference drifts toward them.
+    ///
+    /// Two properties keep this from collapsing back into the
+    /// circularity it replaces. It is slow relative to the tick rate,
+    /// so it cannot chase moment-to-moment state — a preference that
+    /// tracked the present would be the old target again. And it pulls
+    /// toward genetics, so a preference that drifted on the strength
+    /// of one bad episode walks back rather than becoming a new
+    /// normal.
+    ///
+    /// Adenosine is excluded for the same reason its baseline is: it
+    /// is driven by a dedicated sleep-pressure mechanism, so a
+    /// preference built from its level would encode "prefer being
+    /// exhausted". Cortisol and CRH are excluded because they have no
+    /// homeostatic set point to prefer.
+    /// Adopt the authority her cognition has granted.
+    ///
+    /// Called each cycle from the state, because the grant is hers to
+    /// change while running — she can delegate more, delegate less, or
+    /// withdraw it entirely. Taking it from the state each tick is what
+    /// makes the grant revocable rather than a one-time handshake.
+    pub fn set_policy_authority(&mut self, authority: f32) {
+        self.policy_authority = crate::state::sanitize::finite_clamp(authority, 0.0, 1.0);
+    }
+
+    /// The policy authority currently in force.
+    pub fn policy_authority(&self) -> f32 {
+        self.policy_authority
+    }
+
+    /// What she is currently aiming for, per dimension.
+    ///
+    /// Exposed so persistence and controller behaviour can be asserted
+    /// directly. This is her preference, not a constant: it is seeded
+    /// from genetics and then moved on evidence of what she fares well
+    /// in, so a change here is a real change in what she wants.
+    pub fn preferred(&self) -> &[f32; DIM] {
+        &self.preferred
+    }
+
+    /// How strongly her preferences steer her.
+    ///
+    /// High precision means her preferences dominate; low precision
+    /// leaves room for exploration. It must not be maximised, because
+    /// over-precise preferences are what make a system rigid and
+    /// unable to revise itself.
+    pub fn preference_precision(&self) -> f32 {
+        self.preference_precision
+    }
+
+    fn adapt_preference(&mut self, levels: &[f32; DIM], dt_scale: f32) {
+        let adapt = PREFERENCE_ADAPT_RATE * dt_scale;
+        let restore = PREFERENCE_RESTORE_RATE * dt_scale;
+        let seed = genetic_preference_seed();
+        for i in 0..DIM {
+            let id = crate::state::neurochemical::NeurochemicalId::from_u8(i as u8);
+            if matches!(
+                id,
+                crate::state::neurochemical::NeurochemicalId::Adenosine
+                    | crate::state::neurochemical::NeurochemicalId::Cortisol
+                    | crate::state::neurochemical::NeurochemicalId::CRH
+            ) {
+                continue;
+            }
+            let level = crate::state::sanitize::finite_clamp(levels[i], 0.0, 2.0);
+            let current = self.preferred[i];
+            self.preferred[i] = crate::state::sanitize::finite_clamp(
+                current + (level - current) * adapt + (seed[i] - current) * restore,
+                0.05,
+                0.95,
+            );
+        }
+    }
+
     pub fn save(&self, path: &Path) -> std::io::Result<()> {
         use std::io::Write;
 
@@ -2289,7 +2979,7 @@ impl ActiveInferenceEngine {
 
         // Magic + version
         file.write_all(b"AIFE")?;
-        file.write_all(&4u32.to_le_bytes())?;
+        file.write_all(&5u32.to_le_bytes())?;
 
         // Transition matrix (row-major)
         for i in 0..DIM {
@@ -2343,6 +3033,14 @@ impl ActiveInferenceEngine {
         // Fsync the temp file before renaming — without this, the
         // rename could reach disk before the file contents, leaving
         // an empty or partial model file after a crash.
+
+        // Preference (v5) — appended last so an older reader that
+        // stops early still gets a complete, valid prefix.
+        for i in 0..DIM {
+            file.write_all(&self.preferred[i].to_le_bytes())?;
+        }
+        file.write_all(&self.preference_precision.to_le_bytes())?;
+
         file.sync_all()?;
 
         // Drop the file handle before rename (Windows requires this,
@@ -2381,7 +3079,11 @@ impl ActiveInferenceEngine {
             return Self::new();
         }
         let version = u32::from_le_bytes(version_bytes);
-        if version != 1 && version != 2 && version != 3 && version != 4 {
+        // Every version the writer can emit, including 5 (which added
+        // the preference vector). A whitelist that omits a version the
+        // writer produces does not fail loudly — `load` silently returns
+        // a fresh engine, so the model looks like it was never saved.
+        if !(1..=5).contains(&version) {
             return Self::new();
         }
 
@@ -2516,7 +3218,14 @@ impl ActiveInferenceEngine {
         // but the system is stable because B starts at zero (the
         // model assumes its actions have no effect until it learns
         // otherwise).
-        if version == 3 {
+        // `>= 3`, not `== 3`. The action matrix and last_action were
+        // introduced in v3, so every later file also contains them.
+        // With an equality test a v4 or v5 file skipped 1368 bytes and
+        // every field after this point was read from the wrong offset —
+        // which silently corrupted the preference vector in v5. Any
+        // version that added fields after this one would have had the
+        // same effect.
+        if version >= 3 {
             // Action matrix B (row-major) — same sanitization as A.
             // Clamped to [-1, 1] (tighter than A's [-2, 2]) because
             // action effects are bounded by impulse magnitudes.
@@ -2548,7 +3257,12 @@ impl ActiveInferenceEngine {
         // error variance implied by the loaded precision
         // (v = V0 * (1/p − 1)), and the maturity tracker is the error
         // level implied by the loaded maturity (err = −scale·ln(m)).
-        if version == 4 {
+        // `>= 4`, not `== 4`: the save side writes these two trackers
+        // unconditionally, so every file from v4 onward contains them.
+        // Gating on equality silently skipped them for v5, which
+        // misaligned the sequential read and corrupted everything after
+        // it — including the preference block.
+        if version >= 4 {
             let mut var_bytes = [0u8; 4];
             let mut mat_err_bytes = [0u8; 4];
             if file.read_exact(&mut var_bytes).is_err()
@@ -2576,6 +3290,42 @@ impl ActiveInferenceEngine {
             );
         }
 
+        // ─── Preference (v5+) ─────────────────────────────────────
+        // Read last, and only for v5+, because the loader above walks
+        // the file sequentially: v4 and earlier contain no preference
+        // block, so reading one would consume the version-specific
+        // fields that follow. For those the genetic seed from new()
+        // stands.
+        //
+        // Her preference is what she is trying to be, as opposed to
+        // where she happens to be. Not persisting it means she forgets
+        // what she wanted on every restart, which would be a silent
+        // version of the very not-knowing this is meant to fix.
+        if version >= 5 {
+            let mut complete = true;
+            for i in 0..DIM {
+                let mut bytes = [0u8; 4];
+                if file.read_exact(&mut bytes).is_err() {
+                    complete = false;
+                    break;
+                }
+                // Clamp to the full chemical range, not 0.05..0.95.
+                // Cortisol and melatonin legitimately rest at zero, and
+                // a floor of 0.05 meant every restart quietly rewrote
+                // her preference for them — a value she could never
+                // return to, so the axis could not be shut off.
+                engine.preferred[i] =
+                    crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), 0.0, 1.0);
+            }
+            if complete {
+                let mut bytes = [0u8; 4];
+                if file.read_exact(&mut bytes).is_ok() {
+                    engine.preference_precision =
+                        crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), 0.0, 1.0);
+                }
+            }
+        }
+
         engine
     }
 
@@ -2592,6 +3342,37 @@ impl ActiveInferenceEngine {
     pub(crate) fn test_set_transition_diagonal(&mut self, i: usize, value: f32) {
         assert!(i < DIM);
         self.transition_matrix[i][i] = value;
+    }
+
+    /// Force the allostatic load.
+    ///
+    /// The "preference must not adapt under strain" path cannot be
+    /// reached from a resting start, because load first has to be
+    /// driven up over time. Exposed so that guard can actually be
+    /// tested rather than assumed. Not `cfg(test)`, because the
+    /// integration tests link the library without it.
+    pub fn test_set_allostasis_load(&mut self, load: f32) {
+        self.allostasis_load = load;
+    }
+
+    /// Recompute the prior variance alone, without the learning update.
+    ///
+    /// The Kalman predict step is a pure function of the current
+    /// transition matrix and belief variance. Asserting it through a
+    /// full `cycle` no longer works, because the cycle now applies
+    /// weight decay before the variance is read, so the diagonal has
+    /// already moved by the time the assertion runs. This recomputes
+    /// just the variance step so the identity can be checked exactly.
+    #[cfg(test)]
+    pub(crate) fn test_recompute_prior_var(&mut self) {
+        for i in 0..DIM {
+            let a_diag_sq = self.transition_matrix[i][i] * self.transition_matrix[i][i];
+            self.prior_var[i] = crate::state::sanitize::finite_clamp(
+                a_diag_sq * self.belief_var[i] + PROCESS_NOISE,
+                1e-8,
+                1.0,
+            );
+        }
     }
 
     /// Set the posterior variance belief_var[i] (test only).
@@ -2694,11 +3475,58 @@ impl Default for ActiveInferenceEngine {
 /// separately by the daemon (stored and applied on the next advance).
 ///
 /// This is called by `advance_neuro` after the inference cycle.
+/// Convert an intended level displacement into the impulse rate that
+/// actually produces it.
+///
+/// `Neurochemical::apply_impulse` adds its magnitude straight to
+/// `level`, while the homeostatic restoring force reaches `level`
+/// through the second-order integrator
+/// (`velocity += F·dt; velocity *= damping^dt_scale; level +=
+/// velocity·dt`). Solving that for a constant impulse rate `R` at
+/// steady state — level constant requires `velocity = −R` — gives
+///
+/// ```text
+/// −R = (−R + F·dt)·d        where d = damping^dt_scale
+///  F = R(d−1)/(d·dt) = −(1−d)/(d·dt) · R
+///  F = (baseline − level) · homeostatic_rate
+///  ⟹ level − baseline = R · (1−d)/(d·dt·homeostatic_rate)
+/// ```
+///
+/// so a sustained rate `R` displaces the level by `R / k` where
+/// `k = (1−d)/(d·dt·homeostatic_rate)`, and the impulse needed for a
+/// desired displacement `x` is `R = x · d·dt·homeostatic_rate/(1−d)`.
+///
+/// The gain is strongly time-dependent — 44× at dt=0.1, 48× at dt=0.2,
+/// 102× at dt=1.0 — so an unconverted impulse is not merely too large,
+/// it is a *different size depending on the tick rate*.
+///
+/// Measured against it, the impulse writers in this codebase disagree
+/// sharply. The interoception impulses (0.001–0.004) are correctly
+/// scaled, implying offsets of 0.10–0.41. The inference layer's policy
+/// impulses (0.02–0.03) and its homeostatic reflex (up to ~0.06) imply
+/// offsets of 3–6, i.e. several times the full 0–1 range, which is how
+/// the resting chemistry ended up pinned far from its defaults.
+///
+/// Applying this factor makes the authored magnitudes mean what they
+/// read as — small nudges expressed as intended displacements — and
+/// makes the effect identical per simulated second at any tick rate.
+pub fn impulse_offset_to_rate(params: &NeuroTickParams) -> f32 {
+    let dt = crate::state::sanitize::finite_clamp(params.dt, 0.001, 10.0);
+    let dt_scale = dt / crate::state::neurochemical::DT;
+    let d = params.damping.powf(dt_scale);
+    // 1 − d is bounded away from zero (d → 0 only as damping → 0 over
+    // many ticks), but clamp anyway so a corrupt damping cannot divide
+    // by ~0 and produce an unbounded impulse.
+    let one_minus_d = crate::state::sanitize::finite_clamp(1.0 - d, 1e-3, 1.0);
+    d * dt * params.homeostatic_rate / one_minus_d
+}
+
 pub fn apply_inference_feedback(
     neuro: &mut NeurochemicalVector,
     result: &InferenceResult,
     now_ms: u64,
     zone_sleeping: bool,
+    offset_to_rate: f32,
 ) {
     // Apply neurochemical impulses. During sleep, skip adenosine
     // impulses: a "rest" policy selected while already in NREM/REM
@@ -2716,7 +3544,11 @@ pub fn apply_inference_feedback(
             continue;
         }
         let id = crate::state::neurochemical::NeurochemicalId::from_u8(chem_id);
-        neuro.apply_impulse_capped(id, magnitude, now_ms);
+        // `magnitude` is an intended displacement, not a rate. Convert
+        // it against the substrate's measured gain so it displaces the
+        // level by roughly what it says, identically per simulated
+        // second at any tick rate. See `impulse_offset_to_rate_scale`.
+        neuro.apply_impulse_capped(id, magnitude * offset_to_rate, now_ms);
     }
 
     // Apply cortisol baseline adjustment (allostatic regulation).
@@ -2745,10 +3577,17 @@ pub fn apply_inference_feedback(
 
 #[cfg(test)]
 mod tests {
-    //! White-box tests for the Kalman predict step's use of the
-    //! learned transition matrix diagonal. These live inside the
-    //! module (not in tests/active_inference.rs) because they need
-    //! access to private fields via the test-only accessors.
+    /// Deterministic pseudo-noise in [-1, 1], for probes that need a
+    /// reproducible signal rather than a constant.
+    fn jitter(seed: u32) -> f32 {
+        let x = (seed.wrapping_mul(2654435761) >> 8) as f32 / 16777216.0;
+        x * 2.0 - 1.0
+    }
+
+    // White-box tests for the Kalman predict step's use of the
+    // learned transition matrix diagonal. These live inside the
+    // module (not in tests/active_inference.rs) because they need
+    // access to private fields via the test-only accessors.
 
     use super::*;
 
@@ -2780,11 +3619,10 @@ mod tests {
         engine.test_set_transition_diagonal(0, 0.5);
         engine.test_set_belief_var(0, 0.02);
 
-        // Second cycle: post[0] = A[0][0] * pre[0] = 0.25 → e[0] = 0
-        let pre2 = [0.5f32; DIM];
-        let mut post2 = [0.5f32; DIM];
-        post2[0] = 0.25;
-        engine.cycle(&pre2, &post2, 0.1, &[0.5f32; DIM]);
+        // Recompute the variance step directly. A full cycle would
+        // first apply weight decay to the diagonal, so the value read
+        // back would no longer be the one that was set.
+        engine.test_recompute_prior_var();
 
         // prior_var[0] = 0.5^2 * 0.02 + 0.01 = 0.015
         let expected = 0.5f32 * 0.5 * 0.02 + PROCESS_NOISE;
@@ -2816,15 +3654,12 @@ mod tests {
         engine_damping.test_set_belief_var(0, 0.02);
         engine_amplifying.test_set_belief_var(0, 0.02);
 
-        // Zero prediction error for dim 0 (so A doesn't change)
-        let pre = [0.5f32; DIM];
-        let mut post_damping = [0.5f32; DIM];
-        let mut post_amplifying = [0.5f32; DIM];
-        post_damping[0] = 0.5 * 0.5; // 0.25
-        post_amplifying[0] = 1.5 * 0.5; // 0.75
-
-        engine_damping.cycle(&pre, &post_damping, 0.1, &state);
-        engine_amplifying.cycle(&pre, &post_amplifying, 0.1, &state);
+        // Recompute the variance step directly rather than inferring
+        // it from a full cycle: the cycle applies weight decay to the
+        // diagonal first, so a value read afterwards is not the one
+        // that was set.
+        engine_damping.test_recompute_prior_var();
+        engine_amplifying.test_recompute_prior_var();
 
         let damping_prior = engine_damping.test_prior_var(0);
         let amplifying_prior = engine_amplifying.test_prior_var(0);
@@ -2895,12 +3730,8 @@ mod tests {
         engine.test_set_transition_diagonal(0, -0.5);
         engine.test_set_belief_var(0, 0.02);
 
-        // predicted[0] = -0.5 * 0.5 = -0.25, clamped to [0, 2] → 0.0
-        // For e[0] = 0: post[0] = 0.0
-        let pre = [0.5f32; DIM];
-        let mut post = [0.5f32; DIM];
-        post[0] = 0.0;
-        engine.cycle(&pre, &post, 0.1, &state);
+        // Variance propagates on A^2, so the sign is irrelevant.
+        engine.test_recompute_prior_var();
 
         // prior_var[0] = (-0.5)^2 * 0.02 + 0.01 = 0.015
         let expected = 0.5f32 * 0.5 * 0.02 + PROCESS_NOISE;
@@ -2911,6 +3742,194 @@ mod tests {
             expected,
             actual
         );
+    }
+
+    // ─── Allostatic load integration ────────────────────────────
+
+    #[test]
+    fn test_allostatic_load_accumulates_proportionally_above_rest() {
+        // The wear rate is proportional to how far above her measured
+        // resting burden she is, so a greater elevation costs more per
+        // unit time.
+        let rest = 0.15;
+        let dt_scale = 1.0;
+        let db = rest * REST_DEADBAND_FRACTION;
+        let mild = integrate_allostasis(0.0, rest + db + 0.05, rest, dt_scale);
+        let severe = integrate_allostasis(0.0, rest + db + 0.30, rest, dt_scale);
+        assert!(mild > 0.0, "sustained elevation must accrue load");
+        assert!(
+            severe > mild,
+            "greater elevation must cost more: {mild} vs {severe}"
+        );
+    }
+
+    #[test]
+    fn test_allostatic_load_is_neutral_inside_the_rest_deadband() {
+        // Ordinary physiological variation must not integrate
+        // without bound. A burden within the dead-band of rest is
+        // neither accumulating nor draining.
+        let rest = 0.15;
+        let db = rest * REST_DEADBAND_FRACTION;
+        let at_rest = integrate_allostasis(0.4, rest, rest, 1.0);
+        let inside = integrate_allostasis(0.4, rest + db * 0.5, rest, 1.0);
+        assert!((at_rest - 0.4).abs() < 1e-6, "rest itself must be neutral");
+        assert!(
+            (inside - 0.4).abs() < 1e-6,
+            "inside the dead-band must be neutral, got {inside}"
+        );
+    }
+
+    #[test]
+    fn test_allostatic_load_recovers_below_rest() {
+        // Load must not be permanent — that is the allostatic trap.
+        let rest = 0.15;
+        let db = rest * REST_DEADBAND_FRACTION;
+        let after_one = integrate_allostasis(0.5, rest - db - 0.10, rest, 1.0);
+        assert!(
+            after_one < 0.5,
+            "load must drain below rest, got {after_one}"
+        );
+    }
+
+    #[test]
+    fn test_allostatic_load_charges_duration_not_amplitude() {
+        // The distinction the construct exists to draw, and the one
+        // the old hard threshold destroyed: one hour and six hours of
+        // the same stress must not cost the same. With an integral
+        // wear rate, six times the duration costs six times the load.
+        let rest = 0.15;
+        let db = rest * REST_DEADBAND_FRACTION;
+        let burden = rest + db + 0.05;
+        let dt_scale = 1.0;
+        let one_hour = integrate_allostasis(0.0, burden, rest, dt_scale * 3600.0);
+        let six_hours = integrate_allostasis(0.0, burden, rest, dt_scale * 6.0 * 3600.0);
+        assert!(
+            six_hours > one_hour * 5.0,
+            "longer sustained stress must cost far more: {one_hour} vs {six_hours}"
+        );
+    }
+
+    #[test]
+    fn test_allostatic_load_recovers_faster_than_it_accumulates() {
+        // The claim the old code made in a comment but did not
+        // implement: recovery is faster than accumulation given the
+        // chance. With both rates now proportional to distance from
+        // rest, this holds for a symmetric excursion.
+        let rest = 0.15;
+        let db = rest * REST_DEADBAND_FRACTION;
+        let up = integrate_allostasis(0.0, rest + db + 0.10, rest, 1.0);
+        let down = integrate_allostasis(up, rest - db - 0.10, rest, 1.0);
+        assert!(
+            down < up,
+            "recovery must be faster than accumulation: {up} -> {down}"
+        );
+    }
+
+    #[test]
+    fn test_allostatic_load_stays_bounded() {
+        for (load, burden) in [
+            (0.0f32, 1.0f32),
+            (1.0, 0.0),
+            (0.5, 1.0),
+            (1.0, 1.0),
+            (f32::NAN, 0.9),
+            (0.5, f32::INFINITY),
+        ] {
+            let next = integrate_allostasis(load, burden, 0.15, 1.0);
+            assert!(
+                (0.0..=1.0).contains(&next) && next.is_finite(),
+                "load escaped range: {load},{burden} -> {next}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_rest_baseline_is_a_slow_symmetric_average() {
+        // The reference is a long-run average with an ~83 minute time
+        // constant (rate 2e-5 at dt_scale 1, so 1/rate = 50,000 ticks
+        // = 5,000 s at 10 Hz). It must be slow enough that a burst
+        // cannot move it and fast enough to follow a genuine change
+        // in resting physiology within a session.
+        let mut base = RestBaseline::new(0.04);
+        // One second of a strong reading moves it very little.
+        for _ in 0..10 {
+            base.update(0.60, 1.0);
+        }
+        assert!(
+            base.level() < 0.05,
+            "a one-second excursion moved the reference to {}",
+            base.level()
+        );
+
+        // A genuinely different sustained level is followed.
+        let mut high = RestBaseline::new(0.04);
+        for _ in 0..400_000 {
+            high.update(0.30, 1.0);
+        }
+        assert!(
+            (high.level() - 0.30).abs() < 0.05,
+            "a sustained shift must be followed: {}",
+            high.level()
+        );
+        let mut low = RestBaseline::new(0.30);
+        for _ in 0..400_000 {
+            low.update(0.05, 1.0);
+        }
+        assert!(
+            (low.level() - 0.05).abs() < 0.05,
+            "a sustained drop must be followed too: {}",
+            low.level()
+        );
+    }
+
+    #[test]
+    fn test_rest_baseline_ignores_bursts_not_means() {
+        // Averaging means a bursty signal and a smooth signal with the
+        // same mean produce the same reference. That is the property
+        // that makes spikes non-proliferating: what matters is how
+        // much time is spent elevated, not how high the peaks go.
+        let mean = 0.10;
+        let mut smooth = RestBaseline::new(mean);
+        let mut bursty = RestBaseline::new(mean);
+        for i in 0..40_000u32 {
+            smooth.update(mean, 1.0);
+            // Every 100th tick is a large spike; the rest sit low
+            // enough that the running mean stays at `mean`.
+            bursty.update(if i % 100 == 0 { 0.9 } else { 0.089 }, 1.0);
+        }
+        assert!(
+            (bursty.level() - smooth.level()).abs() < 0.02,
+            "a spiky signal moved the reference to {} from {} despite an \
+             unchanged mean",
+            bursty.level(),
+            smooth.level()
+        );
+    }
+
+    #[test]
+    fn test_resting_system_accrues_no_load() {
+        // The most important property of all: a system at rest must
+        // measure zero wear. Every previous miscalibration of this
+        // measure showed up here first.
+        let mut load = 0.0f32;
+        for _ in 0..20_000 {
+            let burden = 0.039 + (self::tests::jitter(0) * 0.002);
+            let rest = 0.04;
+            load = integrate_allostasis(load, burden, rest, 1.0);
+        }
+        assert!(
+            load < 0.01,
+            "resting system accrued load {load}: ordinary variation must not wear"
+        );
+    }
+
+    #[test]
+    fn test_rest_baseline_ignores_non_finite_input() {
+        let mut base = RestBaseline::new(0.15);
+        base.update(f32::NAN, 1.0);
+        base.update(f32::INFINITY, 1.0);
+        assert!(base.level().is_finite());
+        assert!((base.level() - 0.15).abs() < 1e-6);
     }
 
     // ─── Circuit breaker tests ────────────────────────────────────

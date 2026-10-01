@@ -500,6 +500,160 @@ fn test_corrupted_file_detected() {
     cleanup(&path);
 }
 
+// ─── Legacy layout migration ───────────────────────────────────
+
+/// The struct size before `InferenceSignals` gained `policy_authority`.
+/// A state file written by that binary carries `version = 3` (the
+/// reserve grew without a schema bump) but this `state_size`, which is
+/// what `open()` must detect and migrate.
+const LEGACY_STATE_SIZE: u32 = 3288;
+
+/// All 18 chemicals, in discriminant order.
+const ALL_CHEMICALS: [NeurochemicalId; 18] = [
+    NeurochemicalId::Dopamine,
+    NeurochemicalId::Serotonin,
+    NeurochemicalId::Norepinephrine,
+    NeurochemicalId::Acetylcholine,
+    NeurochemicalId::GABA,
+    NeurochemicalId::Glutamate,
+    NeurochemicalId::Cortisol,
+    NeurochemicalId::Oxytocin,
+    NeurochemicalId::Endorphin,
+    NeurochemicalId::Histamine,
+    NeurochemicalId::Adenosine,
+    NeurochemicalId::BDNF,
+    NeurochemicalId::Endocannabinoid,
+    NeurochemicalId::Vasopressin,
+    NeurochemicalId::CRH,
+    NeurochemicalId::Orexin,
+    NeurochemicalId::Epinephrine,
+    NeurochemicalId::Melatonin,
+];
+
+/// Rewrite an on-disk state file to look like it was written by the
+/// pre-`policy_authority` binary: same header, but `state_size` set to
+/// the old length. Everything else — all 18 neurochemicals, zones,
+/// memory, manifest — is left exactly as the current binary wrote it,
+/// which is precisely the situation the migration has to survive.
+fn downgrade_to_legacy_layout(path: &std::path::Path) {
+    let mut bytes = std::fs::read(path).expect("read state");
+    assert!(bytes.len() >= 4096, "state file is one 4K page");
+    bytes[8..12].copy_from_slice(&LEGACY_STATE_SIZE.to_le_bytes());
+    std::fs::write(path, &bytes).expect("rewrite state");
+}
+
+#[test]
+fn test_open_migrates_legacy_layout_in_place() {
+    let path = temp_path("legacy-layout");
+
+    // Give every chemical a distinct level so that a migration which
+    // silently reinitialised even one slot would be caught.
+    let levels_before: Vec<f32> = {
+        let mmap = MmapState::create(&path, 1, now_ms()).expect("create");
+        mmap.modify(2000, |state| {
+            for (i, &id) in ALL_CHEMICALS.iter().enumerate() {
+                state
+                    .neurochemicals
+                    .get_mut(id)
+                    .expect("chemical slot")
+                    .apply_impulse(0.05 * (i as f32 + 1.0), 2000);
+            }
+            state.neurochemicals.recompute_derived();
+        })
+        .expect("modify");
+        mmap.sync().expect("sync");
+        let snapshot = mmap.read_consistent().expect("read");
+        ALL_CHEMICALS
+            .iter()
+            .map(|&id| {
+                snapshot
+                    .neurochemicals
+                    .get(id)
+                    .expect("chemical slot")
+                    .level
+            })
+            .collect()
+    };
+
+    downgrade_to_legacy_layout(&path);
+
+    // Opening must succeed rather than refusing the file — the whole
+    // point of the reserve is that a state written by the previous
+    // build is still readable.
+    let mmap = MmapState::open(&path).expect("open should migrate the legacy layout");
+
+    let state = mmap.read_consistent().expect("read after migration");
+    // The persisted state survived: this is a migration, not a reset.
+    for (&id, &before) in ALL_CHEMICALS.iter().zip(&levels_before) {
+        assert_eq!(
+            state.neurochemicals.get(id).expect("chemical slot").level,
+            before,
+            "{id:?} must survive the layout migration untouched"
+        );
+    }
+    // The new field exists and starts at zero — the authority grant is
+    // something cognition extends, never something a file inherits.
+    assert_eq!(
+        state.inference_signals.policy_authority, 0.0,
+        "migrated state must not come up granting policy authority"
+    );
+    // `open()` already verified magic, version and checksum, so reaching
+    // here means the migrated file is internally consistent.
+    assert!(state.verify().is_ok());
+    assert!(state.verify_checksum().is_ok());
+    drop(mmap);
+
+    // The migration is durable, not just in-memory: reopen from disk
+    // and the size field must already be the current one.
+    let raw = std::fs::read(&path).expect("read back");
+    assert_eq!(
+        u32::from_le_bytes(raw[8..12].try_into().unwrap()),
+        GenesisCoreState::SIZE as u32,
+        "state_size must be rewritten on disk"
+    );
+
+    let mmap = MmapState::open(&path).expect("reopen after migration");
+    let state = mmap.read_consistent().expect("read after reopen");
+    assert!(state.verify().is_ok());
+    drop(mmap);
+
+    cleanup(&path);
+}
+
+#[test]
+fn test_open_rejects_unknown_layout_size() {
+    let path = temp_path("bad-layout-size");
+
+    {
+        let mmap = MmapState::create(&path, 1, now_ms()).expect("create");
+        mmap.sync().expect("sync");
+        drop(mmap);
+    }
+
+    // A size we have no migration for is a damaged or foreign file, not
+    // something to guess at. It must fail loudly rather than be read as
+    // the current layout.
+    let mut bytes = std::fs::read(&path).expect("read state");
+    bytes[8..12].copy_from_slice(&3632u32.to_le_bytes());
+    std::fs::write(&path, &bytes).expect("rewrite state");
+
+    let result = MmapState::open(&path);
+    assert!(
+        matches!(result, Err(StateFileError::VerificationFailed(_))),
+        "an unmigratable size must fail verification, not be guessed at"
+    );
+
+    // And the file must be left exactly as it was found.
+    let after = std::fs::read(&path).expect("read back");
+    assert_eq!(
+        &after[8..12],
+        &3632u32.to_le_bytes(),
+        "rejected file must be untouched"
+    );
+
+    cleanup(&path);
+}
+
 // ─── Persistence across instances ─────────────────────────────
 
 #[test]

@@ -254,6 +254,14 @@ impl MemoryPointers {
     }
 
     /// Whether the system is in a high-encoding state (learning fast).
+    /// Whether encoding is in its elevated range.
+    ///
+    /// Measured encoding ranges from 0.267 at the low end to 0.775 at
+    /// maximum engagement (a weighted average of dopamine,
+    /// norepinephrine and acetylcholine effective levels, weighted 0.4 /
+    /// 0.3 / 0.3). The 0.6 threshold sits inside that range: above the
+    /// resting value of ~0.35 and below the engaged peak, so it
+    /// discriminates rather than sitting outside the reachable set.
     pub fn is_high_encoding(&self) -> bool {
         self.encoding_weight > 0.6
     }
