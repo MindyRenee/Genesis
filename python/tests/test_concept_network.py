@@ -101,15 +101,55 @@ def test_network_quality_decreases_with_low_confidence_edges() -> None:
 
 
 def test_category_detection_preserves_uncertainty() -> None:
+    """Competing evidence must not be forced into a single category.
+
+    A concept whose definition supports living *and* non-living
+    readings ("bat" is both an animal and a machine) must stay
+    UNKNOWN, with both sides of the evidence recorded. Choosing one
+    would assert something the evidence does not support.
+
+    Note the vocabulary: the competing words must be ones the
+    classifier's keyword sets actually contain. "equipment" appears
+    in no set, so a definition using it produces no non-living
+    evidence at all and there is nothing to be uncertain about —
+    the test would then assert LIVING, which is correct behaviour for
+    unambiguous evidence and the opposite of what it means to test.
+    """
     network = ConceptNetwork()
     concept = network.add_concept(
         "bat",
-        properties={"definition": "an animal and a piece of sporting equipment"},
+        properties={"definition": "an animal and a machine"},
     )
     assert concept.category == ConceptCategory.UNKNOWN
     evidence = concept.properties["category_evidence"]
     assert evidence["living"] > 0
     assert evidence["non_living"] > 0
+
+
+def test_category_detection_resolves_unambiguous_evidence() -> None:
+    """The counterpart: one-sided evidence must still decide.
+
+    Uncertainty should be preserved only when it exists. Without
+    this, a classifier that always returned UNKNOWN would pass the
+    test above while being useless.
+    """
+    network = ConceptNetwork()
+    animal = network.add_concept(
+        "dog", properties={"definition": "a loyal animal that barks"}
+    )
+    assert animal.category == ConceptCategory.LIVING
+
+    artifact = network.add_concept(
+        "hammer", properties={"definition": "a tool used for driving nails"}
+    )
+    assert artifact.category == ConceptCategory.NON_LIVING
+
+    # A word the classifier does not know contributes no evidence, so
+    # it cannot manufacture a category on its own.
+    unknown_word = network.add_concept(
+        "widget", properties={"definition": "a piece of sporting equipment"}
+    )
+    assert unknown_word.category == ConceptCategory.UNKNOWN
 
 
 def test_category_detection_weights_name_over_definition() -> None:

@@ -2004,3 +2004,149 @@ def test_reflection_mood_tracking() -> None:
 
     mood_insights = reflector.get_insights_by_type("mood")
     assert len(mood_insights) > 0
+
+
+# ─── Hardware body perception ──────────────────────────────────
+#
+# The daemon measures ~25 hardware channels every 5 s. Until now none
+# of them reached the self-model, so the mind knew it had a process
+# but not that it had a body. These pin that closed.
+
+class _FullBody:
+    """A BodyState-shaped stand-in reporting every channel."""
+
+    cpu_temp_c = 71.5
+    throttle_state = 0.25
+    thermoregulatory_effort = 0.4
+    energy_reserve = 0.08
+    on_ac_power = False
+    supply_voltage = 11.1
+    battery_cycles = 512.0
+    psi_cpu = 0.31
+    psi_io = 0.05
+    psi_mem = 0.44
+    stress_load = 0.62
+    cognitive_load = 0.11
+    io_activity = 0.02
+    metabolic_rate = 0.33
+    top_freq_share = 0.91
+    pulse_hz = 3100.0
+    pulse = 0.77
+    autonomic_rate = 3.0
+    cache_miss_rate = 0.14
+    branch_miss_rate = 0.09
+    core_voltage = 1.19
+    core_activity = 0.5
+    uncore_activity = 0.4
+    dram_activity = 0.6
+    entropy_level = 0.97
+    clocksource = 1
+    suspend_caps = 3
+    distressed = True
+    description = "low battery, hot"
+
+
+def test_self_model_sees_her_own_hardware_body() -> None:
+    """Every channel the daemon reports must reach the self-model.
+
+    The regression this pins: `sense_body` only sampled its own RSS,
+    own process CPU, and socket existence, so the self-model had no
+    field for silicon temperature, battery charge, pressure stalls,
+    or any of the other hardware signals. She could not know she was
+    hot, or out of power, or being stalled.
+    """
+    from genesis_cognitive.self.model import SelfModel as SM
+
+    body = SM().update_hardware_body(_FullBody())
+
+    assert body.cpu_temp_c == 71.5
+    assert body.energy_reserve == 0.08
+    assert body.on_ac_power is False
+    assert body.psi_mem == 0.44
+    assert body.pulse_hz == 3100.0
+    assert body.cache_miss_rate == 0.14
+    assert body.branch_miss_rate == 0.09
+    assert body.entropy_level == 0.97
+    assert body.battery_cycles == 512.0
+    assert body.body_hardware_distressed is True
+    assert body.hardware_description == "low battery, hot"
+
+
+def test_absent_sensor_is_distinguishable_from_measured_zero() -> None:
+    """A missing channel must not read as a healthy zero.
+
+    Without this, an absent sensor is indistinguishable from a normal
+    reading, and a need derived from the body could be inferred from
+    silence. `hardware_sensors_present` counts what actually reported.
+    """
+    from genesis_cognitive.self.model import SelfModel as SM
+
+    class _PartialBody:
+        cpu_temp_c = 60.0
+        energy_reserve = 0.5
+
+    body = SM().update_hardware_body(_PartialBody())
+
+    assert body.hardware_sensors_present == 2, "only the two reported channels count"
+    # Unreported channels keep their "unknown" default rather than
+    # acquiring a fabricated measurement.
+    assert body.psi_mem == 0.0
+    assert body.pulse_hz == 0.0
+    # on_ac_power defaults True, which must read as "no battery
+    # information", never as "confirmed plugged in".
+    assert body.on_ac_power is True
+
+    full = SM().update_hardware_body(_FullBody())
+    assert full.hardware_sensors_present > 20
+
+
+def test_stale_hardware_reading_is_not_actionable() -> None:
+    """A need computed from a stale body reading is a hallucinated need."""
+    import time as _time
+
+    from genesis_cognitive.self.model import SelfModel as SM
+
+    model = SM()
+    body = model.update_hardware_body(_FullBody())
+    assert body.hardware_is_fresh(_time.monotonic()) is True
+
+    # No reading yet — the substrate has never reported.
+    assert SM().body_model.hardware_is_fresh(_time.monotonic()) is False
+
+    # A reading from a minute ago describes a machine that may no
+    # longer be this one.
+    body.hardware_read_at = _time.monotonic() - 999.0
+    assert body.hardware_is_fresh(_time.monotonic()) is False
+
+
+def test_non_finite_sensor_reading_is_not_a_measurement() -> None:
+    """A NaN or inf from a sensor must not enter the self-model."""
+    from genesis_cognitive.self.model import SelfModel as SM
+
+    class _BrokenBody:
+        cpu_temp_c = float("nan")
+        energy_reserve = float("inf")
+        psi_mem = 0.2
+
+    body = SM().update_hardware_body(_BrokenBody())
+    assert body.cpu_temp_c == 0.0
+    assert body.energy_reserve == 1.0
+    assert body.psi_mem == 0.2
+
+
+def test_hardware_staleness_constant_is_not_a_serialized_field() -> None:
+    """A constant must not become self-model state.
+
+    `HARDWARE_STALE_SECONDS` is a ClassVar. As a plain dataclass
+    annotation it would be an instance field, persisted with every
+    self-model save and settable per instance.
+    """
+    import dataclasses
+
+    from genesis_cognitive.self.model import ComputationalSubstrate
+
+    field_names = {f.name for f in dataclasses.fields(ComputationalSubstrate)}
+    assert "HARDWARE_STALE_SECONDS" not in field_names
+    assert isinstance(
+        ComputationalSubstrate.HARDWARE_STALE_SECONDS, float
+    )

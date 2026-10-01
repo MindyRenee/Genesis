@@ -62,8 +62,9 @@ def _pack_inference_summary(
     pe_serotonin=0.0,
     model_maturity=0.0,
     tick_count=0,
+    policy_authority=0.0,
 ) -> bytes:
-    """Pack an InferenceSummary into 60 bytes (matching the Rust layout)."""
+    """Pack an InferenceSummary into 64 bytes (matching the Rust layout)."""
     return (
         struct.pack("<f", surprise_ema)
         + struct.pack("<f", free_energy)
@@ -80,11 +81,12 @@ def _pack_inference_summary(
         + struct.pack("<f", pe_serotonin)
         + struct.pack("<f", model_maturity)
         + struct.pack("<I", tick_count)
+        + struct.pack("<f", policy_authority)
     )
 
 
-def test_inference_summary_unpack_60_bytes():
-    """InferenceSummary should unpack exactly 60 bytes."""
+def test_inference_summary_unpack_64_bytes():
+    """InferenceSummary should unpack exactly 64 bytes."""
     data = _pack_inference_summary(
         surprise_ema=0.3,
         free_energy=0.4,
@@ -93,7 +95,7 @@ def test_inference_summary_unpack_60_bytes():
         model_maturity=0.8,
         tick_count=42,
     )
-    assert len(data) == 60
+    assert len(data) == 64
     summary = InferenceSummary.unpack(data)
     assert abs(summary.surprise_ema - 0.3) < 1e-6
     assert abs(summary.free_energy - 0.4) < 1e-6
@@ -106,10 +108,10 @@ def test_inference_summary_unpack_60_bytes():
 def test_inference_summary_unpack_too_short():
     """InferenceSummary should reject short data."""
     try:
-        InferenceSummary.unpack(b"\x00" * 59)
+        InferenceSummary.unpack(b"\x00" * 63)
         raise AssertionError("should have raised ValueError")
     except ValueError as e:
-        assert "60 bytes" in str(e)
+        assert "64 bytes" in str(e)
 
 
 def test_inference_summary_is_surprised():

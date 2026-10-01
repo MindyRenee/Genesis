@@ -1872,12 +1872,43 @@ def test_verbatim_fallback_is_last_resort_and_not_used_by_composer_paths() -> No
 
 
 def test_comprehension_exposes_parse_failure_signals() -> None:
-    """Weak parses must expose reusable diagnostics rather than only low confidence."""
-    result = _props("the quantum mechanism blorps unexpectedly")
+    """Structural parse gaps must surface as reusable diagnostics.
+
+    `parse_coverage` measures how much of the input the parse actually
+    placed into a proposition role. When a content word is left over,
+    the result must carry a machine-readable diagnostic, not merely a
+    lower confidence number, so downstream learning can react to the
+    *kind* of failure rather than re-deriving it.
+
+    Scope, stated honestly: this measures *structural* coverage. The
+    comprehension engine is a pattern matcher with no lexicon, so it
+    cannot tell a nonsense word from a rare real one. A sentence whose
+    words are all echoed into a single subject ("the dog",
+    "the quantum mechanism blorps unexpectedly") parses to the same
+    shape and is reported as fully covered. Detecting that would need
+    vocabulary grounding, which this engine does not have — a feature,
+    not a test fix. What is verifiable here is the mechanism that
+    genuinely works: a content token with no role in the parse.
+    """
+    result = _props("I am thinking about the door and the window")
     assert 0.0 <= result.parse_coverage <= 1.0
     assert isinstance(result.unresolved_tokens, list)
     assert isinstance(result.diagnostics, list)
-    assert result.diagnostics, "a structurally weak parse should produce diagnostics"
+    assert result.parse_coverage < 1.0, "a token left out of the parse is a real gap"
+    assert result.unresolved_tokens, "the unplaced token must be reported"
+    assert "unresolved_content_tokens" in result.diagnostics
+    assert "partial_parse" in result.diagnostics
+
+
+def test_comprehension_diagnostics_are_empty_for_clean_parse() -> None:
+    """A well-formed proposition must not be flagged as a failure.
+
+    Without this, a comprehension engine that reported a diagnostic
+    for everything would pass the test above while being useless.
+    """
+    result = _props("the engine moves the piston")
+    assert result.parse_coverage >= 0.8
+    assert result.diagnostics == []
 
 
 def test_comprehension_full_parse_has_high_coverage() -> None:

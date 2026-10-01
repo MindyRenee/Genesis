@@ -367,9 +367,9 @@ def test_similar_results_valid() -> None:
 
 
 def test_core_state_unpack() -> None:
-    """A 3288-byte buffer unpacks the key fields correctly.
+    """A 3296-byte buffer unpacks the key fields correctly.
 
-    Tests the v3 schema (18 chemicals, 3288 bytes). The offsets are:
+    Tests the v3 schema (18 chemicals, 3296 bytes). The offsets are:
     - Header: 0-55 (56 bytes)
     - NeurochemicalVector: 56-2471 (2416 bytes)
       - chemicals[18]: 56-1063 (1008 bytes, 18 × 56 each)
@@ -389,7 +389,7 @@ def test_core_state_unpack() -> None:
       - consolidation_weight: 2636
       - retrieval_weight: 2640
     """
-    data = bytearray(3288)
+    data = bytearray(3296)
 
     # Header fields
     struct.pack_into("<Q", data, 16, 1000)   # created_at
@@ -439,7 +439,7 @@ def test_core_state_unpack() -> None:
 
 
 def test_core_state_too_short() -> None:
-    """A buffer shorter than 3288 bytes raises ValueError."""
+    """A buffer shorter than 3296 bytes raises ValueError."""
     try:
         CoreState.unpack(b"\x00" * 3287)
         raise AssertionError()
