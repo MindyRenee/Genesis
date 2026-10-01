@@ -2842,8 +2842,12 @@ impl NeurochemicalVector {
         let mel_factor = self.melatonin_factor();
         let mel_idx = NeurochemicalId::Melatonin as usize;
         let mel_target = mel_factor * 0.80; // peak ~0.80 at midnight
-        let mel_approach_rate = 0.05 * dt_scale; // fast approach (~2 seconds)
-        let mel_delta = (mel_target - self.chemicals[mel_idx].level) * mel_approach_rate;
+        // Exponential approach for time-invariance and large-dt stability:
+        // 0.5/sec matches the old 0.05/tick at 10 Hz (1-exp(-0.05) ~= 0.0488)
+        // while clamping alpha to [0,1] so a 1-10 s heartbeat dt after a
+        // stall cannot overshoot (linear 0.05*dt_scale reaches 5.0 at dt=10).
+        let mel_alpha = 1.0 - (-0.5 * dt).exp();
+        let mel_delta = (mel_target - self.chemicals[mel_idx].level) * mel_alpha;
         self.chemicals[mel_idx].level += mel_delta;
         self.chemicals[mel_idx].level =
             crate::state::sanitize::finite_clamp(self.chemicals[mel_idx].level, 0.0, 1.0);

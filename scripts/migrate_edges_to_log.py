@@ -175,7 +175,10 @@ def migrate(data_dir: Path, write: bool, force: bool) -> int:
         ])
         log.close()
         tmp.replace(log_path)
-    except BaseException:
+    except Exception:
+        # Migration cleanup: remove the scratch file, then re-raise so the
+        # failure is visible (and Ctrl+C/SystemExit propagate — Exception
+        # never catches those). Tmp uses missing_ok so double-cleanup is safe.
         tmp.unlink(missing_ok=True)
         raise
 

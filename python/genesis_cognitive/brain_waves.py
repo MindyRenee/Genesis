@@ -715,19 +715,36 @@ class BrainWaveOscillator:
             )
         )
 
+        # Real-time bookkeeping, shared by both paths: _last_time
+        # tracks the last assessment, not the last relaxation, so the
+        # next dt spans exactly one interval even across transitions.
+        now = time.monotonic()
+        if self._last_time is not None:
+            dt = min(now - self._last_time, 1.0)  # cap at 1s
+        else:
+            dt = 0.1  # default 100ms
+        self._last_time = now
+
         if should_snap:
-            # Snap amplitudes to targets on phase/dominant transition
+            # Phase precesses continuously — it must not stall on
+            # transition ticks (_step advances it on relaxed ticks;
+            # this is the snap-tick counterpart).
+            self._advance_phase(dt)
+            # Snap amplitudes to targets on phase/dominant transition,
+            # honouring accumulated top-down drive: cognition's boost
+            # (attention → gamma, filtering → alpha, retrieval →
+            # theta) takes effect immediately instead of being silently
+            # discarded until the first relaxed tick. The drive decays
+            # here exactly as _step would decay it, so it cannot pile
+            # up unseen across a run of snaps and then dump all at once.
             for band in BrainWave:
-                self._amplitude[band] = targets[band]
+                self._amplitude[band] = targets[band] + self._top_down[band]
+            decay = math.exp(-dt / self._DRIVE_TAU)
+            for band in BrainWave:
+                self._top_down[band] *= decay
         else:
             # Relax amplitudes toward targets with real-time dynamics
-            now = time.monotonic()
-            if self._last_time is not None:
-                dt = min(now - self._last_time, 1.0)  # cap at 1s
-            else:
-                dt = 0.1  # default 100ms
-            self._last_time = now
-
+            # (_step advances phase internally).
             self._step(dt, targets)
 
         self._last_phase_name = phase_name
@@ -764,6 +781,19 @@ class BrainWaveOscillator:
 
         return powers, label, description
 
+    def _advance_phase(self, dt: float) -> None:
+        """Precess every band's phase at its characteristic frequency.
+
+        Single call site for phase advancement — used by `_step` on
+        relaxed ticks and directly by `assess` on snap ticks, so the
+        oscillator never stalls on transitions.
+        """
+        for band in BrainWave:
+            freq = self._FREQS[band]
+            self._phase[band] = (
+                self._phase[band] + 2.0 * math.pi * freq * dt
+            ) % (2.0 * math.pi)
+
     def _step(
         self,
         dt: float,
@@ -778,11 +808,7 @@ class BrainWaveOscillator:
         5. Decay top-down drive
         """
         # 1. Advance phase
-        for band in BrainWave:
-            freq = self._FREQS[band]
-            self._phase[band] = (
-                self._phase[band] + 2.0 * math.pi * freq * dt
-            ) % (2.0 * math.pi)
+        self._advance_phase(dt)
 
         # 2. Cross-frequency phase-amplitude modulation
         # Slow band phase modulates fast band target
@@ -1171,6 +1197,18 @@ def _waking_phase_powers(
         }
         label = "delta"
         description = "deep and slow, barely cognitive"
+    # Normalize to the documented ~1.0 power budget. The
+    # moderate-alpha branch builds its peak additively (sums to
+    # ~1.05-1.10) and the low-theta branch sums to ~0.95-1.09
+    # depending on consolidation weight; the other branches already
+    # sum to 1.0 and are untouched in effect. Uniform scaling
+    # preserves every ratio, so dominant/secondary and all
+    # normalized readouts are unchanged — only the absolute target
+    # scale (and therefore relaxation transients) becomes honest.
+    total = sum(powers.values())
+    if total > 0:
+        for band in powers:
+            powers[band] /= total
     return powers, label, description
 
 

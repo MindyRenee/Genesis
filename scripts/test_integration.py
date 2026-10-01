@@ -62,8 +62,9 @@ def wait_for_socket(socket_path: str, timeout: float = 10.0) -> bool:
                 s.connect(socket_path)
                 s.close()
                 return True
-            except OSError:
-                pass
+            except OSError as e:
+                # Socket file exists but daemon isn't accepting yet — keep polling.
+                logger.debug(f"socket not ready yet: {e}")
         time.sleep(0.1)
     return os.path.exists(socket_path)
 

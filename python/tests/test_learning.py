@@ -1817,3 +1817,81 @@ def test_curiosity_contemplate() -> None:
     for q in questions:
         assert q.internal
         assert not q.should_ask
+
+
+# ======================================================================
+# Web provenance: network-learned claims stay quarantinable
+# ======================================================================
+
+
+def _web_source(url: str = "https://en.wikipedia.org/wiki/Cat") -> dict:
+    return {
+        "url": url,
+        "domain": "en.wikipedia.org",
+        "source": "wikipedia",
+        "at": 1700000000000,
+    }
+
+
+def test_web_study_tags_edge_origin() -> None:
+    """Relationships read off the web carry web:<domain>, not learned."""
+    learner = _make_learner()
+    rels = learner._extract_and_add_relationships(
+        "A neutron star is a stellar remnant.", source=_web_source()
+    )
+    assert rels, "parser should extract at least one typed relationship"
+    for subject, _rel, obj in rels:
+        edges = [
+            e for e in learner.network.get_edges(subject, direction="out")
+            if e.target == obj
+        ]
+        assert edges, f"missing edge {subject} -> {obj}"
+        assert all(e.origin == "web:en.wikipedia.org" for e in edges)
+
+
+def test_local_study_keeps_learned_origin() -> None:
+    """Without a source record, extraction keeps the historical origin."""
+    learner = _make_learner()
+    rels = learner._extract_and_add_relationships(
+        "A neutron star is a stellar remnant."
+    )
+    assert rels, "parser should extract at least one typed relationship"
+    for subject, _rel, obj in rels:
+        edges = [
+            e for e in learner.network.get_edges(subject, direction="out")
+            if e.target == obj
+        ]
+        assert edges, f"missing edge {subject} -> {obj}"
+        assert all(e.origin == "learned" for e in edges)
+
+
+def test_web_study_records_concept_sources_capped() -> None:
+    """Concepts remember where they were read, bounded in size."""
+    from genesis_cognitive.concepts.edge_log import WEB_SOURCES_CAP
+
+    learner = _make_learner()
+    created = learner._extract_and_add_concepts(
+        "photosynthesis chlorophyll sunlight", "plants", source=_web_source()
+    )
+    assert created, "extractor should yield at least one concept"
+    concept = learner.network.get_concept(created[0])
+    assert concept is not None
+    sources = concept.properties.get("web_sources")
+    assert isinstance(sources, list) and sources
+    assert sources[0]["domain"] == "en.wikipedia.org"
+
+    # Flooding one concept with distinct URLs stays bounded.
+    for i in range(WEB_SOURCES_CAP + 5):
+        learner._record_web_source(
+            concept,
+            {"url": f"https://example{i}.com/x", "domain": f"example{i}.com",
+             "source": "web", "at": i},
+        )
+    assert len(concept.properties["web_sources"]) <= WEB_SOURCES_CAP
+
+
+def test_study_fetch_refuses_unsafe_urls_offline() -> None:
+    """The study fetch path refuses non-http and loopback URLs locally."""
+    learner = _make_learner()
+    assert learner._fetch_page_text("file:///etc/hostname", "topic") is None
+    assert learner._fetch_page_text("http://127.0.0.1/blocked", "topic") is None

@@ -19,9 +19,12 @@ like success isn't — the toddler's first lesson in "working" vs
 
 from __future__ import annotations
 
+import logging
 import random
 from dataclasses import dataclass
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # Attribute vocab for generated sorters. Instances given as data (an
 # offered puzzle, a described task) may use any attributes at all —
@@ -483,5 +486,7 @@ class PerceptualSorter(ShapeSorter):
             if name:
                 try:
                     self.cortex.learn_from_image(img, name)
-                except Exception:  # noqa: BLE001
-                    pass
+                except Exception as e:  # noqa: BLE001
+                    # One bad image must not abort the whole teaching pass —
+                    # log and continue with the remaining bindings.
+                    logger.debug(f"teach skipped image {key!r} ({name!r}): {e}")

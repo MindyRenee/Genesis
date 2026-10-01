@@ -10,7 +10,10 @@ import json
 
 from genesis_cognitive.concepts.edge_log import (
     is_derivable_edge,
+    is_web_origin,
     open_edge_log,
+    web_domain_of,
+    web_origin,
 )
 from genesis_cognitive.concepts.network import ConceptNetwork
 from genesis_cognitive.concepts.types import Edge, RelationType
@@ -38,6 +41,33 @@ class TestClassification:
         assert not is_derivable_edge(RelationType.RELATED_TO, "stated")
         assert not is_derivable_edge(RelationType.RELATED_TO, "observed")
         assert not is_derivable_edge(RelationType.SIMILAR_TO, "vocabulary_seed")
+
+    def test_web_origin_normalizes_domain(self):
+        assert web_origin("en.wikipedia.org") == "web:en.wikipedia.org"
+        assert web_origin("https://EN.wikipedia.org/wiki/Cat") == "web:en.wikipedia.org"
+        assert web_origin("http://example.com:8080/x?y=1") == "web:example.com"
+        assert web_origin("") == "web:unknown"
+        assert web_origin("not a domain!!") == "web:unknown"
+
+    def test_is_web_origin_matches_prefix_only(self):
+        assert is_web_origin("web:en.wikipedia.org")
+        assert is_web_origin("web")
+        assert not is_web_origin("stated")
+        assert not is_web_origin("learned")
+        assert not is_web_origin("observed")
+        assert not is_web_origin("cognition_lesson")
+
+    def test_web_domain_of_round_trips(self):
+        assert web_domain_of("web:en.wikipedia.org") == "en.wikipedia.org"
+        assert web_domain_of("web") == "unknown"
+        assert web_domain_of("stated") is None
+        assert web_domain_of("learned") is None
+
+    def test_web_typed_edge_is_canonical_but_quarantinable(self):
+        # A typed web claim is a factual claim (canonical), yet still
+        # identifiable as untrusted-source by prefix.
+        assert not is_derivable_edge(RelationType.IS_A, "web:example.com")
+        assert is_web_origin("web:example.com")
         assert not is_derivable_edge(RelationType.BRIDGES, "labeling")
 
     def test_unknown_origin_defaults_canonical(self):

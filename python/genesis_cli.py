@@ -3214,8 +3214,10 @@ def _stop_child(proc: subprocess.Popen, name: str, timeout: float) -> bool:
     try:
         proc.wait(timeout=timeout)
         return proc.returncode == 0
-    except subprocess.TimeoutExpired:
-        pass
+    except subprocess.TimeoutExpired as e:
+        # Expected fallthrough: SIGTERM didn't stop it in time, escalate
+        # to SIGKILL below. Logged (not silent) so shutdown hangs are visible.
+        logger.debug(f"{name} SIGTERM timeout ({e}); escalating to SIGKILL")
 
     print(
         f"[genesis] {name} did not stop within {timeout:g}s after SIGTERM; "
@@ -3224,8 +3226,9 @@ def _stop_child(proc: subprocess.Popen, name: str, timeout: float) -> bool:
     )
     try:
         proc.kill()
-    except OSError:
-        pass
+    except OSError as e:
+        # Process already gone (raced with natural exit) — nothing to kill.
+        logger.debug(f"{name} kill skipped, already exited: {e}")
     try:
         proc.wait(timeout=_KILL_GRACE_S)
     except subprocess.TimeoutExpired:
@@ -3280,8 +3283,8 @@ def _close_client_quietly(client: object) -> None:
         if callable(fn):
             try:
                 fn()
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"client {attr} failed during shutdown: {e}")
             return
 
 

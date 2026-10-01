@@ -317,8 +317,9 @@ def _raw_size_of_backup(backup_path: str, state_path: str) -> int:
     try:
         with open(backup_path, "rb") as f:
             return len(lzma.decompress(f.read()))
-    except (OSError, lzma.LZMAError):
-        pass
+    except (OSError, lzma.LZMAError) as e:
+        # Backup unreadable/corrupt — fall through to the live state size.
+        logger.debug(f"backup size probe failed, using live state: {e}")
     try:
         return os.path.getsize(state_path)
     except OSError:

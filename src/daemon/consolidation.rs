@@ -287,7 +287,11 @@ fn compute_compact_tag(full_tag: &[f32; LTM_TAG_SIZE]) -> [f32; 4] {
         ne * 0.20 + hist * 0.15 + da * 0.15 + ach * 0.15 + orexin * 0.20 + epi * 0.10;
     let sleep_promoters = gaba * 0.25 + adn * 0.65 + mel * 0.35;
     let net_drive = arousal_promoters - sleep_promoters;
-    let total_input = net_drive * crate::state::neurochemical::WC_GAIN; // no self-excitation
+    // Must match recompute_derived(): arousal uses AROUSAL_GAIN (3.0).
+    // WC_GAIN (2.0) is the consolidation net-drive gain — a different
+    // decision with its own thresholds. Using it here understated
+    // arousal stored in the LTM compact tag relative to the live value.
+    let total_input = net_drive * crate::state::neurochemical::AROUSAL_GAIN; // no self-excitation
     let arousal = if total_input > 20.0 {
         1.0
     } else if total_input < -20.0 {
@@ -504,7 +508,7 @@ mod tests {
         let arousal_promoters =
             ne * 0.20 + hist * 0.15 + da * 0.15 + ach * 0.15 + orexin * 0.20 + epi * 0.10;
         let net_drive = arousal_promoters - sleep_promoters;
-        let total_input = net_drive * crate::state::neurochemical::WC_GAIN;
+        let total_input = net_drive * crate::state::neurochemical::AROUSAL_GAIN;
         let expected_arousal = if total_input > 20.0 {
             1.0
         } else if total_input < -20.0 {
@@ -523,7 +527,7 @@ mod tests {
         // The old buggy weight (0.30) would give a different value:
         let buggy_sleep = gaba * 0.30 + adn * 0.65 + mel * 0.35;
         let buggy_drive = arousal_promoters - buggy_sleep;
-        let buggy_input = buggy_drive * crate::state::neurochemical::WC_GAIN;
+        let buggy_input = buggy_drive * crate::state::neurochemical::AROUSAL_GAIN;
         let buggy_arousal = 1.0 / (1.0 + (-buggy_input).exp());
         assert!(
             (compact[0] - buggy_arousal).abs() > 0.001,

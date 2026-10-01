@@ -8,6 +8,7 @@ spawn/wait/teardown pattern of ``scripts/test_integration.py``.
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import socket as _socket
@@ -18,6 +19,8 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 from genesis_client import GenesisClient
+
+logger = logging.getLogger(__name__)
 
 _DAEMON_CANDIDATES = ("target/release/genesis-daemon", "target/debug/genesis-daemon")
 
@@ -56,8 +59,9 @@ def wait_for_socket(socket_path: str, timeout: float = 10.0) -> bool:
                 s.connect(socket_path)
                 s.close()
                 return True
-            except OSError:
-                pass
+            except OSError as e:
+                # Socket file exists but daemon isn't accepting yet — keep polling.
+                logger.debug(f"socket not ready yet: {e}")
         time.sleep(0.1)
     return os.path.exists(socket_path)
 
@@ -107,8 +111,8 @@ def isolated_daemon(
     finally:
         try:
             client.disconnect()
-        except OSError:
-            pass
+        except OSError as e:
+            logger.debug(f"harness client disconnect failed (benign): {e}")
         try:
             killer = GenesisClient(socket_path)
             killer.connect()

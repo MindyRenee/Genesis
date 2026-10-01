@@ -75,6 +75,63 @@ GEOMETRIC_RELATIONS: frozenset[RelationType] = frozenset({
     RelationType.SIMILAR_TO,
 })
 
+# Provenance tier for network-learned claims: origins of the form
+# ``web:<domain>`` (e.g. ``web:en.wikipedia.org``) mark edges whose
+# only evidence is fetched web content. They are canonical — a typed
+# relation is a factual claim no matter who asserted it — but the
+# prefix makes them quarantinable: recall and consolidation can price
+# or exclude untrusted-source claims without touching taught
+# (``stated``, ``cognition_lesson``), observed, or conversational
+# knowledge. Teaching-protection and decay rules that match exact
+# teaching origins never match this prefix.
+WEB_ORIGIN_PREFIX = "web:"
+
+# Cap on per-concept remembered web sources (see
+# ``AutonomousLearner._record_web_source``): provenance must not
+# become an unbounded growth channel.
+WEB_SOURCES_CAP = 8
+
+
+def web_origin(domain_or_url: str) -> str:
+    """Canonical origin for a network-learned edge from a web domain.
+
+    Accepts a bare domain (``en.wikipedia.org``) or a full URL and
+    returns ``web:<domain>`` with the domain lowercased and any port,
+    credentials, or path stripped. Unparseable input maps to
+    ``web:unknown`` rather than raising — provenance must never break
+    the learning pipeline.
+    """
+    raw = (domain_or_url or "").strip().lower()
+    if "://" in raw:
+        raw = raw.split("://", 1)[1]
+    raw = raw.split("/")[0].split("?")[0].split("#")[0]
+    if "@" in raw:
+        raw = raw.rsplit("@", 1)[1]
+    # Strip port (careful: IPv6 literals carry colons in brackets).
+    if raw.startswith("["):
+        raw = raw.split("]")[0] + "]" if "]" in raw else raw
+    elif raw.count(":") == 1:
+        raw = raw.split(":")[0]
+    raw = raw.strip(".")
+    if not raw or any(ch.isspace() for ch in raw):
+        return f"{WEB_ORIGIN_PREFIX}unknown"
+    return f"{WEB_ORIGIN_PREFIX}{raw}"
+
+
+def is_web_origin(origin: str) -> bool:
+    """True if this edge origin marks network-learned (untrusted-source) content."""
+    return origin == "web" or origin.startswith(WEB_ORIGIN_PREFIX)
+
+
+def web_domain_of(origin: str) -> str | None:
+    """The source domain of a web origin, or None for non-web origins."""
+    if origin == "web":
+        return "unknown"
+    if origin.startswith(WEB_ORIGIN_PREFIX):
+        domain = origin[len(WEB_ORIGIN_PREFIX):]
+        return domain or "unknown"
+    return None
+
 def is_derivable_edge(relation: RelationType | str, origin: str) -> bool:
     """True if this edge is pipeline-generated geometry, not an earned fact.
 
@@ -362,11 +419,11 @@ class EdgeLog:
                     self._fh.close()
                 os.replace(tmp, self._path)
                 self._open()
-            except BaseException:
+            except Exception:
                 try:
                     os.unlink(tmp)
-                except OSError:
-                    pass
+                except OSError as cleanup_e:
+                    logger.debug(f"edge-log snapshot tmp cleanup skipped: {cleanup_e}")
                 # Test for *closed*, not just None. The handle was
                 # closed above before the rename, so on a rename
                 # failure it is still a live reference to a closed file

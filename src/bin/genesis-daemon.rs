@@ -16,19 +16,22 @@
 //! 1. Opens (or creates) the core state file, STM ring buffer, and
 //!    LTM store in the data directory
 //! 2. Starts the IPC server in a background thread
-//! 3. Waits in the main thread, performing staleness detection and
-//!    housekeeping; the cognitive mind drives neurochemistry, memory,
-//!    and body control through reactive IPC commands
+//! 3. Runs the autonomous fallback in the main thread: while the
+//!    mind's lease is fresh it does staleness detection only; past
+//!    the lease it drives neurochemistry, consolidation, dreaming,
+//!    and sensing itself (never body-control application)
 //! 4. On shutdown (SIGINT/SIGTERM or IPC shutdown command), syncs
 //!    everything to disk and exits cleanly
 //!
 //! # Architecture
 //!
-//! The daemon is reactive — it does not run a fixed tick loop. The
-//! `TickLoop` controller holds the daemon's long-lived subsystems and
-//! is shared (behind a mutex) with the IPC handler, which dispatches
-//! the mind-driven commands (ADVANCE_NEURO, CONSOLIDATE, ASSOCIATE,
-//! DREAM, READ_SENSORS, APPLY_BODY_CONTROL) to it.
+//! The daemon is lease-driven, not purely reactive. The `TickLoop`
+//! controller holds the daemon's long-lived subsystems and is shared
+//! (behind a mutex) with the IPC handler, which dispatches the
+//! mind-driven commands (ADVANCE_NEURO, CONSOLIDATE, ASSOCIATE,
+//! DREAM, READ_SENSORS, APPLY_BODY_CONTROL) and renews the mind's
+//! lease on each one. The main thread's autonomous fallback drives
+//! the same `TickLoop` past the lease (`tick::MIND_LEASE_SECS`).
 //!
 //! The IPC server and the main thread share the same `MmapState`,
 //! `RingBuffer`, and `LtmStore`. This is safe because:
@@ -291,12 +294,10 @@ fn main() {
     // Set up signal handlers (SIGINT, SIGTERM)
     let watcher_thread = setup_signal_handlers(&shutdown_flag);
 
-    // Create the TickLoop — but it no longer runs on a fixed schedule.
-    // It's wrapped in Arc<Mutex> and shared with the IPC handler.
-    // The cognitive mind drives each function through IPC commands
-    // (ADVANCE_NEURO, CONSOLIDATE, ASSOCIATE, DREAM, READ_SENSORS,
-    // APPLY_BODY_CONTROL). The daemon is a bus — it carries
-    // information and executes requests, but never initiates actions.
+    // Create the TickLoop, shared with both the IPC handler (mind
+    // lease) and the main-thread autonomous fallback (past the
+    // lease). The mind drives while alive; the daemon drives itself
+    // when silent. Body-control application stays mind-requested.
     let tick_loop = Arc::new(Mutex::new(TickLoop::new_with_data_dir(&config.data_dir)));
 
     // Create the IPC server (library version — no duplicated accept loop)
@@ -343,27 +344,181 @@ fn main() {
         "[genesis] IPC server listening on {}",
         config.socket_path.display()
     );
-    eprintln!("[genesis] Reactive mode — mind-driven, no tick loop.");
-    eprintln!("[genesis] All functions idle until the mind activates them.");
+    eprintln!("[genesis] Lease mode — mind-driven when alive, autonomous fallback when silent.");
+    eprintln!("[genesis] Mind holds a 3 s lease via reactive IPC; past it the daemon drives itself.");
 
-    // The main thread waits for shutdown and runs periodic
-    // housekeeping that the reactive IPC handlers don't cover.
-    // The cognitive mind drives neurochemistry, memory, and body
-    // control through IPC commands; the daemon handles staleness
-    // detection — if the cognitive mind crashes, its modules'
-    // heartbeats go stale and the daemon marks them Stopped so
-    // the manifest reflects reality.
+    // The main thread is the autonomous fallback. While the mind
+    // drives through IPC (lease fresh), this loop does nothing but
+    // staleness detection. Once the lease expires — stall, crash,
+    // disconnect, or simply not yet connected — it drives physiology
+    // itself (neurochemistry, consolidation, dreaming) so the system
+    // keeps living instead of freezing. The mind modulates; absence
+    // degrades to solitude, not to paused existence.
+    //
+    // Lock discipline: the IPC path locks LTM first, then the
+    // TickLoop. The neuro advance below needs only the TickLoop (no
+    // LTM), so it cannot deadlock. The memory phase below acquires
+    // LTM first, then the TickLoop — the same order as IPC. Every
+    // lock here is `try_lock`: the fallback never blocks a
+    // mind-driven request; it skips the cycle instead.
+    //
+    // Deliberately excluded: body-control *application* (sysfs,
+    // renice, EPP/boost). The fallback publishes the recommendation
+    // and senses the body, but acting on the shared body stays a
+    // mind-requested IPC, preserving cognition as the author of
+    // outward action. Everything else the integrated tick does —
+    // zone arbitration included — runs here, so no TickLoop method
+    // only lives in the test-only reference path.
     let mut last_staleness_check = std::time::Instant::now();
     const STALENESS_CHECK_INTERVAL: Duration = Duration::from_secs(60);
+    let mut last_auto_associate = std::time::Instant::now();
+    let mut last_auto_dream = std::time::Instant::now();
+    let mut last_auto_sensor = std::time::Instant::now();
+    let mut last_auto_sync = std::time::Instant::now();
+    let mut last_auto_body = std::time::Instant::now();
+    let mut last_auto_zone = std::time::Instant::now();
+    let mut last_auto_model_save = std::time::Instant::now();
+    const AUTO_ASSOCIATE_INTERVAL: Duration = Duration::from_secs(10);
+    const AUTO_DREAM_INTERVAL: Duration = Duration::from_secs(4);
+    const AUTO_SENSOR_INTERVAL: Duration = Duration::from_secs(5);
+    const AUTO_SYNC_INTERVAL: Duration = Duration::from_secs(20);
+    const AUTO_BODY_INTERVAL: Duration = Duration::from_secs(10);
+    // Zone arbitration runs at most every few seconds past the
+    // lease — intentions evolve slowly, and each pass writes a
+    // manifest transaction plus a possible LTM trace.
+    const AUTO_ZONE_INTERVAL: Duration = Duration::from_secs(5);
+    const AUTO_MODEL_SAVE_INTERVAL: Duration = Duration::from_secs(60);
     while !shutdown_flag.load(std::sync::atomic::Ordering::Relaxed)
         && !ipc_shutdown_flag.load(std::sync::atomic::Ordering::Relaxed)
     {
-        std::thread::sleep(Duration::from_millis(100));
+        std::thread::sleep(Duration::from_millis(
+            genesis::daemon::tick::AUTONOMOUS_INTERVAL_MS,
+        ));
+
+        // Staleness detection runs regardless of lease — a crashed
+        // mind's modules must read Stopped even while the fallback
+        // keeps the body alive.
         if last_staleness_check.elapsed() >= STALENESS_CHECK_INTERVAL {
             last_staleness_check = std::time::Instant::now();
-            if let Ok(mut tl) = tick_loop.lock() {
+            if let Ok(mut tl) = tick_loop.try_lock() {
                 tl.check_staleness(&mmap);
             }
+        }
+
+        // Lease check without holding the lock across work: peek,
+        // then release. A mind driving at ~1 Hz keeps idle ~1 s;
+        // the fallback fires only past 3 s of silence.
+        let lease_expired = match tick_loop.try_lock() {
+            Ok(tl) => tl.mind_lease_expired(),
+            Err(_) => continue, // TickLoop busy (mind driving) — skip.
+        };
+        if !lease_expired {
+            continue;
+        }
+
+        // ── Autonomous neurochemistry (TickLoop only, no LTM) ──
+        // dt tracks real time since the last advance from ANY source
+        // (mind or fallback), capped like the IPC path, so catch-up
+        // after a stall never overshoots the integrator.
+        {
+            let Ok(mut tl) = tick_loop.try_lock() else {
+                continue;
+            };
+            // Re-check under the lock: the mind may have driven
+            // between the peek above and now.
+            if !tl.mind_lease_expired() {
+                continue;
+            }
+            let dt = tl
+                .since_last_advance_secs()
+                .unwrap_or(
+                    genesis::daemon::tick::TICK_INTERVAL_MS as f32 / 1000.0,
+                )
+                .clamp(0.001, 10.0);
+            tl.advance_neuro(&mmap, dt);
+        }
+
+        // ── Autonomous memory + sensing (LTM first, then TickLoop:
+        // same order as the IPC path, both try_lock) ──
+        let Ok(mut ltm_guard) = ltm.try_lock() else {
+            continue; // IPC owns LTM — physiology already advanced above.
+        };
+        let Ok(mut tl) = tick_loop.try_lock() else {
+            continue; // Mind driving — drop LTM guard by scope end.
+        };
+        // The mind may have returned while we acquired locks.
+        if !tl.mind_lease_expired() {
+            continue;
+        }
+        // LTMStore derefs through the MutexGuard; the granular
+        // TickLoop methods take `&mut LtmStore`.
+        let ltm_store: &mut LtmStore = &mut ltm_guard;
+        // Consolidation is self-gating (plasticity, overwhelm, empty
+        // STM) — call whenever autonomous and let it decide.
+        tl.consolidate(&mmap, &stm, ltm_store);
+        if last_auto_associate.elapsed() >= AUTO_ASSOCIATE_INTERVAL {
+            last_auto_associate = std::time::Instant::now();
+            tl.associate(&mmap, ltm_store);
+        }
+        // Dream only when sleeping — same gate the integrated tick
+        // uses (phase or zone), so waking autonomous never dreams.
+        if last_auto_dream.elapsed() >= AUTO_DREAM_INTERVAL {
+            let sleeping = mmap.read_consistent().is_some_and(|s| {
+                use genesis::state::{CognitiveZone, MentalPhase};
+                let p = s.zones.phase();
+                p == MentalPhase::NREM
+                    || p == MentalPhase::REM
+                    || s.zones.zone() == CognitiveZone::Sleeping
+            });
+            if sleeping {
+                last_auto_dream = std::time::Instant::now();
+                tl.dream(&mmap, ltm_store);
+            }
+        }
+        if last_auto_sensor.elapsed() >= AUTO_SENSOR_INTERVAL {
+            last_auto_sensor = std::time::Instant::now();
+            tl.read_sensors(&mmap);
+        }
+        // Intention expiry + zone arbitration + trace. Same
+        // 5 s gating rationale as above; skipped while the mind
+        // holds the lease by the outer check.
+        if last_auto_zone.elapsed() >= AUTO_ZONE_INTERVAL {
+            last_auto_zone = std::time::Instant::now();
+            tl.arbitrate_zone(&mmap, ltm_store);
+        }
+        // Guards drop here (LTM, then TickLoop).
+        drop(tl);
+        drop(ltm_guard);
+
+        // Body-control recommendation publish (compute + publish
+        // only — never application). Needs the TickLoop alone.
+        if last_auto_body.elapsed() >= AUTO_BODY_INTERVAL {
+            last_auto_body = std::time::Instant::now();
+            if let Ok(mut tl) = tick_loop.try_lock()
+                && tl.mind_lease_expired()
+            {
+                tl.publish_body_recommendation(&mmap);
+            }
+        }
+
+        // Generative-model checkpoint so autonomous learning is
+        // durable. The mind saves every 60 s while alive; this covers
+        // mindless stretches. Shutdown always saves regardless.
+        if last_auto_model_save.elapsed() >= AUTO_MODEL_SAVE_INTERVAL {
+            last_auto_model_save = std::time::Instant::now();
+            if let Ok(tl) = tick_loop.try_lock()
+                && tl.mind_lease_expired()
+                && !tl.save_inference_model(&config.data_dir)
+            {
+                eprintln!("[genesis] WARNING: autonomous inference save failed");
+            }
+        }
+
+        // Periodic non-blocking flush so autonomous life is durable.
+        // Shutdown and explicit SYNC still use the blocking path.
+        if last_auto_sync.elapsed() >= AUTO_SYNC_INTERVAL {
+            last_auto_sync = std::time::Instant::now();
+            let _ = mmap.sync_async();
         }
     }
 

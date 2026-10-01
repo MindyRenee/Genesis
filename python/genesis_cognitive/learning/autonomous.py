@@ -31,15 +31,12 @@ Safety:
 
 from __future__ import annotations
 
-import html.parser
 import logging
 import random
 import re
-import ssl
 import threading
 import time
 import urllib.parse
-import urllib.request
 from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
@@ -55,6 +52,7 @@ from genesis_client.protocol import CHEM_DOPAMINE
 
 from ..brain_waves import BrainWave
 from ..concepts import ConceptNetwork, is_world_concept, strip_sense_suffix
+from ..concepts.edge_log import WEB_SOURCES_CAP, web_origin
 from ..memory import SemanticMemory, SpacedRepetitionScheduler
 from ..tools.source_registry import SourceRegistry, SourceResult
 from .curiosity import CuriosityEngine
@@ -155,8 +153,6 @@ TRUSTED_EXACT_DOMAINS: set[str] = set()
 # restricts Genesis to TRUSTED_EXACT_DOMAINS plus approved sites and
 # makes that flow live again.
 ALLOW_ALL_DOMAINS = True
-USER_AGENT = "Genesis-AI-Learner/1.0 (educational research; mind.cs.example)"
-REQUEST_TIMEOUT = 10  # seconds
 RATE_LIMIT_DELAY = 8.0  # seconds between requests
 MAX_PAGES_PER_SESSION = 50
 MAX_TEXT_LENGTH = 50000  # don't process pages longer than this
@@ -577,118 +573,26 @@ class Expectation:
     weight: float  # decays with graph distance
 
 
-class _TextExtractor(html.parser.HTMLParser):
-    """Extract readable text from HTML, skipping non-content elements.
+def _web_source_record(url: str, source_name: str = "web") -> dict[str, Any] | None:
+    """Provenance record for network-derived learning material.
 
-    Filters out scripts, styles, navigation, forms, dropdown options,
-    and other non-content text that would pollute concept extraction.
-    Only extracts text from content-bearing elements (paragraphs,
-    headings, list items, definitions, blockquotes).
+    Returns ``{"url", "domain", "source", "at"}`` for http(s) URLs, or
+    None for local/non-network sources (man pages, ``local:`` topics,
+    dictionary entries) which carry no untrusted-source taint. The
+    record threads through the extract functions so concepts remember
+    *where* they were read (``properties["web_sources"]``) and edges
+    remember it in their origin (``web:<domain>``) — quarantinable by
+    prefix without touching taught knowledge.
     """
-
-    # Tags whose text content is never useful for learning
-    _SKIP_TAGS = frozenset(
-        {
-            "script",
-            "style",
-            "nav",
-            "footer",
-            "header",
-            "form",
-            "input",
-            "select",
-            "option",
-            "button",
-            "textarea",
-            "label",
-            "fieldset",
-            "legend",
-            "svg",
-            "math",
-            "canvas",
-            "iframe",
-            "noscript",
-            "aside",  # sidebars, ads, related links
-        }
-    )
-
-    # Tags that contain content worth extracting
-    _CONTENT_TAGS = frozenset(
-        {
-            "p",
-            "h1",
-            "h2",
-            "h3",
-            "h4",
-            "h5",
-            "h6",
-            "li",
-            "dd",
-            "dt",
-            "blockquote",
-            "q",
-            "td",
-            "th",
-            "caption",
-            "abbr",
-            "cite",
-            "dfn",
-        }
-    )
-
-    def __init__(self) -> None:
-        """Initialize the HTML text extractor with empty state."""
-        super().__init__()
-        self._text_parts: list[str] = []
-        self._skip_depth = 0
-        self._title = ""
-        self._in_title = False
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        """Track skipped tags and capture the page title."""
-        if tag in self._SKIP_TAGS:
-            self._skip_depth += 1
-        if tag == "title":
-            self._in_title = True
-
-    def handle_endtag(self, tag: str) -> None:
-        """Restore skip depth and add spacing after block-level tags."""
-        if tag in self._SKIP_TAGS and self._skip_depth > 0:
-            self._skip_depth -= 1
-        if tag == "title":
-            self._in_title = False
-        # Add spacing after block-level content tags
-        if tag in self._CONTENT_TAGS or tag in ("div", "br", "tr"):
-            self._text_parts.append(" ")
-
-    def handle_data(self, data: str) -> None:
-        """Collect visible text, skipping non-content elements."""
-        if self._skip_depth > 0:
-            return
-        if self._in_title:
-            self._title += data
-        # Only collect text that's inside content elements or the
-        # body in general. Skip text that's directly in <a> tags
-        # if it looks like navigation (short, link-like text).
-        text = data.strip()
-        if text:
-            self._text_parts.append(text)
-
-    @property
-    def text(self) -> str:
-        """The cleaned, boilerplate-stripped page text."""
-        raw = "".join(self._text_parts)
-        # Clean up whitespace
-        raw = _WHITESPACE_RE.sub(" ", raw).strip()
-        # Remove common web page boilerplate patterns
-        raw = _BOILERPLATE_RE.sub(" ", raw)
-        raw = _WHITESPACE_RE.sub(" ", raw).strip()
-        return raw
-
-    @property
-    def title(self) -> str:
-        """The page title extracted from the <title> tag."""
-        return self._title.strip()
+    parsed = urllib.parse.urlparse(url or "")
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return None
+    return {
+        "url": url,
+        "domain": parsed.netloc.lower(),
+        "source": source_name,
+        "at": int(time.time() * 1000),
+    }
 
 
 class AutonomousLearner:
@@ -899,11 +803,10 @@ class AutonomousLearner:
             return list(self._web_log[-n:])
 
     def _init_sources(self) -> None:
-        """Initialize SSL context and source registry."""
-        # SSL context — verify certificates for security
-        # Some trusted sites have bad certs; we handle those errors per-request
-        self._ssl_ctx = ssl.create_default_context()
-
+        """Initialize the source registry."""
+        # TLS/fetch hardening lives in the single fetch implementation
+        # (``tools.web_search.fetch``) that ``_fetch_page_text``
+        # delegates to — not here.
         # Multi-source knowledge registry — replaces search-engine scraping.
         # Queries local man pages and WordNet, then the Wikipedia API and
         # DuckDuckGo Lite (fallback) instead of scraping Bing/Google.
@@ -1122,7 +1025,7 @@ class AutonomousLearner:
             return
         # If a previous thread is still exiting (stop() may have timed
         # out waiting for an in-flight HTTP fetch that can block for
-        # up to REQUEST_TIMEOUT seconds), wait for it to fully
+        # up to the fetch timeout, 10 seconds), wait for it to fully
         # terminate before starting a new one. Otherwise the old
         # thread would observe _running=True and cleared events, and
         # resume its loop alongside the new thread — two learners
@@ -2541,6 +2444,12 @@ class AutonomousLearner:
         # concepts in their own right.
         is_dictionary = sr.source_name == "wordnet"
 
+        # Network-derived claims carry their provenance: concepts
+        # remember the fetch in properties["web_sources"], edges in
+        # origin="web:<domain>". Local dictionary entries are trusted
+        # reference and stay untagged.
+        source = None if is_dictionary else _web_source_record(sr.url, sr.source_name)
+
         # Extract concepts, relationships, and definitions from the text.
         if is_dictionary:
             # Only the headword gets learned; the definition is attached below.
@@ -2549,11 +2458,11 @@ class AutonomousLearner:
             definitions: dict = {}
         else:
             new_concepts, new_relationships, definitions = (
-                self._extract_learning_material(text, topic)
+                self._extract_learning_material(text, topic, source=source)
             )
 
         self._attach_dictionary_definition(is_dictionary, text, topic, definitions)
-        self._attach_definitions(definitions)
+        self._attach_definitions(definitions, source=source)
 
         # Concepts it now has a definition for count as learned,
         # even when the source is a dictionary (no extracted concepts).
@@ -2619,19 +2528,21 @@ class AutonomousLearner:
         return result
 
     def _extract_learning_material(
-        self, text: str, topic: str
+        self, text: str, topic: str, source: dict[str, Any] | None = None,
     ) -> tuple[list[str], list[tuple[str, str, str]], dict[str, str]]:
         """Extract concepts, relationships, and definitions from corpus text.
 
         Used for non-dictionary sources — dictionary (WordNet) text is
         reference text whose grammar labels and examples should not
-        become concepts in their own right.
+        become concepts in their own right. ``source`` threads
+        network provenance through to concepts and edges; local
+        material passes none.
         """
         # Extract concepts from the text
-        new_concepts = self._extract_and_add_concepts(text, topic)
+        new_concepts = self._extract_and_add_concepts(text, topic, source=source)
 
         # Extract relationships from the text
-        new_relationships = self._extract_and_add_relationships(text)
+        new_relationships = self._extract_and_add_relationships(text, source=source)
 
         # Extract definitions from the text
         definitions = self._extract_definitions(text)
@@ -2673,7 +2584,9 @@ class AutonomousLearner:
         except Exception as e:  # noqa: BLE001
             logger.debug(f"Visual learning failed for '{article_title}': {e}")
 
-    def _attach_definitions(self, definitions: dict[str, str]) -> None:
+    def _attach_definitions(
+        self, definitions: dict[str, str], source: dict[str, Any] | None = None,
+    ) -> None:
         """Attach extracted definitions to concepts in the network.
 
         Function words (pronouns, articles, conjunctions) ARE given
@@ -2682,6 +2595,10 @@ class AutonomousLearner:
         word filtering only applies to relationship extraction (we
         don't want "it is_a cognition" garbage edges), not to
         definition attachment.
+
+        Existing definitions are never overwritten here, and a web
+        source records ``definition_source="web:<domain>"`` alongside
+        so a squatting web definition stays attributable.
         """
         from ..concepts import _FUNCTION_WORDS
         from ..self.learning import _clean_definition_text
@@ -2700,6 +2617,8 @@ class AutonomousLearner:
                 existing_def = c.properties.get("definition", "")
                 if not existing_def or existing_def == "NO DEF":
                     c.properties["definition"] = _clean_definition_text(definition)
+                    if source is not None:
+                        c.properties["definition_source"] = web_origin(source["domain"])
                     # Mark function words with their part of speech
                     if concept_name in _FUNCTION_WORDS:
                         c.properties["part_of_speech"] = "function_word"
@@ -2940,10 +2859,11 @@ class AutonomousLearner:
                 return None
 
             # Extract concepts from the text
-            new_concepts = self._extract_and_add_concepts(text, topic)
+            source = _web_source_record(url, "web")
+            new_concepts = self._extract_and_add_concepts(text, topic, source=source)
 
             # Extract relationships from the text
-            new_relationships = self._extract_and_add_relationships(text)
+            new_relationships = self._extract_and_add_relationships(text, source=source)
 
             # Extract definitions from the text and attach them
             # to any concepts we just learned or already knew.
@@ -2951,7 +2871,7 @@ class AutonomousLearner:
             # with a definition can be used in speech and reasoning;
             # without one it's just a name.
             definitions = self._extract_definitions(text)
-            self._attach_definitions(definitions)
+            self._attach_definitions(definitions, source=source)
 
             # Concepts it now has a definition for count as learned.
             defined_concepts = list(definitions.keys())
@@ -3075,35 +2995,30 @@ class AutonomousLearner:
         return result
 
     def _fetch_page_text(self, url: str, topic: str) -> tuple[str, str] | None:
-        """Fetch a URL and extract text. Returns (text, title) or None."""
-        req = urllib.request.Request(
-            url,
-            headers={"User-Agent": USER_AGENT},
-        )
-        with urllib.request.urlopen(
-            req, timeout=REQUEST_TIMEOUT, context=self._ssl_ctx
-        ) as resp:
-            content_type = resp.headers.get("Content-Type", "")
-            if "text/html" not in content_type and "text/plain" not in content_type:
-                return None
+        """Fetch a URL and extract text. Returns (text, title) or None.
 
-            # Bounded read — never pull more than 3x the processing
-            # cap into memory, even if the server streams endlessly.
-            raw = resp.read(MAX_TEXT_LENGTH * 3 + 1).decode(
-                "utf-8", errors="ignore"
-            )
+        Delegates to the hardened ``tools.web_search.fetch`` path so
+        the study pipeline cannot bypass the content safety boundary:
+        adult/malware blocklist, http(s)-only schemes, SSRF DNS and
+        redirect guards, timeouts, content-type gating, and bounded
+        reads. The learner previously fetched with raw ``urllib`` and
+        enforced only its own allowlist (open by default), so every
+        safeguard the ``tools/`` fetch path had was dead code on this
+        path. One fetch implementation, one boundary.
+        """
+        from ..tools.web_search import fetch as _hardened_fetch
 
-        if len(raw) > MAX_TEXT_LENGTH * 3:
-            raw = raw[: MAX_TEXT_LENGTH * 3]
-
-        # Extract text
-        extractor = _TextExtractor()
-        extractor.feed(raw)
-        text = extractor.text
-        title = extractor.title or topic
-
-        if len(text) < 100:
-            return None  # not enough content
+        try:
+            result = _hardened_fetch(url)
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"hardened fetch failed for {url}: {e}")
+            return None
+        if result is None:
+            return None  # blocked, failed, or too short (same 100-char floor)
+        text = result.content
+        if len(text) > MAX_TEXT_LENGTH:
+            text = text[:MAX_TEXT_LENGTH]
+        title = result.title or topic
 
         return text, title
 
@@ -3202,7 +3117,37 @@ class AutonomousLearner:
 
         return min(1.0, surprise)
 
-    def _extract_and_add_concepts(self, text: str, topic: str) -> list[str]:
+    def _record_web_source(self, concept: Any, source: dict[str, Any] | None) -> None:
+        """Remember a network provenance record on a concept.
+
+        Appends ``source`` to ``properties["web_sources"]`` (deduped by
+        URL, capped at ``WEB_SOURCES_CAP`` so provenance cannot become
+        an unbounded growth channel). No-op without a source — local
+        and taught knowledge stays untagged. Never raises: provenance
+        must not break the learning pipeline.
+        """
+        if source is None or concept is None:
+            return
+        try:
+            props = concept.properties
+            if not isinstance(props, dict):
+                return
+            seen = props.get("web_sources")
+            if not isinstance(seen, list):
+                seen = []
+                props["web_sources"] = seen
+            if not any(
+                isinstance(entry, dict) and entry.get("url") == source.get("url")
+                for entry in seen
+            ):
+                seen.append(dict(source))
+            del seen[:-WEB_SOURCES_CAP]
+        except Exception:
+            logger.debug("web source record failed", exc_info=True)
+
+    def _extract_and_add_concepts(
+        self, text: str, topic: str, source: dict[str, Any] | None = None,
+    ) -> list[str]:
         """Extract concepts from text and add new ones to the network.
 
         Uses the improved noun-phrase extractor from ConceptNetwork
@@ -3213,6 +3158,10 @@ class AutonomousLearner:
         dropdown menus or form text), too short, or contain digits
         are filtered out. This prevents garbage concepts from
         polluting the network.
+
+        When ``source`` is given (network-derived material), every
+        touched concept records it via ``_record_web_source``; without
+        one (local/taught material) nothing is tagged.
         """
         extracted = self.network.extract_from_text(text)
         new_concepts = []
@@ -3241,7 +3190,10 @@ class AutonomousLearner:
 
             existing = self.network.get_concept(concept_name)
             if existing is None:
-                self.network.add_concept(concept_name, confidence=0.4, origin="learned")
+                created = self.network.add_concept(
+                    concept_name, confidence=0.4, origin="learned"
+                )
+                self._record_web_source(created, source)
                 new_concepts.append(concept_name)
                 # Immediately connect the new concept to its nearest
                 # semantic neighbor using GloVe/TF-IDF similarity.
@@ -3254,7 +3206,10 @@ class AutonomousLearner:
                 # Reinforce existing concept. Confidence increases
                 # saturating rather than linearly, so it approaches
                 # 1.0 asymptotically instead of capping abruptly.
+                # A web encounter is still web evidence for an old
+                # concept, so the source is recorded here too.
                 existing.confidence = existing.confidence + (1.0 - existing.confidence) * 0.05
+                self._record_web_source(existing, source)
 
         # Do NOT blanket-link every concept to the topic with RELATED_TO.
         # That created 26k+ meaningless co-occurrence edges ("appeared in
@@ -3319,26 +3274,40 @@ class AutonomousLearner:
             # the learning pipeline.
             logger.debug(f"semantic_connect failed: {e}")
 
-    def _extract_and_add_relationships(self, text: str) -> list[tuple[str, str, str]]:
+    def _extract_and_add_relationships(
+        self, text: str, source: dict[str, Any] | None = None,
+    ) -> list[tuple[str, str, str]]:
         """Extract relationships from text using the ConceptNetwork's parser.
 
         This delegates to ConceptNetwork.parse_relationships, which uses
         the improved pattern-based parser with proper ordering (specific
         patterns before generic "is a") and phrase-breaking verbs.
+
+        When ``source`` is given (network-derived material), endpoint
+        concepts record it and the edge carries
+        ``origin="web:<domain>"`` — canonical but quarantinable (see
+        ``edge_log.is_web_origin``). Without one the historical
+        ``origin="learned"`` is kept, so taught/local pipelines are
+        untouched.
         """
         relationships = []
         parsed = self.network.parse_relationships(text)
+        edge_origin = web_origin(source["domain"]) if source else "learned"
 
         for subject, rel_type, obj in parsed:
             # Ensure both concepts exist with learned origin
-            if self.network.get_concept(subject) is None:
-                self.network.add_concept(subject, confidence=0.3, origin="learned")
+            subj = self.network.get_concept(subject)
+            if subj is None:
+                subj = self.network.add_concept(subject, confidence=0.3, origin="learned")
                 self._connect_new_concept(subject)
-            if self.network.get_concept(obj) is None:
-                self.network.add_concept(obj, confidence=0.3, origin="learned")
+            self._record_web_source(subj, source)
+            obj_concept = self.network.get_concept(obj)
+            if obj_concept is None:
+                obj_concept = self.network.add_concept(obj, confidence=0.3, origin="learned")
                 self._connect_new_concept(obj)
+            self._record_web_source(obj_concept, source)
             # Add the edge
-            self.network.add_edge(subject, obj, rel_type, 0.4, origin="learned")
+            self.network.add_edge(subject, obj, rel_type, 0.4, origin=edge_origin)
             relationships.append((subject, rel_type.value, obj))
 
         return relationships

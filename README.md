@@ -14,13 +14,16 @@ introspection, and self-modeling. The two share a checksummed,
 versioned binary state file (3,288 bytes, schema pinned by layout
 asserts) and a Unix socket.
 
-The daemon is reactive, not autonomous: it is a bus that carries
-information and executes requests, and it never initiates work on a
-schedule. The cadence comes from the mind's 1 Hz heartbeat, which calls
-`ADVANCE_NEURO`, `CONSOLIDATE`, `ASSOCIATE`, `DREAM`, `READ_SENSORS`
-and friends. Neurochemistry therefore advances at the heartbeat's
-rate, not at an independent physiological rate — if the mind is
-stopped, the physiology is too.
+The daemon is lease-driven: while the mind is alive it is a bus
+that carries information and executes requests, driven at the mind's
+1 Hz heartbeat (`ADVANCE_NEURO`, `CONSOLIDATE`, `ASSOCIATE`, `DREAM`,
+`READ_SENSORS` and friends). Past a 3 s silence lease the daemon
+drives the full loop itself — neurochemistry, consolidation,
+sleep-gated dreaming, association, sensing, zone arbitration with
+traces, body recommendations, model checkpoints — so a stall,
+crash, or disconnect degrades to solitude, not to frozen
+physiology. Body-control application stays mind-requested; the
+fallback publishes and senses but never acts outward on its own.
 
 There is no transformer and no pretrained weights anywhere in it.
 Language is composed from a semantic graph the system builds itself —
@@ -99,9 +102,12 @@ The measured record for these claims is in [DEVLOG.md](DEVLOG.md).
 neurochemical dynamics, short→long-term memory consolidation, the
 active-inference generative model, replay-sequence synthesis during
 sleep, and interoception — hardware sensors (CPU temperature, load,
-memory pressure) read as bodily signals. All of it is invoked by the
-mind over IPC; the daemon has no loop of its own (it prints
-"Reactive mode — mind-driven, no tick loop" at startup).
+memory pressure) read as bodily signals. The mind drives all of it
+over IPC while alive (3 s lease, renewed per command); past the
+lease the daemon's main thread drives the same `TickLoop` itself at
+5 Hz — physiology, consolidation, sleep-gated dreaming,
+association, sensing, zone arbitration, body recommendations, model
+checkpoints — but never body-control application.
 
 **Cognitive mind (Python).** Perception, memory retrieval,
 deliberation, language composition, and self-modeling — organized
