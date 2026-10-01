@@ -541,8 +541,7 @@ impl MmapState {
         // flock is held, and no `MmapState` exists yet. The scrub runs
         // on a stack copy and publishes through `publish_stack`: no
         // reference into the mapping is formed.
-        let mut scrubbed =
-            unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) };
+        let mut scrubbed = unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) };
         if scrubbed.scrub_non_finite() {
             let now_ms = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -1043,8 +1042,8 @@ impl MmapState {
     /// `GenesisCoreState::SIZE` bytes with no other writer active
     /// (caller-held locks guarantee this).
     unsafe fn publish_stack(ptr: *mut u8, prepared: &GenesisCoreState) {
-        // SAFETY: `ptr.add(SELF::SEQ_LOCK_OFFSET)` is the `seq_lock`
-        // u64 by the layout const above (8-byte aligned: 40 % 8 == 0).
+        // SAFETY: `ptr.add(SEQ_LOCK_OFFSET)` is the `seq_lock` u64 by
+        // the layout const above (8-byte aligned: 40 % 8 == 0).
         // `AtomicU64::from_ptr` performs atomic RMWs without creating
         // a reference; nothing else here creates one either.
         let seq = unsafe { AtomicU64::from_ptr(ptr.add(Self::SEQ_LOCK_OFFSET) as *mut u64) };
@@ -1057,14 +1056,77 @@ impl MmapState {
             seq.fetch_add(1, Ordering::AcqRel);
         }
         fence(Ordering::Acquire);
-        // SAFETY: `ptr` is a valid writable mapping of at least SIZE
-        // bytes; `prepared` is a valid stack value (`Copy`, so this
-        // moves bytes without borrowing the mapping). Volatile: the
-        // compiler must emit the store.
-        unsafe { core::ptr::write_volatile(ptr as *mut GenesisCoreState, *prepared) };
+        // Publish the payload in two ranges that SKIP the seqlock
+        // counter (offset 40..48). The counter must be owned solely by
+        // the atomic RMWs above and below — it is the one field a
+        // payload write must never touch.
+        //
+        // Writing the whole struct here was a live defect: `prepared`
+        // is a snapshot taken *before* the increments, so its
+        // `seq_lock` field is the stale pre-write value. A single
+        // whole-struct `write_volatile` therefore (a) overwrote the
+        // counter with the stale even value, so the trailing
+        // `fetch_add` left it odd and every `read_consistent` in the
+        // process then failed forever (READ_FAILED on every read), and
+        // (b) briefly restored an even counter *while the payload was
+        // half-written*, which is precisely the torn read the seqlock
+        // exists to prevent. Two ranges fix both: the counter keeps
+        // the value the atomics gave it, and readers never observe an
+        // even counter between the two payload stores.
+        //
+        // The split mirrors `compute_checksum`'s regions (0..40 and
+        // 48..end), both layout-pinned by the header asserts.
+        //
+        // SAFETY: `prepared` is a valid stack value (`Copy` — this
+        // moves bytes without borrowing the mapping); the mapping is
+        // writable and `SIZE` bytes long. Both ranges are inside it:
+        // region 1 is [0, SEQ_LOCK_OFFSET), region 2 is
+        // [SEQ_LOCK_OFFSET+8, size_of::<GenesisCoreState>()). Volatile
+        // so the compiler must emit the stores.
+        unsafe {
+            Self::volatile_copy_region(
+                (prepared as *const GenesisCoreState).cast::<u8>(),
+                ptr,
+                Self::SEQ_LOCK_OFFSET,
+            );
+            Self::volatile_copy_region(
+                (prepared as *const GenesisCoreState)
+                    .cast::<u8>()
+                    .add(Self::SEQ_LOCK_OFFSET + 8),
+                ptr.add(Self::SEQ_LOCK_OFFSET + 8),
+                core::mem::size_of::<GenesisCoreState>() - Self::SEQ_LOCK_OFFSET - 8,
+            );
+        }
         fence(Ordering::Release);
         // SAFETY: same atomic as above; Release publishes the bytes.
         seq.fetch_add(1, Ordering::Release);
+    }
+
+    /// Copy `len` bytes from `src` to `dst` with volatile loads and
+    /// stores, so the compiler can neither elide nor reorder the copy
+    /// across the seqlock's fences.
+    ///
+    /// Volatile byte-at-a-time rather than `copy_nonoverlapping` for the
+    /// same reason the reader side uses `read_volatile`: the publish
+    /// must be an observable effect on the mapping, and a plain copy
+    /// leaves that to the optimizer's dead-store analysis. The volume
+    /// is ~3 KB per transaction at ~10 Hz, so the cost is irrelevant
+    /// next to the ODE integration this wraps.
+    ///
+    /// # Safety
+    ///
+    /// `src` must be readable and `dst` writable for `len` bytes, and
+    /// the ranges must not overlap.
+    unsafe fn volatile_copy_region(src: *const u8, dst: *mut u8, len: usize) {
+        for i in 0..len {
+            // SAFETY: caller guarantees both regions are valid for
+            // `len` bytes; each index is in bounds. Volatile read and
+            // write so neither is elided.
+            unsafe {
+                let byte = src.add(i).read_volatile();
+                dst.add(i).write_volatile(byte);
+            }
+        }
     }
 
     /// Get a mutable reference to the core state.
