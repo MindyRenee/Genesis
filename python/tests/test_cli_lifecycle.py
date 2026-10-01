@@ -254,8 +254,11 @@ def test_daemon_start_timeout_reaps_child(tmp_path):
         patch.object(genesis_cli.subprocess, "Popen", return_value=proc),
         patch.object(genesis_cli, "DAEMON_START_TIMEOUT", 0),
     ):
-        with pytest.raises(RuntimeError, match="didn't start"):
+        with pytest.raises(RuntimeError, match="didn't become ready") as exc:
             genesis_cli._start_daemon("/unused/daemon", str(tmp_path), str(tmp_path / "sock"))
+    # The failure must point at the log: a bare "didn't start" hides
+    # the actual initialization error, which is diagnosable only there.
+    assert "daemon.log" in str(exc.value)
     proc.terminate.assert_called_once()
     proc.wait.assert_called_once()
     proc.kill.assert_not_called()

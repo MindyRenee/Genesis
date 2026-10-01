@@ -434,17 +434,37 @@ mod tests {
             old_valence
         );
 
-        // Old arousal = ((NE + Hist)*0.5 - (GABA+Adn)*0.5 + 1.0) * 0.5
-        // The new formula includes orexin (0.25 default × 0.20 = 0.05),
-        // epinephrine (0.15 default × 0.10 = 0.015), ACh (0.5 × 0.15 = 0.075),
-        // and DA (0.8 × 0.15 = 0.12) as arousal promoters, plus different
-        // weights for NE (0.20 vs 0.50) and histamine (0.15 vs 0.50).
-        let old_arousal = ((0.6 + 0.5) * 0.5 - (0.0 + 0.0) * 0.5 + 1.0) * 0.5;
+        // Gain regression: the arousal sigmoid must use AROUSAL_GAIN
+        // (the live arousal readout's gain in `recompute_derived`),
+        // not WC_GAIN (the consolidation decision's own gain). A prior
+        // revision used WC_GAIN here and understated every stored
+        // arousal; the plain deprecated-formula comparison below
+        // cannot catch that regression (for this input the corrected
+        // value lands within 0.01 of the deprecated one by
+        // coincidence), so the gain is pinned directly instead.
+        let arousal_promoters = 0.6 * 0.20
+            + 0.5 * 0.15
+            + 0.8 * 0.15
+            + 0.5 * 0.15
+            + NeurochemicalId::Orexin.default_baseline() * 0.20
+            + NeurochemicalId::Epinephrine.default_baseline() * 0.10;
+        let sleep_promoters =
+            0.0 * 0.25 + 0.0 * 0.65 + NeurochemicalId::Melatonin.default_baseline() * 0.35;
+        let net_drive = arousal_promoters - sleep_promoters;
+        let with_arousal_gain =
+            1.0 / (1.0 + (-net_drive * crate::state::neurochemical::AROUSAL_GAIN).exp());
+        let with_wc_gain = 1.0 / (1.0 + (-net_drive * crate::state::neurochemical::WC_GAIN).exp());
         assert!(
-            (compact[0] - old_arousal).abs() > 0.01,
-            "corrected arousal {} should differ from deprecated {}",
+            (compact[0] - with_arousal_gain).abs() < 1e-5,
+            "compact arousal {} should match the AROUSAL_GAIN scaling {}",
             compact[0],
-            old_arousal
+            with_arousal_gain
+        );
+        assert!(
+            (compact[0] - with_wc_gain).abs() > 0.01,
+            "compact arousal {} must not match the WC_GAIN scaling {} (gain reversion)",
+            compact[0],
+            with_wc_gain
         );
     }
 
