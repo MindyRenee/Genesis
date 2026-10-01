@@ -47,6 +47,7 @@ pub mod consolidation;
 pub mod cpufreq;
 pub mod dyadic_model;
 pub mod interoception;
+pub mod hpa_development;
 pub mod ipc;
 /// RTC wake alarm — scheduling its own return from suspension.
 pub mod rtc_wake;

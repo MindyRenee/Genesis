@@ -21,7 +21,7 @@ pub const MAGIC: [u8; 4] = *b"GNSX";
 ///   excluded from homeostatic force (circadian-driven). GABA
 ///   disinhibition uses effective levels.
 ///
-///   The struct size (3288 bytes) did not change from v2 to v3
+///   The struct size did not change from v2 to v3
 ///   because the v2 binary was already compiled with the full
 ///   18-chemical NeurochemicalVector — the v2 version label was
 ///   stale. Migration from v2 to v3 initializes the 6 new chemicals
