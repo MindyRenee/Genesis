@@ -837,10 +837,8 @@ static EPP_AVAILABLE: OnceLock<bool> = OnceLock::new();
 
 fn epp_available() -> bool {
     *EPP_AVAILABLE.get_or_init(|| {
-        std::path::Path::new(
-            "/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference",
-        )
-        .exists()
+        std::path::Path::new("/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_preference")
+            .exists()
     })
 }
 
@@ -858,11 +856,7 @@ fn read_epp_profiles() -> Vec<String> {
         "/sys/devices/system/cpu/cpu0/cpufreq/energy_performance_available_preferences",
     )
     .ok()
-    .map(|s| {
-        s.split_whitespace()
-            .map(|w| w.to_string())
-            .collect()
-    })
+    .map(|s| s.split_whitespace().map(|w| w.to_string()).collect())
     .unwrap_or_default()
 }
 
@@ -949,11 +943,20 @@ pub fn derive_epp(effective_levels: &[f32; 18]) -> String {
     //   arousal > -0.4  → "balance_power"
     //   else            → "power"
     if arousal > 0.15 {
-        pick_epp(&profiles, &["performance", "balance_performance", "default"])
+        pick_epp(
+            &profiles,
+            &["performance", "balance_performance", "default"],
+        )
     } else if arousal > 0.0 {
-        pick_epp(&profiles, &["balance_performance", "default", "performance"])
+        pick_epp(
+            &profiles,
+            &["balance_performance", "default", "performance"],
+        )
     } else if arousal > -0.2 {
-        pick_epp(&profiles, &["default", "balance_performance", "balance_power"])
+        pick_epp(
+            &profiles,
+            &["default", "balance_performance", "balance_power"],
+        )
     } else if arousal > -0.4 {
         pick_epp(&profiles, &["balance_power", "default", "power"])
     } else {
@@ -1239,13 +1242,13 @@ mod tests {
         // the first snapshot wins, so a later call (after Genesis has
         // applied a policy) cannot overwrite the original.
         capture_hardware_state();
-        let first = HARDWARE_SNAPSHOT.get().map(|s| {
-            (s.governor.clone(), s.min_freq_khz, s.max_freq_khz, s.boost)
-        });
+        let first = HARDWARE_SNAPSHOT
+            .get()
+            .map(|s| (s.governor.clone(), s.min_freq_khz, s.max_freq_khz, s.boost));
         capture_hardware_state();
-        let second = HARDWARE_SNAPSHOT.get().map(|s| {
-            (s.governor.clone(), s.min_freq_khz, s.max_freq_khz, s.boost)
-        });
+        let second = HARDWARE_SNAPSHOT
+            .get()
+            .map(|s| (s.governor.clone(), s.min_freq_khz, s.max_freq_khz, s.boost));
         assert_eq!(first, second);
     }
 
@@ -1494,7 +1497,10 @@ mod tests {
         let mut levels = [0.0f32; 18];
         levels[NeurochemicalId::Melatonin as usize] = 0.7;
         levels[NeurochemicalId::Dopamine as usize] = 1.0;
-        assert_eq!(boost_for(&levels, 1_000_000, 2_000_000), BoostState::Disabled);
+        assert_eq!(
+            boost_for(&levels, 1_000_000, 2_000_000),
+            BoostState::Disabled
+        );
     }
 
     #[test]
@@ -1504,10 +1510,7 @@ mod tests {
         let levels = [0.5f32; 18];
         let policy = derive_policy(&levels, 1_000_000, 2_000_000);
         assert!(policy.max_freq < 2_000_000);
-        assert_eq!(
-            boost_from_policy(&policy, 2_000_000),
-            BoostState::Disabled
-        );
+        assert_eq!(boost_from_policy(&policy, 2_000_000), BoostState::Disabled);
     }
 
     #[test]
@@ -1519,10 +1522,7 @@ mod tests {
         levels[NeurochemicalId::Norepinephrine as usize] = 0.5;
         let policy = derive_policy(&levels, 1_000_000, 2_000_000);
         assert!(policy.max_freq < 2_000_000);
-        assert_eq!(
-            boost_from_policy(&policy, 2_000_000),
-            BoostState::Disabled
-        );
+        assert_eq!(boost_from_policy(&policy, 2_000_000), BoostState::Disabled);
     }
 
     #[test]
@@ -1546,7 +1546,10 @@ mod tests {
         let mut levels = [0.0f32; 18];
         levels[NeurochemicalId::GABA as usize] = 0.8;
         levels[NeurochemicalId::Adenosine as usize] = 0.5;
-        assert_eq!(boost_for(&levels, 1_000_000, 2_000_000), BoostState::Disabled);
+        assert_eq!(
+            boost_for(&levels, 1_000_000, 2_000_000),
+            BoostState::Disabled
+        );
     }
 
     #[test]
@@ -1556,7 +1559,10 @@ mod tests {
         let mut levels = [0.0f32; 18];
         levels[NeurochemicalId::Dopamine as usize] = f32::NAN;
         levels[NeurochemicalId::Norepinephrine as usize] = f32::INFINITY;
-        assert_eq!(boost_for(&levels, 1_000_000, 2_000_000), BoostState::Disabled);
+        assert_eq!(
+            boost_for(&levels, 1_000_000, 2_000_000),
+            BoostState::Disabled
+        );
     }
 
     #[test]
@@ -1609,10 +1615,7 @@ mod tests {
         assert_eq!(boost_from_policy(&policy, 2_000_000), BoostState::Enabled);
         // 95°C → cap to 40% of range = 1.4M, below the hardware max.
         apply_thermal_cap(&mut policy, 95.0, 1_000_000, 2_000_000);
-        assert_eq!(
-            boost_from_policy(&policy, 2_000_000),
-            BoostState::Disabled
-        );
+        assert_eq!(boost_from_policy(&policy, 2_000_000), BoostState::Disabled);
     }
 
     #[test]
@@ -1625,15 +1628,9 @@ mod tests {
         levels[NeurochemicalId::Acetylcholine as usize] = 2.0;
         let policy = derive_policy(&levels, 1_000_000, 2_000_000);
         if boost_available() {
-            assert_ne!(
-                derive_boost(&policy, 2_000_000),
-                BoostState::Unavailable
-            );
+            assert_ne!(derive_boost(&policy, 2_000_000), BoostState::Unavailable);
         } else {
-            assert_eq!(
-                derive_boost(&policy, 2_000_000),
-                BoostState::Unavailable
-            );
+            assert_eq!(derive_boost(&policy, 2_000_000), BoostState::Unavailable);
         }
     }
 

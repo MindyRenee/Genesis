@@ -260,7 +260,10 @@ pub fn publish_subsystem_telemetry(subsystems: &[SubsystemTelemetry]) {
 
 /// Read the latest published per-subsystem telemetry for IPC responses.
 pub fn read_shared_subsystem_telemetry() -> Vec<SubsystemTelemetry> {
-    shared_subsystems().lock().map(|g| g.clone()).unwrap_or_default()
+    shared_subsystems()
+        .lock()
+        .map(|g| g.clone())
+        .unwrap_or_default()
 }
 
 /// Which subsystem of the mind a process belongs to.
@@ -1051,9 +1054,7 @@ impl PerfSet {
             // SAFETY: reading 8 bytes from a valid perf fd into a
             // u64 buffer. perf counters are read as u64 values
             // when PERF_FORMAT_* groups are unused.
-            let n = unsafe {
-                libc::read(fd, out[i..].as_mut_ptr() as *mut libc::c_void, 8)
-            };
+            let n = unsafe { libc::read(fd, out[i..].as_mut_ptr() as *mut libc::c_void, 8) };
             if n != 8 {
                 out[i] = 0;
             }
@@ -1504,7 +1505,11 @@ impl Interoceptor {
         let telemetry: Vec<SubsystemTelemetry> = subsystems
             .iter()
             .map(|&(subsystem, pid)| {
-                let delta = self.subsystem_perf_delta.get(&pid).copied().unwrap_or([0; 4]);
+                let delta = self
+                    .subsystem_perf_delta
+                    .get(&pid)
+                    .copied()
+                    .unwrap_or([0; 4]);
                 SubsystemTelemetry {
                     subsystem,
                     pid,
@@ -1728,11 +1733,7 @@ impl Interoceptor {
                 RaplKind::Dram => (&mut dram, DRAM_REF_UW),
             };
             // Multiple packages: sum normalized activity and clamp.
-            *value += crate::state::sanitize::finite_clamp(
-                (power_uw / reference) as f32,
-                0.0,
-                1.0,
-            );
+            *value += crate::state::sanitize::finite_clamp((power_uw / reference) as f32, 0.0, 1.0);
         }
 
         (
@@ -1777,8 +1778,7 @@ impl Interoceptor {
             self.perf_unavailable = true;
             return (0.0, 0.0);
         }
-        self.perf_counters
-            .retain(|pid, _| pids.contains(pid));
+        self.perf_counters.retain(|pid, _| pids.contains(pid));
 
         // Sum deltas across the process tree, then form ratios
         // from the summed counts (correct: a process with no
@@ -1913,10 +1913,7 @@ impl Interoceptor {
         //   cooldown after exertion. This is normal operation.
 
         // Fan struggling: high fan + high temp → thermal strain.
-        if self.fan_path.is_some()
-            && body.thermoregulatory_effort > 0.3
-            && body.cpu_temp_c > 75.0
-        {
+        if self.fan_path.is_some() && body.thermoregulatory_effort > 0.3 && body.cpu_temp_c > 75.0 {
             let fan_intensity = crate::state::sanitize::finite_clamp(
                 (body.thermoregulatory_effort - 0.3) / 0.7,
                 0.0,
@@ -1936,9 +1933,7 @@ impl Interoceptor {
         // fan telemetry at all would fabricate a cooling-failure
         // response to any excursion above 80 °C. Absence of a sensor
         // is not evidence of a stopped fan.
-        if self.fan_path.is_some()
-            && body.thermoregulatory_effort < 0.05
-            && body.cpu_temp_c > 80.0
+        if self.fan_path.is_some() && body.thermoregulatory_effort < 0.05 && body.cpu_temp_c > 80.0
         {
             let intensity =
                 crate::state::sanitize::finite_clamp((body.cpu_temp_c - 80.0) / 10.0, 0.0, 1.0);
@@ -2026,11 +2021,8 @@ impl Interoceptor {
         // Below this, the battery is almost empty and the system
         // may shut down soon.
         if !body.on_ac_power && body.supply_voltage > 0.0 && body.supply_voltage < 10.8 {
-            let intensity = crate::state::sanitize::finite_clamp(
-                (10.8 - body.supply_voltage) / 0.8,
-                0.0,
-                1.0,
-            );
+            let intensity =
+                crate::state::sanitize::finite_clamp((10.8 - body.supply_voltage) / 0.8, 0.0, 1.0);
             impulses.push((NeurochemicalId::CRH, intensity * 0.005));
         }
 
@@ -2060,21 +2052,15 @@ impl Interoceptor {
 
         // Core-domain switching → norepinephrine (effort).
         if body.core_activity > 0.40 {
-            let intensity = crate::state::sanitize::finite_clamp(
-                (body.core_activity - 0.40) / 0.60,
-                0.0,
-                1.0,
-            );
+            let intensity =
+                crate::state::sanitize::finite_clamp((body.core_activity - 0.40) / 0.60, 0.0, 1.0);
             impulses.push((NeurochemicalId::Norepinephrine, intensity * 0.002));
         }
 
         // DRAM-domain switching → acetylcholine (memory traffic).
         if body.dram_activity > 0.30 {
-            let intensity = crate::state::sanitize::finite_clamp(
-                (body.dram_activity - 0.30) / 0.70,
-                0.0,
-                1.0,
-            );
+            let intensity =
+                crate::state::sanitize::finite_clamp((body.dram_activity - 0.30) / 0.70, 0.0, 1.0);
             impulses.push((NeurochemicalId::Acetylcholine, intensity * 0.003));
         }
 
@@ -2284,8 +2270,7 @@ fn find_freq_sensors(num_cores: u32) -> Vec<String> {
 /// Existence is not enough: `cpuinfo_cur_freq` is world-*stat*able but
 /// root-only to read, and permission can differ per core.
 fn readable_freq(path: &str) -> bool {
-    fs::read_to_string(path)
-        .is_ok_and(|content| content.trim().parse::<u64>().is_ok())
+    fs::read_to_string(path).is_ok_and(|content| content.trim().parse::<u64>().is_ok())
 }
 
 /// Read the maximum CPU frequency.
@@ -2336,13 +2321,14 @@ fn find_ac_adapter() -> Option<String> {
         .flatten()
         .filter_map(|entry| {
             let path = entry.path();
-            let is_mains = fs::read_to_string(path.join("type"))
-                .is_ok_and(|t| t.trim() == "Mains");
+            let is_mains = fs::read_to_string(path.join("type")).is_ok_and(|t| t.trim() == "Mains");
             if !is_mains {
                 return None;
             }
             let online = path.join("online");
-            fs::metadata(&online).is_ok().then(|| online.to_string_lossy().into_owned())
+            fs::metadata(&online)
+                .is_ok()
+                .then(|| online.to_string_lossy().into_owned())
         })
         .collect();
     // Deterministic order: read_dir order is filesystem-dependent and
@@ -3105,12 +3091,12 @@ mod tests {
             on_ac_power: true,
             num_cores: 4,
             distressed: false,
-            autonomic_rate: 2.0, // normal EC activity
+            autonomic_rate: 2.0,          // normal EC activity
             thermoregulatory_effort: 0.1, // fan barely on
-            metabolic_rate: 0.05, // idle power draw
-            core_voltage: 0.85, // idle Vcore
-            supply_voltage: 12.6, // full battery
-            core_activity: 0.1, // idle silicon
+            metabolic_rate: 0.05,         // idle power draw
+            core_voltage: 0.85,           // idle Vcore
+            supply_voltage: 12.6,         // full battery
+            core_activity: 0.1,           // idle silicon
             uncore_activity: 0.05,
             dram_activity: 0.1,
             cache_miss_rate: 0.02, // healthy miss ratios
@@ -3145,12 +3131,12 @@ mod tests {
             on_ac_power: true,
             num_cores: 4,
             distressed: false,
-            autonomic_rate: 3.0, // EC more active when hot
+            autonomic_rate: 3.0,          // EC more active when hot
             thermoregulatory_effort: 0.5, // fan working harder
-            metabolic_rate: 0.3, // elevated power draw from heat
-            core_voltage: 1.15, // Vcore raised under thermal load
-            supply_voltage: 12.5, // battery present
-            core_activity: 0.6, // cores firing hard under thermal load
+            metabolic_rate: 0.3,          // elevated power draw from heat
+            core_voltage: 1.15,           // Vcore raised under thermal load
+            supply_voltage: 12.5,         // battery present
+            core_activity: 0.6,           // cores firing hard under thermal load
             uncore_activity: 0.4,
             dram_activity: 0.5, // memory traffic elevated
             cache_miss_rate: 0.03,
@@ -3184,14 +3170,14 @@ mod tests {
             on_ac_power: true,
             num_cores: 4,
             distressed: false,
-            autonomic_rate: 4.0, // EC active under heavy load
+            autonomic_rate: 4.0,          // EC active under heavy load
             thermoregulatory_effort: 0.2, // fan picking up
-            metabolic_rate: 0.5, // high power draw
-            core_voltage: 1.20, // Vcore elevated under load
-            supply_voltage: 12.4, // battery slightly discharged
-            core_activity: 0.8, // silicon firing hard
+            metabolic_rate: 0.5,          // high power draw
+            core_voltage: 1.20,           // Vcore elevated under load
+            supply_voltage: 12.4,         // battery slightly discharged
+            core_activity: 0.8,           // silicon firing hard
             uncore_activity: 0.5,
-            dram_activity: 0.7, // heavy memory traffic
+            dram_activity: 0.7,    // heavy memory traffic
             cache_miss_rate: 0.20, // elevated miss ratios under load
             branch_miss_rate: 0.10,
             description: String::new(),
@@ -3307,7 +3293,9 @@ mod tests {
         let locked = dir.join("locked");
         std::fs::write(&locked, "1000\n").expect("write locked");
         {
-            let mut perms = std::fs::metadata(&locked).expect("stat locked").permissions();
+            let mut perms = std::fs::metadata(&locked)
+                .expect("stat locked")
+                .permissions();
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
@@ -3448,7 +3436,10 @@ mod tests {
         );
         // "NaN" must not become a value.
         std::fs::write(&discharging, "NaN\n").expect("write NaN");
-        assert_eq!(read_power_draw(discharging.to_str().expect("utf8 path")), None);
+        assert_eq!(
+            read_power_draw(discharging.to_str().expect("utf8 path")),
+            None
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -3789,11 +3780,11 @@ mod tests {
             on_ac_power: true,
             num_cores: 4,
             distressed: false,
-            autonomic_rate: 5.0, // EC is active
+            autonomic_rate: 5.0,          // EC is active
             thermoregulatory_effort: 0.1, // fan barely on
-            metabolic_rate: 0.05, // idle power
-            core_voltage: 0.90, // normal Vcore
-            supply_voltage: 12.6, // full battery
+            metabolic_rate: 0.05,         // idle power
+            core_voltage: 0.90,           // normal Vcore
+            supply_voltage: 12.6,         // full battery
             core_activity: 0.0,
             uncore_activity: 0.0,
             dram_activity: 0.0,
@@ -3833,11 +3824,11 @@ mod tests {
             on_ac_power: true,
             num_cores: 4,
             distressed: false,
-            autonomic_rate: 3.0, // EC active when hot
+            autonomic_rate: 3.0,          // EC active when hot
             thermoregulatory_effort: 0.8, // fan working hard
-            metabolic_rate: 0.3, // elevated power from heat
-            core_voltage: 1.10, // Vcore raised
-            supply_voltage: 12.5, // battery present
+            metabolic_rate: 0.3,          // elevated power from heat
+            core_voltage: 1.10,           // Vcore raised
+            supply_voltage: 12.5,         // battery present
             core_activity: 0.0,
             uncore_activity: 0.0,
             dram_activity: 0.0,
@@ -3885,11 +3876,11 @@ mod tests {
             on_ac_power: true,
             num_cores: 4,
             distressed: false,
-            autonomic_rate: 3.0, // EC active when hot
+            autonomic_rate: 3.0,          // EC active when hot
             thermoregulatory_effort: 0.0, // fan off!
-            metabolic_rate: 0.2, // some power draw despite fan failure
-            core_voltage: 1.10, // Vcore raised
-            supply_voltage: 12.5, // battery present
+            metabolic_rate: 0.2,          // some power draw despite fan failure
+            core_voltage: 1.10,           // Vcore raised
+            supply_voltage: 12.5,         // battery present
             core_activity: 0.0,
             uncore_activity: 0.0,
             dram_activity: 0.0,
@@ -3949,11 +3940,11 @@ mod tests {
             on_ac_power: true,
             num_cores: 4,
             distressed: false,
-            autonomic_rate: 3.0, // EC active when hot
+            autonomic_rate: 3.0,          // EC active when hot
             thermoregulatory_effort: 0.0, // fan off!
-            metabolic_rate: 0.2, // some power draw despite fan failure
-            core_voltage: 1.10, // Vcore raised
-            supply_voltage: 12.5, // battery present
+            metabolic_rate: 0.2,          // some power draw despite fan failure
+            core_voltage: 1.10,           // Vcore raised
+            supply_voltage: 12.5,         // battery present
             core_activity: 0.0,
             uncore_activity: 0.0,
             dram_activity: 0.0,
@@ -3990,11 +3981,11 @@ mod tests {
             on_ac_power: true,
             num_cores: 4,
             distressed: false,
-            autonomic_rate: 2.0, // normal EC
+            autonomic_rate: 2.0,          // normal EC
             thermoregulatory_effort: 0.1, // fan barely on
-            metabolic_rate: 0.1, // light power from I/O
-            core_voltage: 0.95, // Vcore slightly elevated
-            supply_voltage: 12.6, // full battery
+            metabolic_rate: 0.1,          // light power from I/O
+            core_voltage: 0.95,           // Vcore slightly elevated
+            supply_voltage: 12.6,         // full battery
             core_activity: 0.0,
             uncore_activity: 0.0,
             dram_activity: 0.0,
@@ -4037,11 +4028,11 @@ mod tests {
             on_ac_power: true,
             num_cores: 4,
             distressed: false,
-            autonomic_rate: 3.0, // EC active under load
+            autonomic_rate: 3.0,           // EC active under load
             thermoregulatory_effort: 0.15, // fan picking up
-            metabolic_rate: 0.6, // high power draw
-            core_voltage: 1.25, // elevated Vcore under load
-            supply_voltage: 12.5, // battery present, on AC
+            metabolic_rate: 0.6,           // high power draw
+            core_voltage: 1.25,            // elevated Vcore under load
+            supply_voltage: 12.5,          // battery present, on AC
             core_activity: 0.0,
             uncore_activity: 0.0,
             dram_activity: 0.0,
@@ -4077,11 +4068,11 @@ mod tests {
             on_ac_power: true,
             num_cores: 4,
             distressed: false,
-            autonomic_rate: 3.0, // EC active when hot
+            autonomic_rate: 3.0,          // EC active when hot
             thermoregulatory_effort: 0.5, // fan running hard
-            metabolic_rate: 0.85, // very high power draw
-            core_voltage: 1.15, // Vcore raised under thermal + metabolic load
-            supply_voltage: 12.5, // battery present
+            metabolic_rate: 0.85,         // very high power draw
+            core_voltage: 1.15,           // Vcore raised under thermal + metabolic load
+            supply_voltage: 12.5,         // battery present
             core_activity: 0.0,
             uncore_activity: 0.0,
             dram_activity: 0.0,

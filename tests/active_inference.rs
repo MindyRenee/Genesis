@@ -23,7 +23,6 @@ use genesis::state::neurochemical::{
 };
 use genesis::state::zones::MentalPhase;
 
-
 /// Her actual resting state: every chemical at its genetic default.
 ///
 /// The allostatic tests previously drove all 18 chemicals to 0.5 and
@@ -1874,7 +1873,6 @@ fn test_engine_save_load_v3_round_trip() {
     // Clean up
     let _ = std::fs::remove_file(&path);
 }
-
 
 #[test]
 fn test_policy_selection_remains_stochastic_at_high_precision() {

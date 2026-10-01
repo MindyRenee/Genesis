@@ -299,9 +299,7 @@ use crate::state::neurochemical::NeuroTickParams;
 use std::path::Path;
 
 use crate::state::InferenceSignals;
-use crate::state::neurochemical::{
-    NEUROCHEMICAL_COUNT, NeurochemicalId, NeurochemicalVector,
-};
+use crate::state::neurochemical::{NEUROCHEMICAL_COUNT, NeurochemicalId, NeurochemicalVector};
 use crate::state::zones::MentalPhase;
 
 /// The dimensionality of the state vector (18 neurochemicals).
@@ -504,7 +502,6 @@ const ALLOSTASIS_ACCUMULATION_RATE: f32 = 0.00001;
 /// make a transient spike erase genuine accumulated wear.
 const ALLOSTASIS_RECOVERY_RATE: f32 = 0.00002;
 
-
 /// Advance allostatic load by one step under the hysteresis band.
 ///
 /// Pure function of the current load, the multisignal burden, and the
@@ -619,7 +616,6 @@ impl RestBaseline {
         self.level
     }
 }
-
 
 /// Threshold for dopamine reward prediction error impulses. Only
 /// positive prediction errors above this magnitude generate a DA
@@ -2061,12 +2057,12 @@ impl ActiveInferenceEngine {
             let cort = crate::state::neurochemical::NeurochemicalId::Cortisol as usize;
             let epi = crate::state::neurochemical::NeurochemicalId::Epinephrine as usize;
             let nore = crate::state::neurochemical::NeurochemicalId::Norepinephrine as usize;
-            let cort_rest = crate::state::neurochemical::NeurochemicalId::Cortisol
-                .default_baseline();
-            let epi_rest = crate::state::neurochemical::NeurochemicalId::Epinephrine
-                .default_baseline();
-            let nore_rest = crate::state::neurochemical::NeurochemicalId::Norepinephrine
-                .default_baseline();
+            let cort_rest =
+                crate::state::neurochemical::NeurochemicalId::Cortisol.default_baseline();
+            let epi_rest =
+                crate::state::neurochemical::NeurochemicalId::Epinephrine.default_baseline();
+            let nore_rest =
+                crate::state::neurochemical::NeurochemicalId::Norepinephrine.default_baseline();
             // Each is an elevation over its resting level, normalised by
             // the range available above it. Cortisol rests at zero and
             // is the most load-bearing mediator, so it is weighted
@@ -2348,7 +2344,9 @@ impl ActiveInferenceEngine {
                         continue;
                     }
                     let gate = (headroom / POLICY_HEADROOM_SCALE).min(1.0);
-                    result.impulses.push((chem_id, mag * scale * gate * authority));
+                    result
+                        .impulses
+                        .push((chem_id, mag * scale * gate * authority));
                     continue;
                 }
             }
@@ -2594,9 +2592,7 @@ impl ActiveInferenceEngine {
                 .iter()
                 .map(|&(efe, _)| efe)
                 .fold(f32::MIN, f32::min);
-        let temp =
-            (POLICY_SOFTMAX_TEMPERATURE * (2.0 - self.precision) * efe_spread)
-                .max(1.0e-6);
+        let temp = (POLICY_SOFTMAX_TEMPERATURE * (2.0 - self.precision) * efe_spread).max(1.0e-6);
 
         // Compute softmax weights (negative EFE → higher probability)
         let mut weights = [0.0f32; NUM_POLICIES];
@@ -2739,12 +2735,7 @@ impl ActiveInferenceEngine {
 
         // A concentrated posterior is stronger evidence than one with
         // large residual uncertainty.
-        let mean_belief_var = self
-            .belief_var
-            .iter()
-            .copied()
-            .sum::<f32>()
-            / DIM as f32;
+        let mean_belief_var = self.belief_var.iter().copied().sum::<f32>() / DIM as f32;
         let posterior_certainty = crate::state::sanitize::finite_clamp(
             1.0 - (mean_belief_var / MAX_BELIEF_VAR),
             0.0,
@@ -3272,11 +3263,8 @@ impl ActiveInferenceEngine {
             }
             engine.surprise_var_ema =
                 crate::state::sanitize::finite_clamp(f32::from_le_bytes(var_bytes), 0.0, 1.0);
-            engine.maturity_error_ema = crate::state::sanitize::finite_clamp(
-                f32::from_le_bytes(mat_err_bytes),
-                0.0,
-                1.0,
-            );
+            engine.maturity_error_ema =
+                crate::state::sanitize::finite_clamp(f32::from_le_bytes(mat_err_bytes), 0.0, 1.0);
         } else {
             engine.surprise_var_ema = crate::state::sanitize::finite_clamp(
                 PRECISION_REFERENCE_VAR * (1.0 / engine.precision.max(0.1) - 1.0),
@@ -4205,11 +4193,7 @@ mod tests {
             "IG must be finite nonnegative: {}",
             ig
         );
-        assert!(
-            ig.abs() < 1e-6,
-            "fresh engine IG should be ~0: {}",
-            ig
-        );
+        assert!(ig.abs() < 1e-6, "fresh engine IG should be ~0: {}", ig);
     }
 
     // ─── Persistence v4 ─────────────────────────────────────────

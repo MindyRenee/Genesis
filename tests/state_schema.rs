@@ -2781,10 +2781,7 @@ fn test_wake_recovery_restores_depleted_neurochemicals() {
     // SAFETY: single-threaded test — no concurrent writers.
     unsafe { state.write_begin(0) };
     {
-        let bdnf = state
-            .neurochemicals
-            .get_mut(NeurochemicalId::BDNF)
-            .unwrap();
+        let bdnf = state.neurochemicals.get_mut(NeurochemicalId::BDNF).unwrap();
         bdnf.level = 0.10;
         bdnf.baseline = 0.45;
     }
@@ -2812,8 +2809,16 @@ fn test_wake_recovery_restores_depleted_neurochemicals() {
         .level = 0.0;
     state.write_end();
 
-    let bdnf_before = state.neurochemicals.get(NeurochemicalId::BDNF).unwrap().level;
-    let da_before = state.neurochemicals.get(NeurochemicalId::Dopamine).unwrap().level;
+    let bdnf_before = state
+        .neurochemicals
+        .get(NeurochemicalId::BDNF)
+        .unwrap()
+        .level;
+    let da_before = state
+        .neurochemicals
+        .get(NeurochemicalId::Dopamine)
+        .unwrap()
+        .level;
 
     // Apply wake recovery.
     // SAFETY: single-threaded test — no concurrent writers.
@@ -2821,8 +2826,16 @@ fn test_wake_recovery_restores_depleted_neurochemicals() {
     state.neurochemicals.wake_recovery();
     state.write_end();
 
-    let bdnf_after = state.neurochemicals.get(NeurochemicalId::BDNF).unwrap().level;
-    let da_after = state.neurochemicals.get(NeurochemicalId::Dopamine).unwrap().level;
+    let bdnf_after = state
+        .neurochemicals
+        .get(NeurochemicalId::BDNF)
+        .unwrap()
+        .level;
+    let da_after = state
+        .neurochemicals
+        .get(NeurochemicalId::Dopamine)
+        .unwrap()
+        .level;
 
     // Levels should be boosted 50% of the way toward baseline.
     // BDNF: 0.10 + (0.45 - 0.10) * 0.5 = 0.275
@@ -2857,10 +2870,7 @@ fn test_wake_recovery_resensitizes_receptors() {
     // SAFETY: single-threaded test — no concurrent writers.
     unsafe { state.write_begin(0) };
     {
-        let bdnf = state
-            .neurochemicals
-            .get_mut(NeurochemicalId::BDNF)
-            .unwrap();
+        let bdnf = state.neurochemicals.get_mut(NeurochemicalId::BDNF).unwrap();
         bdnf.level = 0.82;
         bdnf.baseline = 0.65;
         bdnf.receptor_sensitivity = 0.6;
@@ -2925,10 +2935,7 @@ fn test_wake_recovery_skipped_when_cortisol_high() {
     // SAFETY: single-threaded test — no concurrent writers.
     unsafe { state.write_begin(0) };
     {
-        let bdnf = state
-            .neurochemicals
-            .get_mut(NeurochemicalId::BDNF)
-            .unwrap();
+        let bdnf = state.neurochemicals.get_mut(NeurochemicalId::BDNF).unwrap();
         bdnf.level = 0.10;
         bdnf.baseline = 0.45;
     }
@@ -2939,7 +2946,11 @@ fn test_wake_recovery_skipped_when_cortisol_high() {
         .level = 0.5; // high cortisol
     state.write_end();
 
-    let bdnf_before = state.neurochemicals.get(NeurochemicalId::BDNF).unwrap().level;
+    let bdnf_before = state
+        .neurochemicals
+        .get(NeurochemicalId::BDNF)
+        .unwrap()
+        .level;
 
     // Apply wake recovery — should be skipped.
     // SAFETY: single-threaded test — no concurrent writers.
@@ -2947,7 +2958,11 @@ fn test_wake_recovery_skipped_when_cortisol_high() {
     state.neurochemicals.wake_recovery();
     state.write_end();
 
-    let bdnf_after = state.neurochemicals.get(NeurochemicalId::BDNF).unwrap().level;
+    let bdnf_after = state
+        .neurochemicals
+        .get(NeurochemicalId::BDNF)
+        .unwrap()
+        .level;
 
     // BDNF should NOT be boosted (cortisol is high).
     assert!(
@@ -2998,8 +3013,8 @@ fn measured_peaks() -> [f32; 18] {
 #[test]
 fn test_every_phase_gate_is_inside_the_reachable_envelope() {
     use genesis::state::neurochemical::{
-        ALERT_HISTAMINE_GATE, ALERT_NOREPI_GATE, FLOW_ACETYLCHOLINE_GATE,
-        FLOW_DOPAMINE_GATE, STRESS_CORTISOL_GATE, STRESS_NOREPI_GATE,
+        ALERT_HISTAMINE_GATE, ALERT_NOREPI_GATE, FLOW_ACETYLCHOLINE_GATE, FLOW_DOPAMINE_GATE,
+        STRESS_CORTISOL_GATE, STRESS_NOREPI_GATE,
     };
     let p = measured_peaks();
     let at = |id: NeurochemicalId| p[id as usize];
