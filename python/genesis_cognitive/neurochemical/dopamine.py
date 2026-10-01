@@ -34,10 +34,10 @@ DEFAULT BASELINE
 
     baseline = 0.35
 
-Tonic DA is very low (~0.06 nM in PFC, ~5 nM in VTA) but phasic
-bursts are large. The baseline reflects tonic firing rate, not
-concentration. Spontaneous impulses at ~0.01/sec (Mohebi et al.,
-2019).
+Tonic DA extracellular concentration ~90 nM (ACS Omega 2024), but varies
+by region (PFC ~10-20 nM historically reported). The baseline reflects
+tonic firing rate (~4 Hz average) not absolute concentration. Phasic
+bursts are large and activate low-affinity D1 receptors.
 
 
 ════════════════════════════════════════════════════════════════════════

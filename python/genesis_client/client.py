@@ -109,6 +109,7 @@ from .protocol import (
     RETRIEVE_EPISODE,
     SAVE_INFERENCE,
     SEARCH_EPISODES,
+    SET_POLICY_AUTHORITY,
     SET_WAKE_ALARM,
     SET_ZONE,
     SHUTDOWN,
@@ -439,7 +440,7 @@ class GenesisClient:
         return PingResponse.unpack(resp)
 
     def get_state(self, *, timeout: float | None = None) -> CoreState:
-        """Get the full core state (3288 bytes), parsed into useful fields."""
+        """Get the full core state (3296 bytes), parsed into useful fields."""
         resp = self._request(GET_STATE, timeout=timeout)
         return CoreState.unpack(resp)
 
@@ -870,6 +871,35 @@ class GenesisClient:
         payload.append(chem & 0xFF)
         payload.extend(_F32.pack(magnitude))
         resp = self._request(NEURO_IMPULSE, bytes(payload), timeout=timeout)
+        return bool(resp) and resp[0] == 1
+
+    def set_policy_authority(
+        self, authority: float, *, timeout: float | None = None
+    ) -> bool:
+        """Delegate policy choice to the inference engine, in part.
+
+        Choosing a stance — calm, focus, bond, rest, mobilise — is a
+        judgement about what to feel and do, so it belongs to cognition
+        rather than to the engine's own free-energy scoring. This is how
+        she delegates some of that judgement and keeps some, and how she
+        withdraws it again.
+
+        At 0.0 the engine still predicts, learns and reports what it
+        would have chosen, but does not act on it: she decides and acts
+        through `neuro_impulse`, where the effect is hers and traceable
+        to a judgement she made. Her homeostatic reflex is unaffected at
+        any value — correcting drift toward what she wants is physiology,
+        not a choice.
+
+        Args:
+            authority: Fraction of policy authority to delegate, [0, 1].
+
+        Returns:
+            True if the delegation was recorded.
+        """
+        payload = bytearray()
+        payload.extend(_F32.pack(max(0.0, min(1.0, float(authority)))))
+        resp = self._request(SET_POLICY_AUTHORITY, bytes(payload), timeout=timeout)
         return bool(resp) and resp[0] == 1
 
     def neuro_adjust_baseline(

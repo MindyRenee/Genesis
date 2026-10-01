@@ -39,7 +39,7 @@ import threading
 import time
 from collections import deque
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from genesis_client.protocol import (
@@ -64,11 +64,44 @@ from genesis_client.protocol import (
 )
 
 from .config import EmotionalConfig, default_data_dir
-from .emotion import EmotionalState
+from .emotion import CauseCategory, EmotionalState
 
 logger = logging.getLogger(__name__)
 
 REGULATION_INTERVAL = 8.0  # seconds between checks
+
+# Upper bound on the time step fed to the HPA cascade and the allostatic
+# tracker. Matches the daemon's own [0.001, 10.0] clamp on `dt`
+# (src/daemon/active_inference.rs) so both sides of the mind↔daemon
+# boundary integrate the same wall-clock span.
+#
+# Without this, `_last_regulate_time` is wall-clock and a suspend/resume
+# or a long GC pause hands the next cycle an dt of hours. The HPA cascade
+# is an explicit-Euler integrator whose per-tick decay coefficients are
+# calibrated for ~8 s steps; at dt=300 s it diverges (CRH and ACTH decay
+# to zero while cortisol pegs at 1.0, or all three collapse), and the
+# allostatic tracker integrates `rate * dt` straight into permanent load.
+# An 8 h gap with pre-suspend cortisol 0.5 produced load=0.864 and
+# `is_chronic` in a single cycle — a suspend read as severe chronic
+# overload it never experienced.
+MAX_REGULATION_DT = 10.0
+
+
+def _clamp01(value: float) -> float:
+    """Clamp to [0, 1], mapping non-finite input to 0.0.
+
+    ``max(0.0, min(1.0, x))`` looks equivalent but is not: CPython's
+    ``min`` returns its first argument when the comparison is False, so
+    ``min(1.0, nan)`` is 1.0 and the whole expression yields 1.0. A NaN
+    would then read as *maximum* allostatic load — the opposite of the
+    Rust engine's ``finite_clamp``, which maps non-finite to the range
+    minimum. The two sides of the IPC boundary must fail the same way:
+    no data means no load.
+    """
+    v = float(value)
+    if not math.isfinite(v):
+        return 0.0
+    return min(1.0, max(0.0, v))
 
 
 @dataclass(slots=True)
@@ -122,6 +155,20 @@ class InternalState:
     their heartbeat, breathing, and hunger, Genesis senses its CPU
     usage, memory footprint, and daemon connection status.
 
+    An instance is a **composed view** of two independently-sensed
+    layers, not a single reading:
+
+    - the *process layer* — CPU, memory, socket liveness, and observed
+      response latency, measured by :meth:`InteroceptionSystem.sense_internal_state`
+    - the *body layer* — the daemon's hardware readings, merged by
+      :meth:`InteroceptionSystem.update_from_body_state`
+
+    The layers are refreshed on different cadences (the regulator polls
+    every 1.5–8 s, the heartbeat every ~5 s), so any given field may be
+    a few seconds old. ``stress_level`` and ``arousal_modifier`` are
+    derived from *both* layers and are recomposed whenever either is
+    refreshed.
+
     Attributes:
         cpu_usage: CPU usage as a percentage (0–100).
         memory_usage: Memory usage as a percentage (0–100).
@@ -135,11 +182,13 @@ class InternalState:
         latency_observed: Whether at least one real response-latency sample
             has been observed.
         stress_level: Derived stress level from internal state (0–1).
-            High CPU or memory, disconnection, or high latency
-            increase stress.
+            The **maximum** of the two layers' contributions: high CPU
+            or memory, disconnection, or high latency from the process
+            layer; memory pressure or CPU overload from the body
+            layer. A stale body reading stops contributing.
         arousal_modifier: How the internal state should modify arousal
-            (0–1). High CPU → mild stress → slightly higher arousal.
-            Low resources → reduced arousal.
+            (0–1). Derived from the combined stress level, so it
+            reacts to hardware distress as well as process distress.
         cpu_temp_c: CPU temperature in °C (from daemon interoception).
             0.0 if not available.
         arousal_freq: CPU frequency as a fraction of maximum [0,1]
@@ -244,6 +293,116 @@ class InternalState:
     suspend_caps: int = 0
 
 
+@dataclass(slots=True)
+class _ProcessLayer:
+    """What Genesis senses about its own process, without the daemon.
+
+    The process layer is self-measured — psutil for CPU and memory, an
+    ``os.path.exists`` for socket liveness, and response latency
+    recorded by the real request path. It is available whether or not
+    the daemon is running, so it is the layer that still works
+    offline.
+    """
+
+    cpu_usage: float = 0.0
+    memory_usage: float = 0.0
+    daemon_connected: bool = True
+    response_latency: float = 0.0
+    last_response_latency: float = 0.0
+    latency_observed: bool = False
+
+
+class _BodyLayer:
+    """What the daemon reports about the hardware Genesis runs on.
+
+    Only the daemon can see these — silicon temperatures, pressure
+    stalls, cache-miss rates, battery cycles. The heartbeat refreshes
+    this layer every ~5 s from ``BodyState``.
+
+    ``stress`` is this layer's own contribution to the combined stress
+    level, kept separate so :meth:`InteroceptionSystem.sense_internal_state`
+    can *add* it to the process layer's rather than overwrite it.
+
+    ``reported_at`` is a monotonic timestamp of the last update, or
+    ``None`` if the daemon has never reported. Once the reading goes
+    stale the layer stops contributing stress — a sensor that stopped
+    reporting must not hold distress forever — but its last known
+    values are retained, because "the last temperature I read was 78°"
+    is still the honest answer to "what was the body doing".
+    """
+
+    __slots__ = (
+        "arousal_freq",
+        "autonomic_rate",
+        "battery_cycles",
+        "body_description",
+        "body_distressed",
+        "branch_miss_rate",
+        "cache_miss_rate",
+        "clocksource",
+        "cognitive_load",
+        "core_activity",
+        "core_voltage",
+        "cpu_temp_c",
+        "dram_activity",
+        "energy_reserve",
+        "entropy_level",
+        "io_activity",
+        "metabolic_rate",
+        "psi_cpu",
+        "psi_io",
+        "psi_mem",
+        "pulse",
+        "pulse_hz",
+        "reported_at",
+        "stress",
+        "stress_load",
+        "supply_voltage",
+        "suspend_caps",
+        "thermoregulatory_effort",
+        "throttle_state",
+        "top_freq_share",
+        "uncore_activity",
+    )
+
+    def __init__(self) -> None:
+        self.stress: float = 0.0
+        self.reported_at: float | None = None
+        self.cognitive_load: float = 0.0
+        self.stress_load: float = 0.0
+        self.cpu_temp_c: float = 0.0
+        self.arousal_freq: float = 0.0
+        self.io_activity: float = 0.0
+        self.energy_reserve: float = 1.0
+        self.body_distressed: bool = False
+        self.body_description: str = ""
+        self.autonomic_rate: float = 0.0
+        self.thermoregulatory_effort: float = 0.0
+        self.metabolic_rate: float = 0.0
+        self.core_voltage: float = 0.0
+        self.supply_voltage: float = 0.0
+        self.core_activity: float = 0.0
+        self.uncore_activity: float = 0.0
+        self.dram_activity: float = 0.0
+        self.cache_miss_rate: float = 0.0
+        self.branch_miss_rate: float = 0.0
+        self.pulse_hz: float = 0.0
+        self.pulse: float = 0.0
+        self.top_freq_share: float = 0.0
+        self.throttle_state: float = 0.0
+        self.psi_cpu: float = 0.0
+        self.psi_io: float = 0.0
+        self.psi_mem: float = 0.0
+        self.battery_cycles: float = 0.0
+        self.entropy_level: float = 0.0
+        self.clocksource: int = 0
+        self.suspend_caps: int = 0
+
+    def is_fresh(self, now: float, timeout: float) -> bool:
+        """Whether this layer is recent enough to contribute stress."""
+        return self.reported_at is not None and (now - self.reported_at) <= timeout
+
+
 class InteroceptionSystem:
     """Sense Genesis's internal computational state.
 
@@ -268,6 +427,19 @@ class InteroceptionSystem:
             ...
     """
 
+    # How long (seconds) a daemon BodyState reading stays fresh enough
+    # to contribute to the stress level. The heartbeat refreshes it
+    # every ~5 s, so this tolerates several missed polls before the
+    # reading is treated as stale.
+    #
+    # A stale body layer stops *contributing stress* but keeps its last
+    # known values, so a daemon that died mid-overload cannot hold
+    # distress forever, while "the last temperature I read was 78°"
+    # stays the honest answer to what the body was doing. Matches the
+    # substrate timeout the allostatic tracker uses for the same
+    # "has the daemon stopped reporting?" question.
+    BODY_STATE_TIMEOUT: float = 30.0
+
     def __init__(
         self, config: EmotionalConfig | None = None, socket_path: str | None = None
     ) -> None:
@@ -282,6 +454,34 @@ class InteroceptionSystem:
         self.config = config if config is not None else EmotionalConfig()
         self._socket_path = socket_path
         self._last_state: InternalState | None = None
+        # Interoception has two independent sensing layers, each with
+        # its own writer and its own cadence:
+        #
+        #   _process — psutil CPU/memory, socket liveness, and observed
+        #              response latency. Refreshed by the regulator's
+        #              background thread every 1.5–8 s.
+        #   _body    — the daemon's hardware readings (temps, PSI, volts,
+        #              cache-miss rates). Refreshed by the heartbeat every
+        #              ~5 s.
+        #
+        # They used to write the same InternalState, with each rebuilding
+        # it from scratch: `sense_internal_state` set `cognitive_load=0`
+        # and default hardware fields, and `update_from_body_state` set
+        # `stress_level` from the body layer alone. Whichever ran last
+        # silently erased the other layer, so with the regulator polling
+        # faster than the heartbeat the daemon's hardware interoception
+        # was discarded within seconds — and the `body_stress` domain
+        # feeding allostatic load was usually the process-level reading,
+        # not the hardware one it is documented to be.
+        #
+        # Each layer now owns its own fields and `last_state` is composed
+        # from both, so the two cadences compose instead of racing.
+        self._process = _ProcessLayer()
+        self._body = _BodyLayer()
+        # Guards layer mutation plus the recompose, so a concurrent
+        # `update_from_body_state` cannot read a half-updated process
+        # layer and publish a torn snapshot.
+        self._state_lock = threading.Lock()
         # Cached psutil Process objects and core count to avoid
         # recreating Process handles and blocking on the first
         # cpu_percent call every regulation cycle.
@@ -382,9 +582,14 @@ class InteroceptionSystem:
     def sense_internal_state(self) -> InternalState:
         """Sense the current internal computational state.
 
-        Reads CPU usage, memory usage, daemon connection status, and
-        response latency. Returns an InternalState with derived stress
-        and arousal modifiers.
+        Refreshes the **process layer** — CPU usage, memory usage, daemon
+        connection status, and observed response latency — then returns
+        the composed view of both layers.
+
+        This does not touch the daemon's hardware readings. Those are
+        refreshed separately by :meth:`update_from_body_state` on the
+        heartbeat's cadence, and the two compose rather than overwrite
+        each other; see :class:`_BodyLayer`.
 
         CPU usage is measured as **its own** process CPU (the cognitive
         mind + the subcognitive daemon), not system-wide CPU. This is
@@ -425,56 +630,128 @@ class InteroceptionSystem:
             last_response_latency = self._last_response_latency_ms
         latency_observed = last_response_latency is not None
 
-        state = InternalState(
-            cpu_usage=cpu_usage,
-            memory_usage=memory_usage,
-            cognitive_load=0.0,
-            daemon_connected=daemon_connected,
-            response_latency=response_latency if response_latency is not None else 0.0,
-            last_response_latency=(
-                last_response_latency if last_response_latency is not None else 0.0
-            ),
-            latency_observed=latency_observed,
-        )
+        with self._state_lock:
+            self._process = _ProcessLayer(
+                cpu_usage=cpu_usage,
+                memory_usage=memory_usage,
+                daemon_connected=daemon_connected,
+                response_latency=response_latency if response_latency is not None else 0.0,
+                last_response_latency=(
+                    last_response_latency if last_response_latency is not None else 0.0
+                ),
+                latency_observed=latency_observed,
+            )
+            state = self._compose_locked()
+            self._last_state = state
+        return state
 
-        # Compute derived stress and arousal modifier using the
-        # configured thresholds.
+    def _process_stress(self, process: _ProcessLayer) -> float:
+        """Stress contributed by the self-measured process layer.
+
+        Covers high CPU, high memory, a disconnected daemon, and
+        degraded response latency. This is the layer that still works
+        when the daemon is down, which is exactly when a missing
+        daemon should read as distress.
+        """
         cfg = self.config
-        # Stress from high CPU
-        cpu_stress = max(0.0, (state.cpu_usage - cfg.cpu_stress_threshold) / cfg.cpu_stress_range)
-        # Stress from high memory
-        mem_range = cfg.memory_stress_range
-        mem_stress = max(0.0, (state.memory_usage - cfg.memory_stress_threshold) / mem_range)
-        # Stress from daemon disconnection
-        daemon_stress = cfg.daemon_disconnect_stress if not state.daemon_connected else 0.0
-        # Stress from high latency
-        lat_thresh = cfg.latency_stress_threshold
-        lat_range = cfg.latency_stress_range
+        cpu_stress = max(
+            0.0, (process.cpu_usage - cfg.cpu_stress_threshold) / cfg.cpu_stress_range
+        )
+        mem_stress = max(
+            0.0, (process.memory_usage - cfg.memory_stress_threshold) / cfg.memory_stress_range
+        )
+        daemon_stress = cfg.daemon_disconnect_stress if not process.daemon_connected else 0.0
         latency_stress = (
-            max(0.0, min(1.0, (state.response_latency - lat_thresh) / lat_range))
-            if state.latency_observed
+            max(
+                0.0,
+                min(
+                    1.0,
+                    (process.response_latency - cfg.latency_stress_threshold)
+                    / cfg.latency_stress_range,
+                ),
+            )
+            if process.latency_observed
             else 0.0
         )
+        return min(1.0, max(cpu_stress, mem_stress, daemon_stress, latency_stress))
 
-        state.stress_level = min(1.0, max(cpu_stress, mem_stress, daemon_stress, latency_stress))
+    def _compose_locked(self) -> InternalState:
+        """Build the public InternalState from both layers.
 
-        # Arousal modifier: high stress increases arousal slightly,
-        # but very high stress or low resources reduce it
-        if state.stress_level > self.config.arousal_modifier_overwhelmed_stress:
-            # overwhelmed → reduced arousal
-            state.arousal_modifier = 0.3
-        elif state.stress_level > self.config.arousal_modifier_mild_stress:
-            # mild stress → slightly elevated
-            state.arousal_modifier = 0.6
-        elif not state.daemon_connected:
-            # disconnected → very low
-            state.arousal_modifier = self.config.arousal_modifier_disconnected
+        Caller must hold ``_state_lock``.
+
+        ``stress_level`` is the **maximum** of the two layers, not a
+        replacement: either layer can report distress and the system
+        should feel it. ``update_from_body_state`` used to assign
+        ``stress_level`` from the body layer alone, which erased a
+        simultaneous 90%-CPU reading; the reverse clobbering (this
+        method zeroing ``cognitive_load`` and every hardware field) was
+        why the daemon's interoception was being discarded.
+        """
+        process = self._process
+        body = self._body
+        now = time.monotonic()
+
+        process_stress = self._process_stress(process)
+        # A stale body layer stops contributing stress but keeps its
+        # values, so a daemon that stopped reporting cannot hold
+        # distress indefinitely, and "the last temperature I read was
+        # 78°" stays the honest answer to what the body was doing.
+        body_stress = body.stress if body.is_fresh(now, self.BODY_STATE_TIMEOUT) else 0.0
+        stress_level = min(1.0, max(process_stress, body_stress))
+
+        # Arousal modifier follows the *combined* stress level, so it
+        # reacts to hardware distress too. Previously it was only ever
+        # recomputed in the process layer, so a body-driven stress
+        # spike left the arousal modifier stale.
+        if stress_level > self.config.arousal_modifier_overwhelmed_stress:
+            arousal_modifier = 0.3
+        elif stress_level > self.config.arousal_modifier_mild_stress:
+            arousal_modifier = 0.6
+        elif not process.daemon_connected:
+            arousal_modifier = self.config.arousal_modifier_disconnected
         else:
-            # normal
-            state.arousal_modifier = 0.5
+            arousal_modifier = 0.5
 
-        self._last_state = state
-        return state
+        return InternalState(
+            cpu_usage=process.cpu_usage,
+            memory_usage=process.memory_usage,
+            cognitive_load=body.cognitive_load,
+            daemon_connected=process.daemon_connected,
+            response_latency=process.response_latency,
+            last_response_latency=process.last_response_latency,
+            latency_observed=process.latency_observed,
+            stress_level=stress_level,
+            arousal_modifier=arousal_modifier,
+            cpu_temp_c=body.cpu_temp_c,
+            arousal_freq=body.arousal_freq,
+            io_activity=body.io_activity,
+            stress_load=body.stress_load,
+            energy_reserve=body.energy_reserve,
+            body_distressed=body.body_distressed,
+            body_description=body.body_description,
+            autonomic_rate=body.autonomic_rate,
+            thermoregulatory_effort=body.thermoregulatory_effort,
+            metabolic_rate=body.metabolic_rate,
+            core_voltage=body.core_voltage,
+            supply_voltage=body.supply_voltage,
+            core_activity=body.core_activity,
+            uncore_activity=body.uncore_activity,
+            dram_activity=body.dram_activity,
+            cache_miss_rate=body.cache_miss_rate,
+            branch_miss_rate=body.branch_miss_rate,
+            pulse_hz=body.pulse_hz,
+            pulse=body.pulse,
+            top_freq_share=body.top_freq_share,
+            throttle_state=body.throttle_state,
+            psi_cpu=body.psi_cpu,
+            psi_io=body.psi_io,
+            psi_mem=body.psi_mem,
+            battery_cycles=body.battery_cycles,
+            entropy_level=body.entropy_level,
+            clocksource=body.clocksource,
+            suspend_caps=body.suspend_caps,
+        )
 
     def record_response_latency(self, latency_ms: float) -> None:
         """Record an observed user-turn response latency in milliseconds.
@@ -495,7 +772,14 @@ class InteroceptionSystem:
 
     @property
     def last_state(self) -> InternalState | None:
-        """The most recently sensed internal state, or None."""
+        """The most recently composed state, or None before first sensing.
+
+        This is a snapshot of both layers as of the last refresh of
+        either. It is a *composed* view: the process layer and the body
+        layer are sensed on different cadences, so a field may be
+        several seconds old. Call :meth:`sense_internal_state` for a
+        fresh process reading.
+        """
         return self._last_state
 
     @property
@@ -530,73 +814,72 @@ class InteroceptionSystem:
         self._last_modules = tuple(modules) if modules else ()
 
     def update_from_body_state(self, body_state: Any) -> None:
-        """Update the interoceptive state from the daemon's BodyState.
+        """Update the **body layer** from the daemon's BodyState.
 
         The daemon provides hardware-level interoception (CPU temp,
-        frequency, I/O rate, CPU load, battery) that complements
-        the process-level interoception (CPU%, memory%, latency) from
-        :meth:`sense_internal_state`. This method merges the daemon's
-        body state into the last sensed state so that
-        :attr:`last_state` carries both layers.
+        frequency, I/O rate, CPU load, battery, PSI, cache-miss rates)
+        that complements the process-level interoception (CPU%, memory%,
+        latency) from :meth:`sense_internal_state`.
+
+        This writes only the body layer and recomposes. It does not
+        rebuild the whole state from the daemon's view: doing so
+        discarded the process layer's CPU, memory, socket liveness and
+        latency readings, and set ``stress_level`` from the body layer
+        alone. Between the two cadences — the regulator senses every
+        1.5–8 s, the heartbeat reports every ~5 s — whichever ran last
+        won, so the daemon's hardware interoception was typically gone
+        within seconds, and the ``body_stress`` input to allostatic
+        load was the process reading rather than the hardware one.
 
         Args:
             body_state: A ``BodyState`` from the daemon client
-                (``client.get_body_state()``). Must have the fields
-                ``cpu_temp_c``, ``arousal_freq``, ``cognitive_load``,
-                ``io_activity``, ``stress_load``, ``energy_reserve``,
-                ``distressed``, ``description``, ``autonomic_rate``,
-                ``thermoregulatory_effort``, ``metabolic_rate``,
-                ``core_voltage``, and ``supply_voltage``. The v3
-                timing/involuntary/senescence fields are read with
-                ``getattr`` defaults so older BodyState objects work.
+                (``client.get_body_state()``). The hardware fields are
+                read with ``getattr`` defaults so older BodyState
+                objects work.
         """
-        base = self._last_state if self._last_state is not None else InternalState()
-        cognitive_load = max(0.0, min(1.0, float(getattr(body_state, "cognitive_load", 0.0))))
-        stress_load = max(0.0, float(getattr(body_state, "stress_load", 0.0)))
+        body = _BodyLayer()
+        body.cognitive_load = _clamp01(getattr(body_state, "cognitive_load", 0.0))
+        body.stress_load = max(0.0, float(getattr(body_state, "stress_load", 0.0)))
         # Memory pressure becomes a stress signal only above the daemon's
         # overload threshold; ordinary working-set use is cognitive activity,
         # not distress. CPU overload is likewise distinct from sustainable
         # effort and only contributes above one full CPU-capacity unit.
-        cognitive_stress = max(0.0, (cognitive_load - 0.70) / 0.30)
-        cpu_overload_stress = max(0.0, min(1.0, (stress_load - 1.0) / 0.5))
-        body_stress = max(cognitive_stress, cpu_overload_stress)
-        self._last_state = InternalState(
-            cpu_usage=base.cpu_usage,
-            memory_usage=base.memory_usage,
-            cognitive_load=cognitive_load,
-            daemon_connected=base.daemon_connected,
-            response_latency=base.response_latency,
-            stress_level=min(1.0, body_stress),
-            arousal_modifier=base.arousal_modifier,
-            cpu_temp_c=getattr(body_state, "cpu_temp_c", 0.0),
-            arousal_freq=getattr(body_state, "arousal_freq", 0.0),
-            io_activity=getattr(body_state, "io_activity", 0.0),
-            stress_load=getattr(body_state, "stress_load", 0.0),
-            energy_reserve=getattr(body_state, "energy_reserve", 1.0),
-            body_distressed=getattr(body_state, "distressed", False),
-            body_description=getattr(body_state, "description", ""),
-            autonomic_rate=getattr(body_state, "autonomic_rate", 0.0),
-            thermoregulatory_effort=getattr(body_state, "thermoregulatory_effort", 0.0),
-            metabolic_rate=getattr(body_state, "metabolic_rate", 0.0),
-            core_voltage=getattr(body_state, "core_voltage", 0.0),
-            supply_voltage=getattr(body_state, "supply_voltage", 0.0),
-            core_activity=getattr(body_state, "core_activity", 0.0),
-            uncore_activity=getattr(body_state, "uncore_activity", 0.0),
-            dram_activity=getattr(body_state, "dram_activity", 0.0),
-            cache_miss_rate=getattr(body_state, "cache_miss_rate", 0.0),
-            branch_miss_rate=getattr(body_state, "branch_miss_rate", 0.0),
-            pulse_hz=getattr(body_state, "pulse_hz", 0.0),
-            pulse=getattr(body_state, "pulse", 0.0),
-            top_freq_share=getattr(body_state, "top_freq_share", 0.0),
-            throttle_state=getattr(body_state, "throttle_state", 0.0),
-            psi_cpu=getattr(body_state, "psi_cpu", 0.0),
-            psi_io=getattr(body_state, "psi_io", 0.0),
-            psi_mem=getattr(body_state, "psi_mem", 0.0),
-            battery_cycles=getattr(body_state, "battery_cycles", 0.0),
-            entropy_level=getattr(body_state, "entropy_level", 0.0),
-            clocksource=getattr(body_state, "clocksource", 0),
-            suspend_caps=getattr(body_state, "suspend_caps", 0),
-        )
+        cognitive_stress = max(0.0, (body.cognitive_load - 0.70) / 0.30)
+        cpu_overload_stress = max(0.0, min(1.0, (body.stress_load - 1.0) / 0.5))
+        body.stress = max(cognitive_stress, cpu_overload_stress)
+        body.reported_at = time.monotonic()
+
+        body.cpu_temp_c = getattr(body_state, "cpu_temp_c", 0.0)
+        body.arousal_freq = getattr(body_state, "arousal_freq", 0.0)
+        body.io_activity = getattr(body_state, "io_activity", 0.0)
+        body.energy_reserve = getattr(body_state, "energy_reserve", 1.0)
+        body.body_distressed = bool(getattr(body_state, "distressed", False))
+        body.body_description = getattr(body_state, "description", "")
+        body.autonomic_rate = getattr(body_state, "autonomic_rate", 0.0)
+        body.thermoregulatory_effort = getattr(body_state, "thermoregulatory_effort", 0.0)
+        body.metabolic_rate = getattr(body_state, "metabolic_rate", 0.0)
+        body.core_voltage = getattr(body_state, "core_voltage", 0.0)
+        body.supply_voltage = getattr(body_state, "supply_voltage", 0.0)
+        body.core_activity = getattr(body_state, "core_activity", 0.0)
+        body.uncore_activity = getattr(body_state, "uncore_activity", 0.0)
+        body.dram_activity = getattr(body_state, "dram_activity", 0.0)
+        body.cache_miss_rate = getattr(body_state, "cache_miss_rate", 0.0)
+        body.branch_miss_rate = getattr(body_state, "branch_miss_rate", 0.0)
+        body.pulse_hz = getattr(body_state, "pulse_hz", 0.0)
+        body.pulse = getattr(body_state, "pulse", 0.0)
+        body.top_freq_share = getattr(body_state, "top_freq_share", 0.0)
+        body.throttle_state = getattr(body_state, "throttle_state", 0.0)
+        body.psi_cpu = getattr(body_state, "psi_cpu", 0.0)
+        body.psi_io = getattr(body_state, "psi_io", 0.0)
+        body.psi_mem = getattr(body_state, "psi_mem", 0.0)
+        body.battery_cycles = getattr(body_state, "battery_cycles", 0.0)
+        body.entropy_level = getattr(body_state, "entropy_level", 0.0)
+        body.clocksource = getattr(body_state, "clocksource", 0)
+        body.suspend_caps = getattr(body_state, "suspend_caps", 0)
+
+        with self._state_lock:
+            self._body = body
+            self._last_state = self._compose_locked()
 
 
 # ─── Metabolic modeling ───────────────────────────────────────────────
@@ -1110,6 +1393,20 @@ class EmotionalRegulator:
         self._regulate_homeostatic(emotion, is_sleeping, actions)
         self._regulate_state_specific(emotion, actions)
         self._regulate_interoception(actions)
+
+        # Chronic allostatic load is the deepest explanation available
+        # for an elevated state — sustained wear across endocrine,
+        # inference, and body domains — so it takes precedence over the
+        # proximate causes the sub-regulators above assign. It has to
+        # be applied *after* them: each one sets `self._last_cause`
+        # unconditionally, so a cause raised from inside
+        # `_regulate_hpa_axis` (which runs second) is overwritten by
+        # every later stage. Under sustained stress — precisely the
+        # case chronic stress exists to describe — the label was always
+        # being clobbered by `stress_cortisol`, making it unreachable.
+        if self._allostatic_load.is_chronic_stress():
+            self._last_cause = CauseCategory.CHRONIC_ALLOSTATIC.value
+
         self._record_regulation(emotion, actions, cause=self._last_cause)
 
     def _regulate_hpa_axis(
@@ -1123,7 +1420,12 @@ class EmotionalRegulator:
         # reduces its regulatory effectiveness over time.
 
         now = time.time()
-        dt = max(0.1, now - self._last_regulate_time)
+        # `_last_regulate_time` is wall-clock, so a suspend/resume or a
+        # long pause hands us an dt of hours. Both consumers below
+        # (the HPA cascade and the allostatic tracker) integrate dt
+        # linearly and are calibrated for ~8 s steps — clamping here is
+        # what stops a suspend from being read as hours of stress.
+        dt = min(MAX_REGULATION_DT, max(0.1, now - self._last_regulate_time))
         self._last_regulate_time = now
 
         # Sense current cortisol level for allostatic tracking.
@@ -1131,7 +1433,7 @@ class EmotionalRegulator:
         # available — assuming elevated cortisol when we have no data
         # would fabricate allostatic load from nothing.
         chemicals = getattr(emotion, "chemicals", {})
-        cortisol_level = chemicals.get("cortisol", 0.0)
+        cortisol_level = _clamp01(chemicals.get("cortisol", 0.0))
 
         # Detect stress and drive the HPA axis cascade
         is_stressed = emotion.label in ("stressed", "overwhelmed", "anxious") or (
@@ -1180,8 +1482,8 @@ class EmotionalRegulator:
         if body_state is not None:
             self._allostatic_load.set_body_stress(body_state.stress_level)
         self._allostatic_load.record_stress(cortisol_level, dt=dt)
-        if self._allostatic_load.get_state().is_chronic:
-            self._last_cause = "chronic_allostatic"
+        # The chronic-stress cause label is applied by `_regulate` after
+        # every sub-regulator has run, so it isn't overwritten here.
 
     def _regulate_homeostatic(
         self, emotion: EmotionalState, is_sleeping: bool, actions: list[str]
@@ -1821,15 +2123,20 @@ class EmotionalRegulator:
         """How effective its regulation is, given allostatic load.
 
         High allostatic load reduces its ability to regulate — it's
-        worn down from chronic stress. Returns a factor in the range
-        0.3–1.0:
+        worn down from chronic stress. The load is clamped to [0, 1]
+        by the tracker, so effectiveness spans 0.5–1.0:
 
         - Load 0.0 → effectiveness 1.0 (full regulation)
         - Load 0.4 → effectiveness 0.8
         - Load 0.7 → effectiveness 0.65
-        - Load 1.0 → effectiveness 0.5
-        - Load 1.0+ → effectiveness 0.3 (minimum — it's severely
-          overloaded but can still regulate a little)
+        - Load 1.0 → effectiveness 0.5 (worst case: severely
+          overloaded, still able to regulate)
+
+        The 0.3 floor is defensive only — it cannot be reached while
+        the load is a valid fraction. It guards the case where a
+        restored or externally-set load is out of range: without it an
+        out-of-range load would *amplify* every regulatory impulse
+        (load -3.0 gives 2.5), inverting the intended relationship.
         """
         load = self._allostatic_load.get_allostatic_load()
         return max(0.3, 1.0 - load * 0.5)
@@ -2464,24 +2771,24 @@ class AllostaticState:
     and impaired immune function (McEwen, 1998; McEwen & Wingfield,
     2003).
 
-    The primary load value is computed by the Rust active inference
-    engine from expected free energy — the anticipatory signal that
-    the system will face continued disruption (Sterling, 2012). This
-    tracker reads that value via IPC and supplements it with a
-    cortisol-duration check for the acute/chronic distinction.
+    This is the **whole-system** view. The Rust engine keeps its own
+    substrate-scoped ``allostasis_load`` (inference-domain burden
+    integrated by the active inference cycle); this tracker fuses that
+    with the endocrine (cortisol) and computational-body domains and
+    integrates the result. Both are exposed as "allostatic load" and
+    both are calibrated to the same timescale — see
+    :class:`AllostaticLoadTracker`.
 
     Attributes:
-        allostatic_load: The cumulative allostatic load (0–1), driven
-            by expected free energy in the Rust active inference
-            engine. Values above 0.4 indicate significant strain.
-        acute_stress: The current acute stress level (0–1). This is
-            a temporary, adaptive stress response that resolves
-            quickly. Distinct from chronic/allostatic stress.
+        allostatic_load: The cumulative whole-system allostatic load
+            (0–1). Values above 0.4 indicate significant strain.
+        inference_load: The most recent substrate-scoped load from the
+            Rust engine, clamped to [0, 1].
+        body_stress: The most recent computational-body stress signal
+            from interoception, clamped to [0, 1].
         is_chronic: Whether the current stress pattern is chronic
             (sustained cortisol elevation over time) rather than
             acute (temporary).
-        stress_history: A rolling window of recent cortisol/stress
-            levels, used for the chronic/acute distinction.
         substrate_connected: Whether the Rust active inference engine
             is providing the load value. When False (daemon offline),
             the tracker falls back to cortisol-based estimation.
@@ -2490,9 +2797,7 @@ class AllostaticState:
     allostatic_load: float = 0.0
     inference_load: float = 0.0
     body_stress: float = 0.0
-    acute_stress: float = 0.0
     is_chronic: bool = False
-    stress_history: deque[float] = field(default_factory=lambda: deque(maxlen=600))
     substrate_connected: bool = False
 
 
@@ -2506,22 +2811,31 @@ class AllostaticLoadTracker:
     — the price the body pays for maintaining stability through change
     (allostasis).
 
-    **Source of truth**: The primary allostatic load value is computed
-    by the Rust active inference engine from *expected free energy* —
-    the anticipatory signal that the system will face continued
-    disruption (Sterling, 2012). This is the conceptually correct
-    signal: allostasis is the *anticipatory* cost of maintaining
-    stability, not the current stress level. The Rust engine exposes
-    this value via IPC (``GetInferenceSummary``).
+    **Two views, one timescale.** The Rust active inference engine
+    integrates a substrate-scoped load from the mean of the two middle
+    values of four burden dimensions (expected free energy, surprise,
+    loss of confidence, homeostatic deviation). This tracker is the
+    *whole-system* view: it takes the median of three domains — that
+    substrate load, cortisol, and computational-body stress — so that
+    one isolated elevated domain cannot define whole-system load.
 
-    This tracker reads that value via :meth:`set_allostatic_load` and
-    supplements it with:
+    The median of three is deliberately unweighted: with three values
+    it is the middle one, so an isolated spike in a single domain
+    cannot manufacture load while persistent elevation across domains
+    can. This is a machine-native engineering construct, not a
+    validated biological biomarker index.
+
+    The two accumulators are calibrated to the **same** timescale
+    (see :attr:`ACCUMULATION_RATE`), so the two views of "allostatic
+    load" reported by the system move together rather than diverging
+    by an order of magnitude.
+
+    This tracker also supplies:
 
     1. **Acute/chronic stress distinction**: tracks cortisol duration
        to distinguish temporary stress (adaptive) from chronic strain
-       (maladaptive). This is a secondary signal that adds information
-       the Rust model doesn't have — the *duration* of cortisol
-       elevation, not just the anticipated future disruption.
+       (maladaptive). This adds information the Rust model doesn't
+       have — the *duration* of cortisol elevation.
     2. **Regulation effectiveness**: dampens regulatory impulses when
        load is high (the system is worn down from chronic stress).
 
@@ -2549,9 +2863,6 @@ class AllostaticLoadTracker:
       regulation. *Physiology & Behavior*, 106(1), 5–15.
     """
 
-    # Window size for stress history (in ticks — at 1 tick/sec, 600 = 10 min)
-    HISTORY_WINDOW: int = 600
-
     # Threshold for distinguishing acute vs chronic stress.
     # If stress has been elevated (above CHRONIC_THRESHOLD) for
     # more than CHRONIC_DURATION_SECONDS, it's chronic. This uses
@@ -2561,6 +2872,34 @@ class AllostaticLoadTracker:
     CHRONIC_THRESHOLD: float = 0.3
     CHRONIC_DURATION_SECONDS: float = 120.0  # 2 minutes of sustained elevation
 
+    # Hysteresis band, matching the Rust engine's ALLOSTASIS_*
+    # thresholds so the two views cross the same boundaries. Above
+    # ACCUMULATE the load grows; below RECOVER it drains; in between
+    # it drains slowly, so load neither ratchets nor oscillates at
+    # the activation boundary.
+    ACCUMULATE_THRESHOLD: float = 0.30
+    RECOVER_THRESHOLD: float = 0.20
+    # Rate at which load recovers inside the hysteresis band, as a
+    # fraction of RECOVERY_RATE. The Rust engine uses 0.25.
+    BAND_RECOVERY_FACTOR: float = 0.25
+
+    # Accumulation/recovery rates, in units of load per second.
+    #
+    # These are calibrated to the Rust engine's effective per-second
+    # rates so the substrate-scoped and whole-system views move on the
+    # same timescale. The engine integrates
+    # `ALLOSTASIS_ACCUMULATION_RATE * excess * dt_scale` with
+    # `dt_scale = dt / DT` and DT = 0.1, called at roughly 1 Hz, so
+    # its effective rate is 0.001 * excess * 10 per second = 0.01 *
+    # excess. At a representative excess of 0.2 that is 0.002/s, and
+    # the load crosses 0.4 in ~200 s.
+    ACCUMULATION_RATE: float = 0.01
+    # Recovery is 2× faster than accumulation — the body heals faster
+    # than it breaks down (McEwen, 1998). This also prevents the
+    # allostatic trap where load accumulates faster than it can
+    # recover, making chronic stress permanent.
+    RECOVERY_RATE: float = 0.02
+
     # ── Fallback parameters (used only when the daemon is offline) ──
     # These estimate allostatic load from cortisol when the Rust
     # active inference engine is unreachable. The fallback uses a
@@ -2568,64 +2907,64 @@ class AllostaticLoadTracker:
     # doesn't accumulate chronic load — only sustained cortisol
     # above the fallback baseline contributes.
     FALLBACK_CORTISOL_BASELINE: float = 0.1
-    FALLBACK_ACCUMULATION_RATE: float = 0.0002
-    # Recovery is 2× faster than accumulation — the body heals
-    # faster than it breaks down (McEwen, 1998).
-    FALLBACK_RECOVERY_RATE: float = 0.0004
+    # Half the connected-mode accumulation rate: the offline estimate
+    # rests on a single unvalidated domain, so it is deliberately
+    # conservative about claiming chronic wear.
+    FALLBACK_ACCUMULATION_RATE: float = 0.005
 
     # How long (seconds) without a substrate update before we
     # consider the daemon offline and switch to fallback mode.
     SUBSTRATE_TIMEOUT: float = 30.0
 
     def __init__(self) -> None:
-        """Initialize the allostatic state model with an empty stress history."""
-        self._state = AllostaticState(
-            stress_history=deque(maxlen=self.HISTORY_WINDOW),
-        )
-        self._tick_count = 0
+        """Initialize the allostatic state model at baseline."""
+        self._state = AllostaticState()
         # Track how long stress has been elevated (in seconds of
         # real elapsed time, not tick count)
         self._elevated_stress_duration: float = 0.0
-        # Timestamp of the last substrate update (monotonic clock)
+        # Timestamp of the last substrate update (monotonic clock).
+        # A dedicated import alias keeps the module-level `time`
+        # available for wall-clock regulation timing.
         import time as _time
-        self._last_substrate_update: float = _time.monotonic()
+
         self._time = _time
+        self._last_substrate_update: float = _time.monotonic()
 
     def set_inference_load(self, load: float) -> None:
-        self._state.inference_load = max(0.0, min(1.0, float(load)))
+        """Record the substrate-scoped allostatic load from the daemon.
+
+        Also marks the substrate as connected and restarts the offline
+        timeout. Non-finite input is treated as 0.0 (no load) so a
+        corrupt reading cannot present as maximum strain.
+        """
+        self._state.inference_load = _clamp01(load)
         self._state.substrate_connected = True
         self._last_substrate_update = self._time.monotonic()
 
     def set_body_stress(self, stress: float) -> None:
         """Record the latest computational-body stress signal."""
-        self._state.body_stress = max(0.0, min(1.0, float(stress)))
-
-    def set_allostatic_load(self, load: float) -> None:
-        self.set_inference_load(load)
+        self._state.body_stress = _clamp01(stress)
 
     def record_stress(self, cortisol_level: float, dt: float = 1.0) -> None:
-        """Record a cortisol/stress level sample.
+        """Record a cortisol/stress level sample and advance the load.
 
-        Call this every tick (or every few seconds) with the current
-        cortisol level. The tracker maintains a rolling window of
-        stress history for the acute/chronic distinction.
+        Call this every regulation cycle with the current cortisol
+        level and the elapsed time since the last one.
 
-        When the substrate (Rust engine) is connected, the allostatic
-        load value comes from :meth:`set_allostatic_load` and this
-        method only updates the cortisol tracking for the chronic
-        stress detection. When the substrate is offline, this method
-        falls back to cortisol-based load estimation.
+        The load is the median of three domains — the substrate load
+        (:meth:`set_inference_load`), cortisol, and computational-body
+        stress (:meth:`set_body_stress`) — so no single domain can
+        define whole-system load on its own. When the substrate is
+        offline, the load falls back to a conservative cortisol-only
+        estimate.
 
         Args:
-            cortisol_level: The current cortisol level (0–1).
-            dt: Time step in seconds (for accumulation rate scaling).
+            cortisol_level: The current cortisol level (0–1). Non-finite
+                input counts as 0.0.
+            dt: Elapsed time in seconds since the last sample.
         """
-        cortisol_level = max(0.0, min(1.0, cortisol_level))
-        self._state.stress_history.append(cortisol_level)
-        self._tick_count += 1
-
-        # Track acute stress (the current level)
-        self._state.acute_stress = cortisol_level
+        cortisol_level = _clamp01(cortisol_level)
+        dt = min(MAX_REGULATION_DT, max(0.0, float(dt)))
 
         # Track how long stress has been elevated, using real
         # elapsed time. Recovery decays at 2x the elapsed time so
@@ -2639,51 +2978,74 @@ class AllostaticLoadTracker:
                 0.0, self._elevated_stress_duration - dt * 2.0
             )
 
-        # Determine if stress is chronic (sustained elevation)
+        # Determine if stress is chronic (sustained elevation).
+        # This is cortisol-duration evidence, deliberately independent
+        # of the accumulated load: it answers "how long has this been
+        # going", which the load integral cannot.
         self._state.is_chronic = (
             self._elevated_stress_duration >= self.CHRONIC_DURATION_SECONDS
         )
 
-        # Check if the substrate is still connected
-        elapsed = self._time.monotonic() - self._last_substrate_update
-        if elapsed > self.SUBSTRATE_TIMEOUT:
+        # Check if the substrate is still connected.
+        if self._time.monotonic() - self._last_substrate_update > self.SUBSTRATE_TIMEOUT:
             self._state.substrate_connected = False
 
         if self._state.substrate_connected:
-            # The median requires multiple elevated domains; one isolated
-            # signal cannot define whole-system allostatic load.
-            domains = [self._state.inference_load, cortisol_level, self._state.body_stress]
-            domains.sort()
-            burden = domains[1]
-            if burden > 0.3:
-                self._state.allostatic_load = min(
-                    1.0, self._state.allostatic_load + 0.0002 * (burden - 0.3) * dt
-                )
-            elif burden < 0.2:
-                self._state.allostatic_load = max(0.0, self._state.allostatic_load - 0.0004 * dt)
+            burden = self._median_burden(cortisol_level)
+            self._integrate(burden, dt, self.ACCUMULATION_RATE)
         else:
-            self._fallback_update_load(cortisol_level, dt)
+            self._integrate_fallback(cortisol_level, dt)
 
-    def _fallback_update_load(self, cortisol_level: float, dt: float) -> None:
-        """Estimate allostatic load from cortisol when the daemon is offline.
+    def _median_burden(self, cortisol_level: float) -> float:
+        """The whole-system burden: median of the three stress domains.
 
-        This is a degraded mode — the fallback can only react to
-        current cortisol, not anticipate future disruption. It uses
-        a non-zero baseline so acute stress doesn't accumulate
-        chronic load, and recovery is 2× faster than accumulation.
+        An isolated spike in one domain cannot define whole-system
+        load, while persistent elevation across domains can.
+        """
+        domains = sorted(
+            (self._state.inference_load, cortisol_level, self._state.body_stress)
+        )
+        return domains[1]
+
+    def _integrate(self, burden: float, dt: float, rate: float) -> None:
+        """Advance the load toward the burden under a hysteresis band.
+
+        Above :attr:`ACCUMULATE_THRESHOLD` the load grows in proportion
+        to the excess; below :attr:`RECOVER_THRESHOLD` it drains at
+        ``rate``. Inside the band it drains at
+        ``rate * BAND_RECOVERY_FACTOR`` — the third branch is what
+        keeps a load that has already accumulated from becoming
+        permanent under sustained mild stress, which is the common
+        case. Omitting it made the band a hard freeze: a load pinned
+        at 1.0 never recovered no matter how long the mild burden
+        persisted.
+        """
+        load = self._state.allostatic_load
+        if burden > self.ACCUMULATE_THRESHOLD:
+            excess = burden - self.ACCUMULATE_THRESHOLD
+            load += rate * excess * dt
+        elif burden < self.RECOVER_THRESHOLD:
+            load -= rate * dt
+        else:
+            load -= rate * self.BAND_RECOVERY_FACTOR * dt
+        self._state.allostatic_load = _clamp01(load)
+
+    def _integrate_fallback(self, cortisol_level: float, dt: float) -> None:
+        """Estimate load from cortisol alone when the daemon is offline.
+
+        This is a degraded mode — it can only react to current
+        cortisol, not anticipate future disruption. It uses a non-zero
+        baseline so acute stress doesn't accumulate chronic load, and
+        recovery reuses :attr:`RECOVERY_RATE` so the two modes drain at
+        the same speed once the daemon returns.
         """
         excess = max(0.0, cortisol_level - self.FALLBACK_CORTISOL_BASELINE)
-
+        load = self._state.allostatic_load
         if excess > 0:
-            accumulation = excess * self.FALLBACK_ACCUMULATION_RATE * dt
-            self._state.allostatic_load = min(
-                1.0, self._state.allostatic_load + accumulation
-            )
+            load += excess * self.FALLBACK_ACCUMULATION_RATE * dt
         else:
-            recovery = self.FALLBACK_RECOVERY_RATE * dt
-            self._state.allostatic_load = max(
-                0.0, self._state.allostatic_load - recovery
-            )
+            load -= self.RECOVERY_RATE * dt
+        self._state.allostatic_load = _clamp01(load)
 
     def get_allostatic_load(self) -> float:
         """Get the current cumulative allostatic load.
@@ -2695,58 +3057,26 @@ class AllostaticLoadTracker:
         """
         return self._state.allostatic_load
 
-    def get_acute_stress(self) -> float:
-        """Get the current acute stress level (0–1).
-
-        Acute stress is temporary and adaptive — a brief cortisol
-        elevation that resolves quickly. This is distinct from
-        chronic/allostatic stress.
-        """
-        return self._state.acute_stress
-
     def is_chronic_stress(self) -> bool:
         """Whether the current stress pattern is chronic.
 
         Chronic stress is sustained elevation of cortisol over a
-        prolonged period (at least CHRONIC_DURATION_SECONDS seconds
-        above the threshold). It's maladaptive and contributes to
-        allostatic load.
+        prolonged period (at least :attr:`CHRONIC_DURATION_SECONDS`
+        seconds above the threshold). It's maladaptive and contributes
+        to allostatic load.
+
+        This is duration evidence, tracked independently of the
+        accumulated load — the load integral answers "how much wear",
+        this answers "how long".
         """
         return self._state.is_chronic
-
-    def get_stress_history(self) -> list[float]:
-        """Get the rolling window of stress history.
-
-        Returns a list of recent cortisol levels, oldest first.
-        The window size is HISTORY_WINDOW samples.
-        """
-        return list(self._state.stress_history)
 
     def get_state(self) -> AllostaticState:
         """Get the full allostatic state for inspection."""
         return self._state
 
-    @property
-    def load_level(self) -> str:
-        """Human-readable allostatic load level.
-
-        Returns one of: "low", "moderate", "high", "severe".
-        """
-        load = self._state.allostatic_load
-        if load < 0.2:
-            return "low"
-        elif load < 0.4:
-            return "moderate"
-        elif load < 0.7:
-            return "high"
-        else:
-            return "severe"
-
     def reset(self) -> None:
         """Reset the tracker to baseline (no allostatic load)."""
-        self._state = AllostaticState(
-            stress_history=deque(maxlen=self.HISTORY_WINDOW),
-        )
-        self._tick_count = 0
+        self._state = AllostaticState()
         self._elevated_stress_duration = 0.0
         self._last_substrate_update = self._time.monotonic()
