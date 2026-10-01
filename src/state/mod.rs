@@ -7,7 +7,7 @@
 //!
 //! ```text
 //! ┌──────────────────────────────────────────────────────────────┐
-//! │                  GenesisCoreState (3288 bytes)                │
+//! │                  GenesisCoreState (3296 bytes)                │
 //! │  memory-mapped, lock-free readable, CRC32 checksummed         │
 //! │                                                               │
 //! │  ┌──────────────┐  ┌────────────────────────────────────────┐ │
@@ -28,7 +28,7 @@
 //! │  └──────────────┘  └────────────────────────────────────────┘ │
 //! │  ┌──────────────┐  ┌────────────────────────────────────────┐ │
 //! │  │ Manifest      │  │  Checksum + InferenceSignals           │ │
-//! │  │  16 modules   │  │  CRC32 + 60 bytes active inference     │ │
+//! │  │  16 modules   │  │  CRC32 + 64 bytes active inference     │ │
 //! │  └──────────────┘  └────────────────────────────────────────┘ │
 //! └──────────────────────────────────────────────────────────────┘
 //! ```
@@ -66,8 +66,9 @@ pub use inference::InferenceSignals;
 pub use manifest::{MAX_MODULES, ModuleEntry, ModuleId, ModuleStatus, RuntimeManifest};
 pub use memory::{MemoryPointers, WORKING_SET_SIZE};
 pub use neurochemical::{
-    ActiveRegion, CouplingMatrix, DEFAULT_COUPLING_MATRIX, NEUROCHEMICAL_COUNT, NeuroTickParams,
-    Neurochemical, NeurochemicalId, NeurochemicalVector, WC_GAIN, WC_SELF_EXCITATION,
+    AROUSAL_GAIN, ActiveRegion, CouplingMatrix, DEFAULT_COUPLING_MATRIX, NEUROCHEMICAL_COUNT,
+    NeuroTickParams, Neurochemical, NeurochemicalId, NeurochemicalVector, WC_GAIN,
+    WC_SELF_EXCITATION, WC_SELF_EXCITATION_SLOPE,
 };
 pub use sanitize::{finite_clamp, finite_or, sanitize_array_f32, sanitize_matrix_f32};
 pub use zones::{

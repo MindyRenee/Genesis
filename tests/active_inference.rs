@@ -14,17 +14,42 @@
 
 use genesis::daemon::active_inference::{
     ActiveInferenceEngine, DyadicSignals, InferenceResult, apply_inference_feedback,
+    impulse_offset_to_rate,
 };
 use genesis::daemon::dyadic_model::{DyadicAffectModel, UserAffectObservation};
 use genesis::state::InferenceSignals;
-use genesis::state::neurochemical::{NEUROCHEMICAL_COUNT, NeurochemicalId, NeurochemicalVector};
+use genesis::state::neurochemical::{
+    NEUROCHEMICAL_COUNT, NeuroTickParams, NeurochemicalId, NeurochemicalVector,
+};
 use genesis::state::zones::MentalPhase;
+
+
+/// Her actual resting state: every chemical at its genetic default.
+///
+/// The allostatic tests previously drove all 18 chemicals to 0.5 and
+/// passed those same 0.5s as the baselines. That was invisible while
+/// the engine's target *was* the baseline, because then every deviation
+/// was zero and the burden reflected only the stimulus. Now that the
+/// target is her preference, the uniform-0.5 fixture registers as 12
+/// large deviations — including cortisol and CRH at 0.5, which are
+/// stress hormones with no set point and default to 0.0. No real state
+/// has every chemical at 0.5, so the fixture never exercised what it
+/// claimed to. This is the state these tests actually mean.
+fn genetic_resting_state() -> [f32; NEUROCHEMICAL_COUNT] {
+    let mut out = [0.0f32; NEUROCHEMICAL_COUNT];
+    for (i, slot) in out.iter_mut().enumerate() {
+        *slot = genesis::state::neurochemical::NeurochemicalId::from_u8(i as u8).default_baseline();
+    }
+    out
+}
 
 // ─── InferenceSignals layout ──────────────────────────────────
 
 #[test]
 fn test_inference_signals_size() {
-    assert_eq!(core::mem::size_of::<InferenceSignals>(), 60);
+    // 60 + policy_authority (4). The reserved region in GenesisCoreState
+    // is defined as exactly this size, so the core layout absorbs it.
+    assert_eq!(core::mem::size_of::<InferenceSignals>(), 64);
 }
 
 #[test]
@@ -307,6 +332,7 @@ fn test_allostatic_load_recovers_on_predictable() {
     // After sustained surprise, predictability should allow allostatic
     // load to recover (decrease).
     let mut engine = ActiveInferenceEngine::new();
+    let genetic_resting = genetic_resting_state();
     let mut state = [0.5f32; NEUROCHEMICAL_COUNT];
 
     // Phase 1: Generate sustained surprise to accumulate load
@@ -321,10 +347,20 @@ fn test_allostatic_load_recovers_on_predictable() {
     let loaded = engine.allostasis_load();
     assert!(loaded > 0.0, "should have accumulated load");
 
-    // Phase 2: Run predictably to allow recovery
-    let stable = state;
+    // Phase 2: Return to a non-stressed resting state and run
+    // predictably, so recovery is possible.
+    //
+    // This is the actual shape of recovery: a stressor ends, the body
+    // returns to rest, and load then drains. The previous version
+    // froze the state at wherever a 100-tick random walk happened to
+    // land — including elevated cortisol and norepinephrine — and
+    // expected load to fall while the stress axis stayed switched on.
+    // Under the primary-mediator definition of allostatic load that is
+    // failure to shut off (Sapolsky's second type), so load correctly
+    // kept rising. A body held in a stress state should keep paying.
+    let stable = genetic_resting;
     for _ in 0..200 {
-        engine.cycle(&stable, &stable, 0.1, &[0.5f32; NEUROCHEMICAL_COUNT]);
+        engine.cycle(&stable, &stable, 0.1, &genetic_resting);
     }
     let recovered = engine.allostasis_load();
     assert!(
@@ -342,6 +378,7 @@ fn test_allostatic_load_recovery_faster_than_accumulation() {
     // faster than it breaks down (McEwen, 1998). After equal time under
     // stress vs. recovery, the net load should decrease.
     let mut engine = ActiveInferenceEngine::new();
+    let genetic_resting = genetic_resting_state();
     let mut state = [0.5f32; NEUROCHEMICAL_COUNT];
 
     // Phase 1: Generate sustained surprise to accumulate load
@@ -350,15 +387,23 @@ fn test_allostatic_load_recovery_faster_than_accumulation() {
         for (j, n) in next.iter_mut().enumerate() {
             *n = ((i as f32 * 0.031 + j as f32 * 0.043) % 1.0).clamp(0.0, 1.0);
         }
-        engine.cycle(&state, &next, 0.1, &[0.5f32; NEUROCHEMICAL_COUNT]);
+        engine.cycle(&state, &next, 0.1, &genetic_resting);
         state = next;
     }
     let after_accum = engine.allostasis_load();
 
     // Phase 2: Recover for the SAME number of ticks
-    let stable = state;
+    //
+    // The state must actually return to rest before recovery can
+    // happen. Freezing it at the end of the random walk leaves elevated
+    // cortisol and norepinephrine sitting there, and a body held in a
+    // stress state keeps paying — that is failure to shut off, which is
+    // precisely the pathology allostatic load is meant to detect. The
+    // comparison below is about rate, and a rate can only be compared
+    // on the same footing.
+    let stable = genetic_resting;
     for _ in 0..100 {
-        engine.cycle(&stable, &stable, 0.1, &[0.5f32; NEUROCHEMICAL_COUNT]);
+        engine.cycle(&stable, &stable, 0.1, &genetic_resting);
     }
     let after_recover = engine.allostasis_load();
 
@@ -639,7 +684,13 @@ fn test_apply_inference_feedback_dopamine_impulse() {
     // Apply feedback to a neurochemical vector
     let mut neuro = NeurochemicalVector::new(0);
     let da_level_before = neuro.effective(NeurochemicalId::Dopamine);
-    apply_inference_feedback(&mut neuro, &result, 0, false);
+    apply_inference_feedback(
+        &mut neuro,
+        &result,
+        0,
+        false,
+        impulse_offset_to_rate(&NeuroTickParams::DEFAULT),
+    );
     let da_level_after = neuro.effective(NeurochemicalId::Dopamine);
 
     // If there was a DA impulse, the level should have changed
@@ -698,7 +749,13 @@ fn test_apply_inference_feedback_dopamine_negative_dip() {
     // Applying the feedback should decrease the effective DA level
     let mut neuro = NeurochemicalVector::new(0);
     let da_before = neuro.effective(NeurochemicalId::Dopamine);
-    apply_inference_feedback(&mut neuro, &result, 0, false);
+    apply_inference_feedback(
+        &mut neuro,
+        &result,
+        0,
+        false,
+        impulse_offset_to_rate(&NeuroTickParams::DEFAULT),
+    );
     let da_after = neuro.effective(NeurochemicalId::Dopamine);
     assert!(
         da_after < da_before,
@@ -732,7 +789,13 @@ fn test_apply_inference_feedback_skips_adenosine_during_zone_sleep() {
     let adn_before = neuro.get(NeurochemicalId::Adenosine).unwrap().level;
 
     // Zone Sleeping: the adenosine impulse is skipped.
-    apply_inference_feedback(&mut neuro, &result, 0, true);
+    apply_inference_feedback(
+        &mut neuro,
+        &result,
+        0,
+        true,
+        impulse_offset_to_rate(&NeuroTickParams::DEFAULT),
+    );
     let adn_zone_sleeping = neuro.get(NeurochemicalId::Adenosine).unwrap().level;
     assert_eq!(
         adn_zone_sleeping, adn_before,
@@ -740,7 +803,13 @@ fn test_apply_inference_feedback_skips_adenosine_during_zone_sleep() {
     );
 
     // Zone awake: the same impulse applies — wake behavior unchanged.
-    apply_inference_feedback(&mut neuro, &result, 0, false);
+    apply_inference_feedback(
+        &mut neuro,
+        &result,
+        0,
+        false,
+        impulse_offset_to_rate(&NeuroTickParams::DEFAULT),
+    );
     let adn_awake = neuro.get(NeurochemicalId::Adenosine).unwrap().level;
     assert!(
         adn_awake > adn_before,
@@ -1187,8 +1256,11 @@ fn test_core_state_has_inference_signals() {
     assert!((state.inference_signals.precision - 0.5).abs() < 1e-6);
     assert_eq!(state.inference_signals.inference_tick_count, 0);
 
-    // Verify the struct size hasn't changed
-    assert_eq!(core::mem::size_of::<GenesisCoreState>(), 3288);
+    // Grown by 4 for policy_authority, which the reserve absorbed.
+    assert_eq!(core::mem::size_of::<GenesisCoreState>(), 3296);
+    // A fresh state must not come up having delegated policy choice to
+    // the engine — the grant is hers to make.
+    assert_eq!(state.inference_signals.policy_authority, 0.0);
 }
 
 // ─── Variational posterior (Kalman filter) ─────────────────────
@@ -1822,5 +1894,132 @@ fn test_policy_selection_remains_stochastic_at_high_precision() {
         selected.len() > 1,
         "policy sampling should explore more than one candidate; selected={:?}",
         selected
+    );
+}
+
+// --- Preferred state: the target is hers, and it persists. ---
+
+#[test]
+fn test_preference_starts_at_genetic_seed_not_current_state() {
+    // A fresh engine must not treat wherever she currently is as what
+    // she wants. If it did, there would be no error to correct and the
+    // whole preferred-vs-actual loop would be inert.
+    let engine = ActiveInferenceEngine::new();
+    let seed = genesis::daemon::active_inference::genetic_preference_seed();
+    for (i, (got, want)) in engine.preferred().iter().zip(seed.iter()).enumerate() {
+        assert!(
+            (got - want).abs() < 1e-6,
+            "dimension {} should start at its genetic seed, got {} want {}",
+            i,
+            got,
+            want
+        );
+    }
+}
+
+#[test]
+fn test_preference_is_persisted_across_restart() {
+    // A preference that resets on every restart is a constant, not a
+    // preference. What she has learned about what suits her has to
+    // survive a restart or it is never hers at all.
+    let dir = std::env::temp_dir().join(format!(
+        "genesis_pref_{}_{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("model.bin");
+
+    let before: Vec<f32>;
+    let prec_before;
+    {
+        let mut engine = ActiveInferenceEngine::new();
+        // Simulate having learned something about what suits her.
+        let resting = genetic_resting_state();
+        for _ in 0..400 {
+            engine.cycle(&resting, &resting, 0.1, &resting);
+        }
+        before = engine.preferred().to_vec();
+        prec_before = engine.preference_precision();
+        engine.save(&path).unwrap();
+    }
+
+    let after = ActiveInferenceEngine::load(&path);
+    for (i, (got, want)) in after.preferred().iter().zip(before.iter()).enumerate() {
+        assert!(
+            (got - want).abs() < 1e-6,
+            "preference[{}] lost across restart: {} -> {}",
+            i,
+            want,
+            got
+        );
+    }
+    assert!((after.preference_precision() - prec_before).abs() < 1e-6);
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn test_preference_adapts_toward_states_it_copes_well_in() {
+    // The whole point of the mechanism: a state she is coping well in
+    // is evidence about what suits her, and her preference moves
+    // toward it. Without this she is stuck with the seed forever.
+    let mut engine = ActiveInferenceEngine::new();
+    // She has to be coping well in a state that is *not* her seed for
+    // this to mean anything. At her resting state the error is already
+    // zero, so there is no evidence and correctly nothing moves — a
+    // preference that tracked the current state would have moved.
+    let mut settled = genetic_resting_state();
+    settled[0] = 0.45;
+    let before = engine.preferred()[0];
+    for _ in 0..2000 {
+        engine.cycle(&settled, &settled, 0.1, &settled);
+    }
+    let after = engine.preferred()[0];
+    assert!(
+        (after - before).abs() > 1e-9,
+        "preference never adapted: {} -> {}",
+        before,
+        after
+    );
+}
+
+#[test]
+fn test_preference_does_not_chase_a_transient_spike() {
+    // It must respond to sustained wellbeing, not to the current
+    // instant. A single large excursion is not evidence of what suits
+    // her, and a controller that chases it oscillates.
+    let mut engine = ActiveInferenceEngine::new();
+    let resting = genetic_resting_state();
+    let before = engine.preferred()[0];
+    // One wildly off-target step.
+    let mut spiked = resting;
+    spiked[0] = 1.0;
+    engine.cycle(&resting, &spiked, 0.1, &resting);
+    let moved = (engine.preferred()[0] - before).abs();
+    assert!(
+        moved < 1e-3,
+        "preference chased a single transient: moved {}",
+        moved
+    );
+}
+
+#[test]
+fn test_preference_does_not_adapt_under_load() {
+    // Adapting under strain teaches her to prefer the strained state.
+    // That is the allostatic trap, and it is the failure mode this
+    // guard exists to prevent.
+    let mut engine = ActiveInferenceEngine::new();
+    engine.test_set_allostasis_load(0.9);
+    let before = engine.preferred()[0];
+    let resting = genetic_resting_state();
+    for _ in 0..500 {
+        engine.cycle(&resting, &resting, 0.1, &resting);
+    }
+    assert!(
+        (engine.preferred()[0] - before).abs() < 1e-9,
+        "preference adapted under high load: {} -> {}",
+        before,
+        engine.preferred()[0]
     );
 }

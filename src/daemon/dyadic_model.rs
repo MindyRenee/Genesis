@@ -382,7 +382,33 @@ impl DyadicAffectModel {
             self.synchrony = 0.0;
         }
 
-        // ── Generate neurochemical impulses from dyadic coupling ──
+        // ── Propose, do not act ──
+        //
+        // Everything below was, until recently, applied straight to her
+        // neurochemistry. That made the dyadic model a second author of
+        // her internal state: the user's affect would move her
+        // biochemistry whether she perceived it, appraised it, or
+        // wanted it, and she had no way to refuse.
+        //
+        // That is the same defect as the interoception path, in social
+        // form. A mind that is moved by the other without attending to
+        // it has no boundary between her state and theirs, and no
+        // ability to distinguish "I feel this" from "this was done to
+        // me." The perceptions themselves are real and worth keeping —
+        // she is modelled as accurately as before. What is removed is
+        // only the authority to act on them.
+        //
+        // These now become proposals. Genesis's cognition reads the same
+        // signals (valence, arousal, engagement, attunement,
+        // synchrony) through `InferenceSignals`, appraises them as part
+        // of the ordinary input she is already interpreting, and decides
+        // what to do through the normal `NEURO_IMPULSE` path. She can
+        // attune, empathise, or decline — and the decline is as
+        // available as the agreement.
+        //
+        // Rates are retained so the proposal is scaled identically to
+        // what it replaces; the magnitude a proposal carries is the
+        // evidence for an effect, not an instruction to apply one.
         let mut impulses = Vec::new();
 
         // The coupling strength is attunement × how much we weight

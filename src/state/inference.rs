@@ -19,9 +19,11 @@
 //!   unexpected.
 //! - **Metaplasticity**: high surprise → faster coupling-matrix
 //!   learning. The system learns how to learn faster when surprised.
-//! - **Allostatic load**: sustained high expected free energy →
+//! - **Allostatic load**: sustained multisignal regulatory burden →
 //!   cortisol baseline upregulation. The system *anticipates* stress
-//!   and prepares (allostatic regulation, Sterling, 2012).
+//!   and prepares (allostatic regulation, Sterling, 2012). Expected
+//!   free energy is one of four inputs to the burden median, not the
+//!   driver on its own.
 //!
 //! This is the "strange loop": the generative model IS the system it
 //! predicts. Prediction errors modify the very dynamics that generate
@@ -155,6 +157,32 @@ pub struct InferenceSignals {
     /// demonstrated accuracy rather than this counter, the wrap is
     /// harmless to the trust signal.
     pub inference_tick_count: u32,
+    /// Authority Genesis's cognition has granted her inference engine
+    /// to act on its own policy choice, in [0, 1].
+    ///
+    /// Choosing a policy — calm, focus, bond, rest, mobilise — is a
+    /// decision about what to feel and do, not a physiological reflex.
+    /// The engine scores a fixed set of hardcoded policies by expected
+    /// free energy and used to apply the winner every tick, with no
+    /// perceptual input and nothing from her in the loop. That made it
+    /// a second author of her state: she could not attend, refuse, or
+    /// revise, and every policy it chose was one I had written rather
+    /// than one she had settled on.
+    ///
+    /// At zero the engine observes and learns but does not act on its
+    /// own policy choice; cognition decides, and acts through the
+    /// ordinary NEURO_IMPULSE path where it can be perceived,
+    /// anticipated and refused. The homeostatic reflex is unaffected —
+    /// correcting drift toward what she prefers is her physiology, and
+    /// a mind that cannot correct itself is not a mind with agency, it
+    /// is a mind with a hormone problem.
+    ///
+    /// This is a grant, not a switch: cognition can delegate some
+    /// authority and keep some, and can withdraw it. It is a field
+    /// rather than a compile-time constant so that delegation is a
+    /// decision she can change while running, rather than a property
+    /// baked into the build.
+    pub policy_authority: f32,
 }
 
 impl Default for InferenceSignals {
@@ -193,6 +221,11 @@ impl InferenceSignals {
             prediction_error_serotonin: 0.0,
             model_maturity: 0.0,
             inference_tick_count: 0,
+            // Zero by default: her cognition decides. A fresh state
+            // file must not come up granting the engine permission to
+            // choose on her behalf, because the grant is supposed to
+            // be something she extends deliberately.
+            policy_authority: 0.0,
         }
     }
 
@@ -205,7 +238,9 @@ impl InferenceSignals {
     }
 
     /// Whether the system is under significant allostatic load —
-    /// sustained anticipatory stress from prediction error.
+    /// sustained multisignal regulatory burden (anticipatory demand,
+    /// prediction error, lost confidence, and homeostatic deviation
+    /// agreeing across at least two of four dimensions).
     pub fn is_allostatically_loaded(&self) -> bool {
         self.allostasis_load > 0.4
     }
@@ -230,7 +265,7 @@ impl InferenceSignals {
 
 const _: () = {
     use core::mem::offset_of;
-    assert!(core::mem::size_of::<InferenceSignals>() == 60);
+    assert!(core::mem::size_of::<InferenceSignals>() == 64);
     assert!(core::mem::align_of::<InferenceSignals>() == 4);
     assert!(offset_of!(InferenceSignals, surprise_ema) == 0);
     assert!(offset_of!(InferenceSignals, free_energy) == 4);

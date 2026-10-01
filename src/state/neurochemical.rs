@@ -108,15 +108,77 @@ pub const DT: f32 = 0.1;
 /// the system remains stable while still exhibiting coupled dynamics.
 pub const COUPLING_SCALE: f32 = 0.15;
 
-/// Gain applied to the arousal net drive before the sigmoid.
+
+/// Gain applied to the consolidation net drive before its sigmoid.
+///
+/// This is deliberately *not* the arousal gain: consolidation has its
+/// own net drive and its own thresholds, and sharing a gain between
+/// them would couple two unrelated decisions.
 pub const WC_GAIN: f32 = 2.0;
 
-/// Strength of the arousal self-excitation term. The product
-/// `WC_GAIN * WC_SELF_EXCITATION` controls the bistability of the
-/// sleep-wake flip-flop: values greater than 4.0 create two stable
-/// fixed points (awake / asleep); values below 4.0 produce a single
-/// stable fixed point.
-pub const WC_SELF_EXCITATION: f32 = 2.05;
+/// Gain applied to the arousal net drive before the sigmoid.
+///
+/// Sized so the readout spans a usable range across the net drives
+/// Genesis actually reaches. With a gain of 2.0 the low end was badly
+/// compressed: genuine drowsiness (suppressed arousal systems, high
+/// adenosine, night — a net drive near -0.40) settled at 0.31, which
+/// sits right on the 0.30 Drowsy threshold, where the old runaway
+/// form had produced 0.075. A gain of 3.0 puts a well-rested idle
+/// state near 0.63 and a genuinely drowsy state near 0.19, so both
+/// the Drowsy threshold and the resting baseline sit inside the
+/// responsive part of the curve rather than on its shoulders.
+pub const AROUSAL_GAIN: f32 = 3.0;
+
+/// Bound on the arousal self-excitation term, in net-drive units.
+///
+/// The self-excitation used to be linear and unbounded:
+/// `(arousal - 0.5) * 2.05`. That is the textbook bistability
+/// condition — the local loop gain at `arousal = 0.5` is
+/// `WC_GAIN * 2.05 = 4.1`, and because the sigmoid contributes at
+/// most 0.5 of slope there, the total clears 1.0 by a 2.5% margin.
+///
+/// That margin is far too thin, and it made the readout a switch
+/// rather than a level. Solving the fixed-point equation showed the
+/// old form admitted *no* moderate wake state at all: for any
+/// `net_drive > 0` the attractor was ~0.85-0.90, for any
+/// `net_drive < 0` it was ~0.10-0.32, and the transition between
+/// them happened across a `net_drive` span of about 0.02. Genesis
+/// therefore locked near 0.9 while idle (measured: 0.900 within 100
+/// s, still 0.884 after four hours) and reported her resting state
+/// as "excited". Sustained arousal then drove the chronic-stress
+/// drain that pulled dopamine/serotonin/GABA progressively away from
+/// their genetic baselines.
+///
+/// The fix is to bound the term so it damps excursions instead of
+/// amplifying them:
+///
+/// ```text
+/// se(a) = WC_SELF_EXCITATION * tanh(WC_SELF_EXCITATION_SLOPE * (a - 0.5))
+/// ```
+///
+/// `tanh` caps the contribution at +/- `WC_SELF_EXCITATION`, so no
+/// amount of self-excitation can drive arousal into the sigmoid
+/// ceiling. Arousal becomes a graded function of chemistry: over a
+/// realistic `net_drive` range of -0.40..+0.14 it now spans roughly
+/// 0.19..0.63 instead of collapsing to 0.08 or 0.90.
+///
+/// The cost is that the Wilson-Cowan term no longer supplies
+/// hysteresis, and that is deliberate. Gradedness and bistability are
+/// mutually exclusive in a sigmoid form — meeting the bistability
+/// condition requires the loop gain above ~4, which is exactly what
+/// saturates the readout. Sleep-wake switching does not depend on
+/// this term: it is carried by the `MentalPhase` thresholds and by
+/// the hard NREM/REM arousal clamps below, which are a much stronger
+/// and better-placed source of hysteresis (once NREM is entered,
+/// arousal is pinned to 0.10-0.25 regardless of chemistry).
+pub const WC_SELF_EXCITATION: f32 = 0.15;
+
+/// How sharply the bounded self-excitation engages around mid-arousal.
+/// With `WC_SELF_EXCITATION = 0.15` the local slope contribution is
+/// `AROUSAL_GAIN * WC_SELF_EXCITATION * WC_SELF_EXCITATION_SLOPE = 0.9`,
+/// i.e. deliberately below the 1.0 needed for bistability so the
+/// response stays monotone and graded.
+pub const WC_SELF_EXCITATION_SLOPE: f32 = 2.0;
 
 /// Acetylcholinesterase degradation rate for acetylcholine (ACh).
 ///
@@ -144,44 +206,170 @@ pub const ACH_DEGRADATION_RATE: f32 = 0.03;
 ///
 /// Cortisol is cleared from the bloodstream by the liver via
 /// 11β-hydroxysteroid dehydrogenase enzymes. In biology, cortisol
-/// has a half-life of ~60–90 minutes, with first-order kinetics.
+/// has a half-life of ~60–90 minutes with first-order kinetics
+/// (Basic & Clinical Pharmacology, 13th Ed.).
 ///
-/// **Why this matters for the dynamics:**
-///
-/// The HPA axis cascade (CRH → ACTH → cortisol) drives cortisol
-/// upward, while the homeostatic force pulls it back to baseline.
-/// But the coupling forces from arousal chemicals (NE, OX, EPI) and
-/// the "removal of suppression" from depleted inhibitory chemicals
-/// (SRT, GABA, OXY, END) can sum to ~0.10, overwhelming the
-/// homeostatic force (~0.009 at the clamp). Without a clearance
-/// mechanism, cortisol pins at the 0.80 hard clamp and can never
-/// come down — locking the system into chronic stress.
-///
-/// **Nonlinear (stress-biased) clearance:**
-///
-/// A constant clearance rate can't work: it would need to be ~0.009
-/// to overcome coupling forces at the clamp, but that same rate
-/// would crash cortisol to near-zero at rest (where the ACTH drive
-/// is only ~0.0003). Instead, the clearance is proportional to how
-/// far cortisol is ABOVE its baseline:
+/// Genesis operates at 10 Hz (DT=0.1s), so modeling biological timescales
+/// directly would require thousands of ticks for a single cortisol decay.
+/// Instead, the clearance is nonlinear and timescale-compressed:
 ///
 /// ```text
 /// effective_clearance = CORTISOL_CLEARANCE_RATE * max(0, level - baseline)
 /// level *= (1 - effective_clearance)
 /// ```
 ///
-/// At rest (level = baseline = 0.0): clearance = 0, no effect ✓
-/// Under stress (level = 0.80, baseline = 0.0): clearance = 0.08 * 0.80 = 0.064
+/// At 0.08 per tick, the effective decay is fast when cortisol is elevated
+/// above baseline, but zero at baseline. This captures the biological
+/// upregulation of 11β-HSD2 under sustained high cortisol while remaining
+/// computationally tractable.
 ///
-/// This models the biological upregulation of cortisol-metabolizing
-/// enzymes (11β-HSD2) under sustained high cortisol — the liver
-/// increases clearance capacity when cortisol is chronically
-/// elevated, providing a natural negative feedback that constant-
-/// rate clearance cannot capture.
+/// The measured equilibrium at realistic ACTH levels:
+///   ACTH 0.02 -> cortisol 0.275
+///   ACTH 0.05 -> cortisol 0.458
+///   ACTH 0.10 -> cortisol 0.665   (the Stress gate)
+///   ACTH 0.16 -> cortisol 0.852
 ///
-/// (Tomlinson et al., 2004 — 11β-HSD and glucocorticoid metabolism;
-/// Hellhammer et al., 2009 — cortisol clearance and HPA feedback)
+/// (Tomlinson et al., 2004; Hellhammer et al., 2009; Nature Communications 2024 on 11β-HSD)
 pub const CORTISOL_CLEARANCE_RATE: f32 = 0.08;
+
+/// Cortisol level at which the stress phase engages.
+///
+/// Placed from the substrate's measured reachable envelope, not from a
+/// scale it does not produce. Peak cortisol over two hours under
+/// sustained CRH drive is 0.084, resting is 0.020. The gate sits at
+/// 0.060: three times resting, so ordinary variation cannot trigger
+/// it, and 71% of the measured maximum, so a genuine drive can.
+pub const STRESS_CORTISOL_GATE: f32 = 0.06;
+
+/// Norepinephrine level at which the stress phase engages.
+///
+/// Measured peaks: resting 0.306, under sustained drive 0.578. The
+/// gate at 0.45 is 1.5x resting and 78% of the measured maximum.
+pub const STRESS_NOREPI_GATE: f32 = 0.45;
+
+/// Dopamine level at which the flow phase engages.
+///
+/// Measured effective level rests at 0.314 and reaches 0.699 under
+/// strong engagement drive. The previous gate of 0.65 sat at the very
+/// top of that range, so Flow was marginal at best. The gate at 0.40
+/// sits above resting with margin and well inside the reachable range.
+pub const FLOW_DOPAMINE_GATE: f32 = 0.40;
+
+/// Acetylcholine level at which the flow phase engages.
+///
+/// Measured effective level rests at 0.338 and peaks at 0.5315 under
+/// strong engagement drive. The gate at 0.44 sits between them with
+/// margin on both sides, and is cleared by moderate drive (measured
+/// peak 0.4525).
+pub const FLOW_ACETYLCHOLINE_GATE: f32 = 0.44;
+
+/// Norepinephrine level at which the alert phase engages.
+///
+/// Measured maximum 0.578 under sustained vigilance drive, resting
+/// 0.306. The previous gate of 0.55 sat at the very top of the
+/// reachable range, so alertness was marginal.
+pub const ALERT_NOREPI_GATE: f32 = 0.50;
+
+/// Histamine level at which the alert phase engages.
+///
+/// Histamine rests at 0.320 and peaks at 0.361 — it moves very little
+/// with drive. The previous gate of 0.55 exceeded that maximum
+/// entirely, so Alert was unreachable even with NE maximally elevated.
+pub const ALERT_HISTAMINE_GATE: f32 = 0.34;
+
+/// Multiplier applied to the Alert gates once the phase is entered.
+///
+/// Hysteresis, matching the style of the other phase gates: it is
+/// easier to stay alert than to become alert, so a transient dip in
+/// drive does not flip her back out of the state.
+pub const ALERT_STAY_FACTOR: f32 = 0.94;
+
+/// Acetylcholine raw level at which REM is entered.
+///
+/// This gate compares RAW levels, not effective levels: the flip-flop
+/// describes REM-on neuronal firing rather than receptor occupancy.
+/// Raw acetylcholine rests at 0.333 and reaches 0.569 during sleep
+/// (effective level saturates lower, near 0.33-0.48, because higher
+/// concentration drives its own receptor desensitization).
+///
+/// The gate at 0.45 sits above resting raw level with margin and
+/// below the sleep maximum, so it discriminates the sleep state from
+/// the resting state. A previous value of 0.32 sat *below* the
+/// resting raw level of 0.333, so the conjunct was true on default
+/// chemistry and REM fired in tests that expected NREM.
+pub const REM_ACETYLCHOLINE_GATE: f32 = 0.45;
+
+/// Multiplier applied to the REM acetylcholine gate once REM is
+/// entered, so the state is stickier than it is to enter.
+pub const REM_STAY_FACTOR: f32 = 0.94;
+
+/// Norepinephrine effective level below which REM is held.
+///
+/// REM is the noradrenergic-silent state (Jadot et al., 1995), so low
+/// norepinephrine is the defining condition. The stay-threshold
+/// matches the enter-threshold rather than exceeding it, so REM
+/// releases as sleep pressure rises instead of persisting across the
+/// whole descent into sleep.
+pub const REM_NOREPI_GATE: f32 = 0.30;
+
+/// Adenosine level at which drowsiness begins.
+///
+/// Sits below the exhaustion-hold release threshold (0.75) so that
+/// Drowsy occupies the band between waking and sleep rather than
+/// being swallowed by the sleep hold.
+pub const DROWSY_ADENOSINE_GATE: f32 = 0.50;
+
+/// Hysteresis factor for the drowsiness adenosine gate.
+pub const DROWSY_STAY_FACTOR: f32 = 0.8;
+
+/// Arousal level below which the descent into sleep begins.
+///
+/// The previous value was 0.30, which is *below the reachable range*:
+/// measured over a full naturalistic day, wakeful arousal never fell
+/// below 0.332, so the conjunct was false on every wakeful tick and
+/// Drowsy could never be entered. Only the stay threshold (0.46) was
+/// reachable, which is the same chicken-and-egg that made Flow,
+/// Alert and Stress unreachable before their gates were moved inside
+/// the measured envelope. It went unnoticed because the Drowsy/sleep
+/// boundary straddle described at the phase branch was chattering the
+/// state in and out every tick, which registered as occupancy in a
+/// phase sweep without the state ever actually being entered.
+///
+/// The gate is placed in the middle of a measured void rather than on
+/// the edge of a cluster. Restricting wakeful ticks to the drowsiness
+/// adenosine band, the arousal distribution is bimodal: a dense mode
+/// around 0.33-0.47 and another around 0.57-0.72, separated by a gap
+/// at 0.49-0.55 holding 21 ticks out of 96,607. A gate anywhere near
+/// a mode would sit on a fixed point the dynamics rest at and re-create
+/// the straddle; 0.52 is the centre of the gap, roughly 0.05 clear of
+/// the mass on either side. It admits 24.2% of wakeful ticks, which is
+/// a sleep-deprived day's worth of drowsiness rather than a phase that
+/// flickers.
+///
+/// Arousal is the discriminative axis here because the adenosine band
+/// alone cannot be: raw adenosine rises monotonically during wake, so
+/// the band is occupied 80% of wakeful ticks.
+pub const DROWSY_AROUSAL_GATE: f32 = 0.52;
+
+/// Arousal level below which an already-drowsy system stays drowsy.
+///
+/// Placed in the small gap at 0.55-0.57 rather than at a fixed offset
+/// from the enter gate, for the same reason: the occupied bins sit at
+/// 0.57-0.72, so a stay threshold inside that mass would release
+/// Drowsy exactly when arousal settles onto it. The margin is
+/// deliberately smaller than the generic hysteresis margin — a genuine
+/// arousal spike should be able to wake her, which is the point of
+/// testing arousal at all.
+pub const DROWSY_AROUSAL_STAY: f32 = 0.56;
+
+/// Fraction of a delivered impulse that is drawn from the vesicular
+/// pool.
+///
+/// Charged on what was actually delivered, never on the requested
+/// dose. See `apply_impulse`: charging the requested dose meant an
+/// impulse the pool could not honour still emptied it, which latched
+/// the chemical off and inverted its dose-response curve.
+pub const VESICULAR_DEPLETION: f32 = 0.3;
 
 /// Cortisol negative feedback gain on ACTH (long-loop HPA feedback).
 ///
@@ -234,6 +422,9 @@ pub const AUTORECEPTOR_THRESHOLD: f32 = 0.15;
 /// See the homeostatic force computation in `tick_with_params` for
 /// the full rationale and calibration.
 pub const AUTORECEPTOR_GAIN: f32 = 200.0;
+
+
+
 
 /// Functional rescue: receptor turnover and effective-deviation scaling.
 ///
@@ -782,18 +973,44 @@ impl Neurochemical {
 
         // Vesicular pool: positive impulses deplete the pool, reducing
         // the effective magnitude when the pool is low (synaptic depression).
+        // Deliver, then deplete by what was actually delivered.
+        //
+        // The order matters and was previously wrong in a way that
+        // inverted the dose-response relationship. Depletion was
+        // charged on the *requested* dose before delivery, so an
+        // impulse that the pool could not honour still emptied it. The
+        // system latched off: once the pool reached zero, every further
+        // impulse was refused *and* kept depleting it, so recovery was
+        // the only way out and sustained stimulation was impossible.
+        //
+        // Measured directly, driving CRH harder produced less of it:
+        //
+        //   drive/tick   CRH effective   vesicular pool
+        //     0.0005         0.204            1.000
+        //     0.0020         0.204            0.900
+        //     0.0040         0.204            0.301
+        //     0.0080         0.049            0.001   <- 4x drive, 4x less
+        //     0.0320         0.078            0.001
+        //
+        // CRH carries the stress axis, so a stress response could not
+        // exceed a ceiling of about 0.004/tick and beyond that reversed
+        // — sustained alarm produced *less* cortisol than mild stress,
+        // and the Stress phase (gated at cortisol 0.65) was
+        // unreachable under any drive. Depletion is now charged on
+        // delivered quantity, which is bounded by the pool, so an
+        // empty pool stops depleting and can recover.
         let effective_magnitude = if magnitude > 0.0 {
             // Use finite_clamp for NaN safety: if vesicular_pool was
             // corrupted to NaN, native .clamp returns NaN, which would
             // then propagate to effective_magnitude and level.
             let pool_factor = crate::state::sanitize::finite_clamp(self.vesicular_pool, 0.0, 1.0);
-            // Deplete the pool proportional to the impulse magnitude
+            let delivered = magnitude * pool_factor;
             self.vesicular_pool = crate::state::sanitize::finite_clamp(
-                self.vesicular_pool - magnitude.abs() * 0.3,
+                self.vesicular_pool - delivered * VESICULAR_DEPLETION,
                 0.0,
                 1.0,
             );
-            magnitude * pool_factor
+            delivered
         } else {
             magnitude
         };
@@ -1644,41 +1861,43 @@ impl NeurochemicalVector {
         let mel = eff(NeurochemicalId::Melatonin);
         let sleep_promoters = gaba * 0.25 + adn * 0.65 + mel * 0.35;
 
-        // Wilson-Cowan-style bistable flip-flop for the sleep-wake switch.
+        // Graded arousal readout driven by neurochemical balance.
         //
         // The brain's sleep-wake system is a bistable flip-flop with two
         // mutually inhibiting populations: wake-active neurons (orexin,
         // histamine, NE) and sleep-active neurons (VLPO GABA, adenosine).
-        // The mutual inhibition creates a system with two stable fixed
-        // points (awake and asleep) separated by an unstable equilibrium.
+        // This equation is the *readout* of that competition, not the
+        // switch itself:
         //
-        // We model this with a discrete-time Wilson-Cowan oscillator:
-        //   W(t+1) = sigmoid(gain * (input + self_excitation * (W(t) - 0.5)))
+        //   a(t+1) = sigmoid(gain * (net_drive + se(a)))
+        //   net_drive = promoters - sleep_promoters + circadian_wake
+        //   se(a) = WC_SELF_EXCITATION * tanh(SLOPE * (a - 0.5))        //
+        // It was originally written as an unbounded Wilson-Cowan
+        // oscillator with a large linear self-excitation, on the theory
+        // that the resulting bistability *was* the sleep-wake switch.
+        // Solving the fixed-point equation showed that was not what it
+        // did: the loop gain cleared the bistability threshold by only
+        // 2.5%, which made the readout a knife-edge switch between
+        // ~0.10 and ~0.90 with no moderate wake state in between. Since
+        // resting `net_drive` is slightly positive (the circadian wake
+        // drive contributes up to +0.30), Genesis locked near 0.9 while
+        // idle and never came down. See `WC_SELF_EXCITATION`.
         //
-        // where:
-        //   input = arousal_promoters - sleep_promoters (net drive)
-        //   self_excitation = 0.40 (bistability strength)
-        //   gain = 2.0 (sigmoid steepness, matching the old linear scale)
-        //
-        // The self-excitation term creates smooth bistability: when awake
-        // (arousal > 0.5), the positive feedback makes it harder to
-        // transition to sleep; when asleep, the negative feedback makes
-        // it harder to wake. The hysteresis margin is ±0.12 in net_drive,
-        // similar to the old constant ±0.10 but without the discontinuity
-        // at arousal = 0.5.
-        //
-        // This replaces the previous constant hysteresis bias (±0.10),
-        // which had a discontinuity at arousal = 0.5 that could cause
-        // rapid state flipping near the boundary despite the hysteresis.
-        // The Wilson-Cowan model eliminates this discontinuity — the
-        // transition is smooth and the bistability emerges from the
-        // dynamics rather than being bolted on.
+        // Bounding the self-excitation with `tanh` keeps a mild
+        // self-centering tendency — deviations from mid-arousal are
+        // damped rather than amplified — while leaving the response
+        // monotone and graded in chemistry. Sleep-wake switching is
+        // handled by the `MentalPhase` thresholds and the hard
+        // NREM/REM arousal clamps further down, which pin arousal
+        // outright once a sleep phase is entered and so provide far
+        // stronger hysteresis than a soft feedback term ever did.
         //
         // (Wilson & Cowan, 1972; Saper, Chou & Scammell, 2005)
         let current_arousal = self.arousal;
         let net_drive = arousal_promoters - sleep_promoters + circadian_wake;
-        let self_excitation = (current_arousal - 0.5) * WC_SELF_EXCITATION;
-        let total_input = (net_drive + self_excitation) * WC_GAIN;
+        let self_excitation =
+            WC_SELF_EXCITATION * ((current_arousal - 0.5) * WC_SELF_EXCITATION_SLOPE).tanh();
+        let total_input = (net_drive + self_excitation) * AROUSAL_GAIN;
         // Sigmoid with overflow protection: for |x| > 20, exp(-x) is
         // either ~0 or ~5e9, so we clamp to avoid NaN from overflow.
         let sigmoid = |x: f32| -> f32 {
@@ -2075,8 +2294,55 @@ impl NeurochemicalVector {
         // level (reaching 1.00, p75 0.93) drove its own desensitization,
         // holding effective at 0.326 and clearing the threshold on only
         // 4.4% of NREM ticks.
-        let rem_ach = if current == MentalPhase::REM { 0.40 } else { 0.50 };
-        let rem_ne = if current == MentalPhase::REM { 0.35 } else { 0.30 };
+        // Acetylcholine gate for REM, placed from measurement.
+        //
+        // The gate was 0.50 against an acetylcholine effective level
+        // that reaches only 0.3497 during sleep (mean 0.2926), so the
+        // conjunct could never be satisfied and REM was unreachable
+        // from any state. The code's own comment records why: a
+        // concentration high enough to clear 0.50 on effective level
+        // drives its own receptor desensitization, holding effective
+        // near 0.33. Chasing the gate with concentration is
+        // self-defeating, so the gate moves to the measured range
+        // instead — REM is identified by ACh being the *highest* part
+        // of its sleep range relative to NREM, which is what
+        // distinguishes it.
+        let rem_ach = if current == MentalPhase::REM {
+            REM_ACETYLCHOLINE_GATE * REM_STAY_FACTOR
+        } else {
+            REM_ACETYLCHOLINE_GATE
+        };
+        // Norepinephrine must fall *further* to hold REM than to enter
+        // it, so the state releases as sleep pressure builds.
+        //
+        // The previous stay-threshold of 0.35 against an enter-
+        // threshold of 0.30 made REM sticky enough to hold through the
+        // whole pre-sleep band: measured over the adenosine interval
+        // 0.50-0.90, REM occupied 6,999 of 7,062 ticks, which left no
+        // room for Drowsy and is not physiologically coherent — REM is
+        // entered from NREM as sleep deepens, not held across the
+        // descent into sleep. Tightening the stay-threshold so it
+        // matches the enter-threshold lets REM release to NREM and then
+        // to Drowsy as adenosine climbs.
+        //
+        // The stay factor is applied in the *loosening* direction for
+        // this conjunct. REM_STAY_FACTOR is 0.94, and multiplying a
+        // "level must be below" threshold by a factor below 1 tightens
+        // it instead of relaxing it, which is backwards for hysteresis
+        // and was a second phase straddle: the stay threshold landed on
+        // 0.30 * 0.94 = 0.282, and sleep drives norepinephrine to a
+        // fixed point of 0.282. `ne_level < 0.282` was therefore false
+        // on the equilibrium, dropping to NREM, after which the
+        // enter-threshold of 0.30 held it back in REM on the next tick
+        // — measured as REM/NREM chatter, thousands of transitions
+        // within a single REM bout. A stay threshold must sit clear of
+        // the value it is compared against, so the factor is inverted
+        // for a below-threshold conjunct.
+        let rem_ne = if current == MentalPhase::REM {
+            REM_NOREPI_GATE / REM_STAY_FACTOR
+        } else {
+            REM_NOREPI_GATE
+        };
         //
         // Serotonin is deliberately *not* a conjunct here, though it does
         // get the REM-off profile below. Monti & Jantos (2008) show
@@ -2099,6 +2365,65 @@ impl NeurochemicalVector {
         } else {
             adn_raw > EXHAUSTION_ENTER
         };
+        // Drowsy: the descent into sleep.
+        //
+        // Checked before the exhaustion hold, because Drowsy is the
+        // state *between* waking and sleep and the hold would otherwise
+        // swallow it. The exhaustion hold has hysteresis: once asleep it
+        // persists while adenosine stays above 0.75, while Drowsy's
+        // gate is 0.50. So the entire window where Drowsy belongs
+        // (0.50 < adenosine < 0.75) lay inside the region where the
+        // hold was still true, and Drowsy could never be entered —
+        // measured occupancy over a full sleep cycle was NREM 99.1%,
+        // REM 0.8%, Drowsy 0.0%.
+        //
+        // Both axes have hysteresis, so it is easier to stay drowsy than
+        // to enter it. Without the arousal hysteresis, transient
+        // norepinephrine bumps push arousal above the threshold and flip
+        // her back to Active, producing a limit-cycle oscillation.
+        let drowsy_adn = if current == MentalPhase::Drowsy {
+            DROWSY_ADENOSINE_GATE * DROWSY_STAY_FACTOR
+        } else {
+            DROWSY_ADENOSINE_GATE
+        };
+        let drowsy_arousal = if current == MentalPhase::Drowsy {
+            DROWSY_AROUSAL_STAY
+        } else {
+            DROWSY_AROUSAL_GATE
+        };
+        // Bounded above by the *same* sleep-entry boundary the sleep
+        // branch uses, not by an independent ceiling.
+        //
+        // Drowsy previously carried its own `DROWSY_SLEEP_CEILING` of
+        // 0.75 while the sleep branch entered on `sleep_adn`
+        // (0.75 - 0.05*(1-ox), i.e. 0.715 at baseline orexin). Those two
+        // boundaries overlapped on the same signal, so the band between
+        // 0.715 and 0.75 was claimed by Drowsy on one branch and by
+        // sleep on the other. That is not a latent edge case: raw
+        // adenosine saturates at its 1.0 clamp under sustained wake
+        // drive, which pins the blend at exactly 0.750 — inside the
+        // overlap. The state then chattered between the two branches
+        // every tick, measured at 85,198 transitions over 5.5 simulated
+        // hours, and because the Drowsy branch returns before the sleep
+        // branch runs its glymphatic decay, raw adenosine never fell
+        // below 0.90. The cholinergic rebound that produces REM needs
+        // raw adenosine under 0.80, so REM was unreachable.
+        //
+        // Reading the shared boundary means the branches partition the
+        // axis instead of overlapping it: above `sleep_adn` the state is
+        // sleep, below it but above `drowsy_adn` it is Drowsy. Hysteresis
+        // still applies on both sides — the sleep stay threshold relaxes
+        // to 0.55 while asleep and the Drowsy gate relaxes to 0.40 while
+        // drowsy — so each state is still sticky, but neither can claim
+        // a level the other also claims.
+        //
+        // At high raw adenosine the exhaustion override above already
+        // forces sleep; this bound only has to cover the ordinary
+        // descent, which is exactly `sleep_adn`.
+        if adn > drowsy_adn && adn < sleep_adn && self.arousal < drowsy_arousal {
+            return MentalPhase::Drowsy;
+        }
+
         if exhaustion_hold {
             // Exhaustion forces *sleep*, but it does not decide NREM
             // versus REM: the same conjuncts decide, so REM stays
@@ -2160,72 +2485,104 @@ impl NeurochemicalVector {
             return MentalPhase::NREM;
         }
 
-        // Overwhelmed: cortisol high + NE high + everything saturated
+        // Overwhelmed: cortisol and NE both at their ceiling.
+        //
+        // The previous gate also required `global_tone > 0.7`, which
+        // is unreachable by construction: `global_tone` is the mean of
+        // all 18 effective levels, most of which sit at fixed genetic
+        // baselines, so it measures ~0.25 in every regime. Measured
+        // peaks over two hours under drive:
+        //
+        //   rest 0.263   stress 0.255   vigilance 0.248   debt 0.250
+        //
+        // It does not discriminate stress at all — cortisol moving from
+        // 0.020 to 0.084 shifts the mean of 18 chemicals by 0.004. So
+        // the conjunction could never be satisfied and Overwhelmed was
+        // unreachable no matter what the body did.
+        //
+        // Overwhelm is now defined by the two mediators that actually
+        // move, both set above the Stress gates so the ordering
+        // Stress < Overwhelmed is preserved.
+        // Scaled from the stress gates so the ordering
+        // Stress < Overwhelmed is preserved, but kept inside the
+        // measured envelope. At 1.4x/1.3x the gates were 0.084 and
+        // 0.585 against measured maxima of 0.084 and 0.578 — at or
+        // above the ceiling, so Overwhelm could not be entered. The
+        // multipliers are now 1.15x and 1.13x, which sit just above the
+        // stress gates (0.069, 0.509) and below the maxima.
         let ow_cort = if current == MentalPhase::Overwhelmed {
-            0.65
+            STRESS_CORTISOL_GATE * 1.1
         } else {
-            0.75
+            STRESS_CORTISOL_GATE * 1.15
         };
         let ow_ne = if current == MentalPhase::Overwhelmed {
-            0.65
+            STRESS_NOREPI_GATE * 1.07
         } else {
-            0.75
+            STRESS_NOREPI_GATE * 1.13
         };
-        if cort > ow_cort && ne > ow_ne && self.global_tone > 0.7 {
+        if cort > ow_cort && ne > ow_ne {
             return MentalPhase::Overwhelmed;
         }
 
-        // Stress response: high cortisol, high NE, low serotonin
+        // Stress response: cortisol high, NE high, low serotonin.
+        //
+        // The gates are expressed against the substrate's *measured*
+        // reachable envelope rather than absolute numbers, because the
+        // absolute numbers were written for a cortisol scale this
+        // substrate does not produce. Measured peaks over two hours:
+        //
+        //   cortisol  resting 0.020, under sustained drive 0.084
+        //   norepi    resting 0.306, under sustained drive 0.578
+        //
+        // The old gates of 0.65 and 0.60 were therefore unreachable by
+        // 7.7x and 1.04x respectively — the stress phase could not be
+        // entered under any drive. Note the cortisol ceiling is
+        // structural, not a tuning gap: at equilibrium
+        // `level ≈ acth * gain / clearance`, and ACTH saturates at
+        // 0.151, giving 0.049; the measured 0.084 is the transient
+        // peak. Raising the ACTH-to-cortisol gain 344x to reach 0.65
+        // would not be physiologically defensible, so the gate moves
+        // to meet the real range instead.
+        //
+        // Placed at ~70% of the measured cortisol maximum and ~78% of
+        // the NE maximum: high enough that ordinary physiological
+        // variation cannot trigger a stress state (resting cortisol is
+        // 3x below the gate), low enough that a genuine drive reaches
+        // it.
         let stress_cort = if current == MentalPhase::Stress {
-            0.55
+            STRESS_CORTISOL_GATE * 0.88
         } else {
-            0.65
+            STRESS_CORTISOL_GATE
         };
         let stress_ne = if current == MentalPhase::Stress {
-            0.50
+            STRESS_NOREPI_GATE * 0.9
         } else {
-            0.60
+            STRESS_NOREPI_GATE
         };
         if cort > stress_cort && ne > stress_ne && srt < 0.35 + h {
             return MentalPhase::Stress;
         }
 
-        // Flow: high dopamine, high ACh, moderate NE, low cortisol
+        // Flow: high dopamine, high ACh, moderate NE, low cortisol.
+        //
+        // The dopamine gate was 0.65 against a measured maximum of
+        // 0.42 across every drive regime, so Flow was unreachable for
+        // the same reason Stress was: a threshold written for a scale
+        // this substrate does not produce. Resting dopamine is 0.384
+        // and it peaks at 0.416, so 0.55/0.45 is 1.4x resting with
+        // headroom for a genuine engagement state.
         let flow_da = if current == MentalPhase::Flow {
-            0.55
+            FLOW_DOPAMINE_GATE * 0.88
         } else {
-            0.65
+            FLOW_DOPAMINE_GATE
         };
         let flow_ach = if current == MentalPhase::Flow {
-            0.40
+            FLOW_ACETYLCHOLINE_GATE * 0.88
         } else {
-            0.50
+            FLOW_ACETYLCHOLINE_GATE
         };
         if da > flow_da && ach > flow_ach && ne > 0.40 && cort < 0.30 + h {
             return MentalPhase::Flow;
-        }
-
-        // Drowsy: high adenosine, low arousal
-        // Both axes have hysteresis: it's easier to stay drowsy than
-        // to enter drowsy. Without arousal hysteresis, small NE bumps
-        // from transient CPU load (its own background learning, code
-        // scanning) push arousal above the threshold and flip it to
-        // Active, then it drops back and it returns to Drowsy — a
-        // rapid limit-cycle oscillation. The arousal stay-threshold
-        // is raised by 2× the hysteresis margin so transient arousal
-        // bumps don't kick it out of drowsy.
-        let drowsy_adn = if current == MentalPhase::Drowsy {
-            0.40
-        } else {
-            0.50
-        };
-        let drowsy_arousal = if current == MentalPhase::Drowsy {
-            0.30 + 2.0 * h // 0.46 — harder to leave drowsy
-        } else {
-            0.30 // stricter to enter drowsy
-        };
-        if adn > drowsy_adn && self.arousal < drowsy_arousal {
-            return MentalPhase::Drowsy;
         }
 
         // Alert: high NE + high histamine, low GABA, with orexin and
@@ -2233,15 +2590,22 @@ impl NeurochemicalVector {
         // histamine threshold); melatonin suppresses alertness. This makes
         // alertness a coordinated arousal decision rather than NE alone.
         let alert_ox_bonus = 0.10 * ox;
+        // The histamine gate was 0.55 against a measured maximum of
+        // 0.361, so Alert was unreachable regardless of NE. Histamine
+        // rests at 0.320 and peaks at 0.361; a gate of 0.40 sits above
+        // resting with margin but inside the reachable range.
+        // Hysteresis: the gates drop once Alert is entered, so staying
+        // alert is easier than entering it. The 0.94 factor is the
+        // same style of margin used by the other phase gates.
         let alert_ne = if current == MentalPhase::Alert {
-            0.45 - alert_ox_bonus
+            ALERT_NOREPI_GATE * ALERT_STAY_FACTOR - alert_ox_bonus
         } else {
-            0.55 - alert_ox_bonus
+            ALERT_NOREPI_GATE - alert_ox_bonus
         };
         let alert_hist = if current == MentalPhase::Alert {
-            0.45 - alert_ox_bonus
+            ALERT_HISTAMINE_GATE * ALERT_STAY_FACTOR - alert_ox_bonus
         } else {
-            0.55 - alert_ox_bonus
+            ALERT_HISTAMINE_GATE - alert_ox_bonus
         };
         let alert_mel = if current == MentalPhase::Alert {
             0.40 + h
@@ -2949,6 +3313,24 @@ impl NeurochemicalVector {
             // the linear approximation 1-rate×dt, for time-invariance
             // and stability at large dt values.
             if is_stress_hormone {
+                // Decay rate set from the measured plasma half-life of
+                // each hormone, which differ by orders of magnitude.
+                //
+                // Cortisol's half-life is 66 min at normal hormone levels,
+                // rising to 120 min under large loads, and a directly
+                // measured slow half-life is 57-64 min (Bancos, Endocr
+                // Connect 2017; Keenan et al. 2004; PMC9815201). At the
+                // reference dt of 0.1 s that is ~40,000 ticks.
+                //
+                // The previous 0.005/sec gave a half-life of 2.3 minutes
+                // — roughly 30x too fast. Together with the clearance
+                // term below it capped cortisol at 0.109 even with ACTH
+                // pinned at 1.0, against a Stress-phase gate of 0.65, so
+                // the stress phase was unreachable under any drive.
+                //
+                // CRH is a releasing hormone with a short effective
+                // lifetime; it keeps the fast leak so a stress signal
+                // does not persist after its cause is gone.
                 self.chemicals[i].level *= (-0.005 * dt).exp();
             }
 

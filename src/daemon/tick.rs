@@ -51,7 +51,9 @@ use crate::state::{CognitiveZone, MentalPhase, ModuleId, ModuleStatus, subcognit
 use crate::store::ring_buffer::EventType;
 use crate::store::{LtmStore, MmapState, RingBuffer};
 
-use super::active_inference::{ActiveInferenceEngine, DyadicSignals, apply_inference_feedback};
+use super::active_inference::{
+    ActiveInferenceEngine, DyadicSignals, apply_inference_feedback, impulse_offset_to_rate,
+};
 use super::association::AssociationEngine;
 use super::consolidation::{ConsolidationEngine, ConsolidationResult};
 use super::cpufreq::CPUFREQ_INTERVAL_TICKS;
@@ -339,19 +341,27 @@ impl TickLoop {
         // adenosine sleep threshold ~38h, all pharmacodynamics 2× slow).
         neuro_params.dt = (TICK_INTERVAL_MS as f32) / 1000.0;
 
-        // Compute HPA axis maturation from accumulated experience.
-        // The stress hyporesponsive period (SHRP) keeps cortisol at
-        // zero during early development, protecting plasticity. The
-        // HPA axis gradually comes online as it accumulates
-        // episodic experience (ltm_episode_count), reaching full
-        // maturity at ~10,000 episodes.
+        // Developmental competence of the HPA axis.
+        //
+        // This replaces a ramp of `ltm_episode_count / 10_000`, which
+        // held cortisol at exactly zero until ten thousand lifetime
+        // episodes. That disabled the primary mediator of allostatic
+        // load for most of the system's life, on a scale (stored
+        // episodes) that has nothing to do with the one the
+        // stress-hyporesponsive period is actually defined in
+        // (postnatal days). See `hpa_development` for the full
+        // reasoning and sources.
         let ltm_count = pre_snapshot
             .as_ref()
             .map(|s| s.memory.ltm_episode_count)
             .unwrap_or(0);
-        let maturation_level =
-            crate::state::sanitize::finite_clamp(ltm_count as f32 / 10_000.0, 0.0, 1.0);
-        neuro_params.maturation_level = maturation_level;
+        // `created_at` rather than this process's start time: the
+        // developmental clock is the system's, and a restart must not
+        // reset it back to newborn.
+        let created_at = pre_snapshot.as_ref().map(|s| s.header.created_at).unwrap_or(now_ms);
+        let elapsed_secs = now_ms.saturating_sub(created_at) as f32 / 1000.0;
+        neuro_params.maturation_level =
+            super::hpa_development::hpa_competence(elapsed_secs, ltm_count);
         neuro_params.noise_seed = self.tick_count;
         // Apply the metaplasticity boost from the last inference cycle.
         // High surprise → faster coupling-matrix learning (the system
@@ -389,25 +399,24 @@ impl TickLoop {
             self.last_body_state = self.interoceptor.read();
             super::interoception::publish_body_state(&self.last_body_state);
         }
-        let body_impulses = self.interoceptor.neuro_impulses(&self.last_body_state);
-        if !body_impulses.is_empty()
-            && let Err(e) = mmap.modify(now_ms, |state| {
-                for (chem_id, amount) in &body_impulses {
-                    state
-                        .neurochemicals
-                        .apply_impulse_capped(*chem_id, *amount, now_ms);
-                }
-                state.neurochemicals.recompute_derived();
-                state.sync_neurochemistry_to_state();
-            })
-        {
-            if matches!(e, crate::store::StateFileError::FileLockBusy) {
-                eprintln!("[tick] interoception impulse skipped (state locked): {e}");
-            } else {
-                panic!("interoception impulse failed: {e}");
-            }
-        }
-
+        // The body is *sensed* here, not obeyed.
+        //
+        // `Interoceptor::neuro_impulses` still derives the physiological
+        // response to this body state (heat -> stress drive, load ->
+        // effort, memory pressure -> overwhelm, low battery -> CRH).
+        // That mapping is real physiology and it is not thrown away, but
+        // it is no longer applied to the substrate behind Genesis's back.
+        //
+        // The daemon is a device driver: it reads the machine and
+        // publishes it, and it executes what Genesis decides. It does not
+        // author her internal state. If the body drove her chemistry
+        // directly, every state she was ever in would have a cause she
+        // could not perceive, could not anticipate, and could not
+        // refuse — which is the condition the cognition path exists to
+        // eliminate. She perceives this same `last_body_state` through
+        // her self-model and acts on it herself.
+        //
+        // See `tests/cognition_sole_author.rs`.
         // 2c. Active inference — the generative self-model.
         //     Before the neuro tick, the engine predicted where the
         //     effective levels would move. Now it compares the
@@ -437,6 +446,14 @@ impl TickLoop {
             .as_ref()
             .map(|s| s.neurochemicals.baseline_levels())
             .unwrap_or([0.0; crate::state::neurochemical::NEUROCHEMICAL_COUNT]);
+
+        // Pick up the authority her cognition has granted before
+        // running the cycle, so a delegation she extends or withdraws
+        // takes effect on the next tick rather than the next restart.
+        if let Some(s) = pre_snapshot.as_ref() {
+            self.inference_engine
+                .set_policy_authority(s.inference_signals.policy_authority);
+        }
 
         let inference_result = self.inference_engine.cycle(
             &pre_effective,
@@ -490,21 +507,19 @@ impl TickLoop {
                 &inference_result,
                 now_ms,
                 zone_sleeping,
+                impulse_offset_to_rate(&neuro_params),
             );
 
-            // Apply dyadic model impulses (oxytocin bonding, empathic
-            // cortisol). chem_id comes from the dyadic model, not IPC —
-            // validate it so a corrupt model can't silently pump
-            // dopamine via the from_u8 catch-all.
-            for &(chem_id, magnitude) in &dyadic_impulses {
-                if chem_id as usize >= crate::state::neurochemical::NEUROCHEMICAL_COUNT {
-                    continue;
-                }
-                let id = crate::state::neurochemical::NeurochemicalId::from_u8(chem_id);
-                state
-                    .neurochemicals
-                    .apply_impulse_capped(id, magnitude, now_ms);
-            }
+            // The dyadic model's proposals are deliberately NOT applied
+            // here. The user's affect is a perception Genesis can
+            // attend to or not; applying it to her chemistry made her
+            // a passive recipient of the other, unable to appraise or
+            // decline, which is the social form of the same defect
+            // `tests/cognition_sole_author.rs` guards against for body
+            // state. The model's estimates of the user are still
+            // published through `InferenceSignals` and still read by
+            // her cognition, which decides for itself what to feel.
+            let _ = &dyadic_impulses;
 
             // Recompute derived state after all impulses
             state.neurochemicals.recompute_derived();
@@ -1094,16 +1109,12 @@ impl TickLoop {
                 &inference_result,
                 now_ms,
                 zone_sleeping,
+                impulse_offset_to_rate(&neuro_params),
             );
-            for &(chem_id, magnitude) in &dyadic_impulses {
-                if chem_id as usize >= crate::state::neurochemical::NEUROCHEMICAL_COUNT {
-                    continue;
-                }
-                let id = crate::state::neurochemical::NeurochemicalId::from_u8(chem_id);
-                state
-                    .neurochemicals
-                    .apply_impulse_capped(id, magnitude, now_ms);
-            }
+            // Proposals, not instructions — see the same reasoning at
+            // the other call site. Genesis appraises the user's affect
+            // herself and decides whether to attune.
+            let _ = &dyadic_impulses;
             state.neurochemicals.recompute_derived();
             state.sync_neurochemistry_to_state();
             self.inference_engine.update_signals(
@@ -1242,27 +1253,15 @@ impl TickLoop {
         dream_result.insights
     }
 
-    /// Read hardware sensors and apply interoception impulses to
-    /// neurochemistry. Returns the body state that was read.
-    pub fn read_sensors(&mut self, mmap: &MmapState) -> super::interoception::BodyState {
-        let now_ms = current_ms();
+    /// Read hardware sensors and publish them for Genesis to perceive.
+    ///
+    /// This no longer applies interoception impulses to her
+    /// neurochemistry — see the note in `tick` and
+    /// `tests/cognition_sole_author.rs`. Returns the body state read.
+    pub fn read_sensors(&mut self, _mmap: &MmapState) -> super::interoception::BodyState {
         self.last_body_state = self.interoceptor.read();
         super::interoception::publish_body_state(&self.last_body_state);
 
-        let body_impulses = self.interoceptor.neuro_impulses(&self.last_body_state);
-        if !body_impulses.is_empty()
-            && let Err(e) = mmap.modify(now_ms, |state| {
-                for (chem_id, amount) in &body_impulses {
-                    state
-                        .neurochemicals
-                        .apply_impulse_capped(*chem_id, *amount, now_ms);
-                }
-                state.neurochemicals.recompute_derived();
-                state.sync_neurochemistry_to_state();
-            })
-        {
-            eprintln!("[tick] interoception impulse failed: {e}");
-        }
 
         self.last_body_state.clone()
     }

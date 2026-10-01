@@ -1018,7 +1018,7 @@ fn prop_perturbation_growth_remains_bounded_for_random_starts() {
 }
 
 #[test]
-fn prop_arousal_map_exhibits_bistability_for_current_params() {
+fn prop_arousal_map_is_monotone_and_graded() {
     let sigmoid = |x: f32| -> f32 {
         if x > 20.0 {
             1.0
@@ -1030,8 +1030,18 @@ fn prop_arousal_map_exhibits_bistability_for_current_params() {
     };
 
     let f = |arousal: f32, net_drive: f32| -> f32 {
-        let input = WC_GAIN * (net_drive + WC_SELF_EXCITATION * (arousal - 0.5));
+        let self_excitation = WC_SELF_EXCITATION
+            * ((arousal - 0.5) * WC_SELF_EXCITATION_SLOPE).tanh();
+        let input = AROUSAL_GAIN * (net_drive + self_excitation);
         sigmoid(input).clamp(0.0, 1.0)
+    };
+
+    let fixed_point = |net_drive: f32| -> f32 {
+        let mut a = 0.5f32;
+        for _ in 0..2000 {
+            a = f(a, net_drive);
+        }
+        a
     };
 
     let count_roots = |net_drive: f32| -> usize {
@@ -1048,37 +1058,78 @@ fn prop_arousal_map_exhibits_bistability_for_current_params() {
         roots
     };
 
-    let mut saw_three = false;
-    let mut saw_one = false;
-    let mut steps = 0;
+    // The self-excitation is bounded, so the map must be monostable
+    // everywhere: exactly one fixed point for every net drive. This is
+    // the property the old unbounded form violated — it was bistable
+    // with a 2.5% margin, which in practice meant a knife-edge switch
+    // between ~0.10 and ~0.90 with nothing in between.
     let mut d = -0.5f32;
     while d <= 0.5 {
-        steps += 1;
         let roots = count_roots(d);
-        assert!(
-            (1..=3).contains(&roots),
-            "arousal map should have 1-3 fixed points for net_drive={} (found {})",
+        assert_eq!(
+            roots,
+            1,
+            "bounded self-excitation should give a unique fixed point \
+             for net_drive={} (found {})",
             d,
             roots
         );
-        if roots == 3 {
-            saw_three = true;
-        } else if roots == 1 {
-            saw_one = true;
-        }
         d += 0.01;
     }
 
+    // The fixed point must increase monotonically with net drive.
+    let mut prev = f32::NEG_INFINITY;
+    let mut d = -0.5f32;
+    while d <= 0.5 {
+        let a = fixed_point(d);
+        assert!(
+            a >= prev - 1e-6,
+            "arousal should rise with net_drive: {} then {} at net_drive={}",
+            prev,
+            a,
+            d
+        );
+        prev = a;
+        d += 0.01;
+    }
+
+    // Graded, not saturating. Over the range of net drives Genesis
+    // actually reaches, the attractor must stay well clear of both
+    // the floor and the sigmoid ceiling. The old form produced 0.15
+    // and 0.72 for net drives of -0.15 and +0.02.
+    let drowsy = fixed_point(-0.40);
+    let low = fixed_point(-0.15);
+    let high = fixed_point(0.14);
     assert!(
-        saw_three,
-        "arousal map should be bistable for some net_drive"
+        drowsy > 0.10 && drowsy < 0.30,
+        "genuine drowsiness (net_drive=-0.40) should read as low arousal, got {}",
+        drowsy
     );
     assert!(
-        saw_one,
-        "arousal map should be monostable for some net_drive"
+        low > 0.25 && low < 0.50,
+        "arousal at net_drive=-0.15 should be a low-but-not-collapsed \
+         value, got {}",
+        low
     );
     assert!(
-        steps > 50,
-        "bifurcation scan should cover a reasonable range"
+        high > 0.55 && high < 0.70,
+        "arousal at net_drive=+0.14 (measured idle rest) should be a \
+         moderate wake value, got {}",
+        high
+    );
+    assert!(
+        high - low > 0.15,
+        "arousal should span a usable range across net drive, got {}",
+        high - low
+    );
+
+    // Sensitivity must stay bounded: a small change in chemistry must
+    // not throw arousal across most of its range.
+    let delta = fixed_point(0.02) - fixed_point(0.0);
+    assert!(
+        delta < 0.10,
+        "arousal should not be hypersensitive to net_drive \
+         (d(arousal) for d(net_drive)=0.02 was {})",
+        delta
     );
 }
