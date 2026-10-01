@@ -1,6 +1,10 @@
 """Emotion tests — emotional regulator and sentiment analysis."""
 
 import logging
+import time
+from typing import Any
+
+import pytest
 
 from genesis_client.protocol import (
     CHEM_ACETYLCHOLINE,
@@ -16,7 +20,11 @@ from genesis_client.protocol import (
     CHEM_SEROTONIN,
 )
 from genesis_cognitive.emotion import EmotionalState
-from genesis_cognitive.emotional_regulator import AllostaticLoadTracker, EmotionalRegulator
+from genesis_cognitive.emotional_regulator import (
+    AllostaticLoadTracker,
+    EmotionalRegulator,
+    InteroceptionSystem,
+)
 from genesis_cognitive.language.sentiment import analyze_sentiment
 
 logger = logging.getLogger(__name__)
@@ -897,6 +905,254 @@ def test_allostatic_load_recovers_when_domains_calm() -> None:
     assert tracker.get_allostatic_load() < loaded
 
 
+# ─── Allostatic load dynamics ──────────────────────────────────
+#
+# The two failures these guard against were both real: a hysteresis
+# band with no third branch froze the load permanently, and an
+# unclamped dt turned a suspend into hours of accumulated stress.
+
+
+def test_allostatic_load_recovers_inside_hysteresis_band() -> None:
+    """Sustained mild stress must drain, not pin, an accumulated load.
+
+    The regression: a two-branch integrator (accumulate above the
+    threshold, recover below, do nothing in between) made the band a
+    hard freeze. Mild sustained stress parks the median between the
+    two thresholds, so a load that had already accumulated never came
+    back down — the allostatic trap.
+    """
+    tracker = AllostaticLoadTracker()
+    band_mid = (AllostaticLoadTracker.RECOVER_THRESHOLD
+                + AllostaticLoadTracker.ACCUMULATE_THRESHOLD) / 2.0
+
+    tracker.set_inference_load(0.9)
+    tracker.set_body_stress(0.9)
+    for _ in range(2000):
+        tracker.record_stress(0.9, dt=8.0)
+    assert tracker.get_allostatic_load() > 0.9, "expected a loaded baseline"
+
+    # Park every domain mid-band and hold for a simulated week.
+    tracker.set_inference_load(band_mid)
+    tracker.set_body_stress(band_mid)
+    for _ in range(2000):
+        tracker.record_stress(band_mid, dt=8.0)
+
+    assert tracker.get_allostatic_load() == 0.0, (
+        "sustained mild stress must drain the load, not pin it: "
+        f"{tracker.get_allostatic_load()}"
+    )
+
+
+def test_allostatic_band_drains_slower_than_full_recovery() -> None:
+    """The band is a slow drain, not a full one — that's the hysteresis."""
+    band_mid = (AllostaticLoadTracker.RECOVER_THRESHOLD
+                + AllostaticLoadTracker.ACCUMULATE_THRESHOLD) / 2.0
+
+    def loaded_tracker() -> AllostaticLoadTracker:
+        """A tracker holding a load well clear of the 0.0 floor.
+
+        The floor matters: a drain larger than the load clamps to zero,
+        which would make a band drain and a full drain look identical.
+        """
+        tracker = AllostaticLoadTracker()
+        tracker.set_inference_load(0.9)
+        tracker.set_body_stress(0.9)
+        for _ in range(100):
+            tracker.record_stress(0.9, dt=8.0)
+        assert tracker.get_allostatic_load() > 0.5
+        return tracker
+
+    band = loaded_tracker()
+    band.set_inference_load(band_mid)
+    band.set_body_stress(band_mid)
+    before = band.get_allostatic_load()
+    band.record_stress(band_mid, dt=1.0)
+    band_step = before - band.get_allostatic_load()
+
+    full = loaded_tracker()
+    full.set_inference_load(0.0)
+    full.set_body_stress(0.0)
+    before_full = full.get_allostatic_load()
+    full.record_stress(0.0, dt=1.0)
+    full_step = before_full - full.get_allostatic_load()
+
+    assert 0.0 < band_step < full_step, (
+        f"band drain ({band_step}) must be positive but slower than "
+        f"full recovery ({full_step})"
+    )
+    assert band_step == pytest.approx(
+        full_step * AllostaticLoadTracker.BAND_RECOVERY_FACTOR
+    ), "band drain should be exactly BAND_RECOVERY_FACTOR of full recovery"
+
+
+def test_allostatic_load_timescale_matches_rust_engine() -> None:
+    """The two views of allostatic load must move on one timescale.
+
+    The Rust engine integrates substrate burden at an effective
+    0.01 * excess per second and crosses 0.4 in ~200 s. The Python
+    tracker consumes that value as one of its domains, so a rate
+    calibrated to a different timescale made the two "allostatic
+    load" readings diverge by more than an order of magnitude.
+    """
+    tracker = AllostaticLoadTracker()
+    tracker.set_inference_load(0.5)
+    tracker.set_body_stress(0.5)
+
+    elapsed = 0.0
+    while tracker.get_allostatic_load() < 0.4 and elapsed < 2000.0:
+        tracker.record_stress(0.5, dt=1.0)
+        elapsed += 1.0
+
+    # Rust: 0.001 * 0.2 * dt_scale(=10) = 0.002/s -> 0.4 in 200 s.
+    assert 180.0 <= elapsed <= 240.0, (
+        f"load should reach 0.4 in ~200 s like the Rust engine, took {elapsed}"
+    )
+
+
+def test_allostatic_load_treats_nan_as_no_load() -> None:
+    """A NaN must never present as maximum load.
+
+    `max(0.0, min(1.0, nan))` looks like a clamp but CPython's `min`
+    keeps its first argument when the comparison is False, so it
+    yields 1.0 — a corrupt reading would read as *severe* overload.
+    The Rust engine's `finite_clamp` maps non-finite to the range
+    minimum; this asserts the Python side agrees.
+    """
+    nan = float("nan")
+    tracker = AllostaticLoadTracker()
+
+    tracker.set_inference_load(nan)
+    assert tracker.get_state().inference_load == 0.0
+
+    tracker.set_body_stress(nan)
+    assert tracker.get_state().body_stress == 0.0
+
+    tracker.record_stress(nan, dt=1.0)
+    assert tracker.get_allostatic_load() == 0.0
+
+    # A NaN arriving once the load is up must not inflate it.
+    tracker2 = AllostaticLoadTracker()
+    tracker2.set_inference_load(0.9)
+    for _ in range(50):
+        tracker2.record_stress(0.9, dt=1.0)
+    loaded = tracker2.get_allostatic_load()
+    assert loaded > 0.0
+    tracker2.set_inference_load(nan)
+    tracker2.set_body_stress(nan)
+    for _ in range(50):
+        tracker2.record_stress(nan, dt=1.0)
+    assert tracker2.get_allostatic_load() < loaded, (
+        "NaN domains must not raise the load"
+    )
+
+
+def test_allostatic_load_treats_inf_as_no_load() -> None:
+    tracker = AllostaticLoadTracker()
+    tracker.set_inference_load(float("inf"))
+    assert tracker.get_state().inference_load == 0.0
+    tracker.set_body_stress(float("-inf"))
+    assert tracker.get_state().body_stress == 0.0
+
+
+def test_allostatic_load_clamps_out_of_range_inputs() -> None:
+    tracker = AllostaticLoadTracker()
+    tracker.set_inference_load(5.0)
+    assert tracker.get_state().inference_load == 1.0
+    tracker.set_inference_load(-3.0)
+    assert tracker.get_state().inference_load == 0.0
+    tracker.set_body_stress(2.0)
+    assert tracker.get_state().body_stress == 1.0
+
+
+def test_suspend_does_not_accumulate_allostatic_load() -> None:
+    """A long gap between regulation cycles is not hours of stress.
+
+    `_last_regulate_time` is wall-clock, so a suspend/resume or a long
+    pause hands the next cycle an enormous dt. Both consumers of that
+    dt integrate it linearly, so without a clamp the system read a
+    sleep as sustained stress. An 8 h gap used to produce load=0.864
+    and `is_chronic` in a single cycle.
+    """
+    regulator = EmotionalRegulator()
+    regulator.allostatic_load_tracker.set_inference_load(0.45)
+
+    # Pretend the last regulation cycle was 8 hours ago.
+    regulator._last_regulate_time = time.time() - 8 * 3600
+
+    emotion = make_emotion(
+        label="neutral", alertness=0.4, valence=0.0, plasticity=0.6
+    )
+    emotion.chemicals = {"cortisol": 0.5}
+    regulator._regulate(emotion)
+
+    assert regulator.allostatic_load() < 0.1, (
+        f"an 8 h suspend must not read as chronic overload, got "
+        f"{regulator.allostatic_load()}"
+    )
+    assert not regulator.allostatic_load_tracker.is_chronic_stress(), (
+        "a suspend must not set the chronic-stress flag"
+    )
+
+
+def test_regulation_dt_is_clamped() -> None:
+    """The regulation dt must never exceed MAX_REGULATION_DT."""
+    regulator = EmotionalRegulator()
+    regulator._last_regulate_time = time.time() - 100000.0
+    emotion = make_emotion()
+    emotion.chemicals = {"cortisol": 0.0}
+    regulator._regulate(emotion)
+    # The HPA cascade is the most dt-sensitive consumer; if dt had not
+    # been clamped the cascade would have been driven to divergence.
+    state = regulator.hpa_axis.get_state()
+    assert 0.0 <= state.crh_level <= 1.0
+    assert 0.0 <= state.cortisol_level <= 1.0
+
+
+def test_chronic_allostatic_cause_survives_later_regulators() -> None:
+    """`chronic_allostatic` must survive the rest of the cycle.
+
+    Each sub-regulator sets `_last_cause` unconditionally, so a cause
+    raised from inside `_regulate_hpa_axis` (which runs second) was
+    always overwritten by a later stage. Under sustained stress — the
+    exact case chronic stress describes — the label was clobbered by
+    `stress_cortisol`, leaving CauseCategory.CHRONIC_ALLOSTATIC
+    unreachable.
+    """
+    regulator = EmotionalRegulator()
+    emotion = make_emotion(
+        label="stressed", alertness=0.9, valence=-0.6, plasticity=0.2
+    )
+    emotion.chemicals = {"cortisol": 0.55}
+    regulator.allostatic_load_tracker.set_inference_load(0.5)
+
+    # Enough cycles to clear CHRONIC_DURATION_SECONDS of elevation.
+    for _ in range(60):
+        regulator._last_regulate_time = time.time() - 8.0
+        regulator._regulate(emotion)
+
+    assert regulator.allostatic_load_tracker.is_chronic_stress(), (
+        "fixture should produce a chronic stress pattern"
+    )
+    assert regulator.last_cause == "chronic_allostatic", (
+        f"chronic cause must win over proximate causes, got "
+        f"{regulator.last_cause!r}"
+    )
+
+
+def test_non_chronic_cycle_does_not_report_chronic_cause() -> None:
+    """The chronic cause must not appear when stress is acute."""
+    regulator = EmotionalRegulator()
+    emotion = make_emotion(label="neutral", alertness=0.4)
+    emotion.chemicals = {"cortisol": 0.0}
+    regulator.allostatic_load_tracker.set_inference_load(0.0)
+
+    for _ in range(5):
+        regulator._last_regulate_time = time.time() - 8.0
+        regulator._regulate(emotion)
+
+    assert regulator.last_cause != "chronic_allostatic"
+
+
 def test_body_cognitive_load_contributes_to_interoceptive_stress() -> None:
     """High self-memory load is distress only after the overload threshold."""
     from genesis_client.types import BodyState
@@ -951,3 +1207,224 @@ def test_body_cognitive_load_contributes_to_interoceptive_stress() -> None:
     state = regulator.interoception.last_state
     assert state is not None
     assert state.stress_level == 0.0
+
+
+# ─── Interoception layer composition ──────────────────────────
+#
+# Interoception has two independent sensing layers on different
+# cadences: the process layer (psutil, socket liveness, observed
+# latency) is refreshed by the regulator every 1.5-8 s, and the body
+# layer (the daemon's hardware readings) by the heartbeat every ~5 s.
+# They used to write the same InternalState with each rebuilding it
+# from scratch, so whichever ran last erased the other.
+
+
+def _fake_body(**overrides) -> Any:
+    """A BodyState stand-in with a full set of hardware readings."""
+
+    class _Body:
+        cpu_temp_c = 78.0
+        arousal_freq = 0.65
+        cognitive_load = 0.45
+        io_activity = 0.15
+        stress_load = 1.3
+        energy_reserve = 0.22
+        distressed = True
+        description = "overheating"
+        autonomic_rate = 6.0
+        thermoregulatory_effort = 0.05
+        metabolic_rate = 0.85
+        core_voltage = 1.25
+        supply_voltage = 10.3
+        core_activity = 0.4
+        uncore_activity = 0.3
+        dram_activity = 0.2
+        cache_miss_rate = 0.11
+        branch_miss_rate = 0.07
+        pulse_hz = 2400.0
+        pulse = 0.5
+        top_freq_share = 0.9
+        throttle_state = 0.5
+        psi_cpu = 0.3
+        psi_io = 0.1
+        psi_mem = 0.2
+        battery_cycles = 42.0
+        entropy_level = 0.99
+        clocksource = 1
+        suspend_caps = 3
+
+    for key, value in overrides.items():
+        setattr(_Body, key, value)
+    return _Body()
+
+
+def _intero(cpu_usage: float, tmp_path) -> InteroceptionSystem:
+    """An InteroceptionSystem with fixed CPU and a live socket path.
+
+    The socket file is created so `daemon_connected` is True —
+    otherwise the process layer contributes `daemon_disconnect_stress`
+    and these tests would be measuring disconnection rather than the
+    layer under test.
+    """
+    from genesis_cognitive.emotional_regulator import InteroceptionSystem
+
+    sock = tmp_path / "genesis.sock"
+    sock.write_text("")
+    io = InteroceptionSystem(socket_path=str(sock))
+    io._sense_cpu_usage = lambda: cpu_usage  # type: ignore[method-assign]
+    return io
+
+
+def test_process_sensing_does_not_clobber_body_layer(tmp_path) -> None:
+    """The regulator's faster polling must not erase the daemon's hardware.
+
+    The regression: `sense_internal_state` rebuilt the whole state with
+    `cognitive_load=0.0` and default hardware fields. Running every
+    1.5-8 s against the heartbeat's ~5 s body-state poll, it discarded
+    the daemon's interoception within seconds — and the `body_stress`
+    input to allostatic load was then the process reading, not the
+    hardware one it is documented to be.
+    """
+    io = _intero(88.0, tmp_path)
+    io.update_from_body_state(_fake_body())
+    for _ in range(20):
+        io.sense_internal_state()
+
+    state = io.last_state
+    assert state is not None
+    assert state.cpu_temp_c == 78.0, "body layer was clobbered"
+    assert state.stress_load == 1.3, "body layer was clobbered"
+    assert state.energy_reserve == 0.22, "body layer was clobbered"
+    assert state.battery_cycles == 42.0, "body layer was clobbered"
+    assert state.cache_miss_rate == 0.11, "body layer was clobbered"
+    assert state.body_distressed is True
+    # The process layer survives too — the other direction.
+    assert state.cpu_usage == 88.0, "process layer was clobbered"
+
+
+def test_body_update_does_not_clobber_process_layer(tmp_path) -> None:
+    """A calm daemon report must not erase a simultaneous CPU spike.
+
+    The regression: `update_from_body_state` set `stress_level` from
+    the body layer alone, discarding the process layer's CPU, memory,
+    socket and latency readings.
+    """
+    cpu_stress = (88.0 - 70.0) / 30.0
+    io = _intero(88.0, tmp_path)
+    io.sense_internal_state()
+    io.update_from_body_state(
+        _fake_body(cognitive_load=0.1, stress_load=0.0, cpu_temp_c=40.0)
+    )
+
+    state = io.last_state
+    assert state is not None
+    assert state.cpu_usage == 88.0
+    assert abs(state.stress_level - cpu_stress) < 1e-6, (
+        f"process stress erased by a calm body report: {state.stress_level}"
+    )
+
+
+def test_stress_level_is_max_of_both_layers(tmp_path) -> None:
+    """Either layer reporting distress must register as stress."""
+    # Body layer alone: stress_load 1.3 -> (1.3-1.0)/0.5 = 0.6
+    io = _intero(5.0, tmp_path)
+    io.update_from_body_state(_fake_body())
+    state = io.last_state
+    assert state is not None
+    assert abs(state.stress_level - 0.6) < 1e-6
+
+    # Both layers at once: the larger wins, neither is discarded.
+    # Process stress (88-70)/30 = 0.6; cognitive_load 0.95 gives
+    # (0.95-0.70)/0.30 = 0.8333, which is the larger.
+    io2 = _intero(88.0, tmp_path)
+    io2.update_from_body_state(_fake_body(cognitive_load=0.95, stress_load=0.0))
+    state2 = io2.last_state
+    assert state2 is not None
+    assert abs(state2.stress_level - 0.8333) < 1e-3, state2.stress_level
+
+
+def test_stale_body_reading_stops_contributing_stress(tmp_path) -> None:
+    """A sensor that stopped reporting must not hold distress forever.
+
+    The values are retained — "the last temperature I read was 78°" is
+    still the honest answer — but the stress contribution decays, so a
+    daemon that died mid-overload doesn't read as permanent distress.
+    """
+    from genesis_cognitive.emotional_regulator import InteroceptionSystem
+
+    io = _intero(5.0, tmp_path)
+    io.update_from_body_state(_fake_body())
+    fresh = io.last_state
+    assert fresh is not None
+    assert fresh.stress_level > 0.5, "fresh body reading should register stress"
+
+    assert io._body.reported_at is not None
+    io._body.reported_at -= InteroceptionSystem.BODY_STATE_TIMEOUT + 1
+    io.sense_internal_state()
+    stale = io.last_state
+    assert stale is not None
+    assert stale.stress_level < 1e-6, (
+        f"a stale reading should not contribute stress, got {stale.stress_level}"
+    )
+    assert stale.cpu_temp_c == 78.0, "stale reading should retain its last value"
+
+
+def test_body_update_preserves_observed_latency(tmp_path) -> None:
+    """Latency observations must survive a body-state merge.
+
+    The regression: `update_from_body_state` copied `response_latency`
+    but not `last_response_latency` or `latency_observed`, so a merge
+    silently reset the latency gate and the latency stress
+    contribution with it.
+    """
+    io = _intero(5.0, tmp_path)
+    io.record_response_latency(750.0)
+    io.sense_internal_state()
+    before = io.last_state
+    assert before is not None
+    assert before.latency_observed is True
+
+    io.update_from_body_state(_fake_body(cognitive_load=0.1, stress_load=0.0))
+    after = io.last_state
+    assert after is not None
+    assert after.latency_observed is True, "latency_observed lost in body merge"
+    assert after.last_response_latency > 0.0, "last_response_latency lost in body merge"
+
+
+def test_arousal_modifier_follows_combined_stress(tmp_path) -> None:
+    """A body-driven stress spike must move the arousal modifier.
+
+    The regression: the modifier was only recomputed in the process
+    layer, so hardware distress left it stale.
+    """
+    io = _intero(5.0, tmp_path)
+    io.sense_internal_state()
+    calm = io.last_state
+    assert calm is not None
+    assert calm.arousal_modifier == 0.5, calm.arousal_modifier
+
+    # stress_load 1.3 -> (1.3-1.0)/0.5 = 0.6, which lands in the
+    # "mild stress" band rather than the "overwhelmed" one, so the
+    # modifier should read 0.6.
+    io.update_from_body_state(_fake_body())
+    hot = io.last_state
+    assert hot is not None
+    assert (
+        io.config.arousal_modifier_mild_stress
+        < hot.stress_level
+        <= io.config.arousal_modifier_overwhelmed_stress
+    ), hot.stress_level
+    assert hot.arousal_modifier == 0.6, (
+        f"arousal modifier should follow body stress, got {hot.arousal_modifier}"
+    )
+
+
+def test_process_layer_still_works_offline() -> None:
+    """Without a daemon, the process layer must still sense distress."""
+    from genesis_cognitive.emotional_regulator import InteroceptionSystem
+
+    io = InteroceptionSystem(socket_path="/nonexistent/genesis.sock")
+    state = io.sense_internal_state()
+    assert state.daemon_connected is False
+    # A missing daemon is itself distress.
+    assert state.stress_level >= io.config.daemon_disconnect_stress

@@ -64,12 +64,77 @@ def test_transfer_learning_maps_roles_without_shared_vocabulary() -> None:
     assert result.mappings
     assert all(src != tgt for src, tgt in result.mappings)
 
-    target_edges = net.get_edges("compiler", direction="out")
-    transferred_targets = {
-        edge.target for edge in target_edges if edge.origin == "transferred"
+    # A transfer must actually do something to the target graph. The
+    # assertion is on *effect*, not on a provenance tag: candidates are
+    # drawn only from the target's existing neighbours, so the mapped
+    # role already exists (the fixture links compiler→token and
+    # compiler→source) and the transfer reinforces its weight.
+    # `add_edge` deliberately keeps the original `origin`, because
+    # overwriting it would erase the fact that the edge was originally
+    # established rather than inferred. `origin="transferred"` is in
+    # fact unreachable here — there is never a new edge to stamp.
+    weights_before = {e.target: e.weight for e in net.get_edges("compiler", "out")}
+    mapped = {tgt for _, tgt in result.mappings}
+    assert mapped <= set(weights_before), (
+        "the mapped targets should be roles the target graph already had"
+    )
+    for edge in net.get_edges("compiler", direction="out"):
+        if edge.target in mapped:
+            assert edge.weight >= weights_before[edge.target], (
+                f"transfer should reinforce compiler->{edge.target}: "
+                f"{weights_before[edge.target]} -> {edge.weight}"
+            )
+
+
+def test_transfer_learning_only_reinforces_existing_roles() -> None:
+    """Analogy reinforces roles the target graph already has; it never invents one.
+
+    `transfer_learning` draws its candidates from the target domain's
+    *existing* neighbours, so every mapping lands on a role that is
+    already there. The transfer strengthens that role; it does not
+    project onto a relation the target graph has never used.
+
+    This is why no edge in the target graph is ever tagged
+    ``origin="transferred"``: the edges a transfer touches already
+    existed, and `add_edge` preserves their original provenance so
+    that "this was told to me" is not overwritten by "I inferred
+    this". Reinforcement is visible in the weight instead.
+    """
+    learner = _make_learner()
+    net = learner.network
+
+    for concept in ("engine", "piston", "fuel", "compiler", "token", "source"):
+        net.add_concept(concept, confidence=0.9, origin="test")
+
+    net.add_edge("engine", "piston", RelationType.PART_OF, 0.9, origin="test")
+    net.add_edge("engine", "fuel", RelationType.DEPENDS_ON, 0.8, origin="test")
+    net.add_edge("compiler", "token", RelationType.PART_OF, 0.9, origin="test")
+    net.add_edge("compiler", "source", RelationType.DEPENDS_ON, 0.8, origin="test")
+
+    before = {
+        (e.target, e.relation.value): e.weight
+        for e in net.get_edges("compiler", direction="out")
     }
-    mapped_targets = {tgt for _, tgt in result.mappings}
-    assert mapped_targets <= transferred_targets
+
+    result = learner.transfer_learning("engine", "compiler")
+
+    assert result.mappings
+    reinforced = 0
+    for edge in net.get_edges("compiler", direction="out"):
+        key = (edge.target, edge.relation.value)
+        if key in before:
+            assert edge.weight >= before[key], (
+                f"role {key} should be reinforced, not weakened: "
+                f"{before[key]} -> {edge.weight}"
+            )
+            if edge.weight > before[key]:
+                reinforced += 1
+    assert reinforced > 0, "the transfer must actually strengthen a role"
+
+    # No edge may be tagged as transferred: every candidate was an
+    # existing role, so there was never a new edge to tag.
+    target_edges = net.get_edges("compiler", direction="out")
+    assert not [e for e in target_edges if e.origin == "transferred"]
 
     # Transfer should reinforce the mapped target role, not inject the
     # source-domain node into the target domain as a false fact.

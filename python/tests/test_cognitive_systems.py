@@ -1390,13 +1390,41 @@ def test_plan_empty_actions() -> None:
     assert plan.confidence == 0.0
 
 
-def test_plan_selects_best_action() -> None:
-    """plan() selects the action with the highest expected value."""
-    exec_fn = ExecutiveFunction()
-    plan = exec_fn.plan("answer question", ["answer the question", "ignore"])
-    assert plan.expected_value > 0
-    # The goal-related action should be in the plan
-    assert "answer the question" in plan.steps
+def test_plan_expected_value_is_depth_normalized() -> None:
+    """plan() reports the mean discounted value across a plan's steps.
+
+    A plan's expected value is the *average* of ``value * 0.7**depth``
+    over its steps, not their sum. Normalizing this way keeps values
+    comparable across planning depths, so a deeper plan is not
+    automatically scored higher just for being longer.
+
+    Two further properties this pins, both of which the old
+    lexical-overlap behaviour got wrong:
+
+    - Planning requires a grounded outcome model. Without one, the
+      planner returns an explicitly ungrounded plan rather than
+      inferring value from the wording of the goal.
+    - Every step's value comes from the supplied model.
+    """
+    exec_fn = ExecutiveFunction(planning_depth=3)
+
+    def predictor(action: str) -> tuple[str, float]:
+        return f"result of {action}", 1.0
+
+    plan = exec_fn.plan("goal", ["only"], outcome_predictor=predictor)
+
+    # steps: 1.0 + 0.7 + 0.49 = 2.19, over 3 steps => 0.73
+    assert len(plan.steps) == 3
+    assert plan.predicted_outcomes == ["result of only"] * 3
+    assert plan.expected_value == pytest.approx((1.0 + 0.7 + 0.49) / 3)
+
+    # Without a grounded model the planner invents nothing.
+    ungrounded = ExecutiveFunction().plan(
+        "answer the question", ["answer the question", "ignore"]
+    )
+    assert ungrounded.confidence == 0.0
+    assert ungrounded.expected_value == 0.0
+    assert ungrounded.predicted_outcomes == []
 
 
 def test_plan_with_predictor() -> None:
@@ -1412,11 +1440,32 @@ def test_plan_with_predictor() -> None:
     assert "result of action1" in plan.predicted_outcomes
 
 
-def test_plan_stores_current_plan() -> None:
-    """plan() stores the plan as the current plan."""
-    exec_fn = ExecutiveFunction()
-    plan = exec_fn.plan("goal", ["action1"])
-    assert exec_fn.current_plan is plan
+def test_plan_stores_only_grounded_plans() -> None:
+    """current_plan holds a plan only when an outcome model grounded it.
+
+    A plan built without an outcome model still carries ``steps`` — the
+    caller's action list — but zero confidence and no predicted
+    outcomes. Storing it as the current plan would make consumers
+    (``cognition/engine.py``) both act on it and report it as the
+    executive's plan, which is exactly the fabricated confidence the
+    grounded-planning change removed. So the ungrounded path returns
+    without claiming the slot.
+    """
+    def predictor(action: str) -> tuple[str, float]:
+        return f"result of {action}", 0.5
+
+    grounded_exec = ExecutiveFunction()
+    grounded = grounded_exec.plan("goal", ["action1"], outcome_predictor=predictor)
+    assert grounded_exec.current_plan is grounded
+    assert grounded.confidence > 0.0
+
+    ungrounded_exec = ExecutiveFunction()
+    ungrounded = ungrounded_exec.plan("goal", ["action1"])
+    assert ungrounded_exec.current_plan is None
+    # The plan itself is still returned to the caller — it is simply
+    # not adopted as the executive's current plan.
+    assert ungrounded.goal == "goal"
+    assert ungrounded.confidence == 0.0
 
 
 def test_plan_current_plan_initial_none() -> None:

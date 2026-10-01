@@ -589,6 +589,132 @@ def test_semantic_memory_does_not_restore_stale_priming():
     assert sem._primed_concepts == {}
 
 
+def test_allostatic_load_round_trip():
+    """A real allostatic load survives save/restore."""
+    from genesis_cognitive.emotional_regulator import AllostaticLoadTracker
+    from genesis_cognitive.persistence import (
+        _serialize_allostatic_load,
+        restore_allostatic_load,
+    )
+
+    tracker = AllostaticLoadTracker()
+    tracker.set_inference_load(0.6)
+    for _ in range(50):
+        tracker.record_stress(0.6, dt=1.0)
+    expected = tracker.get_allostatic_load()
+    assert expected > 0.0
+
+    data = _serialize_allostatic_load(tracker)
+    fresh = AllostaticLoadTracker()
+    restore_allostatic_load(fresh, data)
+
+    assert fresh.get_allostatic_load() == expected
+    # The elevation counter lives at the top level of the payload, not
+    # inside "state" — a mismatch here silently resets chronic-stress
+    # tracking on every restart.
+    assert fresh._elevated_stress_duration == tracker._elevated_stress_duration
+    assert fresh._elevated_stress_duration > 0.0
+    # Substrate connectivity is deliberately not restored: until the
+    # daemon next reports in, the tracker runs on the fallback.
+    assert fresh.get_state().substrate_connected is False
+
+
+def test_allostatic_restore_clamps_corrupt_load():
+    """A corrupt saved load must not invert the regulatory response.
+
+    The load feeds `_regulation_effectiveness` via `1 - load * 0.5`. An
+    unclamped negative value amplifies every regulatory impulse
+    (load -3.0 -> effectiveness 2.5) rather than dampening it, so a
+    hand-edited or corrupted save file would have made the regulator
+    louder precisely when it was most worn down.
+    """
+    from genesis_cognitive.emotional_regulator import AllostaticLoadTracker
+    from genesis_cognitive.persistence import restore_allostatic_load
+
+    for bad in (-3.0, 50.0, float("nan"), float("inf")):
+        tracker = AllostaticLoadTracker()
+        restore_allostatic_load(
+            tracker,
+            {"state": {"allostatic_load": bad, "is_chronic": False}},
+        )
+        load = tracker.get_allostatic_load()
+        assert 0.0 <= load <= 1.0, f"restored load {bad} -> {load} out of range"
+
+        # And the effectiveness it implies must stay in [0.3, 1.0].
+        effectiveness = max(0.3, 1.0 - load * 0.5)
+        assert 0.3 <= effectiveness <= 1.0, (
+            f"restored load {bad} -> effectiveness {effectiveness}"
+        )
+
+
+def test_allostatic_restore_tolerates_corrupt_duration():
+    """A non-finite elevation counter must not make stress permanently chronic."""
+    from genesis_cognitive.emotional_regulator import AllostaticLoadTracker
+    from genesis_cognitive.persistence import restore_allostatic_load
+
+    tracker = AllostaticLoadTracker()
+    restore_allostatic_load(
+        tracker,
+        {
+            "state": {"allostatic_load": 0.5, "is_chronic": True},
+            "elevated_stress_duration": float("nan"),
+        },
+    )
+    assert tracker._elevated_stress_duration == 0.0
+    # The counter is recomputed on the next sample, so a corrupt value
+    # cannot pin the chronic flag.
+    tracker.set_inference_load(0.0)
+    tracker.record_stress(0.0, dt=1.0)
+    assert tracker.is_chronic_stress() is False
+
+
+def test_allostatic_restore_ignores_removed_fields():
+    """Old save files carrying retired fields still restore cleanly."""
+    from genesis_cognitive.emotional_regulator import AllostaticLoadTracker
+    from genesis_cognitive.persistence import restore_allostatic_load
+
+    tracker = AllostaticLoadTracker()
+    restore_allostatic_load(
+        tracker,
+        {
+            "state": {
+                "allostatic_load": 0.3,
+                "is_chronic": True,
+                # Removed fields, present in older saves.
+                "acute_stress": 0.9,
+                "stress_history": [0.1] * 600,
+                "adjusted_baselines": {"cortisol": 0.4},
+            },
+            "tick_count": 1234,
+        },
+    )
+    assert tracker.get_allostatic_load() == 0.3
+    assert tracker.is_chronic_stress() is True
+
+
+def test_allostatic_serialization_is_compact():
+    """The serialized tracker must not carry per-sample history.
+
+    The retired `stress_history` was a 600-sample cortisol deque that
+    was appended to every regulation cycle, serialized on every save
+    (~3.6 KB), restored, and never read for any decision.
+    """
+    from genesis_cognitive.emotional_regulator import AllostaticLoadTracker
+    from genesis_cognitive.persistence import _serialize_allostatic_load
+
+    tracker = AllostaticLoadTracker()
+    tracker.set_inference_load(0.5)
+    for _ in range(100):
+        tracker.record_stress(0.5, dt=1.0)
+
+    payload = _serialize_allostatic_load(tracker)
+    assert "stress_history" not in payload["state"]
+    assert "acute_stress" not in payload["state"]
+    assert "tick_count" not in payload
+    # A flat scalar dict, not a list of samples.
+    assert set(payload["state"]) == {"allostatic_load", "is_chronic"}
+
+
 
 def run_all():
     """Run all."""
