@@ -1509,7 +1509,7 @@ class InnerLife:
             # Pass semantic data to the language engine via metadata.
             # The engine composes dream-like text from these triples.
             return SpontaneousThought(
-                content=f"{display1} and {display2}",
+                content=display1,
                 trigger="dream",
                 timestamp=int(time.time() * 1000),
                 metadata={
@@ -1522,10 +1522,10 @@ class InnerLife:
             c1 = chosen[0]
             neighbors = self.network.get_neighbors(c1)
             if neighbors:
-                _, neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
+                _, _neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
                 display = c1.replace('_', ' ')
                 return SpontaneousThought(
-                    content=f"{display} and {neighbor_display}",
+                    content=display,
                     trigger="dream",
                     timestamp=int(time.time() * 1000),
                     metadata={
@@ -1620,7 +1620,7 @@ class InnerLife:
             display1 = c1.replace('_', ' ')
             display2 = c2.replace('_', ' ')
             return SpontaneousThought(
-                content=f"{display1} and {display2}",
+                content=display1,
                 trigger="hypnagogic",
                 timestamp=int(time.time() * 1000),
                 metadata={
@@ -1637,7 +1637,7 @@ class InnerLife:
             display1 = c1.replace('_', ' ')
             display2 = c2.replace('_', ' ')
             return SpontaneousThought(
-                content=f"{display1} and {display2}",
+                content=display1,
                 trigger="hypnagogic",
                 timestamp=int(time.time() * 1000),
                 metadata={
@@ -2000,7 +2000,7 @@ class InnerLife:
             if pgo_concept:
                 knowledge.append(("visualizes", pgo_concept, 0.6))
             return SpontaneousThought(
-                content=f"{display1} and {display2}",
+                content=display1,
                 trigger="dream",
                 timestamp=int(time.time() * 1000),
                 metadata={
@@ -2051,11 +2051,11 @@ class InnerLife:
         pgo_concept = pgo.visual_content if pgo and pgo.visual_content else None
 
         if neighbors and self._rng.random() < 0.6:
-            _, neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
+            _, _neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
             if pgo_concept:
                 knowledge.append(("visualizes", pgo_concept, 0.6))
             return SpontaneousThought(
-                content=f"{display} and {neighbor_display}",
+                content=display,
                 trigger="dream",
                 timestamp=int(time.time() * 1000),
                 metadata={
@@ -2074,7 +2074,7 @@ class InnerLife:
                 if pgo_concept:
                     knowledge.append(("visualizes", pgo_concept, 0.6))
                 return SpontaneousThought(
-                    content=f"{display} and {other_display}",
+                    content=display,
                     trigger="dream",
                     timestamp=int(time.time() * 1000),
                     metadata={
@@ -2125,9 +2125,9 @@ class InnerLife:
         neighbors = self.network.get_neighbors(c1)
         display = c1.replace("_", " ")
         if neighbors:
-            _, neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
+            _, _neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
             return SpontaneousThought(
-                content=f"{display} and {neighbor_display}",
+                content=display,
                 trigger="dream",
                 timestamp=int(time.time() * 1000),
                 metadata={
@@ -2168,9 +2168,9 @@ class InnerLife:
 
         if neighbors and self._rng.random() < 0.7:
             # Follow a real connection — memory replay
-            _, neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
+            _, _neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
             return SpontaneousThought(
-                content=f"{display} and {neighbor_display}",
+                content=display,
                 trigger="dream",
                 timestamp=int(time.time() * 1000),
                 metadata={
@@ -2186,7 +2186,7 @@ class InnerLife:
                 other = self._rng.choice([c for c in concept_ids if c != c1])
                 other_display = other.replace("_", " ")
                 return SpontaneousThought(
-                    content=f"{display} and {other_display}",
+                    content=display,
                     trigger="dream",
                     timestamp=int(time.time() * 1000),
                     metadata={
@@ -2280,7 +2280,7 @@ class InnerLife:
                 origin="lucid-dream",
             )
             return SpontaneousThought(
-                content=f"{display} and {neighbor_display}",
+                content=display,
                 trigger="lucid-dream",
                 timestamp=int(time.time() * 1000),
                 directed_concept=target,
@@ -2294,7 +2294,7 @@ class InnerLife:
             )
         else:
             return SpontaneousThought(
-                content=f"{display} and {neighbor_display}",
+                content=display,
                 trigger="lucid-dream",
                 timestamp=int(time.time() * 1000),
                 directed_concept=target,
@@ -2620,24 +2620,45 @@ class InnerLife:
         return max(0.1, min(0.95, prob))
 
     def _extract_concepts_from_thought(self, thought: SpontaneousThought) -> list[str]:
-        """Extract concept names mentioned in a thought's content.
+        """Extract concept names a thought is about.
 
         Scans the thought text for any concept names that exist in its
-        network. These become the seed for the next thought in the chain.
+        network, then adds the targets from its semantic metadata.
+        These become the seed for the next thought in the chain and the
+        pair candidates for insight detection.
+
+        The metadata targets matter because thought ``content`` is only
+        an anchor, not the finished utterance — the language engine
+        composes the words from the knowledge triples. Reading targets
+        from metadata is what keeps a two-concept dream association
+        seeding the next link of its chain after the join that used to
+        live in ``content`` is gone.
         """
-        content = thought.content
-        if not content:
-            return []
-        # Use the cached concept matcher if available, otherwise fall
-        # back to a simple scan. The matcher compiles a single regex
-        # alternation from all concept IDs, turning an O(N) per-thought
-        # loop into a single O(T) regex scan (T = text length).
         matcher = self._get_concept_matcher()
         found: list[str] = []
-        for cid in matcher(content):
-            found.append(cid)
-            if len(found) >= 5:
-                break
+        seen: set[str] = set()
+
+        def _add(cid: str) -> None:
+            if cid not in seen:
+                seen.add(cid)
+                found.append(cid)
+
+        content = thought.content
+        if content:
+            for cid in matcher(content):
+                _add(cid)
+                if len(found) >= 5:
+                    return found
+
+        meta = thought.metadata
+        if meta:
+            for _rel, target, _weight in meta.get("knowledge") or []:
+                # Targets arrive as display names ("cat"), the matcher
+                # normalizes them back to concept IDs ("cat").
+                for cid in matcher(str(target)):
+                    _add(cid)
+                    if len(found) >= 5:
+                        return found
         return found
 
     def _get_concept_matcher(self) -> Callable[[str], list[str]]:
@@ -2797,7 +2818,7 @@ class InnerLife:
         display1 = c1.replace('_', ' ')
         display2 = c2.replace('_', ' ')
         return SpontaneousThought(
-            content=f"{display1} and {display2}",
+            content=display1,
             trigger="connection",
             timestamp=int(time.time() * 1000),
             metadata={
@@ -2815,13 +2836,13 @@ class InnerLife:
         neighbors = self.network.get_neighbors(c1)
         if not neighbors:
             return None
-        _, neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
+        _, _neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
 
         # Pass semantic data as metadata — the language engine composes
         # the actual words, not pre-written template substitution.
         display = c1.replace('_', ' ')
         return SpontaneousThought(
-            content=f"{display} and {neighbor_display}",
+            content=display,
             trigger="connection",
             timestamp=int(time.time() * 1000),
             metadata={
@@ -4447,7 +4468,7 @@ class InnerLife:
         — Genesis notices its own internal state is unpredictable.
 
         The weight also increases with allostatic load — sustained
-        prediction error makes the interoceptive signal more salient.
+        regulatory burden makes the interoceptive signal more salient.
         """
         reading = self._get_inference_reading()
         if reading is None:

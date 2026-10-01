@@ -9,6 +9,7 @@ metadata for the language engine.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -16,6 +17,11 @@ from typing import Any
 from ..self import Insight
 
 __all__ = ["SpontaneousThought", "ThoughtChainType"]
+
+# Terminal punctuation and a leading capital are cosmetic — the grammar
+# adds both on its way out. Comparisons between what a thought asked to
+# be said and what the engine actually said have to ignore them.
+_TERMINAL_PUNCT_RE = re.compile(r"[\s.!?]+$")
 
 
 class ThoughtChainType(Enum):
@@ -115,7 +121,26 @@ class SpontaneousThought:
             # content back unchanged, the thought stays sub-verbal —
             # an association the mind made but could not articulate —
             # rather than surfacing raw concept pairs as utterances.
-            if meta.get("knowledge") and text.strip() == self.content.strip():
+            #
+            # The comparison has to be case- and punctuation-blind. The
+            # grammar capitalizes the first word and appends a period
+            # on its way out, so a literal `==` misses the echo every
+            # time and lets the placeholder through as speech.
+            if meta.get("knowledge") and _same_utterance(text, self.content):
                 return ""
             return text
         return self.content
+
+
+def _same_utterance(left: str, right: str) -> bool:
+    """Return True when two strings are the same utterance cosmetically.
+
+    Ignores surrounding whitespace, a leading capital, and terminal
+    punctuation — the differences the grammar introduces between what a
+    thought asked to be said and what the engine produced. Anything
+    more than that is a real difference in words.
+    """
+    def norm(text: str) -> str:
+        return _TERMINAL_PUNCT_RE.sub("", text.strip()).lower()
+
+    return bool(norm(left)) and norm(left) == norm(right)

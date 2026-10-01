@@ -28,7 +28,9 @@ fn test_struct_sizes() {
     assert_eq!(core::mem::size_of::<MemoryPointers>(), 120);
     assert_eq!(core::mem::size_of::<ModuleEntry>(), 32);
     assert_eq!(core::mem::size_of::<RuntimeManifest>(), 536);
-    assert_eq!(core::mem::size_of::<GenesisCoreState>(), 3288);
+    // 3288 + 4 for InferenceSignals.policy_authority, absorbed by the
+    // reserved region, which is defined as exactly the signals size.
+    assert_eq!(core::mem::size_of::<GenesisCoreState>(), 3296);
 }
 
 // ─── Field offset assertions ──────────────────────────────────
@@ -636,21 +638,136 @@ fn test_emergent_phase_rem() {
 }
 
 #[test]
+fn test_sleep_phases_do_not_straddle_a_shared_boundary() {
+    // Regression: two hysteresis thresholds sat exactly on the fixed
+    // points they were compared against, so the phase chattered between
+    // two branches on every tick instead of settling.
+    //
+    // 1. Drowsy carried its own ceiling of 0.75 while the sleep branch
+    //    entered at `0.75 - 0.05*(1-ox)` = 0.715, both on the same
+    //    blended adenosine signal. Raw adenosine saturates at its 1.0
+    //    clamp under sustained drive, pinning the blend at exactly
+    //    0.750 — inside the overlap. Measured 85,198 phase transitions
+    //    over 5.5 simulated hours, and because the Drowsy branch
+    //    returned before the sleep branch ran its glymphatic decay,
+    //    raw adenosine never fell below 0.90 and REM was unreachable.
+    // 2. The REM norepinephrine stay threshold was 0.30 * 0.94 = 0.282
+    //    while sleep drives norepinephrine to a fixed point of 0.282,
+    //    so `ne < 0.282` was false at equilibrium and the state
+    //    oscillated REM/NREM within a single bout.
+    //
+    // Both are boundary-coincidence bugs, not tuning problems, so the
+    // regression is structural: a state must not flip more than once
+    // within a window where its input signals are stationary.
+    let params = NeuroTickParams {
+        maturation_level: 1.0,
+        ..Default::default()
+    };
+    let mut vec = NeurochemicalVector::new(1);
+    let mut ms = 0u64;
+    // One hour of wake drive, then stop and let clearance run.
+    for step in 0..400_000u32 {
+        ms += 100;
+        if step < 36_000 {
+            vec.apply_impulse_capped(NeurochemicalId::Adenosine, 0.006, ms);
+        }
+        vec.tick_with_params(&params);
+    }
+    let mut transitions = 0u32;
+    let mut last = vec.emergent_phase;
+    let mut saw_nrem = false;
+    let mut saw_rem = false;
+    for _ in 0..200_000u32 {
+        vec.tick_with_params(&params);
+        if vec.emergent_phase != last {
+            transitions += 1;
+            last = vec.emergent_phase;
+        }
+        if vec.emergent_phase == MentalPhase::NREM as u8 {
+            saw_nrem = true;
+        }
+        if vec.emergent_phase == MentalPhase::REM as u8 {
+            saw_rem = true;
+        }
+    }
+    assert!(saw_nrem, "NREM must be reachable in a sleep episode");
+    assert!(saw_rem, "REM must be reachable in a sleep episode");
+    // A ~90 min ultradian cycle over ~5.5 h is a handful of transitions.
+    // The pre-fix straddle produced tens of thousands.
+    assert!(
+        transitions < 200,
+        "phase chattered: {transitions} transitions, expected a few per ultradian cycle"
+    );
+}
+
+#[test]
+fn test_sleep_episode_produces_ultradian_nrem_rem_cycles() {
+    // The point of the sleep architecture is not just that REM is
+    // reachable once, but that sleep alternates NREM and REM on the
+    // documented ultradian rhythm. Process S clearing during sleep is
+    // what lets the cholinergic rebound fire, so a single NREM period
+    // followed by terminal wake would mean clearance is not running.
+    let params = NeuroTickParams {
+        maturation_level: 1.0,
+        ..Default::default()
+    };
+    let mut vec = NeurochemicalVector::new(1);
+    for _ in 0..600_000u32 {
+        vec.tick_with_params(&params);
+    }
+    // From rest, Process S must accumulate over hours before sleep.
+    let mut nrem_bouts = 0u32;
+    let mut rem_bouts = 0u32;
+    let mut prev = vec.emergent_phase;
+    for _ in 0..1_200_000u32 {
+        vec.tick_with_params(&params);
+        let ph = vec.emergent_phase;
+        if ph != prev {
+            if ph == MentalPhase::NREM as u8 {
+                nrem_bouts += 1;
+            }
+            if ph == MentalPhase::REM as u8 {
+                rem_bouts += 1;
+            }
+            prev = ph;
+        }
+    }
+    assert!(
+        nrem_bouts >= 3,
+        "expected repeated NREM bouts across ~33 h, saw {nrem_bouts}"
+    );
+    assert!(
+        rem_bouts >= 2,
+        "expected repeated REM bouts across ~33 h, saw {rem_bouts}"
+    );
+}
+
+#[test]
 fn test_emergent_phase_flow() {
+    // Levels are drawn from the substrate's measured reachable envelope
+    // (dopamine rests at 0.384 and peaks at 0.416; ACh peaks at 0.538
+    // under engagement). The previous values of 0.75 and 0.60 were
+    // above what the substrate can produce at all, which is why the
+    // Flow phase had never been observed despite the test.
     let mut vec = NeurochemicalVector::new(0);
-    vec.get_mut(NeurochemicalId::Dopamine).unwrap().level = 0.75;
-    vec.get_mut(NeurochemicalId::Acetylcholine).unwrap().level = 0.60;
-    vec.get_mut(NeurochemicalId::Norepinephrine).unwrap().level = 0.50;
-    vec.get_mut(NeurochemicalId::Cortisol).unwrap().level = 0.15;
+    vec.get_mut(NeurochemicalId::Dopamine).unwrap().level = 0.46;
+    vec.get_mut(NeurochemicalId::Acetylcholine).unwrap().level = 0.54;
+    vec.get_mut(NeurochemicalId::Norepinephrine).unwrap().level = 0.45;
+    vec.get_mut(NeurochemicalId::Cortisol).unwrap().level = 0.02;
     vec.recompute_derived();
     assert_eq!(vec.phase(), MentalPhase::Flow);
 }
 
 #[test]
 fn test_emergent_phase_stress() {
+    // Cortisol measured 0.020 resting and 0.084 peak under sustained
+    // drive, so the stress gate sits at 0.060. These values are
+    // deliberately between the stress and overwhelm gates, since
+    // Overwhelm now keys on the same two mediators at a higher level
+    // and the old 0.75/0.70 pair landed squarely in it.
     let mut vec = NeurochemicalVector::new(0);
-    vec.get_mut(NeurochemicalId::Cortisol).unwrap().level = 0.75;
-    vec.get_mut(NeurochemicalId::Norepinephrine).unwrap().level = 0.70;
+    vec.get_mut(NeurochemicalId::Cortisol).unwrap().level = 0.07;
+    vec.get_mut(NeurochemicalId::Norepinephrine).unwrap().level = 0.50;
     vec.get_mut(NeurochemicalId::Serotonin).unwrap().level = 0.25;
     vec.recompute_derived();
     assert_eq!(vec.phase(), MentalPhase::Stress);
@@ -1021,7 +1138,7 @@ fn test_flow_state_enhances_encoding() {
             .neurochemicals
             .get_mut(NeurochemicalId::Acetylcholine)
             .unwrap()
-            .level = 0.65;
+            .level = 0.80;
         state
             .neurochemicals
             .get_mut(NeurochemicalId::Norepinephrine)
@@ -1031,7 +1148,7 @@ fn test_flow_state_enhances_encoding() {
             .neurochemicals
             .get_mut(NeurochemicalId::Cortisol)
             .unwrap()
-            .level = 0.15;
+            .level = 0.02;
         state.neuro_tick();
         state.write_end();
     }
@@ -1614,12 +1731,22 @@ fn test_adenosine_accumulates_during_drowsy() {
     };
 
     // Force the system into Drowsy phase: high adenosine, low arousal.
-    // Drowsy threshold: adn > 0.50, arousal < 0.38.
+    // Drowsy threshold: adn > 0.50 and arousal < 0.30 to enter.
     // We set adenosine to 0.55 (above Drowsy threshold, below NREM
     // threshold of ~0.725) and suppress all arousal systems.
+    //
+    // The circadian phase must be set to night as well. Drowsiness
+    // requires high sleep pressure *and* a low circadian wake drive
+    // (the SCN's Process C opposes sleep during the day), and the
+    // default phase of 0.3 contributes about +0.20 of wake drive. The
+    // previous unbounded self-excitation masked that by dragging
+    // arousal down regardless of chemistry; with the bounded, graded
+    // term the wake drive correctly keeps her awake, so the test has
+    // to establish night for the state it is trying to construct.
     for _ in 0..200 {
         // SAFETY: single-threaded test — no concurrent writers.
         unsafe { state.write_begin(0) };
+        state.neurochemicals.set_circadian_phase(0.0);
         let adn = state
             .neurochemicals
             .get_mut(NeurochemicalId::Adenosine)
@@ -2828,5 +2955,162 @@ fn test_wake_recovery_skipped_when_cortisol_high() {
         "BDNF should NOT be boosted when cortisol is high: was {}, now {}",
         bdnf_before,
         bdnf_after
+    );
+}
+
+// ─── Phase gates must sit inside the substrate's reachable range ──
+//
+// Every gate below was originally written as an absolute number
+// borrowed from a neurochemical scale this substrate does not
+// produce. Measured peaks over two hours under sustained drive are
+// cortisol 0.084, norepinephrine 0.578, dopamine 0.416, ACh 0.538 and
+// histamine 0.361, so gates at 0.65/0.70/0.75/0.60 were unreachable
+// and five of eight phases had literally never been entered. These
+// assert the gates against measured maxima so a future change to the
+// chemistry cannot silently make a phase unreachable again.
+
+/// Drive the substrate hard and report the peak of each gated
+/// chemical, in the units the phase gates are written in.
+fn measured_peaks() -> [f32; 18] {
+    use genesis::state::neurochemical::NeuroTickParams;
+    let params = NeuroTickParams {
+        maturation_level: 1.0,
+        ..Default::default()
+    };
+    let mut nv = NeurochemicalVector::new(1);
+    let mut ms = 0u64;
+    let mut hi = [0.0f32; 18];
+    for _ in 0..72_000u32 {
+        ms += 100;
+        nv.apply_impulse_capped(NeurochemicalId::CRH, 0.003, ms);
+        nv.apply_impulse_capped(NeurochemicalId::Norepinephrine, 0.003, ms);
+        nv.apply_impulse_capped(NeurochemicalId::Acetylcholine, 0.003, ms);
+        nv.apply_impulse_capped(NeurochemicalId::Histamine, 0.003, ms);
+        nv.apply_impulse_capped(NeurochemicalId::Dopamine, 0.003, ms);
+        nv.tick_with_params(&params);
+        for (h, v) in hi.iter_mut().zip(nv.effective_levels.iter()) {
+            *h = h.max(*v);
+        }
+    }
+    hi
+}
+
+#[test]
+fn test_every_phase_gate_is_inside_the_reachable_envelope() {
+    use genesis::state::neurochemical::{
+        ALERT_HISTAMINE_GATE, ALERT_NOREPI_GATE, FLOW_ACETYLCHOLINE_GATE,
+        FLOW_DOPAMINE_GATE, STRESS_CORTISOL_GATE, STRESS_NOREPI_GATE,
+    };
+    let p = measured_peaks();
+    let at = |id: NeurochemicalId| p[id as usize];
+
+    // Each gate must be below what the substrate can actually reach,
+    // or the phase is unreachable. Leave headroom: the gate is a
+    // threshold to be cleared with margin, not the ceiling.
+    assert!(
+        STRESS_CORTISOL_GATE < at(NeurochemicalId::Cortisol),
+        "stress cortisol gate {STRESS_CORTISOL_GATE} is not reachable; \
+         measured peak {}",
+        at(NeurochemicalId::Cortisol)
+    );
+    assert!(
+        STRESS_NOREPI_GATE < at(NeurochemicalId::Norepinephrine),
+        "stress NE gate {STRESS_NOREPI_GATE} not reachable; peak {}",
+        at(NeurochemicalId::Norepinephrine)
+    );
+    assert!(
+        ALERT_NOREPI_GATE < at(NeurochemicalId::Norepinephrine),
+        "alert NE gate {ALERT_NOREPI_GATE} not reachable; peak {}",
+        at(NeurochemicalId::Norepinephrine)
+    );
+    assert!(
+        ALERT_HISTAMINE_GATE < at(NeurochemicalId::Histamine),
+        "alert histamine gate {ALERT_HISTAMINE_GATE} not reachable; peak {}",
+        at(NeurochemicalId::Histamine)
+    );
+    assert!(
+        FLOW_DOPAMINE_GATE < at(NeurochemicalId::Dopamine),
+        "flow dopamine gate {FLOW_DOPAMINE_GATE} not reachable; peak {}",
+        at(NeurochemicalId::Dopamine)
+    );
+    assert!(
+        FLOW_ACETYLCHOLINE_GATE < at(NeurochemicalId::Acetylcholine),
+        "flow ACh gate {FLOW_ACETYLCHOLINE_GATE} not reachable; peak {}",
+        at(NeurochemicalId::Acetylcholine)
+    );
+}
+
+#[test]
+fn test_phase_gates_remain_above_the_resting_state() {
+    // A gate must also be above rest, or ordinary physiological
+    // variation triggers the phase and the state space collapses the
+    // other way — every phase always on.
+    let mut nv = NeurochemicalVector::new(1);
+    for _ in 0..36_000u32 {
+        nv.tick_with_params(&genesis::state::neurochemical::NeuroTickParams::default());
+    }
+    use genesis::state::neurochemical::{STRESS_CORTISOL_GATE, STRESS_NOREPI_GATE};
+    let cort = nv.effective_levels[NeurochemicalId::Cortisol as usize];
+    let ne = nv.effective_levels[NeurochemicalId::Norepinephrine as usize];
+    assert!(
+        cort < STRESS_CORTISOL_GATE,
+        "resting cortisol {cort} already clears the stress gate"
+    );
+    assert!(
+        ne < STRESS_NOREPI_GATE,
+        "resting NE {ne} already clears the stress gate"
+    );
+}
+
+#[test]
+fn test_encoding_weight_is_discriminating() {
+    // Encoding is a weighted average of dopamine, norepinephrine and
+    // acetylcholine. Measured range is 0.267 at the low end to 0.775
+    // at maximum engagement, with resting around 0.35, so the 0.6
+    // threshold for "high encoding" sits inside the reachable set and
+    // above rest. Asserting that relationship keeps a future change
+    // to the contributing chemicals from putting the bar out of reach.
+    let params = genesis::state::neurochemical::NeuroTickParams {
+        maturation_level: 1.0,
+        ..Default::default()
+    };
+    let run = |ach: f32, da: f32, ne: f32| -> (f32, f32) {
+        let mut nv = NeurochemicalVector::new(1);
+        let mut ms = 0u64;
+        let mut lo = 1.0f32;
+        let mut hi = 0.0f32;
+        for _ in 0..36_000u32 {
+            ms += 100;
+            if ach > 0.0 {
+                nv.apply_impulse_capped(NeurochemicalId::Acetylcholine, ach, ms);
+            }
+            if da > 0.0 {
+                nv.apply_impulse_capped(NeurochemicalId::Dopamine, da, ms);
+            }
+            if ne > 0.0 {
+                nv.apply_impulse_capped(NeurochemicalId::Norepinephrine, ne, ms);
+            }
+            nv.tick_with_params(&params);
+            let e = 0.4 * nv.effective_levels[NeurochemicalId::Dopamine as usize]
+                + 0.3 * nv.effective_levels[NeurochemicalId::Norepinephrine as usize]
+                + 0.3 * nv.effective_levels[NeurochemicalId::Acetylcholine as usize];
+            lo = lo.min(e);
+            hi = hi.max(e);
+        }
+        (lo, hi)
+    };
+    let (rest_lo, rest_hi) = run(0.0, 0.0, 0.0);
+    let (_, engaged_hi) = run(0.006, 0.006, 0.006);
+    assert!(
+        engaged_hi > 0.6,
+        "max reachable encoding {engaged_hi} cannot clear the 0.6 bar"
+    );
+    assert!(
+        rest_hi < 0.6,
+        "resting encoding {rest_hi} already clears the high-encoding bar"
+    );
+    assert!(
+        rest_lo < rest_hi,
+        "encoding should be dynamic, got a flat {rest_lo}"
     );
 }
