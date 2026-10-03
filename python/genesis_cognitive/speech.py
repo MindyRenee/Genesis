@@ -34,6 +34,8 @@ import wave
 from pathlib import Path
 from typing import Any
 
+from genesis_client.swallow import note_swallowed
+
 logger = logging.getLogger(__name__)
 
 # ─── Paths ────────────────────────────────────────────────────────
@@ -157,7 +159,10 @@ class Voice:
                 with config_path.open() as f:
                     self._sample_rate = json.load(f)["audio"]["sample_rate"]
             except (OSError, KeyError, json.JSONDecodeError) as e:
-                logger.debug(f'__init__ failed: {e}')
+                note_swallowed(
+                    "genesis_cognitive.speech.Voice.__init__",
+                    e,
+                )
         self._piper_proc: subprocess.Popen | None = None
         self._play_proc: subprocess.Popen | None = None
         self._all_procs: list[subprocess.Popen] = []  # track all spawned procs
@@ -324,7 +329,10 @@ class Voice:
                         proc.kill()
                         proc.wait(timeout=5)
                     except Exception as e:  # noqa: BLE001
-                        logger.debug(f"failed to kill TTS child: {e}")
+                        note_swallowed(
+                            "genesis_cognitive.speech._reap_children",
+                            e,
+                        )
                 except Exception as e:  # noqa: BLE001
                     logger.warning(f"reap child failed: {e}")
         finally:
@@ -357,7 +365,10 @@ class Voice:
             elif self._espeak_available:
                 self._speak_espeak(text, False, rate_factor)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"queued speak failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.speech._play_next_queued",
+                e,
+            )
             self._done_speaking()
 
     def _start_speaking(self) -> None:
@@ -472,7 +483,10 @@ class Voice:
                     daemon=True,
                 ).start()
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Piper TTS failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.speech._speak_piper",
+                e,
+            )
             if self._espeak_available:
                 self._speak_espeak(text, blocking, rate_factor)
 
@@ -498,7 +512,10 @@ class Voice:
                     daemon=True,
                 ).start()
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"espeak-ng failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.speech._speak_espeak",
+                e,
+            )
 
     def stop(self) -> None:
         """Stop any currently playing speech."""
@@ -515,7 +532,10 @@ class Voice:
                     proc.kill()
                     proc.wait()
                 except Exception as e:  # noqa: BLE001
-                    logger.debug(repr(e))
+                    note_swallowed(
+                        "genesis_cognitive.speech.stop",
+                        e,
+                    )
         # Also kill any orphaned procs from previous non-blocking calls
         # whose _reap_children thread is still blocked on wait().
         with self._procs_lock:
@@ -529,7 +549,10 @@ class Voice:
                 proc.kill()
                 proc.wait()
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"failed to stop TTS proc: {e}")
+                note_swallowed(
+                    "genesis_cognitive.speech.stop",
+                    e,
+                )
         self._piper_proc = None
         self._play_proc = None
 
@@ -619,7 +642,10 @@ class VoiceInput:
             logger.debug("Vosk model loaded")
             return True
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Vosk init failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.speech._init_vosk",
+                e,
+            )
             return False
 
     def _init_google(self) -> bool:
@@ -632,7 +658,10 @@ class VoiceInput:
             self._sr_recognizer.dynamic_energy_threshold = True
             return True
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Google init failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.speech._init_google",
+                e,
+            )
             return False
 
     @property
@@ -812,7 +841,10 @@ class VoiceInput:
             try:
                 os.unlink(tmp_path)
             except OSError as e:
-                logger.debug(repr(e))
+                note_swallowed(
+                    "genesis_cognitive.speech._listen_google",
+                    e,
+                )
 
     def listen_interactive(self, prompt: str = "Listening...") -> str | None:
         """Listen with a prompt printed to stdout.

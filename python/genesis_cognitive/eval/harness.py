@@ -19,6 +19,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 from genesis_client import GenesisClient
+from genesis_client.swallow import note_swallowed
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,10 @@ def wait_for_socket(socket_path: str, timeout: float = 10.0) -> bool:
                 return True
             except OSError as e:
                 # Socket file exists but daemon isn't accepting yet — keep polling.
-                logger.debug(f"socket not ready yet: {e}")
+                note_swallowed(
+                    "genesis_cognitive.eval.harness.wait_for_socket",
+                    e,
+                )
         time.sleep(0.1)
     return os.path.exists(socket_path)
 
@@ -69,7 +73,7 @@ def wait_for_socket(socket_path: str, timeout: float = 10.0) -> bool:
 def settle(client: GenesisClient, *, ticks: int = 60, dt: float = 1.0) -> None:
     """Advance neurochemistry until transients decay to resting state."""
     for _ in range(ticks):
-        client.advance_neuro(dt=dt)
+        client.advance_physics(dt)
 
 
 @contextmanager
@@ -112,7 +116,10 @@ def isolated_daemon(
         try:
             client.disconnect()
         except OSError as e:
-            logger.debug(f"harness client disconnect failed (benign): {e}")
+            note_swallowed(
+                "genesis_cognitive.eval.harness.isolated_daemon",
+                e,
+            )
         try:
             killer = GenesisClient(socket_path)
             killer.connect()

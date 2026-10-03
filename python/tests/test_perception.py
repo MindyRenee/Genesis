@@ -8,14 +8,10 @@ import tempfile
 import numpy as np
 import pytest
 
-from genesis_cognitive.auditory import (
-    COCO_CLASSES,
-    DetectedObject,
-    ObjectRecognizer,
-)
 from genesis_cognitive.concepts import ConceptNetwork
 from genesis_cognitive.emotion import EmotionalState
 from genesis_cognitive.language import Vocabulary
+from genesis_cognitive.occipital_lobe.v1 import _build_summary
 from genesis_cognitive.perception import (
     IntegratedPerception,
     MemoryBridge,
@@ -51,7 +47,11 @@ from genesis_cognitive.perception.vision import (
     _learn_objects,
 )
 from genesis_cognitive.self import PersonalityTraits
-from genesis_cognitive.vision.v1 import _build_summary
+from genesis_cognitive.temporal_lobe import (
+    COCO_CLASSES,
+    DetectedObject,
+    ObjectRecognizer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -613,7 +613,7 @@ class TestObjectRecognizer:
 
     def test_recognizer_not_available_without_model(self, tmp_path) -> None:
         """Recognizer should report unavailable if model file is missing."""
-        import genesis_cognitive.auditory.object_recognition as mod
+        import genesis_cognitive.temporal_lobe.object_recognition as mod
 
         # Save original model path and point to nonexistent file
         original = mod._MODEL_FILE
@@ -1172,7 +1172,7 @@ class TestV4Model:
 
     def test_process_returns_correct_shape(self, occipital, sample_image):
         """V4 should return latents with the right number of features."""
-        from genesis_cognitive.vision.v1 import (
+        from genesis_cognitive.occipital_lobe.v1 import (
             _extract_patches,
             _to_grayscale,
             _whiten_patches,
@@ -1195,7 +1195,7 @@ class TestV4Model:
 
     def test_dictionary_learning(self, occipital, sample_image):
         """V4 dictionary should change after processing images."""
-        from genesis_cognitive.vision.v1 import (
+        from genesis_cognitive.occipital_lobe.v1 import (
             _extract_patches,
             _to_grayscale,
             _whiten_patches,
@@ -1221,7 +1221,7 @@ class TestV4Model:
 
     def test_color_integration(self, occipital, green_image, blue_image):
         """V4 should produce different activations for different colors."""
-        from genesis_cognitive.vision.v1 import (
+        from genesis_cognitive.occipital_lobe.v1 import (
             _extract_patches,
             _to_grayscale,
             _whiten_patches,

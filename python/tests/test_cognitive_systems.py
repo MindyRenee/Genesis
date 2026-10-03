@@ -1064,7 +1064,7 @@ def test_gw_on_ignition_not_subliminal() -> None:
 
 def test_safeguard_urge_registered() -> None:
     """The safeguard urge ships in the default urge set."""
-    from genesis_cognitive.config import MindConfig
+    from genesis_cognitive.infrastructure.config import MindConfig
 
     urges = {u.name: u for u in MindConfig().volition.urges}
     assert "safeguard" in urges
@@ -1080,7 +1080,7 @@ def test_safeguard_urge_registered() -> None:
 
 def test_safeguard_urge_dynamics() -> None:
     """Safeguard fires under sustained threat, not on a transient."""
-    from genesis_cognitive.config import MindConfig
+    from genesis_cognitive.infrastructure.config import MindConfig
     from genesis_cognitive.volition import Urge
 
     cfg = next(u for u in MindConfig().volition.urges if u.name == "safeguard")
@@ -2752,7 +2752,7 @@ class TestPersistence:
     def test_old_format_backward_compat(self) -> None:
         """Old save files with 'response' (string) instead of 'strategy'
         (dict) should load with a default strategy, not crash."""
-        from genesis_cognitive.persistence import restore_procedural_memory
+        from genesis_cognitive.infrastructure.persistence import restore_procedural_memory
 
         old_data = {
             "skills": [
@@ -2783,7 +2783,7 @@ class TestPersistence:
 
     def test_new_format_round_trip(self) -> None:
         """New format with strategy dict should serialize and restore."""
-        from genesis_cognitive.persistence import (
+        from genesis_cognitive.infrastructure.persistence import (
             _serialize_procedural_memory,
             restore_procedural_memory,
         )

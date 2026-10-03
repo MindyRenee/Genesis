@@ -37,6 +37,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 
 from genesis_client import GenesisClient
+from genesis_client.swallow import note_swallowed
 from genesis_client.types import InferenceSummary
 
 __all__ = [
@@ -318,7 +319,10 @@ class ActiveInferenceReader:
         try:
             signals = self.client.get_inference_summary()
         except Exception as e:  # noqa: BLE001
-            logger.debug("Could not read inference summary: %s", e)
+            note_swallowed(
+                "genesis_cognitive.learning.active_inference.read",
+                e,
+            )
             return None
 
         reading = self._interpret(signals)
@@ -443,5 +447,8 @@ class ActiveInferenceReader:
                 confidence=estimate.confidence,
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug("Could not update user affect: %s", e)
+            note_swallowed(
+                "genesis_cognitive.learning.active_inference.update_user_affect",
+                e,
+            )
             return False

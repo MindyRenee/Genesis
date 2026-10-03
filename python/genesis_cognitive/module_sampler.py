@@ -42,14 +42,17 @@ from genesis_client.protocol import (
     MODULE_REASONING,
     MODULE_SENSORY,
 )
+from genesis_client.swallow import note_swallowed
+
+from .infrastructure.journal import record_error, record_event
 
 logger = logging.getLogger(__name__)
 
 _PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 _CLIENT_DIR = os.path.join(os.path.dirname(_PKG_DIR), "genesis_client")
 
-# Subsystem directory → manifest module. The brain-region packages
-# (control, affect, …) are documented views over the
+# Subsystem directory → manifest module. The brain-lobe packages
+# (frontal_lobe, limbic_system, …) are documented views over the
 # top-level subsystems, so both the view name and the real
 # implementation directory resolve here.
 _DIR_MODULE = {
@@ -59,17 +62,17 @@ _DIR_MODULE = {
     "concepts": MODULE_MEMORY,
     "language": MODULE_LANGUAGE,
     "perception": MODULE_SENSORY,
-    "vision": MODULE_SENSORY,
-    "auditory": MODULE_SENSORY,
-    "association": MODULE_SENSORY,
+    "occipital_lobe": MODULE_SENSORY,  # V1/V4 — the ventral stream's origin
+    "temporal_lobe": MODULE_SENSORY,  # A1, VTC, object recognition
+    "parietal_lobe": MODULE_SENSORY,  # dorsal stream — spatial "where"
     "spatial": MODULE_SENSORY,
-    "relay": MODULE_ATTENTION,  # relay/gate — attention switching
-    "control": MODULE_INTENTION,  # executive / goal direction
-    "action_selection": MODULE_INTENTION,  # action selection
-    "motor_learning": MODULE_MOTOR,
-    "affect": MODULE_EMOTION,
+    "thalamus": MODULE_ATTENTION,  # thalamus/gate — attention switching
+    "frontal_lobe": MODULE_INTENTION,  # executive / goal direction
+    "basal_ganglia": MODULE_INTENTION,  # action selection
+    "cerebellum": MODULE_MOTOR,
+    "limbic_system": MODULE_EMOTION,
     "neurochemical": MODULE_EMOTION,
-    "autonomics": MODULE_EMOTION,  # arousal / neurochemical regulation
+    "brainstem": MODULE_EMOTION,  # arousal / neurochemical regulation
     "sleep": MODULE_DREAMING,
     "learning": MODULE_INTENTION,  # self-directed acquisition
     "tools": MODULE_INTENTION,
@@ -160,6 +163,9 @@ class ModuleSampler:
         self._credit = credit
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        # Consecutive failed sample ticks. Reset by a success, so this
+        # measures a *sustained* fault rather than a single blip.
+        self._failed_ticks = 0
 
     def start(self) -> None:
         """Start the sampling thread (idempotent)."""
@@ -183,8 +189,38 @@ class ModuleSampler:
         while not self._stop.wait(interval):
             try:
                 self._sample(interval)
+                self._failed_ticks = 0
             except Exception as e:  # noqa: BLE001 — telemetry must never kill the loop
-                logger.debug(f"module sample failed: {e}")
+                # The loop must survive, but a dropped tick permanently
+                # under-reports every module's activity for that window
+                # and nothing anywhere said so. Count the failures and
+                # record the first one, so the gap in the data has a
+                # recorded cause rather than being indistinguishable
+                # from a mind that was genuinely idle.
+                self._failed_ticks += 1
+                if self._failed_ticks == 1:
+                    record_error("module_sampler.sample", e)
+                else:
+                    note_swallowed(
+                        "genesis_cognitive.module_sampler._run",
+                        e,
+                    )
+                if self._failed_ticks % 100 == 0:
+                    record_event(
+                        "sampler_degraded",
+                        "module sampler is failing repeatedly",
+                        consecutive_failures=self._failed_ticks,
+                    )
+
+    @property
+    def consecutive_failures(self) -> int:
+        """How many sample ticks in a row have failed.
+
+        Zero means the sampler is healthy. A sustained non-zero value
+        means the activity tiers are under-reporting, which is a
+        different condition from a mind that is simply not busy.
+        """
+        return self._failed_ticks
 
     def _sample(self, dt: float) -> None:
         """One sample tick: credit each executing thread's module dt."""

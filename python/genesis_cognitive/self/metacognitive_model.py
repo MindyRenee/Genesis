@@ -508,7 +508,7 @@ def _extract_features(
     from ..brain_waves import BrainWave
 
     wave = state.brain_waves
-    bands = [BrainWave.DELTA, BrainWave.THETA, BrainWave.ALPHA, BrainWave.BETA, BrainWave.GAMMA]
+    bands = [BrainWave.DELTA, BrainWave.THETA, BrainWave.ALPHA, BrainWave.BETA2, BrainWave.GAMMA]
     for i, band in enumerate(bands):
         if idx + i < NUM_FEATURES:
             features[idx + i] = 1.0 if (wave is not None and wave.dominant == band) else 0.0

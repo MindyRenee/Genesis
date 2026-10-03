@@ -155,6 +155,37 @@ fn parse_args() -> Config {
     config
 }
 
+/// Decide what a `try_lock` refusal means in the fallback loop.
+///
+/// `WouldBlock` is the normal case: the mind is mid-drive and this
+/// cycle should simply be skipped. `Poisoned` means some other thread
+/// panicked while holding the lock, and it never clears — every
+/// subsequent attempt fails the same way. Collapsing the two into
+/// `continue` made a dead subsystem look like a busy one: the daemon
+/// kept answering PING while neurochemistry, consolidation, dreaming
+/// and zone arbitration had all silently stopped. Poisoning is
+/// therefore reported, once per mutex, so it is visible without
+/// flooding the log on every cycle.
+fn lock_refusal<T>(what: &'static str, e: std::sync::TryLockError<T>) {
+    if let std::sync::TryLockError::Poisoned(_) = e {
+        static REPORTED: std::sync::OnceLock<Mutex<Vec<&'static str>>> = std::sync::OnceLock::new();
+        let reported = REPORTED.get_or_init(|| Mutex::new(Vec::new()));
+        let mut guard = match reported.lock() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if !guard.contains(&what) {
+            guard.push(what);
+            eprintln!(
+                "[genesis] {what} mutex is poisoned — a thread panicked while holding it. \
+                 The autonomous fallback cannot run this subsystem and will keep skipping it \
+                 until the daemon restarts. The IPC path will refuse it too."
+            );
+        }
+    }
+    // Both outcomes mean "skip this cycle"; only the reporting differs.
+}
+
 fn main() {
     let config = parse_args();
 
@@ -402,8 +433,11 @@ fn main() {
         // keeps the body alive.
         if last_staleness_check.elapsed() >= STALENESS_CHECK_INTERVAL {
             last_staleness_check = std::time::Instant::now();
-            if let Ok(mut tl) = tick_loop.try_lock() {
-                tl.check_staleness(&mmap);
+            match tick_loop.try_lock() {
+                Ok(mut tl) => tl.check_staleness(&mmap),
+                Err(e) => {
+                    lock_refusal("tick_loop", e);
+                }
             }
         }
 
@@ -412,7 +446,12 @@ fn main() {
         // the fallback fires only past 3 s of silence.
         let lease_expired = match tick_loop.try_lock() {
             Ok(tl) => tl.mind_lease_expired(),
-            Err(_) => continue, // TickLoop busy (mind driving) — skip.
+            Err(e) => {
+                // Busy (mind driving) skips this cycle; poisoned is
+                // reported once and then skips it forever.
+                lock_refusal("tick_loop", e);
+                continue;
+            }
         };
         if !lease_expired {
             continue;
@@ -423,28 +462,40 @@ fn main() {
         // (mind or fallback), capped like the IPC path, so catch-up
         // after a stall never overshoots the integrator.
         {
-            let Ok(mut tl) = tick_loop.try_lock() else {
-                continue;
+            let mut tl = match tick_loop.try_lock() {
+                Ok(tl) => tl,
+                Err(e) => {
+                    lock_refusal("tick_loop", e);
+                    continue;
+                }
             };
             // Re-check under the lock: the mind may have driven
             // between the peek above and now.
             if !tl.mind_lease_expired() {
                 continue;
             }
-            let dt = tl
-                .since_last_advance_secs()
-                .unwrap_or(genesis::daemon::tick::TICK_INTERVAL_MS as f32 / 1000.0)
-                .clamp(0.001, 10.0);
-            tl.advance_neuro(&mmap, dt);
+            // No dt here either: the body measures its own elapsed time.
+            tl.advance_neuro(&mmap);
         }
 
         // ── Autonomous memory + sensing (LTM first, then TickLoop:
         // same order as the IPC path, both try_lock) ──
-        let Ok(mut ltm_guard) = ltm.try_lock() else {
-            continue; // IPC owns LTM — physiology already advanced above.
+        let mut ltm_guard = match ltm.try_lock() {
+            Ok(g) => g,
+            Err(e) => {
+                // IPC owns LTM (physiology already advanced above) —
+                // or it is poisoned, which never clears.
+                lock_refusal("ltm", e);
+                continue;
+            }
         };
-        let Ok(mut tl) = tick_loop.try_lock() else {
-            continue; // Mind driving — drop LTM guard by scope end.
+        let mut tl = match tick_loop.try_lock() {
+            Ok(tl) => tl,
+            Err(e) => {
+                // Mind driving — the LTM guard drops by scope end.
+                lock_refusal("tick_loop", e);
+                continue;
+            }
         };
         // The mind may have returned while we acquired locks.
         if !tl.mind_lease_expired() {
@@ -494,10 +545,14 @@ fn main() {
         // only — never application). Needs the TickLoop alone.
         if last_auto_body.elapsed() >= AUTO_BODY_INTERVAL {
             last_auto_body = std::time::Instant::now();
-            if let Ok(mut tl) = tick_loop.try_lock()
-                && tl.mind_lease_expired()
-            {
-                tl.publish_body_recommendation(&mmap);
+            match tick_loop.try_lock() {
+                Ok(mut tl) if tl.mind_lease_expired() => {
+                    tl.publish_body_recommendation(&mmap);
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    lock_refusal("tick_loop", e);
+                }
             }
         }
 
@@ -506,11 +561,16 @@ fn main() {
         // mindless stretches. Shutdown always saves regardless.
         if last_auto_model_save.elapsed() >= AUTO_MODEL_SAVE_INTERVAL {
             last_auto_model_save = std::time::Instant::now();
-            if let Ok(tl) = tick_loop.try_lock()
-                && tl.mind_lease_expired()
-                && !tl.save_inference_model(&config.data_dir)
-            {
-                eprintln!("[genesis] WARNING: autonomous inference save failed");
+            match tick_loop.try_lock() {
+                Ok(tl) if tl.mind_lease_expired() => {
+                    if !tl.save_inference_model(&config.data_dir) {
+                        eprintln!("[genesis] WARNING: autonomous inference save failed");
+                    }
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    lock_refusal("tick_loop", e);
+                }
             }
         }
 
@@ -539,6 +599,23 @@ fn main() {
     // its running state.
     if genesis::daemon::cpufreq::restore_hardware_state() {
         eprintln!("[genesis] Host CPU policy restored.");
+    } else if genesis::daemon::cpufreq::policy_was_applied() {
+        // The alarming case, and the only one worth shouting about: we
+        // did change the host and could not put it back, so the machine
+        // outlives us pinned to a throttle. Reported unconditionally
+        // rather than through the deduplicating helper so it survives
+        // an earlier same-cause log.
+        eprintln!(
+            "[genesis] WARNING: host CPU policy was NOT restored — this machine may \
+             be left at the throttled governor Genesis applied. Check that the \
+             cpufreq helper and its sudoers rule are still installed."
+        );
+    } else {
+        // Nothing was ever applied, so there is nothing to restore. This
+        // is the ordinary case on a machine where the helper was never
+        // installed, and warning about a throttle we never applied
+        // would be a false alarm on every shutdown.
+        eprintln!("[genesis] Host CPU policy unchanged — nothing was applied, nothing to restore.");
     }
 
     // Wait for the IPC accept thread to finish gracefully.

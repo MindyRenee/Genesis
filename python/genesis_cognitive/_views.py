@@ -8,7 +8,7 @@ cognitive modules. The modules themselves are multi-subsystem and stay
 at the top level; the region package re-exports them so the anatomy
 is a real connection layer:
 
-    from genesis_cognitive.control import ExecutiveFunction
+    from genesis_cognitive.frontal_lobe import ExecutiveFunction
 
 Re-exports resolve lazily through a PEP 562 module ``__getattr__``.
 They must NOT be eager: several of the re-exported modules sit on an

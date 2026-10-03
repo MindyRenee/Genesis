@@ -24,6 +24,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from genesis_client import GenesisClient
+from genesis_client.swallow import note_swallowed
 
 from ..emotion import EmotionalState
 from ..perception import Perception
@@ -161,7 +162,10 @@ class MemoryStore:
         try:
             self._client.consolidate()
         except (OSError, ConnectionError) as e:
-            logger.debug(f"post-conversation consolidate failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.cognition.memory_store.store_conversation_memory",
+                e,
+            )
 
     # ─── Dopamine level ──────────────────────────────────────────
 

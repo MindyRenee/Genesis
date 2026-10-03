@@ -24,6 +24,8 @@ import random
 from dataclasses import dataclass
 from typing import Any
 
+from genesis_client.swallow import note_swallowed
+
 logger = logging.getLogger(__name__)
 
 # Attribute vocab for generated sorters. Instances given as data (an
@@ -489,4 +491,7 @@ class PerceptualSorter(ShapeSorter):
                 except Exception as e:  # noqa: BLE001
                     # One bad image must not abort the whole teaching pass —
                     # log and continue with the remaining bindings.
-                    logger.debug(f"teach skipped image {key!r} ({name!r}): {e}")
+                    note_swallowed(
+                        "genesis_cognitive.sorter.puzzle.teach",
+                        e,
+                    )

@@ -154,7 +154,7 @@ fn run_arm(extreme: bool) -> Arm {
 
     // Settle first, so both arms start from the same resting state.
     for _ in 0..200 {
-        tl.advance_neuro(&sys.mmap, 1.0);
+        tl.advance_physics(&sys.mmap, 1.0);
     }
 
     if extreme {

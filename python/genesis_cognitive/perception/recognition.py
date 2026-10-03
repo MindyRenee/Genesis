@@ -46,7 +46,9 @@ from pathlib import Path
 
 import numpy as np
 
-from ..config import default_data_dir
+from genesis_client.swallow import note_swallowed
+
+from ..infrastructure.config import default_data_dir
 
 __all__ = ["DetectedFace", "FaceRecognizer", "KnownFace"]
 
@@ -72,7 +74,10 @@ def _write_json_atomically(path: Path, data: object) -> None:
         try:
             os.unlink(tmp_path)
         except OSError as cleanup_e:
-            logger.debug(f"face-data tmp cleanup skipped: {cleanup_e}")
+            note_swallowed(
+                "genesis_cognitive.perception.recognition._write_json_atomically",
+                cleanup_e,
+            )
         raise
 
 
@@ -152,7 +157,10 @@ class FaceRecognizer:
             self._get_recognizer()
             self._available = True
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"face recognition not available: {e}")
+            note_swallowed(
+                "genesis_cognitive.perception.recognition.is_available",
+                e,
+            )
             self._available = False
         return self._available
 

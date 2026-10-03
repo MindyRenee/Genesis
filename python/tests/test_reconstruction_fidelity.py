@@ -2,8 +2,8 @@
 
 import numpy as np
 
-from genesis_cognitive.vision.memory_bridge import MemoryBridge
-from genesis_cognitive.vq_codebook import VQCodebook
+from genesis_cognitive.infrastructure.vq_codebook import VQCodebook
+from genesis_cognitive.temporal_lobe.mtl_bridge import MemoryBridge
 
 
 def test_vq_reports_actual_quantized_reconstruction_and_saturation() -> None:

@@ -55,6 +55,8 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from genesis_client.swallow import note_swallowed
+
 logger = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT = 2  # seconds — fail fast when sources are slow
@@ -131,7 +133,7 @@ class WordNetSource:
         if not word or " " in word:
             return None
         try:
-            from ..wordnet_dictionary import lookup_word
+            from ..infrastructure.wordnet_dictionary import lookup_word
         except ImportError:
             return None
 
@@ -227,7 +229,10 @@ class SourceCache:
                 related_topics=data.get("related_topics", []),
             )
         except (OSError, ValueError, KeyError) as e:
-            logger.debug(f"Cache read failed for {source_name}/{topic}: {e}")
+            note_swallowed(
+                "genesis_cognitive.tools.source_registry.get",
+                e,
+            )
             return None
 
     def put(self, result: SourceResult, topic: str) -> None:
@@ -252,7 +257,10 @@ class SourceCache:
                     encoding="utf-8",
                 )
         except OSError as e:
-            logger.debug(f"Cache write failed for {result.source_name}/{topic}: {e}")
+            note_swallowed(
+                "genesis_cognitive.tools.source_registry.put",
+                e,
+            )
 
     def has(self, source_name: str, topic: str) -> bool:
         """Check whether a topic is cached for the given source."""
@@ -299,7 +307,10 @@ class SourceCache:
                 try:
                     path.unlink()
                 except OSError as e:
-                    logger.debug(repr(e))
+                    note_swallowed(
+                        "genesis_cognitive.tools.source_registry.clear",
+                        e,
+                    )
 
     @property
     def count(self) -> int:
@@ -351,7 +362,10 @@ def _wikipedia_search(topic: str, limit: int = 3) -> list[str]:
         results = data.get("query", {}).get("search", [])
         return [r["title"] for r in results if "title" in r]
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as e:
-        logger.debug(f"Wikipedia search failed for '{topic}': {e}")
+        note_swallowed(
+            "genesis_cognitive.tools.source_registry._wikipedia_search",
+            e,
+        )
         return []
 
 
@@ -373,7 +387,10 @@ def _wikipedia_fetch(article_title: str) -> SourceResult | None:
             )
         summary = data.get("extract", "")
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as e:
-        logger.debug(repr(e))  # summary is optional
+        note_swallowed(
+            "genesis_cognitive.tools.source_registry._wikipedia_fetch",
+            e,
+        )# summary is optional
 
     # Get the full article content (plain text via extracts API)
     params = urllib.parse.urlencode(
@@ -416,7 +433,10 @@ def _wikipedia_fetch(article_title: str) -> SourceResult | None:
             related_topics=related,
         )
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as e:
-        logger.debug(f"Wikipedia fetch failed for '{article_title}': {e}")
+        note_swallowed(
+            "genesis_cognitive.tools.source_registry._wikipedia_fetch",
+            e,
+        )
         return None
 
 
@@ -471,7 +491,10 @@ def wikipedia_lead_image(article_title: str, thumb_size: int = 320) -> bytes | N
             return None
         return img
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as e:
-        logger.debug(f"Wikipedia lead image failed for '{article_title}': {e}")
+        note_swallowed(
+            "genesis_cognitive.tools.source_registry.wikipedia_lead_image",
+            e,
+        )
         return None
 
 
@@ -715,7 +738,10 @@ class ManPageSource:
                         return stripped.stdout.strip()
                     return rendered.stdout.strip()
             except (OSError, subprocess.SubprocessError) as e:
-                logger.debug(f"man render failed for {path}: {e}")
+                note_swallowed(
+                    "genesis_cognitive.tools.source_registry._render",
+                    e,
+                )
 
         # Fallback: decompress + groff -Tutf8 -man, then strip ANSI/
         # backspace sequences ourselves.
@@ -728,7 +754,10 @@ class ManPageSource:
                 with open(path, "rb") as fh:
                     raw = fh.read().decode("utf-8", errors="ignore")
         except OSError as e:
-            logger.debug(f"man read failed for {path}: {e}")
+            note_swallowed(
+                "genesis_cognitive.tools.source_registry._render",
+                e,
+            )
             return ""
 
         if shutil.which("groff"):
@@ -744,7 +773,10 @@ class ManPageSource:
                 if rendered.returncode == 0 and rendered.stdout.strip():
                     return self._strip_overstrike(rendered.stdout).strip()
             except (OSError, subprocess.SubprocessError) as e:
-                logger.debug(f"groff render failed for {path}: {e}")
+                note_swallowed(
+                    "genesis_cognitive.tools.source_registry._render",
+                    e,
+                )
 
         # Last resort: return the raw troff source with the most
         # obnoxious control lines stripped. Better than nothing — the
@@ -994,7 +1026,10 @@ class InfoPageSource:
             if result.returncode == 0 and result.stdout.strip():
                 return result.stdout.strip()
         except (OSError, subprocess.SubprocessError) as e:
-            logger.debug(f"info render failed for {topic}: {e}")
+            note_swallowed(
+                "genesis_cognitive.tools.source_registry._render",
+                e,
+            )
 
         return ""
 
@@ -1013,7 +1048,10 @@ class InfoPageSource:
                     with gzip.open(path, "rb") as fh:
                         return fh.read().decode("utf-8", errors="ignore").strip()
             except (OSError, ValueError) as e:
-                logger.debug(f"info decompress failed for {path}: {e}")
+                note_swallowed(
+                    "genesis_cognitive.tools.source_registry._render_raw",
+                    e,
+                )
         return ""
 
     @staticmethod
@@ -1186,7 +1224,10 @@ class PackageDocSource:
             if resolved.is_relative_to(root) and candidate.is_dir():
                 return name
         except (OSError, ValueError) as e:
-            logger.debug(f"candidate resolve failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.tools.source_registry._resolve_package",
+                e,
+            )
 
         # Common command → package mappings
         _CMD_MAP = {
@@ -1238,7 +1279,10 @@ class PackageDocSource:
             else:
                 raw = path.read_text(encoding="utf-8", errors="ignore")
         except OSError as e:
-            logger.debug(f"doc read failed for {path}: {e}")
+            note_swallowed(
+                "genesis_cognitive.tools.source_registry._read_doc_file",
+                e,
+            )
             return ""
 
         # Strip markdown/rst formatting noise for cleaner text
@@ -1316,7 +1360,10 @@ def _duckduckgo_search(topic: str, limit: int = 5) -> list[str]:
                 break
         return trusted
     except (OSError, ValueError, RuntimeError) as e:
-        logger.debug(f"DuckDuckGo search failed for '{topic}': {e}")
+        note_swallowed(
+            "genesis_cognitive.tools.source_registry._duckduckgo_search",
+            e,
+        )
         return []
 
 

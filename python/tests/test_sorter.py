@@ -265,8 +265,8 @@ class TestPerceptualSorter:
     stops leaking `matched`, and the agent works from views."""
 
     def _cortex(self):
-        from genesis_cognitive.vision.v1 import V1Model
-        from genesis_cognitive.vision.visual_cortex import VisualCortex
+        from genesis_cognitive.occipital_lobe.v1 import V1Model
+        from genesis_cognitive.occipital_lobe.visual_cortex import VisualCortex
 
         return VisualCortex(V1Model())
 

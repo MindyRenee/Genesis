@@ -56,6 +56,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, ClassVar
 
+from genesis_client.swallow import note_swallowed
+
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -751,7 +753,10 @@ def simplify(node: Any, enabled_rules: set[str] | None = None) -> Any:
                 result = evaluate(FuncCall(node.name, args))
                 return Num(result)
             except EvalError as e:
-                logger.debug(repr(e))
+                note_swallowed(
+                    "genesis_cognitive.reasoning.math_reasoning.simplify",
+                    e,
+                )
         return FuncCall(node.name, args)
 
     if isinstance(node, BinOp):
@@ -764,7 +769,10 @@ def simplify(node: Any, enabled_rules: set[str] | None = None) -> Any:
                 result = evaluate(BinOp(node.op, left, right))
                 return Num(result)
             except EvalError as e:
-                logger.debug(repr(e))
+                note_swallowed(
+                    "genesis_cognitive.reasoning.math_reasoning.simplify",
+                    e,
+                )
 
         # Algebraic identities — each guarded by its rule name
         simplified = _apply_binop_identities(node.op, left, right, enabled_rules)
@@ -1687,7 +1695,10 @@ def _prove_arithmetic_identity(statement: str, lower: str) -> ProofResult | None
                     "direct computation",
                 )
     except (ParseError, EvalError) as e:
-        logger.debug(repr(e))
+        note_swallowed(
+            "genesis_cognitive.reasoning.math_reasoning._prove_arithmetic_identity",
+            e,
+        )
     return None
 
 
@@ -1885,7 +1896,10 @@ def _prove_algebraic_expansion(statement: str, lower: str) -> ProofResult | None
                     "algebraic expansion",
                 )
     except (ParseError, EvalError) as e:
-        logger.debug(repr(e))
+        note_swallowed(
+            "genesis_cognitive.reasoning.math_reasoning._prove_algebraic_expansion",
+            e,
+        )
     return None
 
 
@@ -2500,7 +2514,10 @@ def _try_compute(lower: str, enabled_rules: set[str] | None) -> MathResult | Non
                         [f"{_expr_to_str(parsed)} = {format_number(value)}"],
                     )
             except (ParseError, EvalError) as e:
-                logger.debug(repr(e))
+                note_swallowed(
+                    "genesis_cognitive.reasoning.math_reasoning._try_compute",
+                    e,
+                )
     return None
 
 
@@ -2519,7 +2536,10 @@ def _try_bare_expression(lower: str) -> MathResult | None:
                         [f"{_expr_to_str(parsed)} = {format_number(value)}"],
                     )
             except (ParseError, EvalError) as e:
-                logger.debug(repr(e))
+                note_swallowed(
+                    "genesis_cognitive.reasoning.math_reasoning._try_bare_expression",
+                    e,
+                )
     return None
 
 
@@ -2542,7 +2562,10 @@ def _try_solve(lower: str, enabled_rules: set[str] | None) -> MathResult | None:
                         [f"{s.description}: {s.expression}" for s in result.steps],
                     )
         except (ParseError, EvalError) as e:
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.reasoning.math_reasoning._try_solve",
+                e,
+            )
     return None
 
 

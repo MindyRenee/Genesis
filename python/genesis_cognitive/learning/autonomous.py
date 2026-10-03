@@ -46,9 +46,10 @@ if TYPE_CHECKING:
     from genesis_client.types import PlasticityProfile
 
     from ..concepts import EmbeddingStore
-    from ..vision import VisualCortex
+    from ..occipital_lobe import VisualCortex
 
 from genesis_client.protocol import CHEM_DOPAMINE
+from genesis_client.swallow import note_swallowed
 
 from ..brain_waves import BrainWave
 from ..concepts import ConceptNetwork, is_world_concept, strip_sense_suffix
@@ -1017,7 +1018,10 @@ class AutonomousLearner:
             try:
                 self._on_live_thought(kind, content)
             except Exception as e:  # noqa: BLE001
-                logger.debug(repr(e))  # listener must never crash learning
+                note_swallowed(
+                    "genesis_cognitive.learning.autonomous._emit",
+                    e,
+                )# listener must never crash learning
 
     def start(self) -> None:
         """Start the background learning thread."""
@@ -1256,7 +1260,10 @@ class AutonomousLearner:
         try:
             source_results = self._sources.query(topic, max_results=3)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"sync lookup query failed for '{topic}': {e}")
+            note_swallowed(
+                "genesis_cognitive.learning.autonomous.lookup_topic_sync",
+                e,
+            )
             return None
 
         if not source_results:
@@ -1287,7 +1294,10 @@ class AutonomousLearner:
                     else:
                         continue
                 except Exception as e:  # noqa: BLE001
-                    logger.debug(f"sync fetch failed for '{sr.url}': {e}")
+                    note_swallowed(
+                        "genesis_cognitive.learning.autonomous.lookup_topic_sync",
+                        e,
+                    )
                     continue
 
             try:
@@ -1300,7 +1310,10 @@ class AutonomousLearner:
                     )
                     return result
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"sync lookup learn failed for '{topic}': {e}")
+                note_swallowed(
+                    "genesis_cognitive.learning.autonomous.lookup_topic_sync",
+                    e,
+                )
                 continue
 
         return None
@@ -2093,7 +2106,10 @@ class AutonomousLearner:
             try:
                 topic = self._get_agency_topic()
             except Exception as e:  # noqa: BLE001
-                logger.debug(repr(e))  # agency callback failure shouldn't block learning
+                note_swallowed(
+                    "genesis_cognitive.learning.autonomous._next_topic",
+                    e,
+                )# agency callback failure shouldn't block learning
             else:
                 with self._queue_lock:
                     if topic and topic not in self._topics_searched:
@@ -2560,8 +2576,8 @@ class AutonomousLearner:
         Runs in a background thread so it doesn't slow down text learning.
         """
         try:
+            from ..occipital_lobe import decode_image_bytes, resize_for_vision
             from ..tools.source_registry import wikipedia_lead_image
-            from ..vision import decode_image_bytes, resize_for_vision
 
             # Fetch the article's lead image
             img_bytes = wikipedia_lead_image(article_title)
@@ -2582,7 +2598,10 @@ class AutonomousLearner:
             if self.visual_cortex:
                 self.visual_cortex.learn_from_image(frame, concept_name)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Visual learning failed for '{article_title}': {e}")
+            note_swallowed(
+                "genesis_cognitive.learning.autonomous._try_visual_learning",
+                e,
+            )
 
     def _attach_definitions(
         self, definitions: dict[str, str], source: dict[str, Any] | None = None,
@@ -2817,7 +2836,10 @@ class AutonomousLearner:
             self.network._create_associative_bridges(max_new=assoc_max)
             self.network._attach_orphans_to_hubs(max_new=orphan_max)
         except Exception as e:  # noqa: BLE001
-            logger.debug(repr(e))  # bridging is best-effort
+            note_swallowed(
+                "genesis_cognitive.learning.autonomous._bridge_and_post_learn",
+                e,
+            )# bridging is best-effort
 
         # ─── Advanced learning system integration ─────────────────
         # Wire STDP, dual-system, spaced repetition, and TD learning
@@ -2918,7 +2940,10 @@ class AutonomousLearner:
             return result
 
         except (OSError, ValueError, RuntimeError, ConnectionError) as e:
-            logger.debug(f"Fetch failed for {url}: {e}")
+            note_swallowed(
+                "genesis_cognitive.learning.autonomous._fetch_and_learn",
+                e,
+            )
             self._log_web_access(url, "web", topic, False, str(e))
             return None
 
@@ -3011,7 +3036,10 @@ class AutonomousLearner:
         try:
             result = _hardened_fetch(url)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"hardened fetch failed for {url}: {e}")
+            note_swallowed(
+                "genesis_cognitive.learning.autonomous._fetch_page_text",
+                e,
+            )
             return None
         if result is None:
             return None  # blocked, failed, or too short (same 100-char floor)
@@ -3272,7 +3300,10 @@ class AutonomousLearner:
         except Exception as e:  # noqa: BLE001
             # Embedding search is best-effort — never let it crash
             # the learning pipeline.
-            logger.debug(f"semantic_connect failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.learning.autonomous._connect_new_concept",
+                e,
+            )
 
     def _extract_and_add_relationships(
         self, text: str, source: dict[str, Any] | None = None,
@@ -3494,7 +3525,10 @@ class AutonomousLearner:
                     # Blend: take the max of graph-derived and embedding weight.
                     expectations[n] = max(expectations.get(n, 0.0), sim * 0.5)
             except Exception as e:  # noqa: BLE001
-                logger.debug(repr(e))  # embeddings optional; don't block on errors
+                note_swallowed(
+                    "genesis_cognitive.learning.autonomous.generate_deep_expectations",
+                    e,
+                )# embeddings optional; don't block on errors
 
         # Build Expectation objects, sorted by weight.
         result = [
@@ -3595,7 +3629,10 @@ class AutonomousLearner:
                         for name, score in similar
                     }
                 except Exception as exc:  # noqa: BLE001
-                    logger.debug("transfer semantic match failed: %s", exc)
+                    note_swallowed(
+                        "genesis_cognitive.learning.autonomous.transfer_learning",
+                        exc,
+                    )
 
             best_target: str | None = None
             best_score = -1.0
@@ -3913,27 +3950,39 @@ class AutonomousLearner:
         try:
             self._apply_stdp(topic, new_concepts, new_relationships)
         except Exception as e:  # noqa: BLE001
-            logger.debug(repr(e))  # STDP is optional; don't block learning
+            note_swallowed(
+                "genesis_cognitive.learning.autonomous._post_learning_hook",
+                e,
+            )# STDP is optional; don't block learning
 
         # 2. Dual-system — encode into hippocampal fast store
         try:
             experience = new_concepts if new_concepts else [topic]
             self.dual_system.encode_fast(experience)
         except Exception as e:  # noqa: BLE001
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.learning.autonomous._post_learning_hook",
+                e,
+            )
 
         # 3. Spaced repetition — schedule reviews for new concepts
         try:
             for concept in new_concepts:
                 self.spaced_repetition.record_review(concept, success=True)
         except Exception as e:  # noqa: BLE001
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.learning.autonomous._post_learning_hook",
+                e,
+            )
 
         # 4. TD learning — reward prediction error and curiosity drive
         try:
             self._update_td(topic, new_concepts, new_relationships, surprise)
         except Exception as e:  # noqa: BLE001
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.learning.autonomous._post_learning_hook",
+                e,
+            )
 
     def _apply_stdp(
         self,
@@ -4074,13 +4123,19 @@ class AutonomousLearner:
         try:
             self.dual_system.consolidate_to_slow()
         except Exception as e:  # noqa: BLE001
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.learning.autonomous._idle_consolidation",
+                e,
+            )
 
         # 2. Spaced repetition: review due concepts
         try:
             self._review_due_concepts(limit=review_limit)
         except Exception as e:  # noqa: BLE001
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.learning.autonomous._idle_consolidation",
+                e,
+            )
 
         # 3. STDP efficacy is already bounded; no embedding normalization is needed.
 

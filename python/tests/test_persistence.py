@@ -12,9 +12,8 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from genesis_cognitive.concepts import ConceptNetwork, RelationType
-from genesis_cognitive.learning.synapses import SynapticStore
-from genesis_cognitive.narrative import NarrativeEngine
-from genesis_cognitive.persistence import (
+from genesis_cognitive.infrastructure.narrative import NarrativeEngine
+from genesis_cognitive.infrastructure.persistence import (
     load_state,
     restore_narrative,
     restore_network,
@@ -25,6 +24,7 @@ from genesis_cognitive.persistence import (
     restore_synapses,
     save_state,
 )
+from genesis_cognitive.learning.synapses import SynapticStore
 from genesis_cognitive.self import (
     Insight,
     PersonalityTraits,
@@ -272,7 +272,7 @@ def test_unreadable_state_is_not_treated_as_first_boot(tmp_path, raw):
 
 
 def test_save_flushes_file_before_replace_and_directory_after(tmp_path):
-    from genesis_cognitive.persistence import _atomic_write_state
+    from genesis_cognitive.infrastructure.persistence import _atomic_write_state
 
     events = []
     replace = os.replace
@@ -283,20 +283,27 @@ def test_save_flushes_file_before_replace_and_directory_after(tmp_path):
 
     with (
         patch(
-            "genesis_cognitive.persistence.os.fsync", side_effect=lambda fd: events.append("sync")
+            "genesis_cognitive.infrastructure.persistence.os.fsync",
+            side_effect=lambda fd: events.append("sync"),
         ),
-        patch("genesis_cognitive.persistence.os.replace", side_effect=record_replace),
+        patch(
+            "genesis_cognitive.infrastructure.persistence.os.replace",
+            side_effect=record_replace,
+        ),
     ):
         _atomic_write_state(str(tmp_path), {"version": 2})
     assert events == ["sync", "replace", "sync"]
 
 
 def test_failed_flush_preserves_previous_save(tmp_path):
-    from genesis_cognitive.persistence import _atomic_write_state
+    from genesis_cognitive.infrastructure.persistence import _atomic_write_state
 
     path = tmp_path / "cognitive_state.json"
     path.write_bytes(b'{"version":2}')
-    with patch("genesis_cognitive.persistence.os.fsync", side_effect=OSError("disk error")):
+    with patch(
+        "genesis_cognitive.infrastructure.persistence.os.fsync",
+        side_effect=OSError("disk error"),
+    ):
         with pytest.raises(OSError, match="disk error"):
             _atomic_write_state(str(tmp_path), {"version": 2, "new": True})
     assert path.read_bytes() == b'{"version":2}'
@@ -592,7 +599,7 @@ def test_semantic_memory_does_not_restore_stale_priming():
 def test_allostatic_load_round_trip():
     """A real allostatic load survives save/restore."""
     from genesis_cognitive.emotional_regulator import AllostaticLoadTracker
-    from genesis_cognitive.persistence import (
+    from genesis_cognitive.infrastructure.persistence import (
         _serialize_allostatic_load,
         restore_allostatic_load,
     )
@@ -629,7 +636,7 @@ def test_allostatic_restore_clamps_corrupt_load():
     louder precisely when it was most worn down.
     """
     from genesis_cognitive.emotional_regulator import AllostaticLoadTracker
-    from genesis_cognitive.persistence import restore_allostatic_load
+    from genesis_cognitive.infrastructure.persistence import restore_allostatic_load
 
     for bad in (-3.0, 50.0, float("nan"), float("inf")):
         tracker = AllostaticLoadTracker()
@@ -650,7 +657,7 @@ def test_allostatic_restore_clamps_corrupt_load():
 def test_allostatic_restore_tolerates_corrupt_duration():
     """A non-finite elevation counter must not make stress permanently chronic."""
     from genesis_cognitive.emotional_regulator import AllostaticLoadTracker
-    from genesis_cognitive.persistence import restore_allostatic_load
+    from genesis_cognitive.infrastructure.persistence import restore_allostatic_load
 
     tracker = AllostaticLoadTracker()
     restore_allostatic_load(
@@ -671,7 +678,7 @@ def test_allostatic_restore_tolerates_corrupt_duration():
 def test_allostatic_restore_ignores_removed_fields():
     """Old save files carrying retired fields still restore cleanly."""
     from genesis_cognitive.emotional_regulator import AllostaticLoadTracker
-    from genesis_cognitive.persistence import restore_allostatic_load
+    from genesis_cognitive.infrastructure.persistence import restore_allostatic_load
 
     tracker = AllostaticLoadTracker()
     restore_allostatic_load(
@@ -700,7 +707,7 @@ def test_allostatic_serialization_is_compact():
     (~3.6 KB), restored, and never read for any decision.
     """
     from genesis_cognitive.emotional_regulator import AllostaticLoadTracker
-    from genesis_cognitive.persistence import _serialize_allostatic_load
+    from genesis_cognitive.infrastructure.persistence import _serialize_allostatic_load
 
     tracker = AllostaticLoadTracker()
     tracker.set_inference_load(0.5)

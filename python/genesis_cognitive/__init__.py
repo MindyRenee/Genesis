@@ -44,13 +44,14 @@ natural language responses.
         print(mind.respond("How are you feeling?"))
         print(mind.respond("What are you?"))
 
-# Subsystem naming convention
+# Brain-lobe naming convention
 
-The package is organized into functional subsystem directories
-(``control/``, ``association/``, ``auditory/``, ``vision/``,
-``affect/``, ``action_selection/``, ``motor_learning/``, ``relay/``,
-``autonomics/``, ``neurochemical/``). Each is a *view package* that
-lazily re-exports the relevant top-level modules — the subsystem layer
+The package is organized into neuroanatomical lobe directories
+(``frontal_lobe/``, ``parietal_lobe/``, ``temporal_lobe/``,
+``occipital_lobe/``, ``limbic_system/``, ``basal_ganglia/``,
+``cerebellum/``, ``thalamus/``, ``brainstem/``,
+``neurochemical/``). Each is a *view package* that
+lazily re-exports the relevant top-level modules — the lobe layer
 is a documented map of the architecture, not a duplicate of it.
 
 Each directory's ``__init__.py`` documents the design rationale and
@@ -102,6 +103,17 @@ from .executive import (
     TaskState,
 )
 from .global_workspace import GlobalWorkspace, WorkspaceItem, WorkspaceModule
+from .infrastructure.narrative import LifeChapter, LifeEvent, NarrativeEngine
+from .infrastructure.notifications import (
+    Notification,
+    NotificationQueue,
+)
+from .infrastructure.vq_codebook import VQCodebook
+from .infrastructure.wordnet_dictionary import (
+    WordNetEntry,
+    lookup_definition,
+    lookup_word,
+)
 from .language import (
     ComprehensionEngine,
     ComprehensionResult,
@@ -175,11 +187,6 @@ from .memory import (
     WorkingMemory,
 )
 from .mind import Mind
-from .narrative import LifeChapter, LifeEvent, NarrativeEngine
-from .notifications import (
-    Notification,
-    NotificationQueue,
-)
 from .perception import (
     IntegratedPerception,
     Intent,
@@ -239,8 +246,10 @@ from .self import (
     ProtoSelfState,
     ReflectionEngine,
     SelfModel,
+    SomaticSnapshot,
     StageResolution,
     Value,
+    somatic_congruence,
 )
 from .sleep import (
     HippocampalReplay,
@@ -273,12 +282,6 @@ from .tools.web_search import (
 )
 from .tools.web_search import (
     search as web_search_query,
-)
-from .vq_codebook import VQCodebook
-from .wordnet_dictionary import (
-    WordNetEntry,
-    lookup_definition,
-    lookup_word,
 )
 
 __all__ = [
@@ -422,6 +425,7 @@ __all__ = [
     "SleepSpindle",
     "SleepStage",
     "SleepStageSignature",
+    "SomaticSnapshot",
     "SourceCache",
     "SourceRegistry",
     "SourceResult",
@@ -479,6 +483,7 @@ __all__ = [
     "lookup_word",
     "open_archive",
     "perceive",
+    "somatic_congruence",
     "web_fetch_page",
     "web_search_query",
 ]

@@ -11,7 +11,7 @@ Subsystems:
     FaceRecognizer, DetectedFace, KnownFace — face recognition
 
 The occipital subsystem (V1, V4, VTC, MTL bridge, VisualCortex) has been
-extracted to ``genesis_cognitive.vision``. The visual cortex
+extracted to ``genesis_cognitive.occipital_lobe``. The visual cortex
 classes are re-exported here for backward compatibility.
 """
 
@@ -20,7 +20,7 @@ from __future__ import annotations
 # Occipital-subsystem re-export last: vision pulls in vision.py,
 # which imports FaceRecognizer from this package — the internal
 # modules above must be bound first for the partial-init resolution.
-from ..vision import (
+from ..occipital_lobe import (
     MemoryBridge,
     TrainingExample,
     V1Model,

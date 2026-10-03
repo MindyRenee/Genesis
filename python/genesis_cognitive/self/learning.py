@@ -66,6 +66,8 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 
+from genesis_client.swallow import note_swallowed
+
 from ..brain_waves import BrainWave
 from ..concepts import _FUNCTION_WORDS, ConceptNetwork, RelationType
 
@@ -1696,7 +1698,7 @@ class SelfDirectedLearner:
         Gracefully no-ops when WordNet/NLTK is unavailable.
         """
         try:
-            from ..wordnet_dictionary import lookup_word
+            from ..infrastructure.wordnet_dictionary import lookup_word
         except ImportError:
             return False
 
@@ -2679,7 +2681,10 @@ class SelfDirectedLearner:
                 data = json.load(f)
             return [(str(t[0]), str(t[1]), str(t[2])) for t in data]
         except (OSError, json.JSONDecodeError, TypeError) as e:
-            logger.debug(f"man page genus cache load failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.self.learning._load_man_page_genus_cache",
+                e,
+            )
             return None
 
     def _save_man_page_genus_cache(self, cache_path, entries) -> None:
@@ -2689,7 +2694,10 @@ class SelfDirectedLearner:
             with cache_path.open("w", encoding="utf-8") as f:
                 json.dump(entries, f)
         except OSError as e:
-            logger.debug(f"man page genus cache write failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.self.learning._save_man_page_genus_cache",
+                e,
+            )
 
     def _man_page_dirs(self) -> list[str]:
         """Return the list of man page directories to scan."""

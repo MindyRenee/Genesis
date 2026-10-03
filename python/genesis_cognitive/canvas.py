@@ -54,6 +54,8 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from PIL import Image
 
+from genesis_client.swallow import note_swallowed
+
 if TYPE_CHECKING:
     from .emotion import EmotionalState
 
@@ -536,7 +538,10 @@ class Canvas:
             for old in drawings[: max(0, len(drawings) - _MAX_DRAWINGS)]:
                 old.unlink(missing_ok=True)
         except OSError as e:
-            logger.debug(f"drawing prune failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.canvas._prune_drawings",
+                e,
+            )
 
     def _render_canvas(
         self,

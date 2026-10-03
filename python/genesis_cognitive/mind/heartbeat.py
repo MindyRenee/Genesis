@@ -16,6 +16,7 @@ from genesis_client.protocol import (
     MODULE_SENSORY,
     PHASE_NAMES,
 )
+from genesis_client.swallow import note_swallowed
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,9 @@ class HeartbeatMixin:
         _autosave_failures: int
         _last_threat_snapshot: float
         _offline: bool
+        _module_seconds: dict[int, float]
+        _module_seconds_lock: Any
+        _known_modules: set[int]
         def __getattr__(self, name: str) -> Any: ...
 
     def _credit_module(self, module_id: int, seconds: float) -> None:
@@ -47,6 +51,7 @@ class HeartbeatMixin:
             self._module_seconds[module_id] = (
                 self._module_seconds.get(module_id, 0.0) + seconds
             )
+            self._known_modules.add(module_id)
 
 
     def _read_interoceptive_signals(self) -> dict[str, float]:
@@ -83,7 +88,10 @@ class HeartbeatMixin:
                 if emotion.plasticity < 0.40:
                     receptor_fatigue = min(1.0, (0.40 - emotion.plasticity) * 3.0)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"interoceptive emotion read failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.heartbeat._read_interoceptive_signals",
+                e,
+            )
 
         try:
             summary = self.client.get_neuro_summary()
@@ -96,7 +104,10 @@ class HeartbeatMixin:
                     1.0, (summary.global_tone - 0.35) * 3.0
                 )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"neuro summary read failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.heartbeat._read_interoceptive_signals",
+                e,
+            )
 
         # Sustained activity: time since last rest, normalized to
         # [0, 1] over 75 minutes (BRAC cycle, Kleitman 1963)
@@ -143,7 +154,10 @@ class HeartbeatMixin:
                         (time.monotonic() - self._daemon_lost_since) / 30.0,
                     )
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"daemon connectivity check failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.heartbeat._read_threat_signals",
+                    e,
+                )
 
         save_failure = min(1.0, self._autosave_failures / 2.0)
 
@@ -161,7 +175,10 @@ class HeartbeatMixin:
                 body_distress = min(1.0, len(snapshot.concerns()) / 2.0)
                 self._last_threat_snapshot = now
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"threat snapshot failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.heartbeat._read_threat_signals",
+                    e,
+                )
 
         return {
             "daemon_lost": daemon_lost,
@@ -192,14 +209,20 @@ class HeartbeatMixin:
             wave_consolidation = waves.consolidation
             wave_dominant = waves.dominant.value
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"brain wave read for volition failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.heartbeat._read_wave_and_adenosine",
+                e,
+            )
 
         adenosine_level = 0.0
         try:
             state = self.client.get_state()
             adenosine_level = state.chemicals.get("adenosine", 0.0)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"adenosine read for volition failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.heartbeat._read_wave_and_adenosine",
+                e,
+            )
 
         return {
             "wave_focus": wave_focus,
@@ -304,7 +327,10 @@ class HeartbeatMixin:
                         apply_self_priority(self_nice, self_io)
                         last_self_priority = new_priority
         except (OSError, ConnectionError, ValueError) as e:
-            logger.debug(f"body control failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.heartbeat._heartbeat_body_control",
+                e,
+            )
         last_body_control_time = now
         return last_body_control_time, last_body_control_sig, last_self_priority
     def _heartbeat_consolidate(
@@ -341,10 +367,16 @@ class HeartbeatMixin:
                         last_stm_count = stm_count - promoted
                         last_consolidate_time = now
                 except (OSError, ConnectionError) as e:
-                    logger.debug(f"consolidate failed: {e}")
+                    note_swallowed(
+                        "genesis_cognitive.mind.heartbeat._heartbeat_consolidate",
+                        e,
+                    )
             last_stm_count = stm_count
         except (OSError, ConnectionError, ValueError) as e:
-            logger.debug(f"memory stats failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.heartbeat._heartbeat_consolidate",
+                e,
+            )
         return last_stm_count, last_consolidate_time
     def _heartbeat_feed_executive(self) -> None:
         """Feed independent world and internal signals into the executive."""
@@ -388,7 +420,10 @@ class HeartbeatMixin:
                         "source": f"self_improvement:{proposal.title}",
                     })
             except Exception as exc:  # noqa: BLE001
-                logger.debug(f"executive proposal feed failed: {exc}")
+                note_swallowed(
+                    "genesis_cognitive.mind.heartbeat._heartbeat_feed_executive",
+                    exc,
+                )
 
             # Internal needs are state signals; only meaningful pressure
             # becomes an executive objective.
@@ -408,7 +443,10 @@ class HeartbeatMixin:
 
             executive.ingest_candidates(candidates)
         except Exception as exc:  # noqa: BLE001
-            logger.debug(f"executive signal feed failed: {exc}")
+            note_swallowed(
+                "genesis_cognitive.mind.heartbeat._heartbeat_feed_executive",
+                exc,
+            )
 
     def _heartbeat_volition(self) -> None:
         """Run the volition phase of the heartbeat loop.
@@ -441,7 +479,10 @@ class HeartbeatMixin:
             if ready:
                 self._act_on_volition(ready)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"volition tick failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.heartbeat._heartbeat_volition",
+                e,
+            )
     def _heartbeat_advance_neuro(
         self,
         last_advance_mono: float,
@@ -462,37 +503,47 @@ class HeartbeatMixin:
         Returns (last_advance_mono, current_brain_wave_state,
         last_learner_phase, last_learner_wave).
         """
+        # The mind does not advance the body. It observes.
+        #
+        # Time ownership is the daemon's: it is the body, it integrates
+        # at TICK_INTERVAL_MS on its own clock, and it accepts no dt from
+        # any caller. This call therefore passes no `dt` — sending one
+        # would be inert (the daemon ignores the field) but would keep
+        # the illusion that the mind controls the body's rate, which is
+        # exactly the coupling that had the chemistry integrating in
+        # 1-second lumps while its rate constants are tuned for 200 ms.
+        #
+        # The allostatic load the regulator needs is read from shared
+        # memory below, alongside the rest of the state; the daemon
+        # writes InferenceSignals on every tick regardless of who asked.
         now_mono = time.monotonic()
-        # Real elapsed since the last successful advance. The
-        # client clamps to the daemon's [0.001, 10.0] range, so
-        # longer stalls (GC pause, system suspend) are truncated;
-        # the circadian phase is re-anchored to the wall clock at
-        # daemon start, which absorbs the residual drift.
-        dt = now_mono - last_advance_mono
         try:
-            result = self.client.advance_neuro(dt=dt)
+            result = self.client.advance_neuro()
             if result is not None:
-                # The dynamics advanced — this step's simulated
-                # time is consumed. On failure (exception or error
-                # response) the elapsed time carries over to the
-                # next successful call, so short outages lose no
-                # neurochemical time.
                 last_advance_mono = now_mono
-                _surprise, _free_energy, _precision, allostatic, _tick_count = result
-                # Pass the Rust neurochemical burden domain to the
-                # regulator. Expected free energy is anticipatory
-                # demand; whole-system allostatic load is computed by
-                # the regulator from converging internal domains.
-                self.regulator.allostatic_load_tracker.set_inference_load(
-                    allostatic
-                )
         except (OSError, ConnectionError) as e:
-            logger.debug(f"advance_neuro failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.heartbeat._heartbeat_advance_neuro",
+                e,
+            )
 
         # ── 2. Read the new state and feed to brain waves ──
         current_brain_wave_state = None
         try:
             core_state = self.client.get_state()
+            # Read the generative model's own report of its regulatory
+            # burden from shared memory. This is the value the mind used
+            # to have to provoke a physics advance in order to obtain;
+            # now it simply reads what the body has already written.
+            #
+            # Expected free energy is anticipatory demand, not
+            # accumulated burden; whole-system allostatic load is
+            # computed by the regulator from converging internal domains,
+            # so only the accumulated domain is fed in here.
+            if core_state.inference is not None:
+                self.regulator.allostatic_load_tracker.set_inference_load(
+                    core_state.inference.allostasis_load
+                )
             current_brain_wave_state = self.brain_waves(core_state)
             # Only notify the learner when the gating-relevant
             # state has actually changed — the daemon phase
@@ -514,7 +565,10 @@ class HeartbeatMixin:
                 last_learner_wave = current_wave
                 self.learner.notify_state_change()
         except (OSError, ConnectionError, ValueError) as e:
-            logger.debug(f"neuro summary / brain waves failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.heartbeat._heartbeat_advance_neuro",
+                e,
+            )
 
         return last_advance_mono, current_brain_wave_state, last_learner_phase, last_learner_wave
     def _heartbeat_periodic_maintenance(
@@ -538,7 +592,10 @@ class HeartbeatMixin:
                 self.client.associate()
                 last_associate_time = now
             except (OSError, ConnectionError) as e:
-                logger.debug(f"associate failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.heartbeat._heartbeat_periodic_maintenance",
+                    e,
+                )
 
         # ── 8. Dream (sleep-state-driven) ──
         # It dreams only when sleeping, and only when enough
@@ -555,7 +612,10 @@ class HeartbeatMixin:
                     self.cognition.narrative.check_milestone("first dream")
                 last_dream_time = now
             except (OSError, ConnectionError) as e:
-                logger.debug(f"dream failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.heartbeat._heartbeat_periodic_maintenance",
+                    e,
+                )
 
         # ── 9. Save inference model (occasionally) ──
         if now - last_inference_save_time >= 60.0:
@@ -563,7 +623,10 @@ class HeartbeatMixin:
                 self.client.save_inference()
                 last_inference_save_time = now
             except (OSError, ConnectionError) as e:
-                logger.debug(f"save_inference failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.heartbeat._heartbeat_periodic_maintenance",
+                    e,
+                )
 
         return last_associate_time, last_dream_time, last_inference_save_time
     def _heartbeat_sensors(
@@ -589,6 +652,17 @@ class HeartbeatMixin:
             # Normalize accumulated per-module work into activity
             # shares and report them with the heartbeat — this is
             # how the daemon learns which brain part was firing.
+            #
+            # Every known module reports every round, including ones
+            # that did no measured work this window. The daemon's
+            # manifest cpu_share is write-only: UPDATE_MODULE_STATUS
+            # omits the field when the payload is short, and the
+            # daemon then leaves the previous value in place. Sending
+            # None for an idle module would therefore pin it at its
+            # last busy-window load — a module that went quiet would
+            # keep reporting phantom CPU, and total_cpu_load would
+            # ratchet toward its clamp. Idleness has to be stated as
+            # an explicit 0.0.
             with self._module_seconds_lock:
                 total_work = sum(self._module_seconds.values())
                 shares = (
@@ -599,23 +673,22 @@ class HeartbeatMixin:
                     if total_work > 0.0
                     else {}
                 )
+                known = set(self._known_modules)
                 self._module_seconds.clear()
-            for module_id in heartbeat_modules:
+            # The registered modules always report so their liveness is
+            # maintained; the sampler's modules report their measured
+            # share. A module in both sets is sent once, with the
+            # measured value.
+            for module_id in set(heartbeat_modules) | known:
                 try:
                     self.client.heartbeat_module(
-                        module_id, shares.get(module_id)
+                        module_id, shares.get(module_id, 0.0)
                     )
                 except (OSError, ConnectionError) as e:
-                    logger.debug(f"heartbeat failed: {e}")
-            # Modules that did measured work but aren't in the fixed
-            # heartbeat tuple still report their activity.
-            for module_id, share in shares.items():
-                if module_id in heartbeat_modules:
-                    continue
-                try:
-                    self.client.heartbeat_module(module_id, share)
-                except (OSError, ConnectionError) as e:
-                    logger.debug(f"heartbeat failed: {e}")
+                    note_swallowed(
+                        "genesis_cognitive.mind.heartbeat._heartbeat_sensors",
+                        e,
+                    )
 
             # Cognitive work is metabolic work. total_work is measured
             # execution — seconds the sampler observed Genesis code at
@@ -638,13 +711,22 @@ class HeartbeatMixin:
                         CHEM_ADENOSINE, 0.00015 * work_frac
                     )
                 except (OSError, ConnectionError, RuntimeError) as e:
-                    logger.debug(f"metabolic adenosine impulse failed: {e}")
+                    note_swallowed(
+                        "genesis_cognitive.mind.heartbeat._heartbeat_sensors",
+                        e,
+                    )
             last_heartbeat_time = now
 
         if now - last_sensor_time >= 5.0:
             try:
                 body_state = self.client.read_sensors()
                 if body_state is not None:
+                    # Which sensors this machine actually has. Fetched
+                    # with the body state rather than counted from it:
+                    # a BodyState field exists whether or not hardware
+                    # backs it, so without this the self-model would
+                    # treat an absent battery as a reading.
+                    presence = self.client.get_sensor_presence()
                     # The same reading serves both layers. The
                     # interoception layer turns it into an acute
                     # stress signal; the self-model keeps the raw
@@ -652,7 +734,7 @@ class HeartbeatMixin:
                     # made of and what it is short of. One IPC call,
                     # two consumers — the fetch already happened.
                     self.regulator.interoception.update_from_body_state(body_state)
-                    self.self_model.update_hardware_body(body_state)
+                    self.self_model.update_hardware_body(body_state, presence)
                 report = self.client.get_subsystem_telemetry()
                 self.regulator.interoception.update_subsystem_telemetry(report)
                 # Feed the same report into its self-model — which
@@ -661,7 +743,10 @@ class HeartbeatMixin:
                 # module_activity → embodiment_facts → language).
                 self.self_model.update_brain_activity(report)
             except (OSError, ConnectionError, ValueError) as e:
-                logger.debug(f"read_sensors failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.heartbeat._heartbeat_sensors",
+                    e,
+                )
             last_sensor_time = now
 
         return last_heartbeat_time, last_sensor_time
@@ -706,7 +791,10 @@ class HeartbeatMixin:
                     self.notifications.reset()
                 self._was_daemon_connected = daemon_connected
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"connectivity sensing failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.heartbeat._heartbeat_connectivity",
+                    e,
+                )
             last_connectivity_time = now
         return last_connectivity_time
     def _heartbeat_emotion(self, now: float) -> None:
@@ -734,7 +822,10 @@ class HeartbeatMixin:
             if emotion:
                 self.regulator.continuous_regulate(emotion)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"continuous regulation failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.heartbeat._heartbeat_emotion",
+                e,
+            )
 
         try:
             # Activity level from interoception: high CPU = high
@@ -747,7 +838,10 @@ class HeartbeatMixin:
             time_since_rest = now - self._last_rest_time
             self.regulator.update_metabolism(activity, time_since_rest)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"metabolic update failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.heartbeat._heartbeat_emotion",
+                e,
+            )
 
         try:
             # User presence: recent interaction = present. Engagement
@@ -757,7 +851,10 @@ class HeartbeatMixin:
             engagement = max(0.0, 1.0 - idle / 120.0) if user_present else 0.0
             self.regulator.social_modulation(user_present, engagement)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"social modulation failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.heartbeat._heartbeat_emotion",
+                e,
+            )
     def _heartbeat_final_steps(self) -> None:
         """Run auto-sleep, volition, warn, and cognition (heartbeat steps 10-13)."""
         # ── 9c. External world — presence decay and social pressure ──
@@ -771,13 +868,19 @@ class HeartbeatMixin:
                 self.world.social_isolation() * 0.02
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"world tick failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.heartbeat._heartbeat_final_steps",
+                e,
+            )
 
         # ── 10. Auto-sleep check ──
         try:
             self._check_auto_sleep()
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"auto-sleep check failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.heartbeat._heartbeat_final_steps",
+                e,
+            )
 
         # ── 11. Executive signal integration ──
         self._heartbeat_feed_executive()
@@ -790,13 +893,19 @@ class HeartbeatMixin:
             # warn() internally checks if the warning changed
             self.warn(speak=True)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"warning check failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.heartbeat._heartbeat_final_steps",
+                e,
+            )
 
         # ── 13. Cognitive maintenance ──
         try:
             self.cognition.tick(dt=1.0)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"cognition tick failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.heartbeat._heartbeat_final_steps",
+                e,
+            )
     def _heartbeat_init_state(self) -> tuple:
         """Initialize the change-detection state for the heartbeat loop.
 
@@ -892,6 +1001,11 @@ class HeartbeatMixin:
             last_learner_phase, last_learner_wave, last_advance_mono,
         ) = self._heartbeat_init_state()
 
+        # Reset volition engine's tick clock so the first dt reflects
+        # actual elapsed time since the heartbeat started, not since
+        # Mind.__init__ (which can be many seconds earlier during init).
+        self.volition._last_tick = time.time()
+
         while self._running:
             # One guard for the whole cycle.
             #
@@ -962,7 +1076,10 @@ class HeartbeatMixin:
                         self.emergent_identity()
                         last_identity_time = now
                     except Exception as e:  # noqa: BLE001
-                        logger.debug(f"emergent identity synthesis failed: {e}")
+                        note_swallowed(
+                            "genesis_cognitive.mind.heartbeat._heartbeat_loop",
+                            e,
+                        )
                         last_identity_time = now
 
                 # ── 10-13. Auto-sleep, volition, warn, cognition ──

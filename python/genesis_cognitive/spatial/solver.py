@@ -23,6 +23,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from genesis_client.swallow import note_swallowed
+
 from ..reasoning.competence import (
     GoalCondition,
     ProcedureStep,
@@ -738,7 +740,10 @@ class SpatialReasoner:
             )
         except Exception as e:  # noqa: BLE001
             # Grounding is best-effort; never break a solve.
-            logger.debug("rule grounding failed: %s", e)
+            note_swallowed(
+                "genesis_cognitive.spatial.solver._ground_rule",
+                e,
+            )
 
     def perceive(self, grid: Grid, background: int | None = None) -> Scene:
         """Segment a grid into objects and spatial relations."""
@@ -906,7 +911,10 @@ class SpatialReasoner:
                 cand = hyp.apply(inp)
                 acc = 1.0 if cand == out else _cell_accuracy(cand, out)
             except Exception as e:  # noqa: BLE001 — hypothesis search must not crash on bad transforms
-                logger.debug(f"hypothesis {hyp.describe()} failed on pair {i}: {e}")
+                note_swallowed(
+                    "genesis_cognitive.spatial.solver._analyze_failure",
+                    e,
+                )
                 acc = 0.0
             pair_scores.append(acc)
             if acc < worst:
@@ -915,7 +923,10 @@ class SpatialReasoner:
         try:
             cand = hyp.apply(inp)
         except Exception as e:  # noqa: BLE001 — failure analysis must not crash on bad transforms
-            logger.debug(f"failure analysis: hypothesis {hyp.describe()} failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.spatial.solver._analyze_failure",
+                e,
+            )
             return FailureInfo(
                 rule=hyp.describe(),
                 pair_scores=pair_scores,
@@ -973,7 +984,10 @@ class SpatialReasoner:
                 for t in transforms:
                     cand = t(cand)
             except Exception as e:  # noqa: BLE001 — scoring treats failed transforms as 0
-                logger.debug(f"transform sequence failed during scoring: {e}")
+                note_swallowed(
+                    "genesis_cognitive.spatial.solver._evaluate",
+                    e,
+                )
                 return 0.0, 0
             if cand == out:
                 exact += 1
@@ -990,7 +1004,10 @@ class SpatialReasoner:
             try:
                 preds.append(hyp.apply(test))
             except Exception as e:  # noqa: BLE001 — failed transform echoes input
-                logger.debug(f"prediction failed, echoing input: {e}")
+                note_swallowed(
+                    "genesis_cognitive.spatial.solver._predict_all",
+                    e,
+                )
                 preds.append(test)  # failed transform → echo input
         return preds
 
@@ -1025,7 +1042,10 @@ class SpatialReasoner:
                 for t in hyp.transforms:
                     mid = t(mid)
             except Exception as e:  # noqa: BLE001 — unexpandable hypothesis yields no candidates
-                logger.debug(f"hypothesis expansion failed for {hyp.describe()}: {e}")
+                note_swallowed(
+                    "genesis_cognitive.spatial.solver._expand_hypothesis",
+                    e,
+                )
                 break
             intermediates.append((mid, out))
         if len(intermediates) != len(examples):

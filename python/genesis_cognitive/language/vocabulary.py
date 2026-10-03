@@ -22,6 +22,8 @@ import re
 from collections import deque
 from typing import Any, ClassVar
 
+from genesis_client.swallow import note_swallowed
+
 from ..concepts import _FUNCTION_WORDS, RelationType
 from ..emotion import PLASTICITY_CLOSED, PLASTICITY_LOW, EmotionalState
 from ..self import PersonalityTraits
@@ -4083,7 +4085,10 @@ class Vocabulary:
                 if learned:
                     return self._rng.choice(learned)
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"relation-verb lookup failed for {rel}: {e}")
+                note_swallowed(
+                    "genesis_cognitive.language.vocabulary._relation_verb_for",
+                    e,
+                )
         return fallback
 
     def _compose_question_content(

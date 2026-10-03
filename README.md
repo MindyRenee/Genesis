@@ -11,7 +11,7 @@ executes the neurochemical dynamics, memory consolidation, and
 generative-model work the cognitive mind requests over a Unix socket.
 A Python *cognitive layer* handles perception, reasoning, language,
 introspection, and self-modeling. The two share a checksummed,
-versioned binary state file (3,288 bytes, schema pinned by layout
+versioned binary state file (3,296 bytes, schema pinned by layout
 asserts) and a Unix socket.
 
 The daemon is lease-driven: while the mind is alive it is a bus
@@ -111,9 +111,10 @@ checkpoints — but never body-control application.
 
 **Cognitive mind (Python).** Perception, memory retrieval,
 deliberation, language composition, and self-modeling — organized
-into functional subsystem packages (`control/`, `association/`,
-`vision/`, `auditory/`, `affect/`, `action_selection/`,
-`motor_learning/`, `relay/`, `autonomics/`, `neurochemical/`). Each is
+into neuroanatomical lobe packages (`frontal_lobe/`, `parietal_lobe/`,
+`temporal_lobe/`, `occipital_lobe/`, `limbic_system/`,
+`basal_ganglia/`, `cerebellum/`, `thalamus/`, `brainstem/`,
+`neurochemical/`). Each is
 a documented view over the top-level modules — a map of the
 architecture, not a duplicate of it.
 
@@ -122,7 +123,7 @@ architecture, not a duplicate of it.
 This is engineered for a 4.7 GB machine, not a datacenter, and the
 low-level design reflects it:
 
-- **One page of core state, zero copies.** The 3,288-byte state
+- **One page of core state, zero copies.** The 3,296-byte state
   struct occupies a single OS page under `MAP_SHARED`; the kernel
   handles paging instead of the process holding heap copies.
 - **Seqlock protocol.** Readers get an owned copy via sequence lock —

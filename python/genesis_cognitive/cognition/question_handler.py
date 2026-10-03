@@ -34,11 +34,11 @@ from ..perception import Perception, QuestionType
 if TYPE_CHECKING:
     from ..cognition.thought_composer import ThoughtComposer
     from ..concepts import ConceptNetwork, RelationType
+    from ..infrastructure.user_profile import UserProfile
     from ..memory import MemoryContext
     from ..reasoning import ReasoningResult, TheoryOfMind
     from ..self import SelfComposer, SelfModel
     from ..tools.framework import ToolRegistry
-    from ..user_profile import UserProfile
 
 __all__ = ["QuestionHandler"]
 

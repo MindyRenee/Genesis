@@ -42,6 +42,8 @@ import logging
 import os
 from typing import Any
 
+from genesis_client.swallow import note_swallowed
+
 from ..concepts import ConceptNetwork, RelationType
 
 logger = logging.getLogger(__name__)
@@ -1087,7 +1089,10 @@ class IntrospectionEngine:
                     if importlib.util.find_spec(candidate) is not None:
                         return True
                 except (ModuleNotFoundError, ValueError) as e:
-                    logger.debug(f'_module_exists failed: {e}')
+                    note_swallowed(
+                        "genesis_cognitive.self.introspection._module_exists",
+                        e,
+                    )
             return False
         try:
             return importlib.util.find_spec(mod_path) is not None

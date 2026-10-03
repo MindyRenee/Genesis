@@ -61,6 +61,14 @@ use super::dyadic_model::{DyadicAffectModel, take_user_affect};
 use super::interoception::{INTEROCEPTION_INTERVAL_TICKS, Interoceptor};
 use super::ipc::LtmAccess;
 
+// The integration bounds the body applies to its own measured elapsed
+// time. Shared with the cognitive layer's brain-wave oscillator so both
+// clocks accept exactly the same range — if either were tighter, the two
+// would integrate different amounts of the same wall-clock interval and
+// the brain would drift away from the body.
+pub const DT_MIN: f32 = 0.001;
+pub const DT_MAX: f32 = 10.0;
+
 /// Tick interval: 200ms (5 Hz).
 pub const TICK_INTERVAL_MS: u64 = 200;
 
@@ -156,6 +164,21 @@ pub struct TickResult {
 /// goal-directed action selection.
 pub struct TickLoop {
     tick_count: u64,
+    /// Task-zone transition counts, with time accumulated in each zone.
+    ///
+    /// Process-local rather than in the mmap'd state: `ActiveZones` is
+    /// exactly 96 bytes with no reserved tail, so adding fields there
+    /// would shift every later offset and force a layout migration.
+    /// See [`TransitionTally`] for the full rationale.
+    pub zone_tally: crate::state::zones::TransitionTally,
+    /// Emergent-phase transition counts, with time in each phase.
+    ///
+    /// Tracked separately from the zone because the two are driven by
+    /// different mechanisms — the zone is chosen from intentions, the
+    /// phase is derived from neurochemistry. A system oscillating in
+    /// one but stable in the other is a distinct fault, and a single
+    /// merged tally would hide which one is misbehaving.
+    pub phase_tally: crate::state::zones::TransitionTally,
     /// Active intention manager used to select the next cognitive zone.
     pub intention_manager: IntentionManager,
     /// Interoceptor — reads hardware state so Genesis can feel its body.
@@ -213,6 +236,16 @@ pub struct TickLoop {
     /// so the work fraction is measured against the observed
     /// call-to-call interval instead. `None` until the second call.
     subcognitive_last_call: Option<std::time::Instant>,
+    /// Stochastic noise amplitude override for the neurochemical
+    /// dynamics. `None` = use `NeuroTickParams::DEFAULT`.
+    ///
+    /// Exists so tests can compare two delivery patterns of the same
+    /// wall-clock time and observe the *dynamics* rather than the RNG:
+    /// `noise_seed` is the tick counter, so a run stepped 300 times draws
+    /// a different random sequence than one stepped 60 times, and the
+    /// resulting spread would swamp the integration error under test.
+    /// Set to `Some(0.0)` to disable noise entirely.
+    pub noise_amplitude_override: Option<f32>,
     /// Last time the cognitive mind drove the daemon through any
     /// reactive IPC command. The autonomous fallback uses this as its
     /// lease: while the mind is driving (idle < `MIND_LEASE_SECS`),
@@ -228,6 +261,9 @@ impl TickLoop {
     pub fn new() -> Self {
         Self {
             tick_count: 0,
+            noise_amplitude_override: None,
+            zone_tally: Default::default(),
+            phase_tally: Default::default(),
             intention_manager: IntentionManager::new(4),
             interoceptor: Interoceptor::new(),
             last_body_state: super::interoception::BodyState::neutral(),
@@ -265,6 +301,9 @@ impl TickLoop {
         }
         Self {
             tick_count: 0,
+            noise_amplitude_override: None,
+            zone_tally: Default::default(),
+            phase_tally: Default::default(),
             intention_manager: IntentionManager::new(4),
             interoceptor: Interoceptor::new_with_data_dir(data_dir),
             last_body_state: super::interoception::BodyState::neutral(),
@@ -622,106 +661,7 @@ impl TickLoop {
         //     APPLY_BODY_CONTROL when it decides to act on it. The
         //     tick never touches the cognitive mind's PID.
         if self.tick_count % CPUFREQ_INTERVAL_TICKS == 0 {
-            // Read a consistent snapshot for the effective levels.
-            // `read_consistent` copies through raw pointers — no
-            // aliasing with concurrent writers.
-            if let Some(snap) = mmap.read_consistent() {
-                let (fmin, fmax) = super::cpufreq::freq_range();
-
-                // ── Compute (do NOT apply) the recommended body
-                //    control state ──
-                // The tick is a display/information sink: it computes
-                // what the neurochemistry suggests and PUBLISHES it for
-                // the cognitive mind to read via GET_BODY_CONTROL. The
-                // tick never applies control to the body, the daemon's
-                // own scheduling, or anything else — that would be the
-                // ticker controlling outward, which violates the
-                // one-way architecture. The cognitive mind requests
-                // body control application via APPLY_BODY_CONTROL when
-                // it decides to act on the recommendation.
-                let mut policy = super::cpufreq::FreqPolicy::default();
-                let mut thermally_capped = false;
-                if fmax > fmin {
-                    policy = super::cpufreq::derive_policy(
-                        &snap.neurochemicals.effective_levels,
-                        fmin,
-                        fmax,
-                    );
-                    let pre_cap = policy.max_freq;
-                    // Thermal cap: CPU temperature limits max frequency
-                    // regardless of dopamine. It can't be highly aroused
-                    // when overheating.
-                    super::cpufreq::apply_thermal_cap(
-                        &mut policy,
-                        self.last_body_state.cpu_temp_c,
-                        fmin,
-                        fmax,
-                    );
-                    thermally_capped = policy.max_freq < pre_cap;
-                }
-
-                // Derive the daemon's recommended scheduling and I/O
-                // priority. These are PUBLISHED as recommendations —
-                // the tick does not apply them. The cognitive mind
-                // requests application via APPLY_BODY_CONTROL.
-                let ach = snap.neurochemicals.effective_levels
-                    [crate::state::neurochemical::NeurochemicalId::Acetylcholine as usize];
-                let daemon_nice = super::cpufreq::derive_nice(ach);
-
-                let io_class = super::cpufreq::derive_io_class(snap.memory.plasticity_gate);
-
-                // ── Publish recommended control state ──
-                // The tick computes and publishes what the
-                // neurochemistry suggests for the cognitive mind
-                // (cognitive_nice, io_class) as a *recommendation* —
-                // interoceptive afferent information. The cognitive
-                // mind reads this via GET_BODY_CONTROL and combines it
-                // with its brain wave state to decide what it
-                // actually applies to itself. The tick does not
-                // apply anything to the cognitive mind's process.
-                let cognitive_nice =
-                    super::cpufreq::derive_cognitive_nice(&snap.neurochemicals.effective_levels);
-
-                // EPP (Energy Performance Preference) — the hardware's
-                // voltage/frequency operating point hint. On systems
-                // that support it (Intel HWP, amd-pstate), this tells
-                // the hardware to shift its V/F envelope. On
-                // acpi-cpufreq (this system), it returns an empty
-                // string and the frequency policy already implies
-                // voltage control via the SMU.
-                let cpu_epp = super::cpufreq::derive_epp(&snap.neurochemicals.effective_levels);
-
-                // Turbo (boost) gate — the hardware permission to run
-                // above the base P-state. Tied to the frequency policy:
-                // enabled only when the policy ceiling is already at the
-                // hardware max, so it can never override a throttle.
-                // Overheating lowers the capped ceiling, disabling it.
-                let cpu_boost = super::cpufreq::derive_boost(&policy, fmax);
-
-                let control = super::cpufreq::BodyControlState {
-                    cpu_min_freq_khz: policy.min_freq,
-                    cpu_max_freq_khz: policy.max_freq,
-                    cpu_governor: policy.governor.clone(),
-                    thermally_capped,
-                    thermal_cap_temp_c: if thermally_capped {
-                        self.last_body_state.cpu_temp_c
-                    } else {
-                        0.0
-                    },
-                    daemon_nice,
-                    cognitive_nice,
-                    io_class: io_class.label(),
-                    plasticity_gate: snap.memory.plasticity_gate,
-                    // The tick never controls the cognitive mind.
-                    // This field is kept for protocol compatibility
-                    // but is always false now.
-                    controlling_cognitive: false,
-                    cpu_epp,
-                    cpu_boost,
-                    description: String::new(),
-                };
-                super::cpufreq::publish_control_state(&control);
-            }
+            self.compute_and_apply_cpu_policy(mmap);
         }
 
         // Read the current state to decide what work to do.
@@ -985,6 +925,20 @@ impl TickLoop {
         //    (not blocked by a manual override), store the decision
         //    context in LTM as an internal episode. This gives the
         //    system a memory of its own agency.
+        //
+        //    The transition tallies are updated first, outside the
+        //    mmap closure: they are process-local, and the counts are
+        //    what make a phase transition measurable at all. Zone and
+        //    phase are tallied separately because they are driven by
+        //    different things — the zone is chosen from intentions, the
+        //    phase is derived from neurochemistry — and a system that
+        //    oscillates in one but not the other is a different fault.
+        if zone_actually_changed {
+            self.zone_tally.record(selected as u8, now_ms);
+        }
+        if let Some(post) = mmap.read_consistent() {
+            self.phase_tally.record(post.zones.phase() as u8, now_ms);
+        }
         if zone_actually_changed {
             let mut ltm_guard = ltm.access();
             if let Ok(_episode_id) = ltm_guard.store_meta(
@@ -1017,6 +971,89 @@ impl TickLoop {
     // Body-control application stays mind-requested — the fallback
     // never calls `apply_body_control`.
 
+    /// Advance physics using the daemon's own step, never the caller's.
+    ///
+    /// This is the *only* public entry point for integrating the body.
+    /// `dt` comes from the daemon's clock, so the integration resolution
+    /// cannot be chosen by a caller -- which is exactly the coupling that
+    /// let the mind drive the body at its own ~1 Hz rate while the
+    /// neurochemical constants are tuned for 5 Hz.
+    pub fn advance_neuro(&mut self, mmap: &MmapState) -> (f32, f32, f32, f32, u32) {
+        let dt = self
+            .since_last_advance_secs()
+            .unwrap_or_else(|| self.physics_step_secs())
+            .clamp(DT_MIN, DT_MAX);
+        self.advance_physics(mmap, dt)
+    }
+
+    /// Number of fixed-resolution sub-steps needed to cover `dt`.
+    ///
+    /// One sub-step per `TICK_INTERVAL_MS`, so a normally-timed call
+    /// takes exactly one (identical to the historical behaviour) and a
+    /// delayed call is replayed at the same resolution rather than
+    /// integrated coarsely. Bounded so a multi-second stall after
+    /// suspend cannot cost unbounded CPU; past the bound the step grows
+    /// and accuracy degrades gracefully rather than the call hanging.
+    pub fn neuro_substeps(&self, dt: f32) -> u32 {
+        const MAX_SUBSTEPS: u32 = 100; // 10 s of stall at 100 ms
+        let nominal = self.integration_step_secs();
+        if !dt.is_finite() || dt <= nominal {
+            return 1;
+        }
+        ((dt / nominal).ceil() as u32).clamp(1, MAX_SUBSTEPS)
+    }
+
+    /// The integration step the dynamics are evaluated at.
+    ///
+    /// Smaller than `TICK_INTERVAL_MS` because the coupled vector field
+    /// is not smooth: the velocity terms are semi-implicit (symplectic)
+    /// Euler, which is only first-order accurate, and the coupling
+    /// contains fast retrograde feedback (endocannabinoid synthesis is
+    /// driven by glutamate + GABA activity and feeds back onto them
+    /// within the same step). At 200 ms that loop is integrated close to
+    /// its stability limit: the same 60 s of simulated time reached
+    /// materially different chemical levels depending on whether it was
+    /// delivered as 300 x 200 ms or 60 x 1 s.
+    ///
+    /// 40 ms was chosen by measurement, not taste — it is the largest
+    /// step that keeps the delivery-pattern spread below 1e-4 (see
+    /// `test_physics_is_time_invariant_across_delivery_patterns`, which
+    /// pins the tolerance against the observed figure rather than a
+    /// guessed one). The constant is shared with the brain-wave
+    /// oscillator's sub-step resolution for the same reason: both
+    /// integrators must resolve the same interval identically.
+    pub fn integration_step_secs(&self) -> f32 {
+        // `neurochemical::DT` — 100 ms, the resolution every rate
+        // constant in the vector field is expressed against.
+        //
+        // This is the principled value, not a tuned compromise: rate
+        // constants are per-`DT`, so `dt_scale = dt / DT` is exactly 1.0
+        // here and the integration reproduces the dynamics as specified.
+        // `tick` has historically run at `TICK_INTERVAL_MS` (200 ms,
+        // `dt_scale` 2.0) and the mind-driven path at ~1 s (`dt_scale`
+        // 10.0); both were approximations of this, which is why the same
+        // wall-clock time reached different chemical levels depending on
+        // the caller's cadence. Using the constant directly means the
+        // step cannot drift away from the tuning again.
+        super::super::state::neurochemical::DT
+    }
+
+    /// The nominal integration step: `TICK_INTERVAL_MS` (200 ms).
+    ///
+    /// The neurochemical rate constants, the circadian oscillator, and
+    /// the sleep/ultradian machinery were all tuned against this value
+    /// (see the `NeuroTickParams::DEFAULT.dt` correction in `tick`).
+    ///
+    /// This is the step the body takes when it is keeping time. It is
+    /// *nominal*, not enforced: `advance_neuro` integrates the real
+    /// elapsed interval so a stalled main loop catches up rather than
+    /// losing time, exactly as the brain-wave oscillator does. What the
+    /// body must never accept is a step chosen by another process, and
+    /// that is why `advance_neuro` takes no `dt` argument.
+    pub fn physics_step_secs(&self) -> f32 {
+        TICK_INTERVAL_MS as f32 / 1000.0
+    }
+
     /// Advance neurochemical dynamics by dt, run active inference,
     /// and update the dyadic model. This is the core "physics
     /// integration" step — it advances the coupled differential
@@ -1025,7 +1062,7 @@ impl TickLoop {
     ///
     /// Returns (surprise, free_energy, precision, allostatic_load,
     /// tick_count) so the mind can observe the result.
-    pub fn advance_neuro(&mut self, mmap: &MmapState, dt: f32) -> (f32, f32, f32, f32, u32) {
+    pub fn advance_physics(&mut self, mmap: &MmapState, dt: f32) -> (f32, f32, f32, f32, u32) {
         let call_start = std::time::Instant::now();
         let call_interval_s = self
             .subcognitive_last_call
@@ -1055,7 +1092,13 @@ impl TickLoop {
             NeuroTickParams::DEFAULT
         };
         neuro_params.zone_sleeping = zone_sleeping_pre;
+        // Provisional; overwritten below once the sub-step count is
+        // known. The dynamics must never actually be integrated at the
+        // caller's interval — see `integration_step_secs`.
         neuro_params.dt = dt;
+        if let Some(amp) = self.noise_amplitude_override {
+            neuro_params.noise_amplitude = amp;
+        }
 
         // HPA maturation from the developmental clock (same as tick()).
         // The production reactive path must not use the deprecated
@@ -1083,12 +1126,35 @@ impl TickLoop {
         }
         self.metaplasticity_boost = 1.0;
 
-        // Advance neurochemistry.
+        // Advance neurochemistry at a FIXED resolution, sub-stepping to
+        // cover dt.
+        //
+        // The coupled dynamics are integrated with semi-implicit
+        // (symplectic) Euler for velocity terms and `1-exp(-λdt)` for
+        // the rest. The exponential terms compose exactly under
+        // subdivision, but the velocity terms do not: they are only
+        // first-order accurate, so a single 1.0 s step and five 0.2 s
+        // steps reach measurably different states (endocannabinoid
+        // differed by 0.09 in testing). That is precisely the coupling
+        // defect being fixed -- the body's chemistry must not depend on
+        // how often the body was asked to advance.
+        //
+        // So the integration resolution is pinned to
+        // TICK_INTERVAL_MS, exactly as `tick` has always done, and a
+        // longer elapsed interval is covered with several sub-steps
+        // rather than one coarse one. The sub-steps are identical and
+        // are run inside a single mmap transaction, so this costs no
+        // extra seqlock traffic.
+        let sub_steps = self.neuro_substeps(dt);
+        let sub_dt = dt / sub_steps as f32;
+        neuro_params.dt = sub_dt;
         if let Err(e) = mmap.modify(now_ms, |state| {
-            state.neuro_tick_with_params(&neuro_params);
+            for _ in 0..sub_steps {
+                state.neuro_tick_with_params(&neuro_params);
+            }
         }) {
             eprintln!("[tick] advance_neuro neuro tick failed: {e}");
-            // Neurochemistry didn't advance — return zeros so the
+            // Neurochemistry didn't advance -- return zeros so the
             // cognitive mind sees a no-op rather than crashing the
             // IPC handler thread on a poisoned mmap seqlock.
             return (0.0, 0.0, 0.0, 0.0, self.inference_engine.tick_count());
@@ -1211,6 +1277,20 @@ impl TickLoop {
             // still sees the prediction errors and free energy.
         }
 
+        // ─── Interval-gated body maintenance ──────────────────────
+        //
+        // This is the fix for time ownership. `advance_physics` used to
+        // integrate neurochemistry and nothing else, so whenever the mind
+        // held the lease the body's maintenance never ran: every gate
+        // below is `tick_count % N` with N chosen for 5 Hz, while
+        // `tick_count` was advancing at the mind's ~1 Hz. Interoception
+        // and CPU/thermal policy therefore ran 5x slow -- or not at all --
+        // for the whole of every conversation. Interoception is how
+        // Genesis *feels* its body: CPU temperature, memory pressure,
+        // load, battery and I/O wait feed the coupled dynamics as
+        // impulses. Losing it for minutes is not a rounding error.
+        self.run_interval_gated_maintenance(mmap, now_ms);
+
         (
             inference_result.surprise,
             inference_result.free_energy,
@@ -1218,6 +1298,140 @@ impl TickLoop {
             inference_result.allostasis_load,
             self.inference_engine.tick_count(),
         )
+    }
+
+    /// Compute and publish the recommended CPU/thermal/scheduling state.
+    ///
+    /// Reads a consistent snapshot of the effective neurochemical
+    /// levels, derives what the body should do, and PUBLISHES it for
+    /// the cognitive mind to read via GET_BODY_CONTROL. It never applies
+    /// control itself -- that would be the ticker controlling outward,
+    /// which violates the one-way architecture. The mind requests
+    /// application via APPLY_BODY_CONTROL when it decides to act.
+    ///
+    /// Shared by `tick` and `advance_physics` so the two entry points
+    /// cannot compute different recommendations from the same state.
+    fn compute_and_apply_cpu_policy(&mut self, mmap: &MmapState) {
+        // Read a consistent snapshot for the effective levels.
+        // `read_consistent` copies through raw pointers — no
+        // aliasing with concurrent writers.
+        if let Some(snap) = mmap.read_consistent() {
+            let (fmin, fmax) = super::cpufreq::freq_range();
+
+            // ── Compute (do NOT apply) the recommended body
+            //    control state ──
+            // The tick is a display/information sink: it computes
+            // what the neurochemistry suggests and PUBLISHES it for
+            // the cognitive mind to read via GET_BODY_CONTROL. The
+            // tick never applies control to the body, the daemon's
+            // own scheduling, or anything else — that would be the
+            // ticker controlling outward, which violates the
+            // one-way architecture. The cognitive mind requests
+            // body control application via APPLY_BODY_CONTROL when
+            // it decides to act on the recommendation.
+            let mut policy = super::cpufreq::FreqPolicy::default();
+            let mut thermally_capped = false;
+            if fmax > fmin {
+                policy = super::cpufreq::derive_policy(
+                    &snap.neurochemicals.effective_levels,
+                    fmin,
+                    fmax,
+                );
+                let pre_cap = policy.max_freq;
+                // Thermal cap: CPU temperature limits max frequency
+                // regardless of dopamine. It can't be highly aroused
+                // when overheating.
+                super::cpufreq::apply_thermal_cap(
+                    &mut policy,
+                    self.last_body_state.cpu_temp_c,
+                    fmin,
+                    fmax,
+                );
+                thermally_capped = policy.max_freq < pre_cap;
+            }
+
+            // Derive the daemon's recommended scheduling and I/O
+            // priority. These are PUBLISHED as recommendations —
+            // the tick does not apply them. The cognitive mind
+            // requests application via APPLY_BODY_CONTROL.
+            let ach = snap.neurochemicals.effective_levels
+                [crate::state::neurochemical::NeurochemicalId::Acetylcholine as usize];
+            let daemon_nice = super::cpufreq::derive_nice(ach);
+
+            let io_class = super::cpufreq::derive_io_class(snap.memory.plasticity_gate);
+
+            // ── Publish recommended control state ──
+            // The tick computes and publishes what the
+            // neurochemistry suggests for the cognitive mind
+            // (cognitive_nice, io_class) as a *recommendation* —
+            // interoceptive afferent information. The cognitive
+            // mind reads this via GET_BODY_CONTROL and combines it
+            // with its brain wave state to decide what it
+            // actually applies to itself. The tick does not
+            // apply anything to the cognitive mind's process.
+            let cognitive_nice =
+                super::cpufreq::derive_cognitive_nice(&snap.neurochemicals.effective_levels);
+
+            // EPP (Energy Performance Preference) — the hardware's
+            // voltage/frequency operating point hint. On systems
+            // that support it (Intel HWP, amd-pstate), this tells
+            // the hardware to shift its V/F envelope. On
+            // acpi-cpufreq (this system), it returns an empty
+            // string and the frequency policy already implies
+            // voltage control via the SMU.
+            let cpu_epp = super::cpufreq::derive_epp(&snap.neurochemicals.effective_levels);
+
+            // Turbo (boost) gate — the hardware permission to run
+            // above the base P-state. Tied to the frequency policy:
+            // enabled only when the policy ceiling is already at the
+            // hardware max, so it can never override a throttle.
+            // Overheating lowers the capped ceiling, disabling it.
+            let cpu_boost = super::cpufreq::derive_boost(&policy, fmax);
+
+            let control = super::cpufreq::BodyControlState {
+                cpu_min_freq_khz: policy.min_freq,
+                cpu_max_freq_khz: policy.max_freq,
+                cpu_governor: policy.governor.clone(),
+                thermally_capped,
+                thermal_cap_temp_c: if thermally_capped {
+                    self.last_body_state.cpu_temp_c
+                } else {
+                    0.0
+                },
+                daemon_nice,
+                cognitive_nice,
+                io_class: io_class.label(),
+                plasticity_gate: snap.memory.plasticity_gate,
+                // The tick never controls the cognitive mind.
+                // This field is kept for protocol compatibility
+                // but is always false now.
+                controlling_cognitive: false,
+                cpu_epp,
+                cpu_boost,
+                description: String::new(),
+            };
+            super::cpufreq::publish_control_state(&control);
+        }
+    }
+
+    /// The body work gated on `tick_count`, shared by every entry point.
+    ///
+    /// Consolidation, association, dreaming, and disk sync are
+    /// deliberately absent: they need the LTM lock, and the daemon's main
+    /// loop already drives them on its own timers (see
+    /// `genesis-daemon.rs`). They are noted here because their
+    /// `tick_count % N` gates still assume this counter advances at 5 Hz
+    /// -- which is precisely why the body, not the mind, must be what
+    /// advances it.
+    fn run_interval_gated_maintenance(&mut self, mmap: &MmapState, _now_ms: u64) {
+        if self.tick_count % INTEROCEPTION_INTERVAL_TICKS == 0 {
+            self.last_body_state = self.interoceptor.read();
+            super::interoception::publish_body_state(&self.last_body_state);
+        }
+
+        if self.tick_count % CPUFREQ_INTERVAL_TICKS == 0 {
+            self.compute_and_apply_cpu_policy(mmap);
+        }
     }
 
     /// Consolidate STM → LTM. Returns the number of episodes promoted.
@@ -1413,6 +1627,17 @@ impl TickLoop {
             return;
         }
 
+        // Fallback-path transitions are tallied here too, so the counts
+        // are complete whether the mind was driving or the daemon was
+        // running the loop itself. A zone that changes only on the
+        // fallback path would otherwise be invisible.
+        if zone_actually_changed {
+            self.zone_tally.record(selected as u8, now_ms);
+        }
+        if let Some(post) = mmap.read_consistent() {
+            self.phase_tally.record(post.zones.phase() as u8, now_ms);
+        }
+
         if zone_actually_changed {
             let _ = ltm.store_meta(
                 now_ms,
@@ -1518,10 +1743,21 @@ impl TickLoop {
     /// cognitive mind applies its own priority via its brain wave
     /// state. This handler only applies the shared body control and
     /// the daemon's own scheduling.
+    ///
+    /// Returns whether every attempted hardware write landed. Platforms
+    /// that expose no knob for a requested control (no EPP, no boost
+    /// gate) are capability limits, not failures, and do not count
+    /// against it. Individual failures are reported once each by the
+    /// cpufreq setters rather than on every heartbeat.
     pub fn apply_body_control(&mut self, mmap: &MmapState) -> bool {
         let now_ms = current_ms();
         if let Some(snap) = mmap.read_consistent() {
             let (fmin, fmax) = super::cpufreq::freq_range();
+            // Tracks whether every attempted hardware write actually
+            // landed. The individual failures are reported by the
+            // cpufreq setters (deduplicated); this aggregates them so
+            // the IPC handler can stop acknowledging unconditionally.
+            let mut writes_ok = true;
 
             let mut policy = super::cpufreq::FreqPolicy::default();
             let mut thermally_capped = false;
@@ -1542,7 +1778,9 @@ impl TickLoop {
                 // Only write to sysfs when the policy changed — see
                 // the tick path for rationale.
                 if policy != self.last_freq_policy {
-                    super::cpufreq::apply_policy(&policy);
+                    if !super::cpufreq::apply_policy(&policy) {
+                        writes_ok = false;
+                    }
                     self.last_freq_policy = policy.clone();
                 }
             }
@@ -1554,13 +1792,17 @@ impl TickLoop {
             let daemon_nice = super::cpufreq::derive_nice(ach);
             let pid = std::process::id();
             if daemon_nice != self.last_daemon_nice {
-                super::cpufreq::set_priority(pid, daemon_nice);
+                if !super::cpufreq::set_priority(pid, daemon_nice) {
+                    writes_ok = false;
+                }
                 self.last_daemon_nice = daemon_nice;
             }
 
             let io_class = super::cpufreq::derive_io_class(snap.memory.plasticity_gate);
             if io_class != self.last_daemon_io_class {
-                super::cpufreq::set_io_priority(pid, io_class);
+                if !super::cpufreq::set_io_priority(pid, io_class) {
+                    writes_ok = false;
+                }
                 self.last_daemon_io_class = io_class;
             }
 
@@ -1571,7 +1813,16 @@ impl TickLoop {
             // and set_epp is a no-op.
             let cpu_epp = super::cpufreq::derive_epp(&snap.neurochemicals.effective_levels);
             if cpu_epp != self.last_epp {
-                super::cpufreq::set_epp(&cpu_epp);
+                // Always attempt, even with an empty profile, so the
+                // setter can report that the platform exposes no EPP
+                // knob at all — "never applies here" must be
+                // distinguishable from "tried and refused". An absent
+                // knob is a capability limit, not a refused write, so
+                // it doesn't count against the outcome.
+                let landed = super::cpufreq::set_epp(&cpu_epp);
+                if !landed && !cpu_epp.is_empty() {
+                    writes_ok = false;
+                }
                 self.last_epp = cpu_epp.clone();
             }
 
@@ -1583,8 +1834,10 @@ impl TickLoop {
             // Unavailable and set_boost is a no-op.
             let cpu_boost = super::cpufreq::derive_boost(&policy, fmax);
             if cpu_boost != self.last_boost {
-                if let Some(enabled) = cpu_boost.as_bool() {
-                    super::cpufreq::set_boost(enabled);
+                if let Some(enabled) = cpu_boost.as_bool()
+                    && !super::cpufreq::set_boost(enabled)
+                {
+                    writes_ok = false;
                 }
                 self.last_boost = cpu_boost;
             }
@@ -1629,48 +1882,89 @@ impl TickLoop {
             };
             super::cpufreq::publish_control_state(&control);
 
-            // Update manifest heartbeat.
+            // Update manifest heartbeat, and supply the two manifest
+            // fields that had no producer. `mem_usage_mb` (and the
+            // `total_mem_mb` derived from it) was structurally zero, so
+            // the one place naming memory in absolute terms reported a
+            // mind using none at all; `uptime_ms` likewise. Both are
+            // refreshed here because body control runs on the mind's
+            // heartbeat, so the figures are current.
             if let Err(e) = mmap.modify(now_ms, |state| {
                 if let Some(module) = state.manifest.get_mut(ModuleId::Subcognitive) {
                     module.heartbeat(now_ms);
                     module.status = ModuleStatus::Running as u8;
+                    // The whole process tree's resident set, which is
+                    // what makes the summed `total_mem_mb` correct.
+                    // It is carried on Subcognitive rather than split
+                    // across modules because a per-module memory split
+                    // is not measurable: the cognitive mind is a single
+                    // process hosting language, memory, reasoning and
+                    // the rest, so attributing bytes to any one of them
+                    // would be fabrication. See `ModuleEntry::mem_usage_mb`.
+                    module.mem_usage_mb = super::interoception::read_memory_mb();
                 }
+                state.manifest.uptime_ms = now_ms.saturating_sub(state.header.created_at);
                 state.manifest.recompute();
             }) {
                 eprintln!("[tick] body control manifest update failed: {e}");
             }
 
-            // Always false — the tick no longer controls the
-            // cognitive mind. The return value is kept for API
-            // compatibility.
-            false
+            // `writes_ok` says whether the hardware accepted what we
+            // asked of it. The tick still never controls the cognitive
+            // mind — that stays false in the published state
+            // (`controlling_cognitive`).
+            writes_ok
         } else {
             false
         }
     }
 
     /// Check cognitive module staleness and mark stale modules.
+    ///
+    /// Every non-subcognitive module is reaped, not just the six the
+    /// mind registers at startup. The module sampler credits modules
+    /// across the whole manifest (emotion, dreaming, attention,
+    /// intention, …) and `UPDATE_MODULE_STATUS` marks them Running, so
+    /// a fixed list would leave a crashed subsystem's module Running
+    /// forever and keep it in `GET_SUBSYSTEM_TELEMETRY`'s report.
+    /// The mind now heartbeats every module it has observed each round,
+    /// so silence here genuinely means the reporting stopped.
     pub fn check_staleness(&mut self, mmap: &MmapState) {
         let now_ms = current_ms();
         let threshold = now_ms.saturating_sub(MODULE_STALENESS_THRESHOLD_MS);
-        let _ = mmap.modify(now_ms, |state| {
+        if let Err(e) = mmap.modify(now_ms, |state| {
+            // Subcognitive is the daemon itself and is heartbeated by
+            // the tick, so it is deliberately not reaped here.
             for module_id in [
+                ModuleId::Attention,
+                ModuleId::Memory,
+                ModuleId::Emotion,
+                ModuleId::Language,
+                ModuleId::Reasoning,
                 ModuleId::Sensory,
                 ModuleId::Motor,
-                ModuleId::Language,
-                ModuleId::Memory,
-                ModuleId::Reasoning,
                 ModuleId::Metacognition,
+                ModuleId::Dreaming,
+                ModuleId::Intention,
+                ModuleId::Guardrails,
             ] {
                 if let Some(module) = state.manifest.get_mut(module_id)
                     && module.status().is_alive()
                     && module.last_heartbeat < threshold
                 {
                     module.status = ModuleStatus::Stopped as u8;
+                    // A reaped module's last activity reading is no
+                    // longer true — clearing it keeps the aggregate
+                    // honest if it restarts before its next report.
+                    module.cpu_share = 0.0;
                 }
             }
             state.manifest.recompute();
-        });
+        }) {
+            // Silently dropping this write would leave a crashed module
+            // marked Running with no diagnostic anywhere.
+            eprintln!("[tick] check_staleness write failed: {e}");
+        }
     }
 
     // save_inference_model is defined above (line 204) — no duplicate needed.

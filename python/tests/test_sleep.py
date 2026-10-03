@@ -34,7 +34,7 @@ from genesis_cognitive import (
     RelationType,
     SelfModel,
 )
-from genesis_cognitive.persistence import (
+from genesis_cognitive.infrastructure.persistence import (
     load_state,
     restore_sleep_cycle,
     save_state,

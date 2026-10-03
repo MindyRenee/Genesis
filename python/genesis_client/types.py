@@ -12,10 +12,14 @@ from dataclasses import dataclass, field
 from .protocol import (
     _F32,
     _I32,
+    _U16,
     _U32,
     _U64,
     CHEM_NAMES,
     PHASE_NAMES,
+    SENSOR_NAMES,
+    SUBSYSTEM_NAMES,
+    ZONE_NAMES,
 )
 
 __all__ = [
@@ -36,10 +40,14 @@ __all__ = [
     "PhaseInfo",
     "PingResponse",
     "PlasticityProfile",
+    "ProcessHealth",
     "RecentEpisode",
+    "SensorPresence",
     "SimilarEpisode",
+    "StateDwell",
     "SubsystemReport",
     "SubsystemTelemetry",
+    "ZoneTransitions",
     "unpack_recent_episodes",
     "unpack_similar_results",
 ]
@@ -714,6 +722,17 @@ class CoreState:
     stm_count: int
     ltm_episode_count: int
 
+    # The generative self-model's projection (offset 3228, 64 bytes).
+    #
+    # Exposed so the mind can *observe* how its own model is doing
+    # without having to ask the daemon to run physics in order to get
+    # an answer. The daemon writes these every tick; previously the only
+    # way for the mind to read them was as the return value of
+    # ADVANCE_NEURO, which meant the mind had to drive the body in order
+    # to know what the body was doing. That is the coupling that let the
+    # mind's 1 Hz cadence dictate the body's integration rate.
+    inference: InferenceSummary | None
+
     @property
     def phase_name(self) -> str:
         """Human-readable name of the emergent mental phase."""
@@ -773,7 +792,70 @@ class CoreState:
             emergent_phase=emergent_phase,
             stm_count=stm_count,
             ltm_episode_count=ltm_episode_count,
+            inference=_unpack_inference_signals(data),
         )
+
+
+def _unpack_inference_signals(data: bytes) -> InferenceSummary | None:
+    """Unpack the 64-byte InferenceSignals block at offset 3228.
+
+    Layout (see `InferenceSignals` in src/state/inference.rs)::
+
+        0   surprise_ema               f32
+        4   free_energy                f32
+        8   expected_free_energy       f32
+        12  allostasis_load            f32
+        16  precision                  f32
+        20  attunement                 f32
+        24  dyadic_synchrony           f32
+        28  user_valence               f32
+        32  user_arousal               f32
+        36  user_engagement            f32
+        40  prediction_error_dopamine  f32
+        44  prediction_error_cortisol  f32
+        48  prediction_error_serotonin f32
+        52  model_maturity             f32
+        56  inference_tick_count       u32
+        60  policy_authority           f32
+        64  TOTAL
+
+    Returns None when the block is absent or unreadable rather than
+    raising: an older or truncated state file should still parse, the
+    mind simply has no inference signals that cycle. A seqlock read that
+    raced a writer can also come back short, and losing the block is far
+    better than losing the whole snapshot.
+    """
+    offset = 3228
+    if len(data) < offset + 64:
+        return None
+    block = data[offset : offset + 64]
+    try:
+        f = [_F32.unpack(block[i * 4 : i * 4 + 4])[0] for i in range(15)]
+        tick_count = _U32.unpack(block[56:60])[0]
+        policy_authority = _F32.unpack(block[60:64])[0]
+        return InferenceSummary(
+            surprise_ema=f[0],
+            free_energy=f[1],
+            expected_free_energy=f[2],
+            allostasis_load=f[3],
+            precision=f[4],
+            attunement=f[5],
+            dyadic_synchrony=f[6],
+            user_valence=f[7],
+            user_arousal=f[8],
+            user_engagement=f[9],
+            prediction_error_dopamine=f[10],
+            prediction_error_cortisol=f[11],
+            prediction_error_serotonin=f[12],
+            model_maturity=f[13],
+            inference_tick_count=tick_count,
+            policy_authority=policy_authority,
+        )
+    except (ValueError, IndexError):
+        # A short or malformed block loses the inference signals, not the
+        # whole snapshot: the mind simply observes without them this
+        # cycle. Losing the entire state read would stall the heartbeat.
+        return None
 
 
 def _unpack_header(data: bytes) -> tuple[int, int, int, int]:
@@ -1141,14 +1223,21 @@ class SubsystemTelemetry:
 
 
 # Module section appended after the subsystem records:
-#   [u8 module_count] then per module (6 bytes each):
-#   [u8 module_id][u8 status][f32 cpu_share]
+#   [u8 module_count] then per module (18 bytes each):
+#   [u8 module_id][u8 status][f32 cpu_share][u64 task_id][u32 error_code]
+#
+# The 12-byte task/error tail is optional: a v2-era daemon emits only
+# the first 6 bytes of each record, and both parsers read a short tail
+# as task 0 / no error rather than failing.
 #
 # These are the mind's brain *parts* — the manifest's module table —
 # self-reported by the cognitive mind via UPDATE_MODULE_STATUS's
 # optional cpu_share. Hardware can't attribute activity inside one
 # process, so the mind measures how much of its cycle time each
 # subsystem consumed and reports it.
+
+MODULE_REC_V2 = 6
+MODULE_REC_V3 = 18
 
 MODULE_NAMES = {
     0: "subcognitive",
@@ -1166,6 +1255,24 @@ MODULE_NAMES = {
 }
 
 
+# Lifecycle states, in the order the manifest stores them.
+MODULE_STOPPED = 0
+MODULE_STARTING = 1
+MODULE_RUNNING = 2
+MODULE_IDLE = 3
+MODULE_STOPPING = 4
+MODULE_ERROR = 5
+
+MODULE_STATUS_NAMES: dict[int, str] = {
+    MODULE_STOPPED: "stopped",
+    MODULE_STARTING: "starting",
+    MODULE_RUNNING: "running",
+    MODULE_IDLE: "idle",
+    MODULE_STOPPING: "stopping",
+    MODULE_ERROR: "error",
+}
+
+
 @dataclass(frozen=True)
 class ModuleTelemetry:
     """Per-module telemetry — one brain part's self-reported activity.
@@ -1174,16 +1281,49 @@ class ModuleTelemetry:
     measured work [0,1]; ``status`` is the manifest lifecycle state
     (0=Stopped … 5=Error). Together with the per-subsystem records this
     answers "which brain part is firing" at functional granularity.
+
+    ``task_id`` says *what* the part is working on and ``error_code``
+    whether it has failed. Both were manifest fields with no producer,
+    so a part that had crashed was indistinguishable from one that had
+    never run, and "busy on what" was unanswerable. Both read as 0
+    against a daemon that predates them.
     """
 
     module_id: int
     status: int
     cpu_share: float
+    task_id: int = 0
+    error_code: int = 0
 
     @property
     def module_name(self) -> str:
         """Human-readable module name ("language", "memory", …)."""
         return MODULE_NAMES.get(self.module_id, f"unknown:{self.module_id}")
+
+    @property
+    def status_name(self) -> str:
+        """Human-readable lifecycle state ("running", "idle", …)."""
+        return MODULE_STATUS_NAMES.get(self.status, f"unknown:{self.status}")
+
+    @property
+    def is_failed(self) -> bool:
+        """Whether this part has reported an error."""
+        return self.error_code != 0
+
+    @property
+    def is_busy(self) -> bool:
+        """Whether this part is doing measured work right now."""
+        return self.cpu_share > 0.0
+
+    @property
+    def is_alive(self) -> bool:
+        """Whether the part exists and has not stopped.
+
+        ``Stopped`` and ``Stopping`` are the two states that mean "not
+        running"; a part in Error is still alive in the sense that the
+        failure is what it is reporting, so it is included.
+        """
+        return self.status not in (MODULE_STOPPED, MODULE_STOPPING)
 
 
 @dataclass(frozen=True)
@@ -1208,22 +1348,299 @@ class SubsystemReport:
         tail = 1 + len(subsystems) * 21
         if len(data) > tail:
             mcount = data[tail]
-            if len(data) < tail + 1 + mcount * 6:
-                raise ValueError(
-                    f"ModuleTelemetry needs {tail + 1 + mcount * 6} "
-                    f"bytes, got {len(data)}"
+            # Each record is 18 bytes in v3. A v2-era daemon emits 6, so
+            # the per-record stride is chosen from the buffer length
+            # rather than assumed: a record that does not fit is read as
+            # far as it goes, with the optional tail left at zero.
+            available = len(data) - (tail + 1)
+            if not mcount:
+                modules = ()
+            elif available >= mcount * MODULE_REC_V3:
+                stride = MODULE_REC_V3
+            elif available >= mcount * MODULE_REC_V2:
+                stride = MODULE_REC_V2
+            else:
+                # Short of even the v2 record. Tolerating this the way
+                # Rust does (empty module list) is the safer choice:
+                # the heartbeat catches ValueError and would lose the
+                # hardware reading it had already taken, while an empty
+                # module section merely leaves the tiers untouched.
+                return cls(subsystems=subsystems, modules=())
+
+            def _rec(i: int) -> ModuleTelemetry:
+                base = tail + 1 + i * stride
+                cpu = _F32.unpack(data[base + 2 : base + 6])[0]
+                task = _U64.unpack(data[base + 6 : base + 14])[0] if stride >= 14 else 0
+                err = _U32.unpack(data[base + 14 : base + 18])[0] if stride >= 18 else 0
+                return ModuleTelemetry(
+                    module_id=data[base],
+                    status=data[base + 1],
+                    cpu_share=cpu,
+                    task_id=task,
+                    error_code=err,
                 )
-            modules = tuple(
-                ModuleTelemetry(
-                    module_id=data[tail + 1 + i * 6],
-                    status=data[tail + 1 + i * 6 + 1],
-                    cpu_share=_F32.unpack(
-                        data[tail + 1 + i * 6 + 2 : tail + 1 + i * 6 + 6]
-                    )[0],
-                )
-                for i in range(mcount)
-            )
+
+            modules = tuple(_rec(i) for i in range(mcount))
         return cls(subsystems=subsystems, modules=modules)
+
+
+# ─── ZoneTransitions (GET_ZONE_TRANSITIONS) ───────────────────
+#
+# Response: [u8 zone_count] then per zone [u32 count][u64 total_ms],
+#           then [u8 phase_count] then per phase the same 12-byte record.
+#
+# Emergent phase transitions are a stated contribution, and nothing
+# measured them: the mmap'd zone record holds one duration sample that
+# every transition overwrites, and no count at all. So neither how
+# often the system changed state nor how long it dwelled in each was
+# answerable — a mind oscillating between two phases looked identical
+# to one that had settled.
+#
+# Zone and phase are tracked separately because they are driven by
+# different things: the zone follows intentions, the phase follows
+# neurochemistry. Oscillating in one while stable in the other is a
+# distinct fault that a single merged tally would hide.
+
+_STATE_REC = 12
+
+
+@dataclass(frozen=True)
+class StateDwell:
+    """How many times one state was entered, and total time in it."""
+
+    state: int
+    count: int = 0
+    total_ms: int = 0
+
+    @property
+    def mean_dwell_ms(self) -> float:
+        """Average time per visit, in milliseconds.
+
+        Zero when never entered. A state entered often but left fast is
+        a different picture from one entered once and held, and the
+        counts alone cannot tell them apart.
+        """
+        if self.count == 0:
+            return 0.0
+        return self.total_ms / self.count
+
+    @property
+    def zone_name(self) -> str:
+        """This state read as a task zone."""
+        return ZONE_NAMES.get(self.state, f"unknown:{self.state}")
+
+    @property
+    def phase_name(self) -> str:
+        """This state read as an emergent phase."""
+        return PHASE_NAMES.get(self.state, f"unknown:{self.state}")
+
+
+@dataclass(frozen=True)
+class ZoneTransitions:
+    """Zone and phase transition counts, with time in each state.
+
+    Counts are process-local and reset when the daemon restarts, which
+    suits reading them as a rate rather than a lifetime total.
+    """
+
+    zones: tuple[StateDwell, ...] = ()
+    phases: tuple[StateDwell, ...] = ()
+
+    @property
+    def total_zone_transitions(self) -> int:
+        """Total task-zone changes since startup."""
+        return sum(z.count for z in self.zones)
+
+    @property
+    def total_phase_transitions(self) -> int:
+        """Total emergent-phase changes since startup."""
+        return sum(p.count for p in self.phases)
+
+    def busiest_zone(self) -> StateDwell | None:
+        """The zone with the most transitions, if any were recorded."""
+        candidates = [z for z in self.zones if z.count > 0]
+        return max(candidates, key=lambda z: z.count) if candidates else None
+
+    def most_settled_phase(self) -> StateDwell | None:
+        """The phase with the longest mean dwell among entered phases.
+
+        Long average dwell is the signature of a settled system; a phase
+        re-entered constantly is the signature of oscillation.
+        """
+        candidates = [p for p in self.phases if p.count > 0]
+        return max(candidates, key=lambda p: p.mean_dwell_ms) if candidates else None
+
+    @classmethod
+    def unpack(cls, data: bytes) -> ZoneTransitions:
+        """Unpack the zone and phase sections."""
+
+        def section(offset: int) -> tuple[tuple[StateDwell, ...], int]:
+            if len(data) <= offset:
+                return (), offset
+            count = data[offset]
+            offset += 1
+            out = []
+            for i in range(count):
+                base = offset + i * _STATE_REC
+                if len(data) < base + _STATE_REC:
+                    raise ValueError(
+                        f"StateDwell needs {base + _STATE_REC} bytes, got {len(data)}"
+                    )
+                out.append(
+                    StateDwell(
+                        state=i,
+                        count=_U32.unpack(data[base : base + 4])[0],
+                        total_ms=_U64.unpack(data[base + 4 : base + 12])[0],
+                    )
+                )
+            return tuple(out), offset + count * _STATE_REC
+
+        zones, offset = section(0)
+        phases, _ = section(offset)
+        return cls(zones=zones, phases=phases)
+
+
+# ─── ProcessHealth (GET_PROCESS_HEALTH) ───────────────────────
+#
+# Response: [u16 alive_mask][u16 deaths][u8 last_death]
+#
+# A subsystem that died used to vanish from the telemetry with no
+# trace, so a crashed retina was indistinguishable from one that was
+# never started. This reports liveness explicitly and counts losses.
+
+
+@dataclass(frozen=True)
+class ProcessHealth:
+    """Liveness of Genesis's own process tree, with a death count."""
+
+    alive_mask: int = 0
+    deaths: int = 0
+    last_death: int = 0xFF
+
+    def is_alive(self, subsystem: int) -> bool:
+        """Whether that subsystem's process is running."""
+        return bool(self.alive_mask & (1 << subsystem))
+
+    @property
+    def alive(self) -> frozenset[str]:
+        """Names of the subsystems currently running."""
+        return frozenset(
+            name
+            for tag, name in SUBSYSTEM_NAMES.items()
+            if self.alive_mask & (1 << tag)
+        )
+
+    @property
+    def missing(self) -> frozenset[str]:
+        """Names of the subsystems that are not running.
+
+        Empty on a healthy machine, or for a subsystem that was never
+        started in the first place — this is "not running", not
+        "crashed". Use ``deaths`` to tell a loss from an absence.
+        """
+        return frozenset(
+            name
+            for tag, name in SUBSYSTEM_NAMES.items()
+            if not self.alive_mask & (1 << tag)
+        )
+
+    @property
+    def has_lost_a_subsystem(self) -> bool:
+        """Whether any subsystem has been seen alive and then lost."""
+        return self.deaths > 0
+
+    @property
+    def last_death_name(self) -> str:
+        """Name of the most recently lost subsystem, if any."""
+        if self.last_death == 0xFF:
+            return "none"
+        return SUBSYSTEM_NAMES.get(self.last_death, f"unknown:{self.last_death}")
+
+    @classmethod
+    def unpack(cls, data: bytes) -> ProcessHealth:
+        """Unpack the 5-byte health record."""
+        if len(data) < 5:
+            return cls()
+        return cls(
+            alive_mask=_U16.unpack(data[0:2])[0],
+            deaths=_U16.unpack(data[2:4])[0],
+            last_death=data[4],
+        )
+
+
+# ─── SensorPresence (GET_SENSOR_PRESENCE) ──────────────────────
+#
+# Response: [u16 mask]
+#
+# ``BodyState`` is 30 bare values with no per-channel validity, so a
+# channel backed by no sensor is indistinguishable from one reading a
+# healthy zero. This mask carries that distinction: a set bit means the
+# matching field is a real measurement, a clear bit means it is a
+# placeholder. It is what lets the cognitive layer honour the rule that
+# an absent sensor must never be treated as evidence.
+
+
+@dataclass(frozen=True)
+class SensorPresence:
+    """Which optional hardware sensors this machine actually has.
+
+    ``mask == 0`` means nothing has been discovered yet — either the
+    daemon is older than this command, or no interoception read has
+    completed. Both read the same way, and both are the safe direction:
+    nothing is claimed to be measured.
+    """
+
+    mask: int = 0
+
+    def has(self, bit: int) -> bool:
+        """Whether the sensor named by ``bit`` is present."""
+        return bool(self.mask & bit)
+
+    @property
+    def present(self) -> frozenset[str]:
+        """Names of the sensors present on this machine."""
+        return frozenset(
+            name for bit, name in SENSOR_NAMES.items() if self.mask & bit
+        )
+
+    @property
+    def missing(self) -> frozenset[str]:
+        """Names of the optional sensors this machine does not have.
+
+        The useful direction: these are the channels whose values in a
+        ``BodyState`` are placeholders and must not be reasoned about.
+        """
+        return frozenset(
+            name for bit, name in SENSOR_NAMES.items() if not self.mask & bit
+        )
+
+    def channel_verified(self, channel: str) -> bool:
+        """Whether ``channel``'s value is a real measurement.
+
+        Unknown channel names are reported as *not* verified: an
+        unrecognised channel cannot be claimed to be backed by hardware,
+        which is the same answer a missing sensor gets.
+        """
+        for bit, name in SENSOR_NAMES.items():
+            if name == channel:
+                return bool(self.mask & bit)
+        return False
+
+    def has_channel(self, channel: str) -> bool:
+        """Whether the named channel is backed by hardware.
+
+        The name-taking counterpart to :meth:`has`, which takes a bit.
+        This is what :meth:`SelfModel.update_hardware_body` calls, so
+        it must accept a name and return a bool.
+        """
+        return self.channel_verified(channel)
+
+    @classmethod
+    def unpack(cls, data: bytes) -> SensorPresence:
+        """Unpack a 2-byte presence mask."""
+        if len(data) < 2:
+            return cls(mask=0)
+        return cls(mask=_U16.unpack(data[0:2])[0])
 
 
 # ─── BodyControlState (variable length) ───────────────────────

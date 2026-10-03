@@ -41,6 +41,10 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from genesis_client.swallow import note_swallowed
+
+from .infrastructure.journal import record_event
+
 logger = logging.getLogger(__name__)
 
 
@@ -59,9 +63,16 @@ def _format_size(size: int) -> str:
 
 @dataclass(slots=True)
 class SystemSnapshot:
-    """A point-in-time snapshot of the system state."""
+    """A point-in-time snapshot of the system state.
+
+    ``unreadable_metrics`` names the metrics whose readers failed on
+    this snapshot. Their fields hold 0.0, which is indistinguishable
+    from a real reading of zero — the ambiguity this set exists to
+    resolve.
+    """
 
     timestamp: float = field(default_factory=time.time)
+    unreadable_metrics: frozenset[str] = frozenset()
 
     # OS info
     os_name: str = ""
@@ -150,6 +161,18 @@ class SystemSnapshot:
             concerns.append(
                 f"{self.process_count} processes running — "
                 f"a lot of activity on this machine"
+            )
+        # A failed read is itself a concern. Every reader here returns
+        # 0.0 on failure, so without this a machine whose /proc could
+        # not be read looked perfectly healthy — and the safeguard
+        # urge's `telemetry_anomaly` stimulus is computed from exactly
+        # these metrics, so the substrate's own monitoring could vanish
+        # with no signal at all.
+        if self.unreadable_metrics:
+            concerns.append(
+                "Could not read: "
+                + ", ".join(sorted(self.unreadable_metrics))
+                + " — these readings are missing, not normal"
             )
         return concerns
 
@@ -328,6 +351,19 @@ class SystemBaseline:
              "Disk usage is at {val:.0f}% — normally around {mean:.0f}% "
              "(±{std:.0f}%). Disk usage has changed."),
         ]
+        # A metric that could not be read is not a metric at 0.0. It is
+        # reported as a deviation in its own right: its value sits far
+        # below the learned mean, so the statistical path would likely
+        # catch it anyway, but stating it as unreadable rather than
+        # anomalously low is the honest description — and it holds even
+        # for a baseline where the metric has barely varied.
+        if snapshot.unreadable_metrics:
+            deviations.append(
+                "Could not read: "
+                + ", ".join(sorted(snapshot.unreadable_metrics))
+                + " — these readings are missing, not normal"
+            )
+
         for name, value, min_std, template in checks:
             metric = self._metrics[name]
             if metric.is_deviation(value, threshold, min_std=min_std):
@@ -399,13 +435,19 @@ class SystemBaseline:
             os.replace(tmp_path, self._persist_path)
             tmp_path = None
         except (OSError, TypeError, ValueError) as e:
-            logger.debug(f"baseline save failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.system_monitor.save",
+                e,
+            )
         finally:
             if tmp_path is not None:
                 try:
                     os.unlink(tmp_path)
                 except OSError as e:
-                    logger.debug(f"baseline tmp cleanup skipped: {e}")
+                    note_swallowed(
+                        "genesis_cognitive.system_monitor.save",
+                        e,
+                    )
 
     def load(self) -> None:
         """Load a previously saved baseline from disk."""
@@ -421,7 +463,10 @@ class SystemBaseline:
                 for val in mdata.get("samples", []):
                     m.record(float(val))
         except (OSError, ValueError, KeyError) as e:
-            logger.debug(f"baseline load failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.system_monitor.load",
+                e,
+            )
 
 
 class SystemMonitor:
@@ -460,6 +505,11 @@ class SystemMonitor:
         baseline learns what's normal for this machine.
         """
         s = SystemSnapshot()
+        # Readers that fail set their name here. The snapshot is the
+        # unit of record, so tracking on it (rather than on the
+        # monitor) keeps the failure attached to the reading it
+        # invalidated.
+        unreadable: set[str] = set()
 
         # OS info
         s.os_name = platform.system()
@@ -476,6 +526,8 @@ class SystemMonitor:
 
         # Memory
         mem = self._read_memory()
+        if mem.get("unreadable"):
+            unreadable.add("memory")
         s.memory_total_gb = mem["total_gb"]
         s.memory_used_gb = mem["used_gb"]
         s.memory_percent = mem["percent"]
@@ -484,6 +536,8 @@ class SystemMonitor:
 
         # Disk
         disk = self._read_disk()
+        if disk.get("unreadable"):
+            unreadable.add("disk")
         s.disk_total_gb = disk["total_gb"]
         s.disk_used_gb = disk["used_gb"]
         s.disk_percent = disk["percent"]
@@ -494,12 +548,24 @@ class SystemMonitor:
 
         # Processes
         s.process_count = self._count_processes()
+        if s.process_count == 0:
+            # /proc is never legitimately empty, so a zero here is a
+            # failed read rather than a measurement.
+            unreadable.add("processes")
 
         # Filesystem
         s.project_root = str(self.project_root)
         fs = self._scan_filesystem()
         s.project_file_count = fs["file_count"]
         s.project_size_mb = fs["size_mb"]
+
+        if unreadable:
+            s.unreadable_metrics = frozenset(unreadable)
+            record_event(
+                "telemetry_partial",
+                "some machine metrics could not be read",
+                metrics=sorted(unreadable),
+            )
 
         self._last_snapshot = s
         # Feed this snapshot into the baseline so it learns what's
@@ -586,7 +652,13 @@ class SystemMonitor:
             result["swap_total_gb"] = swap_total / 1e9
             result["swap_used_gb"] = (swap_total - swap_free) / 1e9
         except (OSError, ValueError) as e:
-            logger.debug(repr(e))
+            # Marked, not just logged: this returns zeros, and the
+            # safeguard urge reads memory pressure from here.
+            result["unreadable"] = True
+            note_swallowed(
+                "genesis_cognitive.system_monitor._read_memory",
+                e,
+            )
         return result
 
     # ─── Disk ─────────────────────────────────────────────────────
@@ -603,7 +675,11 @@ class SystemMonitor:
             result["used_gb"] = used / 1e9
             result["percent"] = (used / total * 100) if total > 0 else 0.0
         except OSError as e:
-            logger.debug(repr(e))
+            result["unreadable"] = True
+            note_swallowed(
+                "genesis_cognitive.system_monitor._read_disk",
+                e,
+            )
         return result
 
     # ─── Network ──────────────────────────────────────────────────
@@ -653,7 +729,10 @@ class SystemMonitor:
                     if len(processes) >= limit:
                         break
         except OSError as e:
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.system_monitor.list_processes",
+                e,
+            )
         return processes
 
     @staticmethod
@@ -709,7 +788,10 @@ class SystemMonitor:
                     total_size += size
                     file_count += 1
         except OSError as e:
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.system_monitor._scan_filesystem",
+                e,
+            )
 
         return {
             "file_count": file_count,
@@ -773,7 +855,10 @@ class SystemMonitor:
                     if line.startswith("btime "):
                         return float(line.split()[1])
         except (OSError, IndexError, ValueError) as e:
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.system_monitor._read_boot_time",
+                e,
+            )
         return time.time() - 3600  # fallback: assume 1h uptime
 
     # ─── Introspection ────────────────────────────────────────────

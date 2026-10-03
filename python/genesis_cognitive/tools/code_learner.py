@@ -31,6 +31,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from genesis_client.swallow import note_swallowed
+
 from ..concepts import RelationType
 from .code_analysis import FileAnalysis, analyze_python_tree
 
@@ -509,7 +511,10 @@ class CodeLearner:
                 if self.network.remove_concept(concept_id):
                     removed += 1
             except Exception as exc:  # noqa: BLE001
-                logger.debug("failed retiring stale code symbol %s: %s", concept_id, exc)
+                note_swallowed(
+                    "genesis_cognitive.tools.code_learner._retire_stale_file_symbols",
+                    exc,
+                )
         return removed
 
     def learn_file(self, filepath: str, *, force: bool = False) -> FileLearningResult:

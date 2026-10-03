@@ -32,6 +32,8 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from genesis_client.swallow import note_swallowed
+
 if TYPE_CHECKING:
     from ..concepts import ConceptNetwork
 
@@ -1053,7 +1055,10 @@ class TaskCompetence:
                 )
         except Exception as e:  # noqa: BLE001
             # Grounding is best-effort; never break consolidation.
-            logger.debug("skill grounding failed: %s", e)
+            note_swallowed(
+                "genesis_cognitive.reasoning.competence._ground_skill",
+                e,
+            )
 
     def mark_skill_failure(self, skill_id: str) -> None:
         skill = self.skills.get(skill_id)

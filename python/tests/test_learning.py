@@ -1063,7 +1063,7 @@ def test_statistics_include_trace_info(network_td_learning) -> None:
 
 def test_trace_persistence_roundtrip(network_td_learning) -> None:
     """Eligibility traces and λ survive serialize/restore."""
-    from genesis_cognitive.persistence import (
+    from genesis_cognitive.infrastructure.persistence import (
         _serialize_td_learner,
         restore_td_learner,
     )
@@ -1084,7 +1084,7 @@ def test_trace_persistence_roundtrip(network_td_learning) -> None:
 
 def test_restore_old_save_without_traces(network_td_learning) -> None:
     """Restoring a pre-TD(λ) save (no traces/lam keys) doesn't crash."""
-    from genesis_cognitive.persistence import restore_td_learner
+    from genesis_cognitive.infrastructure.persistence import restore_td_learner
 
     td = TDLearner(network_td_learning, lam=0.8)
     old_data = {

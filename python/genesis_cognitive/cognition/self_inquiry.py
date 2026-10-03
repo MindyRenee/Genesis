@@ -31,6 +31,8 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from genesis_client.swallow import note_swallowed
+
 from ..emotion import EmotionalState
 from ..language import LanguageEngine, Thought
 from ..perception import Perception
@@ -40,8 +42,8 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from ..cognition.thought_composer import ThoughtComposer
     from ..concepts import ConceptNetwork, NetworkTopology
+    from ..infrastructure.narrative import NarrativeEngine
     from ..memory import MemoryContext, MemoryEngine
-    from ..narrative import NarrativeEngine
     from ..self import ReflectionEngine, SelfAssessmentEngine, SelfComposer, SelfModel
     from ..self_learner import SelfDirectedLearner
     from .feeling_reporter import FeelingReporter
@@ -302,7 +304,10 @@ class SelfInquiryHandler:
                     elif event.event_type == "conversation":
                         activity_type = "conversation"
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"failed to read recent learning events for activity summary: {e}")
+            note_swallowed(
+                "genesis_cognitive.cognition.self_inquiry.self_inquiry_recent_activity",
+                e,
+            )
 
         # 2. Recent reflection insights — what it noticed about itself
         try:
@@ -312,7 +317,10 @@ class SelfInquiryHandler:
                 if desc and len(activity_fragments) < 5:
                     activity_fragments.append(desc)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"failed to read recent reflection insights for activity summary: {e}")
+            note_swallowed(
+                "genesis_cognitive.cognition.self_inquiry.self_inquiry_recent_activity",
+                e,
+            )
 
         # 3. Compose from its actual state using the self-composer.
         # self_reflection_fragments selects what it knows, what it's
@@ -323,6 +331,30 @@ class SelfInquiryHandler:
         fragments = self._self_composer.self_reflection_fragments(
             self._self_model, self._network, self._reflection, emotion,
         )
+
+        # 4. Which regions are carrying the work right now. This is the
+        # most direct evidence it has of what it is doing at this
+        # instant — it comes from the 25 Hz module sampler and the
+        # daemon's per-process counters, not from recalled history.
+        # They are seeds: the composer resolves each against the
+        # concept network and the language engine words them.
+        active_regions = self._self_model.activity_seeds()
+        # Conditions its body is under, most urgent first. Distinct
+        # from `active_regions` above: those say which part is
+        # working, these say what the substrate is doing to it.
+        body_conditions = [
+            seed for seed, _urgency in self._self_model.body_condition_seeds()
+        ]
+        if active_regions or body_conditions:
+            fragments = [
+                *fragments,
+                *(("region", name) for name in active_regions),
+                *(("condition", name) for name in body_conditions),
+            ]
+            if len(activity_fragments) < 5:
+                activity_fragments.extend(
+                    [*active_regions, *body_conditions]
+                )
 
         return Thought(
             content="my recent activity",
@@ -479,7 +511,33 @@ class SelfInquiryHandler:
                 seeds.extend(["learning", "plasticity"])
             if not body.network_connected:
                 seeds.extend(["offline", "connectivity", "network"])
+            # The substrate itself leads, then whatever is happening to
+            # it right now, then which regions are carrying the work.
+            #
+            # Order matters because the composer takes the first seed
+            # it can resolve into a thought. A question about her body
+            # should be answered *as* a question about her body, so
+            # "body"/"silicon" lead; the condition-specific seeds above
+            # already take precedence for a specific complaint ("are you
+            # overheating?"), and the activity tiers are supporting
+            # detail rather than the subject. Leading with the busiest
+            # region instead made her answer "how is your body" with a
+            # thought about reasoning.
             seeds.extend(["body", "cpu", "hardware", "silicon", "substrate"])
+            # What the substrate is doing to it right now, most urgent
+            # first. The involuntary channels — throttling, stalls,
+            # entropy, battery wear — were measured and stored for a
+            # long time without reaching anything that could speak of
+            # them; these are seeds, so she still composes the words
+            # from her own knowledge of each condition.
+            seeds.extend(
+                seed for seed, _urgency in self._self_model.body_condition_seeds()
+            )
+            # Which parts of it are actually firing — the measured
+            # brain parts and per-process tiers, offered so she
+            # composes from her own knowledge of them rather than from
+            # a canned description of her load.
+            seeds.extend(self._self_model.activity_seeds())
 
             for seed in seeds:
                 thought = self._composer.compose_about(seed, emotion, focused=True)

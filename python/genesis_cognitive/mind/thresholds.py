@@ -94,6 +94,14 @@ WAKE_RESCUE_ADENOSINE = 0.60  # above this, sleep anyway
 WAKE_RESCUE_MELATONIN = 0.30  # above this, circadian drive wins
 WAKE_REINFORCE_INTERVAL = 60.0  # minimum seconds between impulses
 
+# How long after waking an asleep daemon phase is still the expected
+# transitional state rather than a desync. The wake impulse cascade
+# takes time to move the neurochemistry, so a phase check earlier than
+# this would flag the normal transition as a fault. Sized to the
+# impulse cascade's first reinforcement (WAKE_REINFORCE_INTERVAL),
+# since that is when the first opportunity to correct it has passed.
+WAKE_DESYNC_SETTLE_SECONDS = 90.0
+
 # Voluntary sleep-urge floor. The self_sleep urge integrates
 # adenosine as a drive signal, but deciding to sleep should require
 # pressure near the drowsy boundary (DROWSINESS_ADENOSINE = 0.55,

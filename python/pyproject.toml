@@ -13,6 +13,14 @@ select = ["E", "F", "W", "I", "UP", "RUF", "B", "BLE", "C4"]
 # docstrings and comments for math notation and prose.
 ignore = ["RUF001", "RUF002", "RUF003"]
 
+[tool.ruff.lint.per-file-ignores]
+# engine.py enters the self -> perception -> language -> self cycle, so the
+# position of `..infrastructure.narrative` relative to `..self` decides
+# whether `genesis_cognitive.self` is fully bound when language/generator.py
+# imports SelfModel from it. Sorting the block breaks every import in the
+# package. The order is documented inline and guarded by test_import_order.py.
+"genesis_cognitive/cognition/engine.py" = ["I001"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

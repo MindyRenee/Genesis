@@ -1580,163 +1580,134 @@ def instantiate(family: str, params: dict[str, object]) -> Transform | None:
     values observed in a later task. Returns None for families that
     can't be re-parameterized (e.g. ``recolor``, whose map is derived
     from evidence rather than chosen).
+
+    Dispatch is via a registry mapping family names to builder callables.
     """
-    def color_param() -> int | None:
+    def _color() -> int | None:
         v = params.get("color")
         return v if isinstance(v, int) else None
 
-    if family == "gravity":
-        direction = params.get("direction")
-        if direction not in ("down", "up", "left", "right"):
+    def _dir() -> str | None:
+        d = params.get("direction")
+        return d if d in ("down", "up", "left", "right") else None
+
+    # Simple no-param builders
+    simple: dict[str, Callable[[], Transform]] = {
+        "self_tile": lambda: Transform("self_tile", _mk_self_tile(), {}),
+        "repeat_down": lambda: Transform("repeat_down", _mk_repeat_down(), {}),
+        "rank_bars": lambda: Transform("rank_bars", _mk_rank_bars(), {}),
+        "pick_quadrant": lambda: Transform("pick_quadrant", _mk_pick_quadrant(), {}),
+        "dual_frame": lambda: Transform("dual_frame", _mk_dual_frame(), {}),
+        "unwind_tile": lambda: Transform("unwind_tile", _mk_unwind_tile(), {}),
+        "stamp_recolor": lambda: Transform("stamp_recolor", _mk_stamp_recolor(), {}),
+        "link_blocks": lambda: Transform("link_blocks", _mk_link_blocks(), {}),
+        "rot_symmetrize": lambda: Transform("rot_symmetrize", _mk_rot_symmetrize(), {}),
+        "ray_recolor": lambda: Transform("ray_recolor", _mk_ray_recolor(), {}),
+        "nearest_border": lambda: Transform("nearest_border", _mk_nearest_border(), {}),
+        "stamp_at_marks": lambda: Transform("stamp_at_marks", _mk_stamp_at_marks(), {}),
+        "fill_busiest": lambda: Transform("fill_busiest", _mk_fill_busiest(), {}),
+        "eye_ray": lambda: Transform("eye_ray", _mk_eye_ray(), {}),
+        "cross_fill": lambda: Transform("cross_fill", _mk_cross_fill(), {}),
+    }
+
+    # Color-param builders
+    def _with_color(
+        mk_fn: Callable[[int], TransformFn], name: str | None = None
+    ) -> Transform | None:
+        c = _color()
+        if c is None:
             return None
-        if "color" in params:
-            color = color_param()
-            if color is None:
-                return None
-            return Transform(
-                f"gravity_{direction}_{color}",
-                _mk_gravity(str(direction), color),
-                {"direction": direction, "color": color},
-            )
-        return Transform(
-            f"gravity_{direction}",
-            _mk_gravity(str(direction)),
-            {"direction": direction},
-        )
-    if family == "erase_color":
-        color = color_param()
-        if color is None:
+        return Transform(name or f"mk_{mk_fn.__name__}", mk_fn(c), {"color": c})
+
+    color_builders: dict[str, Callable[[], Transform | None]] = {
+        "erase_color": lambda: _with_color(_mk_erase, "erase_color"),
+        "select_color": lambda: _with_color(_mk_select, "select_color"),
+        "fill_enclosed": lambda: _with_color(_mk_fill_enclosed, "fill_enclosed"),
+        "mark_diagonals": lambda: _with_color(_mk_mark_diagonals, "mark_diagonals"),
+        "intersect_halves": lambda: _with_color(_mk_intersect_halves, "intersect_halves"),
+        "ghost_pair": lambda: _with_color(_mk_ghost_pair, "ghost_pair"),
+        "align_tops": lambda: _with_color(_mk_align_tops, "align_tops"),
+        "empty_halves": lambda: _with_color(_mk_empty_halves, "empty_halves"),
+        "diff_halves": lambda: _with_color(_mk_diff_halves, "diff_halves"),
+        "recolor_largest": lambda: _with_color(
+            lambda c: _mk_recolor_object("largest", c), "recolor_largest"
+        ),
+        "recolor_smallest": lambda: _with_color(
+            lambda c: _mk_recolor_object("smallest", c), "recolor_smallest"
+        ),
+        "fill_lanes": lambda: _with_color(lambda c: _mk_fill_lanes(c), "fill_lanes"),
+        "ring_unique": lambda: _with_color(_mk_ring_unique, "ring_unique"),
+    }
+
+    # Direction builders
+    dir_builders: dict[str, Callable[[str], Transform | None]] = {
+        "gravity": lambda d: (
+            Transform(f"gravity_{d}_{c}", _mk_gravity(d, c), {"direction": d, "color": c})
+            if (c := _color()) is not None
+            else Transform(f"gravity_{d}", _mk_gravity(d), {"direction": d})
+        ) if d else None,
+        "settle": lambda d: (
+            Transform(f"settle_{d}", _mk_settle(d), {"direction": d}) if d else None
+        ),
+        "shift": lambda d: (
+            Transform("shift", _mk_shift(dr, dc, cl), {"dr": dr, "dc": dc, "clamp": cl})
+            if isinstance(dr := params.get("dr"), int) and isinstance(dc := params.get("dc"), int)
+            and isinstance(cl := params.get("clamp", False), bool) else None
+        ),
+    }
+
+    # Parameterized builders
+    def _gravity() -> Transform | None:
+        d = _dir()
+        return dir_builders["gravity"](d) if d else None
+
+    def _settle() -> Transform | None:
+        d = _dir()
+        return dir_builders["settle"](d) if d else None
+
+    def _shift() -> Transform | None:
+        dr, dc = params.get("dr"), params.get("dc")
+        cl = params.get("clamp", False)
+        if not (isinstance(dr, int) and isinstance(dc, int) and isinstance(cl, bool)):
             return None
-        return Transform(
-            "erase_color",
-            _mk_erase(color),
-            {"color": color},
-        )
-    if family == "select_color":
-        color = color_param()
-        if color is None:
+        return Transform("shift", _mk_shift(dr, dc, cl), {"dr": dr, "dc": dc, "clamp": cl})
+
+    def _extend_down() -> Transform | None:
+        n = params.get("n")
+        if not (isinstance(n, int) and n >= 1):
             return None
-        return Transform(
-            "select_color",
-            _mk_select(color),
-            {"color": color},
-        )
-    if family in ("recolor_largest", "recolor_smallest"):
-        color = color_param()
-        if color is None:
-            return None
-        which = family.removeprefix("recolor_")
-        return Transform(
-            family,
-            _mk_recolor_object(which, color),
-            {"color": color},
-        )
-    if family == "fill_enclosed":
-        color = color_param()
-        if color is None:
-            return None
-        return Transform(
-            "fill_enclosed",
-            _mk_fill_enclosed(color),
-            {"color": color},
-        )
-    if family == "mark_uniform":
+        return Transform("extend_down", _mk_extend_down(n), {"n": n})
+
+    def _mark_uniform() -> Transform | None:
         axis = params.get("axis")
-        color = color_param()
-        if axis not in ("row", "column") or color is None:
+        c = _color()
+        if axis not in ("row", "column") or c is None:
             return None
         return Transform(
             f"mark_uniform_{axis}",
-            _mk_mark_uniform(str(axis), color),
-            {"axis": axis, "color": color},
+            _mk_mark_uniform(str(axis), c),
+            {"axis": axis, "color": c},
         )
-    if family == "shift":
-        dr, dc = params.get("dr"), params.get("dc")
-        clamp = params.get("clamp", False)
-        if (
-            not isinstance(dr, int) or not isinstance(dc, int)
-            or not isinstance(clamp, bool)
-        ):
-            return None
-        return Transform(
-            "shift",
-            _mk_shift(dr, dc, clamp),
-            {"dr": dr, "dc": dc, "clamp": clamp},
-        )
-    if family == "self_tile":
-        return Transform("self_tile", _mk_self_tile(), {})
-    if family == "mark_diagonals":
-        color = color_param()
-        if color is None:
-            return None
-        return Transform(
-            "mark_diagonals",
-            _mk_mark_diagonals(color),
-            {"color": color},
-        )
-    if family == "extend_down":
-        n = params.get("n")
-        if not isinstance(n, int) or n < 1:
-            return None
-        return Transform("extend_down", _mk_extend_down(n), {"n": n})
-    if family == "repeat_down":
-        return Transform("repeat_down", _mk_repeat_down(), {})
-    if family == "intersect_halves":
-        color = color_param()
-        if color is None:
-            return None
-        return Transform(
-            "intersect_halves",
-            _mk_intersect_halves(color),
-            {"color": color},
-        )
-    if family == "classify_shape":
+
+    def _classify_shape() -> Transform | None:
         table = params.get("table")
         if not isinstance(table, dict):
             return None
-        return Transform(
-            "classify_shape",
-            _mk_classify_shape(table),
-            {"table": table},
-        )
-    if family == "settle":
-        direction = params.get("direction")
-        if direction not in ("down", "up", "left", "right"):
+        return Transform("classify_shape", _mk_classify_shape(table), {"table": table})
+
+    def _bridge_endpoints() -> Transform | None:
+        m = params.get("marker")
+        if not isinstance(m, int):
             return None
-        return Transform(
-            f"settle_{direction}",
-            _mk_settle(str(direction)),
-            {"direction": direction},
-        )
-    if family == "bridge_endpoints":
-        marker = params.get("marker")
-        if not isinstance(marker, int):
-            return None
-        return Transform(
-            "bridge_endpoints",
-            _mk_bridge_endpoints(marker),
-            {"marker": marker},
-        )
-    if family == "rank_bars":
-        return Transform("rank_bars", _mk_rank_bars(), {})
-    if family == "cross_rays":
+        return Transform("bridge_endpoints", _mk_bridge_endpoints(m), {"marker": m})
+
+    def _cross_rays() -> Transform | None:
         clash = params.get("clash")
         if not isinstance(clash, int):
             return None
-        return Transform(
-            "cross_rays", _mk_cross_rays(clash), {"clash": clash},
-        )
-    if family == "pick_quadrant":
-        return Transform("pick_quadrant", _mk_pick_quadrant(), {})
-    if family == "dual_frame":
-        return Transform("dual_frame", _mk_dual_frame(), {})
-    if family == "unwind_tile":
-        return Transform("unwind_tile", _mk_unwind_tile(), {})
-    if family == "stamp_recolor":
-        return Transform("stamp_recolor", _mk_stamp_recolor(), {})
-    if family == "link_blocks":
-        return Transform("link_blocks", _mk_link_blocks(), {})
-    if family == "cross_halos":
+        return Transform("cross_rays", _mk_cross_rays(clash), {"clash": clash})
+
+    def _cross_halos() -> Transform | None:
         raw = params.get("table")
         if not isinstance(raw, dict):
             return None
@@ -1745,112 +1716,89 @@ def instantiate(family: str, params: dict[str, object]) -> Transform | None:
             halo_map[int(key)] = tuple(
                 (int(dr), int(dc), int(k)) for dr, dc, k in halo
             )
-        return Transform("cross_halos", _mk_cross_halos(halo_map),
-                         {"table": raw})
-    if family == "count_blocks":
+        return Transform("cross_halos", _mk_cross_halos(halo_map), {"table": raw})
+
+    def _count_blocks() -> Transform | None:
         ccolor = params.get("color")
         cwidth = params.get("width")
-        if not isinstance(ccolor, int) or not isinstance(cwidth, int):
+        if not (isinstance(ccolor, int) and isinstance(cwidth, int)):
             return None
-        return Transform("count_blocks", _mk_count_blocks(ccolor, cwidth),
-                         {"color": ccolor, "width": cwidth})
-    if family == "draw_lines":
+        return Transform(
+            "count_blocks",
+            _mk_count_blocks(ccolor, cwidth),
+            {"color": ccolor, "width": cwidth},
+        )
+
+    def _draw_lines() -> Transform | None:
         lraw = params.get("table")
         if not isinstance(lraw, dict):
             return None
-        return Transform(
-            "draw_lines",
-            _mk_draw_lines({int(k): str(a) for k, a in lraw.items()}),
-            {"table": lraw},
-        )
-    if family == "rot_symmetrize":
-        return Transform("rot_symmetrize", _mk_rot_symmetrize(), {})
-    if family == "ray_recolor":
-        return Transform("ray_recolor", _mk_ray_recolor(), {})
-    if family == "nearest_border":
-        return Transform("nearest_border", _mk_nearest_border(), {})
-    if family == "ghost_pair":
-        gcolor = params.get("color")
-        if not isinstance(gcolor, int):
+        lines = {int(k): str(a) for k, a in lraw.items()}
+        return Transform("draw_lines", _mk_draw_lines(lines), {"table": lraw})
+
+    def _axes_stamp() -> Transform | None:
+        c = params.get("color")
+        t = params.get("transpose")
+        if not (isinstance(c, int) and isinstance(t, bool)):
             return None
         return Transform(
-            "ghost_pair", _mk_ghost_pair(gcolor), {"color": gcolor}
+            "axes_stamp", _mk_axes_stamp(c, t), {"color": c, "transpose": t}
         )
-    if family == "axes_stamp":
-        scolor = params.get("color")
-        strans = params.get("transpose")
-        if not isinstance(scolor, int) or not isinstance(strans, bool):
+
+    def _attract_to() -> Transform | None:
+        a = params.get("anchor")
+        if not isinstance(a, int):
             return None
-        return Transform(
-            "axes_stamp",
-            _mk_axes_stamp(scolor, strans),
-            {"color": scolor, "transpose": strans},
-        )
-    if family == "ring_unique":
-        rcolor = params.get("color")
-        if not isinstance(rcolor, int):
+        return Transform("attract_to", _mk_attract_to(a), {"anchor": a})
+
+    def _radial_map() -> Transform | None:
+        c = params.get("color")
+        if not isinstance(c, int):
             return None
-        return Transform(
-            "ring_unique", _mk_ring_unique(rcolor), {"color": rcolor}
-        )
-    if family == "attract_to":
-        acolor = params.get("anchor")
-        if not isinstance(acolor, int):
-            return None
-        return Transform(
-            "attract_to", _mk_attract_to(acolor), {"anchor": acolor}
-        )
-    if family == "stamp_at_marks":
-        return Transform("stamp_at_marks", _mk_stamp_at_marks(), {})
-    if family == "radial_map":
-        mcolor = params.get("color")
-        if not isinstance(mcolor, int):
-            return None
-        return Transform(
-            "radial_map", _mk_radial_map(mcolor), dict(params)
-        )
-    if family == "fill_busiest":
-        return Transform("fill_busiest", _mk_fill_busiest(), {})
-    if family == "fill_lanes":
-        lcolor = params.get("color")
-        if not isinstance(lcolor, int):
-            return None
-        return Transform(
-            "fill_lanes", _mk_fill_lanes(lcolor), dict(params)
-        )
-    if family == "eye_ray":
-        return Transform("eye_ray", _mk_eye_ray(), {})
-    if family == "cross_fill":
-        return Transform("cross_fill", _mk_cross_fill(), {})
-    if family == "align_tops":
-        acolor = params.get("color")
-        if not isinstance(acolor, int):
-            return None
-        return Transform(
-            "align_tops", _mk_align_tops(acolor), {"color": acolor},
-        )
-    if family == "shear":
+        return Transform("radial_map", _mk_radial_map(c), dict(params))
+
+    def _shear() -> Transform | None:
         dr, dc = params.get("dr"), params.get("dc")
-        if not isinstance(dr, int) or not isinstance(dc, int):
-            return None
-        return Transform(
-            "shear", _mk_shear(dr, dc), {"dr": dr, "dc": dc},
-        )
-    if family == "empty_halves":
-        ecolor = params.get("color")
-        if not isinstance(ecolor, int):
-            return None
-        return Transform(
-            "empty_halves", _mk_empty_halves(ecolor), {"color": ecolor},
-        )
-    if family == "diff_halves":
-        dcolor = params.get("color")
-        if not isinstance(dcolor, int):
-            return None
-        return Transform(
-            "diff_halves", _mk_diff_halves(dcolor), {"color": dcolor},
-        )
-    return None
+        return Transform("shear", _mk_shear(dr, dc), {"dr": dr, "dc": dc}) \
+            if isinstance(dr, int) and isinstance(dc, int) else None
+
+    # Direction entries bind the registry-time direction once.
+    # ``_dir()`` is a pure read of ``params``, so sampling it here is
+    # identical to sampling it at builder-invocation time — and it
+    # gives mypy a narrowable local instead of an uninferrable
+    # double-call lambda.
+    def _dir_entry(key: str) -> Callable[[], Transform | None]:
+        d = _dir()
+
+        def _build() -> Transform | None:
+            return dir_builders[key](d) if d else None
+
+        return _build
+
+    # Composite registry
+    registry: dict[str, Callable[[], Transform | None]] = {
+        **simple,
+        **color_builders,
+        **{k: _dir_entry(k) for k in dir_builders if k != "shift"},
+        "gravity": _gravity,
+        "settle": _settle,
+        "shift": _shift,
+        "extend_down": _extend_down,
+        "mark_uniform": _mark_uniform,
+        "classify_shape": _classify_shape,
+        "bridge_endpoints": _bridge_endpoints,
+        "cross_rays": _cross_rays,
+        "cross_halos": _cross_halos,
+        "count_blocks": _count_blocks,
+        "draw_lines": _draw_lines,
+        "axes_stamp": _axes_stamp,
+        "attract_to": _attract_to,
+        "radial_map": _radial_map,
+        "shear": _shear,
+    }
+
+    builder = registry.get(family)
+    return builder() if builder else None
 
 
 def _propose_gravity(examples: list[Example]) -> list[Transform]:

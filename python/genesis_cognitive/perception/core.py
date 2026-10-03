@@ -24,6 +24,8 @@ from enum import Enum
 
 import numpy as np
 
+from genesis_client.swallow import note_swallowed
+
 from ..brain_waves import BrainWave, BrainWaveState
 from ..concepts import _FUNCTION_WORDS, is_world_concept
 from ..language.sentiment import analyze_sentiment
@@ -1742,7 +1744,10 @@ class PatternWeights:
             try:
                 os.unlink(tmp_path)
             except OSError as oe:
-                logger.debug(repr(oe))
+                note_swallowed(
+                    "genesis_cognitive.perception.core.save_weights",
+                    oe,
+                )
             raise
 
     def load_weights(self, path: str) -> None:
@@ -1840,7 +1845,10 @@ def _get_prototype_vectors(embeddings) -> dict[Intent, list[np.ndarray]]:
         _intent_prototype_cache[embeddings] = vectors
     except TypeError as e:
         # duck-typed stores that can't be weak-referenced just skip caching
-        logger.debug(f"intent prototype cache skipped (unweakrefable store): {e}")
+        note_swallowed(
+            "genesis_cognitive.perception.core._get_prototype_vectors",
+            e,
+        )
     return vectors
 
 

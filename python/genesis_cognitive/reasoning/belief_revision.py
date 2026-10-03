@@ -50,6 +50,8 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from genesis_client.swallow import note_swallowed
+
 from ..concepts import ConceptNetwork, Edge, RelationType
 
 if TYPE_CHECKING:
@@ -394,7 +396,10 @@ class BeliefRevisionEngine:
                 source, relation, target, positive, weight,
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f'silent except: {e}')
+            note_swallowed(
+                "genesis_cognitive.reasoning.belief_revision._observe_evidence",
+                e,
+            )
 
     # ─── Non-destructive contradiction resolution ─────────────────
 

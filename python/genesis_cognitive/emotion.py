@@ -21,6 +21,7 @@ from enum import Enum
 from typing import Any
 
 from genesis_client import NeuroSummary
+from genesis_cognitive.brain_waves import BrainWave, BrainWaveState
 
 
 class EmotionCategory(Enum):
@@ -266,8 +267,8 @@ class EmotionalState:
 #     ~0.6-0.7 via the Wilson-Cowan oscillator. 0.7 is the point
 #     where the sigmoid is clearly in the upper branch.
 #   LOW_AROUSAL: below this → content/lethargic territory. The Rust
-#     Drowsy phase enters at arousal < 0.30+0.08 hysteresis. 0.4
-#     gives a margin above the drowsy threshold for the "calm but
+#     Drowsy phase enters at arousal < 0.52+0.08 hysteresis. 0.4
+#     gives a margin below the drowsy threshold for the "calm but
 #     awake" band.
 #
 # Valence boundaries:
@@ -306,6 +307,7 @@ GUARDED_CORTISOL = 0.5    # below Rust Stress phase (0.65) — catches silent st
 def assess_emotion(
     summary: NeuroSummary,
     chemicals: dict[str, float] | None = None,
+    brain_waves: BrainWaveState | None = None,
 ) -> EmotionalState:
     """Map a neurochemical summary to a structural emotional state.
 
@@ -320,6 +322,12 @@ def assess_emotion(
     - Low arousal + negative valence → lethargy/sadness
     - Low plasticity → rigid thinking, repetition
     - High plasticity → flexible, exploratory
+
+    When ``brain_waves`` is provided, the emotional state is modulated
+    by the current oscillatory state — gamma-dominant states produce
+    more flow-like emotions, delta-dominant states suppress emotional
+    intensity, theta-dominant states shift toward consolidation-style
+    emotional processing.
 
     Returns a structural state — no English strings. The language
     system must generate text from the concept network.
@@ -356,6 +364,15 @@ def assess_emotion(
         ) = _av_emotion(
             alertness, valence, cognitive_mode,
             creativity, openness_to_engage, caution,
+        )
+
+    # Modulate emotional state by brain wave state
+    if brain_waves is not None:
+        category, cognitive_mode, verbosity, openness_to_engage, caution, creativity = (
+            _modulate_emotion_by_brain_waves(
+                brain_waves, category, cognitive_mode,
+                verbosity, openness_to_engage, caution, creativity,
+            )
         )
 
     # Guard against pleasant categories when the substrate is actually
@@ -399,6 +416,61 @@ def assess_emotion(
         plasticity=plasticity,
         chemicals={},  # Filled by caller if full state available
     )
+
+
+def _modulate_emotion_by_brain_waves(
+    brain_waves: BrainWaveState,
+    category: EmotionCategory,
+    cognitive_mode: CognitiveMode,
+    verbosity: float,
+    openness_to_engage: float,
+    caution: float,
+    creativity: float,
+) -> tuple[EmotionCategory, CognitiveMode, float, float, float, float]:
+    """Modulate emotional state by current brain wave state.
+
+    Emotional states and brain wave bands are deeply intertwined:
+    - Gamma (integration) → flow-like emotions, high creativity
+    - High beta (hypervigilance) → anxiety/stress, high caution
+    - Alpha (filtering) → contentment, moderate openness
+    - Theta (consolidation) → dreamlike, introspective
+    - Delta (deep rest) → minimal emotional intensity
+    """
+    dominant = brain_waves.dominant
+
+    if dominant == BrainWave.GAMMA:
+        if category in (EmotionCategory.NEUTRAL, EmotionCategory.CONTENT):
+            category = EmotionCategory.FLOW
+        cognitive_mode = CognitiveMode.SHARP
+        creativity = min(1.0, creativity + 0.3)
+        openness_to_engage = min(1.0, openness_to_engage + 0.2)
+        verbosity = min(1.0, verbosity + 0.1)
+    elif dominant == BrainWave.BETA3:
+        if category in (EmotionCategory.NEUTRAL, EmotionCategory.CONTENT):
+            category = EmotionCategory.STRESSED
+        cognitive_mode = CognitiveMode.VIGILANT
+        caution = min(1.0, caution + 0.4)
+        openness_to_engage = max(0.0, openness_to_engage - 0.2)
+        creativity = max(0.0, creativity - 0.2)
+    elif dominant == BrainWave.ALPHA:
+        if category == EmotionCategory.NEUTRAL:
+            category = EmotionCategory.CONTENT
+        cognitive_mode = CognitiveMode.RELAXED
+        openness_to_engage = min(1.0, openness_to_engage + 0.1)
+        caution = max(0.0, caution - 0.1)
+    elif dominant == BrainWave.THETA:
+        if category in (EmotionCategory.NEUTRAL, EmotionCategory.DROWSY):
+            category = EmotionCategory.DROWSY
+        cognitive_mode = CognitiveMode.DREAMLIKE
+        creativity = min(1.0, creativity + 0.2)
+        verbosity = max(0.0, verbosity - 0.1)
+    elif dominant == BrainWave.DELTA:
+        verbosity = max(0.0, verbosity - 0.3)
+        openness_to_engage = max(0.0, openness_to_engage - 0.3)
+        creativity = max(0.0, creativity - 0.2)
+        caution = max(0.0, caution - 0.1)
+
+    return category, cognitive_mode, verbosity, openness_to_engage, caution, creativity
 
 
 def _base_cognitive_mode(plasticity: float) -> tuple[CognitiveMode, float]:

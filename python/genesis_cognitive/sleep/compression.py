@@ -94,8 +94,10 @@ import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from genesis_client.swallow import note_swallowed
+
 from ..concepts import HolographicGraph
-from ..vq_codebook import VQCodebook
+from ..infrastructure.vq_codebook import VQCodebook
 
 __all__ = ["SleepCompressor"]
 
@@ -344,7 +346,10 @@ class SleepCompressor:
                     len(all_bridge_edges), self._compress_cycle,
                 )
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"holographic graph rebuild failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.sleep.compression._maybe_rebuild_holographic_graph",
+                    e,
+                )
 
     # ─── Phase 1: Quantize ──────────────────────────────────────
 
@@ -689,9 +694,15 @@ class SleepCompressor:
                 ltm_client.archive_episode(episode_id)  # type: ignore[attr-defined]
                 stats["ltm_archived"] += 1
         except AttributeError as e:
-            logger.debug(f"LTM episode archive skipped (no episode_id): {e}")
+            note_swallowed(
+                "genesis_cognitive.sleep.compression._compact_episode",
+                e,
+            )
         except OSError as e:
-            logger.debug(f"LTM episode archive failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.sleep.compression._compact_episode",
+                e,
+            )
 
         stats["ltm_replayed"] += 1
         return associations

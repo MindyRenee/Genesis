@@ -2,10 +2,13 @@
 cognitive gating effects."""
 
 import logging
+import math
 import sys
+import time
 
 from genesis_client.protocol import (
     PHASE_ACTIVE,
+    PHASE_ALERT,
     PHASE_DROWSY,
     PHASE_FLOW,
     PHASE_NREM,
@@ -13,6 +16,8 @@ from genesis_client.protocol import (
     PHASE_REM,
     PHASE_SLEEPING,
     PHASE_STRESS,
+    ZONE_IDLE,
+    ZONE_SLEEPING,
 )
 from genesis_client.types import NeuroSummary
 from genesis_cognitive.brain_waves import (
@@ -64,7 +69,7 @@ def test_high_arousal_low_plasticity_beta():
     """High arousal + low plasticity → beta (alert but not integrating)."""
     summary = _make_summary(arousal=0.8, plasticity=0.2, phase=PHASE_ACTIVE)
     state = assess_brain_waves(summary)
-    assert state.dominant == BrainWave.BETA
+    assert state.dominant == BrainWave.BETA2
     assert state.integration < 0.5
 
 
@@ -114,10 +119,10 @@ def test_flow_phase_gamma():
 
 
 def test_stress_phase_beta():
-    """Stress phase → beta without gamma integration."""
+    """Stress phase → high beta without gamma integration."""
     summary = _make_summary(arousal=0.7, phase=PHASE_STRESS)
     state = assess_brain_waves(summary)
-    assert state.dominant == BrainWave.BETA
+    assert state.dominant == BrainWave.BETA3
     assert state.integration < 0.4  # stress blocks integration
 
 
@@ -129,10 +134,186 @@ def test_drowsy_phase_theta():
 
 
 def test_overwhelmed_phase_beta():
-    """Overwhelmed phase → beta (alert but can't integrate)."""
+    """Overwhelmed phase → high beta (alert but can't integrate)."""
     summary = _make_summary(arousal=0.8, phase=PHASE_OVERWHELMED)
     state = assess_brain_waves(summary)
-    assert state.dominant == BrainWave.BETA
+    assert state.dominant == BrainWave.BETA3
+
+
+# ─── Physiology alignment tests ──────────────────────────────────
+
+
+def test_drowsy_is_alpha_theta_not_delta():
+    """Drowsy (early) is alpha+theta — delta only deepens in."""
+    summary = _make_summary(arousal=0.5, phase=PHASE_DROWSY)
+    state = assess_brain_waves(summary)
+    assert state.dominant in (BrainWave.ALPHA, BrainWave.THETA)
+    assert state.powers[BrainWave.ALPHA] + state.powers[BrainWave.THETA] > 0.5
+    assert state.powers[BrainWave.DELTA] < 0.2
+
+
+def test_drowsy_deepens_alpha_dropout():
+    """Deeper drowsiness: theta rises, alpha falls out."""
+    shallow = assess_brain_waves(_make_summary(arousal=0.5, phase=PHASE_DROWSY))
+    deep = assess_brain_waves(_make_summary(arousal=0.3, phase=PHASE_DROWSY))
+    assert deep.powers[BrainWave.THETA] > shallow.powers[BrainWave.THETA]
+    assert deep.powers[BrainWave.ALPHA] < shallow.powers[BrainWave.ALPHA]
+
+
+def test_active_low_arousal_resolves_to_drowsy_signature():
+    """Active phase with N1-level arousal must read like drowsy, not like alert."""
+    active = assess_brain_waves(_make_summary(arousal=0.3, phase=PHASE_ACTIVE))
+    drowsy = assess_brain_waves(_make_summary(arousal=0.3, phase=PHASE_DROWSY))
+    assert active.dominant == drowsy.dominant == BrainWave.THETA
+    assert abs(active.powers[BrainWave.THETA] - drowsy.powers[BrainWave.THETA]) < 0.02
+
+
+def test_rem_theta_dominant_with_awakening_intensity():
+    """REM: theta dominant but beta/gamma at waking metabolic intensity."""
+    state = assess_brain_waves(_make_summary(arousal=0.6, phase=PHASE_REM))
+    assert state.dominant == BrainWave.THETA
+    fast = (
+        state.powers[BrainWave.BETA1]
+        + state.powers[BrainWave.BETA2]
+        + state.powers[BrainWave.BETA3]
+        + state.powers[BrainWave.GAMMA]
+    )
+    assert fast > 0.30, f"REM fast-band sum too low: {fast}"
+    assert state.powers[BrainWave.GAMMA] > 0.10, (
+        f"REM gamma too low: {state.powers[BrainWave.GAMMA]}"
+    )
+
+
+def test_rem_hippocampus_is_theta_predominant():
+    """REM theta is hippocampus-predominant."""
+    state = assess_brain_waves(_make_summary(arousal=0.6, phase=PHASE_REM))
+    hipp = state.regional_powers["hippocampus"]
+    assert max(hipp, key=lambda b: hipp[b]) == BrainWave.THETA
+
+
+def test_alpha_dominant_at_occipital_for_relaxed_state():
+    """Relaxed-wake alpha is occipital."""
+    state = assess_brain_waves(_make_summary(arousal=0.55, plasticity=0.5, phase=PHASE_ACTIVE))
+    occ = state.regional_powers["occipital"]
+    assert max(occ, key=lambda b: occ[b]) == BrainWave.ALPHA
+
+
+def test_rem_alpha_is_intermittent():
+    """REM alpha waxes/wanes on the infraslow envelope."""
+    from genesis_cognitive.brain_waves import BrainWaveOscillator, _sleep_phase_powers
+
+    osc = BrainWaveOscillator()
+    summary = _make_summary(arousal=0.6, phase=PHASE_REM)
+    targets, _l, _d = _sleep_phase_powers(summary)
+    osc._last_phase_name = "rem"
+
+    osc._amplitude = dict.fromkeys(BrainWave, 0.1)
+    for _ in range(40):
+        osc._phase[BrainWave.EPSILON] = 0.0  # envelope ~ max gain
+        osc._step(0.2, targets)
+    hi = osc._amplitude[BrainWave.ALPHA]
+
+    osc._amplitude = dict.fromkeys(BrainWave, 0.1)
+    for _ in range(40):
+        osc._phase[BrainWave.EPSILON] = 3.141592653589793  # envelope ~ 0
+        osc._step(0.2, targets)
+    lo = osc._amplitude[BrainWave.ALPHA]
+    assert hi > lo * 4, f"alpha not intermittent: hi={hi}, lo={lo}"
+
+
+def test_rem_theta_uses_sawtooth_carrier():
+    """REM theta PAC uses a sawtooth carrier, not a cosine."""
+    from genesis_cognitive.brain_waves import _wave_phase_value
+
+    assert _wave_phase_value(BrainWave.THETA, 0.0, "rem") == -1.0
+    assert _wave_phase_value(BrainWave.THETA, math.pi, "rem") == 0.0
+    assert _wave_phase_value(BrainWave.THETA, 0.0, "nrem") == 1.0
+    assert _wave_phase_value(BrainWave.ALPHA, 0.5, "rem") == math.cos(0.5)
+
+
+def test_sleep_stage_override_drives_nrem_waves():
+    """The ultradian stage overrides the arousal-derived stage.
+
+    The daemon clamps arousal into 0.10-0.25 for all of NREM, so
+    arousal cannot distinguish N1 from N3 — without the override
+    every NREM tick reports slow-wave N3.
+    """
+    summary = _make_summary(arousal=0.18, phase=PHASE_NREM)
+
+    n1 = assess_brain_waves(summary, SleepStage.N1)
+    n2 = assess_brain_waves(summary, SleepStage.N2)
+    n3 = assess_brain_waves(summary, SleepStage.N3)
+
+    assert n1.dominant == BrainWave.THETA, "N1 is theta-dominant"
+    # N2's background is theta/delta with sigma riding above it —
+    # spindles are transient graphoelements, not the standing band.
+    assert n2.dominant == BrainWave.THETA, "N2 background is theta-dominant"
+    assert n2.powers[BrainWave.SIGMA] > n3.powers[BrainWave.SIGMA]
+    assert n3.dominant == BrainWave.DELTA, "N3 is slow-wave dominant"
+    # Without the override the same summary reads as N3.
+    from genesis_cognitive.brain_waves import reset_oscillator
+
+    reset_oscillator()
+    assert assess_brain_waves(summary).dominant == BrainWave.DELTA
+    reset_oscillator()
+
+
+def test_n2_waves_carry_sigma_spindles():
+    """N2 waves are spindle-rich — the graphoelement that defines it."""
+    state = assess_brain_waves(
+        _make_summary(arousal=0.18, phase=PHASE_NREM), SleepStage.N2
+    )
+    assert state.powers[BrainWave.SIGMA] > 0.15
+    # Spindles are generated centrally.
+    central = state.regional_powers["central"]
+    assert max(central, key=lambda b: central[b]) == BrainWave.SIGMA
+
+
+def test_n3_waves_are_frontally_dominant_delta():
+    """Slow-wave sleep delta peaks over frontal cortex."""
+    state = assess_brain_waves(
+        _make_summary(arousal=0.15, phase=PHASE_NREM), SleepStage.N3
+    )
+    frontal = state.regional_powers["frontal"]
+    assert max(frontal, key=lambda b: frontal[b]) == BrainWave.DELTA
+
+
+def test_effective_phase_resolves_waking_low_arousal_to_drowsy():
+    """Mind._effective_phase is the chokepoint that keeps layers agreeing."""
+    from types import SimpleNamespace
+
+    from genesis_cognitive.mind.status import StatusMixin
+
+    effective = StatusMixin._effective_phase
+
+    def _core(zone, phase, arousal):
+        return SimpleNamespace(
+            cognitive_zone=zone, emergent_phase=phase, arousal=arousal
+        )
+
+    # Waking phase carrying N1-level arousal is pre-sleep.
+    assert effective(None, _core(ZONE_IDLE, PHASE_ACTIVE, 0.30)) == PHASE_DROWSY
+    assert effective(None, _core(ZONE_IDLE, PHASE_ALERT, 0.30)) == PHASE_DROWSY
+    # Genuinely awake is left alone.
+    assert effective(None, _core(ZONE_IDLE, PHASE_ACTIVE, 0.60)) == PHASE_ACTIVE
+    assert effective(None, _core(ZONE_IDLE, PHASE_FLOW, 0.60)) == PHASE_FLOW
+    assert effective(None, _core(ZONE_IDLE, PHASE_STRESS, 0.60)) == PHASE_STRESS
+    # The clamp band is floor/ceiling safe either side of the gate.
+    assert effective(None, _core(ZONE_IDLE, PHASE_ACTIVE, 0.36)) == PHASE_ACTIVE
+    assert effective(None, _core(ZONE_IDLE, PHASE_ACTIVE, 0.34)) == PHASE_DROWSY
+    # Never rewrite a non-waking phase.
+    assert effective(None, _core(ZONE_IDLE, PHASE_OVERWHELMED, 0.10)) == PHASE_OVERWHELMED
+    assert effective(None, _core(ZONE_IDLE, PHASE_DROWSY, 0.90)) == PHASE_DROWSY
+    # Sleeping zone still wins.
+    assert effective(None, _core(ZONE_SLEEPING, PHASE_ACTIVE, 0.15)) == PHASE_NREM
+    assert effective(None, _core(ZONE_SLEEPING, PHASE_REM, 0.45)) == PHASE_REM
+
+
+def test_regional_powers_normalized_per_region():
+    """Each region's power vector sums to 1."""
+    state = assess_brain_waves(_make_summary(arousal=0.55, phase=PHASE_ACTIVE))
+    for region, powers in state.regional_powers.items():
+        assert abs(sum(powers.values()) - 1.0) < 1e-6, region
 
 
 # ─── Cognitive gating tests ──────────────────────────────────
@@ -290,8 +471,10 @@ def _make_wave_state(dominant: BrainWave) -> BrainWaveState:
     """Create a BrainWaveState with a specific dominant wave for testing."""
     if dominant == BrainWave.GAMMA:
         return assess_brain_waves(_make_summary(arousal=0.85, plasticity=0.8, phase=PHASE_ACTIVE))
-    elif dominant == BrainWave.BETA:
+    elif dominant == BrainWave.BETA2:
         return assess_brain_waves(_make_summary(arousal=0.8, plasticity=0.2, phase=PHASE_ACTIVE))
+    elif dominant == BrainWave.BETA3:
+        return assess_brain_waves(_make_summary(arousal=0.7, phase=PHASE_STRESS))
     elif dominant == BrainWave.ALPHA:
         return assess_brain_waves(_make_summary(arousal=0.55, plasticity=0.5, phase=PHASE_ACTIVE))
     elif dominant == BrainWave.THETA:
@@ -405,7 +588,7 @@ def test_narrative_delta_suppresses_recording():
 
     from genesis_cognitive.concepts import ConceptNetwork
     from genesis_cognitive.emotion import EmotionalState
-    from genesis_cognitive.narrative import NarrativeEngine
+    from genesis_cognitive.infrastructure.narrative import NarrativeEngine
     from genesis_cognitive.self import SelfModel
 
     model = SelfModel(born_at=int(time.time() * 1000))
@@ -533,13 +716,16 @@ def test_derive_self_priority_gamma_dominant():
 
     state = BrainWaveState(
         dominant=BrainWave.GAMMA,
-        secondary=BrainWave.BETA,
+        secondary=BrainWave.BETA2,
         powers={
             BrainWave.GAMMA: 0.50,
-            BrainWave.BETA: 0.25,
-            BrainWave.ALPHA: 0.15,
+            BrainWave.BETA2: 0.15,
+            BrainWave.BETA1: 0.05,
+            BrainWave.BETA3: 0.05,
+            BrainWave.ALPHA: 0.10,
             BrainWave.THETA: 0.07,
             BrainWave.DELTA: 0.03,
+            BrainWave.SIGMA: 0.00,
         },
         focus=0.7,
         integration=0.8,
@@ -567,9 +753,12 @@ def test_derive_self_priority_delta_dominant():
         powers={
             BrainWave.DELTA: 0.55,
             BrainWave.THETA: 0.25,
-            BrainWave.ALPHA: 0.12,
-            BrainWave.BETA: 0.06,
+            BrainWave.ALPHA: 0.08,
+            BrainWave.BETA1: 0.02,
+            BrainWave.BETA2: 0.02,
+            BrainWave.BETA3: 0.01,
             BrainWave.GAMMA: 0.02,
+            BrainWave.SIGMA: 0.03,
         },
         focus=0.1,
         integration=0.05,
@@ -592,13 +781,16 @@ def test_derive_self_priority_brain_waves_override_body():
     # Gamma-dominant (active thinking) but body says deprioritize (tired)
     state = BrainWaveState(
         dominant=BrainWave.GAMMA,
-        secondary=BrainWave.BETA,
+        secondary=BrainWave.BETA2,
         powers={
             BrainWave.GAMMA: 0.45,
-            BrainWave.BETA: 0.30,
-            BrainWave.ALPHA: 0.15,
+            BrainWave.BETA2: 0.20,
+            BrainWave.BETA1: 0.05,
+            BrainWave.BETA3: 0.05,
+            BrainWave.ALPHA: 0.10,
             BrainWave.THETA: 0.07,
             BrainWave.DELTA: 0.03,
+            BrainWave.SIGMA: 0.00,
         },
         focus=0.7,
         integration=0.7,
@@ -622,13 +814,16 @@ def test_derive_self_priority_clamps():
     # Extreme gamma
     state = BrainWaveState(
         dominant=BrainWave.GAMMA,
-        secondary=BrainWave.BETA,
+        secondary=BrainWave.BETA2,
         powers={
             BrainWave.GAMMA: 1.0,
-            BrainWave.BETA: 0.0,
+            BrainWave.BETA1: 0.0,
+            BrainWave.BETA2: 0.0,
+            BrainWave.BETA3: 0.0,
             BrainWave.ALPHA: 0.0,
             BrainWave.THETA: 0.0,
             BrainWave.DELTA: 0.0,
+            BrainWave.SIGMA: 0.0,
         },
         focus=1.0,
         integration=1.0,
@@ -642,6 +837,161 @@ def test_derive_self_priority_clamps():
                         "best-effort-3", "best-effort-6"), (
         f"invalid io_class: {io_class}"
     )
+
+
+# ─── Beta sub-band tests ──────────────────────────────────────
+
+
+def test_stress_phase_high_beta3():
+    """Stress phase → high beta3 (hypervigilance)."""
+    summary = _make_summary(arousal=0.7, phase=PHASE_STRESS)
+    state = assess_brain_waves(summary)
+    assert state.dominant == BrainWave.BETA3
+    assert state.powers[BrainWave.BETA3] > 0.25
+
+
+def test_overwhelmed_phase_high_beta3():
+    """Overwhelmed phase → high beta3 (can't integrate)."""
+    summary = _make_summary(arousal=0.8, phase=PHASE_OVERWHELMED)
+    state = assess_brain_waves(summary)
+    assert state.dominant == BrainWave.BETA3
+    assert state.powers[BrainWave.BETA3] > 0.25
+
+
+def test_beta_subbands_distinct():
+    """Beta sub-bands are distinct in the power distribution."""
+    summary = _make_summary(arousal=0.8, plasticity=0.2, phase=PHASE_ACTIVE)
+    state = assess_brain_waves(summary)
+    assert BrainWave.BETA1 in state.powers
+    assert BrainWave.BETA2 in state.powers
+    assert BrainWave.BETA3 in state.powers
+    assert state.powers[BrainWave.BETA2] > state.powers[BrainWave.BETA1]
+    assert state.powers[BrainWave.BETA2] > state.powers[BrainWave.BETA3]
+
+
+# ─── Sigma band tests ─────────────────────────────────────────
+
+
+def test_n2_sleep_has_sigma():
+    """N2 sleep has sigma band (sleep spindles)."""
+    summary = _make_summary(arousal=0.25, phase=PHASE_NREM)
+    state = assess_brain_waves(summary)
+    assert state.powers[BrainWave.SIGMA] > 0.1
+
+
+def test_waking_no_sigma():
+    """Waking states have no sigma activity."""
+    summary = _make_summary(arousal=0.5, phase=PHASE_ACTIVE)
+    state = assess_brain_waves(summary)
+    assert state.powers[BrainWave.SIGMA] < 0.05
+
+
+# ─── Epsilon and Lambda band tests ────────────────────────────
+
+
+def test_deep_sleep_has_epsilon():
+    """Deep sleep (N3) has epsilon (infraslow) activity."""
+    summary = _make_summary(arousal=0.1, phase=PHASE_NREM)
+    state = assess_brain_waves(summary)
+    assert state.powers[BrainWave.EPSILON] > 0.03
+
+
+def test_waking_has_epsilon():
+    """Waking states have some epsilon (infraslow) activity."""
+    summary = _make_summary(arousal=0.5, phase=PHASE_ACTIVE)
+    state = assess_brain_waves(summary)
+    assert state.powers[BrainWave.EPSILON] > 0.02
+
+
+def test_n3_has_lambda():
+    """N3 sleep has lambda (HFO) activity — sharp wave-ripples."""
+    summary = _make_summary(arousal=0.1, phase=PHASE_NREM)
+    state = assess_brain_waves(summary)
+    assert state.powers[BrainWave.LAMBDA] > 0.01
+
+
+def test_flow_has_lambda():
+    """Flow state has lambda (HFO) activity."""
+    summary = _make_summary(arousal=0.7, plasticity=0.6, phase=PHASE_FLOW)
+    state = assess_brain_waves(summary)
+    assert state.powers[BrainWave.LAMBDA] > 0.02
+
+
+# ─── Theta-gamma coupling tests ───────────────────────────────
+
+
+def test_theta_gamma_coupling_encoding_phase():
+    """Encoding bias → gamma peaks near theta peak (0 rad)."""
+    from genesis_cognitive.brain_waves import compute_theta_gamma_coupling
+
+    state = assess_brain_waves(
+        _make_summary(arousal=0.5, plasticity=0.5, phase=PHASE_ACTIVE,
+                      encoding=0.9, consolidation=0.1)
+    )
+    coupling = compute_theta_gamma_coupling(state, consolidation_weight=0.1, encoding_weight=0.9)
+    assert coupling.mode == "encoding"
+    assert coupling.preferred_phase < 0.5, (
+        f"encoding should peak near theta peak (0 rad), got {coupling.preferred_phase}"
+    )
+
+
+def test_theta_gamma_coupling_retrieval_phase():
+    """Retrieval bias → gamma peaks near theta trough (π rad)."""
+    from genesis_cognitive.brain_waves import compute_theta_gamma_coupling
+
+    state = assess_brain_waves(
+        _make_summary(arousal=0.5, plasticity=0.5, phase=PHASE_ACTIVE,
+                      encoding=0.1, consolidation=0.9)
+    )
+    coupling = compute_theta_gamma_coupling(state, consolidation_weight=0.9, encoding_weight=0.1)
+    assert coupling.mode == "retrieval"
+    assert coupling.preferred_phase > 2.5, (
+        f"retrieval should peak near theta trough (π rad), got {coupling.preferred_phase}"
+    )
+
+
+# ─── Dynamic stimulus tests ───────────────────────────────────
+
+
+def test_stimulus_modulates_amplitude():
+    """Continuous stimulus modulates band amplitude."""
+    from genesis_cognitive.brain_waves import add_stimulus, reset_oscillator
+
+    reset_oscillator()
+    summary = _make_summary(arousal=0.5, phase=PHASE_ACTIVE)
+    state_before = assess_brain_waves(summary)
+    gamma_before = state_before.powers[BrainWave.GAMMA]
+
+    add_stimulus(BrainWave.GAMMA, 0.3)
+    state_after = assess_brain_waves(summary)
+    gamma_after = state_after.powers[BrainWave.GAMMA]
+
+    assert gamma_after > gamma_before, (
+        f"stimulus should increase gamma: {gamma_before} → {gamma_after}"
+    )
+    reset_oscillator()
+
+
+def test_stimulus_decays():
+    """Stimulus decays over time without re-application."""
+    from genesis_cognitive.brain_waves import add_stimulus, reset_oscillator
+
+    reset_oscillator()
+    summary = _make_summary(arousal=0.5, phase=PHASE_ACTIVE)
+
+    add_stimulus(BrainWave.GAMMA, 0.3)
+    state1 = assess_brain_waves(summary)
+    gamma1 = state1.powers[BrainWave.GAMMA]
+
+    for _ in range(20):
+        time.sleep(0.05)  # 50ms per tick
+        state2 = assess_brain_waves(summary)
+    gamma2 = state2.powers[BrainWave.GAMMA]
+
+    assert gamma2 < gamma1, (
+        f"stimulus should decay: {gamma1} → {gamma2}"
+    )
+    reset_oscillator()
 
 
 # ─── Test runner ──────────────────────────────────────────────

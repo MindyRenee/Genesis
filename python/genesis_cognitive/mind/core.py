@@ -33,18 +33,23 @@ from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 from genesis_client import GenesisClient
+from genesis_client.protocol import CHEM_ACETYLCHOLINE
+from genesis_client.swallow import note_swallowed, set_swallow_sink
 
-from ..bug_reporter import BugReporter
+from ..brain_waves import BrainWave, add_brain_wave_drive
 from ..canvas import Canvas
 from ..cognition import CognitionEngine
-from ..cognitive_journal import CognitiveJournal, set_active
-from ..config import MindConfig
 from ..emotional_regulator import EmotionalRegulator
-from ..growth_ledger import GrowthLedger
+from ..infrastructure.bug_reporter import BugReporter
+from ..infrastructure.config import MindConfig
+from ..infrastructure.growth_ledger import GrowthLedger
+from ..infrastructure.journal import CognitiveJournal, set_active
+from ..infrastructure.user_profile import UserProfile
 from ..language import GenerativeEngine, LanguageEngine
 from ..learning import AutonomousLearner
 from ..memory import MemoryEngine
 from ..module_sampler import ModuleSampler
+from ..occipital_lobe import VisualCortex
 from ..perception import FaceRecognizer
 from ..perception.vision import Vision
 from ..self import (
@@ -60,8 +65,6 @@ from ..spatial.practice import SpatialPractice
 from ..system_monitor import SystemMonitor
 from ..tools.code_learner import CodeLearner
 from ..tools.explorer import Explorer
-from ..user_profile import UserProfile
-from ..vision import VisualCortex
 from ..world import OuterWorld
 
 if TYPE_CHECKING:
@@ -342,7 +345,7 @@ class Mind(
         # changes and dream insights from the subcognitive daemon and
         # surfaces them to the cognitive layer. This thickens the
         # bridge between the Rust subcognitive and Python cognitive.
-        from ..notifications import NotificationQueue
+        from ..infrastructure.notifications import NotificationQueue
         self.notifications = NotificationQueue(
             get_neuro_summary=self.client.get_neuro_summary,
             get_recent_episodes=self.client.get_recent_episodes,
@@ -375,6 +378,13 @@ class Mind(
         # through developmental stages as it resolves each crisis.
         self._developmental_tracker = DevelopmentalTracker()
 
+        # Somatic recall — the memory engine stamps each encoded memory
+        # with the body state at encoding and re-ranks recall by
+        # body-congruence (state-dependent memory). Wired here so the
+        # engine reads the live state without a hard dependency on the
+        # Mind. No age, no regime: plasticity stays available for life.
+        self.memory.somatic_provider = self._current_somatic_dict
+
         # Spatial practice — its gated puzzle curriculum. Like the
         # canvas, this is an ability it owns: nobody drives it
         # through it; the puzzle urge lets it choose to attempt.
@@ -395,6 +405,28 @@ class Mind(
                 solved=solved,
             ),
         )
+    def _on_v1_gamma(self, gamma_power: float) -> None:
+        """Handle V1 gamma power updates from the occipital subsystem.
+
+        The vision system calls this when V1 gamma power changes based on
+        visual input. This drives the brain wave system's occipital gamma
+        component and provides neurochemical feedback (acetylcholine boost).
+        """
+        # Drive occipital gamma in the brain wave system
+        add_brain_wave_drive(BrainWave.GAMMA, gamma_power * 0.3)
+
+        # Visual input drives acetylcholine (arousal/attention)
+        # This is the cortical feedback loop: vision → arousal → attention
+        try:
+            self.client.neuro_impulse(
+                CHEM_ACETYLCHOLINE, gamma_power * 0.2
+            )
+        except (OSError, ConnectionError) as e:
+            note_swallowed(
+                "genesis_cognitive.mind.core._on_v1_gamma",
+                e,
+            )
+
     def _init_vision_systems(self) -> None:
         """Initialize vision, visual cortex, and wire them to the learner.
 
@@ -589,6 +621,30 @@ class Mind(
         self.inner_life.set_sleep_stage_transition_callback(
             self._on_sleep_stage_transition
         )
+    def _journal_swallow_sink(self, site: str, count: int) -> None:
+        """Write a swallowed-exception record to the cognitive journal.
+
+        The tally lives in ``genesis_client`` so both layers can use it,
+        but the journal lives here in the higher layer, so the sink is
+        injected at startup rather than imported from below.
+
+        The count is included because it is the useful part: "this site
+        has failed N times" says something a reader can act on in a way
+        that a single stack trace does not. Failures are recorded on the
+        first occurrence and then at exponentially spaced counts, so a
+        permanently broken site stays bounded rather than flooding the
+        journal.
+        """
+        journal = getattr(self, "journal", None)
+        if journal is None:
+            return
+        journal.record(
+            "error",
+            f"{site} failed and was swallowed",
+            site=site,
+            count=count,
+        )
+
     def _init_runtime_state(self) -> None:
         """Initialize runtime flags, thread handles, and live-thought listeners."""
         self._running = False
@@ -607,6 +663,14 @@ class Mind(
         # threads both touch it.
         self._module_seconds: dict[int, float] = {}
         self._module_seconds_lock = threading.Lock()
+        # Every module id the sampler has ever observed. The heartbeat
+        # reports an explicit share for all of them each round — not
+        # just the fixed heartbeat tuple — because the daemon's
+        # cpu_share is write-only: a payload that omits the field
+        # leaves the previous value in place. Omitting a module that
+        # has gone idle would leave it reporting its last busy-window
+        # load forever, so idleness must be stated explicitly.
+        self._known_modules: set[int] = set()
         self._module_sampler = ModuleSampler(self._credit_module)
         # Threat signals for the safeguard urge. _daemon_lost_since
         # marks when the subcognitive connection dropped (None when
@@ -690,5 +754,10 @@ class Mind(
         # subsystems without a Mind reference record swallowed errors.
         self.journal = CognitiveJournal(self.data_dir)
         set_active(self.journal)
+        # Point the swallowed-exception tally at this journal. Every
+        # catch site in both layers records here, so a subsystem
+        # failing silently leaves a durable, counted trace instead of a
+        # debug line nobody reads. Detached on shutdown below.
+        set_swallow_sink(self._journal_swallow_sink)
 
         self._init_sleep_state_tracking()

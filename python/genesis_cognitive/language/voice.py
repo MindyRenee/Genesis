@@ -189,7 +189,7 @@ class Voice:
                 # Gamma: keep complex sentences — integration needs
                 # room to unfold. Reduce splitting.
                 split_prob = 0.1
-            elif dom == BrainWave.BETA:
+            elif dom == BrainWave.BETA2:
                 # Beta: precise, structured — split for clarity.
                 split_prob = 0.4
             elif dom == BrainWave.ALPHA:
@@ -407,7 +407,7 @@ class Voice:
             dom = brain_waves.dominant
             if dom == BrainWave.GAMMA:
                 effective_caution -= 0.1 * brain_waves.integration
-            elif dom == BrainWave.BETA:
+            elif dom == BrainWave.BETA2:
                 effective_caution += 0.05
             elif dom == BrainWave.THETA:
                 effective_caution += 0.1

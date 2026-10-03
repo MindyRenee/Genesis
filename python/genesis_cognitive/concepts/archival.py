@@ -6,6 +6,8 @@ import logging
 import sqlite3
 from typing import TYPE_CHECKING, Any
 
+from genesis_client.swallow import note_swallowed
+
 from .classify import _column_of
 from .edge_log import is_derivable_edge
 from .types import Concept, ConceptCategory, ConceptModality, Edge, RelationType
@@ -48,7 +50,10 @@ class ArchivalMixin:
         try:
             return self._archive.has_concept(cid)
         except (sqlite3.Error, RuntimeError) as e:
-            logger.debug(f"archive has_concept failed for {cid!r}: {e}")
+            note_swallowed(
+                "genesis_cognitive.concepts.archival.has_concept_anywhere",
+                e,
+            )
             return False
     @property
     def all_concept_ids(self) -> list[str]:
@@ -64,7 +69,10 @@ class ArchivalMixin:
             try:
                 ids.update(self._archive.get_all_ids())
             except (sqlite3.Error, RuntimeError) as e:
-                logger.debug(f"archive get_all_ids failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.concepts.archival.all_concept_ids",
+                    e,
+                )
         return list(ids)
     def restore_archive_to_working_memory(self) -> int:
         """Recall ALL archived concepts back into working memory.
@@ -107,7 +115,10 @@ class ArchivalMixin:
             try:
                 archived_edges = self._archive.recall_edges(concept.id)
             except (sqlite3.Error, RuntimeError) as e:
-                logger.debug(f"edge recall during restore failed for {concept_id!r}: {e}")
+                note_swallowed(
+                    "genesis_cognitive.concepts.archival.restore_archive_to_working_memory",
+                    e,
+                )
                 archived_edges = []
             for e_data in archived_edges:
                 try:
@@ -144,7 +155,10 @@ class ArchivalMixin:
             try:
                 self._archive.recall_concept(concept_id)
             except (sqlite3.Error, RuntimeError) as e:
-                logger.debug(f"archive cleanup during restore failed for {concept_id!r}: {e}")
+                note_swallowed(
+                    "genesis_cognitive.concepts.archival.restore_archive_to_working_memory",
+                    e,
+                )
             recalled += 1
         # Invalidate caches
         self._concept_ids_cache: list[str] | None = None
@@ -182,7 +196,10 @@ class ArchivalMixin:
                 return 0
             removed = self._archive.remove_concepts_batch(dupes)
         except (sqlite3.Error, RuntimeError) as e:
-            logger.debug(f"archive dedupe failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.concepts.archival.dedupe_archive",
+                e,
+            )
             return 0
         if removed > 0:
             logger.info(
@@ -220,7 +237,10 @@ class ArchivalMixin:
             try:
                 self._archive.archive_edges_batch(edge_dicts)
             except (sqlite3.Error, RuntimeError) as e:
-                logger.debug(f"edge archive during spill failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.concepts.archival._archive_spilled_edges",
+                    e,
+                )
             # Retract from the canonical log. The archive now holds a
             # durable copy, and `persistence._restore_edges` drops
             # edges whose concept is absent, so the JSON and the log
@@ -437,7 +457,10 @@ class ArchivalMixin:
         try:
             data = self._archive.recall_concept(concept_id)
         except (sqlite3.Error, RuntimeError) as e:
-            logger.debug(f"archive recall by id failed for {concept_id!r}: {e}")
+            note_swallowed(
+                "genesis_cognitive.concepts.archival._recall_from_archive_by_id",
+                e,
+            )
             return None
         if data is None:
             return None
@@ -456,7 +479,10 @@ class ArchivalMixin:
         try:
             archived_edges = self._archive.recall_edges(concept.id)
         except (sqlite3.Error, RuntimeError) as e:
-            logger.debug(f"edge recall failed for {concept_id!r}: {e}")
+            note_swallowed(
+                "genesis_cognitive.concepts.archival._recall_from_archive_by_id",
+                e,
+            )
             archived_edges = []
         for e_data in archived_edges:
             try:
@@ -516,7 +542,10 @@ class ArchivalMixin:
         try:
             concept_ids = self._archive.find_by_alias(alias)
         except (sqlite3.Error, RuntimeError) as e:
-            logger.debug(f"archive recall by alias failed for {alias!r}: {e}")
+            note_swallowed(
+                "genesis_cognitive.concepts.archival._recall_from_archive_by_alias",
+                e,
+            )
             return None
         if not concept_ids:
             return None

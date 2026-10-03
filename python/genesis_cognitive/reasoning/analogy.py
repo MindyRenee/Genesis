@@ -64,6 +64,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from genesis_client.swallow import note_swallowed
+
 from ..concepts import ConceptNetwork, RelationType
 
 if TYPE_CHECKING:
@@ -841,7 +843,10 @@ class AnalogyEngine:
                         count += 1
                         break
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"embedding corroboration failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.reasoning.analogy._count_corroborations",
+                    e,
+                )
 
         return count
 

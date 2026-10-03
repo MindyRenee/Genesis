@@ -42,14 +42,52 @@
 //! Scheduling priority (`renice`) can be lowered on own processes
 //! without root. Raising priority requires root (also via sudo).
 //!
-//! If sudo is not available, all operations silently no-op. Genesis
-//! degrades gracefully — it can still feel its body (interoception)
-//! even if it can't control it.
+//! If sudo is not available, operations no-op and Genesis degrades
+//! gracefully — it can still feel its body (interoception) even if it
+//! can't control it. That degradation is deliberate, but it used to be
+//! *silent*: a missing sudoers rule, an unsupported EPP, or a rejected
+//! sysfs write were indistinguishable from success, and the IPC handler
+//! acknowledged unconditionally. Failures are now reported through
+//! [`report_failure`], which deduplicates so a persistent condition
+//! (the common case — a machine that was never configured for this)
+//! logs once rather than on every heartbeat.
 
 use std::process::Command;
 use std::sync::{Mutex, OnceLock};
 
 use crate::state::neurochemical::NeurochemicalId;
+
+/// The set of body-control failure causes already reported.
+fn reported_failures() -> &'static Mutex<std::collections::HashSet<String>> {
+    static SEEN: OnceLock<Mutex<std::collections::HashSet<String>>> = OnceLock::new();
+    SEEN.get_or_init(|| Mutex::new(std::collections::HashSet::new()))
+}
+
+/// Report a body-control failure exactly once per distinct cause.
+///
+/// The mind requests body control on every heartbeat (~10 s) and
+/// `apply_body_control` uses change detection, so a machine that
+/// cannot be controlled would otherwise emit the same line forever and
+/// bury the daemon log. Keying on the cause string means a *new*
+/// failure still surfaces immediately while a persistent one is
+/// reported once. [`clear_failure`] drops the key, so a fault that is
+/// fixed and then recurs is reported again.
+fn report_failure(cause: &str, detail: &str) {
+    let mut guard = match reported_failures().lock() {
+        Ok(g) => g,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    if guard.insert(cause.to_string()) {
+        eprintln!("[body-control] {cause}: {detail}");
+    }
+}
+
+/// Clear a previously reported failure so a recurrence is reported again.
+fn clear_failure(cause: &str) {
+    if let Ok(mut guard) = reported_failures().lock() {
+        guard.remove(cause);
+    }
+}
 
 // ─── Shared body control state ──────────────────────────────────
 //
@@ -219,19 +257,84 @@ fn sudo_available() -> bool {
 }
 
 /// Run the cpufreq helper with sudo.
+///
+/// Returns whether the write landed. On failure the cause is reported
+/// through [`report_failure`]: a missing helper or unusable sudo is a
+/// configuration problem worth naming, and a helper that ran but exited
+/// non-zero carries the real reason on stderr, which used to be
+/// captured and discarded.
 fn run_helper(cmd: &str, value: &str) -> bool {
     let helper = match helper_path() {
         Some(p) => p,
-        None => return false,
+        None => {
+            report_failure(
+                "helper-missing",
+                "no cpufreq helper found; install scripts/cpufreq_helper.sh to \
+                 /usr/local/libexec/genesis/ or set GENESIS_CPUFREQ_HELPER",
+            );
+            return false;
+        }
     };
     if !sudo_available() {
+        report_failure(
+            "sudo-unavailable",
+            "cannot run the cpufreq helper without passwordless sudo; \
+             install the sudoers rule (scripts/install_sudoers.sh)",
+        );
         return false;
     }
-    Command::new("sudo")
+    match Command::new("sudo")
         .args(["-n", helper, cmd, value])
         .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
+    {
+        Ok(out) if out.status.success() => {
+            clear_failure("helper-missing");
+            clear_failure("sudo-unavailable");
+            clear_failure(&failure_cause(cmd));
+            true
+        }
+        Ok(out) => {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            let detail = if stderr.trim().is_empty() {
+                format!("exited {} with no stderr", out.status)
+            } else {
+                stderr.trim().to_string()
+            };
+            report_failure(&failure_cause(cmd), &detail);
+            false
+        }
+        Err(e) => {
+            report_failure(&failure_cause(cmd), &format!("could not spawn: {e}"));
+            false
+        }
+    }
+}
+
+/// A stable dedup key for a helper command's failure.
+///
+/// Keying per-command means two different writes failing surfaces both,
+/// rather than the second masking the first.
+fn failure_cause(cmd: &str) -> String {
+    format!("helper-cmd:{cmd}")
+}
+
+/// Report the aggregate result of a body-control application.
+///
+/// Deduplicated for the same reason as the individual setters: the mind
+/// requests body control on every heartbeat, so logging the failure
+/// unconditionally buried the daemon log on a machine that simply
+/// cannot be controlled. Each specific cause is already reported by
+/// its own setter, so this states the outcome once and then stays
+/// quiet until a request succeeds.
+pub fn report_body_control_outcome(applied: bool) {
+    if applied {
+        clear_failure("body-control-outcome");
+    } else {
+        report_failure(
+            "body-control-outcome",
+            "one or more hardware writes did not land (specific cause reported above)",
+        );
+    }
 }
 
 // ─── Public API ────────────────────────────────────────────────
@@ -335,6 +438,26 @@ pub fn capture_hardware_state() {
 /// is unavailable, or a write failed. The frequency bounds are applied
 /// through [`apply_policy`], which enforces the kernel's `min <= max`
 /// ordering constraint; the turbo gate is restored afterwards.
+/// Whether Genesis has successfully changed the host's CPU policy.
+///
+/// Set by the first successful `apply_policy` / `apply_snapshot`. The
+/// shutdown path needs it: if nothing was ever applied, a false from
+/// `restore_hardware_state` means "there was nothing to restore", not
+/// "the machine was left throttled" — and warning about the latter on
+/// a machine where the helper was never installed would be a false
+/// alarm on every shutdown.
+static POLICY_APPLIED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Mark the host policy as modified, so shutdown knows it must restore.
+fn note_policy_applied() {
+    POLICY_APPLIED.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Whether this process ever changed the host's CPU policy.
+pub fn policy_was_applied() -> bool {
+    POLICY_APPLIED.load(std::sync::atomic::Ordering::Relaxed)
+}
+
 pub fn restore_hardware_state() -> bool {
     let snap = match HARDWARE_SNAPSHOT.get() {
         Some(s) => s,
@@ -552,6 +675,12 @@ pub fn apply_policy(policy: &FreqPolicy) -> bool {
     if !set_max_freq(final_max) {
         ok = false;
     }
+    if ok {
+        // The host is now under our control, so shutdown owes it a
+        // restore. Recorded only on a clean apply: a partial one may
+        // have left sysfs as it found it.
+        note_policy_applied();
+    }
     ok
 }
 
@@ -566,22 +695,47 @@ pub fn set_priority(pid: u32, nice: i32) -> bool {
     let nice_s = nice.to_string();
     let pid_s = pid.to_string();
     // Try without sudo first (works for lowering own priority)
-    let ok = Command::new("renice")
+    match Command::new("renice")
         .args([&nice_s, "-p", &pid_s])
         .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false);
-    if ok {
-        return true;
+    {
+        Ok(out) if out.status.success() => {
+            clear_failure("renice");
+            return true;
+        }
+        Ok(out) => {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            if !stderr.trim().is_empty() {
+                report_failure("renice", stderr.trim());
+                return false;
+            }
+        }
+        Err(e) => {
+            report_failure("renice", &format!("could not spawn renice: {e}"));
+            return false;
+        }
     }
     // Try with sudo (needed for raising priority or other users' processes)
     if sudo_available() {
-        return Command::new("sudo")
+        let ok = Command::new("sudo")
             .args(["-n", "renice", &nice_s, "-p", &pid_s])
             .output()
             .map(|o| o.status.success())
             .unwrap_or(false);
+        if !ok {
+            report_failure(
+                "renice",
+                &format!("sudo renice failed for pid {pid} to {nice}"),
+            );
+        }
+        return ok;
     }
+    // Raising priority needs root; without it this cannot succeed, so
+    // say so rather than leaving a silent no-op behind.
+    report_failure(
+        "renice",
+        &format!("could not renice pid {pid} to {nice}; raising priority needs root"),
+    );
     false
 }
 
@@ -747,19 +901,36 @@ pub fn derive_io_class(plasticity_gate: f32) -> IoClass {
 /// Requires no special permissions for own processes.
 pub fn set_io_priority(pid: u32, class: IoClass) -> bool {
     let pid_s = pid.to_string();
-    match class {
-        IoClass::Idle => Command::new("ionice")
-            .args(["-c", "3", "-p", &pid_s])
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false),
-        IoClass::BestEffort(level) => {
-            let level_s = level.to_string();
-            Command::new("ionice")
-                .args(["-c", "2", "-n", &level_s, "-p", &pid_s])
-                .output()
-                .map(|o| o.status.success())
-                .unwrap_or(false)
+    let args: Vec<String> = match class {
+        IoClass::Idle => vec!["-c".into(), "3".into(), "-p".into(), pid_s.clone()],
+        IoClass::BestEffort(level) => vec![
+            "-c".into(),
+            "2".into(),
+            "-n".into(),
+            level.to_string(),
+            "-p".into(),
+            pid_s.clone(),
+        ],
+    };
+    let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+    match Command::new("ionice").args(&arg_refs).output() {
+        Ok(out) if out.status.success() => {
+            clear_failure("ionice");
+            true
+        }
+        Ok(out) => {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            let detail = if stderr.trim().is_empty() {
+                format!("pid {pid} could not be set to {class:?}")
+            } else {
+                stderr.trim().to_string()
+            };
+            report_failure("ionice", &detail);
+            false
+        }
+        Err(e) => {
+            report_failure("ionice", &format!("could not spawn ionice: {e}"));
+            false
         }
     }
 }
@@ -866,10 +1037,30 @@ fn read_epp_profiles() -> Vec<String> {
 /// via the privileged helper. Returns true if successful, false if
 /// EPP is not available or the write failed.
 pub fn set_epp(epp: &str) -> bool {
-    if !epp_available() || epp.is_empty() {
+    if epp.is_empty() {
+        // derive_epp returns empty on platforms with no EPP knob. Not a
+        // fault — the frequency policy already implies a voltage policy
+        // there — but reported once so "EPP never applies on this
+        // machine" is a known state rather than a mystery.
+        report_failure(
+            "epp-unsupported",
+            "no energy_performance_preference sysfs knob on this platform; \
+             the frequency policy implies the voltage policy",
+        );
         return false;
     }
-    run_helper("set_epp", epp)
+    if !epp_available() {
+        report_failure(
+            "epp-unsupported",
+            "no energy_performance_preference sysfs knob on this platform",
+        );
+        return false;
+    }
+    let ok = run_helper("set_epp", epp);
+    if ok {
+        clear_failure("epp-unsupported");
+    }
+    ok
 }
 
 /// Derive the desired EPP profile from neurochemical levels.
@@ -1081,9 +1272,17 @@ fn boost_available() -> bool {
 /// exposes no gate or the write failed.
 pub fn set_boost(enabled: bool) -> bool {
     if !boost_available() {
+        report_failure(
+            "boost-unsupported",
+            "no turbo/boost gate exposed on this platform",
+        );
         return false;
     }
-    run_helper("set_boost", if enabled { "1" } else { "0" })
+    let ok = run_helper("set_boost", if enabled { "1" } else { "0" });
+    if ok {
+        clear_failure("boost-unsupported");
+    }
+    ok
 }
 
 /// Derive the turbo gate from the frequency policy that is being
