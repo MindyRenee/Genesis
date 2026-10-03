@@ -12,7 +12,6 @@ python/genesis_data/
 .genesis-discord
 python/voices/
 launch/
-paper/*.pdf
 
 # Eval harnesses and held-out corpora live outside this repo
 eval_heldout/
