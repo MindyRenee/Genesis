@@ -362,11 +362,18 @@ Two further unbounded-growth findings were investigated and deliberately
 *not* changed, because the fix is a design decision rather than a patch:
 
 - `semantic.py` consolidation labels its edges with `origin="semantic"`,
-  which is in `DERIVABLE_ORIGINS` and therefore rejected — so
-  `relates_to`/`similar_to` facts extracted by the semantic layer have no
-  durable representation anywhere. Per the edge-log rule this is
-  technically correct, but an extracted proposition is earned, not
-  recomputable geometry; this wants a non-listed origin.
+  which is in `DERIVABLE_ORIGINS`. Since `is_derivable` also requires a
+  geometric relation, the 9 mapped typed relations (`is_a`,
+  `part_of`, `causes`, `enables`, `has_property`, `emerges_from`,
+  `depends_on`, `opposite_of`, `prevents`) still land as canonical
+  edges; only `relates_to`/`similar_to` facts, and facts whose relation
+  string misses the mapping and falls back to `RELATED_TO`, are rejected
+  by the edge log. Those survive as durable facts in the semantic
+  store's own serialisation, so nothing is lost on restart — but they
+  never become traversable edges, so the concept graph cannot reach them
+  by association. Per the edge-log rule the rejection is technically
+  correct; an extracted proposition is earned rather than recomputable
+  geometry, which is the argument for a non-listed origin.
 - `concepts/embeddings.py` builds a dense 5000² SVD (~100 MB, O(n³))
   on a 4.7 GB machine. Correct, but the dominant memory spike.
 
