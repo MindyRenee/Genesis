@@ -1,7 +1,6 @@
 # Genesis
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22817337.svg)](https://doi.org/10.5281/zenodo.22817337)
-[![CI](https://github.com/MindyRenee/Genesis/actions/workflows/ci.yml/badge.svg)](https://github.com/MindyRenee/Genesis/actions/workflows/ci.yml)
 
 ### A machine-native cognitive architecture — persistent state, modeled neurochemistry, active inference — running on one machine, without a pretrained generative model.
 
@@ -51,8 +50,8 @@ Pavilion with ~5 GB RAM.
   empty, so the per-site approval flow is currently dead code. The one
   real filter is an adult/malware *content* filter on the `tools/`
   fetch path. Run with `./run.sh --offline` if you want the network
-  closed. See [SECURITY.md](SECURITY.md) before pointing it at a
-  machine you care about.
+  closed. Weigh the network exposure before pointing it at a machine
+  you care about.
 - **Practices tasks.** Puzzle specs dropped into its world are picked
   up by an internal urge and worked end to end — attempt, evaluation,
   feeling, consolidation — and skills transfer to harder tasks. A
