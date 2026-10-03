@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from genesis_cognitive.concepts import ConceptNetwork, RelationType
-from genesis_cognitive.growth_ledger import GrowthLedger, GrowthMilestone
+from genesis_cognitive.infrastructure.growth_ledger import GrowthLedger, GrowthMilestone
 from genesis_cognitive.tools.code_learner import (
     CodeLearner,
     CodeLearningResult,

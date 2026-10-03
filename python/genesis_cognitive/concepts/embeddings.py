@@ -63,7 +63,9 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from .._npz_io import load_npz, save_npz, str_array
+from genesis_client.swallow import note_swallowed
+
+from ..infrastructure._npz_io import load_npz, save_npz, str_array
 
 logger = logging.getLogger(__name__)
 
@@ -1046,7 +1048,10 @@ class EmbeddingStore:
                 for w, idx in zip(words, indices, strict=False)
             }
         except (KeyError, ValueError) as e:
-            logger.debug(f'silent except: {e}')
+            note_swallowed(
+                "genesis_cognitive.concepts.embeddings.load_experiential",
+                e,
+            )
 
         # Build saved→current TF-IDF column mapping
         tfidf_col_map: dict[int, int] = {}  # saved_col → current_col
@@ -2119,7 +2124,10 @@ class EmbeddingStore:
         try:
             archived = archive.get_all_concepts()
         except (sqlite3.Error, RuntimeError) as e:
-            logger.debug(f"archive listing for cold matrix failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.concepts.embeddings._build_archive_matrix",
+                e,
+            )
             return
         items = [
             (cid, data) for cid, data in archived

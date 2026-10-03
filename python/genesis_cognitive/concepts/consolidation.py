@@ -7,6 +7,8 @@ import sqlite3
 import time
 from typing import TYPE_CHECKING, Any
 
+from genesis_client.swallow import note_swallowed
+
 from .classify import _BRIDGE_ORIGINS, _column_of, _strip_prefix
 from .edge_log import is_derivable_edge
 from .types import Concept, Edge, RelationType
@@ -517,7 +519,10 @@ class ConsolidationMixin:
             try:
                 self._archive.archive_edges_batch(edge_dicts)
             except (sqlite3.Error, RuntimeError) as e:
-                logger.debug(f"pre-spill edge archive failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.concepts.consolidation._pre_spill_archive_edges",
+                    e,
+                )
     def consolidate_during_sleep(self, max_in_memory: int = 15000) -> dict[str, int]:
         """Consolidate the concept network during sleep.
 
@@ -603,7 +608,10 @@ class ConsolidationMixin:
             try:
                 self._archive.vacuum()
             except (sqlite3.Error, RuntimeError) as e:
-                logger.debug(f"archive vacuum during sleep failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.concepts.consolidation.consolidate_during_sleep",
+                    e,
+                )
 
         return {
             "strengthened": strengthened,

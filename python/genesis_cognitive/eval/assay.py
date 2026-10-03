@@ -213,18 +213,18 @@ def run_chemical_assay(
         # describes itself.
         control_pre = client.get_state()
         for _ in range(FAST_TICKS):
-            client.advance_neuro(dt=dt)
+            client.advance_physics(dt)
         control_fast = client.get_state()
         for _ in range(SLOW_EXTRA_TICKS):
-            client.advance_neuro(dt=dt)
+            client.advance_physics(dt)
         control_slow = client.get_state()
 
         client.neuro_impulse(chem_id, impulse)
         for _ in range(FAST_TICKS):
-            client.advance_neuro(dt=dt)
+            client.advance_physics(dt)
         fast = client.get_state()
         for _ in range(SLOW_EXTRA_TICKS):
-            client.advance_neuro(dt=dt)
+            client.advance_physics(dt)
         slow = client.get_state()
 
         for snap, tag in ((fast, "fast"), (slow, "slow")):

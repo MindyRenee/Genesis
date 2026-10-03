@@ -91,6 +91,7 @@ from .reflection import (
     PredictionError,
     ReflectionEngine,
 )
+from .somatic import SomaticSnapshot, somatic_congruence
 
 __all__ = [
     "AgencyDetector",
@@ -135,6 +136,8 @@ __all__ = [
     "SelfEsteem",
     "SelfImprovementEngine",
     "SelfModel",
+    "SomaticSnapshot",
     "StageResolution",
     "Value",
+    "somatic_congruence",
 ]

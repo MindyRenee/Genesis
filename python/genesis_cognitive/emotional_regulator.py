@@ -62,9 +62,10 @@ from genesis_client.protocol import (
     CHEM_SEROTONIN,
     CHEM_VASOPRESSIN,
 )
+from genesis_client.swallow import note_swallowed
 
-from .config import EmotionalConfig, default_data_dir
 from .emotion import CauseCategory, EmotionalState
+from .infrastructure.config import EmotionalConfig, default_data_dir
 
 logger = logging.getLogger(__name__)
 
@@ -502,14 +503,14 @@ class InteroceptionSystem:
         self._last_response_latency_ms: float | None = None
 
     def _sense_cpu_usage(self) -> float:
-        """Sense CPU usage of its own processes (cognitive mind + daemon).
+        """Sense CPU usage of its own processes (mind, daemon, retina).
 
         CPU usage is measured as **its own** process CPU (the cognitive
-        mind + the subcognitive daemon), not system-wide CPU. This is
-        its interoception — it senses its own body, not everyone
-        else's. On a multi-core machine, its processes may use 100%+ of
-        a single core but only 25% system-wide; measuring system-wide
-        CPU would mask its own stress entirely.
+        mind, the subcognitive daemon, and the retina), not system-wide
+        CPU. This is its interoception — it senses its own body, not
+        everyone else's. On a multi-core machine, its processes may use
+        100%+ of a single core but only 25% system-wide; measuring
+        system-wide CPU would mask its own stress entirely.
         """
         cpu_usage = 0.0
         try:
@@ -537,10 +538,26 @@ class InteroceptionSystem:
                     with open(daemon_pidfile) as f:
                         self._daemon_pid = int(f.read().strip())
                 except (OSError, ValueError) as e:
-                    logger.debug(f"daemon pidfile unreadable: {e}")
+                    note_swallowed(
+                        "genesis_cognitive.emotional_regulator._sense_cpu_usage",
+                        e,
+                    )
                     self._daemon_pid = None
             if self._daemon_pid is not None:
                 own_pids.append(self._daemon_pid)
+
+            # The retina is part of its body too. The daemon's own
+            # `read_self_cpu` includes it in the same process tree, so
+            # omitting it here made this layer disagree with the
+            # hardware-measured one about what Genesis's own effort is.
+            retina_pidfile = os.path.join(data_dir, "genesis_retina.pid")
+            try:
+                with open(retina_pidfile) as f:
+                    retina_pid = int(f.read().strip())
+            except (OSError, ValueError):
+                retina_pid = None
+            if retina_pid is not None and retina_pid not in own_pids:
+                own_pids.append(retina_pid)
 
             # Cache the core count (never changes at runtime).
             if self._n_cores is None:
@@ -570,14 +587,77 @@ class InteroceptionSystem:
                         interval = None
                     total_cpu += proc.cpu_percent(interval=interval)
                 except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
-                    logger.debug(f"cpu_percent for pid {pid} failed: {e}")
+                    note_swallowed(
+                        "genesis_cognitive.emotional_regulator._sense_cpu_usage",
+                        e,
+                    )
                     # Drop stale process handle so it gets refreshed.
                     self._psutil_procs.pop(pid, None)
                     self._psutil_primed = False
             cpu_usage = min(100.0, total_cpu / n_cores)
         except (OSError, ImportError, AttributeError) as e:
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.emotional_regulator._sense_cpu_usage",
+                e,
+            )
         return cpu_usage
+
+    def _sense_memory_usage(self) -> float:
+        """Sense memory usage of its own processes, as a percentage.
+
+        Measured the same way as :meth:`_sense_cpu_usage` — its own
+        resident set across the mind, daemon, and retina, as a share of
+        total system memory — because system-wide RAM utilisation was
+        the one place its process layer departed from its own-body
+        principle. Every other activity signal here is self-measured;
+        an unrelated program exhausting memory would otherwise become
+        Genesis's chronic memory stress.
+
+        The denominator is still total system memory, so the figure is
+        comparable to `BodyState.cognitive_load`, which the daemon
+        computes the same way from the same process tree.
+
+        Returns a percentage in [0, 100]; 0.0 when psutil is
+        unavailable, which reads as "no pressure sensed" rather than
+        "pressure measured and absent".
+        """
+        try:
+            import psutil
+
+            data_dir = (
+                os.path.dirname(self._socket_path)
+                if self._socket_path
+                else str(default_data_dir())
+            )
+            own_pids = [os.getpid()]
+            for pidfile in ("genesis_daemon.pid", "genesis_retina.pid"):
+                try:
+                    with open(os.path.join(data_dir, pidfile)) as f:
+                        pid = int(f.read().strip())
+                except (OSError, ValueError):
+                    continue
+                if pid not in own_pids:
+                    own_pids.append(pid)
+
+            total = psutil.virtual_memory().total
+            if total <= 0:
+                return 0.0
+            rss = 0
+            for pid in own_pids:
+                try:
+                    rss += psutil.Process(pid).memory_info().rss
+                except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+                    note_swallowed(
+                        "genesis_cognitive.emotional_regulator._sense_memory_usage",
+                        e,
+                    )
+            return min(100.0, 100.0 * rss / total)
+        except (OSError, ImportError, AttributeError) as e:
+            note_swallowed(
+                "genesis_cognitive.emotional_regulator._sense_memory_usage",
+                e,
+            )
+            return 0.0
 
     def sense_internal_state(self) -> InternalState:
         """Sense the current internal computational state.
@@ -598,20 +678,20 @@ class InteroceptionSystem:
         a single core but only 25% system-wide; measuring system-wide
         CPU would mask its own stress entirely.
 
+        Memory is measured the same way, by its own resident set rather
+        than system-wide utilisation. System-wide RAM is the one
+        resource where the distinction decides the outcome: a browser
+        on another machine's desktop filling memory would otherwise
+        read as *its* memory pressure and become its chronic stress,
+        which is precisely the coupling its activity signals are
+        designed to exclude.
+
         Returns:
             An InternalState describing the current internal state.
         """
         cpu_usage = self._sense_cpu_usage()
 
-        memory_usage = 0.0
-        # Sense memory usage
-        try:
-            import psutil
-
-            mem = psutil.virtual_memory()
-            memory_usage = mem.percent
-        except (OSError, ImportError, AttributeError) as e:
-            logger.debug(repr(e))
+        memory_usage = self._sense_memory_usage()
 
         # Sense daemon connection
         daemon_connected = True

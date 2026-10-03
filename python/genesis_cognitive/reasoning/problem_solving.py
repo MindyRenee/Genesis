@@ -77,6 +77,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from genesis_client.swallow import note_swallowed
+
 from ..concepts import ConceptNetwork, RelationType
 from .engine import ReasoningStrategy
 
@@ -790,7 +792,10 @@ class ProblemSolver:
                 strategy_enum, problem.goal, confidence, success,
             )
         except (ValueError, Exception) as e:  # noqa: BLE001
-            logger.debug(f"_record_meta: failed to record strategy {strategy!r}: {e}")
+            note_swallowed(
+                "genesis_cognitive.reasoning.problem_solving._record_meta",
+                e,
+            )
 
     def _op_reason(self, problem: Problem) -> SolutionStep | None:
         """Operator: invoke the ReasoningEngine on the goal concept."""

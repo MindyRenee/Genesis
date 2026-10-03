@@ -27,11 +27,14 @@ from genesis_client.protocol import (
     MODULE_REASONING,
     MODULE_SENSORY,
     MODULE_STATUS_RUNNING,
+    MODULE_STATUS_STARTING,
     MODULE_STATUS_STOPPED,
+    MODULE_STATUS_STOPPING,
     ZONE_CONVERSATION,
     ZONE_IDLE,
     ZONE_SLEEPING,
 )
+from genesis_client.swallow import note_swallowed, set_swallow_sink
 
 logger = logging.getLogger(__name__)
 
@@ -79,16 +82,15 @@ class LifecycleMixin:
         # modules are the cognitive mind's I/O layers. We also
         # register the other cognitive subsystems so the manifest
         # accurately reflects what's running.
-        for module_id in (
-            MODULE_SENSORY,
-            MODULE_MOTOR,
-            MODULE_LANGUAGE,
-            MODULE_MEMORY,
-            MODULE_REASONING,
-            MODULE_METACOGNITION,
-        ):
+        for module_id in self._registered_modules():
+            # `Starting`, not `Running`: at this point the module is
+            # registered and alive but its subsystem has not been
+            # started. Two of the six lifecycle states were previously
+            # unreachable, so "registered" and "working" were the same
+            # word. The transition to Running happens once the
+            # autonomous subsystems are actually up.
             try:
-                self.client.update_module_status(module_id, MODULE_STATUS_RUNNING)
+                self.client.update_module_status(module_id, MODULE_STATUS_STARTING)
             except (OSError, ConnectionError) as e:
                 logger.warning(f"daemon not ready: {e}")  # daemon may not be ready — non-fatal
     def _start_set_zone_after_restore(self) -> None:
@@ -159,7 +161,10 @@ class LifecycleMixin:
                 f"{_warmup_time.perf_counter() - _warmup_t0:.2f}s"
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"LTM warmup find_similar failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.lifecycle._start_restore_state",
+                e,
+            )
         _embed_t0 = _warmup_time.perf_counter()
         try:
             self.cognition.embeddings.find_similar_to_text("warmup", k=1, threshold=0.5)
@@ -168,7 +173,10 @@ class LifecycleMixin:
                 f"{_warmup_time.perf_counter() - _embed_t0:.2f}s"
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"embeddings warmup failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.lifecycle._start_restore_state",
+                e,
+            )
     def _start_introspect_and_train(self) -> None:
         """Introspect on identity and clear sleep pressure if needed."""
         # Introspect — discover who it is by examining itself
@@ -230,7 +238,10 @@ class LifecycleMixin:
                 self._learner_neuro_impulse(CHEM_NOREPINEPHRINE, 0.05)
                 self._learner_neuro_impulse(CHEM_MELATONIN, -0.05)
         except (OSError, ConnectionError, RuntimeError) as e:
-            logger.debug("startup wake cascade skipped: %s", e)
+            note_swallowed(
+                "genesis_cognitive.mind.lifecycle._start_introspect_and_train",
+                e,
+            )
     def _start_autonomous_subsystems(self) -> None:
         """Start autonomous learning, inner life, and emotional regulation."""
         # Start autonomous learning in the background
@@ -239,6 +250,55 @@ class LifecycleMixin:
         self.inner_life.start()
         # Start emotional self-regulation — it controls its state
         self.regulator.start()
+        # Registration claimed `Starting`; the subsystems are now live,
+        # so the modules are genuinely working. The heartbeat takes over
+        # the status from here, reporting `Running` with measured load
+        # or `Idle` with none.
+        self._mark_modules_running()
+
+    def _mark_modules_running(self) -> None:
+        """Move registered modules from `Starting` to `Running`.
+
+        Best-effort: the daemon reaps anything that stops heartbeating,
+        so a failure here self-corrects rather than leaving a module
+        wedged in `Starting` for the life of the process.
+        """
+        for module_id in self._registered_modules():
+            try:
+                self.client.update_module_status(module_id, MODULE_STATUS_RUNNING)
+            except (OSError, ConnectionError) as e:
+                note_swallowed(
+                    "genesis_cognitive.mind.lifecycle._mark_modules_running",
+                    e,
+                )
+
+    @staticmethod
+    def _registered_modules() -> tuple:
+        """The cognitive modules this mind registers with the manifest."""
+        return (
+            MODULE_SENSORY,
+            MODULE_MOTOR,
+            MODULE_LANGUAGE,
+            MODULE_MEMORY,
+            MODULE_REASONING,
+            MODULE_METACOGNITION,
+        )
+
+    def _mark_modules_stopping(self) -> None:
+        """Move live modules to `Stopping` before they are torn down.
+
+        Distinct from `Stopped`: during a graceful shutdown the modules
+        are still alive and winding down, and a reader can tell a clean
+        stop from a crash by which of the two it saw.
+        """
+        for module_id in self._registered_modules():
+            try:
+                self.client.update_module_status(module_id, MODULE_STATUS_STOPPING)
+            except (OSError, ConnectionError, RuntimeError) as e:
+                note_swallowed(
+                    "genesis_cognitive.mind.lifecycle._mark_modules_stopping",
+                    e,
+                )
     def _start_engage_restored_sleep(self) -> None:
         """Engage the sleep mechanism if restoring a saved sleep state.
 
@@ -350,7 +410,10 @@ class LifecycleMixin:
                 try:
                     self.record_growth_snapshot()
                 except Exception as e:  # noqa: BLE001
-                    logger.debug(f"growth snapshot failed: {e}")
+                    note_swallowed(
+                        "genesis_cognitive.mind.lifecycle._autosave_loop",
+                        e,
+                    )
                 if self._save_state():
                     logger.debug("Autosaved cognitive state")
                     self._autosave_failures = 0
@@ -370,7 +433,10 @@ class LifecycleMixin:
                 try:
                     self.client.sync()
                 except (OSError, ConnectionError) as e:
-                    logger.debug(f"daemon sync failed: {e}")
+                    note_swallowed(
+                        "genesis_cognitive.mind.lifecycle._autosave_loop",
+                        e,
+                    )
 
                 # Periodically archive dormant concepts to long-term
                 # storage to prevent working-memory bloat from the
@@ -437,7 +503,10 @@ class LifecycleMixin:
                     if pruned > 0:
                         logger.info(f"Pruned {pruned} dormant concepts (no archive)")
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"dormant concept archiving failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.lifecycle._archive_dormant_concepts",
+                e,
+            )
     def restore_archive(self) -> int:
         """Recall all archived concepts back into working memory.
 
@@ -454,7 +523,10 @@ class LifecycleMixin:
             recalled = network.restore_archive_to_working_memory()
             return recalled
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"archive restore failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.lifecycle.restore_archive",
+                e,
+            )
             return 0
 
     def stop(self) -> bool:
@@ -509,7 +581,10 @@ class LifecycleMixin:
             self.inner_life.stop()
             self.regulator.stop()
         except KeyboardInterrupt as e:
-            logger.debug(repr(e))  # user pressed Ctrl+C — still try to save
+            note_swallowed(
+                "genesis_cognitive.mind.lifecycle.stop",
+                e,
+            )# user pressed Ctrl+C — still try to save
             clean_shutdown = False
         for subsystem in (self.learner, self.inner_life, self.regulator):
             clean_shutdown &= self._join_shutdown_thread(
@@ -556,7 +631,10 @@ class LifecycleMixin:
             try:
                 archive.close()
             except (OSError, RuntimeError) as e:
-                logger.debug(repr(e))
+                note_swallowed(
+                    "genesis_cognitive.mind.lifecycle.stop",
+                    e,
+                )
                 clean_shutdown = False
 
         # Close the canonical edge log — already fsynced at save, this
@@ -566,33 +644,42 @@ class LifecycleMixin:
             try:
                 edge_log.close()
             except (OSError, RuntimeError) as e:
-                logger.debug(repr(e))
+                note_swallowed(
+                    "genesis_cognitive.mind.lifecycle.stop",
+                    e,
+                )
 
-        # Deregister cognitive modules from the manifest
-        for module_id in (
-            MODULE_SENSORY,
-            MODULE_MOTOR,
-            MODULE_LANGUAGE,
-            MODULE_MEMORY,
-            MODULE_REASONING,
-            MODULE_METACOGNITION,
-        ):
+        # Deregister cognitive modules from the manifest. `Stopping`
+        # first: they are alive and winding down, which is a different
+        # observation from `Stopped` and lets a reader distinguish a
+        # clean shutdown from a crash that skipped this.
+        self._mark_modules_stopping()
+        for module_id in self._registered_modules():
             try:
                 self.client.update_module_status(module_id, MODULE_STATUS_STOPPED)
             except (OSError, ConnectionError, KeyboardInterrupt) as e:
-                logger.debug(repr(e))  # daemon may already be gone
+                note_swallowed(
+                    "genesis_cognitive.mind.lifecycle.stop",
+                    e,
+                )# daemon may already be gone
 
         # Try to tell the daemon we're idle, but don't crash if it's dead
         try:
             self.client.set_zone(ZONE_IDLE)
             self.client.sync()
         except (OSError, ConnectionError, RuntimeError, KeyboardInterrupt) as e:
-            logger.debug(repr(e))  # daemon may already be gone
+            note_swallowed(
+                "genesis_cognitive.mind.lifecycle.stop",
+                e,
+            )# daemon may already be gone
 
         try:
             self.client.disconnect()
         except (OSError, ConnectionError, RuntimeError, KeyboardInterrupt) as e:
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.mind.lifecycle.stop",
+                e,
+            )
             clean_shutdown = False
 
         # Close the cognitive journal last of all writers — it is the
@@ -601,8 +688,11 @@ class LifecycleMixin:
         journal = getattr(self, "journal", None)
         if journal is not None:
             journal.close()
-        from ..cognitive_journal import set_active
+        from ..infrastructure.journal import set_active
         set_active(None)
+        # Detach the swallow sink too, so a late catch site in a
+        # shutting-down subsystem cannot write to a closed journal.
+        set_swallow_sink(None)
 
         return clean_shutdown
 
@@ -633,7 +723,7 @@ class LifecycleMixin:
 
     def _load_saved_state(self) -> None:
         """Load saved cognitive state from disk."""
-        from ..persistence import load_state
+        from ..infrastructure.persistence import load_state
 
         data = load_state(self.data_dir)
         if data is None:
@@ -678,8 +768,8 @@ class LifecycleMixin:
     def _restore_saved_components(self, data) -> None:
         """Validate and commit each saved component as one transaction."""
         from ..concepts import ConceptNetwork
-        from ..narrative import NarrativeEngine
-        from ..persistence import (
+        from ..infrastructure.narrative import NarrativeEngine
+        from ..infrastructure.persistence import (
             restore_narrative,
             restore_network,
             restore_reflection,
@@ -783,7 +873,7 @@ class LifecycleMixin:
         scalar_updates: list[tuple[Any, str, Any]],
     ) -> list[tuple[Any, Any]]:
         """Restore optional systems into scratch objects before commit."""
-        from ..persistence import (
+        from ..infrastructure.persistence import (
             restore_allostatic_load,
             restore_attractor,
             restore_emergent_identity,
@@ -867,7 +957,10 @@ class LifecycleMixin:
                     data["dream_synthesis"],
                 )
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"dream synthesis restore failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.lifecycle._stage_cognitive_systems",
+                    e,
+                )
         if "sleep_state" in data:
             is_sleeping, user_sleep, cycle = self._stage_sleep_state(
                 data["sleep_state"]
@@ -886,7 +979,10 @@ class LifecycleMixin:
                     int(ils.get("lucid_dream_count", 0)),
                 )
             except (TypeError, ValueError, AttributeError) as e:
-                logger.debug(f"inner life state restore failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.lifecycle._stage_cognitive_systems",
+                    e,
+                )
             else:
                 scalar_updates.extend((
                     (self.inner_life, "_thought_count", counts[0]),
@@ -915,7 +1011,7 @@ class LifecycleMixin:
         subsystems are started — otherwise the learner thread would
         start after the pause and run unpaused.
         """
-        from ..persistence import restore_sleep_cycle
+        from ..infrastructure.persistence import restore_sleep_cycle
         from ..sleep import SleepCycleTracker
 
         # Restore sleep state exactly as saved. The defaults are
@@ -953,7 +1049,7 @@ class LifecycleMixin:
         self.cognition.embeddings._concept_matrix = None
     def _save_state(self) -> bool:
         """Save cognitive state to disk. Returns False on I/O failure."""
-        from ..persistence import save_state, serialize_sleep_state
+        from ..infrastructure.persistence import save_state, serialize_sleep_state
 
         try:
             # Serialize sleep state so sleep survives restarts. The

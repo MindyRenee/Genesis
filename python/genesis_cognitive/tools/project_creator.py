@@ -64,6 +64,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from genesis_client.swallow import note_swallowed
+
 from .framework import get_tools
 from .project_composer import (
     compose_main_module,
@@ -388,8 +390,6 @@ def _scaffold_test(name: str) -> str:
     return f'''"""Tests for {name}."""
 
 from {name}.main import main
-
-
 def test_main_runs(capsys):
     """main() should execute without error."""
     main()
@@ -435,7 +435,10 @@ def _dir_size(path: Path) -> int:
             try:
                 total += f.stat().st_size
             except OSError as e:
-                logger.debug(f'_dir_size failed: {e}')
+                note_swallowed(
+                    "genesis_cognitive.tools.project_creator._dir_size",
+                    e,
+                )
     return total
 
 
@@ -479,7 +482,10 @@ def archive_project(name: str, data_dir: str) -> bool:
             logger.debug(f"archive_project: tar failed: {result.stderr}")
             return False
     except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-        logger.debug(f"archive_project: {e}")
+        note_swallowed(
+            "genesis_cognitive.tools.project_creator.archive_project",
+            e,
+        )
         return False
 
     # Verify the archive was created and is non-empty before removing
@@ -491,7 +497,10 @@ def archive_project(name: str, data_dir: str) -> bool:
     try:
         shutil.rmtree(project_path)
     except OSError as e:
-        logger.debug(f"archive_project: could not remove {name}: {e}")
+        note_swallowed(
+            "genesis_cognitive.tools.project_creator.archive_project",
+            e,
+        )
         # The archive exists, so this is recoverable — but the space
         # isn't reclaimed. Leave the archive in place.
         return False
@@ -532,7 +541,10 @@ def restore_project(name: str, data_dir: str) -> bool:
             logger.debug(f"restore_project: tar failed: {result.stderr}")
             return False
     except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-        logger.debug(f"restore_project: {e}")
+        note_swallowed(
+            "genesis_cognitive.tools.project_creator.restore_project",
+            e,
+        )
         return False
 
     return (projects_dir / name).is_dir()
@@ -556,7 +568,10 @@ def delete_archived_project(name: str, data_dir: str) -> bool:
         archive_path.unlink()
         return True
     except OSError as e:
-        logger.debug(f"delete_archived_project: {e}")
+        note_swallowed(
+            "genesis_cognitive.tools.project_creator.delete_archived_project",
+            e,
+        )
         return False
 
 
@@ -616,7 +631,10 @@ def leave_project_note(
             f.write(entry)
         return True
     except OSError as e:
-        logger.debug(f"leave_project_note: write failed: {e}")
+        note_swallowed(
+            "genesis_cognitive.tools.project_creator.leave_project_note",
+            e,
+        )
         return False
 
 
@@ -641,7 +659,10 @@ def read_project_notes(data_dir: str, project_name: str) -> str | None:
     try:
         return notes_file.read_text(encoding="utf-8")
     except OSError as e:
-        logger.debug(f"read_project_notes: read failed: {e}")
+        note_swallowed(
+            "genesis_cognitive.tools.project_creator.read_project_notes",
+            e,
+        )
         return None
 
 
@@ -684,7 +705,10 @@ def clear_project_notes(data_dir: str, project_name: str) -> bool:
         notes_file.unlink()
         return True
     except OSError as e:
-        logger.debug(f"clear_project_notes: {e}")
+        note_swallowed(
+            "genesis_cognitive.tools.project_creator.clear_project_notes",
+            e,
+        )
         return False
 
 

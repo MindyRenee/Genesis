@@ -66,7 +66,16 @@ from genesis_client.protocol import (
     PHASE_NREM,
     PHASE_REM,
 )
+from genesis_client.swallow import note_swallowed
 
+# The order of the imports below is load-bearing. ``infrastructure.narrative``
+# must come AFTER ``..self``, ``..perception`` and ``..language``: those three
+# close a cycle with each other (``self -> perception -> language -> self``),
+# and entering it early leaves ``genesis_cognitive.self`` only partially
+# initialised, so ``from ..self import SelfModel`` inside
+# ``language/generator.py`` raises ImportError. Importing ``narrative`` after
+# them means they are already bound. Do not sort this block -- see
+# ``test_import_order.py``, which fails if the order is disturbed.
 from ..attention import AttentionSystem
 from ..brain_waves import (
     BrainWave,
@@ -97,7 +106,8 @@ from ..memory import (
     SemanticMemory,
     SpacedRepetitionScheduler,
 )
-from ..narrative import NarrativeEngine
+from ..infrastructure.narrative import NarrativeEngine
+from ..infrastructure.user_profile import UserProfile
 from ..perception import Intent, Perception, perceive
 from ..reasoning import (
     DecisionResult,
@@ -117,7 +127,6 @@ from ..self import (
     ReflectionEngine,
     SelfModel,
 )
-from ..user_profile import UserProfile
 from .answer_composer import AnswerComposer
 from .code_tools import CodeToolHandler
 from .concept_learner import ConceptLearner
@@ -129,8 +138,8 @@ from .self_inquiry import SelfInquiryHandler
 from .topic_resolver import TopicResolver
 
 if TYPE_CHECKING:
-    from ..bug_reporter import BugReporter
     from ..emotional_regulator import EmotionalRegulator
+    from ..infrastructure.bug_reporter import BugReporter
     from ..language import ComprehensionResult
     from ..learning import AutonomousLearner, Prediction
     from ..learning import PredictionError as PCPredictionError
@@ -886,7 +895,10 @@ class CognitionEngine:
                 (0.008 + margin * 0.012) * scale,
             )
         except (OSError, ConnectionError, RuntimeError, AttributeError) as e:
-            logger.debug(f"ignition orienting impulse failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.cognition.engine._on_workspace_ignition",
+                e,
+            )
 
     def _init_cognitive_systems(self, data_dir: str | None = None) -> None:
         """Initialize new cognitive systems wired into the think() loop."""
@@ -1718,7 +1730,10 @@ class CognitionEngine:
                 elif route.sub_kind == "wake":
                     self.on_self_command("/wake")
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"self command callback failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.cognition.engine._route_command",
+                    e,
+                )
         return Thought(
             content=route.sub_kind,
             intent="self_report",
@@ -3003,7 +3018,10 @@ class CognitionEngine:
                 neurochemistry={"acetylcholine": summary.arousal}
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"minimal self update failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.cognition.engine.tick",
+                e,
+            )
         # Self-esteem homeostasis — gradually returns to baseline
         # after boosts or hits. Without this, self-esteem only
         # changes from events and never recovers.
@@ -3029,13 +3047,19 @@ class CognitionEngine:
                 serotonin=chem.get("serotonin", 0.4),
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"cortical tick failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.cognition.engine.tick",
+                e,
+            )
             # Daemon unreachable (offline mind): keep the field alive
             # on default parameters rather than freezing it.
             try:
                 self.network.cortical_tick()
             except Exception as e2:  # noqa: BLE001
-                logger.debug(f"cortical tick (default params) failed: {e2}")
+                note_swallowed(
+                    "genesis_cognitive.cognition.engine.tick",
+                    e2,
+                )
 
     def _think_early_routes(
         self, user_input: str, perception, raw_input: str = "",
@@ -3107,7 +3131,10 @@ class CognitionEngine:
                 user_input, response, perception, state.emotion
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"early-route conversation memory failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.cognition.engine._record_early_turn",
+                e,
+            )
         try:
             from ..memory import Turn
 
@@ -3134,7 +3161,10 @@ class CognitionEngine:
                 sentiment=state.emotion.valence,
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"early-route turn record failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.cognition.engine._record_early_turn",
+                e,
+            )
 
     def _think_setup(self) -> tuple[dict[str, float], float]:
         """Initialize per-think bookkeeping and return (timing, t0).
@@ -3380,7 +3410,10 @@ class CognitionEngine:
             quick_emotion = assess_emotion(summary)
             self._learn_word_from_labeling(raw_input, quick_emotion)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"word labeling from neuro summary failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.cognition.engine._think_learn_emotion_label",
+                e,
+            )
 
     def _think_early_broadcast(self, perception: Perception) -> None:
         """Broadcast the percept to the global workspace early.
@@ -3467,7 +3500,10 @@ class CognitionEngine:
                         cog_reading.surprise * 0.02,
                     )
             except (OSError, ConnectionError, RuntimeError) as e:
-                logger.debug(f'surprise norepinephrine impulse failed: {e}')
+                note_swallowed(
+                    "genesis_cognitive.cognition.engine._think_cognitive_surprise",
+                    e,
+                )
 
     def _think_post_response(
         self,
@@ -3608,7 +3644,10 @@ class CognitionEngine:
                 if interpretation:
                     self._store_metaphor_understanding(metaphor, interpretation)
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"Metaphor interpretation failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.cognition.engine._think_comprehend_and_predict",
+                    e,
+                )
 
         # ── 0.5 Self-directed learning — extract facts from user input ──
         # Before processing the input, try to learn from it. This means
@@ -3634,7 +3673,10 @@ class CognitionEngine:
                 self.language.learned_chunks
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Known-chunk update failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.cognition.engine._think_comprehend_and_predict",
+                e,
+            )
 
         # ── 0.5 Predictive coding — generate prediction BEFORE perceiving ──
         # Build context from recent conversation history.
@@ -3862,7 +3904,10 @@ class CognitionEngine:
             summary = self.client.get_neuro_summary()
             self._last_summary = summary
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"get_neuro_summary failed in think(): {e}")
+            note_swallowed(
+                "genesis_cognitive.cognition.engine._read_neuro_summary",
+                e,
+            )
             summary = self._last_summary
         if summary is None:
             # No summary available (first call and daemon unreachable) —
@@ -4067,7 +4112,10 @@ class CognitionEngine:
                         BrainWave.GAMMA, dominant.intensity * 0.3
                     )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f'silent except: {e}')
+            note_swallowed(
+                "genesis_cognitive.cognition.engine._think_emotion_tom_attention",
+                e,
+            )
 
         damasio_feeling = self._update_damasio_self(user_input, emotion)
 
@@ -4130,7 +4178,7 @@ class CognitionEngine:
         # integration gate modulates reasoning depth in return.
         if reasoning_results:
             add_brain_wave_drive(BrainWave.GAMMA, 0.15)
-            add_brain_wave_drive(BrainWave.BETA, 0.1)
+            add_brain_wave_drive(BrainWave.BETA2, 0.1)
 
         # ── Prediction error → executive arbitration ────────────────
         # A mismatch is actionable information: the executive can turn
@@ -4163,7 +4211,7 @@ class CognitionEngine:
             # Top-down drive: action planning boosts beta (the
             # active-thinking/motor-decision band). Bidirectional
             # coupling — executive function drives the oscillator.
-            add_brain_wave_drive(BrainWave.BETA, 0.2)
+            add_brain_wave_drive(BrainWave.BETA2, 0.2)
             # Activate a task for this goal so it can be marked complete
             task_name = perception.intent.value
             self.executive.switch_task(task_name)
@@ -5205,7 +5253,10 @@ class CognitionEngine:
         try:
             emotion = assess_emotion(self.client.get_neuro_summary())
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"get_neuro_summary failed in _handle_answer(): {e}")
+            note_swallowed(
+                "genesis_cognitive.cognition.engine._process_question_answer",
+                e,
+            )
             # Fall back to a neutral emotion so the acknowledgment
             # still works even if the daemon is unreachable.
             from ..emotion import EmotionalState
@@ -5463,7 +5514,10 @@ class CognitionEngine:
                 if any(tw in nn or nn in tw for tw in topic_words for nn in neighbor_names):
                     return True
         except Exception as e:  # noqa: BLE001
-            logger.debug(f'silent except: {e}')
+            note_swallowed(
+                "genesis_cognitive.cognition.engine._concept_relates_to_lesson",
+                e,
+            )
         return False
 
     def _think_curiosity_and_narrative(
@@ -6441,7 +6495,7 @@ class CognitionEngine:
             # Delta: minimal engagement
             openness = max(0.1, openness - 0.3)
             verbosity = max(0.3, verbosity - 0.3)
-        elif waves.dominant == BrainWave.BETA:
+        elif waves.dominant == BrainWave.BETA2:
             # Beta: standard alert thinking — slight focus boost
             caution = min(1.0, caution + 0.05)
 
@@ -6886,7 +6940,10 @@ class CognitionEngine:
         try:
             practice.offer(task)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"problem offer failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.cognition.engine._deliberate_problem_offer",
+                e,
+            )
         world = getattr(self, "_outer_world", None)
         if world is not None:
             try:
@@ -6895,7 +6952,10 @@ class CognitionEngine:
                     salience=0.6,
                 )
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"problem world event failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.cognition.engine._deliberate_problem_offer",
+                    e,
+                )
 
         # Work it now — the user asked, so the same machinery the
         # puzzle urge drives runs immediately, on this task rather
@@ -6913,7 +6973,10 @@ class CognitionEngine:
                     solved=result.solved,
                 )
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"puzzle feeler failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.cognition.engine._deliberate_problem_offer",
+                    e,
+                )
         return self._problem_thought(task, result, perception, emotion)
 
     @staticmethod
@@ -7667,7 +7730,10 @@ class CognitionEngine:
             arousal = self._build_meta_emotion().arousal
         except Exception as e:  # noqa: BLE001 — meta-emotion may be
             # unavailable before first turn; fall back to neutral 0.5.
-            logger.debug(f"meta-emotion unavailable, using neutral arousal: {e}")
+            note_swallowed(
+                "genesis_cognitive.cognition.engine._competence_salience",
+                e,
+            )
         return max(
             0.0,
             min(1.0, 0.5 * arousal + 0.5 * self._get_dopamine_level()),
@@ -7904,7 +7970,10 @@ class CognitionEngine:
                         f"Last repair: {last['check_type']} — {last['issue'][:50]}"
                     )
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"self-monitoring introspection failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.cognition.engine._introspect_learning_systems",
+                    e,
+                )
         # Damasio proto-self — the pre-cognitive body-state mapping.
         # The feeling of being comes from the proto-self; the core
         # self is the cognitive experience of it.
@@ -7918,7 +7987,10 @@ class CognitionEngine:
             if episodes:
                 parts.append(f"Core episodes: {len(episodes)}")
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"damasio introspection failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.cognition.engine._introspect_learning_systems",
+                e,
+            )
         # System monitor — self-awareness of its own machine. Without
         # this, it has no introspective access to its hardware state.
         if self.system_monitor is not None:
@@ -7927,7 +7999,10 @@ class CognitionEngine:
                 if devs:
                     parts.append(f"System deviations: {devs[:80]}")
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"system monitor introspection failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.cognition.engine._introspect_learning_systems",
+                    e,
+                )
         # Bug reporter — it knows what bugs it's tracking. This is
         # part of its self-awareness about its own issues.
         if self.bug_reporter is not None:
@@ -7936,7 +8011,10 @@ class CognitionEngine:
                 if track:
                     parts.append(f"Bug track: {track[:80]}")
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"bug reporter introspection failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.cognition.engine._introspect_learning_systems",
+                    e,
+                )
     def get_curiosity_questions(self) -> list[Question]:
         """Return the current curiosity questions."""
         return getattr(self, "_curiosity_questions", [])

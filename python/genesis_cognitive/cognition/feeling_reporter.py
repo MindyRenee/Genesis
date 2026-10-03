@@ -28,9 +28,9 @@ from ..emotion import EmotionalState
 from ..language import LanguageEngine, Thought
 
 if TYPE_CHECKING:
-    from ..bug_reporter import BugReporter
     from ..cognition.thought_composer import ThoughtComposer
     from ..concepts import ConceptNetwork
+    from ..infrastructure.bug_reporter import BugReporter
     from ..self import DamasioSelfHierarchy, SelfModel
     from ..system_monitor import SystemMonitor
 

@@ -308,7 +308,7 @@ class TestLegacyJsonMigration:
         assert is_derivable_edge(RelationType.RELATED_TO, "inferred")
 
     def test_restore_keeps_legacy_edge_without_origin(self, tmp_path):
-        from genesis_cognitive.persistence import _restore_edges
+        from genesis_cognitive.infrastructure.persistence import _restore_edges
 
         net = ConceptNetwork()
         for n in ("a", "b"):
@@ -325,7 +325,7 @@ class TestLegacyJsonMigration:
         )
 
     def test_restore_drops_derivable_legacy_edge(self, tmp_path):
-        from genesis_cognitive.persistence import _restore_edges
+        from genesis_cognitive.infrastructure.persistence import _restore_edges
 
         net = ConceptNetwork()
         for n in ("a", "b"):
@@ -340,7 +340,7 @@ class TestLegacyJsonMigration:
         assert net.edge_count == 0
 
     def test_restore_keeps_typed_edge_with_pipeline_origin(self, tmp_path):
-        from genesis_cognitive.persistence import _restore_edges
+        from genesis_cognitive.infrastructure.persistence import _restore_edges
 
         net = ConceptNetwork()
         for n in ("a", "b"):

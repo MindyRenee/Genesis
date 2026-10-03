@@ -93,12 +93,12 @@ from discord_feed import DiscordFeed, FeedLogHandler, StderrTee
 from genesis_client.ltm_index import scan_ltm_index
 from genesis_client.protocol import PHASE_ACTIVE, PHASE_ALERT, PHASE_NREM, PHASE_REM
 from genesis_cognitive.ambient import AmbientListener, contains_wake_word, strip_wake_word
-from genesis_cognitive.auditory import AuditoryCortex, SoundEvent
 from genesis_cognitive.concepts import RelationType
-from genesis_cognitive.config import default_data_dir
+from genesis_cognitive.infrastructure.config import default_data_dir
 from genesis_cognitive.mind import Mind
 from genesis_cognitive.mind.thresholds import AUTO_WAKE_MIN_SLEEP_S
 from genesis_cognitive.speech import Voice, VoiceInput
+from genesis_cognitive.temporal_lobe import AuditoryCortex, SoundEvent
 
 # Script directory — used to locate the project root. Python already
 # adds the script's directory to sys.path[0], so genesis_cognitive and

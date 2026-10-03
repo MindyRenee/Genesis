@@ -75,7 +75,7 @@ from collections import OrderedDict
 
 import numpy as np
 
-from .._npz_io import load_npz, save_npz, str_array
+from ..infrastructure._npz_io import load_npz, save_npz, str_array
 
 logger = logging.getLogger(__name__)
 

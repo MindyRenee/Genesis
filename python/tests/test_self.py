@@ -1033,7 +1033,7 @@ def _make_brain_waves() -> BrainWaveState:
         powers={
             BrainWave.ALPHA: 0.5,
             BrainWave.THETA: 0.2,
-            BrainWave.BETA: 0.2,
+            BrainWave.BETA2: 0.2,
             BrainWave.DELTA: 0.05,
             BrainWave.GAMMA: 0.05,
         },

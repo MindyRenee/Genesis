@@ -8,11 +8,12 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from genesis_client.protocol import CHEM_DOPAMINE, MODULE_SENSORY
+from genesis_client.swallow import note_swallowed
 
 from ..cognition import CognitiveState
 from ..language import Thought
+from ..occipital_lobe import load_image, resize_for_vision
 from ..self import EmergentIdentitySource, IdentityStage
-from ..vision import load_image, resize_for_vision
 from ..world import EventKind, PresenceKind
 
 if TYPE_CHECKING:
@@ -130,7 +131,10 @@ class ConversationMixin:
             try:
                 self.world.it_said(content)
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"world utterance record failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.conversation._emit_live_thought",
+                    e,
+                )
     def mark_user_activity(self) -> None:
         """Mark that the user is active (typing or interacting).
 
@@ -236,7 +240,10 @@ class ConversationMixin:
             if gamma > 0.1:
                 add_brain_wave_drive(BrainWave.GAMMA, gamma * 0.2)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"V1 gamma drive failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.conversation._on_v1_gamma",
+                e,
+            )
     def _learn_from_bugs(self) -> None:
         """Fetch documentation for bug categories it doesn't understand.
 
@@ -267,7 +274,10 @@ class ConversationMixin:
                 # Mark as studied so we don't re-fetch
                 self.bug_reporter.mark_studied(category)
             except Exception as e:  # noqa: BLE001
-                logger.debug(repr(e))  # docs fetch failure shouldn't crash
+                note_swallowed(
+                    "genesis_cognitive.mind.conversation._learn_from_bugs",
+                    e,
+                )# docs fetch failure shouldn't crash
     def _on_spontaneous_thought(self, thought) -> None:
         """Callback for when Genesis has a spontaneous thought."""
         # Surface to live listeners first (e.g. terminal ticker)
@@ -343,7 +353,10 @@ class ConversationMixin:
                 text=text[:188],
             )
         except (OSError, ConnectionError) as e:
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.mind.conversation._on_spontaneous_thought",
+                e,
+            )
 
         # Feed the thought into its emergent identity — its
         # reflections and questions become part of who it is.
@@ -412,7 +425,10 @@ class ConversationMixin:
                     source_confidence=0.85,
                 )
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"world event memory store failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.conversation._on_world_event",
+                    e,
+                )
 
         # Feed its sleep systems — what happens in its world should be
         # replayed and integrated during sleep, just like what it
@@ -423,13 +439,19 @@ class ConversationMixin:
                     [event.describe()[:200]], salience=event.salience,
                 )
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"world event replay queue failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.conversation._on_world_event",
+                    e,
+                )
     def _learner_neuro_impulse(self, chem: int, amount: float) -> None:
         """Callback for the learner to trigger neurochemistry."""
         try:
             self.client.neuro_impulse(chem, amount)
         except (OSError, ConnectionError) as e:
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.mind.conversation._learner_neuro_impulse",
+                e,
+            )
     def _get_plasticity_profile(self):
         """Callback for the learner to read the substrate's metaplastic state.
 
@@ -443,7 +465,10 @@ class ConversationMixin:
         try:
             return self.client.get_plasticity_profile()
         except (OSError, ConnectionError, RuntimeError, ValueError) as e:
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.mind.conversation._get_plasticity_profile",
+                e,
+            )
             return None
     def _get_current_posture(self) -> str:
         """Read the learner's current learning posture.
@@ -529,7 +554,10 @@ class ConversationMixin:
             )
             self.inner_life.accumulate_synaptic_load(salience * 0.1)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"sleep feed failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.conversation._learner_store_memory",
+                e,
+            )
 
         # Record the act in its external world — autonomous web study
         # is its reaching *out*: an act upon the world, not just an
@@ -537,7 +565,10 @@ class ConversationMixin:
         try:
             self.world.it_acted("studied the web", detail=text[:200])
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"world action record failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.conversation._learner_store_memory",
+                e,
+            )
     def _schedule_think_recovery(self) -> None:
         """Resume background systems only after the timed-out thinker exits."""
         with self._think_worker_lock:
@@ -604,7 +635,10 @@ class ConversationMixin:
         try:
             self.cognition.attention.clear()
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"attention.clear() failed during think timeout recovery: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.conversation._respond_timeout",
+                e,
+            )
         self.cognition._last_state = None
         self._schedule_think_recovery()
         from ..language import Thought as _Thought
@@ -717,7 +751,10 @@ class ConversationMixin:
         try:
             self.world.hear_user(user_input)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"world hear_user failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.conversation._respond_once",
+                e,
+            )
 
         with self._think_worker_lock:
             active_worker = self._active_think_worker
@@ -789,7 +826,10 @@ class ConversationMixin:
         try:
             self.world.it_said(text)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"world utterance record failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.conversation._said",
+                e,
+            )
         return text
 
     def _note_faces_seen(self) -> None:
@@ -804,7 +844,10 @@ class ConversationMixin:
                     f"face:{name}", PresenceKind.FACE, name=name
                 )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"world face presence failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.conversation._note_faces_seen",
+                e,
+            )
 
     def _think_in_worker(
         self, user_input: str, timeout: float
@@ -905,7 +948,10 @@ class ConversationMixin:
                     self.self_invoke("/sleep")
                     return
             except Exception as e:  # noqa: BLE001
-                logger.debug(f'post-conversation sleep self-invoke check failed: {e}')
+                note_swallowed(
+                    "genesis_cognitive.mind.conversation._check_post_conversation_self_invoke",
+                    e,
+                )
 
             # If it's curious after a deep discussion (high curiosity,
             # positive valence), it may choose to introspect — examine
@@ -921,9 +967,15 @@ class ConversationMixin:
                     )
                     self.self_invoke("/introspect")
             except Exception as e:  # noqa: BLE001
-                logger.debug(f'post-conversation introspect self-invoke check failed: {e}')
+                note_swallowed(
+                    "genesis_cognitive.mind.conversation._check_post_conversation_self_invoke",
+                    e,
+                )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"post-conversation self-invoke check failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.conversation._check_post_conversation_self_invoke",
+                e,
+            )
     def _resume_inner_life(self) -> None:
         """Resume inner life and volition once the user has gone quiet.
 
@@ -1009,10 +1061,16 @@ class ConversationMixin:
                     "looked through the retina", detail=report[:200]
                 )
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"world action record failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.conversation.see",
+                    e,
+                )
             return report
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"mind see failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.conversation.see",
+                e,
+            )
             from ..language import Thought as _Thought
             emo = self.feel()
             thought = _Thought(
@@ -1088,10 +1146,16 @@ class ConversationMixin:
                     "looked at an image", detail=rendered[:200]
                 )
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"world action record failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.conversation.look_at_image",
+                    e,
+                )
             return rendered
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"mind look_at_image failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.conversation.look_at_image",
+                e,
+            )
             thought = _Thought(
                 content="see",
                 intent="self_report",

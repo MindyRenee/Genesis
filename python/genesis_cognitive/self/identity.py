@@ -28,10 +28,12 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Any
 
+from genesis_client.swallow import note_swallowed
+
 from ..concepts import ConceptNetwork
 
 if TYPE_CHECKING:
-    from ..narrative import NarrativeEngine
+    from ..infrastructure.narrative import NarrativeEngine
 
 __all__ = [
     "DevelopmentalTracker",
@@ -350,7 +352,10 @@ class DevelopmentalTracker:
             try:
                 self._current_stage = IdentityStage[stage_name]
             except KeyError as e:
-                logger.debug(f"restore_from_dict: unknown stage '{e}'")
+                note_swallowed(
+                    "genesis_cognitive.self.identity.restore_from_dict",
+                    e,
+                )
         resolutions = data.get("resolutions", {})
         for stage in IdentityStage:
             entry = resolutions.get(stage.name)
@@ -637,7 +642,10 @@ class EmergentIdentity:
                         f"through experience, has become {', '.join(drift_descs[:3])}"
                     )
         except (AttributeError, TypeError) as e:
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.self.identity._synthesize_from_narrative",
+                e,
+            )
 
         # Weight based on how much it's experienced
         weight = min(1.0, event_count / 30.0) if event_count > 0 else 0.2
@@ -689,7 +697,10 @@ class EmergentIdentity:
             else:
                 observations.append("lets emotions flow naturally")
         except (AttributeError, TypeError) as e:
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.self.identity._synthesize_from_regulation",
+                e,
+            )
 
         # Is it in homeostasis?
         try:
@@ -706,7 +717,10 @@ class EmergentIdentity:
                 else:
                     observations.append("working on managing stress better")
         except (AttributeError, TypeError) as e:
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.self.identity._synthesize_from_regulation",
+                e,
+            )
 
         # Weight based on how much regulation data we have
         weight = min(1.0, reg_count / 50.0) if reg_count > 0 else 0.3
@@ -762,7 +776,10 @@ class EmergentIdentity:
                 if topics:
                     observations.append(f"wonders about {', '.join(list(topics)[:4])}")
         except (TypeError, AttributeError, ValueError) as e:
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.self.identity._synthesize_from_curiosity",
+                e,
+            )
 
         # Weight based on how curious it's been
         weight = min(1.0, questions_asked / 50.0) if questions_asked > 0 else 0.3

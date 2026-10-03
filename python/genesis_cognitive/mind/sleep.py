@@ -18,12 +18,16 @@ from genesis_client.protocol import (
     CHEM_OREXIN,
     CHEM_SEROTONIN,
     PHASE_NAMES,
+    PHASE_NREM,
+    PHASE_REM,
     ZONE_CONVERSATION,
     ZONE_REFLECTION,
     ZONE_SLEEPING,
 )
+from genesis_client.swallow import note_swallowed
 
 from ..commitment import CommitmentBoundary
+from ..infrastructure.journal import record_event
 from ..sleep import SleepStage
 from .thresholds import (
     AUTO_SLEEP_ADENOSINE,
@@ -37,6 +41,7 @@ from .thresholds import (
     DROWSINESS_ADENOSINE,
     DROWSINESS_CONFIRM_S,
     DROWSINESS_EXIT,
+    WAKE_DESYNC_SETTLE_SECONDS,
     WAKE_REINFORCE_INTERVAL,
     WAKE_RESCUE_ADENOSINE,
     WAKE_RESCUE_MELATONIN,
@@ -151,6 +156,9 @@ class SleepMixin:
         self._last_wake_reinforce: float = 0.0
         self._sleep_start_cycles: int = 0
         self._is_meditating = False
+        # When the current meditation began, so the exit record can
+        # report its duration rather than only the fact.
+        self._meditation_start_time: float = 0.0
         self._last_rest_time = time.time()
         self._last_concept_count = 0
         self._is_teaching = False
@@ -171,6 +179,10 @@ class SleepMixin:
             release=AUTO_SLEEP_EXIT,
             confirm_s=AUTO_SLEEP_CONFIRM_S,
         )
+        # Treat fresh start like a wake event so volition wake delays
+        # (WAKE_VOLITION_DELAYS) apply on first run. Otherwise
+        # _wake_time=0.0 bypasses all delays and urges fire immediately.
+        self._wake_time = time.time()
     @property
     def is_sleeping(self) -> bool:
         """Whether it is currently in a sleep state."""
@@ -268,7 +280,10 @@ class SleepMixin:
             if stage is SleepStage.N3:
                 self._consolidate_n3_heavy(consolidation_intensity)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"sleep stage consolidation failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.sleep._on_sleep_stage_transition",
+                e,
+            )
     def _run_sleep_compression(self, network, consolidation_intensity: float) -> None:
         """Algorithmic sleep compression: VQ, holographic graph, LTM compaction.
 
@@ -431,7 +446,10 @@ class SleepMixin:
         try:
             core_state = self.client.get_state()
         except (OSError, ConnectionError, RuntimeError) as e:
-            logger.debug(f"auto-sleep check failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.sleep._check_auto_sleep",
+                e,
+            )
             return
 
         adenosine = core_state.chemicals.get("adenosine", 0.0)
@@ -439,6 +457,11 @@ class SleepMixin:
 
         # ── Auto-sleep onset ──
         if not self._is_sleeping and not self._is_meditating:
+            # Checked on this path because it already holds a state
+            # snapshot, so comparing the two layers' sleep states
+            # costs no extra IPC call. The reverse desync — mind asleep
+            # while the daemon is awake — is handled by the sync above.
+            self._check_sleep_desync()
             now = time.time()
             # Feed the commitment boundaries before the gates — the
             # sustained-crossing window must track the physical
@@ -591,9 +614,15 @@ class SleepMixin:
                     try:
                         self._on_speak(thought.content)
                     except Exception as e:  # noqa: BLE001
-                        logger.debug(f"drowsiness speak failed: {e}")
+                        note_swallowed(
+                            "genesis_cognitive.mind.sleep._announce_drowsiness",
+                            e,
+                        )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"drowsiness announcement failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.sleep._announce_drowsiness",
+                e,
+            )
     def sleep(self, user_initiated: bool = False, nap: bool = False) -> None:
         """Put Genesis into sleep mode for dreaming.
 
@@ -649,6 +678,19 @@ class SleepMixin:
                 "learning",
                 f"Sleep onset: {n_memories} episodes lightly consolidated (N1)",
             )
+        # Record the onset unconditionally. Previously the only record
+        # was the live thought above, which fires only when there was
+        # something to consolidate — so a sleep that consolidated
+        # nothing left no trace at all, and the number of sleep
+        # episodes could not be reconstructed from any durable state.
+        record_event(
+            "sleep_onset",
+            "sleep episode began",
+            user_initiated=user_initiated,
+            nap=nap,
+            cycle=(cycle.cycles_completed if cycle is not None else 0),
+            consolidated=n_memories,
+        )
     def _engage_sleep_mechanism(self) -> None:
         """Engage the sleep mechanism — pause learners, resume inner life.
 
@@ -707,7 +749,10 @@ class SleepMixin:
         try:
             self.cognition.comprehension.reset()
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"comprehension reset on sleep failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.sleep._engage_sleep_mechanism",
+                e,
+            )
     def sleep_status(self) -> str:
         """Return a summary of its sleep state for the /sleep and /wake commands.
 
@@ -768,7 +813,10 @@ class SleepMixin:
                     f"BDNF={profile.bdnf_tonic:.2f} — still recovering."
                 )
         except (OSError, ConnectionError, RuntimeError) as e:
-            logger.debug(f"receptor state check failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.sleep.sleep_status",
+                e,
+            )
 
         return "\n".join(lines)
     def wake_readiness(self) -> tuple[bool, str]:
@@ -819,7 +867,10 @@ class SleepMixin:
             core_state = self.client.get_state()
             adenosine = core_state.chemicals.get("adenosine", 0.0)
         except (OSError, ConnectionError, RuntimeError) as e:
-            logger.debug(f"wake_readiness: state check failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.sleep.wake_readiness",
+                e,
+            )
             # If we can't read state, don't block wake — the daemon
             # might be disconnected, and forcing it to stay asleep
             # forever is worse than waking without a neurochemical check.
@@ -845,7 +896,10 @@ class SleepMixin:
                     f"— neuroplasticity substrate hasn't restored"
                 )
         except (OSError, ConnectionError, RuntimeError) as e:
-            logger.debug(f"wake_readiness: receptor check failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.sleep.wake_readiness",
+                e,
+            )
             # Same as above — don't block wake on a failed read.
 
         return True, "ready"
@@ -892,6 +946,15 @@ class SleepMixin:
         """
         if not self._is_sleeping:
             return
+        # Capture the episode's length before clearing the start time,
+        # so the journal records the duration and not just the fact.
+        episode_secs = (
+            time.time() - self._sleep_start_time
+            if self._sleep_start_time > 0.0
+            else 0.0
+        )
+        was_nap = self._nap_mode
+        was_user_initiated = self._user_initiated_sleep
         self._is_sleeping = False
         self._user_initiated_sleep = False
         # Waking starts a new epoch — any volition suppression still
@@ -914,6 +977,18 @@ class SleepMixin:
         # even though the mind's _is_sleeping flag is cleared. This
         # closes the desync between cognitive and subcognitive layers.
         self._send_wake_neuro_impulses()
+
+        # Record the wake unconditionally. Waking previously produced no
+        # durable record of any kind, so sleep *stages* were traceable
+        # while the onset and termination of an episode were not — the
+        # boundaries were the one part left unmeasured.
+        record_event(
+            "wake",
+            "sleep episode ended",
+            duration_secs=round(episode_secs, 3),
+            nap=was_nap,
+            user_initiated=was_user_initiated,
+        )
 
         # Resume autonomous learning. Inner life was not paused during
         # sleep (it generates dreams and advances the sleep cycle), so
@@ -947,7 +1022,10 @@ class SleepMixin:
         try:
             self.cognition.global_workspace.clear()
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"workspace clear on wake failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.sleep.wake",
+                e,
+            )
 
         # Notify the regulator that rest has ended (resets its
         # cooldown timer so it doesn't immediately try to meditate
@@ -988,6 +1066,55 @@ class SleepMixin:
         self._learner_neuro_impulse(CHEM_DOPAMINE, 0.05)
         self._learner_neuro_impulse(CHEM_NOREPINEPHRINE, 0.05)
         self._learner_neuro_impulse(CHEM_MELATONIN, -0.10)
+
+    def _check_sleep_desync(self) -> bool:
+        """Compare this layer's sleep state against the daemon's.
+
+        The two layers track sleep independently: `_is_sleeping` is the
+        mind's own flag, and the daemon derives its own phase from
+        neurochemistry. The documented failure mode is a desync — the
+        mind awake while the daemon's phase is still NREM/REM, because
+        residual adenosine keeps suppressing the wake-promoting
+        chemicals. `wake()` mitigates it with an impulse cascade, but
+        nothing measured whether it worked: a recurrence was invisible.
+
+        Reading the daemon's phase back and comparing it closes that
+        gap. The desync is expected briefly after a wake, while the
+        impulse cascade takes effect, so it is only recorded once it
+        persists past that window — an immediate check would report the
+        normal transitional state as a fault.
+
+        Returns True when a persistent desync was detected and
+        recorded.
+        """
+        if self._is_sleeping:
+            return False
+        try:
+            phase = self.client.get_phase().emergent_phase
+        except (OSError, ConnectionError, ValueError) as e:
+            note_swallowed(
+                "genesis_cognitive.mind.sleep._check_sleep_desync",
+                e,
+            )
+            return False
+        if phase not in (PHASE_NREM, PHASE_REM):
+            return False
+        # Within the settle window after waking, an asleep phase is the
+        # expected transitional state, not a fault.
+        settle = time.time() - self._wake_time if self._wake_time else 0.0
+        if settle < WAKE_DESYNC_SETTLE_SECONDS:
+            return False
+        record_event(
+            "sleep_desync",
+            "mind is awake but the daemon's phase is still asleep",
+            phase=PHASE_NAMES.get(phase, str(phase)),
+            seconds_since_wake=round(settle, 1),
+        )
+        logger.warning(
+            "sleep desync: mind awake for %.0fs but daemon phase is %s",
+            settle, PHASE_NAMES.get(phase, phase),
+        )
+        return True
 
     def _reinforce_wake(self) -> None:
         """Re-latch the sleep-wake flip-flop during the stabilization
@@ -1039,7 +1166,14 @@ class SleepMixin:
         if self._is_meditating or self._is_sleeping:
             return
         self._is_meditating = True
+        self._meditation_start_time = time.time()
         self.client.set_zone(ZONE_REFLECTION)
+        # Meditation is a deliberate state change with no durable
+        # record, like sleep onset before this. It is also the only
+        # state in which inner life and the learner are both paused,
+        # so an unrecorded entry would explain a gap in the journal
+        # with nothing to account for it.
+        record_event("meditation_begin", "meditation started")
 
         # Pause inner life — no spontaneous thoughts during meditation
         self.inner_life.pause()
@@ -1155,11 +1289,21 @@ class SleepMixin:
         """
         if not self._is_meditating:
             return
+        duration = (
+            time.time() - self._meditation_start_time
+            if getattr(self, "_meditation_start_time", 0.0) > 0.0
+            else 0.0
+        )
         self._is_meditating = False
         # Any volition suppression latched by a conversation turn
         # before meditating lapses on exit.
         self._suppress_volition = False
         self.client.set_zone(ZONE_CONVERSATION)
+        record_event(
+            "meditation_end",
+            "meditation ended",
+            duration_secs=round(duration, 3),
+        )
 
         # Resume inner life — spontaneous thoughts can flow again
         self.inner_life.resume()
@@ -1210,7 +1354,10 @@ class SleepMixin:
             # Expected when sleep compression has deleted the
             # episode. Log at debug — this is normal operation,
             # not an error.
-            logger.debug(f"retrieve episode {ep_id} failed (likely pruned): {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.sleep._resolve_episode",
+                e,
+            )
             ep_cache[ep_id] = ""
             return ""
     def _collect_leaf_texts(

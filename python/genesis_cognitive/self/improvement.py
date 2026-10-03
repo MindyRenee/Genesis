@@ -92,8 +92,8 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from ..tools.framework import ToolResult, get_tools
 
 if TYPE_CHECKING:
-    from ..bug_reporter import BugReport, BugReporter
     from ..concepts import ConceptNetwork
+    from ..infrastructure.bug_reporter import BugReport, BugReporter
 
 logger = logging.getLogger(__name__)
 
@@ -1688,7 +1688,7 @@ class SelfImprovementEngine:
         the parsed comparison, so only the offending operator changes —
         a nearby valid ``is None`` on the same line is left alone.
         """
-        from ..bug_reporter import is_literal_operand
+        from ..infrastructure.bug_reporter import is_literal_operand
 
         tree = _parse_source_tree(source)
         if tree is None:
@@ -1742,7 +1742,7 @@ class SelfImprovementEngine:
         replaced, AST-guided so the class expression and the value
         expression are copied verbatim from the source.
         """
-        from ..bug_reporter import type_call_arg
+        from ..infrastructure.bug_reporter import type_call_arg
 
         tree = _parse_source_tree(source)
         if tree is None:

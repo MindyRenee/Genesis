@@ -52,10 +52,11 @@ from genesis_client.protocol import (
     CHEM_NOREPINEPHRINE,
     CHEM_OXYTOCIN,
 )
+from genesis_client.swallow import note_swallowed
 
-from ..auditory import DetectedObject, ObjectRecognizer
 from ..concepts import RelationType
-from ..vision import V1Model, VisualField
+from ..occipital_lobe import V1Model, VisualField
+from ..temporal_lobe import DetectedObject, ObjectRecognizer
 from .recognition import FaceRecognizer
 from .retina import latest_frame
 
@@ -174,7 +175,10 @@ class Vision:
                 img = latest_frame(copy=True)
                 self._available = img is not None and img.size > 0
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"vision not available: {e}")
+                note_swallowed(
+                    "genesis_cognitive.perception.vision.is_available",
+                    e,
+                )
                 self._available = False
         return self._available
 
@@ -235,7 +239,10 @@ class Vision:
             try:
                 objects = obj_recognizer.detect_objects(rgb)
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"object recognition failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.perception.vision._recognize_objects",
+                    e,
+                )
         self._last_objects = [o.name for o in objects]
         object_colors = _object_colors(rgb, objects)
         return objects, object_colors
@@ -257,7 +264,10 @@ class Vision:
                     else:
                         n_unknown_faces += 1
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"face recognition failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.perception.vision._recognize_faces",
+                    e,
+                )
         self._last_faces = face_names
         return face_names, n_unknown_faces
 
@@ -373,11 +383,17 @@ class Vision:
                 try:
                     self._on_gamma(field.gamma_power)
                 except Exception as e:  # noqa: BLE001
-                    logger.debug(f"gamma callback failed: {e}")
+                    note_swallowed(
+                        "genesis_cognitive.perception.vision.see",
+                        e,
+                    )
 
             return scene
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"vision see failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.perception.vision.see",
+                e,
+            )
             return VisionScene(status="unprocessed")
 
     def _compute_salience(
@@ -431,13 +447,19 @@ class Vision:
                 client.neuro_impulse(CHEM_DOPAMINE, 0.03)  # recognition reward
                 client.neuro_impulse(CHEM_ACETYLCHOLINE, 0.02)  # attentional focus
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"neuro impulse for objects failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.perception.vision._modulate_vision_chemistry",
+                    e,
+                )
         if face_names:
             try:
                 client.neuro_impulse(CHEM_OXYTOCIN, 0.03)  # social bonding
                 client.neuro_impulse(CHEM_DOPAMINE, 0.02)  # recognition reward
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"neuro impulse for faces failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.perception.vision._modulate_vision_chemistry",
+                    e,
+                )
         _store_vision_event(client, emotion, scene.memory_text(), salience)
 
 
@@ -902,7 +924,10 @@ def _store_vision_event(client, emotion: EmotionalState, desc: str, salience: fl
             text=desc,
         )
     except Exception as e:  # noqa: BLE001
-        logger.debug(f"vision store_event failed: {e}")
+        note_swallowed(
+            "genesis_cognitive.perception.vision._store_vision_event",
+            e,
+        )
 
 
 def _emotional_tag(emotion: EmotionalState) -> list[float]:

@@ -23,6 +23,7 @@ from typing import Any
 
 from genesis_client import GenesisClient
 from genesis_client.protocol import CHEM_NAMES, PROTOCOL_VERSION
+from genesis_client.swallow import note_swallowed
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +151,10 @@ def capture_snapshot(
     except ImportError as e:
         # Emotion module unavailable in minimal installs — baseline simply
         # omits the resting-emotion enrichment rather than failing.
-        logger.debug(f"resting-emotion enrichment skipped: {e}")
+        note_swallowed(
+            "genesis_cognitive.eval.baseline.capture_snapshot",
+            e,
+        )
 
     return Snapshot(
         captured_at_unix=time.time(),

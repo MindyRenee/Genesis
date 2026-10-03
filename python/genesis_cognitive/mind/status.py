@@ -19,6 +19,7 @@ from ..self import EmergentIdentity, IdentityStage
 if TYPE_CHECKING:
     from ..brain_waves import BrainWaveState
     from ..learning import Question
+from genesis_client.swallow import note_swallowed
 
 from .thresholds import WARN_ADENOSINE, WARN_AROUSAL, WARN_CORTISOL, WARN_VALENCE
 
@@ -60,7 +61,10 @@ class StatusMixin:
             try:
                 self._poll_and_process_notifications()
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"notification loop error: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.status._notification_loop",
+                    e,
+                )
     def _poll_and_process_notifications(self) -> None:
         """Poll for notifications and process any that are found."""
         enqueued = self.poll_notifications()
@@ -271,7 +275,10 @@ class StatusMixin:
                     concepts=["genesis", "identity", "self"],
                 )
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"narrative identity recording failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.status.emergent_identity",
+                    e,
+                )
 
         return self._emergent_identity
     def site_requests_status(self) -> str:
@@ -294,7 +301,20 @@ class StatusMixin:
         or REM) when the zone is Sleeping, so emotion assessment, brain
         wave assessment, and status reporting all see a consistent
         sleep state instead of a stale "active" phase.
+
+        Outside sleep it resolves the other direction of the same
+        problem: a waking phase carrying N1-level arousal is pre-sleep.
+        The daemon only enters its Drowsy phase on an *adenosine*
+        conjunct, and NeuroSummary carries no adenosine, so there is a
+        window — right after a cold start, or when arousal dips before
+        the sleep gate — where the phase reads active/alert while the
+        neurochemistry plainly reads drowsy. Reporting that as "active"
+        is what made her say she felt sluggish while nominally awake.
+        Resolving it here rather than in each consumer keeps emotion,
+        brain waves, and sleep gating reading the same phase.
         """
+        from ..brain_waves import resolve_waking_drowsy
+
         if core_state.cognitive_zone == ZONE_SLEEPING:
             # The emergent phase may already be REM (cholinergic
             # activation during sleep). Preserve it; otherwise use
@@ -302,7 +322,9 @@ class StatusMixin:
             if core_state.emergent_phase == PHASE_REM:
                 return PHASE_REM
             return PHASE_NREM
-        return core_state.emergent_phase
+        return resolve_waking_drowsy(
+            core_state.emergent_phase, core_state.arousal
+        )
     def feel(self, core_state: CoreState | None = None) -> EmotionalState:
         """Read current emotional state from neurochemistry.
 
@@ -360,7 +382,10 @@ class StatusMixin:
         try:
             core_state = self.client.get_state()
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"warn(): could not read core state: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.status.warn",
+                e,
+            )
             return None
 
         # Each entry is (condition_key, composed_phrase). The key is a
@@ -415,7 +440,10 @@ class StatusMixin:
             try:
                 self._on_speak(warning_text)
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"on_speak failed in warn(): {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.status.warn",
+                    e,
+                )
 
         self._last_warning_keys = current_keys
         return warning_text
@@ -448,7 +476,10 @@ class StatusMixin:
                 if thought and thought.content and thought.confidence > 0.3:
                     return key, thought.content
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"warning phrase composition failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.status._warn_phrase",
+                e,
+            )
         # Don't recite raw state labels — stay silent instead.
         # The state is still tracked internally for /status and
         # /feel commands; it just doesn't speak it aloud.
@@ -466,7 +497,10 @@ class StatusMixin:
         try:
             return self.notifications.poll()
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"notification poll error: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.status.poll_notifications",
+                e,
+            )
             return 0
     def drain_notifications(self) -> list:
         """Drain and return all pending subcognitive notifications.
@@ -507,11 +541,20 @@ class StatusMixin:
         (NREM/REM) instead of the daemon's emergent phase, which may
         not have caught up yet. This prevents delta brain waves from
         being computed via the waking path when it's actually asleep.
+
+        While asleep, the ultradian sleep-cycle tracker's stage is
+        passed through as the authoritative N1/N2/N3/REM. The daemon
+        only distinguishes NREM from REM and clamps arousal into
+        0.10-0.25 for the whole of NREM, so the stage cannot be
+        recovered from the summary; without the tracker the waves
+        would report slow-wave N3 for the entire night while
+        consolidation ran the full N1→N2→N3→N2→REM architecture.
         """
         from ..brain_waves import assess_brain_waves
 
         if core_state is None:
             core_state = self.client.get_state()
+        effective_phase = self._effective_phase(core_state)
         summary = NeuroSummary(
             arousal=core_state.arousal,
             valence=core_state.valence,
@@ -520,9 +563,14 @@ class StatusMixin:
             encoding_weight=core_state.encoding_weight,
             consolidation_weight=core_state.consolidation_weight,
             retrieval_weight=core_state.retrieval_weight,
-            phase=self._effective_phase(core_state),
+            phase=effective_phase,
         )
-        return assess_brain_waves(summary)
+        stage = None
+        if effective_phase in (PHASE_NREM, PHASE_REM):
+            cycle = getattr(self.inner_life, "sleep_cycle", None)
+            if cycle is not None:
+                stage = cycle.current_stage
+        return assess_brain_waves(summary, stage)
     def introspect(self) -> str:
         """Generate an introspective report."""
         return self.cognition.introspect()
@@ -539,6 +587,36 @@ class StatusMixin:
         and which it's currently working through.
         """
         return self._developmental_tracker.developmental_summary()
+
+    def _current_somatic_dict(self) -> dict[str, float] | None:
+        """Current body snapshot as a flat dict for somatic tagging.
+
+        Read from the live emotional state (itself derived from the
+        daemon's neurochemistry). Best-effort: any IPC failure yields
+        None, and the memory engine treats None as "no bodily
+        evidence" — recall falls back to legacy order.
+        """
+        try:
+            emo = self.feel()
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("genesis_cognitive.mind.status._current_somatic_dict", e)
+            return None
+        try:
+            arousal = float(getattr(emo, "alertness", 0.5))
+            valence = float(getattr(emo, "valence", 0.0))
+            chemicals = getattr(emo, "chemicals", {}) or {}
+            tone = float(chemicals.get("global_tone", 0.5)) if isinstance(chemicals, dict) else 0.5
+            plasticity = float(getattr(emo, "plasticity", 0.5))
+            return {
+                "arousal": arousal,
+                "valence": valence,
+                "tone": tone,
+                "plasticity": plasticity,
+                "balance": 0.8,
+            }
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("genesis_cognitive.mind.status._current_somatic_dict", e)
+            return None
     def bug_report(self) -> str:
         """Return a description of bugs Genesis has noticed in its code."""
         return self.bug_reporter.describe_concerns()
@@ -673,7 +751,10 @@ class StatusMixin:
                 ],
             }
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"_topology_status_summary failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.status._topology_status_summary",
+                e,
+            )
             return {
                 "global_clustering": 0.0,
                 "average_path_length": 0.0,
@@ -890,7 +971,15 @@ class StatusMixin:
         field exposes a subsystem's introspection API so the shape of
         its mind is visible from the outside.
         """
+        from genesis_client.swallow import swallow_report
+
         return {
+            # Swallowed exceptions — a count per catch site across both
+            # layers. Every `except` that discards an error records here,
+            # so a subsystem failing continuously shows up as a growing
+            # number rather than as nothing at all. Read this before
+            # concluding that a quiet subsystem is a healthy one.
+            "swallowed_errors": swallow_report(),
             # Holographic graph — fixed-size associative memory stats.
             # Exposes the stats() API for introspection so the holographic
             # graph's state (edge count, storage, concepts/relations) is

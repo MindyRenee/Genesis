@@ -8,9 +8,10 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from genesis_client.protocol import CHEM_NAMES, MODULE_METACOGNITION
+from genesis_client.swallow import note_swallowed
 
 from ..canvas import DrawingResult, NeurochemistryInput
-from ..cognitive_journal import record_error
+from ..infrastructure.journal import record_error
 from ..tools.project_creator import create_project, manage_project_lifecycle
 from ..volition import Urge, VolitionEngine
 from .thresholds import (
@@ -93,7 +94,10 @@ class VolitionMixin:
                 return None
             return method()
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"self_invoke {command} failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition.self_invoke",
+                e,
+            )
             return None
     def self_invokeable_commands(self) -> list[str]:
         """Return the list of commands Genesis can self-invoke."""
@@ -155,7 +159,10 @@ class VolitionMixin:
                 )
                 creativity = getattr(emotion, "creativity", 0.0)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"emotion read for drawing urge failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._volition_context",
+                e,
+            )
 
         # Spatial practice — an unmastered puzzle is an open curiosity.
         puzzle_pending = 0.0
@@ -163,7 +170,10 @@ class VolitionMixin:
             if self.spatial_practice.has_pending():
                 puzzle_pending = 1.0
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"puzzle_pending read failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._volition_context",
+                e,
+            )
 
         wave_data = self._read_wave_and_adenosine()
         threat_data = self._read_threat_signals()
@@ -193,7 +203,10 @@ class VolitionMixin:
             concept_growth = min(1.0, delta / 50.0)
             self._last_concept_count: int = current_count
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"concept growth read failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._volition_context",
+                e,
+            )
 
         # Social isolation from its external world — how long it has
         # been since anyone engaged it. Dampened by unanswered
@@ -217,7 +230,10 @@ class VolitionMixin:
                 trust = min(1.0, r.evidence / 8.0)
                 social_isolation *= 1.0 - 0.5 * (1.0 - r.mean) * trust
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"social isolation read failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._volition_context",
+                e,
+            )
 
         return {
             "bug_count": bug_count,
@@ -275,7 +291,10 @@ class VolitionMixin:
                 if bw.dominant == BrainWave.DELTA:
                     ready = [r for r in ready if r not in creative]
             except Exception as e:  # noqa: BLE001
-                logger.debug(f'brain-wave gating for creative urges failed: {e}')
+                note_swallowed(
+                    "genesis_cognitive.mind.volition._act_on_volition",
+                    e,
+                )
 
         performers = {
             "bug_scan": self._perform_bug_scan,
@@ -319,7 +338,10 @@ class VolitionMixin:
         try:
             fn()
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Volition action {name} failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._run_volition_action",
+                e,
+            )
             # This is the single boundary every voluntary action's
             # failure lands on — record it durably so a crashed urge
             # is not invisible outside debug logging.
@@ -366,7 +388,10 @@ class VolitionMixin:
                     self._emit_live_thought(thought_type, thought.content)
                     return
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"volition thought compose failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._emit_volition_thought",
+                e,
+            )
     def _compose_drawing_description(self, result) -> str:
         """Compose a description of a drawing from its own understanding.
 
@@ -414,7 +439,10 @@ class VolitionMixin:
                     thought.metadata["techniques_used"] = result.techniques_used
                     return self.language.render(thought, emotion)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"drawing description compose failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._compose_drawing_description",
+                e,
+            )
         # If it can't articulate it from its own understanding, it
         # stays silent rather than reciting a file-path template. The
         # drawing event is already stored in STM with its description;
@@ -449,7 +477,10 @@ class VolitionMixin:
                 )
                 return
         except Exception as e:  # noqa: BLE001
-            logger.debug(f'silent except: {e}')
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_bug_scan",
+                e,
+            )
 
         self._emit_volition_thought(("bug", "code", "scan"), "thinking")
         try:
@@ -468,7 +499,10 @@ class VolitionMixin:
                     "scanned code, didn't find any new issues",
                 )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Volition bug scan failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_bug_scan",
+                e,
+            )
     def _perform_learn(self) -> None:
         """Grant the autonomous learner permission for one learning cycle.
 
@@ -517,7 +551,10 @@ class VolitionMixin:
                 )
                 return
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"brain-wave gating for act failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_act",
+                e,
+            )
 
         self._emit_volition_thought(
             ("action", "tools", "doing", "agency"), "thinking",
@@ -528,7 +565,10 @@ class VolitionMixin:
         try:
             agency.act_once()
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Volition act failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_act",
+                e,
+            )
     def _perform_code_learning(self) -> None:
         """Study its own source code because the urge crossed its threshold.
 
@@ -548,7 +588,10 @@ class VolitionMixin:
                 )
                 return
         except Exception as e:  # noqa: BLE001
-            logger.debug(f'brain-wave gating for code learning failed: {e}')
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_code_learning",
+                e,
+            )
 
         self._emit_volition_thought(
             ("code", "learning", "understanding"), "thinking",
@@ -565,7 +608,10 @@ class VolitionMixin:
                 f"{learned.relationships_added} relationships",
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Volition code learning failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_code_learning",
+                e,
+            )
     def _perform_improve(self) -> None:
         """Generate self-improvement proposals because the urge crossed its threshold.
 
@@ -602,7 +648,10 @@ class VolitionMixin:
                 )
                 return
         except Exception as e:  # noqa: BLE001
-            logger.debug(f'silent except: {e}')
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_improve",
+                e,
+            )
 
         self._emit_volition_thought(("improvement", "progress", "better"), "thinking")
         try:
@@ -637,7 +686,10 @@ class VolitionMixin:
             # to propose. A hardcoded "nothing stood out" sentence
             # would violate the no-hardcoding rule and add noise.
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Volition improvement failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_improve",
+                e,
+            )
     def _perform_speech(self) -> None:
         """Speak a queued utterance because the urge crossed its threshold."""
         if self._is_sleeping:
@@ -652,13 +704,19 @@ class VolitionMixin:
             try:
                 self._on_speak(utterance)
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"Speech callback failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.volition._perform_speech",
+                    e,
+                )
         # Record its voice in its external world — the utterance
         # reached out, whether or not a listener was attached.
         try:
             self.world.it_said(utterance)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"world utterance record failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_speech",
+                e,
+            )
     def _perform_safeguard(self) -> None:
         """Protect its own integrity because the urge crossed threshold.
 
@@ -683,7 +741,10 @@ class VolitionMixin:
                 self.client.ping(timeout=2.0)
                 self._daemon_lost_since = None
             except (OSError, ConnectionError, RuntimeError) as e:
-                logger.debug(f"safeguard daemon probe failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.volition._perform_safeguard",
+                    e,
+                )
 
         self._emit_volition_thought(
             ("self", "protection", "memory", "body"),
@@ -730,7 +791,10 @@ class VolitionMixin:
                 or self.world.last_seen_presence()
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"reach-out presence lookup failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_reach_out",
+                e,
+            )
             target = None
         if target is not None:
             belief = target.belief
@@ -744,7 +808,10 @@ class VolitionMixin:
         try:
             emotion = self.feel()
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"reach-out emotion read failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_reach_out",
+                e,
+            )
             return
         # Compose the question from its actual knowledge gaps and
         # curiosity — the same path its inner-life social questions
@@ -754,7 +821,10 @@ class VolitionMixin:
                 topic, emotion
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"reach-out question compose failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_reach_out",
+                e,
+            )
             return
         if not q_data:
             return
@@ -763,7 +833,10 @@ class VolitionMixin:
                 q_data, emotion
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"reach-out question render failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_reach_out",
+                e,
+            )
             return
         if not content:
             return
@@ -795,7 +868,10 @@ class VolitionMixin:
                 if activation > 0.1:
                     return name
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"reach-out network read failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._reach_out_topic",
+                e,
+            )
         return None
     def _perform_look(self) -> None:
         """Look around because the camera is a continuous sense.
@@ -814,7 +890,10 @@ class VolitionMixin:
             if waves.dominant == BrainWave.DELTA:
                 return  # deep rest — eyes closed, no visual input
         except Exception as e:  # noqa: BLE001
-            logger.debug(f'_perform_look failed: {e}')
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_look",
+                e,
+            )
         self._emit_volition_thought(("vision", "seeing", "looking"), "looking")
         try:
             self.vision.see(
@@ -827,7 +906,10 @@ class VolitionMixin:
             # Record the act — looking is its reaching out perceptually.
             self.world.it_acted("looked around")
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Volition look failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_look",
+                e,
+            )
     def _perform_meditate(self) -> None:
         """Meditate because the rest urge crossed its threshold.
 
@@ -876,13 +958,19 @@ class VolitionMixin:
             if bw.dominant == BrainWave.DELTA:
                 return None  # deep rest — not enough arousal for creative expression
         except Exception as e:  # noqa: BLE001
-            logger.debug(f'brain-wave gating for draw failed: {e}')
+            note_swallowed(
+                "genesis_cognitive.mind.volition.draw",
+                e,
+            )
 
         # Read its current neurochemistry for the canvas
         try:
             state = self.client.get_state()
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"state read for drawing failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition.draw",
+                e,
+            )
             return None
 
         try:
@@ -916,14 +1004,20 @@ class VolitionMixin:
                 for turn in self.cognition.working_memory.get_recent_turns(3):
                     active_concepts.extend(turn.topics)
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"working memory topics for drawing failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.volition.draw",
+                    e,
+                )
             # Also include the most activated concepts from the network
             try:
                 for name, activation in self.cognition.network.most_activated(5):
                     if activation > 0.1:
                         active_concepts.append(name)
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"network activation for drawing failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.volition.draw",
+                    e,
+                )
 
             result = self.canvas.draw(
                 emotion=emotion,
@@ -942,7 +1036,10 @@ class VolitionMixin:
             else:
                 return None
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"drawing failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition.draw",
+                e,
+            )
             return None
     def _store_drawing_event(self, chem: dict, result: DrawingResult) -> None:
         """Store a drawing as an STM event for later reflection.
@@ -963,7 +1060,10 @@ class VolitionMixin:
                 text=result.description,
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"failed to store drawing event: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._store_drawing_event",
+                e,
+            )
     def _perform_draw(self) -> None:
         """Draw because the creative urge crossed its threshold.
 
@@ -981,7 +1081,10 @@ class VolitionMixin:
             try:
                 self.world.it_acted("drew a picture", detail=desc[:200])
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"world action record failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.volition._perform_draw",
+                    e,
+                )
             self._emit_live_thought("art", desc)
         else:
             # draw() returns None for several reasons: sleeping,
@@ -999,7 +1102,10 @@ class VolitionMixin:
                     if bw.dominant == BrainWave.DELTA:
                         reason = "too tired to draw, need rest first"
             except Exception as e:  # noqa: BLE001
-                logger.debug(f'draw failure reason check failed: {e}')
+                note_swallowed(
+                    "genesis_cognitive.mind.volition._perform_draw",
+                    e,
+                )
             self._emit_live_thought("art", reason)
     def _perform_puzzle(self) -> None:
         """Take one attempt at its current spatial puzzle.
@@ -1026,13 +1132,19 @@ class VolitionMixin:
                     str(task["name"]), 0.0
                 )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"puzzle prior-best read failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_puzzle",
+                e,
+            )
         try:
             result = self.spatial_practice.attempt(
                 self.cognition.spatial
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"puzzle attempt failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_puzzle",
+                e,
+            )
             return
         if result is None:
             return
@@ -1053,7 +1165,10 @@ class VolitionMixin:
                 solved=result.solved,
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"puzzle emotional response failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_puzzle",
+                e,
+            )
 
         # Surface the raw outcome — telemetry, not speech. Printed to
         # the terminal and broadcast into its workspace so the numeric
@@ -1095,7 +1210,10 @@ class VolitionMixin:
                 ),
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"failed to store puzzle event: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_puzzle",
+                e,
+            )
 
         # Let its articulate it through its own understanding — the
         # rule it found (or the puzzle concept) — rather than a
@@ -1141,7 +1259,10 @@ class VolitionMixin:
                 source_confidence=0.9,
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"failed to store creation memory: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._store_creation_memory",
+                e,
+            )
     def _add_project_concept(self, result, topic: str) -> None:
         """Add the project name as a concept in its network.
 
@@ -1161,7 +1282,10 @@ class VolitionMixin:
                 "genesis", result.name, RelationType.CREATES, 0.8,
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"failed to add project concept: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._add_project_concept",
+                e,
+            )
     def _perform_create(self) -> None:
         """Create a code project because the creative urge crossed threshold.
 
@@ -1186,7 +1310,10 @@ class VolitionMixin:
             if waves.dominant in (BrainWave.DELTA, BrainWave.THETA):
                 return
         except Exception as e:  # noqa: BLE001
-            logger.debug(f'brain-wave gating for create_project failed: {e}')
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_create",
+                e,
+            )
 
         self._emit_volition_thought(
             ("creation", "project", "code", "building"),
@@ -1240,9 +1367,15 @@ class VolitionMixin:
                         f"reclaim space: {', '.join(archived)}",
                     )
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"project lifecycle management failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.volition._perform_create",
+                    e,
+                )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"project creation failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_create",
+                e,
+            )
     def _pick_creation_topic(self) -> str | None:
         """Pick a topic for a creative project from its concept network.
 
@@ -1284,7 +1417,10 @@ class VolitionMixin:
                     if defn.startswith(prefix):
                         already_built.add(defn[len(prefix):].strip())
         except Exception as e:  # noqa: BLE001
-            logger.debug(f'_pick_creation_topic: failed to gather existing: {e}')
+            note_swallowed(
+                "genesis_cognitive.mind.volition._pick_creation_topic",
+                e,
+            )
 
         def _is_code_symbol(topic: str) -> bool:
             """True if ``topic`` is an internal symbol, not knowledge.
@@ -1320,7 +1456,10 @@ class VolitionMixin:
                     if not _is_code_symbol(topic) and topic not in already_built:
                         return topic
         except Exception as e:  # noqa: BLE001
-            logger.debug(f'_pick_creation_topic failed: {e}')
+            note_swallowed(
+                "genesis_cognitive.mind.volition._pick_creation_topic",
+                e,
+            )
 
         # Fall back to a random high-confidence concept
         try:
@@ -1339,7 +1478,10 @@ class VolitionMixin:
                 weights = [c[1] for c in concepts]
                 return self._rng.choices(names, weights=weights, k=1)[0]
         except Exception as e:  # noqa: BLE001
-            logger.debug(f'_pick_creation_topic failed: {e}')
+            note_swallowed(
+                "genesis_cognitive.mind.volition._pick_creation_topic",
+                e,
+            )
 
         return None
     def _perform_introspect(self) -> None:
@@ -1362,7 +1504,10 @@ class VolitionMixin:
             if waves.dominant == BrainWave.DELTA:
                 return
         except Exception as e:  # noqa: BLE001
-            logger.debug(f'brain-wave gating for introspection failed: {e}')
+            note_swallowed(
+                "genesis_cognitive.mind.volition._perform_introspect",
+                e,
+            )
 
         self._emit_volition_thought(
             ("introspection", "self", "understanding", "reflection"),
@@ -1464,7 +1609,10 @@ class VolitionMixin:
                     try:
                         self.wake_from_meditation()
                     except Exception as e:  # noqa: BLE001
-                        logger.debug(f"wake_from_meditation fallback failed: {e}")
+                        note_swallowed(
+                            "genesis_cognitive.mind.volition._run_meditation",
+                            e,
+                        )
 
         threading.Thread(
             target=_run_meditation,

@@ -28,7 +28,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from ..cognitive_journal import record_error
+from genesis_client.swallow import note_swallowed
+
+from ..infrastructure.journal import record_error
 from .grid import Grid
 from .solver import SpatialReasoner
 
@@ -1005,7 +1007,10 @@ class SpatialPractice:
                 examples=list(task["train"]),
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug("task competence update failed: %s", e)
+            note_swallowed(
+                "genesis_cognitive.spatial.practice.attempt",
+                e,
+            )
 
         return PracticeAttempt(
             task=name,

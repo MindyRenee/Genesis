@@ -112,7 +112,7 @@ fn run_arm(label: &str, sleep_us: Option<u64>) {
 
     let mut checkpoints: Vec<Trace> = Vec::new();
     for t in 0..TICKS {
-        tl.advance_neuro(&sys.mmap, DT);
+        tl.advance_physics(&sys.mmap, DT);
         if let Some(us) = sleep_us {
             std::thread::sleep(std::time::Duration::from_micros(us));
         }

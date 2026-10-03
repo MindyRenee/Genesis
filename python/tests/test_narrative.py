@@ -14,7 +14,7 @@ import logging
 
 from genesis_cognitive.concepts import ConceptNetwork
 from genesis_cognitive.emotion import EmotionalState
-from genesis_cognitive.narrative import (
+from genesis_cognitive.infrastructure.narrative import (
     AutobiographicalLevel,
     HierarchyNode,
     LifeChapter,

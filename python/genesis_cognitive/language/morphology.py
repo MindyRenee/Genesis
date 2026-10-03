@@ -35,6 +35,8 @@ from __future__ import annotations
 
 import logging
 
+from genesis_client.swallow import note_swallowed
+
 __all__ = [
     "VERB_LEXICON",
     "agree_verb_phrase",
@@ -671,7 +673,10 @@ def person_pronoun(
                     if is_person:
                         return _pick("they", for_object)
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"animacy check failed for {concept_id}: {e}")
+                note_swallowed(
+                    "genesis_cognitive.language.morphology.person_pronoun",
+                    e,
+                )
 
     return _pick("it", for_object)
 

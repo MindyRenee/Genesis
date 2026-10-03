@@ -45,10 +45,11 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from genesis_client import GenesisClient
+from genesis_client.swallow import note_swallowed
 from genesis_client.types import Episode, SimilarEpisode
 
 from ..brain_waves import SleepStage
-from ..config import MemoryConfig
+from ..infrastructure.config import MemoryConfig
 from .systems import (
     AttractorNetwork,
     EmotionalMemorySystem,
@@ -188,6 +189,12 @@ class MemoryRecord:
             learning, inference, imagination). Used for reality
             monitoring and confabulation detection. ``None`` for
             memories created before source monitoring was added.
+        somatic: Body state at encoding — flat dict from
+            ``SomaticSnapshot.to_dict`` (arousal, valence, tone,
+            plasticity, balance). ``None`` for memories encoded
+            before somatic tagging. Powers state-dependent
+            retrieval: recall favours memories encoded in a similar
+            bodily state (Eich 1980; Bower 1981).
     """
 
     episode_id: int
@@ -205,6 +212,7 @@ class MemoryRecord:
     last_reconsolidated: int = 0
     reconsolidation_count: int = 0
     source_tag: SourceTag | None = None
+    somatic: dict[str, float] | None = None
 
 
 # ─── Reconsolidation modification ────────────────────────────────────
@@ -383,6 +391,15 @@ class MemoryEngine:
         #   for emotional tagging and mood-congruent retrieval.
         self._network = network
         self._get_emotion = get_emotion
+        # Somatic recall hooks (wired by the Mind; None keeps legacy
+        # behaviour):
+        # - ``somatic_provider``: returns the current body snapshot
+        #   as a flat dict (SomaticSnapshot.to_dict()).
+        # - ``somatic_weight``: recall re-rank strength. Bounded to
+        #   [0, 0.5]; small by design so body-congruence biases but
+        #   never overrides semantic order on its own.
+        self.somatic_provider: Callable[[], dict[str, float] | None] | None = None
+        self.somatic_weight: float = 0.15
 
         # Emotional memory (amygdala-dependent): tags memories with
         # emotional context and prioritises emotionally congruent
@@ -451,6 +468,7 @@ class MemoryEngine:
         source: str = "unknown",
         source_confidence: float = 0.8,
         memory_mode: str = "balanced",
+        somatic: dict[str, float] | None = None,
     ) -> bool:
         """Store a deliberate memory directly in LTM.
 
@@ -486,6 +504,9 @@ class MemoryEngine:
                 new associations). In retrieval mode, salience is
                 dampened (the hippocampus is reactivating, not
                 encoding).
+            somatic: Body state at encoding as a flat dict
+                (``SomaticSnapshot.to_dict()``). When None, the
+                engine consults ``somatic_provider`` if wired.
         """
         # Theta-gamma coupling gates encoding strength.
         # In encoding mode, the theta trough aligns gamma bursts for
@@ -515,8 +536,18 @@ class MemoryEngine:
         )
         if eid is None:
             return False
+        if somatic is None and self.somatic_provider is not None:
+            try:
+                somatic = self.somatic_provider()
+            except Exception:  # noqa: BLE001
+                somatic = None
         self._register_memory_record(
-            eid, salience, emotional_tag, source, source_confidence
+            eid,
+            salience,
+            emotional_tag,
+            source,
+            source_confidence,
+            somatic=somatic,
         )
         # Item 5: immediate synaptic consolidation.
         self.synaptic_consolidate(eid)
@@ -532,6 +563,7 @@ class MemoryEngine:
         emotional_tag: list[float],
         source: str,
         source_confidence: float,
+        somatic: dict[str, float] | None = None,
     ) -> None:
         """Register a MemoryRecord for Python-side consolidation tracking.
 
@@ -559,6 +591,7 @@ class MemoryEngine:
                 modality="text",
                 confidence=max(0.0, min(1.0, source_confidence)),
             ),
+            somatic=dict(somatic) if isinstance(somatic, dict) else None,
         )
         self._records[eid] = record
 
@@ -588,7 +621,10 @@ class MemoryEngine:
                 try:
                     self.emotional_memory_callback(text[:200], intensity)
                 except Exception as e:  # noqa: BLE001
-                    logger.debug(f"emotional memory callback failed: {e}")
+                    note_swallowed(
+                        "genesis_cognitive.memory.engine._wire_memory_subsystems",
+                        e,
+                    )
 
     def retrieve_relevant(
         self,
@@ -660,6 +696,12 @@ class MemoryEngine:
         results = self._rank_by_emotional_congruence(
             results, query_emotion=query_emotion
         )
+        # Somatic (state-dependent) re-rank: memories encoded in a
+        # body state similar to the current one are easier to recall
+        # (Eich 1980). Additive and bounded — never overrides the
+        # semantic order entirely, just biases it. No-op when no
+        # somatic snapshots exist or no provider is wired.
+        results = self._rank_by_somatic_congruence(results)
         _t_emotion = time.perf_counter() - _t0
 
         _t0 = time.perf_counter()
@@ -744,7 +786,10 @@ class MemoryEngine:
             ep = self.client.retrieve_episode(episode_id)
         except Exception as e:  # noqa: BLE001
             # Expected when sleep compression has pruned the episode.
-            logger.debug(f"retrieve episode {episode_id} failed (likely pruned): {e}")
+            note_swallowed(
+                "genesis_cognitive.memory.engine.retrieve_episode",
+                e,
+            )
             return None
         if ep is not None:
             opens_window = prediction_error >= self.config.reconsolidation_pe_threshold
@@ -791,7 +836,10 @@ class MemoryEngine:
             ep = self.client.retrieve_episode(episode_id)
         except Exception as e:  # noqa: BLE001
             # Expected when sleep compression has pruned the episode.
-            logger.debug(f"replay retrieve {episode_id} failed (likely pruned): {e}")
+            note_swallowed(
+                "genesis_cognitive.memory.engine._replay_into_semantic_graph",
+                e,
+            )
             return 0
         if ep is None or not ep.text:
             return 0
@@ -1164,7 +1212,10 @@ class MemoryEngine:
             ep = self.client.retrieve_episode(eid)
         except Exception as e:  # noqa: BLE001
             # Expected when sleep compression has pruned the episode.
-            logger.debug(f"retrieve episode {eid} failed (likely pruned): {e}")
+            note_swallowed(
+                "genesis_cognitive.memory.engine._apply_attractor_completion",
+                e,
+            )
             ep = None
         _t_fetch = _attractor_time.perf_counter() - _t0
         if ep is None:
@@ -1275,6 +1326,77 @@ class MemoryEngine:
             return base + congruence
 
         return sorted(results, key=_score, reverse=True)
+
+    def _rank_by_somatic_congruence(
+        self,
+        results: list[SimilarEpisode],
+    ) -> list[SimilarEpisode]:
+        """Re-rank results by body-state congruence (Eich, 1980).
+
+        Memories encoded in a bodily state similar to the current one
+        are easier to recall. The bonus is additive and bounded by
+        ``somatic_weight`` (default 0.15), so it biases but never
+        overrides semantic order on its own.
+
+        No-op when no ``somatic_provider`` is wired, when the current
+        snapshot is unavailable, or when none of the candidates carry
+        a somatic tag — legacy states recall exactly as before.
+        """
+        if not results or self.somatic_provider is None:
+            return results
+        try:
+            current = self.somatic_provider()
+        except Exception:  # noqa: BLE001
+            return results
+        if not current:
+            return results
+        weight = max(0.0, min(0.5, self.somatic_weight))
+        if weight <= 0.0:
+            return results
+        if not any(
+            (rec := self._records.get(r.episode_id)) is not None
+            and rec.somatic
+            and not rec.forgotten
+            for r in results
+        ):
+            return results
+
+        from ..self.somatic import somatic_congruence as _cong
+
+        def _score(r: SimilarEpisode) -> float:
+            base = r.salience - (r.hamming_distance / 64.0)
+            rec = self._records.get(r.episode_id)
+            if rec is None or rec.forgotten or not rec.somatic:
+                return base
+            try:
+                return base + weight * _cong(current, rec.somatic)
+            except Exception:  # noqa: BLE001
+                return base
+
+        return sorted(results, key=_score, reverse=True)
+
+    def somatic_congruence_of(self, episode_id: int) -> float | None:
+        """Congruence between now and an episode's encoding state.
+
+        Returns None when either snapshot is missing — the caller can
+        treat that as "no bodily evidence", never as dissimilarity.
+        Useful for introspection and for the Damasio as-if loop.
+        """
+        if self.somatic_provider is None:
+            return None
+        try:
+            current = self.somatic_provider()
+        except Exception:  # noqa: BLE001
+            return None
+        rec = self._records.get(episode_id)
+        if current is None or rec is None or not rec.somatic:
+            return None
+        from ..self.somatic import somatic_congruence as _cong
+
+        try:
+            return _cong(current, rec.somatic)
+        except Exception:  # noqa: BLE001
+            return None
 
     # ── Enhanced working-memory access ───────────────────────────
 
@@ -2038,6 +2160,7 @@ class MemoryEngine:
                     "source": rec.source_tag.source if rec.source_tag else None,
                     "source_modality": rec.source_tag.modality if rec.source_tag else "text",
                     "source_confidence": rec.source_tag.confidence if rec.source_tag else 0.8,
+                    "somatic": dict(rec.somatic) if rec.somatic else None,
                 }
                 for rec in _snapshot(self._records.values)
             ],
@@ -2086,6 +2209,11 @@ class MemoryEngine:
                 last_reconsolidated=int(entry.get("last_reconsolidated", 0)),
                 reconsolidation_count=int(entry.get("reconsolidation_count", 0)),
                 source_tag=source_tag,
+                somatic=(
+                    {k: float(v) for k, v in entry["somatic"].items()}
+                    if isinstance(entry.get("somatic"), dict)
+                    else None
+                ),
             )
             self._records[eid] = rec
         self.forgotten_count = int(data.get("forgotten_count", 0))

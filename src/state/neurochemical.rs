@@ -2897,6 +2897,18 @@ impl NeurochemicalVector {
         // directly from self.chemicals[i].baseline inside the loop — no
         // need for a separate snapshot array since baselines don't change
         // during this step (only levels and velocities do).
+        //
+        // Re-derived per sub-step, deliberately. The snapshot exists to
+        // stop a single step from feeding back into itself mid-loop, NOT
+        // to freeze the coupling inputs for the whole call. When the
+        // daemon sub-steps to cover a longer interval (see
+        // `TickLoop::neuro_substeps`), holding one snapshot meant every
+        // sub-step drove off the same stale levels — so the number of
+        // sub-steps changed the answer, which is precisely the
+        // step-size dependence the sub-stepping was meant to remove.
+        // Endocannabinoid was the worst case: its synthesis is driven by
+        // glutamate + GABA activity, and integrating a stale drive
+        // repeatedly diverged ~10x more than any other chemical.
         let eff_snapshot = self.effective_levels;
 
         // Dopamine subtype-weighted effective level for coupling.
@@ -3838,14 +3850,21 @@ impl NeurochemicalVector {
         // homeostatic force pull cortisol back to baseline.
         //
         // This models the biological upregulation of 11β-HSD2 under
-        // sustained high cortisol. See CORTISOL_CLEARANCE_RATE for
-        // the full rationale.
-        // `dt_scale` is correct here: direct level update, time-invariant.
-        let eff_clearance = CORTISOL_CLEARANCE_RATE * cort_excess * dt_scale;
-        // Clamp the clearance to at most 50% per tick to prevent
-        // overshoot under large dt_scale values.
-        self.chemicals[cort_idx].level *=
-            1.0 - crate::state::sanitize::finite_clamp(eff_clearance, 0.0, 0.5);
+        // sustained high cortisol. See CORTISOL_CLEARANCE_RATE for the
+        // full rationale.
+        //
+        // The decay is exponential, not `level *= 1 - rate` (Euler). The
+        // Euler form is only first-order accurate and is step-size
+        // dependent: at dt_scale 5 (a 1 s step) it removes 5x the
+        // fraction that 5 steps of 0.2 s would, so cortisol settled at a
+        // different level purely because of *how often* the body was
+        // ticked. That is exactly the coupling defect this file is
+        // being fixed for — the body's chemistry must not depend on the
+        // caller's cadence. `exp(-x)` with x = rate * dt / DT composes
+        // exactly over sub-steps, matching every other decay here and
+        // the AChE clearance a few lines above.
+        let clearance_exponent = CORTISOL_CLEARANCE_RATE * cort_excess * dt_scale;
+        self.chemicals[cort_idx].level *= (-clearance_exponent).exp();
         self.chemicals[cort_idx].level =
             crate::state::sanitize::finite_clamp(self.chemicals[cort_idx].level, 0.0, 1.0);
 

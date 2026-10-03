@@ -54,6 +54,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from genesis_client.protocol import CHEM_DOPAMINE
+from genesis_client.swallow import note_swallowed
 
 from ..concepts import is_world_concept, strip_sense_suffix
 from ..executive import ExecutiveFunction, ExecutiveIntention
@@ -282,7 +283,10 @@ class ActingLoop:
         try:
             self._handlers[intention.kind](intention, result)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"act_once {intention.kind} failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.tools.agency.act_once",
+                e,
+            )
         self._finish(result)
         return result
 
@@ -297,7 +301,10 @@ class ActingLoop:
             try:
                 topic = self.get_agency_topic()
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"agency topic read failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.tools.agency.propose",
+                    e,
+                )
                 topic = None
             if topic and not self._recently_acted(_LEARN, topic):
                 return self._register_intention(Intention(_LEARN, topic, "agency"))
@@ -398,7 +405,10 @@ class ActingLoop:
                 emotion, max_questions=3,
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"curiosity question generation failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.tools.agency._curiosity_question",
+                e,
+            )
             return None
         for q in questions:
             if getattr(q, "should_ask", False):
@@ -460,7 +470,10 @@ class ActingLoop:
             try:
                 self.learner.add_topic(topic)
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"learner add_topic failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.tools.agency._execute_learn",
+                    e,
+                )
 
         if self.offline or edges >= 2:
             result.success = bool(result.discoveries)
@@ -482,7 +495,10 @@ class ActingLoop:
         try:
             learned = self.network.learn_from_text(content)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"learn_from_text failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.tools.agency._execute_learn",
+                e,
+            )
             learned = []
         result.discoveries.append(
             f"read about '{topic}' ({page.data.get('title', '?')}); "
@@ -492,7 +508,10 @@ class ActingLoop:
             try:
                 self.curiosity.mark_resolved(intention.target)
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"mark_resolved failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.tools.agency._execute_learn",
+                    e,
+                )
         result.success = True
 
     def _execute_inspect(self, intention: Intention, result: ActingResult) -> None:
@@ -549,7 +568,10 @@ class ActingLoop:
             try:
                 learned = self.network.learn_from_text(page.output)
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"explore learn_from_text failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.tools.agency._execute_explore",
+                    e,
+                )
                 learned = []
             result.discoveries.append(
                 f"read {name} ({len(learned)} relationships learned)"
@@ -647,7 +669,10 @@ class ActingLoop:
         try:
             return self.tools.run(tool, **kwargs)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"target-pick {tool} failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.tools.agency._run_tool",
+                e,
+            )
             return None
 
     def _scope_root(self, scope: str) -> str:
@@ -760,7 +785,10 @@ class ActingLoop:
                         reason=summary,
                     )
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"executive outcome recording failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.tools.agency._finish",
+                    e,
+                )
 
         self._write_field_note(result)
 
@@ -768,22 +796,34 @@ class ActingLoop:
             try:
                 self.on_live_thought("act", summary)
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"act live-thought failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.tools.agency._finish",
+                    e,
+                )
         if self.on_event is not None:
             try:
                 self.on_event(f"acted on {intention.kind} '{intention.target}'")
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"act world-event failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.tools.agency._finish",
+                    e,
+                )
         if result.success and self.on_store_memory is not None:
             try:
                 self.on_store_memory(summary, 0.55)
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"act store-memory failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.tools.agency._finish",
+                    e,
+                )
         if result.success and self.on_neuro_impulse is not None:
             try:
                 self.on_neuro_impulse(CHEM_DOPAMINE, 0.12)
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"act neuro impulse failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.tools.agency._finish",
+                    e,
+                )
 
     def _write_field_note(self, result: ActingResult) -> None:
         """Append a line to its own field-notes file in the sandbox.
@@ -812,7 +852,10 @@ class ActingLoop:
                 project_root=self._scratch,
             )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"field note write failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.tools.agency._write_field_note",
+                e,
+            )
 
     def _use_outside_budget(self, tool: str) -> str:
         """Read the current notes file (helper for _write_field_note)."""

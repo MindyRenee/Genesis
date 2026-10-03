@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from genesis_cognitive.vision.v4 import V4Model
+from genesis_cognitive.occipital_lobe.v4 import V4Model
 
 
 def test_gram_cache_is_immediately_consistent_after_dictionary_update():

@@ -34,6 +34,8 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass, field
 
+from genesis_client.swallow import note_swallowed
+
 logger = logging.getLogger(__name__)
 
 # ─── Network constants ─────────────────────────────────────────────
@@ -408,7 +410,10 @@ def search(query: str, limit: int = 5) -> list[WebSearchResult]:
                 "utf-8", errors="ignore"
             )
     except (OSError, ValueError, RuntimeError) as e:
-        logger.debug(f"web search failed for {query!r}: {e}")
+        note_swallowed(
+            "genesis_cognitive.tools.web_search.search",
+            e,
+        )
         return []
 
     urls = _URL_RE.findall(html_text)
@@ -484,7 +489,10 @@ def fetch(url: str) -> WebFetchResult | None:
                 "utf-8", errors="ignore"
             )
     except (urllib.error.URLError, urllib.error.HTTPError, OSError, ValueError) as e:
-        logger.debug(f"web fetch failed for {url}: {e}")
+        note_swallowed(
+            "genesis_cognitive.tools.web_search.fetch",
+            e,
+        )
         return None
 
     if len(raw) > MAX_TEXT_LENGTH * 10:

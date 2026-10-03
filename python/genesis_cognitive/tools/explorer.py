@@ -26,6 +26,8 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from genesis_client.swallow import note_swallowed
+
 from ..concepts import ConceptNetwork, RelationType
 
 logger = logging.getLogger(__name__)
@@ -203,7 +205,10 @@ class Explorer:
                     )[:188],
                 )
             except (OSError, ConnectionError) as e:
-                logger.debug(repr(e))
+                note_swallowed(
+                    "genesis_cognitive.tools.explorer.explore_directory",
+                    e,
+                )
 
         return result
 
@@ -371,7 +376,10 @@ class Explorer:
                     concepts_added += 1
                     rels_added += 1
         except (json.JSONDecodeError, ValueError) as e:
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.tools.explorer._learn_json",
+                e,
+            )
 
         return concepts_added, rels_added
 

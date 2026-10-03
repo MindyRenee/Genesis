@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 from genesis_client.types import NeuroSummary, RecentEpisode
-from genesis_cognitive.notifications import Notification, NotificationQueue
+from genesis_cognitive.infrastructure.notifications import Notification, NotificationQueue
 
 
 def _make_summary(phase: int = 0) -> NeuroSummary:

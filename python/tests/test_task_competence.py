@@ -1,8 +1,8 @@
 """Task competence — schema recognition, affordances, and skill reuse."""
 
 from genesis_cognitive.concepts import ConceptNetwork
-from genesis_cognitive.narrative import NarrativeEngine
-from genesis_cognitive.persistence import (
+from genesis_cognitive.infrastructure.narrative import NarrativeEngine
+from genesis_cognitive.infrastructure.persistence import (
     load_state,
     restore_task_competence,
     save_state,

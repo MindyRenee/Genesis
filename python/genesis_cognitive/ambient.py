@@ -39,6 +39,8 @@ from collections import deque
 from collections.abc import Callable
 from typing import Any
 
+from genesis_client.swallow import note_swallowed
+
 __all__ = ["AmbientListener", "contains_wake_word", "strip_wake_word"]
 
 logger = logging.getLogger(__name__)
@@ -307,7 +309,10 @@ class AmbientListener:
                         self._emit(text)
                         speech_state["active"] = False
                     except queue.Empty as e:
-                        logger.debug(f"no speech detected this interval: {e}")
+                        note_swallowed(
+                            "genesis_cognitive.ambient._listen_loop",
+                            e,
+                        )
 
         except Exception as e:
             logger.exception(f"Ambient listener crashed: {e}")
@@ -344,7 +349,10 @@ class AmbientListener:
             if accept:
                 final_queue.put(text)
         except (json.JSONDecodeError, KeyError) as e:
-            logger.debug(f"vosk final result parse failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.ambient._handle_final_result",
+                e,
+            )
 
     def _track_partial(self, recognizer: Any, speech_state: dict) -> None:
         """Track partial results for speech activity."""
@@ -355,7 +363,10 @@ class AmbientListener:
                 speech_state["active"] = True
                 speech_state["last_partial"] = partial_text
         except (json.JSONDecodeError, KeyError) as e:
-            logger.debug(f"vosk partial result parse failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.ambient._track_partial",
+                e,
+            )
 
     def _emit(self, text: str) -> None:
         """Emit a transcribed utterance to the callback."""

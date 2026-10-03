@@ -52,8 +52,10 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from genesis_client import NeuroSummary
 
-    from ..bug_reporter import BugReporter
+    from ..infrastructure.bug_reporter import BugReporter
     from ..system_monitor import SystemMonitor
+
+from genesis_client.swallow import note_swallowed
 
 from ..brain_waves import (  # canonical definition — avoids threshold drift
     SleepStage,
@@ -500,7 +502,10 @@ class InnerLife:
         try:
             self._on_thought(_LiveEvent(content, kind))
         except Exception as e:  # noqa: BLE001
-            logger.debug(repr(e))  # callback must never crash inner life
+            note_swallowed(
+                "genesis_cognitive.sleep.inner_life._emit",
+                e,
+            )# callback must never crash inner life
 
     def start(self) -> None:
         """Start the inner life thread."""
@@ -815,7 +820,10 @@ class InnerLife:
                             stats = self._learner.stats
                             queue_depth = stats.get("curiosity_queue_size", 0)
                         except Exception as e:  # noqa: BLE001
-                            logger.debug(f'curiosity queue depth read failed: {e}')
+                            note_swallowed(
+                                "genesis_cognitive.sleep.inner_life._run",
+                                e,
+                            )
 
                     # Drive grows from queue depth and emotional openness
                     if emotion:
@@ -860,7 +868,10 @@ class InnerLife:
                                 if topic and isinstance(topic, str):
                                     self._agency_topics.append(topic)
                 except Exception as e:  # noqa: BLE001
-                    logger.debug(f"workspace tick failed: {e}")
+                    note_swallowed(
+                        "genesis_cognitive.sleep.inner_life._run",
+                        e,
+                    )
 
             # Wait before next check
             self._stop_event.wait(timeout=THOUGHT_CHECK_INTERVAL)
@@ -1082,7 +1093,10 @@ class InnerLife:
             try:
                 is_sleeping = self._is_mind_sleeping()
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"is_mind_sleeping check failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.sleep.inner_life._is_currently_sleeping",
+                    e,
+                )
         return is_sleeping
 
     @staticmethod
@@ -1221,7 +1235,10 @@ class InnerLife:
             try:
                 self._on_sleep_stage_transition(stage, dt)
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"sleep stage transition callback failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.sleep.inner_life._determine_dream_stage",
+                    e,
+                )
 
         # Track accumulated N2 time for spindle density computation.
         if stage is SleepStage.N2:
@@ -1296,7 +1313,10 @@ class InnerLife:
                     from ..brain_waves import assess_brain_waves
                     waves = assess_brain_waves(summary)
                 except Exception as e:  # noqa: BLE001
-                    logger.debug(f'dream synthesis brain-wave assessment failed: {e}')
+                    note_swallowed(
+                        "genesis_cognitive.sleep.inner_life._run_dream_synthesis",
+                        e,
+                    )
             proposals = self._dream_synthesis.synthesize(
                 max_proposals=5, brain_waves=waves,
             )
@@ -1308,7 +1328,10 @@ class InnerLife:
                         f"(similarity: {p.structural_similarity:.2f})",
                     )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Dream synthesis failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.sleep.inner_life._run_dream_synthesis",
+                e,
+            )
 
     def _review_dream_proposals(self) -> None:
         """Validate pending dream-synthesis edges on wake.
@@ -1330,7 +1353,10 @@ class InnerLife:
                         f"— {r.reason}",
                     )
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"Dream review failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.sleep.inner_life._review_dream_proposals",
+                e,
+            )
 
     def _check_dream_parasomnia_and_lucid(self, emotion, summary, is_rem) -> bool:
         """Check for parasomnia events and determine if this is a lucid dream."""
@@ -3094,7 +3120,10 @@ class InnerLife:
         try:
             questions = self.curiosity.generate_questions(emotion, max_questions=5)
         except (OSError, ConnectionError, RuntimeError) as e:
-            logger.debug(f"Curiosity cycle skipped — question generation failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.sleep.inner_life._curiosity_learning_cycle",
+                e,
+            )
             return
 
         if not questions:
@@ -3111,7 +3140,10 @@ class InnerLife:
         try:
             queued = self._learner.learn_from_curiosity(questions)
         except (OSError, ConnectionError, RuntimeError) as e:
-            logger.debug(f"Curiosity cycle skipped — learner unavailable: {e}")
+            note_swallowed(
+                "genesis_cognitive.sleep.inner_life._curiosity_learning_cycle",
+                e,
+            )
             return
 
         if queued > 0:
@@ -3159,7 +3191,10 @@ class InnerLife:
                     gap_detail=q.gap_detail or "",
                 )
         except Exception as e:  # noqa: BLE001
-            logger.debug(repr(e))  # best-effort
+            note_swallowed(
+                "genesis_cognitive.sleep.inner_life._surface_curiosity_question",
+                e,
+            )# best-effort
 
     def _should_think(self, emotion: EmotionalState) -> bool:
         """Determine if a spontaneous thought should arise.
@@ -4780,7 +4815,10 @@ class InnerLife:
             try:
                 self._on_neuro_impulse(3, 0.02)  # CHEM_ACETYLCHOLINE = 3
             except (OSError, ConnectionError, RuntimeError) as e:
-                logger.debug(f"ACh impulse from thought failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.sleep.inner_life._record_thought",
+                    e,
+                )
             # Insight reward: small DA for "aha" moments.
             # DA is the reward prediction error signal (Schultz, 2016).
             # An insight is a genuine reward — it understood something.
@@ -4788,7 +4826,10 @@ class InnerLife:
                 try:
                     self._on_neuro_impulse(0, 0.03)  # CHEM_DOPAMINE = 0
                 except (OSError, ConnectionError, RuntimeError) as e:
-                    logger.debug(f"DA impulse from insight failed: {e}")
+                    note_swallowed(
+                        "genesis_cognitive.sleep.inner_life._record_thought",
+                        e,
+                    )
 
         # Curiosity-driven agency: when it wonders about a concept in
         # its train of thought, queue it for the autonomous learner.
@@ -5344,5 +5385,8 @@ class InnerLife:
                     if novel_thought is not None:
                         self._emit("thought", f"composed: {novel_thought.content[:80]}")
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"novel connection composition failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.sleep.inner_life._make_insight",
+                    e,
+                )
         return insight

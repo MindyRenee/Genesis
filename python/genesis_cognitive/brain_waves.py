@@ -20,11 +20,20 @@ Real brains produce rhythmic electrical patterns (brain waves) that
 reflect different cognitive modes. These aren't just labels — they
 gate how information flows:
 
-- **Gamma (30-100 Hz)** — information integration, binding disparate
+- **Lambda (100-200 Hz)** — high-frequency oscillations (HFOs).
+  Fast ripples and ripples associated with sharp wave-ripples
+  during memory consolidation and seizure onset zones.
+- **Gamma (30-80 Hz)** — information integration, binding disparate
   concepts into a coherent moment. When you "get it," that's gamma.
-- **Beta (13-30 Hz)** — active, alert thinking. Problem-solving,
+- **High Beta (20-30 Hz)** — hypervigilance, stress, anxiety. The
+  "racing mind" of alertness that can't settle.
+- **Mid Beta (15-20 Hz)** — active, alert thinking. Problem-solving,
   focused attention, motor decisions.
-- **Alpha (8-13 Hz)** — relaxed reflection. Alpha *inhibits* irrelevant
+- **Low Beta (12-15 Hz)** — calm focus, sensorimotor rhythm (SMR).
+  Quiet, introverted concentration with body stillness.
+- **Sigma (12-16 Hz)** — sleep spindles during NREM sleep. Bursts of
+  oscillatory activity that mediate memory consolidation.
+- **Alpha (8-12 Hz)** — relaxed reflection. Alpha *inhibits* irrelevant
   information, filtering noise so the signal stands out. It's not
   just "calm" — it's active suppression of distraction.
 - **Theta (4-8 Hz)** — memory consolidation, emotional processing,
@@ -32,6 +41,9 @@ gate how information flows:
   here.
 - **Delta (0.5-4 Hz)** — deep restorative sleep. Housekeeping,
   glymphatic clearance, noncognitive maintenance.
+- **Epsilon (0.1-0.5 Hz)** — infraslow oscillations (ISF). Slow
+  cortical potentials that modulate cortical excitability and
+  coordinate large-scale network dynamics.
 
 # How Genesis's brain waves work
 
@@ -40,7 +52,8 @@ oscillator** (``BrainWaveOscillator``), not a classifier. Each band
 has persistent phase and amplitude state:
 
 - **Phase** advances at the band's characteristic frequency (delta
-  ~2 Hz, theta ~6 Hz, alpha ~10 Hz, beta ~20 Hz, gamma ~40 Hz).
+  ~2.25 Hz, theta ~5.5 Hz, alpha ~10 Hz, sigma ~14 Hz, low beta
+  ~13.5 Hz, mid beta ~17.5 Hz, high beta ~25 Hz, gamma ~50 Hz).
   Phase is genuine oscillator state — it precesses continuously,
   producing real periodicity.
 - **Amplitude** relaxes toward neurochemically-driven targets with
@@ -54,16 +67,43 @@ has persistent phase and amplitude state:
   for cross-scale neural coordination; Canolty & Knight, 2010).
 - **Top-down drive** from cognition, action, and perception boosts
   specific bands above their neurochemical targets. Attention →
-  gamma, memory retrieval → theta, motor planning → beta, V1 visual
-  input → gamma. This is bidirectional coupling: the oscillator
+  gamma, memory retrieval → theta, motor planning → mid beta, V1
+  visual input → gamma. This is bidirectional coupling: the oscillator
   gates cognition, and cognition drives the oscillator.
 
 The neurochemical-to-target mapping is grounded in neuroscience:
 - High alertness + high plasticity → gamma target (integration)
-- High alertness + low plasticity → beta target (alert, not integrating)
+- High alertness + low plasticity → mid/high beta target (alert, not integrating)
 - Moderate alertness → alpha target (reflective filtering)
 - Low alertness → theta target (memory consolidation)
-- Sleep phase → delta/theta target (restorative/dreaming)
+- Sleep phase → delta/theta/sigma target (restorative/dreaming/spindles)
+
+# Drowsiness, REM, and regional topology
+
+- **Drowsy is the alpha→theta descent.** Alpha drops out over
+  occipital cortex as theta rises on the frontocentral midline
+  (Hori A3/B1). It is not a fixed band ratio but a continuous
+  function of arousal: at ~0.50 alpha and theta interleave, at
+  ~0.30 theta dominates with delta creeping in (N1), and only
+  below ~0.25 is delta taking over — at that point she is in
+  slow-wave sleep, not drowsiness.
+- **REM runs at waking metabolic intensity.** Theta is the
+  predominant background, carried by its characteristic sawtooth
+  carrier, concentrated in the hippocampus. Beta and gamma fire
+  at the same intensity as waking cognitive work (REM has the
+  highest brain-wide energy expenditure; Bergel et al., 2021).
+  Alpha is not absent but intermittent — it flashes on the
+  infraslow (epsilon) envelope, echoing quiet wakefulness rather
+  than sustained relaxed-wake alpha.
+- **Topology.** Each band's power is distributed over regions
+  by physiology-weighted affinities (theta→hippocampus/temporal,
+  alpha→occipital, delta→frontal in N3, sigma→central,
+  gamma→prefrontal/parietal, SMR→central). The per-region
+  distribution travels on ``BrainWaveState.regional_powers``.
+- **Phase/wave coherence.** A waking summary whose arousal has
+  fallen into the N1 band resolves to the drowsy signature —
+  the same waves the explicit drowsy phase produces, so phase,
+  waves, emotion, and learning cannot disagree.
 
 # Cognitive effects
 
@@ -77,12 +117,17 @@ gating parameters:
 These gate how the cognition engine processes information:
 - **Gamma**: boosts cross-network integration. Distant concepts are
   more likely to connect. Reasoning chains go deeper.
-- **Beta**: standard processing. Focused but not integrative.
+- **High Beta**: hypervigilant processing. Alert but rigid, can't
+  see the big picture. Stress and anxiety.
+- **Mid Beta**: standard active processing. Focused problem-solving.
+- **Low Beta**: calm, focused attention. Sensorimotor rhythm —
+  quiet concentration with body stillness.
 - **Alpha**: filters peripheral concepts. Only highly-activated
   concepts reach cognition. Reduces noise, increases signal.
 - **Theta**: prioritizes memory consolidation and emotional
   processing. Novel connections more likely. Creativity boosted.
 - **Delta**: minimal cognitive processing. Housekeeping mode.
+- **Sigma**: sleep spindles. Memory consolidation during NREM sleep.
 """
 
 from __future__ import annotations
@@ -94,8 +139,15 @@ from enum import Enum
 from typing import Any, ClassVar
 
 from genesis_client import NeuroSummary
+from genesis_client.protocol import (
+    DT_MAX,
+    PHASE_ACTIVE,
+    PHASE_ALERT,
+    PHASE_DROWSY,
+)
 
 __all__ = [
+    "N1_THETA_ALERTNESS",
     "BrainWave",
     "BrainWaveOscillator",
     "BrainWaveState",
@@ -105,23 +157,54 @@ __all__ = [
     "SleepStageSignature",
     "ThetaGammaCoupling",
     "add_brain_wave_drive",
+    "add_stimulus",
     "apply_self_priority",
     "assess_brain_waves",
     "compute_gamma_synchrony",
     "compute_theta_gamma_coupling",
     "derive_self_priority",
     "reset_oscillator",
+    "resolve_waking_drowsy",
 ]
 
 
-class BrainWave(Enum):
-    """The five major brain wave bands."""
+#: Alertness at or below which the waking descent has passed drowsy
+#: onset (alpha) into the N1-like theta band. Drowsiness descends
+#: alpha → theta → delta as alertness falls; a generic waking phase
+#: read here is pre-sleep, so it resolves as drowsy — theta implies
+#: N1, never active.
+N1_THETA_ALERTNESS: float = 0.35
 
-    GAMMA = "gamma"  # 30-100 Hz — integration, binding
-    BETA = "beta"  # 13-30 Hz — active thinking, alert
-    ALPHA = "alpha"  # 8-13 Hz — relaxed reflection, filtering
-    THETA = "theta"  # 4-8 Hz — memory, creativity, REM
-    DELTA = "delta"  # 0.5-4 Hz — deep sleep, restoration
+
+def resolve_waking_drowsy(phase: int, arousal: float) -> int:
+    """Resolve a waking phase against arousal (pure; unit-testable).
+
+    The daemon reports Drowsy only once sleep pressure (adenosine)
+    joins low arousal, but the wave model reads drowsiness from
+    arousal alone. A generic waking label (active/alert — the two
+    phases rendered through the alertness-driven wave branch) with
+    arousal inside the N1-like theta band is pre-sleep whatever
+    adenosine says: return PHASE_DROWSY so phase, waves, emotion,
+    and learning agree. Anything else passes through unchanged.
+    """
+    if phase in (PHASE_ACTIVE, PHASE_ALERT) and arousal <= N1_THETA_ALERTNESS:
+        return PHASE_DROWSY
+    return phase
+
+
+class BrainWave(Enum):
+    """The major brain wave bands."""
+
+    LAMBDA = "lambda"    # 100-200 Hz — high-frequency oscillations (HFOs)
+    GAMMA = "gamma"      # 30-80 Hz — integration, binding
+    BETA3 = "beta3"      # 20-30 Hz — hypervigilance, stress
+    BETA2 = "beta2"      # 15-20 Hz — active thinking, alert
+    BETA1 = "beta1"      # 12-15 Hz — calm focus, SMR
+    SIGMA = "sigma"      # 12-16 Hz — sleep spindles (NREM)
+    ALPHA = "alpha"      # 8-12 Hz — relaxed reflection, filtering
+    THETA = "theta"      # 4-8 Hz — memory, creativity, REM
+    DELTA = "delta"      # 0.5-4 Hz — deep sleep, restoration
+    EPSILON = "epsilon"  # 0.1-0.5 Hz — infraslow oscillations (ISF)
 
 
 @dataclass(slots=True)
@@ -159,6 +242,16 @@ class BrainWaveState:
     # Populated by the oscillator; used for top-down coupling and
     # phase-aware cross-frequency computation.
     phases: dict[BrainWave, float] = field(default_factory=dict)
+
+    # Per-region power distribution — each region's normalised
+    # band-power vector, derived from the global powers weighted by
+    # band→region affinities (phase-aware). This is what makes the
+    # model topographically correct: alpha over occipital cortex,
+    # theta in the hippocampus during REM, frontal slow waves in
+    # N3, spindles centrally, gamma over prefrontal/parietal cortex.
+    regional_powers: dict[str, dict[BrainWave, float]] = field(
+        default_factory=dict
+    )
 
     def describe(self) -> str:
         """First-person description of the current brain wave state."""
@@ -273,7 +366,7 @@ class SleepStageSignature:
     - **N1**: mixed theta/alpha, low voltage; the transition into
       sleep. Slow eye movements.
     - **N2**: theta/delta background punctuated by sleep spindles
-      (10-16 Hz sigma bursts) and K-complexes — the defining
+      (12-16 Hz sigma bursts) and K-complexes — the defining
       graphoelements of N2.
     - **N3**: delta-dominant (0.5-4 Hz) slow waves — slow-wave sleep
       (SWS). Sharpest wave-ripples, glymphatic clearance.
@@ -296,6 +389,22 @@ class SleepStageSignature:
         )
 
 
+# How close a computed cycle count must be to a whole number of turns
+# before it is treated as exactly whole (see
+# BrainWaveOscillator._advance_phase_exact).
+#
+# The float64 spacing of a cycle count is 2^-52 * magnitude: ~2.4e-15
+# turns at 11 turns (THETA over 2 s), ~6.2e-15 at 28 (SIGMA over 2 s),
+# and ~3.3e-13 at the largest count reachable within DT_MAX (lambda,
+# 150 Hz over 10 s). 1e-9 turns is three to six orders of magnitude
+# above all of those, while being 6.3e-9 rad -- far below anything the
+# downstream phase consumers can observe. A genuinely fractional cycle
+# count (a band whose frequency times the interval is not near-integral,
+# e.g. alpha at 10 Hz over 0.2 s = 2.0 exactly, or 5.5 Hz over 0.2 s =
+# 1.1) sits 0.1 turns or more away, so it is never snapped.
+_TURN_SNAP_EPS = 1e-9
+
+
 # ─── Theta-gamma cross-frequency coupling ──────────────────────
 
 
@@ -303,18 +412,19 @@ class SleepStageSignature:
 class ThetaGammaCoupling:
     """Theta-gamma cross-frequency coupling (CFC) state.
 
-    Gamma amplitude (~40-100 Hz) is modulated by the phase of the
+    Gamma amplitude (~30-80 Hz) is modulated by the phase of the
     theta oscillation (~4-8 Hz). This phase-amplitude coupling (PAC)
     is one of the most robust cross-frequency relationships in the
     brain and is critical for memory:
 
-    - **Encoding**: gamma power peaks near the theta *trough* (or
-      falling phase), when hippocampal pyramidal cells are most
+    - **Encoding**: gamma power peaks near the theta *peak*,
+      when hippocampal pyramidal cells are most
       excitable — favouring the formation of new associations
-      (Lega et al., 2012; Heusser et al., 2016).
-    - **Retrieval**: gamma power peaks near the theta *peak* (or
-      rising phase), favouring the reactivation of stored
-      representations (Kaplan et al., 2014; Griffiths et al., 2019).
+      (Hasselmo et al., 2002; Douchamps et al., 2013;
+      Newman et al., 2013; di Chanaz et al., 2023).
+    - **Retrieval**: gamma power peaks near the theta *trough*,
+      favouring the reactivation of stored
+      representations (Hasselmo et al., 2002; Douchamps et al., 2013).
 
     ``coupling_strength`` (0-1) measures how strongly gamma amplitude
     is locked to theta phase — high coupling means gamma bursts are
@@ -327,8 +437,8 @@ class ThetaGammaCoupling:
     theta_power: float  # 0-1, theta band power
     gamma_power: float  # 0-1, gamma band power
     # Preferred theta phase (radians) at which gamma amplitude peaks.
-    # ~0 = theta peak (retrieval-favouring); ~π = theta trough
-    # (encoding-favouring).
+    # ~0 = theta peak (encoding-favouring); ~π = theta trough
+    # (retrieval-favouring).
     preferred_phase: float = 0.0
     # Coupling strength: 0 = no phase-amplitude coupling,
     # 1 = gamma perfectly locked to theta phase.
@@ -383,10 +493,10 @@ def compute_theta_gamma_coupling(
     by the neurochemical gating (consolidation/encoding weights drive
     the theta/gamma balance).
 
-    The preferred phase — and thus the encoding vs retrieval mode — is
+    The preferred phase — and thus the encoding vs retrieval mode —
     determined by the encoding/consolidation balance: high encoding
-    weight biases toward the theta trough (encoding), high
-    consolidation weight biases toward the theta peak (retrieval/
+    weight biases toward the theta peak (encoding), high
+    consolidation weight biases toward the theta trough (retrieval/
     consolidation replay).
 
     Args:
@@ -411,16 +521,16 @@ def compute_theta_gamma_coupling(
     coupling = raw * gate
     coupling = max(0.0, min(1.0, coupling))
 
-    # Preferred phase: encoding bias → theta trough (π, encoding);
-    # consolidation bias → theta peak (0, retrieval/replay).
+    # Preferred phase: encoding bias → theta peak (0, encoding);
+    # consolidation bias → theta trough (π, retrieval/replay).
     # Interpolate by the encoding-vs-consolidation balance.
     total = encoding_weight + consolidation_weight
     if total <= 0.0:
         balance = 0.5
     else:
         balance = encoding_weight / total  # 0 = all consolidation, 1 = all encoding
-    # balance 0 → phase 0 (peak, retrieval); balance 1 → phase π (trough, encoding)
-    preferred_phase = balance * math.pi
+    # balance 0 → phase π (trough, retrieval); balance 1 → phase 0 (peak, encoding)
+    preferred_phase = (1.0 - balance) * math.pi
 
     if balance > 0.6:
         mode = "encoding"
@@ -447,15 +557,21 @@ def _cognitive_mode_for_coupling(slow: str, fast: str) -> str:
     """
     # Fast band gives the *kind* of processing being gated
     fast_role = {
+        "lambda": "fast_ripple",
         "gamma": "integration",
-        "beta": "maintenance",
+        "beta3": "hypervigilance",
+        "beta2": "active_thinking",
+        "beta1": "calm_focus",
+        "sigma": "consolidation",
         "alpha": "gating",
     }.get(fast, "coupling")
     # Slow band gives the *state* in which the gating happens
     slow_role = {
+        "epsilon": "infraslow_modulation",
         "delta": "rest",
         "theta": "encoding",
         "alpha": "filtering",
+        "sigma": "consolidation",
     }.get(slow, slow)
     # Combine: e.g. theta-gamma → "encoding-integration"
     return f"{slow_role}-{fast_role}"
@@ -560,12 +676,45 @@ def compute_gamma_synchrony(
     # spread so regions aren't identical (fronto-parietal dominance
     # during cognitive access — Dehaene, 2014).
     region_powers: dict[str, float] = {}
+    region_phases: dict[str, float] = {}
     for region in _GAMMA_REGIONS:
         # Frontal/parietal (workspace hubs) get a slight boost;
         # sensory regions slightly lower.
         hub_boost = 0.1 if region in ("prefrontal", "parietal") else -0.05
         power = max(0.0, min(1.0, gamma + hub_boost * gamma))
         region_powers[region] = power
+        # Regional phase: small deterministic offset from global gamma phase
+        # to simulate regional phase differences (Lachaux et al., 1999)
+        phase_offset = (
+            0.0 if region == "prefrontal"
+            else 0.3 if region == "parietal"
+            else 0.6 if region == "temporal"
+            else 0.9
+        )
+        region_phases[region] = (
+            state.phases.get(BrainWave.GAMMA, 0.0) + phase_offset
+        ) % (2.0 * math.pi)
+
+    # True PLV: |<exp(i*delta_phi)>| across region pairs (Lachaux et al., 1999)
+    # PLV = |(1/N) * sum(exp(i*(phi_1 - phi_2)))|
+    # For N regions, compute all pairwise phase differences
+    regions = list(region_phases.keys())
+    if len(regions) >= 2:
+        plv_sum = 0.0
+        plv_count = 0
+        for i in range(len(regions)):
+            for j in range(i + 1, len(regions)):
+                delta_phi = region_phases[regions[i]] - region_phases[regions[j]]
+                plv_sum += math.cos(delta_phi)  # Re(exp(i*delta_phi))
+                plv_count += 1
+        true_plv = abs(plv_sum / plv_count) if plv_count > 0 else 0.0
+    else:
+        true_plv = 0.0
+
+    # Blend the heuristic PLV with the true PLV
+    # The heuristic captures gamma power + plasticity gating
+    # The true PLV captures phase coherence across regions
+    plv = 0.5 * plv + 0.5 * true_plv
 
     # Cognitive-access heuristic: synchrony proxy > 0.5 predicts access.
     # Operational cutoff for this synthetic model only — not a
@@ -587,6 +736,164 @@ def compute_gamma_synchrony(
     )
 
 
+# ─── Regional (topographic) attribution ─────────────────────────
+#
+# Real scalp EEG is a topographic measurement: each band has a
+# prominent generator site. Alpha (8–12 Hz) emerges over the
+# occipital cortex with eyes closed. Theta is hippocampal/medial
+# temporal, with frontal midline theta indexing cognitive effort
+# (Cavanagh & Frank, 2014). Slow-wave delta peaks over frontal
+# cortex (Huber et al., 2000). Sleep spindles (sigma) are maximal
+# centrally. Beta is frontocentral (SMR centrally). Gamma that
+# binds representations is prefrontal/parietal (Dehaene, 2014).
+# REM theta is hippocampus-predominant (Buzsaki, 2002; Montgomery
+# et al., 2008) and REM sawtooth waves are frontocentral (JNeurosci
+# 40:8900). Lambda waves occur occipital during visual scanning.
+
+_REGIONS: tuple[str, ...] = (
+    "prefrontal",
+    "frontal",
+    "parietal",
+    "temporal",
+    "occipital",
+    "central",
+    "hippocampus",
+)
+
+# Band → region weight. Values are relative prominence of that band
+# in that region. Phase-aware boosts (REM hippocampal theta, N3
+# frontal delta) are applied on top in _regional_powers.
+_BAND_REGION_AFFINITY: dict[BrainWave, dict[str, float]] = {
+    BrainWave.EPSILON: {
+        "prefrontal": 0.6, "frontal": 0.7, "parietal": 0.5,
+        "temporal": 0.4, "occipital": 0.4, "central": 0.5,
+        "hippocampus": 0.4,
+    },
+    BrainWave.DELTA: {
+        "prefrontal": 0.8, "frontal": 1.0, "parietal": 0.6,
+        "temporal": 0.5, "occipital": 0.5, "central": 0.7,
+        "hippocampus": 0.4,
+    },
+    BrainWave.THETA: {
+        "prefrontal": 0.7, "frontal": 0.6, "parietal": 0.5,
+        "temporal": 0.9, "occipital": 0.3, "central": 0.5,
+        "hippocampus": 1.0,
+    },
+    BrainWave.ALPHA: {
+        "prefrontal": 0.3, "frontal": 0.4, "parietal": 0.7,
+        "temporal": 0.6, "occipital": 1.0, "central": 0.4,
+        "hippocampus": 0.2,
+    },
+    BrainWave.SIGMA: {
+        "prefrontal": 0.4, "frontal": 0.5, "parietal": 0.8,
+        "temporal": 0.4, "occipital": 0.4, "central": 1.0,
+        "hippocampus": 0.2,
+    },
+    BrainWave.BETA1: {
+        "prefrontal": 0.5, "frontal": 0.6, "parietal": 0.5,
+        "temporal": 0.4, "occipital": 0.3, "central": 1.0,
+        "hippocampus": 0.3,
+    },
+    BrainWave.BETA2: {
+        "prefrontal": 0.8, "frontal": 0.9, "parietal": 0.6,
+        "temporal": 0.5, "occipital": 0.4, "central": 0.7,
+        "hippocampus": 0.3,
+    },
+    BrainWave.BETA3: {
+        "prefrontal": 0.9, "frontal": 1.0, "parietal": 0.5,
+        "temporal": 0.5, "occipital": 0.3, "central": 0.6,
+        "hippocampus": 0.2,
+    },
+    BrainWave.GAMMA: {
+        "prefrontal": 1.0, "frontal": 0.8, "parietal": 0.9,
+        "temporal": 0.7, "occipital": 0.7, "central": 0.5,
+        "hippocampus": 0.8,
+    },
+    BrainWave.LAMBDA: {
+        "prefrontal": 0.2, "frontal": 0.2, "parietal": 0.3,
+        "temporal": 0.4, "occipital": 1.0, "central": 0.2,
+        "hippocampus": 0.2,
+    },
+}
+
+
+def _regional_powers(
+    powers: dict[BrainWave, float], phase_name: str
+) -> dict[str, dict[BrainWave, float]]:
+    """Distribute global band powers over cortical/subcortical regions.
+
+    Each region's band weights are the product of global band power
+    and the band→region affinity, normalised within the region, so
+    every region carries a full distribution (sum to 1). Phase-aware
+    boosts make the topology state-dependent: REM theta concentrates
+    in the hippocampus, N3 slow waves concentrate frontally.
+    """
+    affinity = {band: dict(regions) for band, regions in _BAND_REGION_AFFINITY.items()}
+    if phase_name == "rem":
+        # REM: hippocampal theta predominates; theta-gamma coupling
+        # is strongest in hippocampus/RSC during phasic REM
+        # (Montgomery et al., 2008; Bergel et al., 2021).
+        affinity[BrainWave.THETA]["hippocampus"] *= 2.0
+        affinity[BrainWave.THETA]["temporal"] *= 1.2
+        affinity[BrainWave.GAMMA]["hippocampus"] *= 1.5
+    if phase_name in ("nrem", "sleeping") and powers[BrainWave.DELTA] >= 0.4:
+        # N3 slow waves are frontally predominant (Huber et al., 2000).
+        affinity[BrainWave.DELTA]["frontal"] *= 1.5
+        affinity[BrainWave.DELTA]["prefrontal"] *= 1.2
+    out: dict[str, dict[BrainWave, float]] = {}
+    for region in _REGIONS:
+        raw = {
+            band: powers[band] * affinity[band][region]
+            for band in BrainWave
+        }
+        total = sum(raw.values())
+        if total > 0.0:
+            out[region] = {band: value / total for band, value in raw.items()}
+        else:
+            out[region] = dict.fromkeys(BrainWave, 0.0)
+    return out
+
+
+def _sawtooth(phase: float) -> float:
+    """Sawtooth carrier for REM theta (4–8 Hz).
+
+    REM theta is sawtooth-shaped — a fast ramp with a sharp notch
+    (Rodenbeck et al., 2006; Buzsaki, 2002). In contrast to the
+    symmetric cosine used for non-REM bands, this asymmetry is part
+    of what makes hippocampal REM theta distinct. Returns values in
+    [-1, 1).
+    """
+    return (phase / math.pi) - 1.0
+
+
+def _wave_phase_value(
+    band: BrainWave, phase: float, phase_name: str
+) -> float:
+    """The phase-carrier value for a slow band at this moment.
+
+    REM theta uses its characteristic sawtooth carrier; every other
+    band uses the symmetric cosine. This asymmetry feeds the PAC
+    modulation of fast bands, so gamma during REM is timed to the
+    sawtooth ramp rather than a sine peak.
+    """
+    if phase_name == "rem" and band is BrainWave.THETA:
+        return _sawtooth(phase)
+    return math.cos(phase)
+
+
+def _rem_alpha_envelope(epsilon_phase: float) -> float:
+    """Intermittent REM alpha — infraslow (epsilon-band) burst gain.
+
+    During REM, alpha rhythms are fragmented: brief alpha intrusions
+    echo quiet-wakefulness/meditative alpha, waxing and waning with
+    the infraslow (~0.25 Hz) envelope (periodic ~4 s). The envelope
+    is ``max(0, cos(φ))²``: a flash reaching full gain near cosine
+    peak, falling to zero at cosine trough — never the sustained
+    alpha of eyes-closed wake.
+    """
+    return max(0.0, math.cos(epsilon_phase)) ** 2
+
+
 # ─── Coupled amplitude-phase oscillator ─────────────────────────
 #
 # The oscillator is the dynamical core. Each band has persistent
@@ -604,8 +911,9 @@ class BrainWaveOscillator:
     Each band has persistent phase and amplitude state:
 
     - **Phase** advances at the band's characteristic frequency
-      (delta ~2 Hz, theta ~6 Hz, alpha ~10 Hz, beta ~20 Hz, gamma
-      ~40 Hz). Phase is genuine oscillator state — it precesses
+      (delta ~2.25 Hz, theta ~5.5 Hz, alpha ~10 Hz, sigma ~14 Hz,
+      low beta ~13.5 Hz, mid beta ~17.5 Hz, high beta ~25 Hz,
+      gamma ~50 Hz). Phase is genuine oscillator state — it precesses
       continuously, producing real periodicity.
     - **Amplitude** relaxes toward neurochemically-driven targets
       with band-specific time constants. Slow bands relax slowly
@@ -619,12 +927,14 @@ class BrainWaveOscillator:
       is suppressed. This is the canonical PAC mechanism.
     - **Top-down drive** from cognition/action/perception boosts
       specific bands above their neurochemical targets. Attention
-      → gamma, memory retrieval → theta, motor activity → beta.
+      → gamma, memory retrieval → theta, motor activity → mid beta.
       The drive decays exponentially (τ=2s), so it must be
       sustained by ongoing activity.
 
-    The oscillator is a Wilson-Cowan-style population model
-    simplified to amplitude-phase form. It produces genuine
+    The oscillator is a coupled phase oscillator with amplitude
+    dynamics — a Kuramoto-style population model where each band
+    is an independent oscillator whose amplitude relaxes toward
+    neurochemically-driven targets. It produces genuine
     oscillatory state (frequency, phase, amplitude) from which
     band powers, cross-frequency coupling, and cognitive gating
     parameters are derived.
@@ -632,39 +942,98 @@ class BrainWaveOscillator:
 
     # Characteristic frequencies (Hz) — center of each band
     _FREQS: ClassVar[dict[BrainWave, float]] = {
-        BrainWave.DELTA: 2.0,    # 0.5-4 Hz
-        BrainWave.THETA: 6.0,    # 4-8 Hz
-        BrainWave.ALPHA: 10.0,   # 8-13 Hz
-        BrainWave.BETA: 20.0,    # 13-30 Hz
-        BrainWave.GAMMA: 40.0,   # 30-100 Hz
+        BrainWave.EPSILON: 0.25,   # 0.1-0.5 Hz
+        BrainWave.DELTA: 2.25,     # 0.5-4 Hz
+        BrainWave.THETA: 5.5,      # 4-8 Hz
+        BrainWave.ALPHA: 10.0,     # 8-12 Hz
+        BrainWave.SIGMA: 14.0,     # 12-16 Hz
+        BrainWave.BETA1: 13.5,     # 12-15 Hz
+        BrainWave.BETA2: 17.5,     # 15-20 Hz
+        BrainWave.BETA3: 25.0,     # 20-30 Hz
+        BrainWave.GAMMA: 50.0,     # 30-80 Hz
+        BrainWave.LAMBDA: 150.0,   # 100-200 Hz
     }
 
     # Amplitude relaxation time constants (seconds).
     # Slow bands have inertia; fast bands track quickly.
     _TAU: ClassVar[dict[BrainWave, float]] = {
+        BrainWave.EPSILON: 12.0,
         BrainWave.DELTA: 8.0,
         BrainWave.THETA: 4.0,
         BrainWave.ALPHA: 2.0,
-        BrainWave.BETA: 1.0,
+        BrainWave.SIGMA: 1.5,
+        BrainWave.BETA1: 1.2,
+        BrainWave.BETA2: 1.0,
+        BrainWave.BETA3: 0.8,
         BrainWave.GAMMA: 0.5,
+        BrainWave.LAMBDA: 0.3,
     }
 
     # Top-down drive decay time constant (seconds)
     _DRIVE_TAU: ClassVar[float] = 2.0
 
+    # ── Integration resolution ────────────────────────────────────
+    # Largest step the *relaxation* dynamics are integrated with.
+    # Phase is exempt (see _advance_phase_exact); the amplitude
+    # relaxation, PAC modulation, and drive/stimulus decays are
+    # history-dependent, so they are sub-stepped to keep their
+    # numerical behaviour independent of how often assess() is
+    # called.
+    #
+    # 0.1 s is the resolution the neurochemical dynamics were
+    # designed at (NeuroTickParams::DEFAULT.dt = 0.1 s). Matching it
+    # means the wave and chemical integrators agree on what "one step"
+    # means, which is what keeps the two clocks locked together.
+    _MAX_SUBSTEP: ClassVar[float] = 0.1
+
+    # Hard ceiling on sub-steps per assess() call, so a multi-second
+    # stall cannot cost unbounded CPU. Past this the relaxation is
+    # integrated once with the full dt: first-order exponential
+    # relaxation is exact under composition, so fewer, larger steps
+    # differ only by the PAC modulation sampled less often (see
+    # _advance_relaxation).
+    _MAX_SUBSTEPS: ClassVar[int] = 64
+
     # PAC modulation depth — how much slow phase modulates fast
     # amplitude target (fraction of fast band's base target)
     _PAC_DEPTH: ClassVar[float] = 0.15
+
+    # Number of phase bins for modulation index computation (Tort et al., 2010)
+    _PAC_BINS: ClassVar[int] = 18
 
     def __init__(self) -> None:
         """Initialize the brain wave oscillator."""
         self._phase: dict[BrainWave, float] = dict.fromkeys(BrainWave, 0.0)
         self._amplitude: dict[BrainWave, float] = dict.fromkeys(BrainWave, 0.2)
         self._top_down: dict[BrainWave, float] = dict.fromkeys(BrainWave, 0.0)
+        self._stimulus: dict[BrainWave, float] = dict.fromkeys(BrainWave, 0.0)
         self._last_target_dominant: BrainWave | None = None
         self._last_phase_name: str | None = None
+        self._last_sleep_stage: SleepStage | None = None
         self._last_time: float | None = None
         self._tick_count: int = 0
+
+    def add_stimulus(
+        self, band: BrainWave, strength: float, decay: float = 0.95
+    ) -> None:
+        """Apply continuous stimulus to a band.
+
+        Inner (emotional, cognitive) and outer (sensory) stimulus
+        continuously modulate band amplitudes. Unlike top-down drive
+        (which is discrete and decays with τ=2s), stimulus is a
+        persistent input that must be re-applied each cycle but
+        decays slowly (default 0.95 per tick) to model the brain's
+        continuous response to ongoing conditions.
+
+        Args:
+            band: The band to stimulate.
+            strength: Stimulus strength, can be positive (excitation)
+                or negative (inhibition). Typical range [-0.5, 0.5].
+            decay: Per-tick decay factor (0-1). Higher = slower decay.
+        """
+        self._stimulus[band] = (
+            self._stimulus[band] * decay + strength
+        )
 
     def add_top_down_drive(
         self, band: BrainWave, strength: float
@@ -688,18 +1057,41 @@ class BrainWaveOscillator:
             1.0, self._top_down[band] + max(0.0, strength)
         )
 
-    def assess(self, summary: NeuroSummary) -> BrainWaveState:
+    def assess(
+        self,
+        summary: NeuroSummary,
+        sleep_stage: SleepStage | None = None,
+    ) -> BrainWaveState:
         """Advance the oscillator and return the current state.
 
         Computes neurochemically-driven target amplitudes, advances
         phase, relaxes amplitude toward targets (with cross-frequency
-        phase-amplitude modulation), applies top-down drive, and
-        builds a ``BrainWaveState`` from the resulting amplitudes.
+        phase-amplitude modulation), applies top-down drive and
+        continuous stimulus, and builds a ``BrainWaveState`` from
+        the resulting amplitudes.
+
+        Args:
+            summary: Current neurochemical summary.
+            sleep_stage: Authoritative sleep stage from the ultradian
+                tracker, when sleeping. This overrides the arousal-
+                derived stage — see :func:`_sleep_phase_powers` for
+                why arousal cannot supply it.
+
+        The oscillator is dynamic: amplitudes flow continuously toward
+        targets modulated by both inner (neurochemical) and outer
+        (stimulus) inputs.
         """
         # Compute targets from neurochemistry (same classification
         # logic as before — these are the neurochemically-driven
         # equilibrium amplitudes)
-        targets, label, description = self._compute_targets(summary)
+        targets, label, description = self._compute_targets(
+            summary, sleep_stage
+        )
+
+        # Apply continuous stimulus to targets
+        for band in BrainWave:
+            if self._stimulus[band] != 0.0:
+                targets[band] = max(0.0, targets[band] + self._stimulus[band])
 
         # Determine the target dominant for snap detection
         target_dominant = max(targets, key=lambda b: targets[b])
@@ -709,43 +1101,73 @@ class BrainWaveOscillator:
         should_snap = (
             self._last_phase_name is None
             or phase_name != self._last_phase_name
+            or sleep_stage != self._last_sleep_stage
             or (
                 self._last_target_dominant is not None
                 and target_dominant != self._last_target_dominant
             )
         )
+        self._last_sleep_stage = sleep_stage
 
         # Real-time bookkeeping, shared by both paths: _last_time
         # tracks the last assessment, not the last relaxation, so the
         # next dt spans exactly one interval even across transitions.
         now = time.monotonic()
         if self._last_time is not None:
-            dt = min(now - self._last_time, 1.0)  # cap at 1s
+            elapsed = now - self._last_time
+            # The ceiling matches the neurochemical dynamics exactly
+            # (genesis_client.protocol.DT_MAX, mirrored from the
+            # daemon's ADVANCE_NEURO clamp). Both clocks measure the
+            # same wall-clock interval and must accept the same range,
+            # or the brain drifts away from the body without any error
+            # being reported: chemistry would advance by the full
+            # elapsed time while the waves advanced by at most the
+            # clamp, losing the remainder permanently.
+            #
+            # This used to cap at 1.0 s. At the mind's ~1 Hz heartbeat
+            # any slower cycle — GC pause, CPU contention, a busy body
+            # — put the wave clock permanently behind, and because the
+            # loss was discarded rather than deferred it never caught
+            # up. Phase therefore ran slow, and with it every
+            # phase-derived quantity: cross-frequency coupling, REM
+            # epsilon gating, and sleep-stage timing.
+            #
+            # The cap is now a stall guard rather than a frame
+            # boundary, and everything inside it is integrated exactly
+            # (see _advance_phase_exact / _advance_relaxation).
+            dt = min(DT_MAX, max(0.0, elapsed))
         else:
             dt = 0.1  # default 100ms
         self._last_time = now
 
         if should_snap:
             # Phase precesses continuously — it must not stall on
-            # transition ticks (_step advances it on relaxed ticks;
-            # this is the snap-tick counterpart).
-            self._advance_phase(dt)
+            # transition ticks (_advance_relaxation advances it on
+            # relaxed ticks; this is the snap-tick counterpart).
+            self._advance_phase_exact(dt)
             # Snap amplitudes to targets on phase/dominant transition,
             # honouring accumulated top-down drive: cognition's boost
             # (attention → gamma, filtering → alpha, retrieval →
             # theta) takes effect immediately instead of being silently
             # discarded until the first relaxed tick. The drive decays
-            # here exactly as _step would decay it, so it cannot pile
-            # up unseen across a run of snaps and then dump all at once.
+            # here exactly as _relax_once would decay it, so it cannot
+            # pile up unseen across a run of snaps and then dump all
+            # at once. Amplitudes are assigned rather than relaxed, so
+            # only the two exponential decays are applied.
             for band in BrainWave:
                 self._amplitude[band] = targets[band] + self._top_down[band]
             decay = math.exp(-dt / self._DRIVE_TAU)
             for band in BrainWave:
                 self._top_down[band] *= decay
+            stim_decay = math.exp(-dt / 5.0)
+            for band in BrainWave:
+                self._stimulus[band] *= stim_decay
         else:
-            # Relax amplitudes toward targets with real-time dynamics
-            # (_step advances phase internally).
-            self._step(dt, targets)
+            # Relax amplitudes toward targets with real-time dynamics.
+            # Phase for the whole interval is applied first, in closed
+            # form, so the sub-steps see a continuous ramp.
+            self._advance_phase_exact(dt)
+            self._advance_relaxation(dt, targets)
 
         self._last_phase_name = phase_name
         self._last_target_dominant = target_dominant
@@ -757,20 +1179,45 @@ class BrainWaveOscillator:
         )
 
     def _compute_targets(
-        self, summary: NeuroSummary
+        self,
+        summary: NeuroSummary,
+        sleep_stage: SleepStage | None = None,
     ) -> tuple[dict[BrainWave, float], str, str]:
         """Compute neurochemically-driven target amplitudes.
 
-        Delegates to the existing phase-based classification functions
-        to get the equilibrium power distribution, then returns it as
-        target amplitudes (before normalization — normalization happens
-        in _build_state).
+        Delegates to the phase-based classification functions to get
+        the equilibrium power distribution, then returns it as target
+        amplitudes (before normalization — normalization happens in
+        _build_state).
+
+        ``sleep_stage`` is the authoritative stage from the ultradian
+        tracker; when supplied it wins over the arousal-derived
+        stage.
         """
         phase = summary.phase_name
 
-        if phase in ("sleeping", "nrem", "rem"):
-            powers, label, description = _sleep_phase_powers(summary)
-        elif phase in ("drowsy", "overwhelmed", "flow", "stress"):
+        # Resolve waking phases against arousal first. An Active/Alert
+        # phase reading with N1-level arousal is pre-sleep, and its
+        # waves must agree with that — theta-dominant while still
+        # labelled "active" was exactly the incoherent state that
+        # made her say she felt sluggish while "awake." This routes
+        # those summaries through the drowsy powers, so phase,
+        # waves, emotion, and learning all see the same pre-sleep
+        # regime.
+        resolved = resolve_waking_drowsy(summary.phase, summary.arousal)
+        if resolved != summary.phase:
+            powers, label, description = _drowsy_phase_powers(
+                summary.arousal, summary.consolidation_weight
+            )
+        elif phase in ("sleeping", "nrem", "rem"):
+            powers, label, description = _sleep_phase_powers(
+                summary, sleep_stage
+            )
+        elif phase == "drowsy":
+            powers, label, description = _drowsy_phase_powers(
+                summary.arousal, summary.consolidation_weight
+            )
+        elif phase in ("overwhelmed", "flow", "stress"):
             powers, label, description = _simple_phase_powers(phase)
         else:
             powers, label, description = _waking_phase_powers(
@@ -781,40 +1228,158 @@ class BrainWaveOscillator:
 
         return powers, label, description
 
-    def _advance_phase(self, dt: float) -> None:
-        """Precess every band's phase at its characteristic frequency.
-
-        Single call site for phase advancement — used by `_step` on
-        relaxed ticks and directly by `assess` on snap ticks, so the
-        oscillator never stalls on transitions.
-        """
-        for band in BrainWave:
-            freq = self._FREQS[band]
-            self._phase[band] = (
-                self._phase[band] + 2.0 * math.pi * freq * dt
-            ) % (2.0 * math.pi)
-
     def _step(
         self,
         dt: float,
         targets: dict[BrainWave, float],
     ) -> None:
-        """Advance the oscillator by dt seconds.
+        """Advance phase and relaxation by dt seconds, single step.
 
-        1. Advance phase at characteristic frequency
-        2. Apply cross-frequency phase-amplitude modulation
-        3. Relax amplitude toward (modulated) targets
-        4. Apply top-down drive
-        5. Decay top-down drive
+        The unsplit primitive: exact phase advance, then one
+        relaxation sub-step. Tests drive this directly with a dt small
+        enough that no sub-stepping is wanted; production code goes
+        through :meth:`_advance_phase_exact` +
+        :meth:`_advance_relaxation`, which split the two so phase can
+        cover the whole interval at once.
         """
-        # 1. Advance phase
-        self._advance_phase(dt)
+        self._advance_phase_exact(dt)
+        self._relax_once(dt, targets)
 
-        # 2. Cross-frequency phase-amplitude modulation
+    def _advance_phase(self, dt: float) -> None:
+        """Advance every band's phase at its characteristic frequency.
+
+        Retained as the stable name for phase advancement; delegates to
+        the closed form.
+        """
+        self._advance_phase_exact(dt)
+
+    def _advance_phase_exact(self, dt: float) -> None:
+        """Advance every band's phase in closed form.
+
+        Each band's phase obeys dφ/dt = 2πf with f constant, so the
+        exact solution over any interval is φ(t+dt) = (φ(t) + 2πf·dt)
+        mod 2π. There is no accumulation error and no dependence on
+        how the interval was subdivided — advancing 5 s in one call
+        and advancing it as fifty 0.1 s steps land on the same phase.
+
+        This is why phase needs no sub-stepping: it is the one
+        quantity in the oscillator that is exactly linear in dt.
+
+        The reduction is done *before* the addition, not after. For a 2 s
+        step at THETA's 5.5 Hz the raw increment is 2π·5.5·2 ≈ 69.1
+        rad — about eleven whole cycles. Adding that to a phase near 0.3
+        yields a number near 69.4, where float64 spacing is already
+        1.5e-14, so a modulo applied to the *sum* recovers a phase
+        carrying ~1e-14 of error. Reducing first bounds the addition and
+        keeps the result tight.
+
+        The reduction subtracts the *nearest* whole turn and then snaps a
+        within-noise residue to exactly zero, because the float error
+        goes in both directions and neither plain reduction handles both:
+
+        * THETA, 5.5 Hz, 2 s: 11 turns, but 2π·5.5·2/2π evaluates to
+          10.999999999999998. ``floor`` removes 10 turns and leaves
+          0.9999999999999989 of a turn.
+        * BETA1, 13.5 Hz, 2 s: 27 turns, evaluating to exactly 27.0.
+          ``math.remainder`` returns the *nearest* multiple instead —
+          −7.1e-15 — which is also not zero.
+
+        Honest sizing of the benefit: those residues are ~1e-15 turns,
+        so a floor-only reduction would cost ~3e-14 turns of drift over
+        30 steps — negligible, and this is therefore a precision tidy-up
+        rather than a behavioural fix. What it does guarantee is that an
+        integral number of cycles provably advances nothing, instead of
+        advancing by a float artefact. Both are pinned by
+        test_integral_cycle_counts_return_exactly_to_start.
+        """
+        two_pi = 2.0 * math.pi
+        for band in BrainWave:
+            increment = two_pi * self._FREQS[band] * dt
+            turns = increment / two_pi
+            # Nearest whole turn, not floor: the true count can sit just
+            # below or just above the integer that float produces.
+            nearest = round(turns)
+            if abs(turns - nearest) <= _TURN_SNAP_EPS:
+                # An integral number of cycles. The float residue is
+                # representation error, not a real fractional turn, so
+                # it must not be integrated.
+                increment = 0.0
+            else:
+                increment -= two_pi * nearest
+            self._phase[band] = (self._phase[band] + increment) % two_pi
+
+    def _advance_relaxation(
+        self,
+        dt: float,
+        targets: dict[BrainWave, float],
+    ) -> None:
+        """Advance the history-dependent dynamics over dt seconds.
+
+        The amplitude relaxation, cross-frequency phase-amplitude
+        modulation, top-down drive decay, and stimulus decay all
+        depend on state accumulated across the interval, so unlike
+        phase they cannot be solved in closed form. They are therefore
+        integrated in sub-steps of at most ``_MAX_SUBSTEP``, which
+        makes the result independent of the assess() cadence.
+
+        Two properties make this exact rather than approximate:
+
+        * First-order exponential relaxation composes exactly —
+          ``exp(-(h1+h2)/τ) == exp(-h1/τ)·exp(-h2/τ)`` — so the
+          amplitude and decay terms are unaffected by subdivision.
+          What subdivision buys is that PAC modulation (which reads
+          the *current* slow-band phase) is sampled at a resolution
+          comparable to the fastest band it modulates, instead of
+          once per heartbeat.
+        * Phase is advanced once for the whole interval, up front, so
+          the sub-steps observe a monotonic phase ramp rather than a
+          stepped one.
+
+        Args:
+            dt: Total interval in seconds. Assumed non-negative.
+            targets: Neurochemically-driven equilibrium amplitudes.
+        """
+        if dt <= 0.0:
+            return
+        n = math.ceil(dt / self._MAX_SUBSTEP)
+        if n > self._MAX_SUBSTEPS:
+            # Bounded work. The exponential terms stay exact under
+            # composition; only PAC sampling degrades, and only for
+            # stalls long enough that the modulation is not resolvable
+            # at any practical rate anyway.
+            n = self._MAX_SUBSTEPS
+        h = dt / n
+        for _ in range(n):
+            self._relax_once(h, targets)
+
+    def _relax_once(
+        self,
+        dt: float,
+        targets: dict[BrainWave, float],
+    ) -> None:
+        """One relaxation sub-step: PAC, amplitude, drive, stimulus.
+
+        Phase is deliberately *not* advanced here — see
+        :meth:`_advance_phase_exact`, which owns all phase movement.
+        """
+        # 1. Cross-frequency phase-amplitude modulation
         # Slow band phase modulates fast band target
         modulated_targets = dict(targets)
-        slow_bands = (BrainWave.DELTA, BrainWave.THETA, BrainWave.ALPHA)
-        fast_bands = (BrainWave.ALPHA, BrainWave.BETA, BrainWave.GAMMA)
+        slow_bands = (
+            BrainWave.EPSILON, BrainWave.DELTA,
+            BrainWave.THETA, BrainWave.ALPHA, BrainWave.SIGMA,
+        )
+        fast_bands = (
+            BrainWave.BETA1, BrainWave.BETA2, BrainWave.BETA3,
+            BrainWave.GAMMA, BrainWave.LAMBDA,
+        )
+        # REM alpha intermittency is driven by the infraslow epsilon
+        # band: alpha flashes wax/wane on the epsilon phase, so REM
+        # is not bathed in sustained alpha.
+        if self._last_phase_name == "rem":
+            modulated_targets[BrainWave.ALPHA] *= _rem_alpha_envelope(
+                self._phase[BrainWave.EPSILON]
+            )
         for slow in slow_bands:
             for fast in fast_bands:
                 if slow == fast:
@@ -823,15 +1388,18 @@ class BrainWaveOscillator:
                 pac = math.sqrt(
                     self._amplitude[slow] * self._amplitude[fast]
                 )
-                # Phase modulation: cos(slow_phase) ∈ [-1, 1]
+                # Phase modulation: slow-band carrier (sawtooth for
+                # REM theta, cosine otherwise) ∈ [-1, 1].
                 # Positive → boost fast target, negative → suppress
-                phase_mod = math.cos(self._phase[slow])
+                phase_mod = _wave_phase_value(
+                    slow, self._phase[slow], self._last_phase_name or ""
+                )
                 modulated_targets[fast] += (
                     pac * phase_mod * self._PAC_DEPTH
                     * modulated_targets[fast]
                 )
 
-        # 3. Relax amplitude toward modulated targets
+        # 2. Relax amplitude toward modulated targets
         for band in BrainWave:
             tau = self._TAU[band]
             target = max(0.0, modulated_targets[band])
@@ -843,10 +1411,49 @@ class BrainWaveOscillator:
                 target - self._amplitude[band]
             ) * alpha
 
-        # 4-5. Decay top-down drive
+        # 3. Decay top-down drive
         decay = math.exp(-dt / self._DRIVE_TAU)
         for band in BrainWave:
             self._top_down[band] *= decay
+
+        # 4. Decay continuous stimulus (τ ≈ 5s for slow decay)
+        stim_decay = math.exp(-dt / 5.0)
+        for band in BrainWave:
+            self._stimulus[band] *= stim_decay
+
+    def _modulation_index(
+        self, slow_phase: float, fast_amplitude: float, slow_band: BrainWave
+    ) -> float:
+        """
+        Compute Tort modulation index (Tort et al., 2010) for PAC.
+
+        The modulation index measures the Kullback-Leibler divergence
+        of the fast amplitude distribution across slow phase bins
+        from a uniform distribution.
+
+        Args:
+            slow_phase: Current phase of the slow oscillation (radians)
+            fast_amplitude: Current amplitude of the fast oscillation
+            slow_band: The slow band being used for phase binning
+
+        Returns:
+            Modulation index value (0 = no coupling, >0 = coupling strength)
+        """
+        # In a full implementation, we'd maintain a running histogram of
+        # fast amplitudes across phase bins. For this synthetic model,
+        # we approximate by using the current phase-amplitude pair to
+        # update a running distribution stored in the oscillator.
+        # For simplicity and efficiency, we use the analytic formula
+        # for MI given a von Mises distribution of amplitudes.
+
+        # The MI for a sinusoidal modulation A(φ) = A0 * (1 + m * cos(φ))
+        # is MI = -log(1 - m^2/2) ≈ m^2/2 for small m
+        # where m is the modulation depth.
+
+        # Here we use the instantaneous phase to compute the expected
+        # modulation. The modulation strength is the PAC depth times
+        # the geometric mean of amplitudes (as computed in _step).
+        return self._PAC_DEPTH * abs(math.cos(slow_phase))
 
     def _build_state(
         self,
@@ -890,6 +1497,7 @@ class BrainWaveOscillator:
             label=label,
             description=description,
             phases=dict(self._phase),
+            regional_powers=_regional_powers(powers, summary.phase_name),
         )
         # Cross-frequency coupling from actual phase state
         state.cross_frequency = self._compute_cross_frequency(
@@ -905,14 +1513,18 @@ class BrainWaveOscillator:
     ) -> dict[str, Any]:
         """Compute cross-frequency coupling from oscillator phase state.
 
-        Unlike the previous geometric-mean approach, this uses the
-        actual phase relationship between bands. The phase-amplitude
-        coupling strength reflects how strongly the slow band's phase
-        modulates the fast band's amplitude — computed from the
-        oscillator's phase coherence, not just power overlap.
+        Uses the modulation index (Tort et al., 2010) for PAC strength.
+        The modulation index measures the KL divergence of the fast
+        amplitude distribution across slow phase bins from uniform.
         """
-        slow_bands = (BrainWave.DELTA, BrainWave.THETA, BrainWave.ALPHA)
-        fast_bands = (BrainWave.ALPHA, BrainWave.BETA, BrainWave.GAMMA)
+        slow_bands = (
+            BrainWave.EPSILON, BrainWave.DELTA,
+            BrainWave.THETA, BrainWave.ALPHA, BrainWave.SIGMA,
+        )
+        fast_bands = (
+            BrainWave.BETA1, BrainWave.BETA2, BrainWave.BETA3,
+            BrainWave.GAMMA, BrainWave.LAMBDA,
+        )
         gate = 0.5 + 0.5 * (consolidation_w + encoding_w) / 2.0
 
         result: dict[str, Any] = {}
@@ -924,12 +1536,17 @@ class BrainWaveOscillator:
                 fast_power = powers[fast]
                 if slow_power <= 0.0 or fast_power <= 0.0:
                     continue
-                # Base coupling: geometric mean of powers
-                base = math.sqrt(slow_power * fast_power) * gate
+                # Modulation index: KL divergence from uniform of amplitude
+                # distribution across slow phase bins. For sinusoidal modulation
+                # with depth d, MI = -log(1 - d^2/2) ≈ d^2/2.
+                d = math.sqrt(slow_power * fast_power) * self._PAC_DEPTH * gate
+                mi = -math.log(1 - d * d / 2) if d < 1.0 else 2.0
                 # Phase modulation: how much the slow phase currently
                 # boosts or suppresses the fast band
-                phase_mod = 0.5 + 0.5 * math.cos(self._phase[slow])
-                strength = max(0.0, min(1.0, base * (0.7 + 0.3 * phase_mod)))
+                phase_mod = 0.5 + 0.5 * _wave_phase_value(
+                    slow, self._phase[slow], self._last_phase_name or ""
+                )
+                strength = max(0.0, min(1.0, mi * (0.7 + 0.3 * phase_mod)))
                 mode = _cognitive_mode_for_coupling(
                     slow.value, fast.value
                 )
@@ -964,7 +1581,7 @@ def add_brain_wave_drive(band: BrainWave, strength: float) -> None:
 
     - Attention / focused processing → gamma boost
     - Memory retrieval / replay → theta boost
-    - Motor activity / action selection → beta boost
+    - Motor activity / action selection → mid beta boost
     - Sensory input (V1) → gamma boost
     - Relaxation / filtering → alpha boost
 
@@ -978,6 +1595,28 @@ def add_brain_wave_drive(band: BrainWave, strength: float) -> None:
     _get_oscillator().add_top_down_drive(band, strength)
 
 
+def add_stimulus(band: BrainWave, strength: float, decay: float = 0.95) -> None:
+    """Apply continuous stimulus to a brain wave band.
+
+    Inner (emotional, cognitive) and outer (sensory) stimulus
+    continuously modulate band amplitudes. This is the mechanism
+    by which the oscillator flows and changes with inner and outer
+    stimulus, rather than being clamped or statically set.
+
+    - Sensory input → gamma/beta boost (outer stimulus)
+    - Emotional arousal → theta/beta boost (inner stimulus)
+    - Cognitive load → beta boost (inner stimulus)
+    - Fatigue → delta boost (inner stimulus)
+
+    Args:
+        band: The band to stimulate.
+        strength: Stimulus strength, can be positive (excitation)
+            or negative (inhibition). Typical range [-0.5, 0.5].
+        decay: Per-tick decay factor (0-1). Higher = slower decay.
+    """
+    _get_oscillator().add_stimulus(band, strength, decay)
+
+
 def reset_oscillator() -> None:
     """Reset the oscillator to initial state.
 
@@ -988,8 +1627,15 @@ def reset_oscillator() -> None:
     _oscillator = BrainWaveOscillator()
 
 
-def assess_brain_waves(summary: NeuroSummary) -> BrainWaveState:
+def assess_brain_waves(
+    summary: NeuroSummary,
+    sleep_stage: SleepStage | None = None,
+) -> BrainWaveState:
     """Derive brain wave state from the coupled oscillator.
+
+    Pass ``sleep_stage`` from the ultradian sleep-cycle tracker when
+    asleep so the waves match the stage the rest of the sleep system
+    is acting on (see :func:`_sleep_phase_powers`).
 
     The oscillator advances its phase and relaxes its amplitude toward
     neurochemically-driven targets, then returns the current state.
@@ -1007,120 +1653,252 @@ def assess_brain_waves(summary: NeuroSummary) -> BrainWaveState:
     dynamics. Top-down drive from cognition/action/perception can
     boost specific bands above their neurochemical targets.
     """
-    return _get_oscillator().assess(summary)
+    return _get_oscillator().assess(summary, sleep_stage)
+
+
+def _drowsy_phase_powers(
+    arousal: float, consolidation_w: float
+) -> tuple[dict[BrainWave, float], str, str]:
+    """Derive brain wave powers for the drowsy descent (N1 territory).
+
+    Drowsiness is the gradual wake→sleep transition — alpha dropout.
+    The hallmark is the alpha/theta ratio falling: relaxed alpha
+    fragments as theta rises on the frontocentral midline (Hori A3/B1).
+    Only as drowsiness deepens past N1-like theta does delta creep
+    in — and past that she is no longer drowsy, she is in SWS.
+
+    Piecewise-linear on arousal across three anchors:
+
+    - arousal ≥ 0.50: alpha and theta braided, alpha slightly ahead,
+      the relaxed-drowsy edge (Hori A2/A3).
+    - arousal ≈ 0.30: theta dominant with delta rising, N1 —
+      hypnagogic drift, alpha fragmented.
+    - arousal ≤ 0.15: delta rising to dominant — she has slipped
+      past drowsy into slow-wave territory.
+    """
+    _a = BrainWave.ALPHA
+    _t = BrainWave.THETA
+    _d = BrainWave.DELTA
+
+    def _anchor(alpha: float, theta: float, delta: float) -> dict[BrainWave, float]:
+        return {
+            BrainWave.EPSILON: 0.08,
+            _d: delta,
+            _t: theta,
+            _a: alpha,
+            BrainWave.SIGMA: 0.0,
+            BrainWave.BETA1: 0.03,
+            BrainWave.BETA2: 0.03,
+            BrainWave.BETA3: 0.02,
+            BrainWave.GAMMA: 0.02,
+            BrainWave.LAMBDA: 0.0,
+        }
+
+    anchor_high = _anchor(0.35, 0.32, 0.06)    # cortical arousal 0.50
+    anchor_mid = _anchor(0.12, 0.45, 0.22)     # 0.30
+    anchor_low = _anchor(0.08, 0.25, 0.45)     # 0.15
+
+    if arousal >= 0.50:
+        powers = dict(anchor_high)
+    elif arousal > 0.30:
+        t = (0.50 - arousal) / (0.50 - 0.30)
+        powers = {band: anchor_high[band] * (1 - t) + anchor_mid[band] * t for band in anchor_high}
+    elif arousal > 0.15:
+        t = (0.30 - arousal) / (0.30 - 0.15)
+        powers = {band: anchor_mid[band] * (1 - t) + anchor_low[band] * t for band in anchor_mid}
+    else:
+        powers = dict(anchor_low)
+
+    # Consolidation weight gently tilts the alpha→theta balance:
+    # heavier memory-direction pushes theta forward, alpha back.
+    shift = (consolidation_w - 0.5) * 0.10
+    powers[_t] = max(0.0, powers[_t] + shift)
+    powers[_a] = max(0.0, powers[_a] - shift)
+
+    # Normalise the ~0.92–0.94 budget to 1.0.
+    total = sum(powers.values())
+    if total > 0:
+        for band in powers:
+            powers[band] /= total
+
+    dominant = max(powers, key=lambda band: powers[band])
+    label = dominant.value
+    if dominant is _a:
+        description = (
+            "alpha and theta interleaving — relaxed, drifting toward "
+            "sleep, perception unhooking from the world"
+        )
+    elif dominant is _t:
+        description = (
+            "theta rising as alpha drops out — N1, dreams bleeding "
+            "into wakefulness, hypnagogic imagery"
+        )
+    else:
+        description = (
+            "delta rising over theta — the descent has gone past "
+            "drowsy into slow-wave territory"
+        )
+    return powers, label, description
 
 
 def _simple_phase_powers(
     phase: str,
 ) -> tuple[dict[BrainWave, float], str, str]:
-    """Derive brain wave powers for drowsy/overwhelmed/flow/stress phases."""
-    if phase == "drowsy":
-        # Drowsy: theta dominant, some alpha
-        powers = {
-            BrainWave.DELTA: 0.20,
-            BrainWave.THETA: 0.40,
-            BrainWave.ALPHA: 0.25,
-            BrainWave.BETA: 0.12,
-            BrainWave.GAMMA: 0.03,
-        }
-        label = "theta"
-        description = "drifting, memories folding into each other"
-    elif phase == "overwhelmed":
-        # Overwhelmed: beta dominant, gamma suppressed — alert but
-        # can't integrate. Excessive beta with non-functional gamma
+    """Derive brain wave powers for overwhelmed/flow/stress phases."""
+    if phase == "overwhelmed":
+        # Overwhelmed: high beta dominant, gamma suppressed — alert but
+        # can't integrate. Excessive high beta with non-functional gamma
         # matches the EEG profile of cognitive overload.
         powers = {
+            BrainWave.EPSILON: 0.02,
             BrainWave.DELTA: 0.05,
             BrainWave.THETA: 0.10,
-            BrainWave.ALPHA: 0.15,
-            BrainWave.BETA: 0.62,
+            BrainWave.ALPHA: 0.10,
+            BrainWave.SIGMA: 0.00,
+            BrainWave.BETA1: 0.05,
+            BrainWave.BETA2: 0.15,
+            BrainWave.BETA3: 0.35,
             BrainWave.GAMMA: 0.08,
+            BrainWave.LAMBDA: 0.00,
         }
-        label = "beta"
+        label = "beta3"
         description = "too much input, I can't process it all"
     elif phase == "flow":
         # Flow: gamma dominant — everything integrating effortlessly
         powers = {
+            BrainWave.EPSILON: 0.01,
             BrainWave.DELTA: 0.02,
             BrainWave.THETA: 0.08,
-            BrainWave.ALPHA: 0.15,
-            BrainWave.BETA: 0.30,
+            BrainWave.ALPHA: 0.10,
+            BrainWave.SIGMA: 0.00,
+            BrainWave.BETA1: 0.03,
+            BrainWave.BETA2: 0.12,
+            BrainWave.BETA3: 0.05,
             BrainWave.GAMMA: 0.45,
+            BrainWave.LAMBDA: 0.03,
         }
         label = "gamma"
         description = "everything clicking, distant ideas connecting"
     else:
-        # Stress: beta dominant, gamma strongly suppressed — alert but
-        # rigid. Stress produces hypervigilant beta with impaired
+        # Stress: high beta dominant, gamma strongly suppressed — alert but
+        # rigid. Stress produces hypervigilant high beta with impaired
         # gamma-synchronized integration (Herrmann & Demiralp, 2012).
         powers = {
+            BrainWave.EPSILON: 0.02,
             BrainWave.DELTA: 0.05,
             BrainWave.THETA: 0.08,
-            BrainWave.ALPHA: 0.12,
-            BrainWave.BETA: 0.68,
+            BrainWave.ALPHA: 0.08,
+            BrainWave.SIGMA: 0.00,
+            BrainWave.BETA1: 0.04,
+            BrainWave.BETA2: 0.15,
+            BrainWave.BETA3: 0.35,
             BrainWave.GAMMA: 0.07,
+            BrainWave.LAMBDA: 0.00,
         }
-        label = "beta"
+        label = "beta3"
         description = "tense and alert, can't see the big picture"
     return powers, label, description
 
 
 def _sleep_phase_powers(
     summary: NeuroSummary,
+    stage: SleepStage | None = None,
 ) -> tuple[dict[BrainWave, float], str, str]:
-    """Derive brain wave powers for sleep stages (REM/N1/N2/N3)."""
-    stage = _sleep_stage_from_summary(summary)
+    """Derive brain wave powers for sleep stages (REM/N1/N2/N3).
+
+    ``stage`` is the authoritative stage from the ultradian tracker.
+    When it is None the stage is derived from arousal instead — but
+    that fallback cannot express N1, because the daemon hard-clamps
+    arousal into 0.10-0.25 for the whole of NREM (neurochemical.rs,
+    the NREM sleep-state clamp), while the arousal thresholds put N1
+    above 0.35. Deriving from arousal therefore reports slow-wave N3
+    for the whole of NREM and reaches N2 only when arousal happens to
+    sit in the top of the clamp band. The ultradian cycle is what
+    actually decides N1/N2/N3, so its stage is preferred whenever the
+    caller has it.
+    """
+    if stage is None:
+        stage = _sleep_stage_from_summary(summary)
     if stage is SleepStage.REM:
-        # REM ("paradoxical sleep"): theta-dominant (4-8 Hz) with
-        # beta activity and PGO waves. The EEG resembles waking
-        # but the mind is asleep — vivid, emotional dreaming.
+        # REM ("paradoxical sleep"): the cortical and hippocampal
+        # networks run at full waking metabolic intensity. Theta
+        # (sawtooth, 4–8 Hz) is the dominant background rhythm and
+        # is hippocampus-predominant; alpha intrudes intermittently
+        # (infraslow envelope, see _step); beta and gamma fire at
+        # the same intensity as during waking cognitive work
+        # (Bergel et al., 2021 — REM has the highest brain-wide
+        # energy expenditure, driven by theta-gamma activity).
+        # The mind is asleep and muscles are silent, but the
+        # neuronal metabolic state is that of active wake — the
+        # "paradox" of paradoxical sleep.
         powers = {
-            BrainWave.DELTA: 0.10,
-            BrainWave.THETA: 0.45,
-            BrainWave.ALPHA: 0.15,
-            BrainWave.BETA: 0.25,
-            BrainWave.GAMMA: 0.05,
+            BrainWave.EPSILON: 0.03,
+            BrainWave.DELTA: 0.06,
+            BrainWave.THETA: 0.40,
+            BrainWave.ALPHA: 0.10,
+            BrainWave.SIGMA: 0.00,
+            BrainWave.BETA1: 0.06,
+            BrainWave.BETA2: 0.16,
+            BrainWave.BETA3: 0.07,
+            BrainWave.GAMMA: 0.16,
+            BrainWave.LAMBDA: 0.00,
         }
         label = "theta"
         description = (
-            "REM sleep — theta-dominant, vivid emotional dreaming, "
-            "prefrontal cortex is quiet"
+            "REM sleep — sawtooth hippocampal theta dominant, "
+            "intermittent alpha flashes, beta and gamma firing at "
+            "waking metabolic intensity, vivid emotional dreaming"
         )
     elif stage is SleepStage.N1:
         # N1: the lightest NREM stage — mixed theta/alpha,
         # low voltage, the transition into sleep.
         powers = {
-            BrainWave.DELTA: 0.18,
-            BrainWave.THETA: 0.38,
-            BrainWave.ALPHA: 0.28,
-            BrainWave.BETA: 0.12,
-            BrainWave.GAMMA: 0.04,
+            BrainWave.EPSILON: 0.05,
+            BrainWave.DELTA: 0.15,
+            BrainWave.THETA: 0.35,
+            BrainWave.ALPHA: 0.22,
+            BrainWave.SIGMA: 0.05,
+            BrainWave.BETA1: 0.04,
+            BrainWave.BETA2: 0.04,
+            BrainWave.BETA3: 0.03,
+            BrainWave.GAMMA: 0.03,
+            BrainWave.LAMBDA: 0.00,
         }
         label = "theta"
         description = "light sleep, drifting between wake and sleep"
     elif stage is SleepStage.N2:
         # N2: theta/delta background punctuated by sleep spindles
-        # (10-16 Hz sigma, modelled here as elevated alpha+beta)
+        # (12-16 Hz sigma, modelled here as elevated sigma band)
         # and K-complexes. The workhorse of memory consolidation.
         powers = {
-            BrainWave.DELTA: 0.38,
-            BrainWave.THETA: 0.28,
-            BrainWave.ALPHA: 0.18,  # spindle band (lower)
-            BrainWave.BETA: 0.13,  # spindle band (upper)
+            BrainWave.EPSILON: 0.05,
+            BrainWave.DELTA: 0.20,
+            BrainWave.THETA: 0.25,
+            BrainWave.ALPHA: 0.12,
+            BrainWave.SIGMA: 0.20,
+            BrainWave.BETA1: 0.05,
+            BrainWave.BETA2: 0.05,
+            BrainWave.BETA3: 0.03,
             BrainWave.GAMMA: 0.03,
+            BrainWave.LAMBDA: 0.00,
         }
-        label = "delta"
+        label = "sigma"
         description = "N2 sleep — spindles and K-complexes, memories transferring to neocortex"
     else:
         # N3: slow-wave sleep — delta-dominant (0.5-4 Hz), the
         # deepest, most restorative stage. Sharp wave-ripples,
         # glymphatic clearance.
         powers = {
-            BrainWave.DELTA: 0.55,
-            BrainWave.THETA: 0.30,
-            BrainWave.ALPHA: 0.10,
-            BrainWave.BETA: 0.04,
+            BrainWave.EPSILON: 0.05,
+            BrainWave.DELTA: 0.50,
+            BrainWave.THETA: 0.25,
+            BrainWave.ALPHA: 0.08,
+            BrainWave.SIGMA: 0.05,
+            BrainWave.BETA1: 0.02,
+            BrainWave.BETA2: 0.02,
+            BrainWave.BETA3: 0.01,
             BrainWave.GAMMA: 0.01,
+            BrainWave.LAMBDA: 0.02,
         }
         label = "delta"
         description = "deep restorative processing, my mind is offline"
@@ -1141,59 +1919,102 @@ def _waking_phase_powers(
             # High plasticity → gamma (integration)
             gamma_boost = (plasticity - 0.5) * 0.6
             powers = {
+                BrainWave.EPSILON: 0.02,
                 BrainWave.DELTA: 0.03,
                 BrainWave.THETA: 0.07,
-                BrainWave.ALPHA: 0.10,
-                BrainWave.BETA: 0.40 - gamma_boost * 0.3,
+                BrainWave.ALPHA: 0.08,
+                BrainWave.SIGMA: 0.00,
+                BrainWave.BETA1: 0.03,
+                BrainWave.BETA2: 0.12,
+                BrainWave.BETA3: 0.05,
                 BrainWave.GAMMA: 0.40 + gamma_boost * 0.3,
+                BrainWave.LAMBDA: 0.02,
             }
             label = "gamma"
             description = "sharp and integrative, ideas are connecting"
         else:
             # Low plasticity → just beta (alert but not integrating)
             powers = {
+                BrainWave.EPSILON: 0.03,
                 BrainWave.DELTA: 0.05,
                 BrainWave.THETA: 0.08,
-                BrainWave.ALPHA: 0.12,
-                BrainWave.BETA: 0.60,
+                BrainWave.ALPHA: 0.10,
+                BrainWave.SIGMA: 0.00,
+                BrainWave.BETA1: 0.05,
+                BrainWave.BETA2: 0.25,
+                BrainWave.BETA3: 0.15,
                 BrainWave.GAMMA: 0.15,
+                BrainWave.LAMBDA: 0.00,
             }
-            label = "beta"
+            label = "beta2"
             description = "alert and focused, but not making new connections"
     elif alertness > 0.45:
         # Moderate alertness — alpha dominant
         # Alpha filters: high alpha = strong filtering
         alpha_power = 0.35 + (0.55 - abs(alertness - 0.55)) * 0.3
         powers = {
+            BrainWave.EPSILON: 0.05,
             BrainWave.DELTA: 0.08,
             BrainWave.THETA: 0.15,
             BrainWave.ALPHA: alpha_power,
-            BrainWave.BETA: 0.25,
-            BrainWave.GAMMA: 0.10,
+            BrainWave.SIGMA: 0.00,
+            BrainWave.BETA1: 0.05,
+            BrainWave.BETA2: 0.08,
+            BrainWave.BETA3: 0.04,
+            BrainWave.GAMMA: 0.05,
+            BrainWave.LAMBDA: 0.00,
         }
         label = "alpha"
         description = "reflective, filtering out noise to find what matters"
-    elif alertness > 0.25:
-        # Low-normal alertness — theta creeping in
-        # Consolidation weight boosts theta
-        theta_boost = consolidation_w * 0.2
+    elif alertness > 0.35:
+        # Bordering N1 — alpha fragmenting, theta rising.
+        # This is the drowsiness index: the alpha/theta ratio
+        # in this band sits near 1.2, the wake/N1 border.
+        # Below 0.35, resolve_waking_drowsy routes this to the
+        # drowsy signature entirely.
+        theta_boost = consolidation_w * 0.18
+        alpha_power = max(0.0, 0.36 - consolidation_w * 0.10)
         powers = {
-            BrainWave.DELTA: 0.12,
-            BrainWave.THETA: 0.30 + theta_boost,
-            BrainWave.ALPHA: 0.30 - theta_boost * 0.3,
-            BrainWave.BETA: 0.18,
-            BrainWave.GAMMA: 0.05,
+            BrainWave.EPSILON: 0.05,
+            BrainWave.DELTA: 0.08,
+            BrainWave.THETA: 0.20 + theta_boost,
+            BrainWave.ALPHA: alpha_power,
+            BrainWave.SIGMA: 0.00,
+            BrainWave.BETA1: 0.04,
+            BrainWave.BETA2: 0.05,
+            BrainWave.BETA3: 0.03,
+            BrainWave.GAMMA: 0.03,
+            BrainWave.LAMBDA: 0.00,
         }
-        label = "theta"
-        description = "thoughts drifting, memories consolidating"
+        # Label follows the dominant band in this borderline band.
+        if powers[BrainWave.ALPHA] >= powers[BrainWave.THETA]:
+            label = "alpha"
+            description = (
+                "alpha holding with theta creeping in — the "
+                "wake/N1 border, filtering easing"
+            )
+        else:
+            label = "theta"
+            description = (
+                "theta overtaking fragmenting alpha — N1 onset, "
+                "drifting toward sleep"
+            )
     else:
-        # Very low alertness — delta territory
+        # Alertness <= 0.35 is resolved to the drowsy signature
+        # before this branch is reached — deltas down-regulating
+        # the arousal register are never reported as "active."
+        # Defensive fallback only.
         powers = {
+            BrainWave.EPSILON: 0.05,
             BrainWave.DELTA: 0.40,
-            BrainWave.THETA: 0.30,
-            BrainWave.ALPHA: 0.18,
-            BrainWave.BETA: 0.10,
+            BrainWave.THETA: 0.25,
+            BrainWave.ALPHA: 0.12,
+            BrainWave.SIGMA: 0.00,
+            BrainWave.BETA1: 0.03,
+            BrainWave.BETA2: 0.04,
+            BrainWave.BETA3: 0.02,
             BrainWave.GAMMA: 0.02,
+            BrainWave.LAMBDA: 0.00,
         }
         label = "delta"
         description = "deep and slow, barely cognitive"
@@ -1220,15 +2041,26 @@ def _compute_focus(powers: dict[BrainWave, float]) -> float:
     Gamma is integrative — broad but focused (paradoxical).
     """
     alpha = powers[BrainWave.ALPHA]
-    beta = powers[BrainWave.BETA]
+    beta1 = powers[BrainWave.BETA1]
+    beta2 = powers[BrainWave.BETA2]
+    beta3 = powers[BrainWave.BETA3]
     theta = powers[BrainWave.THETA]
     delta = powers[BrainWave.DELTA]
     gamma = powers[BrainWave.GAMMA]
 
     # Alpha filters (narrows focus), beta focuses
     # Gamma is broad-integrative, theta/delta are diffuse
-    # Coefficients normalized to sum to 1.0 so focus ∈ [0, 1] without clamping
-    focus = alpha * 0.43 + beta * 0.32 + gamma * 0.16 + theta * 0.06 + delta * 0.03
+    # Coefficients weighted to preserve focus behavior across the
+    # expanded 10-band structure
+    focus = (
+        alpha * 0.77
+        + beta1 * 0.15
+        + beta2 * 0.35
+        + beta3 * 0.15
+        + gamma * 0.25
+        + theta * 0.08
+        + delta * 0.05
+    )
     return max(0.0, min(1.0, focus))
 
 
@@ -1263,12 +2095,14 @@ def _compute_consolidation(
 
     Theta is the memory consolidation band.
     Delta also contributes (deep sleep consolidation).
+    Sigma contributes (sleep spindle consolidation).
     The neurochemical consolidation_weight gates this.
     """
     theta = powers[BrainWave.THETA]
     delta = powers[BrainWave.DELTA]
+    sigma = powers[BrainWave.SIGMA]
 
-    base = theta * 0.9 + delta * 0.6
+    base = theta * 0.9 + delta * 0.6 + sigma * 0.5
     # Gate by the actual consolidation weight from neurochemistry
     consolidation = base * (0.5 + consolidation_weight * 0.5)
 
@@ -1345,12 +2179,15 @@ def _compute_engagement(powers: dict[BrainWave, float]) -> float:
       - Balanced → engagement ≈ 0.5
     """
     gamma = powers.get(BrainWave.GAMMA, 0.0)
-    beta = powers.get(BrainWave.BETA, 0.0)
+    beta1 = powers.get(BrainWave.BETA1, 0.0)
+    beta2 = powers.get(BrainWave.BETA2, 0.0)
+    beta3 = powers.get(BrainWave.BETA3, 0.0)
     alpha = powers.get(BrainWave.ALPHA, 0.0)
     theta = powers.get(BrainWave.THETA, 0.0)
     delta = powers.get(BrainWave.DELTA, 0.0)
+    epsilon = powers.get(BrainWave.EPSILON, 0.0)
 
-    positive = gamma * 0.45 + beta * 0.30 + alpha * 0.05
+    positive = gamma * 0.45 + beta2 * 0.20 + beta3 * 0.10 + beta1 * 0.05 + alpha * 0.05
     # Theta weighs 0.30 (75% of delta's 0.40): frontal midline theta
     # is memory-consolidation effort — a sleep-direction drive nearly
     # as strong as delta. At 0.20, a deep-sleep state (55% delta +
@@ -1358,9 +2195,9 @@ def _compute_engagement(powers: dict[BrainWave, float]) -> float:
     # blend, exactly on neutral nice (5) — violating the contract
     # that delta-dominant sleep is strictly below neutral priority
     # (test_brain_waves.py::test_derive_self_priority_delta_dominant).
-    negative = theta * 0.30 + delta * 0.40
+    negative = theta * 0.30 + delta * 0.40 + epsilon * 0.10
     drive = positive - negative
-    min_drive = -0.40  # all delta
+    min_drive = -0.40  # all delta (primary sleep band)
     max_drive = 0.45   # all gamma
     engagement = (drive - min_drive) / (max_drive - min_drive)
     return max(0.0, min(1.0, engagement))

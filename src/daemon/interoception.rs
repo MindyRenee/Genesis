@@ -230,6 +230,185 @@ use crate::state::neurochemical::NeurochemicalId;
 /// relative to neurochemistry, so we don't need to read every tick.
 pub const INTEROCEPTION_INTERVAL_TICKS: u64 = 30;
 
+// ─── Sensor presence ───────────────────────────────────────────
+//
+// Which optional sensors this machine actually has.
+//
+// The interoception layer's discipline is that an absent sensor must
+// never be read as a healthy zero — a machine with no battery must not
+// report itself as dying, and one with no fan must not be read as
+// failing to cool. That discipline cannot be honoured by the cognitive
+// layer alone: `BodyState` is a plain record of 30 values with no
+// per-channel validity, so every channel looks present whether or not
+// the hardware behind it exists.
+//
+// This bitmask carries that missing validity information, discovered
+// from the same paths the readers use. A set bit means "this reading
+// is a real measurement"; a clear bit means "there is no sensor here
+// and the value is a placeholder".
+//
+// Served by its own additive command (GET_SENSOR_PRESENCE) rather than
+// a new BodyState layout: the wire layouts are already disambiguated by
+// self-consistent desc_len offsets across v1/v2/v3, so adding a field
+// would mean a fourth layout and a protocol bump for one u16.
+
+/// Bit positions in the sensor-presence mask. Each names one optional
+/// sensor group the readers depend on.
+pub mod sensor {
+    /// A CPU temperature sensor was found.
+    pub const TEMPERATURE: u16 = 1 << 0;
+    /// Per-core frequency sensors were found (drives `arousal_freq`).
+    pub const FREQUENCY: u16 = 1 << 1;
+    /// A hardware maximum frequency was readable.
+    pub const MAX_FREQUENCY: u16 = 1 << 2;
+    /// A battery was found.
+    pub const BATTERY: u16 = 1 << 3;
+    /// An AC adapter presence switch was found.
+    pub const AC_ADAPTER: u16 = 1 << 4;
+    /// A fan PWM control was found (drives `thermoregulatory_effort`).
+    pub const FAN: u16 = 1 << 5;
+    /// At least one power-draw sensor was found (drives `metabolic_rate`).
+    pub const POWER: u16 = 1 << 6;
+    /// A CPU core voltage sensor was found.
+    pub const CORE_VOLTAGE: u16 = 1 << 7;
+    /// A supply/battery rail voltage sensor was found.
+    pub const SUPPLY_VOLTAGE: u16 = 1 << 8;
+    /// At least one RAPL power domain was found (core/uncore/dram
+    /// switching activity).
+    pub const RAPL: u16 = 1 << 9;
+    /// perf_event_open succeeded, so cache/branch miss ratios are real
+    /// measurements rather than permanent zeros.
+    pub const PERF_COUNTERS: u16 = 1 << 10;
+    /// The embedded controller's GPE counter was readable (autonomic
+    /// afferent rate).
+    pub const GPE: u16 = 1 << 11;
+    /// Per-core local-timer interrupt counters were readable (pulse).
+    pub const LOCAL_TIMER: u16 = 1 << 12;
+    /// Total system memory was readable.
+    pub const MEMORY: u16 = 1 << 13;
+    /// /proc/pressure was readable (PSI).
+    pub const PSI: u16 = 1 << 14;
+    /// Battery cycle count was readable (senescence).
+    pub const BATTERY_CYCLES: u16 = 1 << 15;
+}
+
+/// Every sensor bit, in report order.
+const SENSOR_BITS: [(u16, &str); 16] = [
+    (sensor::TEMPERATURE, "temperature"),
+    (sensor::FREQUENCY, "frequency"),
+    (sensor::MAX_FREQUENCY, "max frequency"),
+    (sensor::BATTERY, "battery"),
+    (sensor::AC_ADAPTER, "AC adapter"),
+    (sensor::FAN, "fan PWM"),
+    (sensor::POWER, "power draw"),
+    (sensor::CORE_VOLTAGE, "core voltage"),
+    (sensor::SUPPLY_VOLTAGE, "supply voltage"),
+    (sensor::RAPL, "RAPL power domains"),
+    (sensor::PERF_COUNTERS, "perf counters"),
+    (sensor::GPE, "EC GPE counter"),
+    (sensor::LOCAL_TIMER, "local timer counters"),
+    (sensor::MEMORY, "total memory"),
+    (sensor::PSI, "pressure stall information"),
+    (sensor::BATTERY_CYCLES, "battery cycle count"),
+];
+
+static SHARED_SENSOR_PRESENCE: OnceLock<Mutex<u16>> = OnceLock::new();
+
+fn shared_presence() -> &'static Mutex<u16> {
+    SHARED_SENSOR_PRESENCE.get_or_init(|| Mutex::new(0))
+}
+
+/// Publish the discovered sensor-presence mask alongside the body state.
+pub fn publish_sensor_presence(mask: u16) {
+    if let Ok(mut guard) = shared_presence().lock() {
+        *guard = mask;
+    }
+}
+
+/// Read the published sensor-presence mask.
+///
+/// Zero until the first interoception read completes, which correctly
+/// reads as "nothing confirmed present" rather than "everything is
+/// fine" — the safe direction.
+pub fn read_sensor_presence() -> u16 {
+    shared_presence().lock().map(|g| *g).unwrap_or(0)
+}
+
+static SHARED_MEMORY_MB: OnceLock<Mutex<f32>> = OnceLock::new();
+
+fn shared_memory_mb() -> &'static Mutex<f32> {
+    SHARED_MEMORY_MB.get_or_init(|| Mutex::new(0.0))
+}
+
+/// The last measured RSS of Genesis's process tree, in megabytes.
+pub fn read_memory_mb() -> f32 {
+    shared_memory_mb().lock().map(|g| *g).unwrap_or(0.0)
+}
+
+/// Per-subsystem liveness, plus a count of how many times a subsystem
+/// has been seen and then lost.
+///
+/// A subsystem that dies used to simply disappear from the telemetry:
+/// the reader saw a shorter list and had no way to tell "the retina
+/// crashed" from "the retina was never started". Silence was the only
+/// signal, and silence is indistinguishable from absence.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct ProcessHealth {
+    /// One bit per [`Subsystem`]: set while that process is alive.
+    pub alive_mask: u16,
+    /// Cumulative count of subsystem deaths observed since startup.
+    pub deaths: u16,
+    /// The subsystem that died most recently, for diagnostics.
+    pub last_death: u8,
+}
+
+impl ProcessHealth {
+    /// Whether a subsystem's process is currently alive.
+    pub fn is_alive(&self, subsystem: Subsystem) -> bool {
+        self.alive_mask & (1u16 << subsystem.to_wire() as u16) != 0
+    }
+}
+
+static SHARED_PROCESS_HEALTH: OnceLock<Mutex<ProcessHealth>> = OnceLock::new();
+
+fn shared_health() -> &'static Mutex<ProcessHealth> {
+    SHARED_PROCESS_HEALTH.get_or_init(|| Mutex::new(ProcessHealth::default()))
+}
+
+/// Publish the current process health.
+pub fn publish_process_health(health: ProcessHealth) {
+    if let Ok(mut guard) = shared_health().lock() {
+        *guard = health;
+    }
+}
+
+/// Read the last published process health.
+pub fn read_process_health() -> ProcessHealth {
+    shared_health().lock().map(|g| *g).unwrap_or_default()
+}
+
+/// Report which discovered sensors were absent, once, at startup.
+///
+/// Silently defaulting made "this machine has no battery" and "the
+/// battery reads empty" indistinguishable to every layer above.
+pub fn report_missing_sensors(mask: u16) {
+    let missing: Vec<&str> = SENSOR_BITS
+        .iter()
+        .filter(|(bit, _)| mask & bit == 0)
+        .map(|(_, name)| *name)
+        .collect();
+    if missing.is_empty() {
+        eprintln!("[interoception] all optional sensors found");
+    } else {
+        eprintln!(
+            "[interoception] {} optional sensor(s) not present on this machine: {} — \
+             the matching BodyState fields are placeholders, not measurements",
+            missing.len(),
+            missing.join(", ")
+        );
+    }
+}
+
 // ─── Shared body state ──────────────────────────────────────────
 //
 // The reactive interoception path (TickLoop::read_sensors, driven by
@@ -741,6 +920,31 @@ pub struct Interoceptor {
     /// Whether we've already warned about a missing temperature sensor.
     /// Prevents log spam when the sensor is permanently unavailable.
     temp_warned: bool,
+
+    /// Which optional sensors this machine actually has, as a bitmask
+    /// of [`sensor`] constants. Established once at construction from
+    /// the discovered paths, then republished with each body state so
+    /// the cognitive layer can tell an absent sensor from a real zero.
+    ///
+    /// The perf bit is the one that can change at runtime: perf_event_open
+    /// is attempted lazily and can fail permanently on the first try, so
+    /// [`Interoceptor::read`] updates it.
+    sensor_mask: u16,
+}
+
+/// Resident set size of one process, in kB. 0 if it cannot be read.
+fn rss_kb(pid: u32) -> u64 {
+    let Ok(content) = fs::read_to_string(format!("/proc/{pid}/statm")) else {
+        return 0;
+    };
+    // /proc/<pid>/statm fields: size resident shared text lib data dt
+    // Field 2 (resident) is RSS in pages.
+    let rss_pages: u64 = content
+        .split_whitespace()
+        .nth(1)
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0);
+    rss_pages.saturating_mul(page_size_kb())
 }
 
 /// Parsed /proc/<pid>/stat for CPU time computation.
@@ -830,7 +1034,41 @@ enum RaplKind {
     Dram,
 }
 
+/// What the startup probe found, bundled so `build_sensor_mask` takes
+/// one argument instead of eleven positional ones.
+///
+/// Each field records the outcome of a discovery pass over `/proc` and
+/// `/sys`. Presence is derived from whether the probe found something,
+/// never assumed — a channel that no hardware backs must not claim to
+/// be a measurement.
+#[derive(Debug, Default)]
+struct SensorProbe {
+    /// A readable thermal zone with a temperature was found.
+    temp_sensor_present: bool,
+    /// Per-core `scaling_cur_freq` paths.
+    freq_paths: Vec<String>,
+    /// `cpuinfo_max_freq`, or 0 when unavailable.
+    max_freq_khz: u64,
+    /// Battery capacity path, if the machine has one.
+    battery_path: Option<String>,
+    /// AC adapter path, if the machine has one.
+    ac_path: Option<String>,
+    /// Fan PWM control path, if the machine exposes one.
+    fan_path: Option<String>,
+    /// Rail power sensor paths.
+    power_paths: Vec<String>,
+    /// `cpu0_voltage` / `core voltage` path.
+    core_voltage_path: Option<String>,
+    /// `in0_voltage` / `supply voltage` path.
+    supply_voltage_path: Option<String>,
+    /// RAPL power domains.
+    rapl_domains: Vec<RaplDomain>,
+    /// `/proc/meminfo` total, or 0 when unreadable.
+    total_memory_kb: u64,
+}
+
 /// A discovered RAPL power domain with delta-tracking state.
+#[derive(Clone, Debug)]
 struct RaplDomain {
     /// Which subsystem this domain measures.
     kind: RaplKind,
@@ -1113,6 +1351,11 @@ impl Interoceptor {
     pub fn new() -> Self {
         let num_cores = num_cpus();
         let temp_path = find_temp_sensor();
+        // An empty path means no sensor was found. `find_temp_sensor`
+        // returns String rather than Option, so the emptiness is the
+        // only available signal — and exactly the signal the presence
+        // mask needs to stop an absent sensor reading as a real value.
+        let temp_sensor_present = !temp_path.is_empty();
         let freq_paths = find_freq_sensors(num_cores);
         let max_freq_khz = match read_max_freq() {
             Some(f) if f > 0 => f,
@@ -1139,6 +1382,27 @@ impl Interoceptor {
                 8_000_000
             }
         };
+        let rapl_domains = find_rapl_domains();
+        let mut sensor_mask = Self::build_sensor_mask(&SensorProbe {
+            temp_sensor_present,
+            freq_paths: freq_paths.clone(),
+            max_freq_khz,
+            battery_path: battery_path.clone(),
+            ac_path: ac_path.clone(),
+            fan_path: fan_path.clone(),
+            power_paths: power_paths.clone(),
+            core_voltage_path: core_voltage_path.clone(),
+            supply_voltage_path: supply_voltage_path.clone(),
+            rapl_domains: rapl_domains.clone(),
+            total_memory_kb,
+        });
+        // perf_event_open has not been attempted yet, so its
+        // availability is not yet known. Leave the bit clear until
+        // the first read either opens the counters or gives up
+        // permanently — an unverified channel must not claim to be
+        // a measurement.
+        sensor_mask &= !sensor::PERF_COUNTERS;
+        report_missing_sensors(sensor_mask);
 
         Self {
             num_cores,
@@ -1161,7 +1425,7 @@ impl Interoceptor {
             prev_tis_all: 0,
             clocksource_id: read_clocksource(),
             suspend_caps: detect_suspend_caps(),
-            rapl_domains: find_rapl_domains(),
+            rapl_domains,
             perf_counters: std::collections::HashMap::new(),
             perf_unavailable: false,
             subsystem_cpu: std::collections::HashMap::new(),
@@ -1169,6 +1433,7 @@ impl Interoceptor {
             subsystem_perf_delta: std::collections::HashMap::new(),
             last_read: Instant::now(),
             temp_warned: false,
+            sensor_mask,
         }
     }
 
@@ -1181,6 +1446,124 @@ impl Interoceptor {
         let mut intero = Self::new();
         intero.data_dir = Some(data_dir.to_path_buf());
         intero
+    }
+
+    /// Record which subsystems are alive, reporting any that just died.
+    ///
+    /// `genesis_subsystems` already filters out processes that are no
+    /// longer running, which is correct for measurement but loses the
+    /// fact that they were ever there. This keeps the transition: a
+    /// subsystem that was alive on the previous read and is gone now
+    /// increments the death count and is reported once, so a crashed
+    /// retina is a visible event rather than a silently shorter list.
+    ///
+    /// A subsystem that has never been seen alive is not counted as a
+    /// death — it was never running, which is a different fact.
+    fn reap_dead_subsystems(&mut self, present: &[(Subsystem, u32)]) -> Vec<(Subsystem, u32)> {
+        let mut health = read_process_health();
+        let mut alive_mask = 0u16;
+        let mut next: Vec<(Subsystem, u32)> = Vec::with_capacity(present.len());
+
+        for &(subsystem, pid) in present {
+            if !pid_alive(pid) {
+                continue;
+            }
+            alive_mask |= 1u16 << subsystem.to_wire() as u16;
+            next.push((subsystem, pid));
+        }
+
+        // Anything that was alive and now is not.
+        let newly_dead = health.alive_mask & !alive_mask;
+        if newly_dead != 0 {
+            for tag in 0u8..=2 {
+                let bit = 1u16 << tag;
+                if newly_dead & bit != 0 {
+                    health.deaths = health.deaths.saturating_add(1);
+                    health.last_death = tag;
+                    let name = match tag {
+                        1 => "cognitive mind",
+                        2 => "retina",
+                        _ => "daemon",
+                    };
+                    // A lost subsystem is a real event, not a debug
+                    // detail: it changes what the telemetry means.
+                    eprintln!("[interoception] subsystem lost: {name} is no longer running");
+                }
+            }
+        }
+        health.alive_mask = alive_mask;
+        publish_process_health(health);
+        next
+    }
+
+    /// Which optional sensors this machine actually has.
+    ///
+    /// Derived from the discovered paths and cached probe results that
+    /// were established at construction, so it reflects the hardware
+    /// rather than what a default value would assume. Computed once:
+    /// these are startup discoveries, and re-scanning hwmon and
+    /// /sys/class/power_supply on every read would be pure overhead.
+    pub fn sensor_presence(&self) -> u16 {
+        self.sensor_mask
+    }
+
+    /// Build the presence mask from the discovered sensor paths.
+    ///
+    /// The `/proc`-backed channels (GPE, local timer, PSI) and the
+    /// battery cycle count are probed here rather than assumed, because
+    /// their absence is exactly what made a missing sensor
+    /// indistinguishable from a reading of zero.
+    fn build_sensor_mask(probe: &SensorProbe) -> u16 {
+        let mut mask = 0u16;
+        if probe.temp_sensor_present {
+            mask |= sensor::TEMPERATURE;
+        }
+        if !probe.freq_paths.is_empty() {
+            mask |= sensor::FREQUENCY;
+        }
+        if probe.max_freq_khz > 0 {
+            mask |= sensor::MAX_FREQUENCY;
+        }
+        if probe.battery_path.is_some() {
+            mask |= sensor::BATTERY;
+        }
+        if probe.ac_path.is_some() {
+            mask |= sensor::AC_ADAPTER;
+        }
+        if probe.fan_path.is_some() {
+            mask |= sensor::FAN;
+        }
+        if !probe.power_paths.is_empty() {
+            mask |= sensor::POWER;
+        }
+        if probe.core_voltage_path.is_some() {
+            mask |= sensor::CORE_VOLTAGE;
+        }
+        if probe.supply_voltage_path.is_some() {
+            mask |= sensor::SUPPLY_VOLTAGE;
+        }
+        if !probe.rapl_domains.is_empty() {
+            mask |= sensor::RAPL;
+        }
+        if probe.total_memory_kb > 0 {
+            mask |= sensor::MEMORY;
+        }
+        // Probed rather than assumed: /proc/pressure exists only on
+        // kernels built with PSI, and the EC GPE counter only on
+        // machines with an embedded controller.
+        if std::path::Path::new("/proc/pressure/cpu").exists() {
+            mask |= sensor::PSI;
+        }
+        if read_gpe_count() > 0 {
+            mask |= sensor::GPE;
+        }
+        if read_loc_count() > 0 {
+            mask |= sensor::LOCAL_TIMER;
+        }
+        if read_battery_cycles() > 0.0 {
+            mask |= sensor::BATTERY_CYCLES;
+        }
+        mask
     }
 
     /// Collect the PIDs of Genesis's own process tree, tagged by subsystem.
@@ -1319,11 +1702,13 @@ impl Interoceptor {
         // Per-subsystem telemetry (which part of it is firing) is
         // derived from the same per-PID deltas that feed the
         // aggregate signals below.
-        let subsystems = self.genesis_subsystems();
+        let all_subsystems = self.genesis_subsystems();
+        let subsystems = self.reap_dead_subsystems(&all_subsystems);
         let pids: Vec<u32> = subsystems.iter().map(|&(_, pid)| pid).collect();
 
-        // Self-process memory (RSS) → cognitive load.
-        let cognitive_load = self.read_self_memory(&pids);
+        // Self-process memory (RSS) → cognitive load, plus the absolute
+        // megabyte figure the manifest's memory fields are missing.
+        let (cognitive_load, self_memory_mb) = self.read_self_memory_detail(&pids);
 
         // Self-process CPU usage → stress_load.
         let stress_load = self.read_self_cpu(&pids, now);
@@ -1521,6 +1906,23 @@ impl Interoceptor {
             })
             .collect();
         publish_subsystem_telemetry(&telemetry);
+        // Absolute memory, carried alongside the per-process activity
+        // shares. The manifest's `mem_usage_mb` and `total_mem_mb` had
+        // no producer, so a process tree holding hundreds of megabytes
+        // reported zero in the one field that names memory in absolute
+        // terms.
+        self.publish_memory_mb(self_memory_mb);
+
+        // Republish the presence mask with this reading. The perf bit
+        // is settled by now — `read_perf` has either opened the
+        // counters or marked them permanently unavailable — so it is
+        // the one bit that can differ from the startup discovery.
+        if self.perf_unavailable {
+            self.sensor_mask &= !crate::daemon::interoception::sensor::PERF_COUNTERS;
+        } else if !self.subsystem_perf_delta.is_empty() {
+            self.sensor_mask |= crate::daemon::interoception::sensor::PERF_COUNTERS;
+        }
+        publish_sensor_presence(self.sensor_mask);
 
         self.last_read = now;
         state
@@ -1532,26 +1934,33 @@ impl Interoceptor {
     /// Returns 0.0 if no processes are readable. Other programs'
     /// memory usage is not included — only its own cognitive
     /// footprint.
-    fn read_self_memory(&self, pids: &[u32]) -> f32 {
+    /// Resident memory of Genesis's own process tree, as both a
+    /// fraction of total system memory and absolute megabytes.
+    ///
+    /// The absolute figure exists because the manifest carries a
+    /// per-module `mem_usage_mb` and an aggregate `total_mem_mb`, and
+    /// both were structurally zero: nothing ever produced a memory
+    /// number, so the manifest reported a mind using no memory at all
+    /// while `cognitive_load` said otherwise. Splitting the reading
+    /// this way keeps one traversal for both consumers.
+    /// Publish this process tree's absolute resident memory.
+    fn publish_memory_mb(&self, mb: f32) {
+        if let Ok(mut guard) = shared_memory_mb().lock() {
+            *guard = mb;
+        }
+    }
+
+    fn read_self_memory_detail(&self, pids: &[u32]) -> (f32, f32) {
         if self.total_memory_kb == 0 {
-            return 0.0;
+            return (0.0, 0.0);
         }
-        let page_size_kb = page_size_kb();
-        let mut total_rss_kb: u64 = 0;
-        for &pid in pids {
-            if let Ok(content) = fs::read_to_string(format!("/proc/{pid}/statm")) {
-                // /proc/<pid>/statm fields: size resident shared text lib data dt
-                // Field 2 (resident) is RSS in pages.
-                let rss_pages: u64 = content
-                    .split_whitespace()
-                    .nth(1)
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(0);
-                total_rss_kb = total_rss_kb.saturating_add(rss_pages * page_size_kb);
-            }
-        }
+        let total_rss_kb: u64 = pids.iter().map(|pid| rss_kb(*pid)).sum();
         let fraction = (total_rss_kb as f32) / (self.total_memory_kb as f32);
-        crate::state::sanitize::finite_clamp(fraction, 0.0, 1.0)
+        let mb = total_rss_kb as f32 / 1024.0;
+        (
+            crate::state::sanitize::finite_clamp(fraction, 0.0, 1.0),
+            crate::state::sanitize::finite_or(mb, 0.0),
+        )
     }
 
     /// Read combined CPU usage of Genesis's own process tree as a
@@ -3659,9 +4068,12 @@ mod tests {
         // using memory.
         let intero = Interoceptor::new();
         let pids = intero.genesis_pids();
-        let mem = intero.read_self_memory(&pids);
+        let (mem, mb) = intero.read_self_memory_detail(&pids);
         assert!(mem > 0.0, "self RSS should be > 0");
         assert!(mem < 1.0, "self RSS should be < total memory");
+        // The absolute figure is what the manifest's memory fields
+        // consume; it was structurally zero before this was produced.
+        assert!(mb > 0.0, "self RSS in MB should be > 0");
     }
 
     #[test]
@@ -4225,5 +4637,128 @@ mod tests {
             .iter()
             .any(|(id, _)| *id == NeurochemicalId::Acetylcholine);
         assert!(!has_ach, "zero DRAM activity should produce no ACh");
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  Tests for the sensor-presence mask
+// ─────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod sensor_presence_tests {
+    use super::{SENSOR_BITS, read_sensor_presence, report_missing_sensors, sensor};
+    use std::sync::{Mutex, OnceLock};
+
+    // The mask is process-global (it bridges the interoception thread
+    // and the IPC handler), so the tests that touch it share one lock
+    // rather than racing.
+    fn guard() -> std::sync::MutexGuard<'static, ()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+    }
+
+    #[test]
+    fn test_presence_defaults_to_nothing_confirmed() {
+        // Before any read completes, nothing is claimed to be measured.
+        // Zero is the safe direction: it says "unknown", not "fine".
+        let _g = guard();
+        assert_eq!(read_sensor_presence(), 0);
+    }
+
+    #[test]
+    fn test_presence_bit_positions_are_distinct() {
+        // Each sensor needs its own bit or they could not be
+        // distinguished, and a collision would silently merge two
+        // channels' validity.
+        let bits = [
+            sensor::TEMPERATURE,
+            sensor::FREQUENCY,
+            sensor::MAX_FREQUENCY,
+            sensor::BATTERY,
+            sensor::AC_ADAPTER,
+            sensor::FAN,
+            sensor::POWER,
+            sensor::CORE_VOLTAGE,
+            sensor::SUPPLY_VOLTAGE,
+            sensor::RAPL,
+            sensor::PERF_COUNTERS,
+            sensor::GPE,
+            sensor::LOCAL_TIMER,
+            sensor::MEMORY,
+            sensor::PSI,
+            sensor::BATTERY_CYCLES,
+        ];
+        for (i, a) in bits.iter().enumerate() {
+            for b in &bits[i + 1..] {
+                assert_ne!(a, b, "sensor bits must be distinct");
+                assert_eq!(a & b, 0, "sensor bits must not overlap");
+            }
+        }
+        assert_eq!(bits.len(), 16, "a u16 holds exactly 16 channels");
+    }
+
+    #[test]
+    fn test_presence_reports_missing_channels() {
+        // Only temperature present: the other 15 should be named.
+        report_missing_sensors(sensor::TEMPERATURE);
+        // Reporting twice must not panic (it is called on every
+        // Interoceptor::new, which tests construct freely).
+        report_missing_sensors(sensor::TEMPERATURE);
+        report_missing_sensors(0xFFFF);
+    }
+
+    #[test]
+    fn test_interoceptor_presence_matches_this_machine() {
+        // The mask must be derived from real discovery, not constant.
+        // Every machine has memory, so that bit is always set once a
+        // read has run; a laptop here may or may not have a battery.
+        let intero = super::Interoceptor::new();
+        let mask = intero.sensor_presence();
+        assert_ne!(
+            mask, 0,
+            "at least the always-available channels should be discovered"
+        );
+        assert_eq!(
+            mask & sensor::MEMORY,
+            sensor::MEMORY,
+            "total memory is readable on any Linux host"
+        );
+    }
+
+    #[test]
+    fn test_memory_detail_reports_both_scales() {
+        // The manifest's memory fields had no producer, so
+        // `total_mem_mb` was structurally 0.0 while `cognitive_load`
+        // said the tree was using memory. Both scales now come from one
+        // traversal of the process tree.
+        let intero = super::Interoceptor::new();
+        let pids = intero.genesis_pids();
+        let (fraction, mb) = intero.read_self_memory_detail(&pids);
+        assert!(fraction > 0.0, "self RSS as a fraction should be > 0");
+        assert!(mb > 1.0, "a running process tree holds MBs, got {mb}");
+    }
+
+    #[test]
+    fn test_presence_bitmask_fits_the_wire_type() {
+        // GET_SENSOR_PRESENCE serialises as a u16, so no bit may
+        // exceed the type. Asserting one constant against `u16::MAX`
+        // proves nothing (it is a u16 by construction); the real
+        // invariant is that folding every declared bit into a single
+        // u16 neither overflows nor leaves a gap.
+        assert_eq!(std::mem::size_of::<u16>(), 2);
+        let combined = SENSOR_BITS.iter().fold(0u16, |acc, (bit, _)| acc | bit);
+        assert_eq!(
+            combined,
+            u16::MAX,
+            "the 16 declared sensor bits must be exactly the 16 bits of the wire type"
+        );
+        // And the names must be unique, so no bit is described twice.
+        let mut names: Vec<&str> = SENSOR_BITS.iter().map(|(_, name)| *name).collect();
+        names.sort_unstable();
+        let before = names.len();
+        names.dedup();
+        assert_eq!(names.len(), before, "duplicate sensor name in SENSOR_BITS");
     }
 }

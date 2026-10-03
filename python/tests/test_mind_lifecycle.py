@@ -86,7 +86,7 @@ def test_failed_late_restore_does_not_commit_network(tmp_path):
     import gzip
     import json
 
-    from genesis_cognitive.persistence import load_state
+    from genesis_cognitive.infrastructure.persistence import load_state
 
     source_dir = tmp_path / "source"
     target_dir = tmp_path / "target"

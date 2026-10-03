@@ -101,7 +101,7 @@ from ..emotion import (
 
 if TYPE_CHECKING:
     from ..emotion import EmotionalState
-    from ..narrative import NarrativeEngine
+    from ..infrastructure.narrative import NarrativeEngine
 
 __all__ = [
     "AutobiographicalSelf",

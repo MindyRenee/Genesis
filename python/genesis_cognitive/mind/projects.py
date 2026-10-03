@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from genesis_client.protocol import CHEM_NAMES
+from genesis_client.swallow import note_swallowed
 
 from ..tools.project_creator import (
     archive_project as _archive_project,
@@ -93,7 +94,10 @@ class ProjectsMixin:
         try:
             projects = list_projects(self.data_dir)
         except Exception as e:  # noqa: BLE001
-            logger.debug(f"_projects_status_summary failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.mind.projects._projects_status_summary",
+                e,
+            )
             return {"active": 0, "archived": 0, "total": 0, "total_size_bytes": 0}
         active = sum(1 for p in projects if p.get("status") == "active")
         archived = sum(1 for p in projects if p.get("status") == "archived")
@@ -183,7 +187,10 @@ class ProjectsMixin:
                     source_confidence=0.95,
                 )
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"absorb_project_notes: memory store failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.projects.absorb_project_notes",
+                    e,
+                )
 
             # Add what it learned to its concept network. The project
             # concept already exists (added by _add_project_concept);
@@ -207,7 +214,10 @@ class ProjectsMixin:
                     "genesis", feedback_concept, RelationType.RELATED_TO, 0.7,
                 )
             except Exception as e:  # noqa: BLE001
-                logger.debug(f"absorb_project_notes: concept add failed: {e}")
+                note_swallowed(
+                    "genesis_cognitive.mind.projects.absorb_project_notes",
+                    e,
+                )
 
             # Clear the notes so it doesn't re-absorb them
             clear_project_notes(self.data_dir, pname)

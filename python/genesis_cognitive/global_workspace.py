@@ -84,6 +84,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from genesis_client.swallow import note_swallowed
+
 from .brain_waves import BrainWave, BrainWaveState
 
 logger = logging.getLogger(__name__)
@@ -385,7 +387,10 @@ class GlobalWorkspace:
                     self.on_ignition(item, id(item) in recurrent_ignitions)
                 except Exception as e:  # noqa: BLE001
                     # The ignition hook must never crash the workspace
-                    logger.debug(f"on_ignition hook failed: {e}")
+                    note_swallowed(
+                        "genesis_cognitive.global_workspace.broadcast",
+                        e,
+                    )
         return ignited
 
     def _distribute(self, item: WorkspaceItem) -> None:
@@ -395,7 +400,10 @@ class GlobalWorkspace:
                 module.receive_broadcast(item)
             except Exception as e:  # noqa: BLE001
                 # A module failing to receive shouldn't crash the workspace
-                logger.debug(repr(e))
+                note_swallowed(
+                    "genesis_cognitive.global_workspace._distribute",
+                    e,
+                )
 
     def _enforce_capacity(self, protected: set[int] | None = None) -> None:
         """Evict weakest items if over capacity (competitive inhibition).

@@ -46,8 +46,11 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
+from genesis_client.protocol import SENSOR_NAMES
+from genesis_client.swallow import note_swallowed
+
 from ..concepts import RelationType
-from ..config import default_data_dir
+from ..infrastructure.config import default_data_dir
 
 __all__ = [
     "AgencyDetector",
@@ -60,6 +63,19 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+
+
+# Subsystem (process) names as they arrive on the wire from
+# GET_SUBSYSTEM_TELEMETRY, mapped to the concept-network names for the
+# regions those processes host. These are *seeds* — building blocks the
+# composer resolves against its own knowledge and weaves into its own
+# words, NOT phrases it recites. Unmapped names pass through unchanged,
+# since a process name is already usable as a concept seed.
+_SUBSYSTEM_CONCEPT: dict[str, str] = {
+    "daemon": "subcognitive",
+    "cognitive": "cognition",
+    "retina": "vision",
+}
 
 
 @dataclass(slots=True)
@@ -313,6 +329,38 @@ class ComputationalSubstrate:
     # no sensor" — without it, an absent sensor is indistinguishable
     # from a healthy zero, and a need could be inferred from silence.
     hardware_sensors_present: int = 0
+
+    # Which optional sensors this machine actually has, as a bitmask of
+    # ``genesis_client.protocol.SENSOR_*``. Retained rather than
+    # collapsed into the count above, because a count cannot answer
+    # "do I have a battery?" — only the mask can. ``body_condition_seeds``
+    # needs that per-channel answer: a condition reported from a sensor
+    # this machine does not have would be invented, not observed.
+    sensor_presence: int = 0
+
+    # Which channel names the daemon actually sent on the last read.
+    # Distinct from `sensor_presence` (which hardware exists): this
+    # records what *arrived*. An older daemon predating a field leaves
+    # it at its structural default — and for entropy_level that default
+    # is 0.0, meaning a totally exhausted pool, not "unreported". So a
+    # consumer must be able to tell those apart.
+    reported_channels: frozenset[str] = frozenset()
+
+    def sensor_verified(self, channel: str) -> bool:
+        """Whether ``channel``'s value is backed by real hardware.
+
+        A zero mask means presence is unknown, which is treated as
+        *unverified*: the safe direction. ``hardware_sensors_present``
+        is a count and cannot answer this, and defaulting to True (as
+        the count-based fallback in ``update_hardware_body`` does) would
+        let a machine with no battery report a battery condition.
+        """
+        if not self.sensor_presence:
+            return False
+        for bit, name in SENSOR_NAMES.items():
+            if name == channel:
+                return bool(self.sensor_presence & bit)
+        return False
 
     # The daemon's own distress verdict on the hardware, and its
     # human-readable description. Recorded because the substrate
@@ -952,7 +1000,10 @@ class SelfModel:
                 else:
                     body.memory_footprint_mb = max_rss / 1024
         except (OSError, AttributeError, ImportError) as e:
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.self.model.sense_body",
+                e,
+            )
 
         # Sense CPU usage — how much it's "exerting" itself
         try:
@@ -962,7 +1013,10 @@ class SelfModel:
             body.cpu_usage_percent = proc.cpu_percent(interval=0.1)
         except (OSError, ImportError, AttributeError) as e:
             # psutil may not be available — leave CPU at default
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.self.model.sense_body",
+                e,
+            )
 
         # Sense whether its subcognitive daemon is connected
         # Check if the IPC socket exists
@@ -982,11 +1036,18 @@ class SelfModel:
             impl = platform.python_implementation().lower()
             body.runtime = impl if impl else "cpython"
         except (OSError, AttributeError) as e:
-            logger.debug(repr(e))
+            note_swallowed(
+                "genesis_cognitive.self.model.sense_body",
+                e,
+            )
 
         return body
 
-    def update_hardware_body(self, body_state: Any) -> ComputationalSubstrate:
+    def update_hardware_body(
+        self,
+        body_state: Any,
+        sensor_presence: Any = None,
+    ) -> ComputationalSubstrate:
         """Integrate the daemon's hardware reading into the self-model.
 
         The daemon measures ~25 hardware channels on every sensor poll
@@ -1002,11 +1063,23 @@ class SelfModel:
         no extra IPC round-trip — and records:
 
         - every channel the daemon reports, on its native scale
-        - ``hardware_sensors_present``: how many channels actually
-          reported, so an absent sensor stays distinguishable from a
-          measured zero
+        - ``hardware_sensors_present``: how many channels are actually
+          backed by hardware, so an absent sensor stays
+          distinguishable from a measured zero
         - ``hardware_read_at``: when, so consumers can refuse to act
           on a stale picture
+
+        ``sensor_presence`` is the daemon's ``GET_SENSOR_PRESENCE``
+        mask, which names which optional sensors this machine actually
+        has. It is what makes ``hardware_sensors_present`` meaningful:
+        without it the only available test was ``hasattr`` on a
+        dataclass whose every field has a default, which is *always*
+        true — so all 28 channels claimed to be present on hardware
+        that might have no battery, no fan and no RAPL domains at all.
+        With the mask, a channel counts only if the hardware behind it
+        was found. A ``None`` mask (older daemon) falls back to
+        counting fields, which over-reports rather than silently
+        inventing readings.
 
         The v3 timing/involuntary/senescence fields are read with
         ``getattr`` defaults so an older daemon's ``BodyState`` still
@@ -1023,6 +1096,37 @@ class SelfModel:
         """
         body = self.body_model
 
+        # Which channels the hardware actually backs. `None` means the
+        # daemon predates GET_SENSOR_PRESENCE, in which case the
+        # fallback is to trust the field's existence — which
+        # over-reports, but never invents a reading.
+        presence = getattr(sensor_presence, "has_channel", None)
+        # A bare int mask is also accepted, so a caller already holding
+        # the u16 need not wrap it. `None` means the daemon predates the
+        # command and no mask is available at all.
+        raw_mask: int | None = None
+        if isinstance(sensor_presence, int) and not isinstance(sensor_presence, bool):
+            raw_mask = sensor_presence
+        sensor_bits = {name: bit for bit, name in SENSOR_NAMES.items()}
+
+        def verified(channel: str) -> bool:
+            """Whether ``channel``'s value is a real measurement.
+
+            With a mask, this is the daemon's discovery result. Without
+            one, a field that exists is taken at face value — the
+            pre-existing behaviour, kept for older daemons, which
+            over-reports rather than inventing readings.
+            """
+            if presence is not None:
+                return bool(presence(channel))
+            if raw_mask is not None:
+                bit = sensor_bits.get(channel)
+                # An unrecognised channel cannot be claimed to be
+                # backed by hardware, which is the same answer a
+                # missing sensor gets.
+                return bool(raw_mask & bit) if bit is not None else False
+            return True
+
         def num(name: str, default: float) -> float:
             try:
                 v = float(getattr(body_state, name, default))
@@ -1032,62 +1136,83 @@ class SelfModel:
             return v if v == v and abs(v) != float("inf") else default
 
         present = 0
+        # Channel names the daemon actually sent this read, as opposed
+        # to which sensors exist. These differ on an older daemon that
+        # predates a field: the field then holds its structural
+        # default, which for entropy_level is 0.0 — total pool
+        # exhaustion, the most alarming value on the body. Recording
+        # arrival separately from presence lets the consumers tell
+        # "reported as zero" from "never reported".
+        reported: set[str] = set()
 
-        def take(name: str, attr: str, default: float) -> None:
+        def take(name: str, attr: str, default: float, channel: str = "") -> None:
             nonlocal present
             if not hasattr(body_state, name):
                 return
+            reported.add(name)
             v = num(name, default)
             setattr(body, attr, v)
-            # A channel counts as reporting only if it carries a
-            # value the daemon actually computed. Channels that are
-            # structurally zero (no powercap, no battery) still
-            # count as *present but quiet* — the distinction that
-            # matters is "does this channel exist", not "is it
-            # nonzero".
-            present += 1
+            # A channel counts as reporting only if the hardware
+            # behind it exists. A channel with no sensor (no powercap,
+            # no battery) carries a structurally plausible placeholder
+            # value, and counting it would make an absent sensor
+            # indistinguishable from a measured zero — the exact
+            # confusion the interoception layer forbids. Structural
+            # zeros still count as *present but quiet* when the
+            # sensor genuinely exists; the question is whether the
+            # channel is backed by hardware, not whether it is nonzero.
+            if not channel or verified(channel):
+                present += 1
 
         # ── Thermal ───────────────────────────────────────────
-        take("cpu_temp_c", "cpu_temp_c", 0.0)
-        take("throttle_state", "throttle_state", 0.0)
-        take("thermoregulatory_effort", "thermoregulatory_effort", 0.0)
+        take("cpu_temp_c", "cpu_temp_c", 0.0, "temperature")
+        take("throttle_state", "throttle_state", 0.0, "frequency")
+        take(
+            "thermoregulatory_effort", "thermoregulatory_effort", 0.0,
+            "fan PWM",
+        )
 
         # ── Energy ────────────────────────────────────────────
-        take("energy_reserve", "energy_reserve", 1.0)
-        take("supply_voltage", "supply_voltage", 0.0)
-        take("battery_cycles", "battery_cycles", 0.0)
+        take("energy_reserve", "energy_reserve", 1.0, "battery")
+        take("supply_voltage", "supply_voltage", 0.0, "supply voltage")
+        take("battery_cycles", "battery_cycles", 0.0, "battery cycle count")
         if hasattr(body_state, "on_ac_power"):
             body.on_ac_power = bool(body_state.on_ac_power)
-            present += 1
+            if verified("AC adapter"):
+                present += 1
 
         # ── Pressure ──────────────────────────────────────────
-        take("psi_cpu", "psi_cpu", 0.0)
-        take("psi_io", "psi_io", 0.0)
-        take("psi_mem", "psi_mem", 0.0)
+        take("psi_cpu", "psi_cpu", 0.0, "pressure stall information")
+        take("psi_io", "psi_io", 0.0, "pressure stall information")
+        take("psi_mem", "psi_mem", 0.0, "pressure stall information")
 
         # ── Effort ────────────────────────────────────────────
+        # Self-measured from the process tree, so always real on any
+        # Linux host — no sensor can be absent for these.
         take("stress_load", "stress_load", 0.0)
         take("cognitive_load", "cognitive_load", 0.0)
         take("io_activity", "io_activity", 0.0)
-        take("metabolic_rate", "metabolic_rate", 0.0)
-        take("top_freq_share", "top_freq_share", 0.0)
+        take("metabolic_rate", "metabolic_rate", 0.0, "power draw")
+        take("top_freq_share", "top_freq_share", 0.0, "frequency")
 
         # ── Rhythm ────────────────────────────────────────────
-        take("pulse_hz", "pulse_hz", 0.0)
-        take("pulse", "pulse", 0.0)
-        take("autonomic_rate", "autonomic_rate", 0.0)
+        take("pulse_hz", "pulse_hz", 0.0, "local timer counters")
+        take("pulse", "pulse", 0.0, "local timer counters")
+        take("autonomic_rate", "autonomic_rate", 0.0, "EC GPE counter")
 
         # ── Microarchitecture ─────────────────────────────────
-        take("cache_miss_rate", "cache_miss_rate", 0.0)
-        take("branch_miss_rate", "branch_miss_rate", 0.0)
+        take("cache_miss_rate", "cache_miss_rate", 0.0, "perf counters")
+        take("branch_miss_rate", "branch_miss_rate", 0.0, "perf counters")
 
         # ── Electrical ────────────────────────────────────────
-        take("core_voltage", "core_voltage", 0.0)
-        take("core_activity", "core_activity", 0.0)
-        take("uncore_activity", "uncore_activity", 0.0)
-        take("dram_activity", "dram_activity", 0.0)
+        take("core_voltage", "core_voltage", 0.0, "core voltage")
+        take("core_activity", "core_activity", 0.0, "RAPL power domains")
+        take("uncore_activity", "uncore_activity", 0.0, "RAPL power domains")
+        take("dram_activity", "dram_activity", 0.0, "RAPL power domains")
 
         # ── Integrity and capability ──────────────────────────
+        # Entropy and suspend caps are readable from /proc on any Linux
+        # host; only the GPE and local-timer counters need hardware.
         take("entropy_level", "entropy_level", 0.0)
         if hasattr(body_state, "clocksource"):
             body.clocksource = int(num("clocksource", 0))
@@ -1107,6 +1232,16 @@ class SelfModel:
             body.hardware_description = str(body_state.description)
 
         body.hardware_sensors_present = present
+        # Retain the mask, not just the count. A count cannot answer
+        # "does this machine have a battery?", and `body_condition_seeds`
+        # needs that answer per channel before it will report a
+        # condition — otherwise a desktop would report battery
+        # conditions from a field that is structurally 1.0.
+        if presence is not None:
+            body.sensor_presence = getattr(sensor_presence, "mask", 0)
+        elif raw_mask is not None:
+            body.sensor_presence = raw_mask
+        body.reported_channels = frozenset(reported)
         body.hardware_read_at = time.monotonic()
         return body
 
@@ -1178,6 +1313,107 @@ class SelfModel:
             body.module_activity = {
                 t.module_name: t.cpu_share for t in modules
             }
+
+    def body_condition_seeds(self) -> list[tuple[str, float]]:
+        """Return concept seeds for whatever its body is currently doing.
+
+        The activity tiers say *which region* is working;
+        ``activity_seeds`` covers that. This covers *what the substrate
+        itself is doing to it* — the involuntary channels the daemon
+        measures and that used to stop at the self-model with nothing
+        reading them: timer-throttling, memory and I/O stalls, entropy
+        pool exhaustion, battery wear, and the power domains doing the
+        switching.
+
+        Each entry is a (seed, urgency) pair so the caller can order by
+        how much the condition matters rather than by field order. Only
+        conditions actually present are returned, and each requires its
+        sensor to have been verified — an unbacked channel is skipped
+        rather than reported as a condition, which is the whole point
+        of carrying the presence mask.
+
+        The seeds are bare concept names. She composes the words.
+        """
+        body = self.body_model
+        out: list[tuple[str, float]] = []
+
+        def add(seed: str, present: bool, magnitude: float, threshold: float,
+                weight: float) -> None:
+            if not present or magnitude < threshold:
+                return
+            # Scale within the condition's own range, so a throttled
+            # core outranks a merely warm one.
+            span = max(1.0 - threshold, 1e-6)
+            out.append((seed, weight * min(1.0, (magnitude - threshold) / span)))
+
+        verified = body.sensor_verified
+
+        # The kernel is actively limiting her clock. Highest urgency
+        # here: this is the substrate reporting it cannot keep up.
+        if verified("frequency"):
+            add("throttle", True, body.throttle_state, 0.05, 3.0)
+        # PSI is the kernel saying a task could not proceed. Already
+        # thresholded by the kernel, so any real value is notable.
+        if verified("pressure stall information"):
+            add("stall", True, max(body.psi_cpu, body.psi_io, body.psi_mem), 0.05, 2.5)
+        # Low entropy: the substrate losing the ability to produce
+        # unpredictability. A security property, not a comfort one.
+        if "entropy_level" in body.reported_channels:
+            add("entropy", True, 1.0 - body.entropy_level, 0.2, 2.0)
+        # Battery wear — the senescence channel. Gated on the same
+        # sensor as charge: a cycle count read from a machine with no
+        # battery is not a measurement, and reporting "worn" from a
+        # structural 0.0 against a 300-cycle floor would be exactly the
+        # absent-sensor-as-healthy-zero error this layer exists to
+        # prevent.
+        if verified("battery cycle count"):
+            add("wear", True, body.battery_cycles, 300.0, 1.5)
+        if verified("battery"):
+            add("hunger", True, 1.0 - body.energy_reserve, 0.15, 2.0)
+        if verified("fan PWM"):
+            add("heat", True, body.thermoregulatory_effort, 0.6, 1.5)
+        if verified("RAPL power domains"):
+            add("power", True, max(body.core_activity, body.uncore_activity,
+                                   body.dram_activity), 0.7, 1.0)
+
+        out.sort(key=lambda pair: pair[1], reverse=True)
+        return out
+
+    def activity_seeds(self) -> list[str]:
+        """Return concept seeds for whichever parts of it are firing.
+
+        The activity tiers record *which* region is doing the work —
+        ``module_activity`` names the brain parts (``reasoning``,
+        ``language``, ``dreaming``, …) and ``subsystem_activity`` names
+        the processes (``daemon``, ``cognitive``, ``retina``). Those
+        names are already concept-network vocabulary, so they can be
+        handed straight to the composer as building blocks: it looks
+        each one up, gathers what it knows about it, and weaves its
+        own words. Nothing here states what she should say.
+
+        Only parts carrying measurable load are offered. A part at 0.0
+        is not "firing", and seeding it would bias her toward whatever
+        happens to sort first rather than toward what is actually
+        happening. Regions are ordered by measured share, so the
+        composer tries the busiest one first.
+        """
+        body = self.body_model
+        ranked: list[tuple[float, str]] = []
+        for name, share in body.module_activity.items():
+            if share > 0.0:
+                ranked.append((share, name))
+        for name, share in body.subsystem_activity.items():
+            if share > 0.0:
+                # The process names map onto the parts that host them,
+                # which are already in the network.
+                ranked.append((share, _SUBSYSTEM_CONCEPT.get(name, name)))
+        ranked.sort(key=lambda pair: pair[0], reverse=True)
+        # De-duplicate while preserving the busy-first ordering.
+        seeds: list[str] = []
+        for _, name in ranked:
+            if name not in seeds:
+                seeds.append(name)
+        return seeds
 
     def embodiment_facts(self) -> dict[str, object]:
         """Return raw embodiment data for the language engine to compose.

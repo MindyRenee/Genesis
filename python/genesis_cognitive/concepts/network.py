@@ -19,6 +19,8 @@ from collections import deque
 from dataclasses import replace
 from typing import Any, ClassVar
 
+from genesis_client.swallow import note_swallowed
+
 from .archival import ArchivalMixin
 from .classify import (
     _CAMEL_SPLIT_RE,
@@ -410,7 +412,10 @@ class ConceptNetwork(
         try:
             return self._archive.count()
         except (sqlite3.Error, RuntimeError) as e:
-            logger.debug(f"archive count failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.concepts.network.archive_size",
+                e,
+            )
             return 0
     @property
     def total_concept_count(self) -> int:
@@ -1034,7 +1039,10 @@ class ConceptNetwork(
                             properties, new_column,
                         )
             except (sqlite3.Error, RuntimeError) as e:
-                logger.debug(f"archive check in add_concept failed for {name!r}: {e}")
+                note_swallowed(
+                    "genesis_cognitive.concepts.network.add_concept",
+                    e,
+                )
 
         # Create new concept
         return self._create_new_concept(
@@ -1321,7 +1329,10 @@ class ConceptNetwork(
                     for target, sim in hits:
                         result.append((target, rel, float(sim)))
         except (KeyError, ValueError, AttributeError, TypeError) as e:
-            logger.debug(f"holographic neighbor query failed: {e}")
+            note_swallowed(
+                "genesis_cognitive.concepts.network._query_holographic_neighbors",
+                e,
+            )
         return result
     def find_concepts_by_origin(self, origin: str, limit: int = 100) -> list[str]:
         """Find all concept IDs with a given origin.
@@ -2382,7 +2393,10 @@ class ConceptNetwork(
             try:
                 self._archive.remove_edges_for_concept(cid)
             except (sqlite3.Error, RuntimeError) as e:
-                logger.debug(f"archive edge cleanup failed for {cid!r}: {e}")
+                note_swallowed(
+                    "genesis_cognitive.concepts.network.remove_concept",
+                    e,
+                )
 
         # Rebuild edge indices
         self._edge_index = {}
@@ -2464,7 +2478,10 @@ class ConceptNetwork(
                 try:
                     self._archive.remove_edges_for_concept(cid)
                 except (sqlite3.Error, RuntimeError) as e:
-                    logger.debug(f"archive edge cleanup failed for {cid!r}: {e}")
+                    note_swallowed(
+                        "genesis_cognitive.concepts.network.remove_concepts_batch",
+                        e,
+                    )
 
         # Rebuild edge indices once
         self._edge_index = {}

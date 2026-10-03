@@ -42,6 +42,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TextIO
 
+from genesis_client.swallow import note_swallowed
+
 from .types import Edge, RelationType
 
 logger = logging.getLogger(__name__)
@@ -423,7 +425,10 @@ class EdgeLog:
                 try:
                     os.unlink(tmp)
                 except OSError as cleanup_e:
-                    logger.debug(f"edge-log snapshot tmp cleanup skipped: {cleanup_e}")
+                    note_swallowed(
+                        "genesis_cognitive.concepts.edge_log.compact",
+                        cleanup_e,
+                    )
                 # Test for *closed*, not just None. The handle was
                 # closed above before the rename, so on a rename
                 # failure it is still a live reference to a closed file

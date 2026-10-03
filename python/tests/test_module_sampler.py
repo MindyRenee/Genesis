@@ -48,14 +48,15 @@ def test_directory_attribution():
     assert _module_of_filename(_p("reasoning", "x.py")) == MODULE_REASONING
     assert _module_of_filename(_p("language", "engine.py")) == MODULE_LANGUAGE
     assert _module_of_filename(_p("perception", "vision.py")) == MODULE_SENSORY
-    assert _module_of_filename(_p("vision", "x.py")) == MODULE_SENSORY
-    assert _module_of_filename(_p("relay", "x.py")) == MODULE_ATTENTION
-    assert _module_of_filename(_p("affect", "x.py")) == MODULE_EMOTION
+    assert _module_of_filename(_p("occipital_lobe", "v1.py")) == MODULE_SENSORY
+    assert _module_of_filename(_p("temporal_lobe", "vtc.py")) == MODULE_SENSORY
+    assert _module_of_filename(_p("thalamus", "x.py")) == MODULE_ATTENTION
+    assert _module_of_filename(_p("limbic_system", "x.py")) == MODULE_EMOTION
     assert _module_of_filename(_p("neurochemical", "x.py")) == MODULE_EMOTION
-    assert _module_of_filename(_p("autonomics", "x.py")) == MODULE_EMOTION
-    assert _module_of_filename(_p("control", "x.py")) == MODULE_INTENTION
-    assert _module_of_filename(_p("action_selection", "x.py")) == MODULE_INTENTION
-    assert _module_of_filename(_p("motor_learning", "x.py")) == MODULE_MOTOR
+    assert _module_of_filename(_p("brainstem", "x.py")) == MODULE_EMOTION
+    assert _module_of_filename(_p("frontal_lobe", "x.py")) == MODULE_INTENTION
+    assert _module_of_filename(_p("basal_ganglia", "x.py")) == MODULE_INTENTION
+    assert _module_of_filename(_p("cerebellum", "x.py")) == MODULE_MOTOR
     assert _module_of_filename(_p("sleep", "inner_life.py")) == MODULE_DREAMING
     assert _module_of_filename(_p("learning", "x.py")) == MODULE_INTENTION
     assert _module_of_filename(_p("self", "model.py")) == MODULE_METACOGNITION

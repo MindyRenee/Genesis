@@ -264,6 +264,93 @@ pub mod cmd {
     /// Request: [f32 authority] in [0, 1].
     /// Response: [u8 ack] + [f32 applied] (the clamped value written).
     pub const SET_POLICY_AUTHORITY: u8 = 35;
+
+    /// Which optional hardware sensors this machine actually has.
+    ///
+    /// `GET_BODY_STATE` returns ~30 values with no per-channel validity,
+    /// so a channel backed by no sensor is indistinguishable from one
+    /// reading a healthy zero. That distinction is the whole basis of
+    /// the interoception layer's rule that an absent sensor must never
+    /// be treated as a measurement, so it needs to reach the cognitive
+    /// layer explicitly.
+    ///
+    /// Response: [u16 mask] — a bitmask of
+    /// `interoception::sensor::*`. A set bit means the matching
+    /// BodyState field carries a real reading; a clear bit means there
+    /// is no sensor and the field is a placeholder. Zero means nothing
+    /// has been discovered yet, which is the safe direction.
+    ///
+    /// Additive: no BodyState layout changed, so this does not bump
+    /// PROTOCOL_VERSION. An older daemon rejects it as unknown, which
+    /// the client handles by treating every channel as unverified.
+    pub const GET_SENSOR_PRESENCE: u8 = 36;
+
+    /// How many times Genesis has changed task zone and emergent phase,
+    /// and how long it has spent in each.
+    ///
+    /// Response: [u8 zone_count][u8 phase_count] then per zone:
+    ///   [u32 count][u64 total_ms]
+    /// then per phase, same 12-byte record.
+    ///
+    /// Emergent phase transitions are a stated contribution, but nothing
+    /// measured them: `ActiveZones` holds one `zone_duration_ms` sample
+    /// that every transition overwrites, and no count at all. So neither
+    /// how often the system changed phase nor how long it dwelled in
+    /// each was answerable — an oscillating system looked identical to a
+    /// settled one.
+    ///
+    /// Zone and phase are reported separately because they are driven by
+    /// different mechanisms: the zone follows intentions, the phase
+    /// follows neurochemistry. Oscillating in one while stable in the
+    /// other is a distinct fault.
+    ///
+    /// Counts are process-local and reset on restart, which suits a
+    /// rate. Zone and phase indices index the `CognitiveZone` and
+    /// `MentalPhase` discriminants; an index with no accumulated time
+    /// reads as zero.
+    ///
+    /// Additive, like GET_SENSOR_PRESENCE: no BodyState layout changed.
+    pub const GET_ZONE_TRANSITIONS: u8 = 37;
+
+    /// Which of Genesis's own processes are alive, and how many have died.
+    ///
+    /// A subsystem that dies used to vanish from
+    /// `GET_SUBSYSTEM_TELEMETRY` with no trace, so a crashed retina was
+    /// indistinguishable from one that was never started. This reports
+    /// liveness explicitly and counts losses.
+    ///
+    /// Response: `[u16 alive_mask][u16 deaths][u8 last_death]`
+    ///
+    /// Bit *n* of `alive_mask` is set while subsystem *n* is running
+    /// (0 = daemon, 1 = cognitive, 2 = retina). `deaths` counts
+    /// transitions from alive to not-alive since startup; a subsystem
+    /// that was never running does not count. `last_death` is the
+    /// subsystem index of the most recent loss, or 0xff if none.
+    ///
+    /// Additive, like the other telemetry commands: no BodyState layout
+    /// changed.
+    pub const GET_PROCESS_HEALTH: u8 = 38;
+
+    /// Advance the body by an explicit step. **Evaluation only.**
+    ///
+    /// The production path (`ADVANCE_NEURO`) takes no step: the daemon
+    /// owns time and measures its own elapsed interval, because a
+    /// caller-chosen step is what let the mind dictate the body's
+    /// integration rate. Offline experiments still need one — the
+    /// causal assay in `python/genesis_cognitive/eval/assay.py` advances
+    /// a fixed number of ticks and reads the per-tick response, so `dt`
+    /// is its independent variable and cannot be the daemon's wall clock.
+    ///
+    /// Deliberately a *separate command* rather than a parameter on
+    /// `ADVANCE_NEURO`: the production entry point has no way to be
+    /// called with a caller-chosen step, so the coupling cannot be
+    /// reintroduced by a well-meaning caller. Only ever used against an
+    /// isolated daemon in a temporary data directory (`eval/harness.py`),
+    /// never the live one.
+    ///
+    /// Request: [f32 dt]. Response: same 21-byte shape as
+    /// ADVANCE_NEURO, so the existing client decode path is reused.
+    pub const ADVANCE_PHYSICS: u8 = 39;
 }
 
 /// Notification opcodes for daemon→cognitive push messages.
@@ -271,7 +358,8 @@ pub mod cmd {
 /// **Reserved / unwired.** The IPC channel is strictly request-response:
 /// the daemon never writes an unsolicited message to a client, so none
 /// of these are ever sent today. The cognitive mind instead detects
-/// these events by polling (`python/genesis_cognitive/notifications.py`,
+/// these events by polling (`python/genesis_cognitive/infrastructure/
+/// notifications.py`,
 /// a pull-based queue), which is the active mechanism. These constants
 /// reserve the 100+ opcode range for a future push implementation and
 /// mirror the Python `NOTIFY_*` constants in
@@ -578,6 +666,12 @@ pub struct ModuleTelemetrySummary {
     pub status: u8,
     /// Self-reported activity share of the cognitive process [0,1].
     pub cpu_share: f32,
+    /// The task this part is working on (0 = none). Distinguishes a
+    /// part that is busy from one that is busy *on something*.
+    pub task_id: u64,
+    /// Last error this part reported (0 = none). Lets a failed part be
+    /// told apart from one that simply is not running.
+    pub error_code: u32,
 }
 
 /// Combined response of GET_SUBSYSTEM_TELEMETRY: process-level subsystems
@@ -835,15 +929,19 @@ fn serialize_body_state(body: &super::interoception::BodyState) -> Vec<u8> {
 ///   [f32 cache_miss_rate][f32 branch_miss_rate]
 ///   then a module section — the mind's self-reported anatomy:
 ///   [u8 module_count] then per module:
-///   [u8 module_id][u8 status][f32 cpu_share]
+///   [u8 module_id][u8 status][f32 cpu_share][u64 task_id][u32 error_code]
 ///
-/// 1 + count × 21 + 1 + module_count × 6 bytes.
+/// The task_id and error_code tail was added in protocol v3; a parser
+/// that stops after `cpu_share` still reads the original six-byte
+/// record, and both Rust and Python clients tolerate a short tail.
+///
+/// 1 + count × 21 + 1 + module_count × 18 bytes.
 /// An empty report serializes as [0][0].
 fn serialize_subsystem_telemetry(
     subsystems: &[super::interoception::SubsystemTelemetry],
-    modules: &[(u8, u8, f32)],
+    modules: &[(u8, u8, f32, u64, u32)],
 ) -> Vec<u8> {
-    let mut resp = Vec::with_capacity(2 + subsystems.len() * 21 + modules.len() * 6);
+    let mut resp = Vec::with_capacity(2 + subsystems.len() * 21 + modules.len() * 18);
     resp.push(subsystems.len().min(u8::MAX as usize) as u8);
     for subsystem in subsystems.iter().take(u8::MAX as usize) {
         resp.push(subsystem.subsystem.to_wire());
@@ -864,12 +962,15 @@ fn serialize_subsystem_telemetry(
         );
     }
     resp.push(modules.len().min(u8::MAX as usize) as u8);
-    for (module_id, status, cpu_share) in modules.iter().take(u8::MAX as usize) {
+    for (module_id, status, cpu_share, task_id, error_code) in modules.iter().take(u8::MAX as usize)
+    {
         resp.push(*module_id);
         resp.push(*status);
         resp.extend_from_slice(
             &crate::state::sanitize::finite_clamp(*cpu_share, 0.0, 1.0).to_le_bytes(),
         );
+        resp.extend_from_slice(&task_id.to_le_bytes());
+        resp.extend_from_slice(&error_code.to_le_bytes());
     }
     resp
 }
@@ -1660,7 +1761,6 @@ impl IpcClient {
         let resp = self.request(cmd::GET_SUBSYSTEM_TELEMETRY, &[])?;
         let count = resp.first().copied().unwrap_or(0) as usize;
         const REC: usize = 21;
-        const MOD_REC: usize = 6;
         if resp.len() < 1 + count * REC {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
@@ -1692,15 +1792,18 @@ impl IpcClient {
                 branch_miss_rate: f32_at(17),
             });
         }
-        // Module section (v2). Older daemons end after the subsystem
-        // section — treat a missing/short module tail as empty.
+        // Module section. Older daemons end after the subsystem section
+        // — treat a missing/short module tail as empty. The task/error
+        // tail is itself optional, so a v2-era record (6 bytes) parses
+        // with both fields zero rather than failing.
         let tail = 1 + count * REC;
         if resp.len() > tail {
             let mcount = resp[tail] as usize;
-            if resp.len() >= tail + 1 + mcount * MOD_REC {
+            const MOD_REC_V3: usize = 18;
+            if resp.len() >= tail + 1 + mcount * MOD_REC_V3 {
                 report.modules = Vec::with_capacity(mcount);
                 for i in 0..mcount {
-                    let base = tail + 1 + i * MOD_REC;
+                    let base = tail + 1 + i * MOD_REC_V3;
                     report.modules.push(ModuleTelemetrySummary {
                         module_id: resp[base],
                         status: resp[base + 1],
@@ -1709,6 +1812,16 @@ impl IpcClient {
                                 .and_then(|s| s.try_into().ok())
                                 .unwrap_or([0u8; 4]),
                         ),
+                        task_id: resp
+                            .get(base + 6..base + 14)
+                            .and_then(|s| s.try_into().ok())
+                            .map(u64::from_le_bytes)
+                            .unwrap_or(0),
+                        error_code: resp
+                            .get(base + 14..base + 18)
+                            .and_then(|s| s.try_into().ok())
+                            .map(u32::from_le_bytes)
+                            .unwrap_or(0),
                     });
                 }
             }
@@ -2547,7 +2660,10 @@ pub fn default_handler(
         cmd::SHUTDOWN => vec![1],
 
         cmd::UPDATE_MODULE_STATUS => {
-            // Request:  [u8 module_id] [u8 status] [optional f32 cpu_share]
+            // Request:  [u8 module_id] [u8 status]
+            //            [optional f32 cpu_share]     (6 bytes total)
+            //            [optional u64 task_id]       (14 bytes total)
+            //            [optional u32 error_code]    (18 bytes total)
             // Response: [u8 ack (1=ok, 0=invalid module/status)]
             //
             // The optional cpu_share is the module's self-reported
@@ -2555,6 +2671,13 @@ pub fn default_handler(
             // how much of its cycle time each brain part consumed
             // and reports it here so GET_SUBSYSTEM_TELEMETRY can answer
             // "which brain part is firing" at module granularity.
+            //
+            // task_id and error_code fill two manifest fields that had
+            // no producer at all. A module that failed used to be
+            // indistinguishable from one that had never run, and
+            // "which task is this part on" was unanswerable. Both are
+            // optional and trailing, so this stays wire-compatible with
+            // a client that sends only the original two bytes.
             if payload.len() < 2 {
                 return vec![error::PAYLOAD_TOO_SHORT];
             }
@@ -2573,6 +2696,12 @@ pub fn default_handler(
             } else {
                 None
             };
+            let task_id = payload
+                .get(6..14)
+                .map(|s| u64::from_le_bytes(s.try_into().unwrap_or([0u8; 8])));
+            let error_code = payload
+                .get(14..18)
+                .map(|s| u32::from_le_bytes(s.try_into().unwrap_or([0u8; 4])));
             let now = crate::daemon::current_ms();
 
             // Validate module_id against known ModuleId values (0-11)
@@ -2590,6 +2719,21 @@ pub fn default_handler(
                     module.heartbeat(now);
                     if let Some(share) = cpu_share {
                         module.cpu_share = share;
+                    }
+                    if let Some(id) = task_id {
+                        module.set_task(id);
+                    }
+                    if let Some(code) = error_code {
+                        // A module reporting Running must not keep an
+                        // error set from an earlier failure, or a
+                        // recovered module reads as permanently broken.
+                        module.set_error(code);
+                        if status != crate::state::ModuleStatus::Error as u8 && code != 0 {
+                            eprintln!(
+                                "[ipc] module {module_id} reported error {code} with \
+                                 non-Error status {status}"
+                            );
+                        }
                     }
                 }
                 state.manifest.recompute();
@@ -2784,11 +2928,19 @@ pub fn default_handler(
             if let Some(state) = mmap.read_consistent() {
                 for m in &state.manifest.modules {
                     if m.status() != crate::state::ModuleStatus::Stopped {
-                        modules.push((m.module_id, m.status, m.cpu_share));
+                        modules.push((m.module_id, m.status, m.cpu_share, m.task_id, m.error_code));
                     }
                 }
             }
             serialize_subsystem_telemetry(&subsystems, &modules)
+        }
+
+        cmd::GET_SENSOR_PRESENCE => {
+            // Which sensors exist, so the cognitive layer can tell an
+            // absent channel from a reading of zero.
+            super::interoception::read_sensor_presence()
+                .to_le_bytes()
+                .to_vec()
         }
 
         cmd::SET_WAKE_ALARM => {
@@ -3155,11 +3307,19 @@ pub fn reactive_handler(
                         0,
                     ];
                 }
-                let dt = crate::state::sanitize::finite_clamp(
-                    f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default()),
-                    0.001,
-                    10.0,
-                );
+                // The payload's dt is deliberately IGNORED. The daemon
+                // owns time: it is the body, and it integrates at
+                // TICK_INTERVAL_MS regardless of how often — or how
+                // quickly — the mind asks. Letting the mind supply the
+                // step is what let the body be integrated in ~1-second
+                // lumps while its rate constants are tuned for 200 ms.
+                //
+                // The 4-byte field stays on the wire so the frame layout
+                // and PROTOCOL_VERSION are unchanged; it is read only to
+                // keep the length contract explicit and is otherwise
+                // dead. A future protocol revision can drop it.
+                let _requested_dt =
+                    f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
                 let mut tl = match tick_loop.lock() {
                     Ok(tl) => tl,
                     Err(e) => {
@@ -3191,7 +3351,86 @@ pub fn reactive_handler(
                 };
                 tl.note_mind_drive();
                 let (surprise, free_energy, precision, allostatic, tick_count) =
-                    tl.advance_neuro(mmap, dt);
+                    tl.advance_neuro(mmap);
+                let mut resp = vec![1u8]; // ack
+                resp.extend_from_slice(&surprise.to_le_bytes());
+                resp.extend_from_slice(&free_energy.to_le_bytes());
+                resp.extend_from_slice(&precision.to_le_bytes());
+                resp.extend_from_slice(&allostatic.to_le_bytes());
+                resp.extend_from_slice(&tick_count.to_le_bytes());
+                resp
+            }
+
+            cmd::ADVANCE_PHYSICS => {
+                // Evaluation-only sibling of ADVANCE_NEURO. See the
+                // opcode's doc comment: the production command cannot be
+                // given a caller-chosen step, and this one exists so
+                // offline assays can still vary it deliberately against
+                // an isolated daemon.
+                if payload.len() < 4 {
+                    return vec![
+                        error::PAYLOAD_TOO_SHORT,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                    ];
+                }
+                // Same bounds the body applies to its own elapsed time,
+                // so an experiment cannot request a step the production
+                // integrator would refuse.
+                let dt = crate::state::sanitize::finite_clamp(
+                    f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default()),
+                    super::tick::DT_MIN,
+                    super::tick::DT_MAX,
+                );
+                let mut tl = match tick_loop.lock() {
+                    Ok(tl) => tl,
+                    Err(e) => {
+                        eprintln!("[ipc] ADVANCE_PHYSICS: tick_loop poisoned: {e}");
+                        return vec![
+                            error::INTERNAL_ERROR,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                            0,
+                        ];
+                    }
+                };
+                let (surprise, free_energy, precision, allostatic, tick_count) =
+                    tl.advance_physics(mmap, dt);
                 let mut resp = vec![1u8]; // ack
                 resp.extend_from_slice(&surprise.to_le_bytes());
                 resp.extend_from_slice(&free_energy.to_le_bytes());
@@ -3272,12 +3511,55 @@ pub fn reactive_handler(
                     }
                 };
                 tl.note_mind_drive();
-                let _ = tl.apply_body_control(mmap);
-                // Return the control state — the shared layout,
-                // prefixed with a one-byte ack.
+                // The ack still reports "request handled" — the control
+                // state is returned either way and the client contract
+                // (BodyControlState | None) treats a non-1 ack as "the
+                // daemon could not act on this". What changed is that
+                // actuation failures are no longer invisible: the
+                // individual writes report their cause once, and the
+                // aggregate is logged below.
+                let applied = tl.apply_body_control(mmap);
+                super::cpufreq::report_body_control_outcome(applied);
                 let ctrl = super::cpufreq::read_shared_control_state();
                 let mut resp = vec![1]; // ack
                 resp.extend_from_slice(&serialize_body_control(&ctrl));
+                resp
+            }
+
+            cmd::GET_ZONE_TRANSITIONS => {
+                // Transition counts and dwell time per zone and per phase.
+                // Lives on the reactive path because the tallies are
+                // held by the TickLoop, which only this handler locks.
+                let now_ms = crate::daemon::current_ms();
+                let tally_guard = match tick_loop.lock() {
+                    Ok(t) => t,
+                    Err(e) => {
+                        eprintln!("[ipc] GET_ZONE_TRANSITIONS: tick_loop poisoned: {e}");
+                        return vec![error::INTERNAL_ERROR];
+                    }
+                };
+                let mut resp = Vec::with_capacity(2 + 24 * crate::state::zones::TRACKED_STATES);
+                for tally in [&tally_guard.zone_tally, &tally_guard.phase_tally] {
+                    resp.push(crate::state::zones::TRACKED_STATES as u8);
+                    for idx in 0..crate::state::zones::TRACKED_STATES {
+                        let i = idx as u8;
+                        resp.extend_from_slice(&tally.counts[idx].to_le_bytes());
+                        resp.extend_from_slice(&tally.total_ms(i, now_ms).to_le_bytes());
+                    }
+                }
+                drop(tally_guard);
+                resp
+            }
+
+            cmd::GET_PROCESS_HEALTH => {
+                // Liveness of Genesis's own process tree. A subsystem
+                // that died used to disappear from the telemetry with
+                // no record; this makes the loss countable.
+                let h = super::interoception::read_process_health();
+                let mut resp = Vec::with_capacity(5);
+                resp.extend_from_slice(&h.alive_mask.to_le_bytes());
+                resp.extend_from_slice(&h.deaths.to_le_bytes());
+                resp.push(h.last_death);
                 resp
             }
 

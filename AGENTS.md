@@ -60,23 +60,18 @@ not — those must be generated, not recited.
   `linker 'cc' not found` even though `cargo check` passes. Zig ships
   a working clang; shim it so `cc` resolves:
   ```sh
-  mkdir -p /tmp/zigshim && ZIG=/path/to/zig
-  for t in cc c++ ar ranlib; do
-    printf '#!/bin/sh\nexec %s %s "$@"\n' "$ZIG" \
-      "$(case $t in cc) echo cc;; c++) echo c++;; *) echo $t;; esac)" \
-      > /tmp/zigshim/$t && chmod +x /tmp/zigshim/$t
-  done
-  export PATH=/tmp/zigshim:$PATH
-  export LIBCLANG_PATH=/path/to/libclang/clang/native
-  Z=/path/to/zig/lib
-  export BINDGEN_EXTRA_CLANG_ARGS="-I$Z/include \
-    -I$Z/libc/include/x86-linux-gnu -I$Z/libc/include/generic-glibc \
-    -I$Z/libc/include/x86-linux-any -I$Z/libc/include/any-linux-any"
-  cargo test --release
+  . ./scripts/cargo-env.sh && cargo test --release
   ```
-  `BINDGEN_EXTRA_CLANG_ARGS` must match `zig cc -E -v -x c /dev/null`
-  exactly; a partial include set fails on `__STD_TYPE`. With this, the
-  full Rust suite is 498 tests.
+  `scripts/cargo-env.sh` builds the shim and exports `PATH`,
+  `LIBCLANG_PATH`, and `BINDGEN_EXTRA_CLANG_ARGS`. It defaults to the
+  roots verified on this host (Zig 0.16.0 under `~/tools`); override with
+  `ZIG_ROOT=` / `LIBCLANG_ROOT=` if yours differ. The include set must
+  match `$ZIG cc -E -v -x c /dev/null` exactly — print it and copy the
+  `<...>` search list. A partial set fails on `__STD_TYPE` inside
+  `stddef.h`. With this the Rust suite is 520 tests and takes ~2 min.
+  The include set must match `$ZIG cc -E -v -x c /dev/null` exactly — print
+  it and copy the `<...>` search list. A partial set fails on `__STD_TYPE`
+  inside `stddef.h`. With this the Rust suite is 520 tests and takes ~2 min.
 - Run examples: `cargo run --example <name>`
 - Python 3.12+ (CI tests 3.12 and 3.14), dependencies pinned in
   `python/requirements.txt`
@@ -86,6 +81,31 @@ not — those must be generated, not recited.
 - Type check: `mypy python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ --ignore-missing-imports` (0 errors)
 - Optional voice deps (not in requirements.txt): `vosk`, `sounddevice`,
   `speechrecognition` — install separately for microphone/TTS support
+
+## Time ownership
+The daemon is the sole authority on time and on physics. It is the
+body: it integrates neurochemistry, circadian phase, and sleep staging
+on its own clock at `TICK_INTERVAL_MS` (200 ms), whether or not the
+cognitive mind is alive.
+
+- `TickLoop::advance_neuro(mmap)` takes **no `dt`**. The body measures
+  its own elapsed interval (clamped to `DT_MIN..DT_MAX`, shared with the
+  cognitive layer so both clocks accept the same range).
+- `advance_physics` sub-steps at `neurochemical::DT` (100 ms), so the
+  integration resolution cannot drift with the caller's cadence.
+- Both entry points run the interval-gated body maintenance —
+  interoception, CPU/thermal policy. Losing those starved the body for
+  as long as the mind held the lease, which was the original defect.
+- The mind is an observer. It reads `CoreState.inference` (the 64-byte
+  `InferenceSignals` block at offset 3228) for surprise, free energy,
+  precision, and allostatic load rather than provoking a physics advance
+  to obtain them.
+- `tick_count` is a 5 Hz counter by construction: every
+  `_INTERVAL_TICKS` gate assumes it. A caller-chosen step would stretch
+  those periods.
+
+Build environment: `. ./scripts/cargo-env.sh` then `cargo test --release`.
+See the Toolchain section above.
 
 ## Wire protocol
 - The daemon↔mind IPC protocol lives in `src/daemon/ipc.rs`
@@ -98,6 +118,40 @@ not — those must be generated, not recited.
   `scripts/install_sudoers.sh`). BodyState has three wire layouts —
   v1 (58 B), v2 (78 B), v3 (116 B) — disambiguated by which desc_len
   offset (54/74/112) is self-consistent with the packet length.
+  **Do not add a field to BodyState**: each layout is distinguished by
+  that desc_len arithmetic, so a new field means a fourth layout and a
+  version bump. Per-channel sensor validity is served separately by
+  `GET_SENSOR_PRESENCE = 36` (a `u16` bitmask of
+  `interoception::sensor::*` / `protocol.SENSOR_*`) — additive, so it
+  does not bump `PROTOCOL_VERSION`. A zero mask means nothing is
+  confirmed present, which is the safe direction. Absent-sensor
+  discipline depends on it: `ComputationalSubstrate.sensor_verified`
+  and `reported_channels` gate every body-condition claim, so a channel
+  that no hardware backs can never be reported as a reading.
+  `GET_ZONE_TRANSITIONS = 37` is likewise additive — zone and phase
+  transition counts with dwell time, tracked in
+  `zones::TransitionTally` (process-local, because `ActiveZones` is
+  exactly 96 bytes with no reserved tail and a field there would force
+  a layout migration).
+  `GET_PROCESS_HEALTH = 38` reports `[u16 alive_mask][u16 deaths][u8
+  last_death]` for the daemon/cognitive/retina process tree — a
+  subsystem that dies used to vanish from the telemetry with no trace,
+  so a crashed retina was indistinguishable from one never started.
+  `ADVANCE_PHYSICS = 39` is an evaluation-only sibling of
+  `ADVANCE_NEURO = 24`, both requesting `[f32 dt]` and both returning the
+  same 21-byte reply. `ADVANCE_NEURO`'s dt is **ignored**: the daemon
+  owns time, measures its own elapsed interval, and sub-steps at
+  `neurochemical::DT` (100 ms, the resolution every rate constant is
+  expressed against). `Mind.advance_neuro()` takes no `dt`, so the
+  coupling that let the mind dictate the body's integration rate cannot
+  be reintroduced from the cognitive layer. `advance_physics(dt)` is the
+  deliberate exception, used only by the causal assay against an isolated
+  daemon — see "Time ownership" below.
+  `UPDATE_MODULE_STATUS` accepts optional trailing `task_id` (u64) and
+  `error_code` (u32) after the 6-byte cpu_share form, which fills two
+  manifest fields that previously had no producer; the module section
+  of `GET_SUBSYSTEM_TELEMETRY` carries them back at 18 bytes/record,
+  and parsers accept the older 6-byte record as task 0 / no error.
 
 ## Keep the project tidy
 The project is large. Dead code, unused files, and stale leftovers
@@ -139,6 +193,32 @@ written at save time; the log's fold overwrites it at restore.
 - Edge mutations write through to the log; saves snapshot the fold;
   the log self-compacts past 32MB. Migration from pre-log state:
   `scripts/migrate_edges_to_log.py --data-dir DIR [--write]`.
+
+## Swallowed exceptions
+- `genesis_client/swallow.py` tallies every `except` that discards an
+  error, in both layers. The sites previously logged at DEBUG, which is
+  invisible at the default INFO level, so a subsystem could fail on
+  every cycle indefinitely with nothing saying so. Journalling each
+  occurrence would be worse than useless (a per-second failure is 86k
+  lines a day), so the journal receives the *count*: first occurrence,
+  then exponentially spaced repeats (2, 4, 8 … 4096, then every 4096),
+  and additionally whenever 300 s have elapsed so a steadily-failing
+  site cannot go stale between thresholds. 10,000 failures produce 14
+  records, the last carrying the true count. The tally lives in
+  `genesis_client` (the lower layer) with the journal injected as a
+  sink at Mind startup, because `genesis_cognitive` depends on
+  `genesis_client` and not the reverse. Query with `swallow_report()`,
+  surfaced in status as `swallowed_errors`. Site names are
+  `module.function`, derived from the real enclosing scope.
+
+## Manifest memory
+- `ModuleEntry::mem_usage_mb` is only meaningful for a module owning
+  its own process. The cognitive mind is one process hosting language,
+  memory and reasoning alike, so a per-module split would be
+  fabrication; those entries stay 0 ("not separately measurable"), the
+  process-tree total rides on `Subcognitive` so `total_mem_mb` is
+  correct, and per-process figures come from
+  `GET_SUBSYSTEM_TELEMETRY`.
 
 ## Persistence and lifecycle verification
 - `python3 -m pytest python/tests/ -q -o addopts=''` runs the full Python
