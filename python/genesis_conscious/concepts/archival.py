@@ -319,9 +319,17 @@ class ArchivalMixin:
         sleep consolidation or edge cleanup.
 
         Returns the number of concepts spilled. Returns 0 if no
-        archive is attached.
+        archive is attached, or if working memory is already within
+        budget.
+
+        "Under budget" and "nothing was dormant" both return 0, so this
+        logs which one applied at DEBUG. Without that, a caller reading
+        only the return value cannot distinguish healthy idleness from a
+        spill that silently does nothing — which is how "archived is
+        zero" read as a fact about the system rather than a symptom.
         """
         if self._archive is None:
+            logger.debug("spill_dormant: no archive attached")
             return 0
 
         # The spill protected set is smaller than _PROTECTED_ORIGINS
@@ -336,8 +344,14 @@ class ArchivalMixin:
                 "seeded", "structural",
             })
 
-        # If we're under the limit, nothing to spill
+        # Under the cap, so there is nothing to spill. Archiving is a
+        # memory-pressure valve, not a dormancy sweep: activation alone
+        # never triggers it.
         if len(self._concepts) <= max_in_memory:
+            logger.debug(
+                "spill_dormant: %d concepts is within the %d budget",
+                len(self._concepts), max_in_memory,
+            )
             return 0
 
         # Find spillable concepts, sorted by activation (most dormant first)
@@ -358,8 +372,15 @@ class ArchivalMixin:
         # How many to spill
         n_to_spill = min(len(spillable), len(self._concepts) - max_in_memory)
         if n_to_spill <= 0:
+            logger.debug(
+                "spill_dormant: %d concepts over the %d budget but none "
+                "are dormant (activation < %.3f, never reviewed, origin "
+                "not protected); working memory cannot be trimmed",
+                len(self._concepts), max_in_memory, activation_threshold,
+            )
             return 0
 
+        before = len(self._concepts)
         to_spill = {cid for _, cid in spillable[:n_to_spill]}
 
         # Serialize and archive in batch
@@ -393,6 +414,26 @@ class ArchivalMixin:
                 archive_count = self._archive.count()
             except (sqlite3.Error, RuntimeError):
                 archive_count = -1
+
+            # Verify the spill actually happened rather than trusting the
+            # batch count. A spill that reports success but leaves
+            # working memory untouched is the failure mode that hid here
+            # for as long as the archive existed: the concepts were
+            # written, an exception during edge archiving aborted the
+            # trim, the caller caught it, and the next run repeated it.
+            # Working memory then stayed over budget indefinitely while
+            # everything reported "archived" — so assert the observable
+            # effect instead of inferring it.
+            after = len(self._concepts)
+            if after >= before:
+                logger.error(
+                    "Spill reported %d concepts archived but working memory "
+                    "did not shrink (was %d, now %d). The concepts are on "
+                    "disk but still resident; the next spill will treat "
+                    "them as spillable again. This is a bug in "
+                    "_remove_spilled_from_working_memory.",
+                    spilled, before, after,
+                )
             logger.info(
                 "Spilled %d dormant concepts to archive "
                 "(working: %d, archive: %d)",

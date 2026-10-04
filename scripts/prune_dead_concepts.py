@@ -448,7 +448,8 @@ def _default_data_dir() -> str:
     Genesis config — a Flatpak or sandboxed host sets it, which would
     otherwise point this destructive script at the wrong state tree.
     """
-    explicit = os.environ.get("GENESIS_DATA_DIR")
+    # Blank counts as unset, matching run.sh and config.py.
+    explicit = (os.environ.get("GENESIS_DATA_DIR") or "").strip()
     if explicit:
         return explicit
     pin = Path(__file__).resolve().parent.parent / ".genesis-data-dir"

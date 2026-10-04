@@ -196,7 +196,8 @@ def _default_data_dir() -> str:
     config — a Flatpak or sandboxed host sets it, and migrating the wrong
     checkout's edges would rewrite its canonical log from stale data.
     """
-    explicit = os.environ.get("GENESIS_DATA_DIR")
+    # Blank counts as unset, matching run.sh and config.py.
+    explicit = (os.environ.get("GENESIS_DATA_DIR") or "").strip()
     if explicit:
         return explicit
     pin = Path(__file__).resolve().parent.parent / ".genesis-data-dir"

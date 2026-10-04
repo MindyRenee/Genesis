@@ -1663,6 +1663,78 @@ def test_spill_dormant_with_edge_log_retracts_edges() -> None:
         net._archive.close()
 
 
+def test_spill_reports_when_it_trims_nothing(caplog) -> None:
+    """A no-op spill explains itself instead of silently returning 0.
+
+    "Under budget", "no archive", and "nothing is dormant" all return 0.
+    A caller that only sees the number cannot tell healthy idleness from
+    a broken spill, which is how a real spill failure presented for a
+    long time as the flat fact "archived is zero".
+    """
+    import logging
+
+    caplog.set_level(logging.DEBUG, logger="genesis_conscious.concepts.archival")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        net = _make_network_with_archive(tmpdir)
+        for i in range(5):
+            net.add_concept(f"c{i}", confidence=0.4, origin="learned")
+
+        # Under budget.
+        assert net.spill_dormant(max_in_memory=100) == 0
+        assert "within the 100 budget" in caplog.text
+
+        # Over budget, but nothing is dormant.
+        caplog.clear()
+        for i in range(5):
+            c = net.get_concept(f"c{i}")
+            assert c is not None
+            c.activation = 0.9
+        assert net.spill_dormant(max_in_memory=2) == 0
+        assert "none are dormant" in caplog.text
+
+        # No archive attached at all.
+        caplog.clear()
+        bare = ConceptNetwork()
+        bare.add_concept("x", origin="learned")
+        assert bare.spill_dormant() == 0
+        assert "no archive attached" in caplog.text
+
+        net._archive.close()
+
+
+def test_spill_warns_if_working_memory_did_not_shrink(caplog) -> None:
+    """A reported spill that leaves working memory unchanged is an error.
+
+    This is the shape of the failure that went unnoticed: concepts
+    written to the archive, then an exception aborted the trim, and the
+    caller carried on. Working memory stayed over budget forever while
+    every report said the spill had run.
+    """
+    import logging
+
+    caplog.set_level(logging.ERROR, logger="genesis_conscious.concepts.archival")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        net = _make_network_with_archive(tmpdir)
+        for i in range(6):
+            net.add_concept(f"d{i}", confidence=0.4, origin="learned")
+            c = net.get_concept(f"d{i}")
+            assert c is not None
+            c.activation = 0.0
+
+        # Simulate the trim silently failing to take effect.
+        net._remove_spilled_from_working_memory = lambda to_spill: None  # type: ignore[method-assign]
+
+        spilled = net.spill_dormant(max_in_memory=2)
+        assert spilled > 0, "the batch itself still commits to the archive"
+        assert net.size == 6, "working memory was left untouched"
+        assert "did not shrink" in caplog.text
+        assert "ERROR" in caplog.text or caplog.records
+
+        net._archive.close()
+
+
 def test_spill_protected_origins() -> None:
     """Protected origin concepts are never spilled."""
     with tempfile.TemporaryDirectory() as tmpdir:
