@@ -439,18 +439,39 @@ def prune_state(
     )
 
 
+def _default_data_dir() -> str:
+    """Resolve the data dir the way run.sh does.
+
+    Precedence: GENESIS_DATA_DIR, then the checkout's .genesis-data-dir
+    pin, then XDG_DATA_HOME, then ~/.local/share. The pin outranks
+    XDG_DATA_HOME because the latter is ambient launcher environment, not
+    Genesis config — a Flatpak or sandboxed host sets it, which would
+    otherwise point this destructive script at the wrong state tree.
+    """
+    explicit = os.environ.get("GENESIS_DATA_DIR")
+    if explicit:
+        return explicit
+    pin = Path(__file__).resolve().parent.parent / ".genesis-data-dir"
+    if pin.is_file():
+        pinned = pin.read_text().splitlines()[0].strip()
+        if pinned:
+            return pinned
+    return os.path.join(
+        os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share")),
+        "genesis",
+    )
+
+
 def main() -> int:
     """Entry point."""
     parser = argparse.ArgumentParser(description="Prune dead concepts from Genesis state.")
     parser.add_argument(
         "--data-dir",
-        default=os.path.join(
-            os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share")),
-            "genesis",
-        ),
+        default=_default_data_dir(),
         help=(
-            "Path to the data directory "
-            "(default: ${XDG_DATA_HOME:-~/.local/share}/genesis, same as run.sh)."
+            "Path to the data directory (default: same resolution as "
+            "run.sh — GENESIS_DATA_DIR, then .genesis-data-dir, then "
+            "${XDG_DATA_HOME:-~/.local/share}/genesis)."
         ),
     )
     parser.add_argument(
