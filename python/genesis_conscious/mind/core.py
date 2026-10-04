@@ -730,12 +730,14 @@ class Mind(
         self._heartbeat_thread: threading.Thread | None = None
         self._notification_thread: threading.Thread | None = None
         self._autosave_thread: threading.Thread | None = None
-        # Counter for periodic concept-network pruning. The autonomous
-        # learner adds concepts continuously; without periodic pruning
+        # Counter for periodic concept-network shedding. The autonomous
+        # learner adds concepts continuously; without periodic shedding
         # the network bloats and every search becomes O(N) over 100K+
-        # concepts, making conversation laggy. Pruning runs every ~10
-        # autosave cycles (~20 minutes) and removes dormant learned
-        # concepts that the semantic-connect step didn't activate.
+        # concepts, making conversation laggy. Shedding runs on every
+        # 10th autosave cycle, and the autosave loop is 300 s per cycle,
+        # so ~50 minutes. Dormant concepts spill to the SQLite archive
+        # and stay recallable; only when no archive is attached does this
+        # fall back to deleting them outright.
         self._autosave_cycle = 0
 
         # Live-thought listeners — called when Genesis has a spontaneous
