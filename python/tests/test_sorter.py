@@ -12,9 +12,9 @@ from __future__ import annotations
 import json
 import random
 
-from genesis_cognitive.reasoning import TaskCompetence
-from genesis_cognitive.sorter import Block, ShapeSorter, Slot, SorterAgent
-from genesis_cognitive.spatial.practice import SpatialPractice, normalize_offered
+from genesis_conscious.reasoning import TaskCompetence
+from genesis_conscious.sorter import Block, ShapeSorter, Slot, SorterAgent
+from genesis_conscious.spatial.practice import SpatialPractice, normalize_offered
 
 
 def _sorter(n: int, seed: int, **kw) -> ShapeSorter:
@@ -178,7 +178,7 @@ class TestOfferedPuzzles:
         task = practice.current_task()
         assert task is not None and task["name"] == "shapes"
 
-        from genesis_cognitive.spatial.solver import SpatialReasoner
+        from genesis_conscious.spatial.solver import SpatialReasoner
 
         result = practice.attempt(SpatialReasoner())
         assert result is not None
@@ -211,7 +211,7 @@ class TestOfferedPuzzles:
                 }
             )
         )
-        from genesis_cognitive.spatial.solver import SpatialReasoner
+        from genesis_conscious.spatial.solver import SpatialReasoner
 
         task = practice.current_task()
         assert task is not None and task["family"] == "grid"
@@ -265,13 +265,13 @@ class TestPerceptualSorter:
     stops leaking `matched`, and the agent works from views."""
 
     def _cortex(self):
-        from genesis_cognitive.occipital_lobe.v1 import V1Model
-        from genesis_cognitive.occipital_lobe.visual_cortex import VisualCortex
+        from genesis_conscious.occipital_lobe.v1 import V1Model
+        from genesis_conscious.occipital_lobe.visual_cortex import VisualCortex
 
         return VisualCortex(V1Model())
 
     def test_candidates_hide_the_oracle(self):
-        from genesis_cognitive.sorter import PerceptualSorter
+        from genesis_conscious.sorter import PerceptualSorter
 
         base = _sorter(3, 5, difficulty=1)
         ps = PerceptualSorter(
@@ -288,7 +288,7 @@ class TestPerceptualSorter:
         assert out is not None and "matched" in out
 
     def test_views_are_seen_and_stable(self):
-        from genesis_cognitive.sorter import PerceptualSorter
+        from genesis_conscious.sorter import PerceptualSorter
 
         base = _sorter(2, 9, difficulty=1)
         ps = PerceptualSorter(
@@ -306,7 +306,7 @@ class TestPerceptualSorter:
         assert 0.0 <= sim <= 1.0
 
     def test_perceptual_agent_solves(self):
-        from genesis_cognitive.sorter import (
+        from genesis_conscious.sorter import (
             PerceptualSorter,
             PerceptualSorterAgent,
         )
@@ -331,7 +331,7 @@ class TestPerceptualSorter:
     def test_teach_names_what_was_shown(self):
         """teach() binds each object's true shape word to its view —
         graceful without an embedding store."""
-        from genesis_cognitive.sorter import PerceptualSorter
+        from genesis_conscious.sorter import PerceptualSorter
 
         base = _sorter(2, 13, difficulty=1)
         ps = PerceptualSorter(
@@ -349,8 +349,8 @@ class TestPerceptualSorter:
         is wired and the spec asks for it."""
         practice = SpatialPractice(str(tmp_path))
         practice.cortex = self._cortex()
-        from genesis_cognitive.concepts import ConceptNetwork
-        from genesis_cognitive.spatial.solver import SpatialReasoner
+        from genesis_conscious.concepts import ConceptNetwork
+        from genesis_conscious.spatial.solver import SpatialReasoner
 
         reasoner = SpatialReasoner(ConceptNetwork())
         task = normalize_offered(

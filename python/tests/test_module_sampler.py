@@ -1,7 +1,7 @@
-"""Tests for genesis_cognitive.module_sampler — the mind's EEG.
+"""Tests for genesis_conscious.brainstem.module_sampler — the mind's EEG.
 
 Verifies path→module attribution (package layout mirrors its brain
-anatomy), frame-level attribution rules (leaf in genesis_cognitive,
+anatomy), frame-level attribution rules (leaf in genesis_conscious,
 IPC calls attributed to the initiating module), and that the sampler
 credits observed execution into the shared accumulator.
 """
@@ -23,14 +23,14 @@ from genesis_client.protocol import (
     MODULE_REASONING,
     MODULE_SENSORY,
 )
-from genesis_cognitive import module_sampler
-from genesis_cognitive.module_sampler import (
+from genesis_conscious.brainstem import module_sampler
+from genesis_conscious.brainstem.module_sampler import (
     ModuleSampler,
     _module_for_frame,
     _module_of_filename,
 )
 
-PKG = os.path.dirname(module_sampler.__file__)
+PKG = module_sampler._package_root()
 
 
 def _p(*parts: str) -> str:
@@ -72,15 +72,19 @@ def test_mind_disambiguation():
 
 def test_top_level_files():
     """Top-level module files resolve individually."""
-    assert _module_of_filename(_p("emotional_regulator.py")) == MODULE_EMOTION
-    assert _module_of_filename(_p("speech.py")) == MODULE_MOTOR
-    assert _module_of_filename(_p("attention.py")) == MODULE_ATTENTION
-    assert _module_of_filename(_p("persistence.py")) == MODULE_MEMORY
-    assert _module_of_filename(_p("module_sampler.py")) == MODULE_METACOGNITION
+    assert _module_of_filename(_p("limbic_system", "emotional_regulator.py")) == (
+        MODULE_EMOTION
+    )
+    assert _module_of_filename(_p("temporal_lobe", "speech.py")) == MODULE_MOTOR
+    assert _module_of_filename(_p("parietal_lobe", "attention.py")) == MODULE_ATTENTION
+    assert _module_of_filename(_p("infrastructure", "persistence.py")) == MODULE_MEMORY
+    assert _module_of_filename(_p("brainstem", "module_sampler.py")) == (
+        MODULE_METACOGNITION
+    )
 
 
 def test_foreign_files_unattributed():
-    """Files outside genesis_cognitive resolve to None."""
+    """Files outside genesis_conscious resolve to None."""
     assert _module_of_filename("/usr/lib/python3.12/socket.py") is None
     assert _module_of_filename(f"{sys.executable}") is None
     client = os.path.join(os.path.dirname(PKG), "genesis_client", "client.py")
@@ -93,7 +97,7 @@ def test_foreign_files_unattributed():
 def _leaf_in_package():
     """Call from inside this test file — but the leaf is in tests/.
 
-    tests/ is outside genesis_cognitive, so frame attribution must
+    tests/ is outside genesis_conscious, so frame attribution must
     return None rather than the caller's module.
     """
     return _module_for_frame(sys._getframe())

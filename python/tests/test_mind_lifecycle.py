@@ -8,8 +8,8 @@ import time
 
 import pytest
 
-from genesis_cognitive.concepts import RelationType
-from genesis_cognitive.mind import Mind
+from genesis_conscious.concepts import RelationType
+from genesis_conscious.mind import Mind
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ def test_failed_late_restore_does_not_commit_network(tmp_path):
     import gzip
     import json
 
-    from genesis_cognitive.infrastructure.persistence import load_state
+    from genesis_conscious.infrastructure.persistence import load_state
 
     source_dir = tmp_path / "source"
     target_dir = tmp_path / "target"
@@ -381,7 +381,7 @@ def test_curiosity_filtering_in_teaching_mode():
         net.add_concept("synapse", origin="dictionary")
         net.add_concept("pizza", origin="dictionary")
         # Add an edge so neuron and synapse are neighbors
-        from genesis_cognitive.concepts import RelationType
+        from genesis_conscious.concepts import RelationType
         net.add_edge("neuron", "synapse", relation=RelationType.RELATED_TO)
 
         # Simulate teaching mode
@@ -389,7 +389,7 @@ def test_curiosity_filtering_in_teaching_mode():
         cognition.teaching_topic = "neuroscience"
 
         # Test the lesson topic helper
-        from genesis_cognitive.perception import Intent, Perception, QuestionType
+        from genesis_conscious.perception import Intent, Perception, QuestionType
         perception = Perception(
             raw_text="Tell me about neurons",
             intent=Intent.STATEMENT,
@@ -437,7 +437,7 @@ def test_pick_creation_topic_skips_internal_namespaces():
         for internal in (
             "_cat:cause:guarded_cortisol",
             "_utt:hello",
-            "python:genesis_cognitive.concepts",
+            "python:genesis_conscious.concepts",
             "rust:daemon::tick",
             "skill:sorter",
             "goal:explore",

@@ -4,7 +4,7 @@
 Genesis is a machine-native cognitive architecture. The Rust crate
 (`genesis`) defines the core state schema — the memory-mapped hub of
 system state that every module reads from and writes to. The Python
-layer (`python/genesis_cognitive/`) is the cognitive mind: perception,
+layer (`python/genesis_conscious/`) is the cognitive mind: perception,
 reasoning, language, introspection, and self-modeling.
 
 ## CRITICAL RULE: Never hardcode Genesis's responses
@@ -78,9 +78,17 @@ not — those must be generated, not recited.
   (runtime) and `python/requirements-dev.txt` (lint + test). Install
   with: `pip install -r python/requirements-dev.txt`
 - Lint: `ruff check` and `pyflakes` (both must pass)
-- Type check: `mypy python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ --ignore-missing-imports` (0 errors)
-- Optional voice deps (not in requirements.txt): `vosk`, `sounddevice`,
-  `speechrecognition` — install separately for microphone/TTS support
+- Type check: `mypy python/genesis_conscious/ python/genesis_client/ python/genesis_cli.py python/tests/ --ignore-missing-imports` (0 errors)
+- Optional native capabilities (not in requirements.txt, because the
+  wheels bind to system libraries that may be absent): microphone
+  (`vosk`, `sounddevice`, `speechrecognition`), voice (`piper-tts` +
+  `.onnx` models in `python/voices/`), and drawing (`pycairo`).
+  Install and **verify** with `./scripts/install_optional_deps.sh`
+  (`--verify` to re-check). Verify rather than assume: `sounddevice`
+  imports cleanly and only raises `OSError` when it dlopens a missing
+  libportaudio, so a wheel-only install silently turns "no microphone"
+  into a crash in the audio thread. Genesis degrades to text-only when a
+  capability is missing — that is expected, not an error.
 
 ## Time ownership
 The daemon is the sole authority on time and on physics. It is the
@@ -106,6 +114,41 @@ cognitive mind is alive.
 
 Build environment: `. ./scripts/cargo-env.sh` then `cargo test --release`.
 See the Toolchain section above.
+
+## State schema and the ion layer
+`CoreState` is **schema v4** (3416 bytes) in
+`src/state/core_state.rs`. v4 inserted a 124-byte `IonState`
+(`src/state/ions.rs`) immediately **before** the checksum field, so
+every field after `manifest` moved and a v3 file (3296 bytes) cannot be
+reinterpreted in place. `src/state/legacy_v3.rs` holds the byte-exact
+v3 layout that `MmapState::open` decodes a v3 file through before
+widening it; `GenesisCoreStateV3` is frozen history and its size and
+offsets are pinned by assertions.
+
+The ion block sits *inside* the CRC32 region deliberately: resting
+concentrations, electrochemical gradients and membrane potential are
+authoritative state, not derived. Losing them would reset the cell's
+resting state on every restart.
+
+Two layout traps worth knowing before touching either struct:
+
+- `IonState` carries a `current_density: [f32; 4]` that
+  `IonSummary` (the IPC view) does **not** export. So `membrane_potential_mv`
+  is float 20 in the state file but float 16 on the wire. Read ion state
+  through `GenesisClient.get_ion_summary()` or the IPC path — poking
+  `core_state.bin` directly bypasses the seqlock *and* uses a different
+  field layout, so it yields both torn reads and plausible-looking
+  nonsense.
+- Reading the mmap'd file directly is never correct. Use
+  `read_consistent()`, or ask the daemon.
+
+`GET_ION_SUMMARY` (opcode 40, additive, 108-byte reply) exposes the
+layer to the mind; `genesis_conscious/neurochemical/electrochemistry.py`
+turns it into bounded cognitive modulation (attention / integration /
+memory-consolidation gains, neutral ≈ 1.0). Note genesis2 uses opcode
+**36** for this; that id is already spent here on `GET_SENSOR_PRESENCE`,
+so a collision is a real risk if ports are merged — `test_protocol.py`
+pins both ids.
 
 ## Wire protocol
 - The daemon↔mind IPC protocol lives in `src/daemon/ipc.rs`
@@ -206,7 +249,7 @@ written at save time; the log's fold overwrites it at restore.
   site cannot go stale between thresholds. 10,000 failures produce 14
   records, the last carrying the true count. The tally lives in
   `genesis_client` (the lower layer) with the journal injected as a
-  sink at Mind startup, because `genesis_cognitive` depends on
+  sink at Mind startup, because `genesis_conscious` depends on
   `genesis_client` and not the reverse. Query with `swallow_report()`,
   surfaced in status as `swallowed_errors`. Site names are
   `module.function`, derived from the real enclosing scope.

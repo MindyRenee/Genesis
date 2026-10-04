@@ -8,15 +8,15 @@ derivable-edge rejection, and the ConceptNetwork wiring that makes
 
 import json
 
-from genesis_cognitive.concepts.edge_log import (
+from genesis_conscious.concepts.edge_log import (
     is_derivable_edge,
     is_web_origin,
     open_edge_log,
     web_domain_of,
     web_origin,
 )
-from genesis_cognitive.concepts.network import ConceptNetwork
-from genesis_cognitive.concepts.types import Edge, RelationType
+from genesis_conscious.concepts.network import ConceptNetwork
+from genesis_conscious.concepts.types import Edge, RelationType
 
 
 def _edge(src="a", tgt="b", rel=RelationType.IS_A, w=0.7, origin="stated"):
@@ -308,7 +308,7 @@ class TestLegacyJsonMigration:
         assert is_derivable_edge(RelationType.RELATED_TO, "inferred")
 
     def test_restore_keeps_legacy_edge_without_origin(self, tmp_path):
-        from genesis_cognitive.infrastructure.persistence import _restore_edges
+        from genesis_conscious.infrastructure.persistence import _restore_edges
 
         net = ConceptNetwork()
         for n in ("a", "b"):
@@ -325,7 +325,7 @@ class TestLegacyJsonMigration:
         )
 
     def test_restore_drops_derivable_legacy_edge(self, tmp_path):
-        from genesis_cognitive.infrastructure.persistence import _restore_edges
+        from genesis_conscious.infrastructure.persistence import _restore_edges
 
         net = ConceptNetwork()
         for n in ("a", "b"):
@@ -340,7 +340,7 @@ class TestLegacyJsonMigration:
         assert net.edge_count == 0
 
     def test_restore_keeps_typed_edge_with_pipeline_origin(self, tmp_path):
-        from genesis_cognitive.infrastructure.persistence import _restore_edges
+        from genesis_conscious.infrastructure.persistence import _restore_edges
 
         net = ConceptNetwork()
         for n in ("a", "b"):
@@ -479,7 +479,7 @@ class TestCompactionFailureIsReported:
 
         log.compact = boom  # type: ignore[method-assign]
         # Force the threshold so compaction is attempted.
-        import genesis_cognitive.concepts.network as nmod
+        import genesis_conscious.concepts.network as nmod
         original = nmod._COMPACT_THRESHOLD_BYTES
         nmod._COMPACT_THRESHOLD_BYTES = 0
         try:

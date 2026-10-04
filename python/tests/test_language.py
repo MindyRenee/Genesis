@@ -12,10 +12,10 @@ import time
 import warnings
 
 import numpy as np
+import pytest
 
-from genesis_cognitive.concepts import ConceptNetwork, RelationType
-from genesis_cognitive.emotion import EmotionalState
-from genesis_cognitive.language import (
+from genesis_conscious.concepts import ConceptNetwork, RelationType
+from genesis_conscious.language import (
     GenerativeEngine,
     Grammar,
     GraphWalkGenerator,
@@ -25,9 +25,10 @@ from genesis_cognitive.language import (
     Vocabulary,
     Voice,
 )
-from genesis_cognitive.language.flow import FlowGenerator
-from genesis_cognitive.language.grammar import INTENT_STRUCTURES
-from genesis_cognitive.self import PersonalityTraits, SelfModel
+from genesis_conscious.language.flow import FlowGenerator
+from genesis_conscious.language.grammar import INTENT_STRUCTURES
+from genesis_conscious.limbic_system.emotion import EmotionalState
+from genesis_conscious.self import PersonalityTraits, SelfModel
 
 logger = logging.getLogger(__name__)
 
@@ -860,8 +861,8 @@ def test_graph_walk_returns_none_when_no_network() -> None:
     # GraphWalkGenerator requires a network — this test verifies
     # the GenerativeEngine falls back correctly when graph_walk is None
 
-    from genesis_cognitive.language import GenerativeEngine
-    from genesis_cognitive.self import SelfModel
+    from genesis_conscious.language import GenerativeEngine
+    from genesis_conscious.self import SelfModel
 
     sm = SelfModel(born_at=int(time.time() * 1000), personality=_make_personality_gw())
     engine = GenerativeEngine(sm, seed=42, network=None)
@@ -993,8 +994,8 @@ def test_graph_walk_uses_relation_verbs() -> None:
 def test_generative_engine_uses_graph_walk_when_available() -> None:
     """GenerativeEngine uses the graph-walk generator when a network is provided."""
 
-    from genesis_cognitive.language import GenerativeEngine
-    from genesis_cognitive.self import SelfModel
+    from genesis_conscious.language import GenerativeEngine
+    from genesis_conscious.self import SelfModel
 
     net = _make_network_with_concepts()
     sm = SelfModel(born_at=int(time.time() * 1000), personality=_make_personality_gw())
@@ -1016,8 +1017,8 @@ def test_generative_engine_uses_graph_walk_when_available() -> None:
 def test_generative_engine_falls_back_without_network() -> None:
     """GenerativeEngine falls back to grammar when no network is available."""
 
-    from genesis_cognitive.language import GenerativeEngine
-    from genesis_cognitive.self import SelfModel
+    from genesis_conscious.language import GenerativeEngine
+    from genesis_conscious.self import SelfModel
 
     sm = SelfModel(born_at=int(time.time() * 1000), personality=_make_personality_gw())
     engine = GenerativeEngine(sm, seed=42, network=None)
@@ -1310,7 +1311,7 @@ def test_flow_gradient_matches_analytic_von_mises() -> None:
     kernel is K = exp(κ(cos δ − 1)) and the only nonzero gradient
     component is −κ·w·K·sin δ.
     """
-    from genesis_cognitive.language.flow import _FLOW_DIM, _KAPPA
+    from genesis_conscious.language.flow import _FLOW_DIM, _KAPPA
 
     delta = 0.4
     theta = np.zeros(_FLOW_DIM, dtype=np.float32)
@@ -1335,7 +1336,7 @@ def test_flow_gradient_no_overflow_with_clustered_concepts() -> None:
     ``np.linalg.norm``, yielding ``grad_mag = inf`` and collapsing the
     flow onto the momentum clip. The log-space kernel keeps it bounded.
     """
-    from genesis_cognitive.language.flow import _FLOW_DIM
+    from genesis_conscious.language.flow import _FLOW_DIM
 
     rng = np.random.default_rng(0)
     theta = rng.uniform(0, 2 * np.pi, _FLOW_DIM).astype(np.float32)
@@ -1353,7 +1354,7 @@ def test_flow_gradient_no_overflow_with_clustered_concepts() -> None:
 
 def test_flow_potential_is_finite_and_bounded() -> None:
     """_potential stays finite for clustered concepts (bounded kernel)."""
-    from genesis_cognitive.language.flow import _FLOW_DIM
+    from genesis_conscious.language.flow import _FLOW_DIM
 
     rng = np.random.default_rng(1)
     theta = rng.uniform(0, 2 * np.pi, _FLOW_DIM).astype(np.float32)
@@ -1368,7 +1369,7 @@ def test_flow_potential_is_finite_and_bounded() -> None:
 # Morphology — verb agreement and deconjugation
 # ======================================================================
 
-from genesis_cognitive.language.morphology import (  # noqa: E402
+from genesis_conscious.language.morphology import (  # noqa: E402
     agree_verb_phrase,
     copula,
     is_plural_np,
@@ -1496,11 +1497,11 @@ def test_knowledge_content_drops_tautological_facts() -> None:
 
 def test_inner_life_emotional_fallback_skips_self_topic() -> None:
     """When the seed concept IS the emotion word, no thought is emitted."""
-    from genesis_cognitive.concepts.network import ConceptNetwork
-    from genesis_cognitive.learning.curiosity import CuriosityEngine
-    from genesis_cognitive.reasoning.engine import ReasoningEngine
-    from genesis_cognitive.self.reflection import ReflectionEngine
-    from genesis_cognitive.sleep.inner_life import InnerLife
+    from genesis_conscious.concepts.network import ConceptNetwork
+    from genesis_conscious.learning.curiosity import CuriosityEngine
+    from genesis_conscious.reasoning.engine import ReasoningEngine
+    from genesis_conscious.self.reflection import ReflectionEngine
+    from genesis_conscious.sleep.inner_life import InnerLife
 
     net = ConceptNetwork()
     net.add_concept("excited", confidence=0.8)
@@ -1527,7 +1528,7 @@ def test_inner_life_emotional_fallback_skips_self_topic() -> None:
 
 
 def _props(text: str):
-    from genesis_cognitive.language.comprehension import (
+    from genesis_conscious.language.comprehension import (
         ComprehensionEngine,
     )
 
@@ -1795,8 +1796,8 @@ def test_knowledge_metadata_composes_rather_than_passes_content_through() -> Non
     assembler's string. If this test starts failing because the two
     converge, the pass-through has won.
     """
-    from genesis_cognitive.cognition.thought_composer import ThoughtComposer
-    from genesis_cognitive.reasoning.engine import ReasoningEngine
+    from genesis_conscious.cognition.thought_composer import ThoughtComposer
+    from genesis_conscious.reasoning.engine import ReasoningEngine
 
     network = ConceptNetwork()
     network.add_concept("dog", confidence=0.9)
@@ -1834,8 +1835,8 @@ def test_verbatim_fallback_is_last_resort_and_not_used_by_composer_paths() -> No
     say *something*) but it must not be the path a composition route
     takes. Asserted directly so the branch cannot grow unnoticed.
     """
-    from genesis_cognitive.cognition.thought_composer import ThoughtComposer
-    from genesis_cognitive.reasoning.engine import ReasoningEngine
+    from genesis_conscious.cognition.thought_composer import ThoughtComposer
+    from genesis_conscious.reasoning.engine import ReasoningEngine
 
     network = ConceptNetwork()
     network.add_concept("dog", confidence=0.9)
@@ -1916,3 +1917,8 @@ def test_comprehension_full_parse_has_high_coverage() -> None:
     result = _props("the engine moves the piston")
     assert result.parse_coverage >= 0.8
     assert "low_parse_coverage" not in result.diagnostics
+
+pytestmark = [
+    pytest.mark.usefixtures("learned_sentiment"),
+    pytest.mark.usefixtures("learned_verbs"),
+]

@@ -11,11 +11,12 @@ import struct
 import tempfile
 from unittest.mock import MagicMock
 
+import pytest
+
 from genesis_client.protocol import GET_INFERENCE_SUMMARY, UPDATE_USER_AFFECT
 from genesis_client.types import InferenceSummary
-from genesis_cognitive.concepts import ConceptNetwork, RelationType
-from genesis_cognitive.emotional_regulator import EmotionalRegulator
-from genesis_cognitive.learning import (
+from genesis_conscious.concepts import ConceptNetwork, RelationType
+from genesis_conscious.learning import (
     ActiveInferenceReader,
     AutonomousLearner,
     CuriosityEngine,
@@ -27,13 +28,14 @@ from genesis_cognitive.learning import (
     SelfModelState,
     UserAffectEstimate,
 )
-from genesis_cognitive.learning.autonomous import (
+from genesis_conscious.learning.autonomous import (
     RATE_LIMIT_DELAY,
     THROTTLED_DELAY_MULTIPLIER,
 )
-from genesis_cognitive.mind import Mind
-from genesis_cognitive.perception import Intent, Perception, QuestionType
-from genesis_cognitive.reasoning import ReasoningEngine
+from genesis_conscious.limbic_system.emotional_regulator import EmotionalRegulator
+from genesis_conscious.mind import Mind
+from genesis_conscious.perception import Intent, Perception, QuestionType
+from genesis_conscious.reasoning import ReasoningEngine
 
 logger = logging.getLogger(__name__)
 
@@ -1740,3 +1742,5 @@ def test_mind_wires_throttle_callbacks():
         assert not mind.learner._throttled, (
             "Unthrottle callback should unthrottle the learner"
         )
+
+pytestmark = pytest.mark.usefixtures("learned_sentiment")

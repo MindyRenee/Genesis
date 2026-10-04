@@ -26,7 +26,7 @@ from genesis_client.swallow import (
     swallow_report,
     total_swallowed,
 )
-from genesis_cognitive.infrastructure.journal import CognitiveJournal
+from genesis_conscious.infrastructure.journal import CognitiveJournal
 
 
 @pytest.fixture(autouse=True)

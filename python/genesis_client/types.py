@@ -7,6 +7,7 @@ daemon.
 
 from __future__ import annotations
 
+import struct
 from dataclasses import dataclass, field
 
 from .protocol import (
@@ -34,6 +35,7 @@ __all__ = [
     "CoreState",
     "Episode",
     "InferenceSummary",
+    "IonSummary",
     "MemoryStats",
     "ModuleTelemetry",
     "NeuroSummary",
@@ -77,6 +79,68 @@ LEARNING_POSTURE_NEUTRAL = "neutral"
 #  24     retrieval_weight       f32
 #  28     phase                  u8
 #  29     _pad                   [u8;3]
+
+
+@dataclass(frozen=True)
+class IonSummary:
+    """Compact calcium/chloride/potassium/sodium membrane state."""
+
+    intracellular_mm: tuple[float, float, float, float]
+    extracellular_mm: tuple[float, float, float, float]
+    reversal_potential_mv: tuple[float, float, float, float]
+    conductance: tuple[float, float, float, float]
+    membrane_potential_mv: float
+    nak_pump_rate: float
+    kcl_cotransporter_flux: float
+    ncx_flux: float
+    atp_availability: float
+    calcium_signal: float
+    chloride_efficacy: float
+    excitability: float
+    gradient_integrity: float
+    energy_load: float
+    net_membrane_current: float
+
+    @property
+    def ion_names(self) -> tuple[str, str, str, str]:
+        """Names matching the array order used by all four fields."""
+        return ("calcium", "chloride", "potassium", "sodium")
+
+    def intracellular(self, ion: str) -> float:
+        """Return an intracellular concentration by ion name."""
+        return self.intracellular_mm[self.ion_names.index(ion)]
+
+    def extracellular(self, ion: str) -> float:
+        """Return an extracellular concentration by ion name."""
+        return self.extracellular_mm[self.ion_names.index(ion)]
+
+    def reversal_potential(self, ion: str) -> float:
+        """Return a Nernst reversal potential by ion name."""
+        return self.reversal_potential_mv[self.ion_names.index(ion)]
+
+    @classmethod
+    def unpack(cls, data: bytes) -> IonSummary:
+        """Unpack a 108-byte IonSummary from the daemon's response."""
+        if len(data) < 108:
+            raise ValueError(f"IonSummary needs 108 bytes, got {len(data)}")
+        values = struct.unpack_from("<27f", data, 0)
+        return cls(
+            intracellular_mm=values[0:4],
+            extracellular_mm=values[4:8],
+            reversal_potential_mv=values[8:12],
+            conductance=values[12:16],
+            membrane_potential_mv=values[16],
+            nak_pump_rate=values[17],
+            kcl_cotransporter_flux=values[18],
+            ncx_flux=values[19],
+            atp_availability=values[20],
+            calcium_signal=values[21],
+            chloride_efficacy=values[22],
+            excitability=values[23],
+            gradient_integrity=values[24],
+            energy_load=values[25],
+            net_membrane_current=values[26],
+        )
 
 
 @dataclass(frozen=True)

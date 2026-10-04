@@ -23,13 +23,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import pytest
 
 from genesis_client import GenesisClient
-from genesis_cognitive.cognition.engine import CognitionEngine
-from genesis_cognitive.concepts import ConceptNetwork, RelationType
-from genesis_cognitive.infrastructure.user_profile import UserProfile
-from genesis_cognitive.language import GenerativeEngine
-from genesis_cognitive.memory import MemoryEngine
-from genesis_cognitive.perception import perceive
-from genesis_cognitive.self import SelfModel
+from genesis_conscious.cognition.engine import CognitionEngine
+from genesis_conscious.concepts import ConceptNetwork, RelationType
+from genesis_conscious.infrastructure.user_profile import UserProfile
+from genesis_conscious.language import GenerativeEngine
+from genesis_conscious.memory import MemoryEngine
+from genesis_conscious.perception import perceive
+from genesis_conscious.self import SelfModel
 
 
 @pytest.fixture

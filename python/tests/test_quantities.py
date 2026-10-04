@@ -12,13 +12,13 @@ from __future__ import annotations
 import json
 import random
 
-from genesis_cognitive.quantities import (
+from genesis_conscious.quantities import (
     Basket,
     Group,
     QuantitiesAgent,
 )
-from genesis_cognitive.reasoning import TaskCompetence
-from genesis_cognitive.spatial.practice import (
+from genesis_conscious.reasoning import TaskCompetence
+from genesis_conscious.spatial.practice import (
     SpatialPractice,
     normalize_offered,
 )
@@ -184,7 +184,7 @@ class TestQuantitiesOffered:
             )
         )
         practice = SpatialPractice(str(tmp_path))
-        from genesis_cognitive.spatial.solver import SpatialReasoner
+        from genesis_conscious.spatial.solver import SpatialReasoner
 
         result = practice.attempt(SpatialReasoner())
         assert result is not None

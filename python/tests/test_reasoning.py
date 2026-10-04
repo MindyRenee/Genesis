@@ -5,8 +5,8 @@ import random
 
 import pytest
 
-from genesis_cognitive.concepts import ConceptNetwork, RelationType
-from genesis_cognitive.reasoning import (
+from genesis_conscious.concepts import ConceptNetwork, RelationType
+from genesis_conscious.reasoning import (
     AnalogyEngine,
     AnalogyInsight,
     BetaDistribution,
@@ -2373,7 +2373,7 @@ def test_problem_solver_subsolution_tree() -> None:
 
 def test_problem_solver_with_meta_reasoning() -> None:
     """MetaReasoning selects strategies and records results for learning."""
-    from genesis_cognitive.reasoning import MetaReasoning
+    from genesis_conscious.reasoning import MetaReasoning
 
     net = _build_problem_network()
     meta = MetaReasoning(net)
@@ -2389,7 +2389,7 @@ def test_problem_solver_with_meta_reasoning() -> None:
 
 def test_problem_solver_probabilistic_operator() -> None:
     """The probabilistic operator assesses uncertain relationships."""
-    from genesis_cognitive.reasoning import ProbabilisticReasoning
+    from genesis_conscious.reasoning import ProbabilisticReasoning
 
     net = _build_problem_network()
     prob = ProbabilisticReasoning(net)
@@ -2404,7 +2404,7 @@ def test_problem_solver_probabilistic_operator() -> None:
 
 def test_problem_solver_temporal_operator() -> None:
     """The temporal operator orders causes and effects."""
-    from genesis_cognitive.reasoning import TemporalReasoning
+    from genesis_conscious.reasoning import TemporalReasoning
 
     net = _build_problem_network()
     temp = TemporalReasoning(net)
@@ -2420,7 +2420,7 @@ def test_problem_solver_temporal_operator() -> None:
 
 def test_problem_solver_counterfactual_operator() -> None:
     """The counterfactual operator traces effects of removing the goal."""
-    from genesis_cognitive.reasoning import CounterfactualReasoning
+    from genesis_conscious.reasoning import CounterfactualReasoning
 
     net = _build_problem_network()
     cf = CounterfactualReasoning(net)
@@ -2439,7 +2439,7 @@ def test_problem_solver_counterfactual_operator() -> None:
 
 def test_problem_solver_all_operators_combined() -> None:
     """All operators work together when all engines are provided."""
-    from genesis_cognitive.reasoning import (
+    from genesis_conscious.reasoning import (
         CounterfactualReasoning,
         MetaReasoning,
         ProbabilisticReasoning,
@@ -2469,7 +2469,7 @@ def test_problem_solver_all_operators_combined() -> None:
 
 def test_meta_reasoning_strategy_selection() -> None:
     """MetaReasoning selects different strategies for different problems."""
-    from genesis_cognitive.reasoning import MetaReasoning, ReasoningStrategy
+    from genesis_conscious.reasoning import MetaReasoning, ReasoningStrategy
 
     net = _build_problem_network()
     meta = MetaReasoning(net)
@@ -2491,7 +2491,7 @@ def test_meta_reasoning_strategy_selection() -> None:
 
 def test_meta_reasoning_learning() -> None:
     """MetaReasoning learns from recorded results (EMA update)."""
-    from genesis_cognitive.reasoning import MetaReasoning, ReasoningStrategy
+    from genesis_conscious.reasoning import MetaReasoning, ReasoningStrategy
 
     net = _build_problem_network()
     meta = MetaReasoning(net)
@@ -2562,7 +2562,7 @@ def _make_result(
 
 def test_critical_thinking_accepts_well_supported() -> None:
     """A well-supported claim from reliable sources is accepted."""
-    from genesis_cognitive.reasoning import CriticalThinkingEngine
+    from genesis_conscious.reasoning import CriticalThinkingEngine
     net = _build_critical_network()
     critic = CriticalThinkingEngine(net)
     # fire causes heat, supported by conversation (reliability 0.6)
@@ -2574,7 +2574,7 @@ def test_critical_thinking_accepts_well_supported() -> None:
 
 def test_critical_thinking_downgrades_weak_evidence() -> None:
     """A claim from a single low-reliability source is downgraded."""
-    from genesis_cognitive.reasoning import CriticalThinkingEngine
+    from genesis_conscious.reasoning import CriticalThinkingEngine
     net = _build_critical_network()
     critic = CriticalThinkingEngine(net)
     # SIMILAR_TO from inferred origin (low reliability)
@@ -2590,7 +2590,7 @@ def test_critical_thinking_downgrades_weak_evidence() -> None:
 
 def test_critical_thinking_detects_disconfirmation() -> None:
     """Disconfirming evidence lowers confidence."""
-    from genesis_cognitive.reasoning import CriticalThinkingEngine
+    from genesis_conscious.reasoning import CriticalThinkingEngine
     net = _build_critical_network()
     critic = CriticalThinkingEngine(net)
     # Claim: fire SIMILAR_TO ice — disconfirmed by fire CONTRADICTS ice
@@ -2608,7 +2608,7 @@ def test_critical_thinking_detects_disconfirmation() -> None:
 
 def test_critical_thinking_detects_unsupported_assertion() -> None:
     """A claim with no supporting evidence is flagged."""
-    from genesis_cognitive.reasoning import CriticalThinkingEngine
+    from genesis_conscious.reasoning import CriticalThinkingEngine
     net = _build_critical_network()
     critic = CriticalThinkingEngine(net)
     # No knowledge triples, high confidence
@@ -2624,7 +2624,7 @@ def test_critical_thinking_detects_unsupported_assertion() -> None:
 
 def test_critical_thinking_detects_hasty_generalization() -> None:
     """A hypothesis from a single weak source is flagged."""
-    from genesis_cognitive.reasoning import CriticalThinkingEngine
+    from genesis_conscious.reasoning import CriticalThinkingEngine
     net = _build_critical_network()
     critic = CriticalThinkingEngine(net)
     # Single low-reliability source (inferred), high confidence
@@ -2638,7 +2638,7 @@ def test_critical_thinking_detects_hasty_generalization() -> None:
 
 def test_critical_thinking_source_reliability_weighting() -> None:
     """High-reliability sources boost confidence more than low ones."""
-    from genesis_cognitive.reasoning import CriticalThinkingEngine
+    from genesis_conscious.reasoning import CriticalThinkingEngine
     net = _build_critical_network()
     critic = CriticalThinkingEngine(net)
     # Dictionary-sourced evidence (high reliability)
@@ -2661,7 +2661,7 @@ def test_critical_thinking_source_reliability_weighting() -> None:
 
 def test_critical_thinking_evidence_quality_multiple_sources() -> None:
     """Multiple independent sources boost evidence quality."""
-    from genesis_cognitive.reasoning import CriticalThinkingEngine
+    from genesis_conscious.reasoning import CriticalThinkingEngine
     net = _build_critical_network()
     critic = CriticalThinkingEngine(net)
     # Single source: fire causes heat (conversation)
@@ -2682,7 +2682,7 @@ def test_critical_thinking_evidence_quality_multiple_sources() -> None:
 
 def test_critical_thinking_evaluate_batch() -> None:
     """evaluate_batch returns results with revised confidence."""
-    from genesis_cognitive.reasoning import CriticalThinkingEngine
+    from genesis_conscious.reasoning import CriticalThinkingEngine
     net = _build_critical_network()
     critic = CriticalThinkingEngine(net)
     results = [
@@ -2700,7 +2700,7 @@ def test_critical_thinking_evaluate_batch() -> None:
 
 def test_critical_thinking_describe() -> None:
     """Assessment.describe() returns a readable summary."""
-    from genesis_cognitive.reasoning import CriticalThinkingEngine
+    from genesis_conscious.reasoning import CriticalThinkingEngine
     net = _build_critical_network()
     critic = CriticalThinkingEngine(net)
     result = _make_result(confidence=0.7, knowledge=[("causes", "heat", 0.8)])
@@ -2713,7 +2713,7 @@ def test_critical_thinking_describe() -> None:
 
 def test_critical_thinking_persistence() -> None:
     """to_dict / restore_from_dict preserves counts."""
-    from genesis_cognitive.reasoning import CriticalThinkingEngine
+    from genesis_conscious.reasoning import CriticalThinkingEngine
     net = _build_critical_network()
     critic = CriticalThinkingEngine(net)
     # Generate some assessments.
@@ -2731,7 +2731,7 @@ def test_critical_thinking_persistence() -> None:
 
 def test_critical_thinking_stats_tracking() -> None:
     """The engine tracks downgraded/rejected/fallacy counts."""
-    from genesis_cognitive.reasoning import CriticalThinkingEngine
+    from genesis_conscious.reasoning import CriticalThinkingEngine
     net = _build_critical_network()
     critic = CriticalThinkingEngine(net)
     # Unsupported assertion → should be downgraded.
@@ -2747,7 +2747,7 @@ def test_critical_thinking_stats_tracking() -> None:
 
 def test_belief_revision_downgrades_on_disconfirmation() -> None:
     """Disconfirming evidence downgrades the edge weight in the network."""
-    from genesis_cognitive.reasoning import (
+    from genesis_conscious.reasoning import (
         BeliefRevisionEngine,
         CriticalThinkingEngine,
     )
@@ -2770,7 +2770,7 @@ def test_belief_revision_downgrades_on_disconfirmation() -> None:
 
 def test_belief_revision_strengthens_on_strong_support() -> None:
     """Strong multi-source support strengthens the edge weight."""
-    from genesis_cognitive.reasoning import (
+    from genesis_conscious.reasoning import (
         BeliefRevisionEngine,
         CriticalThinkingEngine,
     )
@@ -2800,7 +2800,7 @@ def test_belief_revision_strengthens_on_strong_support() -> None:
 
 def test_belief_revision_prunes_weak_edges() -> None:
     """Edges that fall below threshold after disconfirmation are pruned."""
-    from genesis_cognitive.reasoning import (
+    from genesis_conscious.reasoning import (
         BeliefRevisionEngine,
         CriticalThinkingEngine,
     )
@@ -2829,7 +2829,7 @@ def test_belief_revision_prunes_weak_edges() -> None:
 
 def test_belief_revision_preserves_stated_edges() -> None:
     """Stated edges are not pruned even at low weight."""
-    from genesis_cognitive.reasoning import (
+    from genesis_conscious.reasoning import (
         BeliefRevisionEngine,
         CriticalThinkingEngine,
     )
@@ -2858,7 +2858,7 @@ def test_belief_revision_preserves_stated_edges() -> None:
 
 def test_belief_revision_bayesian_update() -> None:
     """Evidence feeds into the probabilistic reasoning engine."""
-    from genesis_cognitive.reasoning import (
+    from genesis_conscious.reasoning import (
         BeliefRevisionEngine,
         CriticalThinkingEngine,
         ProbabilisticReasoning,
@@ -2882,7 +2882,7 @@ def test_belief_revision_bayesian_update() -> None:
 
 def test_belief_revision_non_destructive_contradiction() -> None:
     """resolve_contradiction_non_destructive downgrades both sides."""
-    from genesis_cognitive.reasoning import BeliefRevisionEngine
+    from genesis_conscious.reasoning import BeliefRevisionEngine
     net = _build_critical_network()
     # Add a SIMILAR_TO + OPPOSITE_OF contradiction.
     net.add_edge("fire", "water", RelationType.SIMILAR_TO, weight=0.7, origin="inferred")
@@ -2910,7 +2910,7 @@ def test_belief_revision_non_destructive_contradiction() -> None:
 
 def test_belief_revision_persistence() -> None:
     """to_dict / restore_from_dict preserves counts."""
-    from genesis_cognitive.reasoning import (
+    from genesis_conscious.reasoning import (
         BeliefRevisionEngine,
         CriticalThinkingEngine,
     )
@@ -2937,7 +2937,7 @@ def test_belief_revision_persistence() -> None:
 
 def test_belief_revision_records_audit_trail() -> None:
     """Revision records provide an audit trail of what changed."""
-    from genesis_cognitive.reasoning import (
+    from genesis_conscious.reasoning import (
         BeliefRevisionEngine,
         CriticalThinkingEngine,
     )
@@ -2989,7 +2989,7 @@ def _make_reasoning_result(
 
 def test_decision_engine_selects_answer_with_strong_evidence() -> None:
     """Strong reasoning evidence keeps 'answer' as the selected action."""
-    from genesis_cognitive.reasoning import ActionType, DecisionEngine
+    from genesis_conscious.reasoning import ActionType, DecisionEngine
     net = ConceptNetwork()
     net.add_concept("fire")
     net.add_concept("heat")
@@ -3010,7 +3010,7 @@ def test_decision_engine_selects_answer_with_strong_evidence() -> None:
 
 def test_decision_engine_switches_to_ask_under_uncertainty() -> None:
     """Low confidence + high uncertainty switches to 'ask'."""
-    from genesis_cognitive.reasoning import ActionType, DecisionEngine
+    from genesis_conscious.reasoning import ActionType, DecisionEngine
     net = ConceptNetwork()
     net.add_concept("fire")
     de = DecisionEngine(net)
@@ -3029,7 +3029,7 @@ def test_decision_engine_switches_to_ask_under_uncertainty() -> None:
 
 def test_decision_engine_uncertainty_switch_threshold() -> None:
     """Switch happens at the configured threshold, not above."""
-    from genesis_cognitive.reasoning import ActionType, DecisionEngine
+    from genesis_conscious.reasoning import ActionType, DecisionEngine
     net = ConceptNetwork()
     de = DecisionEngine(net)
     # Confidence just above threshold → no switch.
@@ -3047,7 +3047,7 @@ def test_decision_engine_uncertainty_switch_threshold() -> None:
 
 def test_decision_engine_evaluates_multiple_candidates() -> None:
     """Multiple candidates are evaluated and ranked."""
-    from genesis_cognitive.reasoning import ActionType, DecisionEngine
+    from genesis_conscious.reasoning import ActionType, DecisionEngine
     net = ConceptNetwork()
     de = DecisionEngine(net)
     outcome = de.decide(
@@ -3068,7 +3068,7 @@ def test_decision_engine_evaluates_multiple_candidates() -> None:
 
 def test_decision_engine_goal_relevance() -> None:
     """Goals boost actions relevant to them."""
-    from genesis_cognitive.reasoning import ActionType, DecisionEngine
+    from genesis_conscious.reasoning import ActionType, DecisionEngine
     net = ConceptNetwork()
     de = DecisionEngine(net)
     # With a goal to understand fire, answering about fire is relevant.
@@ -3089,7 +3089,7 @@ def test_decision_engine_goal_relevance() -> None:
 
 def test_decision_engine_value_weights() -> None:
     """Value criteria are weighted in the composite score."""
-    from genesis_cognitive.reasoning import ActionType, DecisionEngine
+    from genesis_conscious.reasoning import ActionType, DecisionEngine
     net = ConceptNetwork()
     de = DecisionEngine(net)
     outcome = de.decide(
@@ -3112,8 +3112,8 @@ def test_decision_engine_value_weights() -> None:
 
 def test_decision_engine_inhibition() -> None:
     """Executive inhibition withholds very weak responses."""
-    from genesis_cognitive.executive import ExecutiveFunction
-    from genesis_cognitive.reasoning import ActionType, DecisionEngine
+    from genesis_conscious.frontal_lobe.executive import ExecutiveFunction
+    from genesis_conscious.reasoning import ActionType, DecisionEngine
     net = ConceptNetwork()
     exec_fn = ExecutiveFunction()
     de = DecisionEngine(net, executive=exec_fn)
@@ -3150,8 +3150,8 @@ def test_decision_engine_inhibition_triggers_for_weak_candidate() -> None:
     threshold raised to 0.45, making the path reachable for the absolute
     weakest candidates (e.g., ASK with no evidence and low uncertainty).
     """
-    from genesis_cognitive.executive import ExecutiveFunction
-    from genesis_cognitive.reasoning import ActionType, DecisionEngine
+    from genesis_conscious.frontal_lobe.executive import ExecutiveFunction
+    from genesis_conscious.reasoning import ActionType, DecisionEngine
     net = ConceptNetwork()
     exec_fn = ExecutiveFunction(inhibition_threshold=0.5)
     de = DecisionEngine(net, executive=exec_fn)
@@ -3178,8 +3178,8 @@ def test_decision_engine_inhibition_triggers_for_weak_candidate() -> None:
 
 def test_decision_engine_td_value_lookup() -> None:
     """TD value function is consulted for each candidate."""
-    from genesis_cognitive.learning.td import TDLearner
-    from genesis_cognitive.reasoning import ActionType, DecisionEngine
+    from genesis_conscious.learning.td import TDLearner
+    from genesis_conscious.reasoning import ActionType, DecisionEngine
     net = ConceptNetwork()
     net.add_concept("fire")
     net.add_concept("heat")
@@ -3201,7 +3201,7 @@ def test_decision_engine_td_value_lookup() -> None:
 
 def test_decision_engine_persistence() -> None:
     """to_dict / restore_from_dict preserves counts."""
-    from genesis_cognitive.reasoning import ActionType, DecisionEngine
+    from genesis_conscious.reasoning import ActionType, DecisionEngine
     net = ConceptNetwork()
     de = DecisionEngine(net)
     # Make a decision to generate stats.
@@ -3224,7 +3224,7 @@ def test_decision_engine_persistence() -> None:
 
 def test_decision_engine_describe() -> None:
     """describe() produces a human-readable summary."""
-    from genesis_cognitive.reasoning import ActionType, DecisionEngine
+    from genesis_conscious.reasoning import ActionType, DecisionEngine
     net = ConceptNetwork()
     de = DecisionEngine(net)
     outcome = de.decide(
@@ -3243,7 +3243,7 @@ def test_decision_engine_describe() -> None:
 
 def test_decision_engine_reflect_for_novel_reasoning() -> None:
     """Novel reasoning gives 'reflect' a higher score."""
-    from genesis_cognitive.reasoning import ActionType, DecisionEngine
+    from genesis_conscious.reasoning import ActionType, DecisionEngine
     net = ConceptNetwork()
     de = DecisionEngine(net)
     rr = _make_reasoning_result(confidence=0.6, novel=True)
@@ -3265,7 +3265,7 @@ def test_decision_engine_reflect_for_novel_reasoning() -> None:
 
 def test_decision_engine_stats_tracking() -> None:
     """Decision stats are tracked across calls."""
-    from genesis_cognitive.reasoning import ActionType, DecisionEngine
+    from genesis_conscious.reasoning import ActionType, DecisionEngine
     net = ConceptNetwork()
     de = DecisionEngine(net)
     # Make an override decision.
@@ -3284,7 +3284,7 @@ def test_decision_engine_stats_tracking() -> None:
 
 def test_decision_engine_custom_value_weights() -> None:
     """Custom value weights change the composite scores."""
-    from genesis_cognitive.reasoning import ActionType, DecisionEngine
+    from genesis_conscious.reasoning import ActionType, DecisionEngine
     net = ConceptNetwork()
     # Emphasize curiosity heavily.
     custom_weights = {
@@ -3336,7 +3336,7 @@ def _build_planning_network() -> ConceptNetwork:
 
 def test_planning_engine_creates_plan_with_prerequisites() -> None:
     """Plan includes prerequisites before the goal concept."""
-    from genesis_cognitive.reasoning import PlanningEngine, PlanStatus
+    from genesis_conscious.reasoning import PlanningEngine, PlanStatus
     net = _build_planning_network()
     planner = PlanningEngine(net)
     plan = planner.create_plan("fire", "understand")
@@ -3355,7 +3355,7 @@ def test_planning_engine_creates_plan_with_prerequisites() -> None:
 
 def test_planning_engine_feasibility() -> None:
     """Feasibility score reflects concept existence."""
-    from genesis_cognitive.reasoning import PlanningEngine
+    from genesis_conscious.reasoning import PlanningEngine
     net = _build_planning_network()
     planner = PlanningEngine(net)
     plan = planner.create_plan("fire", "understand")
@@ -3365,7 +3365,7 @@ def test_planning_engine_feasibility() -> None:
 
 def test_planning_engine_low_feasibility_for_unknown() -> None:
     """Unknown concepts produce low feasibility."""
-    from genesis_cognitive.reasoning import PlanningEngine
+    from genesis_conscious.reasoning import PlanningEngine
     net = ConceptNetwork()
     net.add_concept("fire")
     planner = PlanningEngine(net)
@@ -3376,7 +3376,7 @@ def test_planning_engine_low_feasibility_for_unknown() -> None:
 
 def test_planning_engine_advance_returns_step() -> None:
     """advance() returns the current step to execute."""
-    from genesis_cognitive.reasoning import PlanningEngine, PlanStepStatus
+    from genesis_conscious.reasoning import PlanningEngine, PlanStepStatus
     net = _build_planning_network()
     planner = PlanningEngine(net)
     plan = planner.create_plan("fire", "understand")
@@ -3387,7 +3387,7 @@ def test_planning_engine_advance_returns_step() -> None:
 
 def test_planning_engine_mark_step_completed() -> None:
     """mark_step with success advances the plan."""
-    from genesis_cognitive.reasoning import (
+    from genesis_conscious.reasoning import (
         PlanningEngine,
         PlanStepStatus,
     )
@@ -3403,7 +3403,7 @@ def test_planning_engine_mark_step_completed() -> None:
 
 def test_planning_engine_completes_plan() -> None:
     """Completing all steps marks the plan as completed."""
-    from genesis_cognitive.reasoning import PlanningEngine, PlanStatus
+    from genesis_conscious.reasoning import PlanningEngine, PlanStatus
     net = _build_planning_network()
     planner = PlanningEngine(net)
     plan = planner.create_plan("fire", "understand")
@@ -3420,7 +3420,7 @@ def test_planning_engine_completes_plan() -> None:
 
 def test_planning_engine_revision_on_failure() -> None:
     """Repeated failure triggers plan revision."""
-    from genesis_cognitive.reasoning import (
+    from genesis_conscious.reasoning import (
         PlanningEngine,
         PlanStepStatus,
     )
@@ -3443,7 +3443,7 @@ def test_planning_engine_revision_on_failure() -> None:
 
 def test_planning_engine_blocked_when_no_alternative() -> None:
     """Plan is blocked when no alternative path exists."""
-    from genesis_cognitive.reasoning import (
+    from genesis_conscious.reasoning import (
         PlanningEngine,
         PlanStatus,
     )
@@ -3463,7 +3463,7 @@ def test_planning_engine_blocked_when_no_alternative() -> None:
 
 def test_planning_engine_persistence() -> None:
     """to_dict / restore_from_dict preserves plan state."""
-    from genesis_cognitive.reasoning import PlanningEngine
+    from genesis_conscious.reasoning import PlanningEngine
     net = _build_planning_network()
     planner = PlanningEngine(net)
     plan = planner.create_plan("fire", "understand")
@@ -3483,7 +3483,7 @@ def test_planning_engine_persistence() -> None:
 
 def test_planning_engine_describe() -> None:
     """describe() produces a human-readable plan summary."""
-    from genesis_cognitive.reasoning import PlanningEngine
+    from genesis_conscious.reasoning import PlanningEngine
     net = _build_planning_network()
     planner = PlanningEngine(net)
     plan = planner.create_plan("fire", "understand")
@@ -3495,7 +3495,7 @@ def test_planning_engine_describe() -> None:
 
 def test_planning_engine_progress_tracking() -> None:
     """Progress is tracked as steps complete."""
-    from genesis_cognitive.reasoning import PlanningEngine
+    from genesis_conscious.reasoning import PlanningEngine
     net = _build_planning_network()
     planner = PlanningEngine(net)
     plan = planner.create_plan("fire", "understand")
@@ -3510,7 +3510,7 @@ def test_planning_engine_progress_tracking() -> None:
 
 def test_planning_engine_causal_decomposition() -> None:
     """ACHIEVE goals decompose into causal chains."""
-    from genesis_cognitive.reasoning import PlanningEngine
+    from genesis_conscious.reasoning import PlanningEngine
     net = _build_planning_network()
     planner = PlanningEngine(net)
     plan = planner.create_plan("heat", "achieve")
@@ -3521,7 +3521,7 @@ def test_planning_engine_causal_decomposition() -> None:
 
 def test_planning_engine_resolve_decomposition() -> None:
     """RESOLVE goals decompose into understanding both sides."""
-    from genesis_cognitive.reasoning import PlanningEngine
+    from genesis_conscious.reasoning import PlanningEngine
     net = _build_planning_network()
     # Add a contradiction.
     net.add_concept("ice")
@@ -3537,7 +3537,7 @@ def test_planning_engine_resolve_decomposition() -> None:
 
 def test_planning_engine_get_plan_for_goal() -> None:
     """get_plan_for_goal retrieves a previously created plan."""
-    from genesis_cognitive.reasoning import PlanningEngine
+    from genesis_conscious.reasoning import PlanningEngine
     net = _build_planning_network()
     planner = PlanningEngine(net)
     plan = planner.create_plan("fire", "understand")
@@ -3547,7 +3547,7 @@ def test_planning_engine_get_plan_for_goal() -> None:
 
 def test_planning_engine_steps_executed_tracking() -> None:
     """Steps executed counter tracks total executions."""
-    from genesis_cognitive.reasoning import PlanningEngine
+    from genesis_conscious.reasoning import PlanningEngine
     net = _build_planning_network()
     planner = PlanningEngine(net)
     plan = planner.create_plan("fire", "understand")
@@ -3558,7 +3558,7 @@ def test_planning_engine_steps_executed_tracking() -> None:
 
 def test_planning_engine_verify_step() -> None:
     """Plans include a final verification step."""
-    from genesis_cognitive.reasoning import PlanningEngine
+    from genesis_conscious.reasoning import PlanningEngine
     net = _build_planning_network()
     planner = PlanningEngine(net)
     plan = planner.create_plan("fire", "understand")
@@ -3569,7 +3569,7 @@ def test_planning_engine_verify_step() -> None:
 
 def test_executive_planning_requires_outcome_model() -> None:
     """Planning must not turn lexical goal overlap into fabricated predictions."""
-    from genesis_cognitive.executive import ExecutiveFunction
+    from genesis_conscious.frontal_lobe.executive import ExecutiveFunction
 
     executive = ExecutiveFunction(planning_depth=2)
     plan = executive.plan(
@@ -3585,7 +3585,7 @@ def test_executive_planning_requires_outcome_model() -> None:
 
 def test_executive_planning_queries_the_outcome_model_for_candidates() -> None:
     """Candidate actions are scored by predicted consequences, not wording."""
-    from genesis_cognitive.executive import ExecutiveFunction
+    from genesis_conscious.frontal_lobe.executive import ExecutiveFunction
 
     values = {"inspect": 0.2, "repair": 0.9, "observe": 0.4}
 
@@ -3601,3 +3601,5 @@ def test_executive_planning_queries_the_outcome_model_for_candidates() -> None:
     assert plan.steps[0] == "repair"
     assert plan.predicted_outcomes[0] == "predicted:repair"
     assert plan.confidence > 0.0
+
+pytestmark = pytest.mark.usefixtures("learned_sentiment")

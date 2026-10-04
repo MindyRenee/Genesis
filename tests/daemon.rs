@@ -1458,7 +1458,9 @@ fn test_inference_signals_are_readable_by_the_cognitive_mind() {
     .expect("write canary");
 
     let raw = std::fs::read(&path).expect("read state file");
-    let off = 3228usize;
+    // Derive the offset rather than hardcoding it: schema v4 moved
+    // inference_signals when `ions` was inserted ahead of the checksum.
+    let off = core::mem::offset_of!(genesis::state::GenesisCoreState, inference_signals);
     assert!(raw.len() >= off + 64, "state file too small: {}", raw.len());
 
     // surprise_ema is the first field of the block: 0.5 as little-endian

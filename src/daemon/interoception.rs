@@ -1372,9 +1372,11 @@ impl Interoceptor {
         let fan_path = find_fan_pwm();
         let power_paths = find_power_sensors();
         let (core_voltage_path, supply_voltage_path) = find_voltage_sensors();
-        let total_memory_kb = match read_total_memory_kb() {
-            Some(m) => m,
-            None => {
+        let real_total_memory_kb = read_total_memory_kb();
+        let memory_present = matches!(real_total_memory_kb, Some(m) if m > 0);
+        let total_memory_kb = match real_total_memory_kb {
+            Some(m) if m > 0 => m,
+            _ => {
                 eprintln!(
                     "[interoception] WARNING: could not read total system memory, \
                      defaulting to 8 GB"
@@ -1394,7 +1396,9 @@ impl Interoceptor {
             core_voltage_path: core_voltage_path.clone(),
             supply_voltage_path: supply_voltage_path.clone(),
             rapl_domains: rapl_domains.clone(),
-            total_memory_kb,
+            // Presence reflects the real probe, not the fallback:
+            // an unreadable /proc/meminfo must not claim MEMORY.
+            total_memory_kb: if memory_present { total_memory_kb } else { 0 },
         });
         // perf_event_open has not been attempted yet, so its
         // availability is not yet known. Leave the bit clear until
@@ -1955,11 +1959,14 @@ impl Interoceptor {
             return (0.0, 0.0);
         }
         let total_rss_kb: u64 = pids.iter().map(|pid| rss_kb(*pid)).sum();
-        let fraction = (total_rss_kb as f32) / (self.total_memory_kb as f32);
-        let mb = total_rss_kb as f32 / 1024.0;
+        // Compute in f64: u64-as-f32 loses integer precision above 2^24
+        // (~16.7M kB ≈ 16 GiB), so hosts with large RAM would quantize
+        // both operands before dividing.
+        let fraction = (total_rss_kb as f64) / (self.total_memory_kb as f64);
+        let mb = (total_rss_kb as f64) / 1024.0;
         (
-            crate::state::sanitize::finite_clamp(fraction, 0.0, 1.0),
-            crate::state::sanitize::finite_or(mb, 0.0),
+            crate::state::sanitize::finite_clamp(fraction as f32, 0.0, 1.0),
+            crate::state::sanitize::finite_or(mb as f32, 0.0),
         )
     }
 
@@ -4760,5 +4767,23 @@ mod sensor_presence_tests {
         let before = names.len();
         names.dedup();
         assert_eq!(names.len(), before, "duplicate sensor name in SENSOR_BITS");
+    }
+
+    #[test]
+    fn test_unreadable_memtotal_does_not_claim_memory() {
+        // Regression: Interoceptor::new fell back to 8 GB when
+        // /proc/meminfo was unreadable, then fed that fallback into
+        // build_sensor_mask — claiming MEMORY present when nothing was
+        // measured. The mask must reflect the real probe (0 → absent).
+        let probe = super::SensorProbe {
+            total_memory_kb: 0,
+            ..Default::default()
+        };
+        let mask = super::Interoceptor::build_sensor_mask(&probe);
+        assert_eq!(
+            mask & sensor::MEMORY,
+            0,
+            "unreadable MemTotal must not claim MEMORY present"
+        );
     }
 }

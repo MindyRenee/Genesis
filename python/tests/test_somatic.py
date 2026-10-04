@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from genesis_cognitive.memory.engine import MemoryEngine, MemoryRecord
-from genesis_cognitive.self.somatic import SomaticSnapshot, somatic_congruence
+from genesis_conscious.memory.engine import MemoryEngine, MemoryRecord
+from genesis_conscious.self.somatic import SomaticSnapshot, somatic_congruence
 
 
 def test_congruence_identical_is_one():

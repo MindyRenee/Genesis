@@ -90,18 +90,23 @@ from pathlib import Path
 from types import FrameType
 
 from discord_feed import DiscordFeed, FeedLogHandler, StderrTee
+
 from genesis_client.ltm_index import scan_ltm_index
 from genesis_client.protocol import PHASE_ACTIVE, PHASE_ALERT, PHASE_NREM, PHASE_REM
-from genesis_cognitive.ambient import AmbientListener, contains_wake_word, strip_wake_word
-from genesis_cognitive.concepts import RelationType
-from genesis_cognitive.infrastructure.config import default_data_dir
-from genesis_cognitive.mind import Mind
-from genesis_cognitive.mind.thresholds import AUTO_WAKE_MIN_SLEEP_S
-from genesis_cognitive.speech import Voice, VoiceInput
-from genesis_cognitive.temporal_lobe import AuditoryCortex, SoundEvent
+from genesis_conscious.concepts import RelationType
+from genesis_conscious.infrastructure.config import default_data_dir
+from genesis_conscious.mind import Mind
+from genesis_conscious.mind.thresholds import AUTO_WAKE_MIN_SLEEP_S
+from genesis_conscious.perception.ambient import (
+    AmbientListener,
+    contains_wake_word,
+    strip_wake_word,
+)
+from genesis_conscious.temporal_lobe import AuditoryCortex, SoundEvent
+from genesis_conscious.temporal_lobe.speech import Voice, VoiceInput
 
 # Script directory — used to locate the project root. Python already
-# adds the script's directory to sys.path[0], so genesis_cognitive and
+# adds the script's directory to sys.path[0], so genesis_conscious and
 # genesis_client are importable without explicit path manipulation.
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -1245,7 +1250,7 @@ def _cmd_puzzle(mind: Mind, rest: str) -> str:
     {"family": "quantities", "generate"/"target"+"groups"}, or
     {"family": "classification", "items"+"predicate"/"examples"}.
     """
-    from genesis_cognitive.spatial.practice import (
+    from genesis_conscious.spatial.practice import (
         CURRICULUM,
         normalize_offered,
     )
@@ -1762,7 +1767,7 @@ def _cmd_register_face(mind: Mind, rest: str) -> str:
         return f"\n  genesis> {result}\n"
 
     # Capture a frame and register
-    from genesis_cognitive.perception.retina import latest_frame
+    from genesis_conscious.perception.retina import latest_frame
 
     frame = latest_frame(copy=True)
     if frame is None:
@@ -1775,7 +1780,7 @@ def _cmd_register_face(mind: Mind, rest: str) -> str:
 
     # Convert to RGB if needed
     if frame.ndim == 3 and frame.shape[2] != 3:
-        from genesis_cognitive.perception.vision import _yuyv_to_rgb
+        from genesis_conscious.perception.vision import _yuyv_to_rgb
         rgb = _yuyv_to_rgb(frame)
     else:
         rgb = frame

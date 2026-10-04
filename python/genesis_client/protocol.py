@@ -60,6 +60,7 @@ __all__ = [
     "GET_BODY_CONTROL",
     "GET_BODY_STATE",
     "GET_INFERENCE_SUMMARY",
+    "GET_ION_SUMMARY",
     "GET_MEMORY_STATS",
     "GET_NEURO_SUMMARY",
     "GET_PHASE",
@@ -171,6 +172,23 @@ __all__ = [
 # Largest message the client will accept. Must be >= the daemon's
 # own limit (1 MiB) so legitimate responses are not rejected.
 MAX_MESSAGE_LEN = 1 << 20  # 1 MiB
+
+# The electrochemical ion layer: a compact 108-byte snapshot of
+# calcium/chloride/potassium/sodium state. Additive — it adds a new
+# opcode and touches no existing layout, so PROTOCOL_VERSION is
+# unaffected.
+#
+# NOTE: this tree already spent command id 36 on GET_SENSOR_PRESENCE,
+# so the ion layer continues past ADVANCE_PHYSICS at 40 rather than
+# reusing genesis2's 36.
+GET_ION_SUMMARY = 40
+
+# Number of neurochemical levels in the ``emotional_tag`` vector sent
+# with STORE_EVENT / STORE_EPISODE. Fixed by the wire layout: the
+# daemon reads ``[f32; 12]`` (see ``STORE_EPISODE`` in src/daemon/ipc.rs)
+# and passes the values through positionally, so sender and receiver
+# must agree on the width or the tag is silently truncated.
+EMOTIONAL_TAG_SIZE = 12
 
 # ─── Command IDs ──────────────────────────────────────────────
 
@@ -397,7 +415,7 @@ DT_NOMINAL_STEP = 0.2
 # Reserved / unwired: the IPC channel is strictly request-response,
 # so the daemon never sends these today. The cognitive mind detects
 # phase changes and dream insights by polling instead — see
-# ``genesis_cognitive/infrastructure/notifications.py`` (a pull-based
+# ``genesis_conscious/infrastructure/notifications.py`` (a pull-based
 # queue). These
 # IDs reserve the 100+ opcode range for a future push mechanism and
 # mirror the Rust ``notify`` module in ``src/daemon/ipc.rs``.

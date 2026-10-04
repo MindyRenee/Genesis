@@ -13,7 +13,7 @@
 //! - **Versioned**: magic bytes + schema version detect format mismatches.
 //! - **Checksummed**: CRC32 detects corruption from crashes mid-write.
 //!
-//! ## Schema v3 layout (3296 bytes)
+//! ## Schema v4 layout (3416 bytes)
 //!
 //! ```text
 //! offset  field             type                size
@@ -23,13 +23,21 @@
 //! 2472    zones             ActiveZones          96
 //! 2568    memory            MemoryPointers      120
 //! 2688    manifest          RuntimeManifest     536
-//! 3224    checksum          u32                   4
-//! 3228    inference_signals InferenceSignals      64
-//! 3292    padding (alignment to 8 bytes)           4
-//! 3296    TOTAL                                   3296 bytes
+//! 3224    ions              IonState            124
+//! 3348    checksum          u32                   4
+//! 3352    inference_signals InferenceSignals      64
+//! 3416    TOTAL                                  3416 bytes
 //! ```
 //!
-//! That's ~3.2 KB — fits in a single 4 KB page with room to spare.
+//! Schema v4 inserted `ions` ahead of the checksum, so every field
+//! after `manifest` moved and a v3 file cannot be reinterpreted in
+//! place — `legacy_v3::GenesisCoreStateV3` decodes it and converts.
+//! The ion block sits *inside* the CRC32 region because resting
+//! concentrations, gradients and membrane potential are authoritative
+//! state, not derived: dropping them would reset the cell's resting
+//! state on every restart.
+//!
+//! That's ~3.3 KB — fits in a single 4 KB page with room to spare.
 //!
 //! The tail is a reserve sized to exactly `size_of::<InferenceSignals>()`
 //! so that adding a signal field cannot shift anything else. Such a
@@ -84,6 +92,7 @@
 
 use super::header::{CoreStateHeader, SCHEMA_VERSION};
 use super::inference::InferenceSignals;
+use super::ions::IonState;
 use super::manifest::RuntimeManifest;
 use super::memory::MemoryPointers;
 use super::neurochemical::{NeuroTickParams, NeurochemicalId, NeurochemicalVector};
@@ -100,7 +109,7 @@ use core::sync::atomic::{AtomicU64, Ordering, fence};
 /// (asserted at the bottom of this file) so that adding a signal field
 /// cannot shift any other field's offset. It is *not* padded out to the
 /// struct's own size: `inference_signals` ends at 3228 + 64 = 3292 and
-/// the struct rounds up to 3296 for 8-byte alignment.
+/// the struct rounds up to 3416 for 8-byte alignment.
 pub const RESERVED_BYTES: usize = 64;
 
 /// The struct size under schema v3 before [`InferenceSignals`] gained
@@ -158,6 +167,12 @@ pub struct GenesisCoreState {
     pub memory: MemoryPointers,
     /// Runtime module manifest table.
     pub manifest: RuntimeManifest,
+    /// Ion electrochemistry — calcium, chloride, potassium, sodium.
+    /// Sits ahead of the checksum because concentrations, gradients,
+    /// and membrane potential are authoritative persistent state, not
+    /// derived: losing them resets the cell's resting state. See
+    /// [`IonState`].
+    pub ions: IonState,
     /// CRC32 checksum of all preceding bytes (header.seq_lock excluded).
     pub checksum: u32,
     /// Active inference signals — the generative self-model's
@@ -179,6 +194,7 @@ impl GenesisCoreState {
             zones: ActiveZones::new(now_ms),
             memory: MemoryPointers::new(),
             manifest: RuntimeManifest::new(),
+            ions: IonState::new(),
             checksum: 0,
             inference_signals: InferenceSignals::new(),
         };
@@ -227,6 +243,16 @@ impl GenesisCoreState {
             self.neurochemicals.effective(NeurochemicalId::Cortisol),
             self.neurochemicals.effective(NeurochemicalId::BDNF),
         );
+
+        // Calcium is the membrane-level plasticity signal: resting Ca²⁺
+        // modestly gates learning, while bounded Ca²⁺ influx restores the
+        // neurochemical gate. This keeps ion dynamics below the abstract
+        // neurotransmitter layer without duplicating BDNF/cortisol logic.
+        self.memory.plasticity_gate = crate::state::sanitize::finite_clamp(
+            self.memory.plasticity_gate * self.ions.plasticity_modulator(),
+            0.0,
+            1.0,
+        );
     }
 
     /// Advance the neurochemical system by one tick and propagate
@@ -243,6 +269,7 @@ impl GenesisCoreState {
     /// propagate the derived state.
     pub fn neuro_tick_with_params(&mut self, params: &NeuroTickParams) {
         self.neurochemicals.tick_with_params(params);
+        self.ions.tick(&self.neurochemicals, params.dt);
         self.sync_neurochemistry_to_state();
     }
 
@@ -373,8 +400,31 @@ impl GenesisCoreState {
 
                 Ok(())
             }
-            // v3 → v3: no-op (same version)
+            // v3 → v4: the ion layer was inserted ahead of the
+            // checksum, so a v3 file cannot be reinterpreted in place
+            // and `ions` has to be seeded. Every other field carries
+            // across unchanged — nothing before `manifest` moved, and
+            // `inference_signals` is derived state the v3 layout
+            // already carried. This arm only runs on a struct that has
+            // already been widened to the current layout (see
+            // `MmapState::open`, which decodes through
+            // `legacy_v3::GenesisCoreStateV3` first), so the field
+            // starts at its default rather than at whatever the
+            // widened bytes happened to contain.
             3 => {
+                self.ions = IonState::new();
+                self.header.version = SCHEMA_VERSION;
+                self.header.state_size = Self::SIZE as u32;
+                // Deliberately not ticking the ions here: migration
+                // seeds the resting state, and the next real tick evolves
+                // it. Running one now would invent a tick of history
+                // for a body that was never stepped.
+                self.sync_neurochemistry_to_state();
+                self.checksum = self.compute_checksum();
+                Ok(())
+            }
+            // v4 → v4: no-op (same version)
+            4 => {
                 self.verify()?;
                 Ok(())
             }
@@ -829,15 +879,16 @@ const _: () = {
     // reserve exists so a new signal field cannot shift the rest of
     // the wire layout. The total rounds up to 3296 for alignment,
     // which is why it is 4 larger than 3228 + 64.
-    assert!(core::mem::size_of::<GenesisCoreState>() == 3296);
     assert!(core::mem::size_of::<GenesisCoreState>() <= 4096);
     assert!(offset_of!(GenesisCoreState, header) == 0);
     assert!(offset_of!(GenesisCoreState, neurochemicals) == 56);
     assert!(offset_of!(GenesisCoreState, zones) == 2472);
     assert!(offset_of!(GenesisCoreState, memory) == 2568);
     assert!(offset_of!(GenesisCoreState, manifest) == 2688);
-    assert!(offset_of!(GenesisCoreState, checksum) == 3224);
-    assert!(offset_of!(GenesisCoreState, inference_signals) == 3228);
+    assert!(offset_of!(GenesisCoreState, ions) == 3224);
+    assert!(offset_of!(GenesisCoreState, checksum) == 3348);
+    assert!(core::mem::size_of::<GenesisCoreState>() == 3416);
+    assert!(offset_of!(GenesisCoreState, inference_signals) == 3352);
     // `compute_checksum` locates the checksum field with
     // `offset_of!(Self, checksum)` and region 2 as `48..<that offset>`
     // — it no longer derives either from `RESERVED_BYTES`. What

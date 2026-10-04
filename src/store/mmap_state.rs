@@ -66,8 +66,8 @@
 //! ## File layout
 //!
 //! ```text
-//! offset 0:     GenesisCoreState (3296 bytes)
-//! offset 3296:  (unused, padding to page boundary)
+//! offset 0:     GenesisCoreState (3416 bytes)
+//! offset 3416:  (unused, padding to page boundary)
 //! ```
 //!
 //! The state struct is 3296 bytes and the file is page-aligned, so the
@@ -86,9 +86,10 @@ use libc::{
     c_void, close, fdatasync, flock, ftruncate, mmap, msync, munmap,
 };
 
+use crate::state::legacy_v3::GenesisCoreStateV3;
 use crate::state::{CoreStateError, GenesisCoreState};
 
-/// The logical file size — one 4K page. The state struct (3296 bytes)
+/// The logical file size — one 4K page. The state struct (3416 bytes)
 /// fits comfortably, with the rest as padding.
 const FILE_SIZE: usize = 4096;
 
@@ -473,6 +474,39 @@ impl MmapState {
                     // `MmapState` exists yet — and the flock is held.
                     snapshot =
                         unsafe { Self::migrate_and_snapshot(ptr, fd, |s| s.migrate_state(2))? };
+                }
+                // v3 → v4: the layout itself changed — `ions` was
+                // inserted ahead of the checksum — so a v3 file cannot
+                // be repaired through a current-layout snapshot: every
+                // field after `manifest` would be read at the wrong
+                // offset. Decode it through the byte-exact v3 type,
+                // widen, then let the normal migration path seed the
+                // ion layer and recompute the checksum.
+                crate::state::CoreStateError::VersionMismatch { found: 3, .. } => {
+                    // SAFETY: as above — `ptr`/`fd` are exclusively
+                    // owned (no `MmapState` exists yet) and the flock is
+                    // held. The mapping is FILE_SIZE (one page), which
+                    // is larger than the 3296-byte v3 struct, so the
+                    // volatile copy stays in bounds.
+                    let legacy = unsafe {
+                        core::ptr::read_volatile(ptr as *const GenesisCoreStateV3)
+                    };
+                    if legacy.header.state_size as usize
+                        != core::mem::size_of::<GenesisCoreStateV3>()
+                    {
+                        // A v3 label on a file of some other size is a
+                        // damaged or foreign file, not a migration.
+                        return Err(StateFileError::VerificationFailed(e));
+                    }
+                    let widened = legacy.into_current();
+                    // SAFETY: as above — `ptr`/`fd` are exclusively
+                    // owned here and the flock is held.
+                    snapshot = unsafe {
+                        Self::migrate_and_snapshot(ptr, fd, |s| {
+                            *s = widened;
+                            s.migrate_state(3)
+                        })?
+                    };
                 }
                 // Correct version, older struct size: the reserve at
                 // the end of the struct grew (see

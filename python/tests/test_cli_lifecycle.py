@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 import genesis_cli
-from genesis_cognitive.mind.lifecycle import LifecycleMixin
+from genesis_conscious.mind.lifecycle import LifecycleMixin
 
 
 def test_shutdown_waits_for_slow_daemon_within_grace_window(tmp_path):
@@ -232,7 +232,7 @@ _stop_all
 
 @pytest.mark.parametrize("raw", [b"{", b'{"version":2,"reflection":null}'])
 def test_failed_mind_start_preserves_saved_state(tmp_path, raw):
-    from genesis_cognitive.mind import Mind
+    from genesis_conscious.mind import Mind
 
     path = tmp_path / "cognitive_state.json"
     path.write_bytes(raw)
@@ -335,7 +335,7 @@ def test_startup_failure_still_shuts_down(tmp_path, failing_step):
 
 
 def test_shutdown_reports_failed_final_save(tmp_path):
-    from genesis_cognitive.mind import Mind
+    from genesis_conscious.mind import Mind
 
     mind = Mind(str(tmp_path / "genesis.sock"), offline=True)
     mind._running = True
@@ -347,7 +347,7 @@ def test_shutdown_reports_failed_final_save(tmp_path):
 
 
 def test_shutdown_waits_for_autosave_before_saving(tmp_path):
-    from genesis_cognitive.mind import Mind
+    from genesis_conscious.mind import Mind
 
     mind = Mind(str(tmp_path / "genesis.sock"), offline=True)
     mind._running = True

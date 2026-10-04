@@ -7,14 +7,14 @@
 Each package's ``__init__`` eagerly imports its submodules, so whichever one
 is entered first leaves the other two partially initialised. Concretely,
 ``language/generator.py`` does ``from ..self import SelfModel``; if
-``genesis_cognitive.self`` is still executing its own ``__init__`` when that
+``genesis_conscious.self`` is still executing its own ``__init__`` when that
 line runs, ``SelfModel`` is not yet bound and the import raises.
 
 The cycle is entered from ``infrastructure/narrative.py``, which
 ``cognition/engine.py`` imports. Placing that import *after* ``..self``,
 ``..perception`` and ``..language`` means those three are already bound
 before the cycle is walked. Moving it earlier breaks the entire package:
-every ``import genesis_cognitive`` fails.
+every ``import genesis_conscious`` fails.
 
 Sorting tools (``ruff --fix``) will happily undo it, so this test pins the
 order. ``ruff``'s I001 is ignored for this one file in pyproject.toml with a
@@ -27,7 +27,7 @@ import ast
 import pathlib
 
 _ROOT = pathlib.Path(__file__).resolve().parents[1]
-ENGINE = _ROOT / "genesis_cognitive" / "cognition" / "engine.py"
+ENGINE = _ROOT / "genesis_conscious" / "cognition" / "engine.py"
 
 # Only `language` must precede it. `language/generator.py` is the module that
 # reads `SelfModel` out of the partially-initialised `self` package, so
@@ -57,7 +57,7 @@ def test_narrative_imports_after_the_cycle() -> None:
             f"..{package} is imported on line {order[package]}, after "
             f"..infrastructure on line {narrative_line}. The cycle "
             f"(self -> perception -> language -> self) will be entered with "
-            f"genesis_cognitive.self only partially initialised, and "
+            f"genesis_conscious.self only partially initialised, and "
             f"language/generator.py's `from ..self import SelfModel` fails."
         )
 
@@ -68,9 +68,9 @@ def test_package_imports_cleanly() -> None:
     import sys
 
     result = subprocess.run(
-        [sys.executable, "-c", "import genesis_cognitive"],
+        [sys.executable, "-c", "import genesis_conscious"],
         capture_output=True,
         text=True,
         cwd=str(ENGINE.parents[2]),
     )
-    assert result.returncode == 0, f"import genesis_cognitive failed:\n{result.stderr}"
+    assert result.returncode == 0, f"import genesis_conscious failed:\n{result.stderr}"

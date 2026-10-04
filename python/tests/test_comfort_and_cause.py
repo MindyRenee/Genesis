@@ -25,9 +25,9 @@ from genesis_client.protocol import (
     CHEM_SEROTONIN,
 )
 from genesis_client.types import NeuroSummary
-from genesis_cognitive.emotion import EmotionalState, assess_emotion
-from genesis_cognitive.emotional_regulator import EmotionalRegulator
-from genesis_cognitive.perception import Intent, perceive
+from genesis_conscious.limbic_system.emotion import EmotionalState, assess_emotion
+from genesis_conscious.limbic_system.emotional_regulator import EmotionalRegulator
+from genesis_conscious.perception import Intent, perceive
 
 # ─── Helpers ────────────────────────────────────────────────────────
 
@@ -382,7 +382,7 @@ def test_neutral_emotion_has_no_cause() -> None:
 def test_cause_category_enum_access() -> None:
     """Emotional state provides enum access to cause category."""
     from genesis_client.protocol import PHASE_STRESS
-    from genesis_cognitive.emotion import CauseCategory
+    from genesis_conscious.limbic_system.emotion import CauseCategory
     summary = make_summary(arousal=0.8, valence=-0.3, plasticity=0.4, phase=PHASE_STRESS)
     emo = assess_emotion(summary)
     assert emo.cause_category == CauseCategory.STRESS_CORTISOL
@@ -391,7 +391,7 @@ def test_cause_category_enum_access() -> None:
 
 def test_cause_category_none() -> None:
     """Neutral state has NONE cause category."""
-    from genesis_cognitive.emotion import CauseCategory
+    from genesis_conscious.limbic_system.emotion import CauseCategory
     summary = make_summary(arousal=0.5, valence=0.0, plasticity=0.5, phase=0)
     emo = assess_emotion(summary)
     assert emo.cause_category == CauseCategory.NONE
@@ -411,8 +411,8 @@ def _make_feeling_reporter():
     """Construct a FeelingReporter with an empty network for tests."""
     import random as _random
 
-    from genesis_cognitive.cognition.feeling_reporter import FeelingReporter
-    from genesis_cognitive.concepts import ConceptNetwork
+    from genesis_conscious.cognition.feeling_reporter import FeelingReporter
+    from genesis_conscious.concepts import ConceptNetwork
 
     return FeelingReporter(
         network=ConceptNetwork(),
@@ -474,7 +474,7 @@ def test_feeling_fragments_never_contain_structural_markers() -> None:
     material — markers stay in the structural channel so they can
     never leak into its spoken words.
     """
-    from genesis_cognitive.cognition.feeling_reporter import FeelingReporter
+    from genesis_conscious.cognition.feeling_reporter import FeelingReporter
 
     # Direct test of the stripper (still used for /feel diagnostics)
     assert FeelingReporter.strip_structural_markers("[plasticity_gate:closed]") == ""

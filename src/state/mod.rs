@@ -7,7 +7,7 @@
 //!
 //! ```text
 //! ┌──────────────────────────────────────────────────────────────┐
-//! │                  GenesisCoreState (3296 bytes)                │
+//! │                  GenesisCoreState (3416 bytes)                │
 //! │  memory-mapped, lock-free readable, CRC32 checksummed         │
 //! │                                                               │
 //! │  ┌──────────────┐  ┌────────────────────────────────────────┐ │
@@ -51,6 +51,8 @@
 //!   maturation-gated CRH → ACTH → cortisol cascade.
 
 pub mod core_state;
+pub mod legacy_v3;
+pub mod ions;
 pub mod header;
 pub mod inference;
 pub mod manifest;
@@ -63,6 +65,8 @@ pub mod zones;
 pub use core_state::{CoreStateError, GenesisCoreState};
 pub use header::{CoreStateHeader, MAGIC, SCHEMA_VERSION};
 pub use inference::InferenceSignals;
+pub use ions::{ION_COUNT, IonId, IonState};
+pub use legacy_v3::GenesisCoreStateV3;
 pub use manifest::{MAX_MODULES, ModuleEntry, ModuleId, ModuleStatus, RuntimeManifest};
 pub use memory::{MemoryPointers, WORKING_SET_SIZE};
 pub use neurochemical::{
