@@ -504,7 +504,21 @@ class LifecycleMixin:
                     pruned = network.remove_concepts_batch(to_remove)
                     if pruned > 0:
                         logger.info(f"Pruned {pruned} dormant concepts (no archive)")
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
+            # Log loudly as well as tallying. This runs from a background
+            # autosave thread and the tally is only visible via
+            # `swallow_report()`, so an exception here used to mean
+            # working memory silently stayed over budget with nothing in
+            # the log saying why. That is exactly how a hard failure in
+            # the spill path — one that wrote concepts to the archive and
+            # then aborted before trimming working memory — persisted
+            # unnoticed and presented as "archiving is zero".
+            logger.error(
+                "Archiving dormant concepts failed: %r — working memory "
+                "is not being shed and will keep growing",
+                e,
+                exc_info=True,
+            )
             note_swallowed(
                 "genesis_conscious.mind.lifecycle._archive_dormant_concepts",
                 e,

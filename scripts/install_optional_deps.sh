@@ -28,6 +28,13 @@ PY=${PYTHON:-python3}
 VERIFY_ONLY=0
 [ "${1:-}" = "--verify" ] && VERIFY_ONLY=1
 
+# Blank means unset, so this agrees with run.sh, config.py, and
+# src/data_dir.rs instead of building a path out of whitespace.
+if [ -n "${GENESIS_DATA_DIR:-}" ] && [ -z "${GENESIS_DATA_DIR//[[:space:]]/}" ]; then
+    unset GENESIS_DATA_DIR
+fi
+
+
 # Where the vosk model lives. Must match
 # genesis_conscious.infrastructure.config.vosk_model_dir(), which is the
 # single source of truth; this shell resolves the same order run.sh does
@@ -46,6 +53,15 @@ else
 fi
 VOSK_NAME="vosk-model-small-en-us-0.15"
 VOSK_URL="https://alphacephei.com/vosk/models/${VOSK_NAME}.zip"
+
+# Report where the model would be installed and exit. Resolving the data
+# dir is the part with a history of being wrong, so it must be
+# inspectable without running an install; see
+# python/tests/test_data_dir_conformance.py.
+if [ "${1:-}" = "--data-dir" ]; then
+    printf '%s\n' "$VOSK_DIR"
+    exit 0
+fi
 
 say()  { printf '%s\n' "$*"; }
 ok()   { printf '  [ok]   %s\n' "$*"; }

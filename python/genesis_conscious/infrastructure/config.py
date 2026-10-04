@@ -52,7 +52,9 @@ def default_data_dir() -> Path:
     already covers the supported launch path; steps 2-3 exist for tools
     run outside ``run.sh``.
     """
-    env = os.environ.get("GENESIS_DATA_DIR")
+    # A blank value counts as unset: `Path("   ")` is a real, wrong path,
+    # and the shell resolvers normalize this the same way.
+    env = (os.environ.get("GENESIS_DATA_DIR") or "").strip()
     if env:
         return Path(env)
     pinned = _pinned_data_dir()

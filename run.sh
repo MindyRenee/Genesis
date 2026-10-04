@@ -18,6 +18,16 @@ set -m
 
 cd "$(dirname "$0")" || exit 1
 
+# An exported-but-blank GENESIS_DATA_DIR is treated as unset. Otherwise
+# it is a non-empty string, every `[ -z "$GENESIS_DATA_DIR" ]` guard below
+# reads as "explicitly configured", and the data dir resolves to a
+# garbage path built from the current directory (e.g. "<cwd>/genesis").
+# Other resolvers normalize this the same way; see the order in
+# src/data_dir.rs and python/tests/test_data_dir_conformance.py.
+if [ -n "${GENESIS_DATA_DIR:-}" ] && [ -z "${GENESIS_DATA_DIR//[[:space:]]/}" ]; then
+    unset GENESIS_DATA_DIR
+fi
+
 # Per-checkout data-dir override: an uncommitted .genesis-data-dir file
 # pins this checkout to its own state directory, so independent
 # checkouts stay fully disconnected without exporting GENESIS_DATA_DIR.
@@ -229,8 +239,12 @@ if [ -f "$MARKER" ]; then
         echo "    $marker_content"
         echo "  This instance's state belongs to that tree. Two checkouts"
         echo "  sharing one data dir corrupt each other's developmental"
-        echo "  record. Use XDG_DATA_HOME or remove the state if you really"
-        echo "  intend to continue from here."
+        echo "  record."
+        echo "  To point this checkout elsewhere, set GENESIS_DATA_DIR or"
+        echo "  edit .genesis-data-dir — note that XDG_DATA_HOME ranks"
+        echo "  *below* the pin, so setting it will not redirect a pinned"
+        echo "  checkout. Otherwise remove the state if you really intend to"
+        echo "  continue from here."
     fi
 else
     echo "$PWD" > "$MARKER"

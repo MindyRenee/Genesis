@@ -51,6 +51,12 @@ cd "$ROOT"
 # The `.genesis-data-dir` case was previously missing, so a checkout
 # pinned to its own state directory had hygiene report "no runtime
 # directory", or clean a different tree entirely.
+# Blank means unset, so this agrees with run.sh, config.py, and
+# src/data_dir.rs instead of resolving to a whitespace "directory".
+if [ -n "${GENESIS_DATA_DIR:-}" ] && [ -z "${GENESIS_DATA_DIR//[[:space:]]/}" ]; then
+    unset GENESIS_DATA_DIR
+fi
+
 if [ -n "${GENESIS_DATA_DIR:-}" ]; then
     RUNTIME_DIR="$GENESIS_DATA_DIR"
 elif [ -f ".genesis-data-dir" ]; then
@@ -767,6 +773,7 @@ Usage:
   scripts/hygiene.sh --clean-cache    Remove only caches + bytecode
   scripts/hygiene.sh --clean-debug    Remove only the debug build
   scripts/hygiene.sh --clean-runtime  Remove orphaned runtime backups
+  scripts/hygiene.sh --data-dir       Print the resolved runtime data dir, then exit
   scripts/hygiene.sh --help           This message
 
 Two locations are tracked:
@@ -792,6 +799,7 @@ case "${1:-}" in
     --clean-cache) do_clean cache ;;
     --clean-debug) do_clean debug ;;
     --clean-runtime) do_clean runtime ;;
+    --data-dir)    echo "$RUNTIME_DIR" ;;
     --help|-h)     do_help ;;
     *)
         echo "Unknown option: $1"

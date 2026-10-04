@@ -239,6 +239,27 @@ order anyway, so tools run outside `run.sh` agree: `config.py`,
 `examples/recover.rs`. There is no remaining known deviation — check
 this list before adding a ninth resolver.
 
+**The list above is enforced, not aspirational.** Two test suites fail if
+any resolver drifts:
+
+- `python/tests/test_data_dir_conformance.py` runs every resolver side by
+  side under a hostile `XDG_DATA_HOME` and asserts they return run.sh's
+  answer. It also greps the tree for files referencing the state
+  directory and fails if one is not in its list, so a tenth resolver
+  cannot be added silently.
+- `src/data_dir.rs` has unit tests for the full precedence matrix,
+  including blank-pin and blank-env cases.
+
+A blank or whitespace-only `GENESIS_DATA_DIR` counts as **unset**
+everywhere; treating it as set resolves the data dir to a garbage path
+built from the current directory. Adding a resolver means adding it to
+`DIR_RESOLVERS` in the conformance test, not just writing the `if`
+cascade again.
+
+The Rust side resolves through `genesis::data_dir()` (a pure function
+over its inputs) rather than reimplementing the order, so the examples
+cannot drift from each other.
+
 Assets follow the data dir too. `config.py::vosk_model_dir()` is the
 single source of truth for the speech model: `$GENESIS_VOSK_DIR`, then
 `<data dir>/vosk-models`, then the XDG-relative location, then the
@@ -284,6 +305,35 @@ Other things worth knowing before experimenting:
 - **It does real background work.** Autonomous urges consume real CPU.
   Interoception dampens heavy work under thermal strain, but keep an
   eye on marginal hardware.
+
+## Concept archiving — working memory is capped, the disk is not
+`ConceptNetwork` keeps at most `max_in_memory` (15 000) concepts resident
+and spills dormant ones to `concept_archive.db`. Archiving is a
+**memory-pressure valve, not a dormancy sweep**: `spill_dormant` returns
+early while the network is under the cap, so activation level alone never
+triggers it. Two call sites: `mind/lifecycle.py::_archive_dormant_concepts`
+(every 10th autosave cycle, ~50 min) and
+`concepts/consolidation.py::_consolidate_n3_heavy` (N3 slow-wave sleep).
+It is not a REM behavior.
+
+Spilled concepts stay recallable — `add_concept` and `_resolve` pull
+them back by id or alias — so nothing is lost, unlike the older
+destructive prune that remains only as the no-archive fallback.
+
+Two invariants keep this from failing silently again:
+
+- `spill_dormant` verifies its own effect. It compares working memory
+  before and after the trim and logs at ERROR if a batch committed to the
+  archive but the trim did not shrink working memory.
+- Every zero return logs why at DEBUG — no archive, within budget, or
+  nothing dormant. Previously all three returned a bare `0`, so "archived
+  is zero" was indistinguishable from healthy idleness.
+
+`_archive_dormant_concepts` logs failures at ERROR as well as tallying
+them via `note_swallowed`. It runs on a background autosave thread, and
+the tally is only visible through `swallow_report()`, so a hard failure
+there left working memory growing over budget with nothing in the log
+explaining it.
 
 ## Edge storage — the edge log is canonical
 Relationships have ONE source of truth: `edge_log.jsonl` in the data
