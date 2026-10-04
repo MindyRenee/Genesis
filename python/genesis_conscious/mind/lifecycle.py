@@ -440,9 +440,11 @@ class LifecycleMixin:
 
                 # Periodically archive dormant concepts to long-term
                 # storage to prevent working-memory bloat from the
-                # autonomous learner. Runs every ~10 autosave cycles
-                # (~20 minutes). Dormant concepts spill to the SQLite
-                # archive; the next save persists the reduced working set.
+                # autonomous learner. Runs on every 10th autosave cycle;
+                # the loop above is 300 s per cycle, so that is ~50
+                # minutes, not the ~20 this used to claim. Dormant
+                # concepts spill to the SQLite archive; the next save
+                # persists the reduced working set.
                 self._autosave_cycle += 1
                 if self._autosave_cycle % 10 == 0:
                     self._archive_dormant_concepts()
