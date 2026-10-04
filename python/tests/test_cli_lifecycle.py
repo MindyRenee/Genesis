@@ -152,7 +152,11 @@ def _run_shell_helpers(code, data_dir):
     helpers = source.split("# ─── Parse arguments", 1)[0]
     return subprocess.run(
         ["bash", "-c", helpers + "\n" + code],
-        env={**os.environ, "XDG_DATA_HOME": str(data_dir)},
+        # GENESIS_DATA_DIR, not XDG_DATA_HOME: run.sh's per-checkout
+        # .genesis-data-dir pin outranks XDG_DATA_HOME, so setting the
+        # latter would leave DATA_DIR pointing at the developer's real
+        # state directory and these tests would read its pid files.
+        env={**os.environ, "GENESIS_DATA_DIR": str(Path(data_dir) / "genesis")},
         capture_output=True, text=True, timeout=5,
     )
 

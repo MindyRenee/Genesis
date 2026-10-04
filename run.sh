@@ -21,9 +21,12 @@ cd "$(dirname "$0")" || exit 1
 # Per-checkout data-dir override: an uncommitted .genesis-data-dir file
 # pins this checkout to its own state directory, so independent
 # checkouts stay fully disconnected without exporting GENESIS_DATA_DIR.
-# It is a default, not an override — explicit env config
-# (GENESIS_DATA_DIR or XDG_DATA_HOME) always wins.
-if [ -z "${GENESIS_DATA_DIR:-}" ] && [ -z "${XDG_DATA_HOME:-}" ] && [ -f .genesis-data-dir ]; then
+# The pin outranks XDG_DATA_HOME, which is ambient environment rather
+# than Genesis config: a launcher (Flatpak/sandboxed agent host) can
+# point XDG_DATA_HOME somewhere else entirely, and honoring that would
+# silently fork this checkout into a second, divergent state directory.
+# Only an explicit GENESIS_DATA_DIR still overrides the pin.
+if [ -z "${GENESIS_DATA_DIR:-}" ] && [ -f .genesis-data-dir ]; then
     GENESIS_DATA_DIR=$(head -n1 .genesis-data-dir)
     export GENESIS_DATA_DIR
 fi

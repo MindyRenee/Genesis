@@ -19,7 +19,11 @@ import pytest
 
 from genesis_client import NeuroSummary
 from genesis_client.protocol import PHASE_FLOW, PHASE_SLEEPING, PHASE_STRESS
-from genesis_conscious.limbic_system.emotion import EmotionalState, assess_emotion
+from genesis_conscious.limbic_system.emotion import (
+    EmotionalState,
+    EmotionCategory,
+    assess_emotion,
+)
 from genesis_conscious.perception import Intent, QuestionType, perceive
 from genesis_conscious.self import SelfModel
 
@@ -475,15 +479,16 @@ def _run_mind_tests(mind) -> None:
     logger.info(f"  PASS  introspection: '{introspection[:50]}...'")
 
     # Test 7: Emotional state changed
+    # Derived from the enum rather than a hand-written list. The list
+    # had rotted in both directions: it still asserted "active" and
+    # "calm", which are not labels at all, while omitting eight that are
+    # — including `drowsy`, which is what a freshly-started mind
+    # actually reports, so this assertion failed on a correct system.
     emotion = mind.feel()
-    assert emotion.label in (
-        "positive",
-        "neutral",
-        "excited",
-        "content",
-        "active",
-        "in flow",
-        "calm",
+    valid_labels = {category.value for category in EmotionCategory}
+    assert emotion.label in valid_labels, (
+        f"unknown emotional label {emotion.label!r}; "
+        f"expected one of {sorted(valid_labels)}"
     )
     logger.info(f"  PASS  emotion: {emotion.label}")
 
@@ -498,7 +503,7 @@ def _cleanup_test_daemon(proc, data_dir: str) -> None:
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     subprocess.run(
         ["bash", os.path.join(project_root, "run.sh"), "--stop"],
-        env={**os.environ, "XDG_DATA_HOME": os.path.dirname(data_dir)},
+        env={**os.environ, "GENESIS_DATA_DIR": data_dir},
         check=True,
         timeout=130,
     )
