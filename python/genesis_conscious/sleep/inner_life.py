@@ -880,18 +880,7 @@ class InnerLife:
                 try:
                     gw = self._cognition.global_workspace
                     gw.tick(dt=THOUGHT_CHECK_INTERVAL)
-                    # Subliminal content that expired without igniting
-                    # feeds its curiosity queue — topics that almost
-                    # surfaced bias what it chooses to think about.
-                    # Dreams don't feed agency topics (waking curiosity
-                    # only).
-                    for item in gw.drain_subliminal():
-                        if item.metadata.get("is_dream"):
-                            continue
-                        with self._agency_topics_lock:
-                            for topic in item.metadata.get("topics", []):
-                                if topic and isinstance(topic, str):
-                                    self._agency_topics.append(topic)
+                    self._absorb_subliminal(gw)
                 except Exception as e:  # noqa: BLE001
                     note_swallowed(
                         "genesis_conscious.sleep.inner_life._run",
@@ -4937,8 +4926,40 @@ class InnerLife:
                 "trigger": thought.trigger,
                 "topics": concepts,
                 "is_dream": thought.is_dream,
+                # Explicit, because the consumer needs "may this become
+                # a learning goal", which is not the same question as
+                # "was this generated while asleep".
+                "is_learning_target": thought.is_learning_target(),
             },
         )
+
+    def _absorb_subliminal(self, gw) -> int:
+        """Queue topics from subliminal workspace content. Returns the count.
+
+        Content that expired without igniting still biases what she
+        chooses to think about, so its topics feed the curiosity queue.
+
+        Dream-derived content is excluded. That test uses the broadcast's
+        explicit ``is_learning_target`` flag, which also covers waking
+        reflections on dream residues — filtering on ``is_dream`` let those
+        through, so a thought could say "I was dreaming about X" and then
+        hand X to the autonomous learner, contradicting the invariant the
+        residues are documented under.
+
+        A *missing* flag is treated as permitted, so workspace content from
+        an older state degrades to the previous behavior instead of
+        silently starving the learner.
+        """
+        queued = 0
+        for item in gw.drain_subliminal():
+            if item.metadata.get("is_learning_target") is False:
+                continue
+            with self._agency_topics_lock:
+                for topic in item.metadata.get("topics", []):
+                    if topic and isinstance(topic, str):
+                        self._agency_topics.append(topic)
+                        queued += 1
+        return queued
 
     @property
     def agency_topics(self) -> list[str]:

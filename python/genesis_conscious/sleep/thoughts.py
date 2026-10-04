@@ -80,6 +80,48 @@ class SpontaneousThought:
     # "topic" (str), "definition" (str|None), "reasoning" (list[str]).
     metadata: dict | None = None
 
+    # Triggers that are dream-derived rather than waking cognition. A
+    # dream reflection is a waking thought *about* a dream, so its
+    # is_dream is False — but it is still not something she decided to go
+    # and learn about.
+    DREAM_DERIVED_TRIGGERS = frozenset({
+        "dream",
+        "lucid-dream",
+        "dream-reflection",
+        "rem-dream",
+        "nrem-dream",
+        "dream_insight",
+    })
+
+    def is_dream_derived(self) -> bool:
+        """True if this thought's content originates in sleep.
+
+        This is *not* the same question as :attr:`is_dream`, which means
+        "generated while asleep". The distinction matters because the
+        autonomous learner is fed from thought topics, and the codebase's
+        stated invariant is that dream material never becomes a learning
+        goal — dreams produce affective impressions, not prefrontal goals.
+        Overloading ``is_dream`` as that filter let waking reflections on
+        dream residues ("I was dreaming about...") through, contradicting
+        the invariant those comments assert.
+        """
+        if self.is_dream:
+            return True
+        if self.trigger in self.DREAM_DERIVED_TRIGGERS:
+            return True
+        meta = self.metadata or {}
+        return bool(meta.get("is_dream") or meta.get("dream"))
+
+    def is_learning_target(self) -> bool:
+        """True if this thought may seed autonomous learning.
+
+        Hypnagogic content is a learning target: it happens while she is
+        still awake and drowsy, reflecting on the day, and deliberately
+        getting it out of the learner's reach would be a regression. The
+        exclusion is specifically dream-derived material.
+        """
+        return not self.is_dream_derived()
+
     def describe(self) -> str:
         """Return a human-readable summary of the thought."""
         prefix = f"[{self.trigger}]"
