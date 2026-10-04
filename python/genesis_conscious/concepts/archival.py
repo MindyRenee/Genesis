@@ -215,6 +215,7 @@ class ArchivalMixin:
         Edges stay in working memory too (for fast traversal), but the
         archive copy survives if the working-memory edge is later pruned.
         """
+        spilled: list[Edge] = []
         edge_dicts: list[dict[str, Any]] = []
         for edge in self._edges:
             # A live edge log never stores derivable edges anywhere —
@@ -225,6 +226,7 @@ class ArchivalMixin:
             ):
                 continue
             if edge.source in to_spill or edge.target in to_spill:
+                spilled.append(edge)
                 edge_dicts.append({
                     "source": edge.source,
                     "target": edge.target,
@@ -252,18 +254,23 @@ class ArchivalMixin:
             # concepts that no longer exist. `remove_edge` cannot do
             # this for us because it resolves both endpoints by name and
             # the concept has already been popped.
+            #
+            # `retract_edge` takes a RelationType, not the serialized
+            # string the archive row stores; passing the string raises
+            # AttributeError on `relation.value`, which escapes the
+            # narrow handler below and aborts the whole spill *after*
+            # the concepts were committed — leaving working memory
+            # untrimmed and every later attempt to repeat the crash.
             if self._edge_log is not None:
-                for edge_dict in edge_dicts:
+                for edge in spilled:
                     try:
                         self._edge_log.retract_edge(
-                            edge_dict["source"],
-                            edge_dict["target"],
-                            edge_dict["relation"],
+                            edge.source, edge.target, edge.relation,
                         )
                     except (OSError, ValueError) as e:
                         logger.warning(
                             f"edge log retraction during spill failed for "
-                            f"{edge_dict['source']}->{edge_dict['target']}: {e}"
+                            f"{edge.source}->{edge.target}: {e}"
                         )
 
     def _remove_spilled_from_working_memory(self, to_spill: set[str]) -> None:
