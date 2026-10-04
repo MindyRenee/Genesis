@@ -37,6 +37,7 @@ from genesis_conscious.concepts import (
     is_world_concept,
     open_archive,
 )
+from genesis_conscious.concepts.edge_log import open_edge_log
 from genesis_conscious.memory import SemanticMemory
 from genesis_conscious.memory.semantic import _relation_to_edge
 
@@ -1603,6 +1604,62 @@ def test_spill_dormant_concepts() -> None:
 
         # Active concept should still be in working memory
         assert net.get_concept("active_concept") is not None
+        net._archive.close()
+
+
+def test_spill_dormant_with_edge_log_retracts_edges() -> None:
+    """Spilling with an edge log attached retracts the log entries.
+
+    Regression: `_archive_spilled_edges` passed the *serialized* relation
+    string to `EdgeLog.retract_edge`, which expects a `RelationType` and
+    calls `.value` on it. That raised `AttributeError`, which the narrow
+    `(OSError, ValueError)` handler did not catch, so it escaped and
+    aborted the whole spill — after the concepts had already been
+    committed to the archive but *before* working memory was trimmed.
+    Net effect: archiving silently failed forever on any instance with a
+    live edge log, which is every current one.
+
+    Both halves matter: the concepts must leave working memory, and the
+    canonical log must stop asserting edges anchored to concepts that no
+    longer exist in it.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        net = ConceptNetwork()
+        net.attach_archive(open_archive(tmpdir))
+        log = open_edge_log(tmpdir)
+        net.attach_edge_log(log)
+
+        for i in range(10):
+            net.add_concept(f"dormant_{i}", confidence=0.4, origin="learned")
+
+        net.add_edge("dormant_0", "dormant_1", RelationType.RELATED_TO)
+        net.add_edge("dormant_2", "dormant_3", RelationType.PART_OF)
+        assert len(log.fold()) == 2
+
+        # `add_edge` activates both endpoints, so force dormancy after
+        # the graph is wired — otherwise the four edge endpoints sit
+        # above the threshold and never spill.
+        for i in range(10):
+            c = net.get_concept(f"dormant_{i}")
+            assert c is not None
+            c.activation = 0.0
+
+        spilled = net.spill_dormant(activation_threshold=0.01, max_in_memory=0)
+
+        # Everything is dormant, so all 10 spill and working memory is
+        # emptied.
+        assert spilled == 10
+        assert net.size == 0
+        assert net.archive_size == 10
+
+        # The archive holds the edges, and the canonical log no longer
+        # asserts them — otherwise `sync_edge_log` would re-promote them
+        # and re-anchor them to absent concepts.
+        assert len(net._archive.recall_edges("dormant_0")) == 1
+        assert len(net._archive.recall_edges("dormant_2")) == 1
+        assert len(log.fold()) == 0
+
+        log.close()
         net._archive.close()
 
 
