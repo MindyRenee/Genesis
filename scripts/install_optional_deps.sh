@@ -29,8 +29,21 @@ VERIFY_ONLY=0
 [ "${1:-}" = "--verify" ] && VERIFY_ONLY=1
 
 # Where the vosk model lives. Must match
-# genesis_conscious.temporal_lobe.speech.VOSK_MODEL_DIR.
-VOSK_DIR="${HOME}/.local/share/genesis/vosk-models"
+# genesis_conscious.infrastructure.config.vosk_model_dir(), which is the
+# single source of truth; this shell resolves the same order run.sh does
+# so the installer and the loader never disagree. An explicit
+# GENESIS_VOSK_DIR wins outright.
+if [ -n "${GENESIS_VOSK_DIR:-}" ]; then
+    VOSK_DIR="$GENESIS_VOSK_DIR"
+elif [ -n "${GENESIS_DATA_DIR:-}" ]; then
+    VOSK_DIR="$GENESIS_DATA_DIR/vosk-models"
+elif [ -f .genesis-data-dir ]; then
+    VOSK_DIR="$(head -n1 .genesis-data-dir)/vosk-models"
+elif [ -n "${XDG_DATA_HOME:-}" ]; then
+    VOSK_DIR="$XDG_DATA_HOME/vosk-models"
+else
+    VOSK_DIR="$HOME/.local/share/vosk-models"
+fi
 VOSK_NAME="vosk-model-small-en-us-0.15"
 VOSK_URL="https://alphacephei.com/vosk/models/${VOSK_NAME}.zip"
 

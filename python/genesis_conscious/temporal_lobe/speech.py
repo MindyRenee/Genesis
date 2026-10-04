@@ -34,6 +34,8 @@ import wave
 from pathlib import Path
 from typing import Any
 
+from ..infrastructure.config import VOSK_MODEL_NAME, vosk_model_dir
+
 logger = logging.getLogger(__name__)
 
 # ─── Paths ────────────────────────────────────────────────────────
@@ -69,8 +71,7 @@ _PIPER_BIN = _VOICES_DIR / "piper"
 _PIPER_MODEL = _VOICES_DIR / "amy-medium.onnx"
 _PIPER_MODEL_FALLBACK = _VOICES_DIR / "amy-low.onnx"
 
-VOSK_MODEL_DIR = Path.home() / ".local" / "share" / "genesis" / "vosk-models"
-VOSK_MODEL_NAME = "vosk-model-small-en-us-0.15"
+VOSK_MODEL_DIR = vosk_model_dir()
 
 # Maximum character length per TTS chunk. Piper synthesizes audio
 # in real-time — on slow CPUs, long text can exceed the 30-second

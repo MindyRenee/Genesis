@@ -228,23 +228,25 @@ Flatpak or sandboxed agent host sets `XDG_DATA_HOME` to its own private
 directory; treating that as authoritative silently forks the checkout
 into a second, divergent state dir. That happened here — six days of
 divergence, ~8.7k concepts and 8 projects in a fork under
-`~/.var/app/`. `run.sh` also exports the pin as `GENESIS_DATA_DIR`, so
-in the supported launch path Python's
-`infrastructure/config.py::default_data_dir` resolves correctly without
-knowing about the pin at all. Anything resolving the dir outside
-`run.sh` — `scripts/hygiene.sh`, `scripts/prune_dead_concepts.py`,
-`examples/read_state.rs`, `examples/recover.rs` — must implement the
-order above explicitly.
+`~/.var/app/`. `run.sh` exports the pin as `GENESIS_DATA_DIR`, so in the
+supported launch path Python's
+`infrastructure/config.py::default_data_dir` resolves correctly even
+without knowing about the pin. That function now implements the full
+order anyway, so tools run outside `run.sh` agree: `config.py`,
+`scripts/hygiene.sh`, `scripts/prune_dead_concepts.py`,
+`scripts/migrate_edges_to_log.py`, `scripts/install_optional_deps.sh`,
+`python/setup_embeddings.py`, `examples/read_state.rs`, and
+`examples/recover.rs`. There is no remaining known deviation — check
+this list before adding a ninth resolver.
 
-Two known deviations, both deliberate for now:
-
-- `temporal_lobe/speech.py` and `perception/ambient.py` hardcode
-  `~/.local/share/genesis/vosk-models` rather than resolving the data
-  dir. This checkout's dir has no Vosk model of its own, so the
-  microphone currently works only by reading another instance's copy.
-- `scripts/migrate_edges_to_log.py` defaults to
-  `~/.local/share/genesis` and honors neither the pin nor
-  `XDG_DATA_HOME`; pass `--data-dir` explicitly.
+Assets follow the data dir too. `config.py::vosk_model_dir()` is the
+single source of truth for the speech model: `$GENESIS_VOSK_DIR`, then
+`<data dir>/vosk-models`, then the XDG-relative location, then the
+pre-pin `~/.local/share/genesis/vosk-models` so an existing install
+keeps working. `temporal_lobe/speech.py` and `perception/ambient.py`
+both call it; the path used to be inlined in both and pointed at
+whatever instance happened to have a model, which for a pinned checkout
+meant reading a *different* instance's directory.
 
 `scripts/merge_data_dirs.py` folds a fork back into the canonical dir
 (concepts unioned by id, edges folded per side then unioned into one

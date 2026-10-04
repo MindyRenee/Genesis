@@ -153,12 +153,9 @@ class AmbientListener:
 
     def _init_vosk(self) -> bool:
         """Load the Vosk model. Returns True on success."""
-        from pathlib import Path
+        from ..infrastructure.config import VOSK_MODEL_NAME, vosk_model_dir
 
-        model_dir = (
-            Path.home() / ".local" / "share" / "genesis"
-            / "vosk-models" / "vosk-model-small-en-us-0.15"
-        )
+        model_dir = vosk_model_dir() / VOSK_MODEL_NAME
         if not model_dir.exists():
             self._init_error = f"Vosk model not found at {model_dir}"
             return False
