@@ -12,17 +12,30 @@ use genesis::MmapState;
 use genesis::state::neurochemical::NeurochemicalId;
 
 fn main() {
-    // Same resolution as run.sh: XDG_DATA_HOME (or ~/.local/share),
-    // with GENESIS_DATA_DIR kept as a manual override.
-    let path = std::env::var("GENESIS_DATA_DIR").unwrap_or_else(|_| {
-        let base = std::env::var("XDG_DATA_HOME").unwrap_or_else(|_| {
-            format!(
-                "{}/.local/share",
-                std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
-            )
+    // Same resolution as run.sh, in the same precedence order:
+    // GENESIS_DATA_DIR, then the checkout's .genesis-data-dir pin, then
+    // XDG_DATA_HOME, then ~/.local/share. The pin outranks XDG_DATA_HOME
+    // because the latter is ambient launcher environment — a Flatpak or
+    // sandboxed host sets it, which would otherwise recover the wrong
+    // checkout's state. Its contents are the data dir itself, not a
+    // parent. cargo runs examples with the package root as the working
+    // directory, so the relative pin path resolves.
+    let path = std::env::var("GENESIS_DATA_DIR")
+        .ok()
+        .or_else(|| {
+            std::fs::read_to_string(".genesis-data-dir")
+                .ok()
+                .and_then(|s| s.lines().next().map(str::trim).filter(|l| !l.is_empty()).map(str::to_string))
+        })
+        .unwrap_or_else(|| {
+            let base = std::env::var("XDG_DATA_HOME").unwrap_or_else(|_| {
+                format!(
+                    "{}/.local/share",
+                    std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+                )
+            });
+            format!("{}/genesis", base)
         });
-        format!("{}/genesis", base)
-    });
     let state_file = format!("{}/core_state.bin", path);
 
     println!("Opening state file: {}", state_file);

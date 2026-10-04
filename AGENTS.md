@@ -210,6 +210,48 @@ unused is dead. Some code is intentionally written but not yet wired in.
 Before removing something that appears unused, check whether it looks
 like scaffolded work-in-progress; if unsure, ask rather than deleting.
 
+## Data directory resolution
+Genesis has one live state directory per checkout, and several places
+resolve it. They must agree, or a tool measures, cleans, prunes, or
+recovers the wrong tree. The canonical order, as implemented in
+`run.sh`:
+
+1. `GENESIS_DATA_DIR` — explicit override, always wins.
+2. `.genesis-data-dir` — uncommitted, gitignored per-checkout pin
+   (`genesis-public` for this checkout). Its contents **are** the data
+   dir; it is not a parent directory.
+3. `XDG_DATA_HOME/genesis`.
+4. `~/.local/share/genesis`.
+
+**The pin outranks `XDG_DATA_HOME`, which is the whole point.** A
+Flatpak or sandboxed agent host sets `XDG_DATA_HOME` to its own private
+directory; treating that as authoritative silently forks the checkout
+into a second, divergent state dir. That happened here — six days of
+divergence, ~8.7k concepts and 8 projects in a fork under
+`~/.var/app/`. `run.sh` also exports the pin as `GENESIS_DATA_DIR`, so
+in the supported launch path Python's
+`infrastructure/config.py::default_data_dir` resolves correctly without
+knowing about the pin at all. Anything resolving the dir outside
+`run.sh` — `scripts/hygiene.sh`, `scripts/prune_dead_concepts.py`,
+`examples/read_state.rs`, `examples/recover.rs` — must implement the
+order above explicitly.
+
+Two known deviations, both deliberate for now:
+
+- `temporal_lobe/speech.py` and `perception/ambient.py` hardcode
+  `~/.local/share/genesis/vosk-models` rather than resolving the data
+  dir. This checkout's dir has no Vosk model of its own, so the
+  microphone currently works only by reading another instance's copy.
+- `scripts/migrate_edges_to_log.py` defaults to
+  `~/.local/share/genesis` and honors neither the pin nor
+  `XDG_DATA_HOME`; pass `--data-dir` explicitly.
+
+`scripts/merge_data_dirs.py` folds a fork back into the canonical dir
+(concepts unioned by id, edges folded per side then unioned into one
+canonical snapshot, journal appended, projects copied). Dry-run by
+default. LTM episodes and the derived vector/holographic/VQ indices
+have no supported union and are reported, not merged.
+
 ## State integrity
 Genesis is a long-running stateful system, designed to run for days at
 a time. Always shut down via `./run.sh --stop` (or Ctrl-C in the
