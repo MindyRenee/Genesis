@@ -335,6 +335,41 @@ the tally is only visible through `swallow_report()`, so a hard failure
 there left working memory growing over budget with nothing in the log
 explaining it.
 
+## Dreams — subcognitive, and never learning goals
+Dream content is generated during sleep (`InnerLife._generate_dream`),
+flagged `is_dream=True`, and surfaced on its own `genesis~ [dream]`
+stream kind — *not* as thoughts. Insisting on that separation is not
+decoration: a night of dreaming previously printed `genesis~ [thought]`
+lines all night, because `detect_insight` runs on every recorded thought
+and announced its results unconditionally as `kind="thought"`.
+
+`is_dream` answers "generated while asleep". The autonomous learner needs
+a **different** question — "may this become a learning goal?" — and
+conflating the two is what let dream material into the learner.
+`SpontaneousThought.is_learning_target()` is that predicate:
+
+- **Excluded:** dreams, lucid dreams, and `dream-reflection` thoughts.
+  A reflection is a *waking* thought about a dream, so its `is_dream` is
+  `False` — but it is still dream-derived, and under the old
+  `is_dream`-only filter it queued its topics for the learner. A thought
+  could say "I was dreaming about X" and then hand X to the autonomous
+  learner, contradicting the invariant the residues are documented under.
+- **Included:** everything waking, and specifically **hypnagogic**
+  content. Hypnagogia is the drowsy pre-sleep state — still awake, still
+  reflecting on the day. Its `is_dream` is `False` and that is correct;
+  flipping it would be a second bug in the opposite direction, cutting
+  genuine pre-sleep reflection out of the learner.
+
+`_absorb_subliminal` applies this and treats a *missing* flag as
+permitted, so workspace content from older state degrades to the old
+behavior rather than silently starving the learner.
+
+`_record_thought` is the single write point for `_thoughts`, a single
+deque holding dreams and thoughts together. `thought_count` is therefore
+a total, not a waking-only figure; use `waking_thought_count` and
+`recent_dreams` for the split. Reporting one merged number made dreaming
+look like thinking.
+
 ## Edge storage — the edge log is canonical
 Relationships have ONE source of truth: `edge_log.jsonl` in the data
 dir (append-only assert/retract/snapshot events; `concepts/edge_log.py`).

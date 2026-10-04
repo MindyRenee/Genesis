@@ -311,3 +311,180 @@ def test_parasomnia_log_is_not_a_thought(caplog) -> None:
     assert all("thought" not in kind for kind, _ in recorder.calls), (
         f"parasomnia must not emit thoughts, got {recorder.calls}"
     )
+
+
+# ── Dream-derived vs learning target ───────────────────────────────
+#
+# `is_dream` answers "generated while asleep". The autonomous learner
+# needs a different question: "may this become a learning goal?". The
+# two are not the same, and conflating them is what let dream material
+# reach the learner.
+
+
+def _thought(trigger: str, **kw) -> SpontaneousThought:
+    t = SpontaneousThought(content=kw.pop("content", "x"), trigger=trigger)
+    t.metadata = kw.pop("metadata", None)
+    for k, v in kw.items():
+        setattr(t, k, v)
+    return t
+
+
+@pytest.mark.parametrize(
+    "trigger",
+    ["dream", "lucid-dream", "dream-reflection"],
+)
+def test_dream_derived_triggers_are_not_learning_targets(trigger: str) -> None:
+    """Dreams and reflections *on* dreams must not seed learning."""
+    t = _thought(trigger)
+    assert t.is_dream_derived() is True, f"{trigger} is dream-derived"
+    assert t.is_learning_target() is False, (
+        f"{trigger} would queue '{t.content}' for the autonomous learner; "
+        f"dreams produce affective impressions, not goals"
+    )
+
+
+def test_dream_flag_alone_marks_dream_derived() -> None:
+    """A thought stamped is_dream is dream-derived regardless of trigger."""
+    t = _thought("spontaneous", is_dream=True)
+    assert t.is_dream_derived() is True
+    assert t.is_learning_target() is False
+
+
+def test_dream_metadata_marks_dream_derived() -> None:
+    """The generators tag metadata["dream"]; that counts too.
+
+    None of the seven dream generators sets is_dream itself — their
+    callers do. Reading the metadata means the predicate is right even if
+    a caller forgets.
+    """
+    t = _thought("spontaneous", metadata={"dream": True})
+    assert t.is_dream_derived() is True
+    assert t.is_learning_target() is False
+
+
+def test_hypnagogic_is_not_a_dream_and_remains_a_learning_target() -> None:
+    """The drowsy pre-sleep state is not sleep, and must stay learnable.
+
+    Hypnagogia happens while she is still awake — a drifting reflection
+    on the day, in the gap before the first dream. Setting its is_dream
+    to True would be a second bug in the opposite direction: it would cut
+    genuine pre-sleep reflection out of the learner. This test exists to
+    stop that "fix".
+    """
+    t = _thought("hypnagogic", metadata={"hypnagogic": True})
+
+    assert t.is_dream is False, "hypnagogia is not a dream"
+    assert t.is_dream_derived() is False
+    assert t.is_learning_target() is True, (
+        "pre-sleep reflection is waking cognition and may seed learning"
+    )
+
+
+def test_ordinary_waking_thought_is_a_learning_target() -> None:
+    for trigger in ("spontaneous", "curiosity", "emotional", "reflect"):
+        t = _thought(trigger)
+        assert t.is_dream_derived() is False, trigger
+        assert t.is_learning_target() is True, trigger
+
+
+def test_broadcast_carries_the_explicit_learning_flag() -> None:
+    """The consumer needs the learning answer, not the sleep answer.
+
+    The subliminal drain used to read `is_dream` and infer. Broadcasting
+    both makes the contract explicit, and lets the filter treat a missing
+    flag as permissive so a workspace from older state degrades to the old
+    behavior instead of silently dropping every topic.
+    """
+    il = _inner_life()
+    captured: list[dict] = []
+
+    class _GW:
+        def broadcast(self, content, source, activation, brain_waves=None, metadata=None):
+            captured.append(metadata or {})
+
+        def drain_subliminal(self):
+            return []
+
+        def tick(self, dt):
+            pass
+
+    class _Cog:
+        global_workspace = _GW()
+
+        class language:
+            current_brain_waves = None
+
+    il._cognition = _Cog()
+
+    dream = _thought("dream", is_dream=True)
+    il._broadcast_thought(dream, ["alpha"])
+    reflection = _thought("dream-reflection")
+    il._broadcast_thought(reflection, ["beta"])
+    awake = _thought("hypnagogic")
+    il._broadcast_thought(awake, ["gamma"])
+
+    assert captured[0]["is_dream"] is True
+    assert captured[0]["is_learning_target"] is False
+    assert captured[1]["is_dream"] is False, (
+        "a waking reflection is correctly not flagged as a dream"
+    )
+    assert captured[1]["is_learning_target"] is False, (
+        "…but it is still dream-derived, so it must not seed learning"
+    )
+    assert captured[2]["is_learning_target"] is True
+
+
+def test_agency_filter_uses_the_learning_flag() -> None:
+    """The drain must key off is_learning_target, not is_dream.
+
+    A dream reflection broadcasts with is_dream=False, so the old
+    `if item.metadata.get("is_dream"): continue` passed it straight into
+    the agency queue — the learner being handed a topic she had only
+    dreamed about.
+    """
+    il = _inner_life()
+
+    class _Item:
+        def __init__(self, topics, **meta):
+            self.metadata = {"topics": topics, **meta}
+
+    class _GW:
+        def __init__(self, items):
+            self._items = items
+
+        def drain_subliminal(self):
+            return self._items
+
+    dream_reflection = _Item(["alpha"], is_dream=False, is_learning_target=False)
+    assert il._absorb_subliminal(_GW([dream_reflection])) == 0
+    assert il.agency_topics == [], (
+        f"a dream reflection reached the learner: {il.agency_topics}"
+    )
+
+    in_sleep_dream = _Item(["beta"], is_dream=True, is_learning_target=False)
+    hypnagogic = _Item(["gamma"], is_dream=False, is_learning_target=True)
+    assert il._absorb_subliminal(_GW([in_sleep_dream, hypnagogic])) == 1
+    assert il.agency_topics == ["gamma"], (
+        "only the hypnagogic topic may reach the learner"
+    )
+
+
+def test_absorb_subliminal_permits_content_with_no_flag() -> None:
+    """Workspace content from an older state must not starve the learner.
+
+    The flag is additive metadata. Treating its absence as "not a
+    learning target" would silently disable agency topics after an
+    upgrade until the next save, so absence means permitted.
+    """
+    il = _inner_life()
+
+    class _Item:
+        def __init__(self, topics):
+            self.metadata = {"topics": topics}
+
+    class _GW:
+        def drain_subliminal(self):
+            return [_Item(["alpha"])]
+
+    assert il._absorb_subliminal(_GW()) == 1
+    assert il.agency_topics == ["alpha"]
