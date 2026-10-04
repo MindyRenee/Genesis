@@ -51,10 +51,10 @@
 //!   maturation-gated CRH → ACTH → cortisol cascade.
 
 pub mod core_state;
-pub mod legacy_v3;
-pub mod ions;
 pub mod header;
 pub mod inference;
+pub mod ions;
+pub mod legacy_v3;
 pub mod manifest;
 pub mod memory;
 pub mod neurochemical;

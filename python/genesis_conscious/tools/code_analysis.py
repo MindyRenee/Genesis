@@ -66,6 +66,7 @@ class SymbolInfo:
     complexity: int = 1      # cyclomatic: decision points + 1
     calls: list[str] = field(default_factory=list)   # dotted callee names
     raises: list[str] = field(default_factory=list)  # exception types raised
+    is_async: bool = False  # an `async def`, not a plain `def`
 
     @property
     def span(self) -> int:
@@ -194,6 +195,7 @@ class _ScopeVisitor(ast.NodeVisitor):
             params=self._params(node.args),
             returns=ast.unparse(node.returns) if node.returns else "",
             decorators=[ast.unparse(d) for d in node.decorator_list],
+            is_async=is_async,
         )
         info.complexity = _complexity(node)
 

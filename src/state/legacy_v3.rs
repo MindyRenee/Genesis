@@ -42,7 +42,6 @@ pub struct GenesisCoreStateV3 {
     pub inference_signals: InferenceSignals,
 }
 
-
 impl GenesisCoreStateV3 {
     /// Convert a decoded v3 snapshot into the current schema.
     ///

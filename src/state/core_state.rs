@@ -108,8 +108,9 @@ use core::sync::atomic::{AtomicU64, Ordering, fence};
 /// The reserve is defined as exactly `size_of::<InferenceSignals>()`
 /// (asserted at the bottom of this file) so that adding a signal field
 /// cannot shift any other field's offset. It is *not* padded out to the
-/// struct's own size: `inference_signals` ends at 3228 + 64 = 3292 and
-/// the struct rounds up to 3416 for 8-byte alignment.
+/// struct's own size: `inference_signals` starts at 3352 (after the ion
+/// block and the checksum that schema v4 inserted ahead of it) and ends
+/// at 3352 + 64 = 3416, which is the struct's size exactly.
 pub const RESERVED_BYTES: usize = 64;
 
 /// The struct size under schema v3 before [`InferenceSignals`] gained
@@ -877,8 +878,9 @@ const _: () = {
     // reserved region is defined as exactly its size, so the reserve
     // grew with it. Nothing before the signals block moved: the
     // reserve exists so a new signal field cannot shift the rest of
-    // the wire layout. The total rounds up to 3296 for alignment,
-    // which is why it is 4 larger than 3228 + 64.
+    // the wire layout. Schema v4 then inserted `ions` ahead of the
+    // checksum, which moved the signals block to 3352 — they now end at
+    // 3352 + 64 = 3416, exactly the struct's size.
     assert!(core::mem::size_of::<GenesisCoreState>() <= 4096);
     assert!(offset_of!(GenesisCoreState, header) == 0);
     assert!(offset_of!(GenesisCoreState, neurochemicals) == 56);

@@ -68,10 +68,11 @@ not — those must be generated, not recited.
   `ZIG_ROOT=` / `LIBCLANG_ROOT=` if yours differ. The include set must
   match `$ZIG cc -E -v -x c /dev/null` exactly — print it and copy the
   `<...>` search list. A partial set fails on `__STD_TYPE` inside
-  `stddef.h`. With this the Rust suite is 520 tests and takes ~2 min.
-  The include set must match `$ZIG cc -E -v -x c /dev/null` exactly — print
-  it and copy the `<...>` search list. A partial set fails on `__STD_TYPE`
-  inside `stddef.h`. With this the Rust suite is 520 tests and takes ~2 min.
+  `stddef.h`. With this the Rust suite is 524 tests and takes ~2 min.
+  Note that `. ./scripts/cargo-env.sh` must run in the *current*
+  shell: piping the source (`. ./scripts/cargo-env.sh | tail`) runs it
+  in a subshell, so the exported `PATH` is discarded and the build
+  fails at link with `linker 'cc' not found`.
 - Run examples: `cargo run --example <name>`
 - Python 3.12+ (CI tests 3.12 and 3.14), dependencies pinned in
   `python/requirements.txt`
@@ -104,16 +105,15 @@ cognitive mind is alive.
 - Both entry points run the interval-gated body maintenance —
   interoception, CPU/thermal policy. Losing those starved the body for
   as long as the mind held the lease, which was the original defect.
-- The mind is an observer. It reads `CoreState.inference` (the 64-byte
-  `InferenceSignals` block at offset 3228) for surprise, free energy,
-  precision, and allostatic load rather than provoking a physics advance
-  to obtain them.
+- The mind is an observer. It reads `CoreState.inference_signals`
+  (the 64-byte `InferenceSignals` block at offset 3352) for surprise,
+  free energy, precision, and allostatic load rather than provoking a
+  physics advance to obtain them. Note the block moved when v4
+  inserted the ions ahead of the checksum — 3228 was the v3 offset and
+  is stale.
 - `tick_count` is a 5 Hz counter by construction: every
   `_INTERVAL_TICKS` gate assumes it. A caller-chosen step would stretch
   those periods.
-
-Build environment: `. ./scripts/cargo-env.sh` then `cargo test --release`.
-See the Toolchain section above.
 
 ## State schema and the ion layer
 `CoreState` is **schema v4** (3416 bytes) in
@@ -211,11 +211,35 @@ Before removing something that appears unused, check whether it looks
 like scaffolded work-in-progress; if unsure, ask rather than deleting.
 
 ## State integrity
-Genesis is a long-running stateful system. Always shut down via
-`./run.sh --stop` (or Ctrl-C in the running terminal) — never kill
-processes directly. Do not corrupt the mmap'd state or drive the system
-into degenerate regimes for experimentation; see the "Operational notes"
-section of the README.
+Genesis is a long-running stateful system, designed to run for days at
+a time. Always shut down via `./run.sh --stop` (or Ctrl-C in the
+running terminal) — never `kill -9` or kill processes directly. The
+core state is memory-mapped, so a hard kill can lose unconsolidated
+memory or leave on-disk state inconsistent. Do not corrupt the mmap'd
+state or drive the system into degenerate regimes for experimentation.
+
+The state is cumulative and load-bearing: the developmental record *is*
+the system. Do not edit, truncate, or casually factory-reset it.
+
+Other things worth knowing before experimenting:
+
+- **Restart occasionally.** `daemon.log` and `retina.log` rotate at
+  startup, so a months-long single session will grow them.
+- **Disk grows slowly by design.** The episodic store is append-only
+  (<1 KB per episode, linear). Expect months-to-years scale; watch
+  small volumes. Everything that grows in memory is bounded and
+  explicitly so — episodic eviction (`memory/engine.py`), attractor
+  trimming to 60% of Hopfield capacity (`memory/systems.py`),
+  executive suppression with release deadlines and 50 retained
+  conversation threads / 200 topic-history entries
+  (`memory/working.py`), 500 retained learning results and a
+  200-entry FIFO curiosity queue (`learning/autonomous.py`), 5,000
+  review records with `stability` capped at 7 days
+  (`memory/spaced_repetition.py`), and a 4,096-entry LRU vector cache
+  (`concepts/embeddings.py`).
+- **It does real background work.** Autonomous urges consume real CPU.
+  Interoception dampens heavy work under thermal strain, but keep an
+  eye on marginal hardware.
 
 ## Edge storage — the edge log is canonical
 Relationships have ONE source of truth: `edge_log.jsonl` in the data

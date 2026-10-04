@@ -1687,14 +1687,23 @@ fn test_get_ion_summary() {
     let mut client = sys.client();
     let ions = client.get_ion_summary().expect("get_ion_summary");
 
-    assert_eq!(core::mem::size_of::<genesis::daemon::ipc::IonSummary>(), 108);
+    assert_eq!(
+        core::mem::size_of::<genesis::daemon::ipc::IonSummary>(),
+        108
+    );
 
     // Resting membrane potential is negative, and the sodium gradient
     // runs outward while potassium runs inward. IonId order is calcium,
     // chloride, potassium, sodium.
     assert!(ions.membrane_potential_mv < 0.0, "resting Vm is negative");
-    assert!(ions.extracellular_mm[3] > ions.intracellular_mm[3], "Na+ outward");
-    assert!(ions.intracellular_mm[2] > ions.extracellular_mm[2], "K+ inward");
+    assert!(
+        ions.extracellular_mm[3] > ions.intracellular_mm[3],
+        "Na+ outward"
+    );
+    assert!(
+        ions.intracellular_mm[2] > ions.extracellular_mm[2],
+        "K+ inward"
+    );
     assert!(ions.atp_availability > 0.0);
     assert!(ions.gradient_integrity > 0.9);
 }

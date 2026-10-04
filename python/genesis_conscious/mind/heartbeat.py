@@ -309,12 +309,16 @@ class HeartbeatMixin:
                 # blended with the body's recommendation. This
                 # is its cortical control of its own process
                 # resources — the tick does not control it.
+                #
+                # Only the body's recommended nice value is blended;
+                # I/O class is decided outright from brain state (see
+                # `derive_self_priority`), so `control.io_class` is
+                # deliberately not passed here.
                 if current_brain_wave_state is not None:
                     from ..thalamus.brain_waves import apply_self_priority, derive_self_priority
                     self_nice, self_io = derive_self_priority(
                         current_brain_wave_state,
                         body_recommended_nice=control.cognitive_nice,
-                        body_recommended_io_class=control.io_class,
                     )
                     # Only spawn renice/ionice subprocesses when
                     # the derived priority actually changed. Brain
