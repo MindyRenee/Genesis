@@ -20,7 +20,7 @@ import os
 import tempfile
 import textwrap
 
-from genesis_cognitive.infrastructure.bug_reporter import BugReporter
+from genesis_conscious.infrastructure.bug_reporter import BugReporter
 
 
 def _scan(source: str) -> list:

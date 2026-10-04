@@ -12,20 +12,22 @@ from __future__ import annotations
 
 import json
 
-from genesis_cognitive.classification import (
+import pytest
+
+from genesis_conscious.classification import (
     Item,
     RuleAgent,
     RuleGame,
     eval_predicate,
     valid_predicate,
 )
-from genesis_cognitive.memory.semantic import (
+from genesis_conscious.memory.semantic import (
     Fact,
     SemanticMemory,
     _restore_schema_relations,
 )
-from genesis_cognitive.reasoning import TaskCompetence
-from genesis_cognitive.spatial.practice import (
+from genesis_conscious.reasoning import TaskCompetence
+from genesis_conscious.spatial.practice import (
     SpatialPractice,
     normalize_offered,
 )
@@ -252,8 +254,8 @@ class TestClassificationSpec:
 
     def test_practice_attempt_apply(self, tmp_path) -> None:
         """End to end through SpatialPractice.attempt's task override."""
-        from genesis_cognitive.concepts import ConceptNetwork
-        from genesis_cognitive.spatial.solver import SpatialReasoner
+        from genesis_conscious.concepts import ConceptNetwork
+        from genesis_conscious.spatial.solver import SpatialReasoner
 
         practice = SpatialPractice(str(tmp_path))
         reasoner = SpatialReasoner(ConceptNetwork())
@@ -290,7 +292,7 @@ class TestProblemIntake:
     """The outer→inner bridge: described problems → task specs."""
 
     def test_tessel_compiles_to_apply_spec(self) -> None:
-        from genesis_cognitive.cognition.problem_intake import (
+        from genesis_conscious.cognition.problem_intake import (
             compile_problem,
         )
 
@@ -318,7 +320,7 @@ class TestProblemIntake:
         assert normalize_offered(spec, "x") is not None
 
     def test_label_assertions_attach_as_evidence(self) -> None:
-        from genesis_cognitive.cognition.problem_intake import (
+        from genesis_conscious.cognition.problem_intake import (
             compile_problem,
         )
 
@@ -334,7 +336,7 @@ class TestProblemIntake:
         assert normalize_offered(spec, "x") is not None
 
     def test_contradicted_assertion_rejected_by_normalizer(self) -> None:
-        from genesis_cognitive.cognition.problem_intake import (
+        from genesis_conscious.cognition.problem_intake import (
             compile_problem,
         )
 
@@ -350,7 +352,7 @@ class TestProblemIntake:
             assert normalize_offered(spec, "x") is None
 
     def test_sequence_compiles(self) -> None:
-        from genesis_cognitive.cognition.problem_intake import (
+        from genesis_conscious.cognition.problem_intake import (
             compile_problem,
         )
 
@@ -361,7 +363,7 @@ class TestProblemIntake:
         assert normalize_offered(spec, "x") is not None
 
     def test_relations_and_quantities_compile(self) -> None:
-        from genesis_cognitive.cognition.problem_intake import (
+        from genesis_conscious.cognition.problem_intake import (
             compile_problem,
         )
 
@@ -379,7 +381,7 @@ class TestProblemIntake:
         assert normalize_offered(qty, "x") is not None
 
     def test_non_problem_text_returns_none(self) -> None:
-        from genesis_cognitive.cognition.problem_intake import (
+        from genesis_conscious.cognition.problem_intake import (
             compile_problem,
         )
 
@@ -395,10 +397,10 @@ class TestProblemIntake:
     def test_interpretation_is_semantic_not_surface(self) -> None:
         """The real entry point takes a ComprehensionResult — intake
         never sees raw text; it reads propositions, roles, negation."""
-        from genesis_cognitive.cognition.problem_intake import (
+        from genesis_conscious.cognition.problem_intake import (
             interpret_problem,
         )
-        from genesis_cognitive.language.comprehension import (
+        from genesis_conscious.language.comprehension import (
             ComprehensionEngine,
         )
 
@@ -414,7 +416,7 @@ class TestProblemIntake:
 
     def test_rephrasing_variants_compile(self) -> None:
         """Semantic robustness: same task, different surface forms."""
-        from genesis_cognitive.cognition.problem_intake import (
+        from genesis_conscious.cognition.problem_intake import (
             compile_problem,
         )
 
@@ -456,11 +458,11 @@ class TestProblemIntake:
 
     def test_heard_problem_solves_through_practice(self, tmp_path) -> None:
         """The whole bridge: words → spec → drop-box → attempt → answer."""
-        from genesis_cognitive.cognition.problem_intake import (
+        from genesis_conscious.cognition.problem_intake import (
             compile_problem,
         )
-        from genesis_cognitive.concepts import ConceptNetwork
-        from genesis_cognitive.spatial.solver import SpatialReasoner
+        from genesis_conscious.concepts import ConceptNetwork
+        from genesis_conscious.spatial.solver import SpatialReasoner
 
         practice = SpatialPractice(str(tmp_path))
         reasoner = SpatialReasoner(ConceptNetwork())
@@ -497,11 +499,11 @@ class TestEngineRoute:
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         )
         from genesis_client import GenesisClient
-        from genesis_cognitive.cognition.engine import CognitionEngine
-        from genesis_cognitive.concepts import ConceptNetwork
-        from genesis_cognitive.language import GenerativeEngine
-        from genesis_cognitive.memory import MemoryEngine
-        from genesis_cognitive.self import SelfModel
+        from genesis_conscious.cognition.engine import CognitionEngine
+        from genesis_conscious.concepts import ConceptNetwork
+        from genesis_conscious.language import GenerativeEngine
+        from genesis_conscious.memory import MemoryEngine
+        from genesis_conscious.self import SelfModel
 
         data_dir = str(tmp_path / "mind")
         os.makedirs(data_dir, exist_ok=True)
@@ -555,7 +557,7 @@ class TestEngineRoute:
         think() already computed — it does not re-parse raw text."""
         from types import SimpleNamespace
 
-        from genesis_cognitive.language.comprehension import (
+        from genesis_conscious.language.comprehension import (
             ComprehensionEngine,
         )
 
@@ -637,7 +639,7 @@ class TestSorterIntake:
     sorter compiles to slots/blocks/lid and validates."""
 
     def test_box_with_holes_compiles(self) -> None:
-        from genesis_cognitive.cognition.problem_intake import (
+        from genesis_conscious.cognition.problem_intake import (
             compile_problem,
         )
 
@@ -656,7 +658,7 @@ class TestSorterIntake:
         assert normalize_offered(spec, "x") is not None
 
     def test_takes_and_fits_frames_compile(self) -> None:
-        from genesis_cognitive.cognition.problem_intake import (
+        from genesis_conscious.cognition.problem_intake import (
             compile_problem,
         )
 
@@ -675,7 +677,7 @@ class TestSorterIntake:
         assert normalize_offered(spec, "x") is not None
 
     def test_gapped_imperative_compiles(self) -> None:
-        from genesis_cognitive.cognition.problem_intake import (
+        from genesis_conscious.cognition.problem_intake import (
             compile_problem,
         )
 
@@ -699,7 +701,7 @@ class TestSorterIntake:
             assert normalize_offered(bad, "x") is None
 
     def test_scene_without_task_signal_returns_none(self) -> None:
-        from genesis_cognitive.cognition.problem_intake import (
+        from genesis_conscious.cognition.problem_intake import (
             compile_problem,
         )
 
@@ -714,7 +716,7 @@ class TestSorterIntake:
         assert compile_problem("sort them") is None
 
     def test_unsolvable_description_does_not_validate(self) -> None:
-        from genesis_cognitive.cognition.problem_intake import (
+        from genesis_conscious.cognition.problem_intake import (
             compile_problem,
         )
 
@@ -732,11 +734,11 @@ class TestSorterIntake:
         self, tmp_path
     ) -> None:
         """Words → spec → drop-box → attempt → solved."""
-        from genesis_cognitive.cognition.problem_intake import (
+        from genesis_conscious.cognition.problem_intake import (
             compile_problem,
         )
-        from genesis_cognitive.concepts import ConceptNetwork
-        from genesis_cognitive.spatial.solver import SpatialReasoner
+        from genesis_conscious.concepts import ConceptNetwork
+        from genesis_conscious.spatial.solver import SpatialReasoner
 
         practice = SpatialPractice(str(tmp_path))
         reasoner = SpatialReasoner(ConceptNetwork())
@@ -818,3 +820,8 @@ class TestSchemaRelationTargets:
         assert _restore_schema_relations({"is_a": []}) == {}
         assert _restore_schema_relations(None) == {}
         assert _restore_schema_relations("nonsense") == {}
+
+pytestmark = [
+    pytest.mark.usefixtures("learned_sentiment"),
+    pytest.mark.usefixtures("learned_verbs"),
+]

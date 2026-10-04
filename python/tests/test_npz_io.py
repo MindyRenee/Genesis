@@ -19,7 +19,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from genesis_cognitive.infrastructure._npz_io import load_npz, save_npz, str_array
+from genesis_conscious.infrastructure._npz_io import load_npz, save_npz, str_array
 
 
 def test_round_trip_preserves_arrays():

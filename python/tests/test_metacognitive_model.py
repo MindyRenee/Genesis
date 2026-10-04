@@ -10,20 +10,20 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-from genesis_cognitive.brain_waves import BrainWave, BrainWaveState
-from genesis_cognitive.cognition import CognitiveState
-from genesis_cognitive.concepts import ConceptNetwork
-from genesis_cognitive.emotion import EmotionalState
-from genesis_cognitive.language.base import Thought
-from genesis_cognitive.memory import MemoryContext
-from genesis_cognitive.perception import Intent, Perception, QuestionType
-from genesis_cognitive.self import (
+from genesis_conscious.cognition import CognitiveState
+from genesis_conscious.concepts import ConceptNetwork
+from genesis_conscious.language.base import Thought
+from genesis_conscious.limbic_system.emotion import EmotionalState
+from genesis_conscious.memory import MemoryContext
+from genesis_conscious.perception import Intent, Perception, QuestionType
+from genesis_conscious.self import (
     CognitiveProcessModel,
     Insight,
     MetacognitiveFeedback,
     MetacognitivePrediction,
     ReflectionEngine,
 )
+from genesis_conscious.thalamus.brain_waves import BrainWave, BrainWaveState
 
 
 def _make_state(
@@ -211,7 +211,7 @@ def test_spawn_level_on_sustained_surprise() -> None:
     predict this, so its surprise stays high, and after enough cycles
     a new level should spawn.
     """
-    from genesis_cognitive.self.metacognitive_model import (
+    from genesis_conscious.self.metacognitive_model import (
         SPAWN_PERSISTENCE,
     )
 
@@ -242,7 +242,7 @@ def test_prune_level_on_sustained_predictability() -> None:
     outcomes very consistent. The spawned level should eventually
     be pruned because it's no longer adding information.
     """
-    from genesis_cognitive.self.metacognitive_model import (
+    from genesis_conscious.self.metacognitive_model import (
         PRUNE_MIN_AGE,
     )
 
@@ -276,7 +276,7 @@ def test_prune_level_on_sustained_predictability() -> None:
 
 def test_depth_never_exceeds_max() -> None:
     """The model never exceeds MAX_LEVELS."""
-    from genesis_cognitive.self.metacognitive_model import MAX_LEVELS
+    from genesis_conscious.self.metacognitive_model import MAX_LEVELS
 
     model = CognitiveProcessModel()
     state = _make_state()

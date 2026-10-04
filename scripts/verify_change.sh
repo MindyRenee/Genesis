@@ -38,10 +38,10 @@ fail() { echo -e "${RED}[verify] ✗${NC} $*" >&2; }
 
 # ─── 1. Python compile check ─────────────────────────────────────
 log "Step 1: py_compile check"
-# Compile all Python source — genesis_cognitive, genesis_client,
+# Compile all Python source — genesis_conscious, genesis_client,
 # the CLI, and the test suite. A syntax error in any of these can
 # break Genesis at runtime even if the tests happen to pass.
-if ! find "$PYTHON_DIR/genesis_cognitive" "$PYTHON_DIR/genesis_client" \
+if ! find "$PYTHON_DIR/genesis_conscious" "$PYTHON_DIR/genesis_client" \
           "$PYTHON_DIR/tests" -name '*.py' -not -path '*__pycache__*' -print0 \
     | xargs -0 python3 -m py_compile "$PYTHON_DIR/genesis_cli.py"; then
     fail "py_compile failed"
@@ -66,7 +66,7 @@ import sys
 import traceback
 
 failed = []
-for pkg_name in ("genesis_cognitive", "genesis_client"):
+for pkg_name in ("genesis_conscious", "genesis_client"):
     try:
         pkg = importlib.import_module(pkg_name)
     except Exception:

@@ -1256,7 +1256,7 @@ fn test_core_state_has_inference_signals() {
     assert_eq!(state.inference_signals.inference_tick_count, 0);
 
     // Grown by 4 for policy_authority, which the reserve absorbed.
-    assert_eq!(core::mem::size_of::<GenesisCoreState>(), 3296);
+    assert_eq!(core::mem::size_of::<GenesisCoreState>(), 3416);
     // A fresh state must not come up having delegated policy choice to
     // the engine — the grant is hers to make.
     assert_eq!(state.inference_signals.policy_authority, 0.0);

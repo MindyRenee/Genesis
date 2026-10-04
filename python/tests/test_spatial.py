@@ -1,7 +1,7 @@
 """Spatial layer tests — grid ops, scene perception, solver, grounding."""
 
-from genesis_cognitive.concepts import ConceptNetwork, RelationType
-from genesis_cognitive.spatial import (
+from genesis_conscious.concepts import ConceptNetwork, RelationType
+from genesis_conscious.spatial import (
     Grid,
     SpatialReasoner,
     SpatialRelationKind,
@@ -176,7 +176,7 @@ class TestSpatialReasoner:
 
     def test_learned_rules_proposed_on_future_tasks(self):
         # Teach its a rule, then confirm it is reused on a later task.
-        from genesis_cognitive.spatial import Transform
+        from genesis_conscious.spatial import Transform
 
         reasoner = SpatialReasoner()
         reasoner.learn(
@@ -202,7 +202,7 @@ class TestSpatialReasoner:
         assert reasoner._learned  # the verified rule was retained
 
     def test_learning_grounds_rules_into_network(self):
-        from genesis_cognitive.spatial import Transform
+        from genesis_conscious.spatial import Transform
 
         net = ConceptNetwork()
         reasoner = SpatialReasoner(net)
@@ -243,7 +243,7 @@ class TestSpatialAgent:
             return self.frame()
 
     def test_agency_detection_and_effects(self):
-        from genesis_cognitive.spatial import SpatialAgent
+        from genesis_conscious.spatial import SpatialAgent
 
         env = self._MockEnv()
         agent = SpatialAgent(seed=0, epsilon=1.0)  # pure exploration
@@ -259,7 +259,7 @@ class TestSpatialAgent:
         assert agent.stats["right"].dc > 0
 
     def test_navigation_moves_toward_goal(self):
-        from genesis_cognitive.spatial import SpatialAgent
+        from genesis_conscious.spatial import SpatialAgent
 
         env = self._MockEnv()
         agent = SpatialAgent(seed=0, epsilon=0.0)
@@ -283,7 +283,7 @@ class TestSpatialAgent:
         assert dist1 < dist0
 
     def test_learned_model_survives_episode_end(self):
-        from genesis_cognitive.spatial import SpatialAgent
+        from genesis_conscious.spatial import SpatialAgent
 
         agent = SpatialAgent(seed=0)
         agent.avatar_color = 3
@@ -299,7 +299,7 @@ class TestSpatialAgent:
         After enough deaths the lethal action drops out of the choice pool while
         the innocent one remains choosable.
         """
-        from genesis_cognitive.spatial import SpatialAgent
+        from genesis_conscious.spatial import SpatialAgent
 
         agent = SpatialAgent(seed=0, epsilon=1.0)
         actions = ["action3", "action4"]
@@ -317,7 +317,7 @@ class TestSpatialAgent:
     def test_delayed_death_does_not_blame_last_action(self):
         """The action in flight at death isn't blamed when another
         action is the consistent discriminator."""
-        from genesis_cognitive.spatial import SpatialAgent
+        from genesis_conscious.spatial import SpatialAgent
 
         agent = SpatialAgent(seed=0, epsilon=1.0)
         # Pattern: episodes die only when "action4" was used — the
@@ -336,7 +336,7 @@ class TestSpatialAgent:
     def test_responsive_cells_are_reclicked(self):
         """A clicked cell that produced change is a working control —
         it gets re-pressed instead of exhausting to a blind sweep."""
-        from genesis_cognitive.spatial import SpatialAgent
+        from genesis_conscious.spatial import SpatialAgent
 
         agent = SpatialAgent(seed=0)
         agent.observe([[0] * 8 for _ in range(8)])
@@ -347,7 +347,7 @@ class TestSpatialAgent:
 
     def test_lethal_cells_excluded_from_clicks(self):
         """Cells whose episodes reliably die stop being click targets."""
-        from genesis_cognitive.spatial import SpatialAgent
+        from genesis_conscious.spatial import SpatialAgent
 
         agent = SpatialAgent(seed=0)
         agent.observe([[0] * 8 for _ in range(8)])
@@ -371,7 +371,7 @@ class TestSpatialAgent:
         alone can't separate the killer from the necessary innocent.
         The visible trace can: the action whose arrival adds a color
         that keeps preceding death takes doom blame."""
-        from genesis_cognitive.spatial import SpatialAgent
+        from genesis_conscious.spatial import SpatialAgent
 
         agent = SpatialAgent(seed=0, epsilon=1.0)
         empty = [[0] * 8 for _ in range(8)]
@@ -456,7 +456,7 @@ class TestGrounding:
 
 class TestSchemaInduction:
     def test_learned_rule_instantiates_new_params(self):
-        from genesis_cognitive.spatial.transforms import Transform
+        from genesis_conscious.spatial.transforms import Transform
 
         reasoner = SpatialReasoner()
         learned = Transform(
@@ -476,7 +476,7 @@ class TestSchemaInduction:
         assert 1 in params and 2 in params
 
     def test_gravity_schema_covers_direction_and_color(self):
-        from genesis_cognitive.spatial.transforms import instantiate
+        from genesis_conscious.spatial.transforms import instantiate
 
         reasoner = SpatialReasoner()
         reasoner.learn([instantiate("gravity", {"direction": "down"})])
@@ -501,7 +501,7 @@ class TestSchemaInduction:
         )
 
     def test_multistep_solution_becomes_macro(self):
-        from genesis_cognitive.spatial.transforms import Transform
+        from genesis_conscious.spatial.transforms import Transform
 
         reasoner = SpatialReasoner()
         t1 = Transform("crop_to_content", lambda g: g)
@@ -518,7 +518,7 @@ class TestSchemaInduction:
         # Learn fill_enclosed(4); a held-out task needing
         # fill_enclosed(2) should still be solvable via the schema
         # even though the learned instance itself doesn't apply.
-        from genesis_cognitive.spatial.transforms import instantiate
+        from genesis_conscious.spatial.transforms import instantiate
 
         reasoner = SpatialReasoner()
         reasoner.learn([instantiate("fill_enclosed", {"color": 4})])

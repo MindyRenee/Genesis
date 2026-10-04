@@ -24,7 +24,7 @@ from prune_dead_concepts import (
     prune_state,
 )
 
-from genesis_cognitive.concepts import (
+from genesis_conscious.concepts import (
     QUALITY_THRESHOLD,
     Concept,
     ConceptCategory,
@@ -37,8 +37,8 @@ from genesis_cognitive.concepts import (
     is_world_concept,
     open_archive,
 )
-from genesis_cognitive.memory import SemanticMemory
-from genesis_cognitive.memory.semantic import _relation_to_edge
+from genesis_conscious.memory import SemanticMemory
+from genesis_conscious.memory.semantic import _relation_to_edge
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ def _c(net: ConceptNetwork, name: str) -> Concept:
 
 def test_network_quality_properties() -> None:
     """Mean edge weight, concept confidence, and density are exposed."""
-    from genesis_cognitive.concepts import (
+    from genesis_conscious.concepts import (
         ConceptNetwork,
         RelationType,
     )
@@ -1103,7 +1103,7 @@ def test_cortical_tick_stability() -> None:
 def test_utterance_words_provenance() -> None:
     """Utterance word retrieval exposes seed vs learned provenance."""
     net = ConceptNetwork()
-    from genesis_cognitive.language import Vocabulary
+    from genesis_conscious.language import Vocabulary
     Vocabulary(seed=42, network=net)  # seeds utterance words into net
 
     items = net.find_utterance_words_with_provenance("greeting_word")
@@ -1924,7 +1924,7 @@ def test_is_world_concept_accepts_genuine_concepts(concept_id: str) -> None:
         # Code symbols
         "python:mind.deny_site",
         "rust:state.neurochemical",
-        "python:genesis_cognitive.concepts.conceptnetwork",
+        "python:genesis_conscious.concepts.conceptnetwork",
         "python:brain_waves.compute_gamma_synchrony",
         # Structural hubs
         "_cat:emotion:joy",
@@ -2046,9 +2046,9 @@ def test_world_concept_ids_empty_network() -> None:
 def test_curiosity_engine_skips_non_world_concepts() -> None:
     """The curiosity engine should not generate questions about
     code symbols or function words."""
-    from genesis_cognitive.emotion import EmotionalState
-    from genesis_cognitive.learning import CuriosityEngine
-    from genesis_cognitive.reasoning import ReasoningEngine
+    from genesis_conscious.learning import CuriosityEngine
+    from genesis_conscious.limbic_system.emotion import EmotionalState
+    from genesis_conscious.reasoning import ReasoningEngine
 
     net = ConceptNetwork()
     # Add a code symbol with high activation
@@ -2093,8 +2093,8 @@ def test_curiosity_engine_skips_non_world_concepts() -> None:
 
 def test_autonomous_learner_add_topic_rejects_garbage() -> None:
     """add_topic should reject code symbols and function words."""
-    from genesis_cognitive.learning import AutonomousLearner, CuriosityEngine
-    from genesis_cognitive.reasoning import ReasoningEngine
+    from genesis_conscious.learning import AutonomousLearner, CuriosityEngine
+    from genesis_conscious.reasoning import ReasoningEngine
 
     net = ConceptNetwork()
     reasoning = ReasoningEngine(net)
@@ -2354,9 +2354,9 @@ def test_dream_concept_ids_falls_back_to_world() -> None:
 def test_curiosity_engine_prefers_quality_concepts() -> None:
     """When selecting from activation (idle curiosity), the curiosity
     engine should prefer high-quality concepts over low-quality ones."""
-    from genesis_cognitive.emotion import EmotionalState
-    from genesis_cognitive.learning import CuriosityEngine
-    from genesis_cognitive.reasoning import ReasoningEngine
+    from genesis_conscious.learning import CuriosityEngine
+    from genesis_conscious.limbic_system.emotion import EmotionalState
+    from genesis_conscious.reasoning import ReasoningEngine
 
     net = ConceptNetwork()
     reasoning = ReasoningEngine(net)

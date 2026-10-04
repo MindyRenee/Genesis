@@ -25,7 +25,7 @@ sys.path.insert(
 
 
 def _cmd_capture(args: argparse.Namespace) -> int:
-    from genesis_cognitive.eval import capture_snapshot, isolated_daemon
+    from genesis_conscious.eval import capture_snapshot, isolated_daemon
 
     with isolated_daemon() as client:
         snap = capture_snapshot(client, settle_ticks=args.settle, settle_dt=args.dt)
@@ -38,7 +38,7 @@ def _cmd_capture(args: argparse.Namespace) -> int:
 
 
 def _cmd_check(args: argparse.Namespace) -> int:
-    from genesis_cognitive.eval import (
+    from genesis_conscious.eval import (
         Snapshot,
         capture_snapshot,
         compare_snapshots,
@@ -59,7 +59,7 @@ def _cmd_check(args: argparse.Namespace) -> int:
 
 
 def _cmd_sanity(args: argparse.Namespace) -> int:
-    from genesis_cognitive.eval import (
+    from genesis_conscious.eval import (
         capture_snapshot,
         check_snapshot_vs_defaults,
         isolated_daemon,
@@ -74,7 +74,7 @@ def _cmd_sanity(args: argparse.Namespace) -> int:
 
 
 def _cmd_assay(args: argparse.Namespace) -> int:
-    from genesis_cognitive.eval import AssayResult, isolated_daemon, run_chemical_assay
+    from genesis_conscious.eval import AssayResult, isolated_daemon, run_chemical_assay
 
     with isolated_daemon() as client:
         result = run_chemical_assay(

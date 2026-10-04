@@ -4,15 +4,15 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from genesis_cognitive.concepts import ConceptNetwork
-from genesis_cognitive.learning.curiosity import Question
-from genesis_cognitive.tools.agency import (
+from genesis_conscious.concepts import ConceptNetwork
+from genesis_conscious.learning.curiosity import Question
+from genesis_conscious.tools.agency import (
     _TOOL_SCOPES,
     ActingLoop,
     ActingResult,
     Intention,
 )
-from genesis_cognitive.tools.framework import ToolRegistry
+from genesis_conscious.tools.framework import ToolRegistry
 
 
 def _make_loop(
@@ -90,8 +90,8 @@ def test_curiosity_code_concept_produces_inspect() -> None:
     """A curiosity question about a code concept becomes an inspection."""
     with tempfile.TemporaryDirectory() as tmp:
         repo = Path(tmp) / "repo"
-        (repo / "genesis_cognitive").mkdir(parents=True)
-        (repo / "genesis_cognitive" / "thing.py").write_text(
+        (repo / "genesis_conscious").mkdir(parents=True)
+        (repo / "genesis_conscious" / "thing.py").write_text(
             "def f():\n    return 1\n"
         )
         q = Question(
@@ -213,13 +213,13 @@ def test_measure_counts_files() -> None:
     """Measure runs whitelisted find/wc/du commands and records numbers."""
     with tempfile.TemporaryDirectory() as tmp:
         repo = Path(tmp) / "repo"
-        target = repo / "genesis_cognitive"
+        target = repo / "genesis_conscious"
         target.mkdir(parents=True)
         (target / "a.py").write_text("x = 1\n")
         (target / "b.py").write_text("y = 2\n")
         loop = _make_loop(tmp)
         result = ActingResult(
-            intention=Intention("measure", "genesis_cognitive", "wander")
+            intention=Intention("measure", "genesis_conscious", "wander")
         )
         loop._execute_measure(result.intention, result)
         assert result.success
@@ -230,7 +230,7 @@ def test_inspect_analyzes_python() -> None:
     """Inspect resolves a code concept to a file and analyzes it."""
     with tempfile.TemporaryDirectory() as tmp:
         repo = Path(tmp) / "repo"
-        pkg = repo / "genesis_cognitive"
+        pkg = repo / "genesis_conscious"
         pkg.mkdir(parents=True)
         (pkg / "widget.py").write_text(
             "class Widget:\n    def spin(self):\n        return 1\n"

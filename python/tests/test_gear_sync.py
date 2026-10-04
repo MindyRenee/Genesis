@@ -136,7 +136,7 @@ def test_wave_clock_ceiling_is_not_tighter_than_the_body() -> None:
     )
     # The wave oscillator's sub-step resolution is the designed 0.1 s,
     # matched to NeuroTickParams::DEFAULT.dt.
-    from genesis_cognitive.brain_waves import BrainWaveOscillator
+    from genesis_conscious.thalamus.brain_waves import BrainWaveOscillator
 
     assert BrainWaveOscillator._MAX_SUBSTEP == 0.1
     assert BrainWaveOscillator._MAX_SUBSTEP <= DT_MAX
@@ -163,7 +163,7 @@ def test_constants_match_source() -> None:
     assert int(m.group(1)) == AUTONOMOUS_INTERVAL_MS
 
     heartbeat = (
-        root / "python" / "genesis_cognitive" / "mind" / "heartbeat.py"
+        root / "python" / "genesis_conscious" / "mind" / "heartbeat.py"
     ).read_text(encoding="utf-8")
     assert "time.sleep(1.0)" in heartbeat, (
         "the mind's heartbeat sleep changed; update MIND_HEARTBEAT_S"
@@ -178,7 +178,7 @@ def test_substep_resolution_finer_than_either_gear_teeth() -> None:
     the wave dynamics are resolved independently of which gear is
     driving — which is the whole point of sub-stepping.
     """
-    from genesis_cognitive.brain_waves import BrainWaveOscillator
+    from genesis_conscious.thalamus.brain_waves import BrainWaveOscillator
 
     body_tooth_s = BODY_TICK_MS / 1000.0
     assert BrainWaveOscillator._MAX_SUBSTEP <= body_tooth_s / 2
@@ -194,7 +194,7 @@ def test_frequencies_remain_anatomically_identifiable() -> None:
     the dominant-band decision gates learning and speech, so bands must
     not drift into each other over a long run.
     """
-    from genesis_cognitive.brain_waves import BrainWave, BrainWaveOscillator
+    from genesis_conscious.thalamus.brain_waves import BrainWave, BrainWaveOscillator
 
     freqs = BrainWaveOscillator._FREQS
     assert set(freqs) == set(BrainWave)

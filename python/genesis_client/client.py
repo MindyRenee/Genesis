@@ -6,7 +6,7 @@ domain socket and provides a clean, Pythonic API for all IPC commands.
 
 The protocol is request-response only. Subcognitive→cognitive
 notifications (phase changes, dream insights) are handled separately
-by ``genesis_cognitive.infrastructure.notifications``, a pull-based queue that
+by ``genesis_conscious.infrastructure.notifications``, a pull-based queue that
 detects state changes during the polling cycle — not by this client.
 
 # Usage
@@ -86,10 +86,12 @@ from .protocol import (
     DT_MAX,
     DT_MIN,
     DT_NOMINAL_STEP,
+    EMOTIONAL_TAG_SIZE,
     FIND_SIMILAR,
     GET_BODY_CONTROL,
     GET_BODY_STATE,
     GET_INFERENCE_SUMMARY,
+    GET_ION_SUMMARY,
     GET_MEMORY_STATS,
     GET_NEURO_SUMMARY,
     GET_PHASE,
@@ -142,6 +144,7 @@ from .types import (
     CoreState,
     Episode,
     InferenceSummary,
+    IonSummary,
     MemoryStats,
     NeuroSummary,
     PhaseInfo,
@@ -465,6 +468,23 @@ class GenesisClient:
         resp = self._request(GET_STATE, timeout=timeout)
         return CoreState.unpack(resp)
 
+    def get_ion_summary(self, *, timeout: float | None = None) -> IonSummary:
+        """Get the electrochemical ion summary (108 bytes).
+
+        Exposes calcium, chloride, potassium, and sodium concentrations,
+        reversal potentials, conductances, membrane voltage, transporter
+        fluxes, ATP availability, and normalized excitability/plasticity
+        signals from the substrate's biophysical layer.
+
+        The ion layer is authoritative state owned by the daemon, so
+        this is a pure observation — there is no request payload and no
+        way for the caller to step it. Absent sensors or an older daemon
+        surface as an exception here, which is why interoception treats
+        a missing summary as "no reading", never as a resting one.
+        """
+        resp = self._request(GET_ION_SUMMARY, timeout=timeout)
+        return IonSummary.unpack(resp)
+
     def get_neuro_summary(self, *, timeout: float | None = None) -> NeuroSummary:
         """Get the compact neurochemical summary (32 bytes).
 
@@ -678,14 +698,17 @@ class GenesisClient:
             event_type: Event type ID (0=UserInput, 1=Output, etc.)
             source_module: Module ID that produced this event.
             salience: Importance score [0.0, 1.0].
-            emotional_tag: 12 effective neurochemical levels.
+            emotional_tag: EMOTIONAL_TAG_SIZE effective neurochemical levels.
             text: Event description (max 188 bytes).
 
         Returns:
             True if the event was stored successfully.
         """
-        if len(emotional_tag) != 12:
-            raise ValueError(f"emotional_tag must have 12 elements, got {len(emotional_tag)}")
+        if len(emotional_tag) != EMOTIONAL_TAG_SIZE:
+            raise ValueError(
+                f"emotional_tag must have {EMOTIONAL_TAG_SIZE} elements, "
+                f"got {len(emotional_tag)}"
+            )
         if not (0 <= event_type <= 255):
             raise ValueError(f"event_type must be 0-255, got {event_type}")
         if not (0 <= source_module <= 255):
@@ -736,7 +759,7 @@ class GenesisClient:
             event_type: Event type ID (0=UserInput, 1=Output, etc.)
             source_module: Module ID that produced this event.
             salience: Importance score [0.0, 1.0].
-            emotional_tag: 12 effective neurochemical levels.
+            emotional_tag: EMOTIONAL_TAG_SIZE effective neurochemical levels.
             text: Event description (max 65535 bytes — the wire protocol's
             u16 text_len limit). The LTM store itself can handle up to
             256 KB per episode; the bottleneck is the u16 length field.
@@ -745,8 +768,11 @@ class GenesisClient:
             The real LTM episode ID on success, or None if the store
             failed.
         """
-        if len(emotional_tag) != 12:
-            raise ValueError(f"emotional_tag must have 12 elements, got {len(emotional_tag)}")
+        if len(emotional_tag) != EMOTIONAL_TAG_SIZE:
+            raise ValueError(
+                f"emotional_tag must have {EMOTIONAL_TAG_SIZE} elements, "
+                f"got {len(emotional_tag)}"
+            )
         if not (0 <= event_type <= 255):
             raise ValueError(f"event_type must be 0-255, got {event_type}")
         if not (0 <= source_module <= 255):

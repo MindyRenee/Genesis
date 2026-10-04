@@ -5,10 +5,10 @@ from dataclasses import dataclass
 
 import pytest
 
-from genesis_cognitive.concepts import (
+from genesis_conscious.concepts import (
     ConceptNetwork,
 )
-from genesis_cognitive.sleep import SleepCompressor
+from genesis_conscious.sleep import SleepCompressor
 
 
 @dataclass

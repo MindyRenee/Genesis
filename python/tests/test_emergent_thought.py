@@ -21,15 +21,15 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from genesis_cognitive import (
+from genesis_conscious import (
     ConceptNetwork,
     CuriosityEngine,
     ReasoningEngine,
     ReflectionEngine,
     RelationType,
 )
-from genesis_cognitive.emotion import EmotionalState
-from genesis_cognitive.sleep import InnerLife
+from genesis_conscious.limbic_system.emotion import EmotionalState
+from genesis_conscious.sleep import InnerLife
 
 
 def _make_network() -> ConceptNetwork:
@@ -495,7 +495,7 @@ class TestRecentTopicTracking:
 
     def test_record_thought_appends_topic(self):
         """_record_thought should append the topic to recent_thought_topics."""
-        from genesis_cognitive.sleep.inner_life import SpontaneousThought
+        from genesis_conscious.sleep.inner_life import SpontaneousThought
         il = _make_inner_life()
         emotion = _neutral_emotion()
         thought = SpontaneousThought(
@@ -509,7 +509,7 @@ class TestRecentTopicTracking:
 
     def test_record_thought_uses_trigger_when_no_topic(self):
         """When metadata has no topic, the trigger should be used."""
-        from genesis_cognitive.sleep.inner_life import SpontaneousThought
+        from genesis_conscious.sleep.inner_life import SpontaneousThought
         il = _make_inner_life()
         emotion = _neutral_emotion()
         thought = SpontaneousThought(

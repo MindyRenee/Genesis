@@ -7,14 +7,14 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from genesis_client.protocol import CHEM_OXYTOCIN
-from genesis_cognitive import (
+from genesis_conscious import (
     ConceptNetwork,
     CuriosityEngine,
     ReasoningEngine,
     ReflectionEngine,
 )
-from genesis_cognitive.sleep import InnerLife
-from genesis_cognitive.world import (
+from genesis_conscious.sleep import InnerLife
+from genesis_conscious.world import (
     Beta,
     EventKind,
     EventStream,
@@ -24,9 +24,9 @@ from genesis_cognitive.world import (
     PresenceBelief,
     PresenceKind,
 )
-from genesis_cognitive.world.belief import BID_WINDOW
-from genesis_cognitive.world.events import ground_topics
-from genesis_cognitive.world.presence import (
+from genesis_conscious.world.belief import BID_WINDOW
+from genesis_conscious.world.events import ground_topics
+from genesis_conscious.world.presence import (
     AMBIENT_PRESENCE_TIMEOUT,
     USER_PRESENCE_TIMEOUT,
 )

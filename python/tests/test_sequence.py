@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import random
 
-from genesis_cognitive.reasoning import TaskCompetence
-from genesis_cognitive.sequence import PatternAgent, PatternLine
+from genesis_conscious.reasoning import TaskCompetence
+from genesis_conscious.sequence import PatternAgent, PatternLine
 
 
 def _line(period: int, length: int, seed: int, **kw) -> PatternLine:
@@ -27,7 +27,7 @@ class TestPatternLine:
             cells=["r", "b", None, None],
             pool=[],
         )
-        from genesis_cognitive.sequence import Token
+        from genesis_conscious.sequence import Token
 
         line.pool[0] = Token(0, "r")
         line.pool[1] = Token(1, "b")
@@ -40,7 +40,7 @@ class TestPatternLine:
         assert line.complete()
 
     def test_wrong_mark_rejected_and_reported(self):
-        from genesis_cognitive.sequence import Token
+        from genesis_conscious.sequence import Token
 
         line = PatternLine(
             expected=["r", "b", "r"],

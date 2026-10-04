@@ -19,13 +19,13 @@ from genesis_client.protocol import (
     CHEM_NOREPINEPHRINE,
     CHEM_SEROTONIN,
 )
-from genesis_cognitive.emotion import EmotionalState
-from genesis_cognitive.emotional_regulator import (
+from genesis_conscious.language.sentiment import analyze_sentiment
+from genesis_conscious.limbic_system.emotion import EmotionalState
+from genesis_conscious.limbic_system.emotional_regulator import (
     AllostaticLoadTracker,
     EmotionalRegulator,
     InteroceptionSystem,
 )
-from genesis_cognitive.language.sentiment import analyze_sentiment
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ def capture_impulses() -> tuple[EmotionalRegulator, list[tuple[int, float]]]:
         neuro_impulse=mock_impulse,
     )
     # Mock interoception to a calm state so tests are deterministic.
-    from genesis_cognitive.emotional_regulator import InternalState
+    from genesis_conscious.limbic_system.emotional_regulator import InternalState
 
     calm_state = InternalState(
         cpu_usage=0.0,
@@ -394,7 +394,7 @@ def test_puzzle_response_dampened_when_stressed() -> None:
 
 def test_interoception_latency_uses_observed_response_not_benchmark() -> None:
     """Latency must come from the real interaction path, not a microbenchmark."""
-    from genesis_cognitive.emotional_regulator import InteroceptionSystem
+    from genesis_conscious.limbic_system.emotional_regulator import InteroceptionSystem
 
     intero = InteroceptionSystem()
     state = intero.sense_internal_state()
@@ -427,7 +427,7 @@ def test_update_from_body_state_maps_all_fields() -> None:
     1000, producing a meaningless tiny number.
     """
     from genesis_client.types import BodyState
-    from genesis_cognitive.emotional_regulator import InteroceptionSystem
+    from genesis_conscious.limbic_system.emotional_regulator import InteroceptionSystem
 
     # Build a BodyState with distinctive values
     body = BodyState(
@@ -1266,7 +1266,7 @@ def _intero(cpu_usage: float, tmp_path) -> InteroceptionSystem:
     and these tests would be measuring disconnection rather than the
     layer under test.
     """
-    from genesis_cognitive.emotional_regulator import InteroceptionSystem
+    from genesis_conscious.limbic_system.emotional_regulator import InteroceptionSystem
 
     sock = tmp_path / "genesis.sock"
     sock.write_text("")
@@ -1350,7 +1350,7 @@ def test_stale_body_reading_stops_contributing_stress(tmp_path) -> None:
     still the honest answer — but the stress contribution decays, so a
     daemon that died mid-overload doesn't read as permanent distress.
     """
-    from genesis_cognitive.emotional_regulator import InteroceptionSystem
+    from genesis_conscious.limbic_system.emotional_regulator import InteroceptionSystem
 
     io = _intero(5.0, tmp_path)
     io.update_from_body_state(_fake_body())
@@ -1421,10 +1421,38 @@ def test_arousal_modifier_follows_combined_stress(tmp_path) -> None:
 
 def test_process_layer_still_works_offline() -> None:
     """Without a daemon, the process layer must still sense distress."""
-    from genesis_cognitive.emotional_regulator import InteroceptionSystem
+    from genesis_conscious.limbic_system.emotional_regulator import InteroceptionSystem
 
     io = InteroceptionSystem(socket_path="/nonexistent/genesis.sock")
     state = io.sense_internal_state()
     assert state.daemon_connected is False
     # A missing daemon is itself distress.
     assert state.stress_level >= io.config.daemon_disconnect_stress
+
+
+def test_own_pids_filters_zero_and_dead(tmp_path) -> None:
+    """The shared PID set must never count PID 0 or stale pidfiles.
+
+    Regression: `_sense_memory_usage` collected pidfile PIDs verbatim,
+    so a `0` pidfile or a dead PID counted a stranger's RSS as
+    cognitive load until the probe happened to swallow it.
+    CPU and memory must also agree on the same process tree.
+    """
+    import os
+
+    sock = tmp_path / "genesis.sock"
+    sock.write_text("")
+    io = InteroceptionSystem(socket_path=str(sock))
+    (tmp_path / "genesis_daemon.pid").write_text("0")
+    (tmp_path / "genesis_retina.pid").write_text(str(os.getpid()))
+    pids = io._own_pids()
+    assert 0 not in pids
+    assert pids.count(os.getpid()) == 1
+
+    (tmp_path / "genesis_daemon.pid").write_text("99999999")
+    io._daemon_pid = None
+    io._retina_pid = None
+    pids = io._own_pids()
+    assert 99999999 not in pids
+
+pytestmark = pytest.mark.usefixtures("learned_sentiment")

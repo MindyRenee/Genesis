@@ -20,7 +20,7 @@ from genesis_client.protocol import (
     ZONE_SLEEPING,
 )
 from genesis_client.types import NeuroSummary
-from genesis_cognitive.brain_waves import (
+from genesis_conscious.thalamus.brain_waves import (
     BrainWave,
     BrainWaveState,
     SleepStage,
@@ -200,7 +200,7 @@ def test_alpha_dominant_at_occipital_for_relaxed_state():
 
 def test_rem_alpha_is_intermittent():
     """REM alpha waxes/wanes on the infraslow envelope."""
-    from genesis_cognitive.brain_waves import BrainWaveOscillator, _sleep_phase_powers
+    from genesis_conscious.thalamus.brain_waves import BrainWaveOscillator, _sleep_phase_powers
 
     osc = BrainWaveOscillator()
     summary = _make_summary(arousal=0.6, phase=PHASE_REM)
@@ -223,7 +223,7 @@ def test_rem_alpha_is_intermittent():
 
 def test_rem_theta_uses_sawtooth_carrier():
     """REM theta PAC uses a sawtooth carrier, not a cosine."""
-    from genesis_cognitive.brain_waves import _wave_phase_value
+    from genesis_conscious.thalamus.brain_waves import _wave_phase_value
 
     assert _wave_phase_value(BrainWave.THETA, 0.0, "rem") == -1.0
     assert _wave_phase_value(BrainWave.THETA, math.pi, "rem") == 0.0
@@ -251,7 +251,7 @@ def test_sleep_stage_override_drives_nrem_waves():
     assert n2.powers[BrainWave.SIGMA] > n3.powers[BrainWave.SIGMA]
     assert n3.dominant == BrainWave.DELTA, "N3 is slow-wave dominant"
     # Without the override the same summary reads as N3.
-    from genesis_cognitive.brain_waves import reset_oscillator
+    from genesis_conscious.thalamus.brain_waves import reset_oscillator
 
     reset_oscillator()
     assert assess_brain_waves(summary).dominant == BrainWave.DELTA
@@ -282,7 +282,7 @@ def test_effective_phase_resolves_waking_low_arousal_to_drowsy():
     """Mind._effective_phase is the chokepoint that keeps layers agreeing."""
     from types import SimpleNamespace
 
-    from genesis_cognitive.mind.status import StatusMixin
+    from genesis_conscious.mind.status import StatusMixin
 
     effective = StatusMixin._effective_phase
 
@@ -487,10 +487,10 @@ def _make_wave_state(dominant: BrainWave) -> BrainWaveState:
 
 def test_curiosity_gamma_more_questions():
     """Gamma state produces more curiosity questions than baseline."""
-    from genesis_cognitive.concepts import ConceptNetwork
-    from genesis_cognitive.emotion import EmotionalState
-    from genesis_cognitive.learning import CuriosityEngine
-    from genesis_cognitive.reasoning import ReasoningEngine
+    from genesis_conscious.concepts import ConceptNetwork
+    from genesis_conscious.learning import CuriosityEngine
+    from genesis_conscious.limbic_system.emotion import EmotionalState
+    from genesis_conscious.reasoning import ReasoningEngine
 
     emo = EmotionalState(
         label="curious", nuance="default", cognitive_style="steady",
@@ -513,7 +513,7 @@ def test_curiosity_gamma_more_questions():
 
 def test_working_memory_gamma_expands_capacity():
     """Gamma state expands working memory capacity."""
-    from genesis_cognitive.memory import WorkingMemory
+    from genesis_conscious.memory import WorkingMemory
 
     wm = WorkingMemory()
     summary = _make_summary(arousal=0.5, plasticity=0.5, phase=PHASE_ACTIVE)
@@ -532,7 +532,7 @@ def test_working_memory_gamma_expands_capacity():
 
 def test_global_workspace_gamma_lowers_threshold():
     """Gamma lowers the ignition threshold — easier broadcast."""
-    from genesis_cognitive.global_workspace import GlobalWorkspace
+    from genesis_conscious.frontal_lobe.global_workspace import GlobalWorkspace
 
     gw = GlobalWorkspace(ignition_threshold=0.7)
 
@@ -554,7 +554,7 @@ def test_global_workspace_gamma_lowers_threshold():
 
 def test_drift_diffusion_gamma_faster_accumulation():
     """Gamma speeds up evidence accumulation vs delta."""
-    from genesis_cognitive.reasoning import DriftDiffusionModel
+    from genesis_conscious.reasoning import DriftDiffusionModel
 
     gamma = _make_wave_state(BrainWave.GAMMA)
     delta = _make_wave_state(BrainWave.DELTA)
@@ -586,10 +586,10 @@ def test_narrative_delta_suppresses_recording():
     """Delta state suppresses narrative event recording."""
     import time
 
-    from genesis_cognitive.concepts import ConceptNetwork
-    from genesis_cognitive.emotion import EmotionalState
-    from genesis_cognitive.infrastructure.narrative import NarrativeEngine
-    from genesis_cognitive.self import SelfModel
+    from genesis_conscious.concepts import ConceptNetwork
+    from genesis_conscious.infrastructure.narrative import NarrativeEngine
+    from genesis_conscious.limbic_system.emotion import EmotionalState
+    from genesis_conscious.self import SelfModel
 
     model = SelfModel(born_at=int(time.time() * 1000))
     net = ConceptNetwork()
@@ -615,8 +615,8 @@ def test_narrative_delta_suppresses_recording():
 
 def test_dream_synthesis_theta_more_proposals():
     """Theta (REM) state produces more dream synthesis proposals than delta."""
-    from genesis_cognitive.concepts import ConceptNetwork
-    from genesis_cognitive.sleep import DreamSynthesisEngine
+    from genesis_conscious.concepts import ConceptNetwork
+    from genesis_conscious.sleep import DreamSynthesisEngine
 
     net = ConceptNetwork()
     # Add some concepts with similar structure
@@ -640,8 +640,8 @@ def test_sleep_compression_consolidation_scales_homeostasis():
     """High consolidation intensity produces more aggressive downscaling."""
     import tempfile
 
-    from genesis_cognitive.concepts import ConceptNetwork, Edge, RelationType
-    from genesis_cognitive.sleep import SleepCompressor
+    from genesis_conscious.concepts import ConceptNetwork, Edge, RelationType
+    from genesis_conscious.sleep import SleepCompressor
 
     net = ConceptNetwork()
     net.add_concept("a", origin="learned")
@@ -670,9 +670,9 @@ def test_sleep_compression_consolidation_scales_homeostasis():
 
 def test_voice_brain_waves_modulate_rhythm():
     """Brain wave state modulates voice rhythm."""
-    from genesis_cognitive.emotion import EmotionalState
-    from genesis_cognitive.language import Voice
-    from genesis_cognitive.self import PersonalityTraits
+    from genesis_conscious.language import Voice
+    from genesis_conscious.limbic_system.emotion import EmotionalState
+    from genesis_conscious.self import PersonalityTraits
 
     personality = PersonalityTraits()
     voice = Voice(personality, seed=42)
@@ -712,7 +712,7 @@ def test_voice_brain_waves_modulate_rhythm():
 
 def test_derive_self_priority_gamma_dominant():
     """Gamma-dominant brain waves should produce high scheduling priority."""
-    from genesis_cognitive.brain_waves import derive_self_priority
+    from genesis_conscious.thalamus.brain_waves import derive_self_priority
 
     state = BrainWaveState(
         dominant=BrainWave.GAMMA,
@@ -745,7 +745,7 @@ def test_derive_self_priority_gamma_dominant():
 
 def test_derive_self_priority_delta_dominant():
     """Delta-dominant brain waves (deep sleep) should produce lowest priority."""
-    from genesis_cognitive.brain_waves import derive_self_priority
+    from genesis_conscious.thalamus.brain_waves import derive_self_priority
 
     state = BrainWaveState(
         dominant=BrainWave.DELTA,
@@ -776,7 +776,7 @@ def test_derive_self_priority_delta_dominant():
 
 def test_derive_self_priority_brain_waves_override_body():
     """Brain waves should override the body recommendation when they disagree."""
-    from genesis_cognitive.brain_waves import derive_self_priority
+    from genesis_conscious.thalamus.brain_waves import derive_self_priority
 
     # Gamma-dominant (active thinking) but body says deprioritize (tired)
     state = BrainWaveState(
@@ -809,7 +809,7 @@ def test_derive_self_priority_brain_waves_override_body():
 
 def test_derive_self_priority_clamps():
     """Priority values should be within valid ranges."""
-    from genesis_cognitive.brain_waves import derive_self_priority
+    from genesis_conscious.thalamus.brain_waves import derive_self_priority
 
     # Extreme gamma
     state = BrainWaveState(
@@ -922,7 +922,7 @@ def test_flow_has_lambda():
 
 def test_theta_gamma_coupling_encoding_phase():
     """Encoding bias → gamma peaks near theta peak (0 rad)."""
-    from genesis_cognitive.brain_waves import compute_theta_gamma_coupling
+    from genesis_conscious.thalamus.brain_waves import compute_theta_gamma_coupling
 
     state = assess_brain_waves(
         _make_summary(arousal=0.5, plasticity=0.5, phase=PHASE_ACTIVE,
@@ -937,7 +937,7 @@ def test_theta_gamma_coupling_encoding_phase():
 
 def test_theta_gamma_coupling_retrieval_phase():
     """Retrieval bias → gamma peaks near theta trough (π rad)."""
-    from genesis_cognitive.brain_waves import compute_theta_gamma_coupling
+    from genesis_conscious.thalamus.brain_waves import compute_theta_gamma_coupling
 
     state = assess_brain_waves(
         _make_summary(arousal=0.5, plasticity=0.5, phase=PHASE_ACTIVE,
@@ -955,7 +955,7 @@ def test_theta_gamma_coupling_retrieval_phase():
 
 def test_stimulus_modulates_amplitude():
     """Continuous stimulus modulates band amplitude."""
-    from genesis_cognitive.brain_waves import add_stimulus, reset_oscillator
+    from genesis_conscious.thalamus.brain_waves import add_stimulus, reset_oscillator
 
     reset_oscillator()
     summary = _make_summary(arousal=0.5, phase=PHASE_ACTIVE)
@@ -974,7 +974,7 @@ def test_stimulus_modulates_amplitude():
 
 def test_stimulus_decays():
     """Stimulus decays over time without re-application."""
-    from genesis_cognitive.brain_waves import add_stimulus, reset_oscillator
+    from genesis_conscious.thalamus.brain_waves import add_stimulus, reset_oscillator
 
     reset_oscillator()
     summary = _make_summary(arousal=0.5, phase=PHASE_ACTIVE)

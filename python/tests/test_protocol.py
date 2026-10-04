@@ -23,7 +23,9 @@ from genesis_client.protocol import (
     CHEM_NAMES,
     CHEM_SEROTONIN,
     DT_NOMINAL_STEP,
+    GET_ION_SUMMARY,
     GET_NEURO_SUMMARY,
+    GET_SENSOR_PRESENCE,
     GET_STATE,
     HANDSHAKE,
     MODULE_ATTENTION,
@@ -228,6 +230,11 @@ def test_command_ids():
     assert STORE_EPISODE == 32
     assert PING == 8
     assert SHUTDOWN == 12
+    # The ion layer is additive and continues past ADVANCE_PHYSICS.
+    # genesis2 used 36, but this tree already spent 36 on
+    # GET_SENSOR_PRESENCE, so GET_ION_SUMMARY must not collide.
+    assert GET_ION_SUMMARY == 40
+    assert GET_SENSOR_PRESENCE == 36
 
 
 def test_chemical_ids():
@@ -301,6 +308,9 @@ def test_protocol_version():
     layer (pulse, throttle, PSI, battery cycles, entropy,
     clocksource, suspend caps) and added SET_WAKE_ALARM.
     """
+    # PROTOCOL_VERSION is the *wire protocol* version and is unaffected
+    # by the schema bump that added the ion layer (schema v4 lives in
+    # the state file, not the IPC framing).
     assert PROTOCOL_VERSION == 3
 
 
@@ -807,3 +817,46 @@ def run_all():
 if __name__ == "__main__":
     success = run_all()
     sys.exit(0 if success else 1)
+
+
+def test_ion_summary_unpack_matches_wire_layout():
+    """IonSummary decodes the daemon's fixed 108-byte block.
+
+    The daemon serializes 27 little-endian f32 in a pinned field order
+    (four IonId arrays, then eleven scalars). If either side reorders a
+    field the payload still unpacks — it just reports the wrong ion —
+    so the test pins the order rather than only the width.
+    """
+    import struct
+
+    from genesis_client.types import IonSummary
+
+    values = [float(i) for i in range(27)]
+    raw = struct.pack("<27f", *values)
+    ions = IonSummary.unpack(raw)
+
+    assert len(raw) == 108
+    assert ions.intracellular_mm == (0.0, 1.0, 2.0, 3.0)
+    assert ions.extracellular_mm == (4.0, 5.0, 6.0, 7.0)
+    assert ions.reversal_potential_mv == (8.0, 9.0, 10.0, 11.0)
+    assert ions.conductance == (12.0, 13.0, 14.0, 15.0)
+    assert ions.membrane_potential_mv == 16.0
+    assert ions.nak_pump_rate == 17.0
+    assert ions.kcl_cotransporter_flux == 18.0
+    assert ions.ncx_flux == 19.0
+    assert ions.atp_availability == 20.0
+    assert ions.calcium_signal == 21.0
+    assert ions.chloride_efficacy == 22.0
+    assert ions.excitability == 23.0
+    assert ions.gradient_integrity == 24.0
+    assert ions.energy_load == 25.0
+    assert ions.net_membrane_current == 26.0
+
+    # IonId order is calcium, chloride, potassium, sodium.
+    assert ions.ion_names == ("calcium", "chloride", "potassium", "sodium")
+    assert ions.intracellular("potassium") == 2.0
+    assert ions.extracellular("sodium") == 7.0
+    assert ions.reversal_potential("calcium") == 8.0
+
+    with pytest.raises(ValueError, match="108 bytes"):
+        IonSummary.unpack(raw[:107])

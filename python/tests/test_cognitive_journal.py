@@ -26,14 +26,14 @@ import pytest
 
 import genesis_cli
 from genesis_client.ltm_index import scan_ltm_index
-from genesis_cognitive.infrastructure.journal import (
+from genesis_conscious.infrastructure.journal import (
     JOURNAL_FILENAME,
     CognitiveJournal,
     record_error,
     record_event,
     set_active,
 )
-from genesis_cognitive.mind import Mind
+from genesis_conscious.mind import Mind
 
 
 def _read_events(path: Path) -> list[dict]:

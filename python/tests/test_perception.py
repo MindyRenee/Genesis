@@ -8,11 +8,11 @@ import tempfile
 import numpy as np
 import pytest
 
-from genesis_cognitive.concepts import ConceptNetwork
-from genesis_cognitive.emotion import EmotionalState
-from genesis_cognitive.language import Vocabulary
-from genesis_cognitive.occipital_lobe.v1 import _build_summary
-from genesis_cognitive.perception import (
+from genesis_conscious.concepts import ConceptNetwork
+from genesis_conscious.language import Vocabulary
+from genesis_conscious.limbic_system.emotion import EmotionalState
+from genesis_conscious.occipital_lobe.v1 import _build_summary
+from genesis_conscious.perception import (
     IntegratedPerception,
     MemoryBridge,
     MultisensoryInput,
@@ -30,7 +30,7 @@ from genesis_cognitive.perception import (
     load_image,
     resize_for_vision,
 )
-from genesis_cognitive.perception.core import (
+from genesis_conscious.perception.core import (
     Intent,
     Perception,
     _classify_intent,
@@ -41,13 +41,13 @@ from genesis_cognitive.perception.core import (
     _extract_topics,
     perceive,
 )
-from genesis_cognitive.perception.vision import (
+from genesis_conscious.perception.vision import (
     ColorInfo,
     _build_scene,
     _learn_objects,
 )
-from genesis_cognitive.self import PersonalityTraits
-from genesis_cognitive.temporal_lobe import (
+from genesis_conscious.self import PersonalityTraits
+from genesis_conscious.temporal_lobe import (
     COCO_CLASSES,
     DetectedObject,
     ObjectRecognizer,
@@ -613,7 +613,7 @@ class TestObjectRecognizer:
 
     def test_recognizer_not_available_without_model(self, tmp_path) -> None:
         """Recognizer should report unavailable if model file is missing."""
-        import genesis_cognitive.temporal_lobe.object_recognition as mod
+        import genesis_conscious.temporal_lobe.object_recognition as mod
 
         # Save original model path and point to nonexistent file
         original = mod._MODEL_FILE
@@ -1172,7 +1172,7 @@ class TestV4Model:
 
     def test_process_returns_correct_shape(self, occipital, sample_image):
         """V4 should return latents with the right number of features."""
-        from genesis_cognitive.occipital_lobe.v1 import (
+        from genesis_conscious.occipital_lobe.v1 import (
             _extract_patches,
             _to_grayscale,
             _whiten_patches,
@@ -1195,7 +1195,7 @@ class TestV4Model:
 
     def test_dictionary_learning(self, occipital, sample_image):
         """V4 dictionary should change after processing images."""
-        from genesis_cognitive.occipital_lobe.v1 import (
+        from genesis_conscious.occipital_lobe.v1 import (
             _extract_patches,
             _to_grayscale,
             _whiten_patches,
@@ -1221,7 +1221,7 @@ class TestV4Model:
 
     def test_color_integration(self, occipital, green_image, blue_image):
         """V4 should produce different activations for different colors."""
-        from genesis_cognitive.occipital_lobe.v1 import (
+        from genesis_conscious.occipital_lobe.v1 import (
             _extract_patches,
             _to_grayscale,
             _whiten_patches,
@@ -1489,3 +1489,5 @@ class TestImageUtils:
         img = np.zeros((640, 480, 3), dtype=np.uint8)
         result = resize_for_vision(img, max_dim=320)
         assert result.shape[2] == 3
+
+pytestmark = pytest.mark.usefixtures("learned_sentiment")

@@ -39,7 +39,7 @@ import pytest
 
 from genesis_client import NeuroSummary
 from genesis_client.protocol import DT_MAX
-from genesis_cognitive.brain_waves import (
+from genesis_conscious.thalamus.brain_waves import (
     _TURN_SNAP_EPS,
     BrainWave,
     BrainWaveOscillator,
@@ -485,7 +485,7 @@ def _run_heartbeat(gaps: list[float], monkeypatch) -> list:
         return clock["t"]
 
     monkeypatch.setattr(
-        "genesis_cognitive.brain_waves.time.monotonic", fake_monotonic
+        "genesis_conscious.thalamus.brain_waves.time.monotonic", fake_monotonic
     )
     # Prime the oscillator's clock. A fresh instance has _last_time None,
     # and assess() then falls back to a 0.1 s default for its first
@@ -534,7 +534,7 @@ def test_assess_matches_chemistry_dt_over_a_slow_cycle(monkeypatch):
     """
     clock = {"t": 0.0}
     monkeypatch.setattr(
-        "genesis_cognitive.brain_waves.time.monotonic",
+        "genesis_conscious.thalamus.brain_waves.time.monotonic",
         lambda: clock["t"],
     )
     for gap in (0.2, 1.0, 1.5, 2.0, 5.0, 9.9):
@@ -578,7 +578,7 @@ def test_phase_does_not_drift_across_many_slow_heartbeats(monkeypatch):
 
     clock = {"t": 0.0}
     monkeypatch.setattr(
-        "genesis_cognitive.brain_waves.time.monotonic",
+        "genesis_conscious.thalamus.brain_waves.time.monotonic",
         lambda: clock["t"],
     )
     for gap, count in ((0.1, 600), (2.0, 30)):

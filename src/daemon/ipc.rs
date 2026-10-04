@@ -337,7 +337,7 @@ pub mod cmd {
     /// owns time and measures its own elapsed interval, because a
     /// caller-chosen step is what let the mind dictate the body's
     /// integration rate. Offline experiments still need one — the
-    /// causal assay in `python/genesis_cognitive/eval/assay.py` advances
+    /// causal assay in `python/genesis_conscious/eval/assay.py` advances
     /// a fixed number of ticks and reads the per-tick response, so `dt`
     /// is its independent variable and cannot be the daemon's wall clock.
     ///
@@ -351,6 +351,13 @@ pub mod cmd {
     /// Request: [f32 dt]. Response: same 21-byte shape as
     /// ADVANCE_NEURO, so the existing client decode path is reused.
     pub const ADVANCE_PHYSICS: u8 = 39;
+    /// Response: IonSummary (108 bytes).
+    ///
+    /// Additive: no BodyState layout changed, so PROTOCOL_VERSION is
+    /// unaffected. The id continues past ADVANCE_PHYSICS rather than
+    /// reusing genesis2's 36, which this tree already spent on
+    /// GET_SENSOR_PRESENCE.
+    pub const GET_ION_SUMMARY: u8 = 40;
 }
 
 /// Notification opcodes for daemon→cognitive push messages.
@@ -358,7 +365,7 @@ pub mod cmd {
 /// **Reserved / unwired.** The IPC channel is strictly request-response:
 /// the daemon never writes an unsolicited message to a client, so none
 /// of these are ever sent today. The cognitive mind instead detects
-/// these events by polling (`python/genesis_cognitive/infrastructure/
+/// these events by polling (`python/genesis_conscious/infrastructure/
 /// notifications.py`,
 /// a pull-based queue), which is the active mechanism. These constants
 /// reserve the 100+ opcode range for a future push implementation and
@@ -410,11 +417,75 @@ pub mod error {
 //  Wire types
 // ─────────────────────────────────────────────────────────────────
 
-/// Compact neurochemical summary (32 bytes) — sent in response to
-/// GetNeuroSummary. This is what the Python side reads to know how
-/// Genesis feels without transferring the full 3288-byte state.
+/// Compact electrochemical ion summary (108 bytes), sent in response
+/// to [`cmd::GET_ION_SUMMARY`].
+///
+/// This is the whole-cell view an interoceptive layer needs: resting
+/// concentrations and gradients on both sides of the membrane, the
+/// Nernst reversal potential driving each ion, and the transporter
+/// state that maintains them. Arrays use [`crate::state::IonId`]
+/// order: calcium, chloride, potassium, sodium.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
+pub struct IonSummary {
+    /// Intracellular concentrations in mM.
+    pub intracellular_mm: [f32; 4],
+    /// Extracellular concentrations in mM.
+    pub extracellular_mm: [f32; 4],
+    /// Nernst reversal potentials in mV.
+    pub reversal_potential_mv: [f32; 4],
+    /// Relative conductances (K⁺ leak ≈ 1).
+    pub conductance: [f32; 4],
+    /// Aggregate membrane potential in mV.
+    pub membrane_potential_mv: f32,
+    /// Na⁺/K⁺-ATPase cycle rate in mM/s.
+    pub nak_pump_rate: f32,
+    /// Net K⁺/Cl⁻ cotransporter flux in mM/s (positive = outward).
+    pub kcl_cotransporter_flux: f32,
+    /// Na⁺/Ca²⁺ exchange flux in mM/s of Ca²⁺ (positive = extrusion).
+    pub ncx_flux: f32,
+    /// ATP availability [0,1].
+    pub atp_availability: f32,
+    /// Log-normalized intracellular Ca²⁺ signal [0,1].
+    pub calcium_signal: f32,
+    /// Effective inhibitory Cl⁻ driving force [0,1].
+    pub chloride_efficacy: f32,
+    /// Depolarization above resting potential [0,1].
+    pub excitability: f32,
+    /// Mean preservation of the four ion gradients [0,1].
+    pub gradient_integrity: f32,
+    /// Normalized channel/transporter workload [0,1].
+    pub energy_load: f32,
+    /// Net membrane current including the electrogenic Na⁺/K⁺ pump.
+    pub net_membrane_current: f32,
+}
+
+const _: () = {
+    use core::mem::offset_of;
+    assert!(core::mem::size_of::<IonSummary>() == 108);
+    assert!(offset_of!(IonSummary, intracellular_mm) == 0);
+    assert!(offset_of!(IonSummary, extracellular_mm) == 16);
+    assert!(offset_of!(IonSummary, reversal_potential_mv) == 32);
+    assert!(offset_of!(IonSummary, conductance) == 48);
+    assert!(offset_of!(IonSummary, membrane_potential_mv) == 64);
+    assert!(offset_of!(IonSummary, nak_pump_rate) == 68);
+    assert!(offset_of!(IonSummary, kcl_cotransporter_flux) == 72);
+    assert!(offset_of!(IonSummary, ncx_flux) == 76);
+    assert!(offset_of!(IonSummary, atp_availability) == 80);
+    assert!(offset_of!(IonSummary, calcium_signal) == 84);
+    assert!(offset_of!(IonSummary, chloride_efficacy) == 88);
+    assert!(offset_of!(IonSummary, excitability) == 92);
+    assert!(offset_of!(IonSummary, gradient_integrity) == 96);
+    assert!(offset_of!(IonSummary, energy_load) == 100);
+    assert!(offset_of!(IonSummary, net_membrane_current) == 104);
+};
+
+/// Compact neurochemical summary (32 bytes) — sent in response to
+/// GetNeuroSummary. This is what the Python side reads to know how
+/// Genesis feels without transferring the full state.
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+
 pub struct NeuroSummary {
     /// Arousal axis: high = alert, low = drowsy.
     pub arousal: f32,
@@ -1469,6 +1540,28 @@ impl IpcClient {
     }
 
     /// Get the neurochemical summary.
+    pub fn get_ion_summary(&mut self) -> std::io::Result<IonSummary> {
+        let resp = self.request(cmd::GET_ION_SUMMARY, &[])?;
+        if resp.len() < core::mem::size_of::<IonSummary>() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "ion summary response too short",
+            ));
+        }
+        let mut summary = IonSummary::default();
+        // SAFETY: `resp.len()` was checked >= size_of::<IonSummary>().
+        // `summary` is a stack value. Non-overlapping heap->stack copy.
+        // IonSummary is #[repr(C)] with no padding.
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                resp.as_ptr(),
+                &mut summary as *mut IonSummary as *mut u8,
+                core::mem::size_of::<IonSummary>(),
+            );
+        }
+        Ok(summary)
+    }
+
     pub fn get_neuro_summary(&mut self) -> std::io::Result<NeuroSummary> {
         let resp = self.request(cmd::GET_NEURO_SUMMARY, &[])?;
         if resp.len() < core::mem::size_of::<NeuroSummary>() {
@@ -2225,6 +2318,58 @@ pub fn default_handler(
             }
         }
 
+        cmd::GET_ION_SUMMARY => {
+            // The electrochemical layer is authoritative state, not
+            // derived: the daemon owns it and the mind reads it the
+            // same way it reads any other body measurement. No
+            // payload — this is a pure observation, and letting the
+            // caller drive it would put ion dynamics outside the
+            // body that owns time.
+            let mut snapshot = None;
+            for _ in 0..8 {
+                let s = mmap.read_consistent();
+                if s.is_some() {
+                    snapshot = s;
+                    break;
+                }
+                std::hint::spin_loop();
+            }
+            match snapshot {
+                Some(state) => {
+                    let ions = state.ions;
+                    let summary = IonSummary {
+                        intracellular_mm: ions.intracellular_mm,
+                        extracellular_mm: ions.extracellular_mm,
+                        reversal_potential_mv: ions.reversal_potential_mv,
+                        conductance: ions.conductance,
+                        membrane_potential_mv: ions.membrane_potential_mv,
+                        nak_pump_rate: ions.nak_pump_rate,
+                        kcl_cotransporter_flux: ions.kcl_cotransporter_flux,
+                        ncx_flux: ions.ncx_flux,
+                        atp_availability: ions.atp_availability,
+                        calcium_signal: ions.calcium_signal,
+                        chloride_efficacy: ions.chloride_efficacy,
+                        excitability: ions.excitability,
+                        gradient_integrity: ions.gradient_integrity,
+                        energy_load: ions.energy_load,
+                        net_membrane_current: ions.net_membrane_current,
+                    };
+                    // SAFETY: `summary` is a valid stack-owned
+                    // value; the slice covers exactly its 108 bytes.
+                    let bytes = unsafe {
+                        std::slice::from_raw_parts(
+                            &summary as *const IonSummary as *const u8,
+                            core::mem::size_of::<IonSummary>(),
+                        )
+                    };
+                    bytes.to_vec()
+                }
+                None => {
+                    eprintln!("[ipc] GET_ION_SUMMARY: read_consistent failed after 8 retries");
+                    vec![error::READ_FAILED]
+                }
+            }
+        }
         cmd::GET_NEURO_SUMMARY => {
             // `read_consistent` uses the seqlock protocol without
             // creating a reference to the mmap'd memory. The tick loop

@@ -11,8 +11,8 @@ Covers:
 - Sleep-state persistence/serialization across restarts
 
 All imports come from the sleep bundle's public API
-(``genesis_cognitive.sleep``) or the package ``__init__``
-(``genesis_cognitive``).
+(``genesis_conscious.sleep``) or the package ``__init__``
+(``genesis_conscious``).
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
-from genesis_cognitive import (
+from genesis_conscious import (
     ConceptNetwork,
     CuriosityEngine,
     NarrativeEngine,
@@ -34,13 +34,13 @@ from genesis_cognitive import (
     RelationType,
     SelfModel,
 )
-from genesis_cognitive.infrastructure.persistence import (
+from genesis_conscious.infrastructure.persistence import (
     load_state,
     restore_sleep_cycle,
     save_state,
     serialize_sleep_state,
 )
-from genesis_cognitive.sleep import (
+from genesis_conscious.sleep import (
     HippocampalReplay,
     HypnagogicState,
     InnerLife,
