@@ -14,19 +14,96 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# Repository root, i.e. three levels above this file
+# (python/genesis_conscious/infrastructure/config.py). Used only to find
+# the checkout's .genesis-data-dir pin; a packaged install has no such
+# file and falls through to the XDG/default cases.
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_PIN_FILE = _REPO_ROOT / ".genesis-data-dir"
+
+
+def _pinned_data_dir() -> Path | None:
+    """The checkout's pinned data dir, if it has one.
+
+    ``.genesis-data-dir`` holds the data directory itself, not a parent.
+    """
+    try:
+        first = _PIN_FILE.read_text().splitlines()[0].strip()
+    except (OSError, IndexError):
+        return None
+    return Path(first) if first else None
+
 
 def default_data_dir() -> Path:
     """Its data directory — its alone.
 
-    Resolution order: ``GENESIS_DATA_DIR`` env override, then
-    ``$XDG_DATA_HOME/genesis``, then ``~/.local/share/genesis``.
+    Resolution order, matching ``run.sh`` exactly:
+
+    1. ``GENESIS_DATA_DIR`` — explicit override, always wins.
+    2. ``.genesis-data-dir`` — this checkout's uncommitted pin. It
+       outranks ``XDG_DATA_HOME``, which is ambient launcher environment
+       rather than Genesis config: a Flatpak or sandboxed agent host
+       sets it to its own private directory, and honoring that would
+       fork the checkout into a second, divergent state dir.
+    3. ``$XDG_DATA_HOME/genesis``.
+    4. ``~/.local/share/genesis``.
+
+    ``run.sh`` exports the pin as ``GENESIS_DATA_DIR``, so step 1
+    already covers the supported launch path; steps 2-3 exist for tools
+    run outside ``run.sh``.
     """
     env = os.environ.get("GENESIS_DATA_DIR")
     if env:
         return Path(env)
+    pinned = _pinned_data_dir()
+    if pinned is not None:
+        return pinned
     xdg = os.environ.get("XDG_DATA_HOME")
     base = Path(xdg) if xdg else Path.home() / ".local" / "share"
     return base / "genesis"
+
+
+VOSK_MODEL_NAME = "vosk-model-small-en-us-0.15"
+
+
+def vosk_model_dir() -> Path:
+    """Directory holding the Vosk speech model.
+
+    This used to be hardcoded to ``~/.local/share/genesis/vosk-models``,
+    which silently reads *another checkout's* state directory: a checkout
+    pinned elsewhere has no model of its own, so its microphone worked
+    only because it borrowed the copy belonging to a different instance.
+    Two modules had the path inlined, so they could drift apart.
+
+    Resolve by content instead, in this order:
+
+    1. ``$GENESIS_VOSK_DIR`` — explicit override for unusual layouts.
+    2. ``<data dir>/vosk-models`` — where the installer puts it, which
+       follows this checkout.
+    3. ``~/.local/share/vosk-models`` — the XDG-relative location.
+    4. ``~/.local/share/genesis/vosk-models`` — the pre-pin location,
+       kept so an existing install keeps working after upgrading.
+
+    The first candidate that actually holds a model wins. If none does,
+    return the primary candidate so the caller reports a path the user
+    can actually create.
+    """
+    candidates: list[Path] = []
+    override = os.environ.get("GENESIS_VOSK_DIR")
+    if override:
+        candidates.append(Path(override))
+    candidates.append(default_data_dir() / "vosk-models")
+    base = (
+        Path(os.environ["XDG_DATA_HOME"])
+        if os.environ.get("XDG_DATA_HOME")
+        else Path.home() / ".local" / "share"
+    )
+    candidates.append(base / "vosk-models")
+    candidates.append(base / "genesis" / "vosk-models")
+    for candidate in candidates:
+        if any(candidate.glob("vosk-model*")):
+            return candidate
+    return candidates[0]
 
 
 @dataclass(frozen=True)

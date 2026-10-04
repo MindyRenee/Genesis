@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
+import os
 import sqlite3
 import sys
 from collections import Counter
@@ -186,12 +187,37 @@ def migrate(data_dir: Path, write: bool, force: bool) -> int:
     return 0
 
 
+def _default_data_dir() -> str:
+    """Resolve the data dir the way run.sh does.
+
+    GENESIS_DATA_DIR, then the checkout's .genesis-data-dir pin, then
+    XDG_DATA_HOME, then ~/.local/share. The pin outranks XDG_DATA_HOME
+    because the latter is ambient launcher environment, not Genesis
+    config — a Flatpak or sandboxed host sets it, and migrating the wrong
+    checkout's edges would rewrite its canonical log from stale data.
+    """
+    explicit = os.environ.get("GENESIS_DATA_DIR")
+    if explicit:
+        return explicit
+    pin = Path(__file__).resolve().parent.parent / ".genesis-data-dir"
+    if pin.is_file():
+        pinned = pin.read_text().splitlines()[0].strip()
+        if pinned:
+            return pinned
+    return str(
+        Path(
+            os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share")),
+        )
+        / "genesis",
+    )
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
         "--data-dir",
-        default=str(Path.home() / ".local/share/genesis"),
-        help="Genesis data directory",
+        default=_default_data_dir(),
+        help="Genesis data directory (default: same resolution as run.sh)",
     )
     p.add_argument("--write", action="store_true", help="commit the migration")
     p.add_argument("--force", action="store_true", help="overwrite an existing non-empty log")
