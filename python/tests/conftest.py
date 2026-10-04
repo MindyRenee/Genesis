@@ -38,6 +38,28 @@ def pytest_configure(config):
     )
 
 
+@pytest.fixture(autouse=True)
+def connected_sensors(monkeypatch):
+    """Run the suite with every sensor connected.
+
+    Genesis runs with CPU load and silicon temperature disconnected by
+    default (``emotional_regulator``): those thresholds were calibrated
+    against other hardware and misread this machine. But most of the
+    body layer's logic — how the process and hardware stress layers
+    compose, how a stale reading decays, that neither merge clobbers
+    the other — is only observable when readings actually arrive.
+    Without this, those tests silently asserted against fields the
+    disconnected path pins to zero, which is how six of them came to
+    fail on a change that never touched the code they cover.
+
+    Pinning the connected path here keeps them guarding what they were
+    written to guard. Tests for the disconnected behaviour set
+    ``GENESIS_DISCONNECTED_SENSORS`` themselves, so both paths stay
+    covered.
+    """
+    monkeypatch.setenv("GENESIS_DISCONNECTED_SENSORS", "none")
+
+
 # Genesis has no seed sentiment lexicon: sentiment is learned through
 # interaction (``sentiment.learn_sentiment``), not shipped as a table.
 # Tests of the sentiment *logic* — negation, intensifiers, dimishers,

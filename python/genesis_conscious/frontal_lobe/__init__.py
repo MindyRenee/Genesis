@@ -14,7 +14,11 @@ Key functions:
     - Working memory (maintaining information online)
     - Decision-making (evidence accumulation, value-based choice)
     - Goal-directed behavior (goal setting, goal maintenance)
-    - Reasoning (deductive, inductive, analogical)
+    - Reasoning: deductive (forward entailment), abductive
+      (inference to the best explanation — the observed effect
+      proposing its likeliest cause), analogical (transfer by
+      similarity), causal, and hypothesis generation, with
+      contradiction detection over the results
     - Theory of mind (modeling others' mental states)
     - Problem solving (means-ends analysis, insight)
     - Self-regulation (emotional control, impulse suppression)

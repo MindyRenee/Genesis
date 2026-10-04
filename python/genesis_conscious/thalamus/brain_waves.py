@@ -2269,7 +2269,6 @@ def _derive_io_class(
 def derive_self_priority(
     state: BrainWaveState,
     body_recommended_nice: int = 0,
-    body_recommended_io_class: str = "best-effort-3",
 ) -> tuple[int, str]:
     """Map brain wave state to scheduling and I/O priority.
 
@@ -2278,21 +2277,29 @@ def derive_self_priority(
     (bottom-up) and cognitive top-down drive — determines how much CPU
     and I/O bandwidth it allocates to itself.
 
-    The body recommendation from the tick (autonomic afferent) is
-    blended in as a body-state input: the brain waves can override it
-    if cognitive state demands different priorities. For example, if
-    the body recommends deprioritization (high adenosine → tired) but
-    the brain waves show gamma dominance (active integration from a
-    top-down cognitive drive), the brain waves win — it's actively
+    The body's recommended nice value from the tick (autonomic
+    afferent) is blended in as a body-state input, so the body can
+    influence the decision without overriding the cortex. For example,
+    if the body recommends deprioritization (high adenosine → tired)
+    but the brain waves show gamma dominance (active integration from
+    a top-down cognitive drive), the brain waves win — it's actively
     thinking despite being tired.
+
+    The body's recommended I/O class is deliberately *not* an input
+    here. I/O class is categorical ("idle" / "best-effort-N"), so
+    there is no honest way to blend it the way nice is blended, and a
+    70/30 mix of two categorical labels has no defined meaning. It is
+    decided outright by brain state — see :func:`_derive_io_class` —
+    which keeps the mind's memory-read and memory-write bandwidth under
+    cortical control. The parameter used to be accepted and documented
+    as an afferent input while nothing read it, so the caller's
+    recommendation was silently dropped while appearing to be wired.
 
     Args:
         state: The current brain wave state from the oscillator.
         body_recommended_nice: The tick's recommended nice value
             (based on neurochemistry). This is an afferent input,
             not a command.
-        body_recommended_io_class: The tick's recommended I/O class
-            string (e.g. "idle", "best-effort-3"). Afferent input.
 
     Returns:
         A (nice, io_class) tuple representing what the cognitive

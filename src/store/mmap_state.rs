@@ -488,9 +488,8 @@ impl MmapState {
                     // held. The mapping is FILE_SIZE (one page), which
                     // is larger than the 3296-byte v3 struct, so the
                     // volatile copy stays in bounds.
-                    let legacy = unsafe {
-                        core::ptr::read_volatile(ptr as *const GenesisCoreStateV3)
-                    };
+                    let legacy =
+                        unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreStateV3) };
                     if legacy.header.state_size as usize
                         != core::mem::size_of::<GenesisCoreStateV3>()
                     {

@@ -214,6 +214,22 @@ class Vision:
         """Public access to the face recognizer for registration."""
         return self._get_face_recognizer()
 
+    def recognize_faces_in(self, rgb) -> tuple[list[str], int]:
+        """Public face recognition for a frame from any source.
+
+        The retina path runs this as part of `see`, but a frame read
+        from an image file never passed through it — so looking at a
+        photograph detected objects and features while never detecting
+        a face in it. That made face recognition reachable only via a
+        live camera, and left her unable to recognise anyone on a
+        machine without one.
+
+        Returns ``(names, unknown_count)``, exactly as the retina path
+        consumes it, and records the names so
+        :meth:`last_faces_seen` reports them.
+        """
+        return self._recognize_faces(rgb)
+
     def last_faces_seen(self) -> list[str]:
         """Return the names of people it last saw (empty if none)."""
         return list(self._last_faces)

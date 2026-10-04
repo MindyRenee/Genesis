@@ -76,6 +76,59 @@ from .emotion import CauseCategory, EmotionalState
 
 logger = logging.getLogger(__name__)
 
+# ─── Disconnected hardware sensors ──────────────────────────────────
+#
+# Not every number the substrate reports is worth believing. These
+# thresholds were calibrated against other hardware, and on a machine
+# they do not fit they read ordinary work as strain — which then drives
+# cortisol, and a stress signal that is really a miscalibration is
+# indistinguishable from distress to the layer above.
+#
+# A sensor named here is not read at all: it does not contribute to
+# stress, and it reports a neutral value so downstream consumers see
+# "no reading" rather than a plausible-looking wrong one. Everything
+# not listed keeps working — memory pressure, daemon connectivity,
+# response latency, and the rest of the body layer are untouched.
+#
+# The sensors disconnected out of the box. See the note above: these
+# were calibrated against other hardware and misread this machine.
+DEFAULT_DISCONNECTED_SENSORS = "cpu_usage,cpu_temp_c"
+
+# Parsed once per distinct raw value rather than once per call.
+# `sensor_connected` sits on the body-update path, so the parse is
+# memoized; the cache is keyed on the raw string, so a test (or an
+# operator changing the environment) sees the new set immediately
+# instead of whichever set happened to be current at import time.
+_SENSOR_CACHE: tuple[str, frozenset[str]] | None = None
+
+
+def disconnected_sensors() -> frozenset[str]:
+    """The sensor names currently excluded from the body layer.
+
+    Read from ``GENESIS_DISCONNECTED_SENSORS`` on each call, so the set
+    is a property of the running configuration rather than of import
+    order. An empty value, or the literal ``none``, connects every
+    sensor.
+    """
+    global _SENSOR_CACHE
+    raw = os.environ.get("GENESIS_DISCONNECTED_SENSORS", DEFAULT_DISCONNECTED_SENSORS)
+    cached = _SENSOR_CACHE
+    if cached is not None and cached[0] == raw:
+        return cached[1]
+    names = frozenset(
+        name.strip()
+        for name in raw.split(",")
+        if name.strip() and name.strip().lower() != "none"
+    )
+    _SENSOR_CACHE = (raw, names)
+    return names
+
+
+def sensor_connected(name: str) -> bool:
+    """Whether ``name`` is currently being read."""
+    return name not in disconnected_sensors()
+
+
 # Upper bound on a single regulation step, in seconds. The HPA cascade
 # and the allostatic tracker integrate dt linearly and are calibrated
 # for ~8 s steps, so an unbounded dt (a suspend, a debugger pause)
@@ -584,6 +637,8 @@ class InteroceptionSystem:
         100%+ of a single core but only 25% system-wide; measuring
         system-wide CPU would mask its own stress entirely.
         """
+        if not sensor_connected("cpu_usage"):
+            return 0.0
         cpu_usage = 0.0
         try:
             import psutil
@@ -757,8 +812,13 @@ class InteroceptionSystem:
         daemon should read as distress.
         """
         cfg = self.config
-        cpu_stress = max(
-            0.0, (process.cpu_usage - cfg.cpu_stress_threshold) / cfg.cpu_stress_range
+        cpu_stress = (
+            max(
+                0.0,
+                (process.cpu_usage - cfg.cpu_stress_threshold) / cfg.cpu_stress_range,
+            )
+            if sensor_connected("cpu_usage")
+            else 0.0
         )
         mem_stress = max(
             0.0, (process.memory_usage - cfg.memory_stress_threshold) / cfg.memory_stress_range
@@ -948,11 +1008,22 @@ class InteroceptionSystem:
         # not distress. CPU overload is likewise distinct from sustainable
         # effort and only contributes above one full CPU-capacity unit.
         cognitive_stress = max(0.0, (body.cognitive_load - 0.70) / 0.30)
-        cpu_overload_stress = max(0.0, min(1.0, (body.stress_load - 1.0) / 0.5))
+        cpu_overload_stress = (
+            max(0.0, min(1.0, (body.stress_load - 1.0) / 0.5))
+            if sensor_connected("cpu_usage")
+            else 0.0
+        )
         body.stress = max(cognitive_stress, cpu_overload_stress)
         body.reported_at = time.monotonic()
 
-        body.cpu_temp_c = getattr(body_state, "cpu_temp_c", 0.0)
+        # Temperature is not read while disconnected. A neutral 0 is the
+        # honest "no reading" here: the field is degrees Celsius, and 0 is
+        # not a temperature a live silicon sensor reports.
+        body.cpu_temp_c = (
+            getattr(body_state, "cpu_temp_c", 0.0)
+            if sensor_connected("cpu_temp_c")
+            else 0.0
+        )
         body.arousal_freq = getattr(body_state, "arousal_freq", 0.0)
         body.io_activity = getattr(body_state, "io_activity", 0.0)
         body.energy_reserve = getattr(body_state, "energy_reserve", 1.0)

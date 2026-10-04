@@ -17,9 +17,12 @@ Key behaviors tested:
 from __future__ import annotations
 
 import os
+import random
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import pytest
 
 from genesis_conscious import (
     ConceptNetwork,
@@ -29,6 +32,7 @@ from genesis_conscious import (
     RelationType,
 )
 from genesis_conscious.limbic_system.emotion import EmotionalState
+from genesis_conscious.reasoning.engine import ReasoningType
 from genesis_conscious.sleep import InnerLife
 
 
@@ -517,3 +521,76 @@ class TestRecentTopicTracking:
         )
         il._record_thought(thought, emotion)
         assert "curiosity" in il._recent_thought_topics
+
+
+# ─── Every reasoning type must reach speech ─────────────────────
+#
+# `_weave_reasoning` dispatches on ReasoningType to choose phrasing.
+# A type with no branch is not an error — it is silently dropped, so
+# the reasoning is computed, held, and then discarded without a word.
+# That is exactly what happened to ABDUCTIVE: `reason_about` returns
+# "fire is a possible explanation for smoke", and no branch matched, so
+# the conclusion never reached `parts`. Enumerating the enum here makes
+# a newly-added type fail loudly instead of quietly disappearing.
+
+# The reasoning types _weave_reasoning has phrasing for. CONTRADICTION
+# and SYNTHESIS are deliberately absent: a detected conflict and a
+# combined synthesis are not standalone conclusions to speak aloud, they
+# are meta-signals about the other results.
+_SPOKEN_REASONING_TYPES = {
+    "DEDUCTIVE",
+    "ABDUCTIVE",
+    "ANALOGICAL",
+    "CAUSAL",
+    "HYPOTHESIS",
+}
+
+_ABDUCTIVE_CONCLUSION = (
+    "fire is a possible explanation for smoke (abductive inference: fire causes smoke)"
+)
+
+
+def _weave_one(reasoning_type):
+    """Run one result of `reasoning_type` through the composer's dispatch."""
+    from genesis_conscious.cognition.thought_composer import ThoughtComposer
+    from genesis_conscious.reasoning.engine import ReasoningResult
+
+    composer = ThoughtComposer.__new__(ThoughtComposer)
+    composer._rng = random.Random(0)
+    composer._join_parts = lambda items: " ".join(items)
+    parts: list[str] = []
+    composer._weave_reasoning(
+        parts,
+        [ReasoningResult(conclusion=_ABDUCTIVE_CONCLUSION, reasoning_type=reasoning_type,
+                          evidence=[], confidence=0.5)],
+        focused=False,
+    )
+    return " ".join(parts)
+
+
+@pytest.mark.parametrize(
+    "reasoning_type",
+    [t for t in ReasoningType if t.name in _SPOKEN_REASONING_TYPES],
+)
+def test_reasoning_type_reaches_speech(reasoning_type) -> None:
+    """Each spoken reasoning type produces non-empty prose."""
+    assert _weave_one(reasoning_type), (
+        f"{reasoning_type.value} produced no text — it has no branch in "
+        f"_weave_reasoning and is being silently dropped"
+    )
+
+
+def test_abductive_inference_is_spoken_and_hedged() -> None:
+    """Abductive reasoning surfaces, and keeps its uncertainty.
+
+    Abduction runs from an observation back to a candidate cause, so it
+    is a ranked guess. Presenting it flatly would overclaim, which is
+    why the conclusion's own hedge must survive into the prose.
+    """
+    from genesis_conscious.reasoning.engine import ReasoningType
+
+    spoken = _weave_one(ReasoningType.ABDUCTIVE)
+    assert "fire" in spoken
+    assert "possible" in spoken, (
+        f"abductive conclusion lost its hedge: {spoken!r}"
+    )

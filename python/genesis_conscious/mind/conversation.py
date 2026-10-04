@@ -1105,6 +1105,26 @@ class ConversationMixin:
                 return self.language.render(thought, emo)
 
             frame = resize_for_vision(frame, max_dim=320)
+
+            # Face recognition (FFA) on the image itself. The retina
+            # path does this inside `vision.see`, so without it here an
+            # image was processed for objects, colour and features but
+            # never for a face — leaving her unable to recognise anyone
+            # in a photograph on a machine with no camera. Faces it
+            # recognises become presences in her world, the same way a
+            # face seen live does.
+            face_names: list[str] = []
+            n_unknown_faces = 0
+            try:
+                face_names, n_unknown_faces = self.vision.recognize_faces_in(frame)
+            except Exception as e:  # noqa: BLE001 — a bad frame is not a failed look
+                note_swallowed(
+                    "genesis_conscious.mind.conversation.look_at_image.faces",
+                    e,
+                )
+            if face_names:
+                self._note_faces_seen()
+
             percept = self.visual_cortex.see(frame, learn=True)
 
             # Build a short semantic marker from the percept — the
@@ -1138,6 +1158,8 @@ class ConversationMixin:
                     "color": percept.dominant_color,
                     "brightness": percept.brightness,
                     "candidates": candidates_meta,
+                    "faces": face_names,
+                    "n_unknown_faces": n_unknown_faces,
                 },
             )
             rendered = self.language.render(thought, emo)

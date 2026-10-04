@@ -3165,15 +3165,23 @@ fn test_v3_to_v4_migration_seeds_ions() {
     assert_eq!(core::mem::size_of::<GenesisCoreStateV3>(), 3296);
 
     let mut state = v3.into_current();
-    state.migrate_state(3).expect("v3 → v4 migration should succeed");
+    state
+        .migrate_state(3)
+        .expect("v3 → v4 migration should succeed");
 
     assert_eq!(state.header.version, SCHEMA_VERSION);
-    assert_eq!(state.header.state_size as usize, core::mem::size_of::<GenesisCoreState>());
+    assert_eq!(
+        state.header.state_size as usize,
+        core::mem::size_of::<GenesisCoreState>()
+    );
     assert!(state.verify().is_ok(), "migrated state should verify");
 
     // Ions start at physiological resting values, not at the
     // resting_intracellular constants being unreachable-by-accident.
-    assert!(state.ions.membrane_potential_mv < 0.0, "resting Vm is negative");
+    assert!(
+        state.ions.membrane_potential_mv < 0.0,
+        "resting Vm is negative"
+    );
     assert!(state.ions.atp_availability > 0.0);
     // Resting gradients are intact and chloride is inhibitory-tonic.
     // `calcium_signal` is normalized against resting Ca2+, so it is 0

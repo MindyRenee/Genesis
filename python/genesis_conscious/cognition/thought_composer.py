@@ -1695,6 +1695,21 @@ class ThoughtComposer:
                 cleaned = re.sub(r"^(might be |might )", "", cleaned)
                 if cleaned:
                     reasoned.append(f"by analogy, {cleaned}")
+            elif r.reasoning_type == ReasoningType.ABDUCTIVE:
+                # No connective, unlike the branches above: an abductive
+                # conclusion is already a full explanatory clause
+                # ("fire is a possible explanation for smoke"), not a
+                # bare noun phrase. Prefixing it with "it follows that"
+                # would be ungrammatical and would also misattribute the
+                # inference — abduction runs from an observation back to
+                # a candidate cause, the reverse of deduction.
+                #
+                # It carries its own hedge ("possible explanation"), and
+                # that hedge must survive: an inference to the best
+                # explanation is a guess ranked by evidence, not an
+                # established cause, and stating it flatly would be
+                # exactly the overclaim the wording avoids.
+                reasoned.append(cleaned)
             elif r.reasoning_type == ReasoningType.HYPOTHESIS:
                 # Preserve the "might" — hypotheses are speculative
                 # and must not be presented as established fact.
