@@ -543,9 +543,35 @@ class InnerLife:
 
     @property
     def thought_count(self) -> int:
-        """Total number of spontaneous thoughts generated since startup."""
+        """Total spontaneous thoughts generated since startup, dreams included.
+
+        ``_thoughts`` is a single deque holding both, and both paths
+        increment one counter, so this is a total and not a waking-only
+        figure. Use :attr:`waking_thought_count` when the distinction
+        matters — reporting this as "spontaneous thoughts" made a night of
+        dreaming look like a night of thinking.
+        """
         with self._thoughts_lock:
             return self._thought_count
+
+    @property
+    def waking_thought_count(self) -> int:
+        """Spontaneous thoughts recorded with ``is_dream`` unset.
+
+        The deque is capped, so this counts the retained window rather
+        than all time; it answers "how much of what I can still see was
+        thinking rather than dreaming", which is the question the merged
+        counter could not.
+        """
+        with self._thoughts_lock:
+            return sum(1 for t in self._thoughts if not getattr(t, "is_dream", False))
+
+    @property
+    def recent_dreams(self) -> list[SpontaneousThought]:
+        """The retained dreams, newest last. A filtered view, not a copy
+        of a separate store — there is only one deque."""
+        with self._thoughts_lock:
+            return [t for t in self._thoughts if getattr(t, "is_dream", False)]
 
     @property
     def recent_thoughts(self) -> list[SpontaneousThought]:
@@ -779,8 +805,7 @@ class InnerLife:
                 # not socially motivated. This replaces the fixed
                 # 45s question timer — it asks when it feels like
                 # reaching out, not because a clock said so.
-                summary = self._get_current_summary()
-                is_sleeping = self._is_currently_sleeping(summary) if summary else False
+                is_sleeping = self._sleep_state()
                 emotion = self._get_current_emotion()
 
                 if not self._paused and not is_sleeping and emotion:
@@ -1023,6 +1048,20 @@ class InnerLife:
             if not current_emotion:
                 break
 
+            # Stop the chain if sleep began. `_generate_chain` is only
+            # entered from the awake branch of the dispatcher, so nothing
+            # downstream re-checks: a chain can run up to
+            # MAX_CHAIN_LENGTH steps at CHAIN_THOUGHT_DELAY seconds each,
+            # and every one of those steps was a *waking* thought emitted
+            # while she was asleep, recorded with is_dream=False and fed
+            # to the agency topic pool as if she had meant it.
+            if self._sleep_state():
+                logger.debug(
+                    "chain %s interrupted at position %d: sleep onset",
+                    chain_id, i,
+                )
+                break
+
             # Generate the next thought, seeded by previous concepts
             thought = self._generate_seeded_thought(current_emotion, self._current_chain_concepts)
             if not thought:
@@ -1077,6 +1116,19 @@ class InnerLife:
             "nrem",
             "rem",
         )
+
+    def _sleep_state(self) -> bool:
+        """Whether she is asleep right now, from one place.
+
+        The dispatcher and the run loop both need this, and they used to
+        compute it separately — once as ``_is_currently_sleeping(summary)``
+        and once as ``_is_currently_sleeping(summary) if summary else
+        False``. The second form discarded the mind-flag fallback that
+        exists precisely for when the daemon read fails, so a transient
+        IPC error reported her awake and ran the social-drive and
+        curiosity branches mid-sleep. One accessor, one behavior.
+        """
+        return self._is_currently_sleeping(self._get_current_summary())
 
     def _is_currently_sleeping(self, summary) -> bool:
         """Check whether Genesis is currently asleep.
@@ -4969,8 +5021,14 @@ class InnerLife:
             # Convert to list for slicing (deque doesn't support negative slices)
             all_thoughts = list(self._thoughts)
             recent = all_thoughts[-n:] if n < len(all_thoughts) else all_thoughts
-            count = self._thought_count
-        parts = [f"{count} spontaneous thoughts"]
+            total = self._thought_count
+            dreams = sum(1 for t in all_thoughts if getattr(t, "is_dream", False))
+        # Report the two populations separately. One merged number made a
+        # night of dreams indistinguishable from a night of thinking.
+        parts = [
+            f"{total} spontaneous thoughts ({total - dreams} waking, "
+            f"{dreams} dream)"
+        ]
         for t in recent:
             chain_marker = ""
             if t.chain_position > 0:
@@ -5341,8 +5399,18 @@ class InnerLife:
 
         weight=None means no edge existed (novel connection, confidence 0.8).
         weight<0.2 means a weak edge (less surprising, confidence 0.7).
+
+        The emitted kind follows the thought that produced it. Insights
+        used to be announced as ``thought`` unconditionally, but
+        ``detect_insight`` runs on *every* recorded thought and a dream
+        always carries at least two concepts — so a night's dreaming
+        printed lines like ``genesis~ [thought] insight: novel connection X
+        and Y``, on the same stream as waking thoughts and
+        indistinguishable from them. Dream-derived observations belong to
+        the dream channel.
         """
         self._insight_count += 1
+        kind = "dream" if getattr(thought, "is_dream", False) else "thought"
         display1 = c1.replace("_", " ")
         display2 = c2.replace("_", " ")
         # Store the insight as a semantic fragment — the language
@@ -5355,7 +5423,9 @@ class InnerLife:
                 confidence=0.8,
                 actionable=False,
             )
-            self._emit("thought", f"insight: novel connection {c1} and {c2}")
+            self._emit(
+                kind, f"insight: novel connection {c1} and {c2}",
+            )
         else:
             insight = Insight(
                 type="pattern",
@@ -5364,7 +5434,7 @@ class InnerLife:
                 actionable=False,
             )
             self._emit(
-                "thought",
+                kind,
                 f"insight: weak connection {c1} and {c2} "
                 f"(weight: {weight:.2f})",
             )
@@ -5383,7 +5453,10 @@ class InnerLife:
                 if emotion is not None:
                     novel_thought = self._cognition.composer.compose_novel_connection(emotion)
                     if novel_thought is not None:
-                        self._emit("thought", f"composed: {novel_thought.content[:80]}")
+                        self._emit(
+                            kind,
+                            f"composed: {novel_thought.content[:80]}",
+                        )
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "genesis_conscious.sleep.inner_life._make_insight",
