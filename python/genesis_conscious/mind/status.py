@@ -875,7 +875,12 @@ class StatusMixin:
         self.growth_ledger.record(
             "inner_life", "thought_count",
             self.inner_life.thought_count,
-            f"Spontaneous thoughts: {self.inner_life.thought_count}",
+            # Say which population this is. The counter is merged, so a
+            # bare "Spontaneous thoughts: 412" after a night's sleep was
+            # mostly dreams wearing a thinking label.
+            f"Spontaneous thoughts: {self.inner_life.thought_count} total "
+            f"({self.inner_life.waking_thought_count} waking, "
+            f"{self.inner_life.dream_count} dream sequences)",
         )
         self.growth_ledger.record(
             "inner_life", "dream_count",
