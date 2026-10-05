@@ -1762,9 +1762,9 @@ def _serialize_td_learner(td_learner: TDLearner) -> dict[str, Any]:
             if not isinstance(key, tuple)
         },
         "action_traces": [
-            [concept, action, value]
-            for (concept, action), value in _snapshot(td_learner._traces.items)
-            if isinstance((concept, action), tuple)
+            [key[0], key[1], value]
+            for key, value in _snapshot(td_learner._traces.items)
+            if isinstance(key, tuple)
         ],
     }
 
