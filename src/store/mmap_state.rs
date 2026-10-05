@@ -690,7 +690,22 @@ impl MmapState {
         // SAFETY: same invariant as the reads above — `ptr` is a
         // valid, mmap'd, page-aligned region of exactly FILE_SIZE
         // bytes and read_volatile observes the actual content.
-        let snapshot = unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) };
+        let mut snapshot = unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) };
+        let old_checksum = snapshot.checksum;
+        snapshot.neurochemicals.recompute_derived();
+        snapshot.sync_neurochemistry_to_state();
+        snapshot.checksum = snapshot.compute_checksum();
+        if snapshot.checksum != old_checksum {
+            unsafe { Self::publish_stack(ptr, &snapshot) };
+            if let Err(e) = Self::do_msync(ptr, mapped_len()) {
+                unsafe {
+                    Self::unlock_file(fd);
+                    munmap(ptr as *mut c_void, mapped_len());
+                    close(fd);
+                }
+                return Err(e);
+            }
+        }
         let stored_phase = snapshot.neurochemicals.circadian_phase();
         let delta = (wall_phase - stored_phase).rem_euclid(1.0);
         let drift_phase = delta.min(1.0 - delta); // circular distance [0, 0.5]
