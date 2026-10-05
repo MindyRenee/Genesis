@@ -697,6 +697,12 @@ class ConceptNetwork(
         self._concept_ids_cache = None
         self._world_concept_ids_cache = None
         self._quality_concept_ids_cache = None
+        # Activation sparsity is a derived runtime index. The staged
+        # network may have a different active set, and retaining the old
+        # set here can make restored concepts disappear from cortical
+        # ticks until a full sweep happens.
+        self._active_ids = None
+        self._ticks_since_sweep = 0
         # The edge log outranks transplanted edges: once a canonical
         # log exists, its fold is the edge set — whatever the staged
         # network deserialized (legacy JSON projections included) is
