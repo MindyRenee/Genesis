@@ -308,7 +308,7 @@ class StatusMixin:
 
         Args:
             core_state: A pre-fetched CoreState to avoid a redundant
-                IPC round-trip and 3288-byte struct unpack. When
+                IPC round-trip and 3296-byte struct unpack. When
                 ``None`` (the common case), the state is fetched from
                 the daemon. Callers that already have a fresh CoreState
                 (e.g. ``warn()`` which fetches it once for threshold
