@@ -50,6 +50,7 @@ References:
 from __future__ import annotations
 
 import logging
+import math
 import re
 import time
 from dataclasses import dataclass, field
@@ -1357,6 +1358,14 @@ class SemanticMemory:
             except (KeyError, TypeError, ValueError) as e:
                 logger.warning(f"skipping malformed persisted fact: {e}")
                 continue
+            # Persistence is an untrusted boundary: reject non-finite
+            # confidence and impossible negative source counts before they
+            # can poison ranking or consolidation.
+            if not math.isfinite(fact.confidence):
+                raise ValueError("non-finite fact confidence")
+            fact.confidence = min(1.0, max(0.0, fact.confidence))
+            if fact.source_count < 0:
+                raise ValueError("negative fact source_count")
             self._facts[fact.key] = fact
             restored += 1
 
@@ -1364,7 +1373,7 @@ class SemanticMemory:
             if not isinstance(raw, dict) or "concept" not in raw:
                 continue
             try:
-                self._schemas[str(raw["concept"])] = Schema(
+                schema = Schema(
                     concept=str(raw["concept"]),
                     parts=set(raw.get("parts") or ()),
                     properties=set(raw.get("properties") or ()),
@@ -1375,6 +1384,12 @@ class SemanticMemory:
                     created_at=int(raw.get("created_at", 0)),
                     last_updated=int(raw.get("last_updated", 0)),
                 )
+                if schema.instances < 0:
+                    raise ValueError("negative schema instances")
+                if not math.isfinite(schema.abstraction_level):
+                    raise ValueError("non-finite schema abstraction_level")
+                schema.abstraction_level = min(1.0, max(0.0, schema.abstraction_level))
+                self._schemas[schema.concept.lower()] = schema
             except (TypeError, ValueError) as e:
                 logger.warning(f"skipping malformed persisted schema: {e}")
 
