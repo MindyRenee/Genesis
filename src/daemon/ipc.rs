@@ -1066,7 +1066,16 @@ impl IpcServer {
         let listener = match bind_result {
             Ok(l) => l,
             Err(e) => {
+                // IPC is a required control plane for the cognitive mind.
+                // A daemon that stays alive without its socket cannot be
+                // driven, observed, or shut down through its supported
+                // interface. Signal the daemon's shared shutdown flag so
+                // the main loop exits instead of leaving a headless process
+                // running until the CLI's startup timeout expires.
                 eprintln!("[ipc] failed to bind socket: {e}");
+                server
+                    .shutdown_flag
+                    .store(true, std::sync::atomic::Ordering::Release);
                 return;
             }
         };
