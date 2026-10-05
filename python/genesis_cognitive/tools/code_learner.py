@@ -1241,12 +1241,13 @@ class CodeLearner:
     def _add_python_call_edges(
         self, analysis: FileAnalysis, module_name: str,
     ) -> None:
-        """Add CALLS edges from the scoped analysis.
+        """Add CALLS edges from scoped callers to resolvable local symbols.
 
-        Callers resolve to real concept ids via _symbol_concept_id —
-        so a method's calls land on ``python:Class.method``, not on a
-        module-level namesake, and nested helpers attribute their calls
-        to the named callable that contains them.
+        The AST records callees as written (for example ``helper`` or
+        ``self.run``). Local definitions must be resolved to the same
+        module-scoped concept IDs used by the learner; otherwise the graph
+        silently points at disconnected concepts such as ``python:helper``.
+        Unresolved external/dynamic calls retain their written target.
         """
         symbol_by_qual = {s.qualified: s for s in analysis.symbols}
         for edge in analysis.call_edges:
@@ -1256,13 +1257,47 @@ class CodeLearner:
             owner = self._symbol_concept_id(owner_sym, module_name)
             if owner is None:
                 continue
+            target = self._resolve_python_callee(
+                edge.callee, edge.caller, analysis.symbols, module_name
+            )
             self.network.add_edge(
                 owner,
-                f"python:{edge.callee}",
+                target,
                 _REL_CALLS,
                 origin="observed",
             )
 
+    def _resolve_python_callee(
+        self,
+        callee: str,
+        caller_qualified: str,
+        symbols: list[Any],
+        module_name: str,
+    ) -> str:
+        """Resolve a locally defined Python callee to its concept ID."""
+        local = {
+            sym.qualified: sym
+            for sym in symbols
+            if sym.kind in ("function", "method")
+            and len(sym.qualified.split(".")) <= 3
+        }
+        caller_parts = caller_qualified.split(".")
+        candidates: list[str] = []
+        if callee.startswith("self.") and len(caller_parts) >= 3:
+            candidates.append(".".join(caller_parts[:-1] + [callee.split(".", 1)[1]]))
+        elif "." not in callee:
+            candidates.extend((
+                f"{module_name}.{callee}",
+                f"{caller_qualified.rsplit('.', 1)[0]}.{callee}"
+                if len(caller_parts) >= 3 else "",
+            ))
+        else:
+            candidates.append(f"{module_name}.{callee}")
+        for qualified in candidates:
+            if qualified and qualified in local:
+                sym = local[qualified]
+                return self._symbol_concept_id(sym, module_name) or f"python:{qualified}"
+        return f"python:{callee}"
     @staticmethod
     def _name_from_node(node: ast.expr) -> str | None:
         """Extract a dotted name from an AST expression."""
