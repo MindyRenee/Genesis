@@ -337,16 +337,13 @@ class ActingLoop:
         return intention
 
     def _activate_executive_intention(self, intention: Intention) -> ExecutiveIntention | None:
-        """Submit the actuator candidate to the executive for arbitration."""
+        """Arbitrate the already-registered candidate against unfinished objectives."""
         if self.executive is None:
             return None
-        self.executive.form_intention(
-            f"{intention.kind}:{intention.target}",
-            reason=intention.origin,
-            priority=0.75 if intention.origin in {"agency", "curiosity"} else 0.35,
-            confidence=0.7 if intention.origin == "agency" else 0.55,
-            expected_outcome=self._expected_outcome(intention),
-        )
+        # The candidate was registered by propose(). Do not register it again:
+        # form_intention updates an existing objective, but repeating the call
+        # obscures the single candidate → arbitration boundary and can overwrite
+        # fields that a future executive implementation may update between them.
         # The executive owns the objective set. Include unfinished prior
         # objectives so failed or interrupted work can outrank a fresh probe.
         return self.executive.select_intention(
