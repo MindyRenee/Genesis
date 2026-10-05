@@ -1122,6 +1122,17 @@ impl IpcServer {
             }
         };
 
+        // The bind succeeded: this instance now owns the endpoint.
+        // Set ownership before entering the accept loop so Drop can safely
+        // clean up the socket on every normal return path.
+        server
+            .owns_socket
+            .store(true, std::sync::atomic::Ordering::Release);
+        eprintln!(
+            "[ipc] listening on {}",
+            server.socket_path.display()
+        );
+
         // Set non-blocking so we can poll for shutdown
         let _ = listener.set_nonblocking(true);
         let mut client_threads = Vec::new();
