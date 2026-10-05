@@ -125,12 +125,22 @@ class _LiveEvent:
     constructing a full ``SpontaneousThought``.
     """
 
-    __slots__ = ("chain_position", "content", "intent", "trigger")
+    # `is_dream` is load-bearing, not decorative: `_on_spontaneous_thought`
+    # *recomputes* the stream kind from these attributes
+    # (`is_dream = getattr(thought, "is_dream", False)`) rather than
+    # trusting the kind passed to `_emit`. Without the attribute every
+    # dream-derived event silently became kind="thought" again — which is
+    # exactly the bug the dream-channel work was supposed to fix, and
+    # which only a live run caught.
+    __slots__ = ("chain_position", "content", "intent", "is_dream", "trigger")
 
-    def __init__(self, content: str, trigger: str) -> None:
+    def __init__(
+        self, content: str, trigger: str, is_dream: bool = False,
+    ) -> None:
         """Create a minimal thought-like event for the callback."""
         self.content = content
         self.trigger = trigger
+        self.is_dream = is_dream
         self.intent = "statement"
         self.chain_position = 0
 
@@ -495,12 +505,20 @@ class InnerLife:
         self._synthesis_done_this_rem = False
 
 
-    def _emit(self, kind: str, content: str) -> None:
-        """Send a live event to the thought callback (if connected)."""
+    def _emit(
+        self, kind: str, content: str, is_dream: bool = False,
+    ) -> None:
+        """Send a live event to the thought callback (if connected).
+
+        ``is_dream`` must be passed for anything derived from a dream.
+        The receiver *recomputes* the stream kind from the event's
+        attributes rather than trusting the ``kind`` string, so leaving
+        this False re-labels dream content as a waking thought.
+        """
         if not self._on_thought:
             return
         try:
-            self._on_thought(_LiveEvent(content, kind))
+            self._on_thought(_LiveEvent(content, kind, is_dream))
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "genesis_conscious.sleep.inner_life._emit",
@@ -1381,6 +1399,7 @@ class InnerLife:
                         "dream_insight",
                         f"dream synthesis: {p.source} {p.relation.value} {p.target} "
                         f"(similarity: {p.structural_similarity:.2f})",
+                        is_dream=True,
                     )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
@@ -1406,6 +1425,7 @@ class InnerLife:
                         f"dream insight validated: {r.proposal.source} "
                         f"{r.proposal.relation.value} {r.proposal.target} "
                         f"— {r.reason}",
+                        is_dream=True,
                     )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
@@ -1434,6 +1454,7 @@ class InnerLife:
                 "dream",
                 f"lucid dream #{self._lucid_dream_count} "
                 f"(probability: {lucid_prob:.3f})",
+                is_dream=True,
             )
         return is_lucid
 
@@ -5445,7 +5466,8 @@ class InnerLife:
         the dream channel.
         """
         self._insight_count += 1
-        kind = "dream" if getattr(thought, "is_dream", False) else "thought"
+        is_dream = bool(getattr(thought, "is_dream", False))
+        kind = "dream" if is_dream else "thought"
         display1 = c1.replace("_", " ")
         display2 = c2.replace("_", " ")
         # Store the insight as a semantic fragment — the language
@@ -5459,7 +5481,9 @@ class InnerLife:
                 actionable=False,
             )
             self._emit(
-                kind, f"insight: novel connection {c1} and {c2}",
+                kind,
+                f"insight: novel connection {c1} and {c2}",
+                is_dream=is_dream,
             )
         else:
             insight = Insight(
@@ -5472,6 +5496,7 @@ class InnerLife:
                 kind,
                 f"insight: weak connection {c1} and {c2} "
                 f"(weight: {weight:.2f})",
+                is_dream=is_dream,
             )
         thought.insight = insight
         # When a novel connection is discovered, try to compose a
@@ -5491,6 +5516,7 @@ class InnerLife:
                         self._emit(
                             kind,
                             f"composed: {novel_thought.content[:80]}",
+                            is_dream=is_dream,
                         )
             except Exception as e:  # noqa: BLE001
                 note_swallowed(

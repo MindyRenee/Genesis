@@ -156,6 +156,11 @@ class FaceRecognizer:
             self._get_detector()
             self._get_recognizer()
             self._available = True
+        except (OSError, FileNotFoundError, ImportError) as e:
+            # Face models not installed — a capability probe answering
+            # "absent", not a swallowed failure.
+            logger.debug("face recognition unavailable: %s", e)
+            self._available = False
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "genesis_conscious.perception.recognition.is_available",

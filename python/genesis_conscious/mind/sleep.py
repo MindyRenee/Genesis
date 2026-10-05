@@ -1111,8 +1111,15 @@ class SleepMixin:
         if self._is_sleeping:
             return False
         try:
-            phase = self.client.get_phase().emergent_phase
-        except (OSError, ConnectionError, ValueError) as e:
+            # `PhaseInfo` carries `phase` (an int code). It has no
+            # `emergent_phase` — that field belongs to `CoreState`, a
+            # different object. Reading it raised AttributeError, which
+            # this handler does not catch, so the desync check escaped to
+            # the heartbeat and has been dead since it was written: the
+            # "mind awake, daemon asleep" fault it exists to record was
+            # silently never detected.
+            phase = self.client.get_phase().phase
+        except (OSError, ConnectionError, ValueError, AttributeError) as e:
             note_swallowed(
                 "genesis_conscious.mind.sleep._check_sleep_desync",
                 e,

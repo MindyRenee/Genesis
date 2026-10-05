@@ -3686,3 +3686,82 @@ def test_clean_noise_never_deletes_while_an_archive_is_attached() -> None:
     for cid in (f"fragment_{i}" for i in range(10)):
         assert net._archive.has_concept(cid), f"{cid} was lost, not archived"
     net._archive.close()
+
+
+# ── Reading the archive must not consume it ─────────────────────────
+#
+# `recall_concept` is a move: it deletes the archive row on the
+# assumption the concept is landing in working memory and will be
+# persisted. Verifying a recovery with it destroyed four concepts before
+# `peek_concept` existed, because nothing was saved afterwards.
+
+
+def test_peek_concept_does_not_consume() -> None:
+    """A read of archived data must leave the archive intact."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        archive = open_archive(tmpdir)
+        archive.archive_concept("frag", {"id": "frag", "confidence": 0.4}, set())
+        assert archive.count() == 1
+
+        peeked = archive.peek_concept("frag")
+        assert peeked is not None and peeked["id"] == "frag"
+        assert archive.count() == 1, "peek consumed the concept"
+        # And repeatedly — inspection must be idempotent.
+        assert archive.peek_concept("frag") is not None
+        assert archive.count() == 1
+        archive.close()
+
+
+def test_peek_missing_concept_returns_none() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        archive = open_archive(tmpdir)
+        assert archive.peek_concept("absent") is None
+        archive.close()
+
+
+def test_recall_is_still_a_move() -> None:
+    """The destructive path stays destructive — that is its job.
+
+    Pinned so the split cannot be 'fixed' by quietly making recall a copy:
+    the live recall path relies on the row being deleted, and
+    `dedupe_archive` exists to clean up the duplicate that leaving it
+    behind would create.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        archive = open_archive(tmpdir)
+        archive.archive_concept("moved", {"id": "moved", "confidence": 0.4}, {"alias"})
+        assert archive.count() == 1
+
+        data = archive.recall_concept("moved")
+        assert data is not None
+        assert archive.count() == 0, "recall must consume the archive row"
+        archive.close()
+
+
+def test_network_get_concept_does_not_consume_the_archive() -> None:
+    """The end-to-end hazard: resolving a name must not archive-delete it.
+
+    `get_concept` is what inspection and reporting call. If resolving an
+    archived name emptied the archive, then any read-only pass over her
+    knowledge would quietly erode it.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        net = _make_network_with_archive(tmpdir)
+        net.add_concept("resident", confidence=0.5, origin="learned")
+        resident = net.get_concept("resident")
+        assert resident is not None
+        net._archive.archive_concept(
+            "resident", net._concept_to_dict(resident), set(),
+        )
+        archived_before = net.archive_size
+        working_before = net.size
+        assert archived_before == 1
+
+        for _ in range(3):
+            net.get_concept("resident")
+
+        assert net.archive_size == 1, (
+            f"archive went {archived_before} -> {net.archive_size} by reading"
+        )
+        assert net.size == working_before
+        net._archive.close()

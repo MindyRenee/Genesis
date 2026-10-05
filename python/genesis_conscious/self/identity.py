@@ -758,10 +758,39 @@ class EmergentIdentity:
             )
 
         # What kinds of questions does it ask?
+        #
+        # `generate_questions` requires a real EmotionalState — it reads
+        # `emotion.alertness`, `.plasticity`, `.valence` and `.creativity`
+        # to score curiosity. Passing None here (the old comment said "may
+        # need an emotion; handle gracefully") raised
+        # `AttributeError: 'NoneType' object has no attribute 'alertness'`
+        # on every identity synthesis, so this source was silently empty
+        # for the life of the process — one of the four inputs to what she
+        # thinks she cares about.
+        #
+        # A neutral baseline is the right substitute: curiosity scoring
+        # wants an emotional context, and "no context" is a midpoint, not
+        # an absence of one. The alternative — weakening the callee's
+        # signature to Optional — would have hidden the real mistake at
+        # every other call site too.
+        from ..limbic_system.emotion import EmotionalState
+
+        neutral_emotion = EmotionalState(
+            label="neutral",
+            nuance="present",
+            cognitive_style="balanced",
+            verbosity=1.0,
+            formality=0.5,
+            openness_to_engage=1.0,
+            creativity=0.5,
+            caution=0.2,
+            alertness=0.5,
+            valence=0.0,
+            plasticity=0.5,
+            cause="",
+        )
         try:
-            questions = curiosity.generate_questions(
-                emotion=None,  # may need an emotion; handle gracefully
-            )
+            questions = curiosity.generate_questions(emotion=neutral_emotion)
             if questions:
                 # Categorize by question type
                 topics = set()

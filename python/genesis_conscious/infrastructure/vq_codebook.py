@@ -417,7 +417,7 @@ class VQCodebook:
     def find_merge_candidates(
         self,
         threshold: float,
-        limit: int | None = None,
+        limit: int | None = 32,
     ) -> list[tuple[str, str, float]]:
         """Closest within-prototype pairs, as (concept_a, concept_b, distance).
 
@@ -425,11 +425,13 @@ class VQCodebook:
 
         Args:
             threshold: Maximum L2 distance to be considered a candidate.
-            limit: Return at most this many, the closest. ``None`` returns
-                every pair under the threshold, which is unbounded and was
-                the reason the N3 quantize pass took over two minutes.
-                Use :meth:`count_merge_candidates` when only the number
-                matters.
+            limit: Return at most this many, the closest. Defaults to 32
+                because the unbounded case is a trap: with ~12k concepts
+                in few prototypes it returns 7.7M tuples and took 142 s of
+                a 175 s sleep pass, and the one caller that hit it only
+                wanted a count. Pass ``limit=None`` to deliberately get
+                everything. Use :meth:`count_merge_candidates` when only
+                the number matters — it allocates nothing.
         """
         if not self.is_trained:
             return []

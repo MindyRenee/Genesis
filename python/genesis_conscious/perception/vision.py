@@ -174,6 +174,12 @@ class Vision:
             try:
                 img = latest_frame(copy=True)
                 self._available = img is not None and img.size > 0
+            except (OSError, FileNotFoundError) as e:
+                # No frame on disk — no camera, or the retina is not
+                # running. That is the documented text-only degradation,
+                # so it must not be tallied beside genuine faults.
+                logger.debug("no vision frame available: %s", e)
+                self._available = False
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "genesis_conscious.perception.vision.is_available",
