@@ -517,6 +517,13 @@ class CodeLearner:
                     removed += 1
             except Exception as exc:  # noqa: BLE001
                 logger.debug("failed retiring stale code symbol %s: %s", concept_id, exc)
+        # A spilled copy is long-term memory, not merely a cache. Purge the
+        # obsolete symbol there too, otherwise the next add_concept() can
+        # transparently recall the old definition instead of learning the
+        # changed source as new evidence.
+        purge = getattr(self.network, "purge_archived_concepts", None)
+        if callable(purge) and stale:
+            purge(stale)
         return removed
 
     def learn_file(self, filepath: str, *, force: bool = False) -> FileLearningResult:
