@@ -728,12 +728,14 @@ def unpack_recent_episodes(data: bytes) -> list[RecentEpisode]:
     return results
 
 
-# ─── CoreState (partial parse of 3296 bytes) ──────────────────
+# ─── CoreState (partial parse of 3416 bytes) ──────────────────
 #
-# We don't parse the full 3296-byte struct — that's too much detail
+# We don't parse the full 3416-byte struct — that's too much detail
 # for the Python side. Instead we extract the most useful fields.
 #
-# Layout (schema v3, 18 chemicals):
+# Layout (schema v4, 18 chemicals). Note the ion block: v4 inserted it
+# immediately before the checksum, so everything from 3224 onward moved
+# and the v3 offsets are wrong for a v4 reply:
 #   offset  field              type           size
 #   0       header             CoreStateHeader  56
 #   56      neurochemicals     NeurochemicalVector  2416
@@ -749,9 +751,10 @@ def unpack_recent_episodes(data: bytes) -> list[RecentEpisode]:
 #   2472    zones              ActiveZones         96
 #   2568    memory             MemoryPointers      120
 #   2688    manifest           RuntimeManifest     536
-#   3224    checksum           u32                 4
-#   3228    inference_signals  InferenceSignals    64
-#   3296    TOTAL
+#   3224    ions               IonState           124
+#   3348    checksum           u32                 4
+#   3352    inference_signals  InferenceSignals    64
+#   3416    TOTAL
 
 
 @dataclass(frozen=True)
@@ -786,7 +789,7 @@ class CoreState:
     stm_count: int
     ltm_episode_count: int
 
-    # The generative self-model's projection (offset 3228, 64 bytes).
+    # The generative self-model's projection (offset 3352, 64 bytes).
     #
     # Exposed so the mind can *observe* how its own model is doing
     # without having to ask the daemon to run physics in order to get
@@ -804,19 +807,21 @@ class CoreState:
 
     @classmethod
     def unpack(cls, data: bytes) -> CoreState:
-        """Parse the 3296-byte GenesisCoreState into useful fields.
+        """Parse the 3416-byte GenesisCoreState into useful fields.
 
-        Layout (schema v3, 18 chemicals, 3296 bytes):
+        Layout (schema v4, 18 chemicals, 3416 bytes). The ion block at
+        3224 is what v4 added, and it displaced the checksum and the
+        inference signals that followed it:
           offset  field           size
           0       header           56
           56      neurochemicals   2416
           2472    zones            96
           2568    memory           120
           2688    manifest         536
-          3224    checksum         4
-          3228    inference_signals 64
-          3292    padding (8-byte alignment) 4
-          3296    TOTAL
+          3224    ions             124
+          3348    checksum         4
+          3352    inference_signals 64
+          3416    TOTAL
 
         NeurochemicalVector internal layout:
           offset  field              size
@@ -830,8 +835,8 @@ class CoreState:
           ...
           2412    emergent_phase     1
         """
-        if len(data) < 3296:
-            raise ValueError(f"CoreState needs 3296 bytes, got {len(data)}")
+        if len(data) < 3416:
+            raise ValueError(f"CoreState needs 3416 bytes, got {len(data)}")
 
         created_at, last_updated, heartbeat, instance_id = _unpack_header(data)
         global_tone, arousal, valence, plasticity_gate, chemicals = _unpack_neuro_summary(data)
@@ -861,7 +866,7 @@ class CoreState:
 
 
 def _unpack_inference_signals(data: bytes) -> InferenceSummary | None:
-    """Unpack the 64-byte InferenceSignals block at offset 3228.
+    """Unpack the 64-byte InferenceSignals block at offset 3352.
 
     Layout (see `InferenceSignals` in src/state/inference.rs)::
 
@@ -889,7 +894,13 @@ def _unpack_inference_signals(data: bytes) -> InferenceSummary | None:
     raced a writer can also come back short, and losing the block is far
     better than losing the whole snapshot.
     """
-    offset = 3228
+    # 3352, not the v3 offset of 3228: schema v4 inserted the 124-byte
+    # ion block at 3224, which pushed the checksum and this block later.
+    # Reading 3228 in a v4 reply lands inside IonState, so the parse
+    # succeeded and returned ion concentrations labelled as inference
+    # signals — plausible numbers feeding the regulator rather than an
+    # error. Allostasis load came back as 1.2 against a true 0.78.
+    offset = 3352
     if len(data) < offset + 64:
         return None
     block = data[offset : offset + 64]
