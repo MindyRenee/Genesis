@@ -1174,6 +1174,15 @@ def restore_spaced_repetition(
 def restore_td_learner(td_learner: TDLearner, data: dict[str, Any]) -> None:
     """Restore TD learner from saved data."""
     td_learner._weights = dict(data.get("weights", {}))
+    # Action-conditioned weights use a list representation because tuple
+    # keys are not valid JSON object keys.
+    td_learner._action_weights = {}
+    for item in data.get("action_weights", []):
+        try:
+            concept, action, weight = item
+            td_learner._action_weights[(str(concept), str(action))] = float(weight)
+        except (TypeError, ValueError):
+            continue
     # Restore transition history
     for t_data in data.get("history", []):
         transition = TDTransition(
@@ -1192,9 +1201,17 @@ def restore_td_learner(td_learner: TDLearner, data: dict[str, Any]) -> None:
     lam = data.get("lam", 0.0)
     if 0.0 <= lam <= 1.0:
         td_learner.lam = lam
-    td_learner._traces = {
-        str(k): float(v) for k, v in data.get("traces", {}).items()
-    }
+    # Restore both legacy concept traces and action-conditioned traces.
+    td_learner._traces = {}
+    traces = data.get("traces", {})
+    if isinstance(traces, dict):
+        td_learner._traces = {str(k): float(v) for k, v in traces.items()}
+    for item in data.get("action_traces", []):
+        try:
+            concept, action, value = item
+            td_learner._traces[(str(concept), str(action))] = float(value)
+        except (TypeError, ValueError):
+            continue
 
 
 def restore_synapses(synapses: SynapticStore, data: dict[str, Any]) -> None:
@@ -1720,6 +1737,10 @@ def _serialize_td_learner(td_learner: TDLearner) -> dict[str, Any]:
     """Serialize TD learner to a dict."""
     return {
         "weights": dict(_snapshot(td_learner._weights.items)),
+        "action_weights": [
+            [concept, action, weight]
+            for (concept, action), weight in _snapshot(td_learner._action_weights.items)
+        ],
         "history": [
             {
                 "state": list(t.state),
@@ -1735,7 +1756,16 @@ def _serialize_td_learner(td_learner: TDLearner) -> dict[str, Any]:
         "total_positive_rpe": td_learner.total_positive_rpe,
         "total_negative_rpe": td_learner.total_negative_rpe,
         "lam": td_learner.lam,
-        "traces": dict(_snapshot(td_learner._traces.items)),
+        "traces": {
+            str(key): value
+            for key, value in _snapshot(td_learner._traces.items)
+            if not isinstance(key, tuple)
+        },
+        "action_traces": [
+            [concept, action, value]
+            for (concept, action), value in _snapshot(td_learner._traces.items)
+            if isinstance((concept, action), tuple)
+        ],
     }
 
 
