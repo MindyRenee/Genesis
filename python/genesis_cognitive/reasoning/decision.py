@@ -312,7 +312,7 @@ class DecisionEngine:
 
         # 1. Generate candidates.
         candidates = self._generate_candidates(
-            default_action, perception_intent, reasoning_results,
+            default_action, perception_intent, reasoning_results, goals,
         )
 
         # 2. Evaluate each candidate.
@@ -450,6 +450,7 @@ class DecisionEngine:
         default_action: ActionType,
         perception_intent: str,
         reasoning_results: list[ReasoningResult],
+        goals: list[str],
     ) -> list[CandidateAction]:
         """Generate candidate actions for the current context.
 
@@ -486,6 +487,14 @@ class DecisionEngine:
         # If there are reasoning results, answering is viable.
         if reasoning_results:
             add(ActionType.ANSWER)
+
+        # Active goals make investigation a legitimate alternative.
+        # Without this candidate, the scoring code for INVESTIGATE is
+        # unreachable unless an upstream component preselects it as the
+        # default action, so the decision engine cannot actually choose
+        # investigation from among alternatives.
+        if goals:
+            add(ActionType.INVESTIGATE)
 
         # If there are no reasoning results, asking is viable.
         if not reasoning_results:
