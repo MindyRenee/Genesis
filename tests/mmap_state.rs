@@ -112,6 +112,36 @@ fn test_open_existing_state_file() {
     cleanup(&path);
 }
 
+#[test]
+fn test_open_recomputes_stale_neurochemical_derived_state() {
+    let path = temp_path("open_recompute_derived");
+
+    // Persist a valid state whose primary chemical levels are intact but
+    // whose derived valence has been made stale. modify() recomputes the
+    // checksum, so this is a valid file that an integrity check accepts.
+    let expected_valence;
+    {
+        let mmap = MmapState::create(&path, 1, now_ms()).expect("create");
+        expected_valence = mmap.read().neurochemicals.valence;
+        assert!(expected_valence > 0.0);
+        mmap.modify(now_ms(), |state| {
+            state.neurochemicals.valence = 0.0;
+        })
+        .expect("persist stale derived value");
+        assert_eq!(mmap.read().neurochemicals.valence, 0.0);
+        assert!(mmap.read().verify_checksum().is_ok());
+    }
+
+    // Reopening must derive valence from the persisted primary chemistry
+    // before the mapping is exposed to IPC/cognitive readers.
+    let mmap = MmapState::open(&path).expect("open should repair derived state");
+    let repaired = mmap.read().neurochemicals.valence;
+    assert!((repaired - expected_valence).abs() < f32::EPSILON);
+    assert!(mmap.read().verify_checksum().is_ok());
+
+    cleanup(&path);
+}
+
 // ─── open_or_create ───────────────────────────────────────────
 
 #[test]
