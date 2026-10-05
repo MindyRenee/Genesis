@@ -340,10 +340,8 @@ fn main() {
         }
     };
 
-    eprintln!(
-        "[genesis] IPC server listening on {}",
-        config.socket_path.display()
-    );
+    // IpcServer reports readiness only after bind succeeds. Do not claim
+    // the endpoint is listening from the spawning thread.
     eprintln!("[genesis] Lease mode — mind-driven when alive, autonomous fallback when silent.");
     eprintln!("[genesis] Mind holds a 3 s lease via reactive IPC; past it the daemon drives itself.");
 
