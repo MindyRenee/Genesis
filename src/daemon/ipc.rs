@@ -1337,7 +1337,7 @@ impl IpcClient {
         Ok(!resp.is_empty() && resp[0] == 1)
     }
 
-    /// Get the full core state (3288 bytes).
+    /// Get the full core state (3296 bytes).
     pub fn get_state(&mut self) -> std::io::Result<GenesisCoreState> {
         let resp = self.request(cmd::GET_STATE, &[])?;
         if resp.len() < core::mem::size_of::<GenesisCoreState>() {
