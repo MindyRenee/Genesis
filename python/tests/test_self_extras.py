@@ -603,7 +603,7 @@ def test_python_structural_enrichment_uses_scoped_ids(tmp_path):
         "python:module.Worker.run", direction="out"
     )
     assert any(edge.relation == RelationType.CALLS for edge in edges)
-    assert any(edge.target_id == "python:helper" for edge in edges)
+    assert any(edge.target_id == "python:module.helper" for edge in edges)
 
 def test_python_class_concepts_are_module_scoped(tmp_path):
     """Same-named classes in different modules must remain distinct."""
