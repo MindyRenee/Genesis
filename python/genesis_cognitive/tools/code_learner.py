@@ -1294,7 +1294,7 @@ class CodeLearner:
         caller_parts = caller_qualified.split(".")
         candidates: list[str] = []
         if callee.startswith("self.") and len(caller_parts) >= 3:
-            candidates.append(".".join(caller_parts[:-1] + [callee.split(".", 1)[1]]))
+            candidates.append(".".join([*caller_parts[:-1], callee.split(".", 1)[1]]))
         elif "." not in callee:
             candidates.extend((
                 f"{module_name}.{callee}",
