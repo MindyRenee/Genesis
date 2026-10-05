@@ -344,6 +344,90 @@ class DualSystemLearner:
         results.sort(key=lambda x: -x[1])
         return results
 
+    def serialize_state(self) -> dict:
+        """Serialize dual-system memory for persistence across restarts."""
+        with self._lock:
+            return {
+                "version": 1,
+                "fast_store": [
+                    {
+                        "key": ep.key,
+                        "pattern": ep.pattern.tolist(),
+                        "content": ep.content,
+                        "timestamp": ep.timestamp,
+                        "replay_count": ep.replay_count,
+                        "consolidated": ep.consolidated,
+                    }
+                    for ep in self._fast_store
+                ],
+                "slow_store": [
+                    {
+                        "key": mem.key,
+                        "pattern": mem.pattern.tolist(),
+                        "strength": mem.strength,
+                        "episode_count": mem.episode_count,
+                        "last_updated": mem.last_updated,
+                    }
+                    for mem in self._slow_store.values()
+                ],
+                "total_encoded": self.total_encoded,
+                "total_consolidated": self.total_consolidated,
+            }
+
+    def restore_state(self, data: dict) -> None:
+        """Restore dual-system memory from a persisted state dictionary.
+
+        Invalid or dimension-mismatched patterns are rejected rather than
+        silently creating a corrupted memory substrate. Runtime capacity
+        limits still apply when restoring the fast store.
+        """
+        if not isinstance(data, dict):
+            raise ValueError("dual-system state must be a dictionary")
+        if data.get("version", 1) != 1:
+            raise ValueError(f"unsupported dual-system state version: {data.get('version')}")
+
+        def pattern_from(value: object) -> np.ndarray:
+            if not isinstance(value, list) or len(value) != self.pattern_dim:
+                raise ValueError("dual-system pattern has incorrect dimension")
+            pattern = np.asarray(value, dtype=np.float32)
+            if not np.all(np.isfinite(pattern)):
+                raise ValueError("dual-system pattern contains non-finite values")
+            return pattern
+
+        fast: list[HippocampalEpisode] = []
+        for item in data.get("fast_store", []):
+            if not isinstance(item, dict):
+                raise ValueError("invalid hippocampal episode")
+            fast.append(
+                HippocampalEpisode(
+                    key=str(item["key"]),
+                    pattern=pattern_from(item["pattern"]),
+                    content=str(item["content"]),
+                    timestamp=int(item["timestamp"]),
+                    replay_count=max(0, int(item.get("replay_count", 0))),
+                    consolidated=bool(item.get("consolidated", False)),
+                )
+            )
+
+        slow: dict[str, NeocorticalMemory] = {}
+        for item in data.get("slow_store", []):
+            if not isinstance(item, dict):
+                raise ValueError("invalid neocortical memory")
+            key = str(item["key"])
+            slow[key] = NeocorticalMemory(
+                key=key,
+                pattern=pattern_from(item["pattern"]),
+                strength=float(item["strength"]),
+                episode_count=max(0, int(item["episode_count"])),
+                last_updated=int(item["last_updated"]),
+            )
+
+        with self._lock:
+            self._fast_store = fast[-self.fast_capacity:]
+            self._slow_store = slow
+            self.total_encoded = max(0, int(data.get("total_encoded", len(fast))))
+            self.total_consolidated = max(0, int(data.get("total_consolidated", 0)))
+
     def get_statistics(self) -> dict[str, int | float]:
         """Return statistics about both learning systems."""
         with self._lock:
