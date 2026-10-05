@@ -1474,10 +1474,27 @@ class CognitionEngine:
                 learner.connect_word_to_category(word, "plasticity", state)
 
     def _build_meta_emotion(self) -> EmotionalState:
-        """Build a neutral, present emotional state for fast meta routes."""
+        """Read Genesis's current substrate state for fast meta routes.
+
+        Meta-cognitive routes must not substitute a synthetic neutral state
+        for Genesis's actual interoceptive state. Prefer the latest summary,
+        refreshing it from the daemon when possible. A connection failure may
+        use the last known state; only when no state has ever been observed do
+        we use the structural neutral fallback.
+        """
+        summary = self._last_summary
+        try:
+            summary = self.client.get_neuro_summary(timeout=2.0)
+            self._last_summary = summary
+        except (OSError, ConnectionError, RuntimeError, AttributeError):
+            pass
+
+        if summary is not None:
+            return assess_emotion(summary)
+
         return EmotionalState(
             label="neutral",
-            nuance="present",
+            nuance="unavailable",
             cognitive_style="balanced",
             verbosity=1.0,
             formality=0.5,
@@ -1487,7 +1504,7 @@ class CognitionEngine:
             alertness=0.5,
             valence=0.0,
             plasticity=0.5,
-            cause="",
+            cause="substrate_unavailable",
         )
 
     def _meta_cognitive_respond(
