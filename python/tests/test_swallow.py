@@ -41,7 +41,7 @@ def _clean_tallies():
 def test_first_failure_is_always_recorded(tmp_path):
     """The first failure of a site is never suppressed."""
     journal = CognitiveJournal(tmp_path)
-    set_swallow_sink(lambda site, count: journal.record(
+    set_swallow_sink(lambda site, count, exc: journal.record(
         "error", site, site=site, count=count
     ))
     try:
@@ -66,7 +66,7 @@ def test_repeat_failures_are_bounded_not_transcribed(tmp_path):
     86,400 lines a day and bury everything worth reading.
     """
     journal = CognitiveJournal(tmp_path)
-    set_swallow_sink(lambda site, count: journal.record(
+    set_swallow_sink(lambda site, count, exc: journal.record(
         "error", site, site=site, count=count
     ))
     try:
@@ -140,7 +140,7 @@ def test_failing_sink_does_not_raise():
     nothing.
     """
 
-    def exploding_sink(site: str, count: int) -> None:
+    def exploding_sink(site: str, count: int, exc: BaseException) -> None:
         raise RuntimeError("journal is on fire")
 
     set_swallow_sink(exploding_sink)
@@ -166,7 +166,7 @@ def test_time_based_report_keeps_the_record_current(tmp_path, monkeypatch):
     the record trustworthy rather than merely bounded.
     """
     journal = CognitiveJournal(tmp_path)
-    set_swallow_sink(lambda site, count: journal.record(
+    set_swallow_sink(lambda site, count, exc: journal.record(
         "error", site, site=site, count=count
     ))
     try:
@@ -186,3 +186,51 @@ def test_time_based_report_keeps_the_record_current(tmp_path, monkeypatch):
         for line in (tmp_path / "cognitive_journal.jsonl").read_text().splitlines()
     ]
     assert events[-1]["count"] == 10, "the final record must carry the true count"
+
+
+def test_sink_receives_the_exception() -> None:
+    """A failure record must say *what* failed, not just that it did.
+
+    The sink used to receive `(site, count)`, so a site failing on every
+    cycle for a day produced 79 journal lines that said only "this site
+    failed 79 times". The exception was logged at DEBUG and nowhere else,
+    which made a recurring failure undiagnosable from the durable record —
+    and that is exactly the case the journal exists for.
+    """
+    seen: list[tuple[str, int, str]] = []
+
+    set_swallow_sink(lambda site, count, exc: seen.append((site, count, repr(exc))))
+    note_swallowed("mod.boom", ValueError("the actual cause"))
+    set_swallow_sink(None)
+
+    assert len(seen) == 1
+    site, count, exc_repr = seen[0]
+    assert site == "mod.boom"
+    assert count == 1
+    assert "the actual cause" in exc_repr, (
+        f"the exception must reach the durable sink, got {exc_repr!r}"
+    )
+
+
+def test_journal_error_record_carries_the_exception(tmp_path) -> None:
+    """End to end through the real journal sink shape."""
+    from genesis_conscious.infrastructure.journal import CognitiveJournal
+
+    j = CognitiveJournal(tmp_path)  # takes the data *directory*
+    j.record(
+        "error",
+        f"mod.boom failed and was swallowed: {KeyError('k')!r}",
+        site="mod.boom",
+        count=1,
+        error=repr(KeyError("k")),
+        error_type="KeyError",
+    )
+    j.close()
+
+    import json
+
+    lines = (tmp_path / "cognitive_journal.jsonl").read_text().strip().splitlines()
+    event = json.loads(lines[-1])
+    assert event["error_type"] == "KeyError"
+    assert "'k'" in event["error"]
+    assert "KeyError" in event["text"], "the human-readable line names the cause too"

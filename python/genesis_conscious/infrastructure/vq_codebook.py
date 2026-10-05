@@ -423,16 +423,31 @@ class VQCodebook:
         for _pid, indices in proto_groups.items():
             if len(indices) < 2:
                 continue
-            for i in range(len(indices)):
-                for j in range(i + 1, len(indices)):
-                    a, b = indices[i], indices[j]
-                    dist = float(np.linalg.norm(recon[a] - recon[b]))
-                    if dist < threshold:
-                        candidates.append((
-                            self._concept_names[a],
-                            self._concept_names[b],
-                            dist,
-                        ))
+            block = recon[indices]
+            # Pairwise L2 within one prototype group, vectorized.
+            #
+            # This was a Python double loop calling np.linalg.norm once
+            # per pair. With k=2048 prototypes concentrated in few groups
+            # that is millions of individual numpy calls, each with
+            # microseconds of dispatch overhead — and it ran on the inner
+            # life thread inside N3 sleep consolidation, where it held
+            # the thread past a 45 s shutdown budget. A blocked inner life
+            # also means no dreams during that window.
+            #
+            # ||a-b||^2 = ||a||^2 + ||b||^2 - 2 a·b, so the whole block
+            # is two matrix products rather than a pairwise loop.
+            sq = np.einsum("ij,ij->i", block, block)
+            diff = sq[:, None] + sq[None, :] - 2.0 * (block @ block.T)
+            np.maximum(diff, 0.0, out=diff)
+            i_idx, j_idx = np.triu_indices(len(indices), k=1)
+            close = diff[i_idx, j_idx] < threshold * threshold
+            for i, j in zip(i_idx[close], j_idx[close], strict=True):
+                a, b = int(indices[i]), int(indices[j])
+                candidates.append((
+                    self._concept_names[a],
+                    self._concept_names[b],
+                    float(np.sqrt(diff[i, j])),
+                ))
 
         candidates.sort(key=lambda x: x[2])
         return candidates

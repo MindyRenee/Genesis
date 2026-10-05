@@ -43,15 +43,20 @@ logger = logging.getLogger(__name__)
 # the other way round, so importing the journal here would invert the
 # dependency. `genesis_conscious` registers the journal at startup; with
 # no sink the tally still works and only the durable record is absent.
-_sink: Callable[[str, int], None] | None = None
+# The sink receives the exception, not just the tally. A record of
+# "site X failed 79 times" with no exception attached is not diagnosable:
+# it says a subsystem is broken for eighteen hours without saying what is
+# broken. The rate limiting already keeps the durable record bounded, so
+# carrying the exception costs nothing.
+_sink: Callable[[str, int, BaseException], None] | None = None
 
 
-def set_swallow_sink(sink: Callable[[str, int], None] | None) -> None:
+def set_swallow_sink(sink: Callable[[str, int, BaseException], None] | None) -> None:
     """Register where swallowed-exception records are written.
 
     Args:
-        sink: Called as ``sink(site, count)`` each time a site is due a
-            record, or ``None`` to detach.
+        sink: Called as ``sink(site, count, exc)`` each time a site is due
+            a record, or ``None`` to detach.
     """
     global _sink
     _sink = sink
@@ -115,7 +120,7 @@ def note_swallowed(site: str, exc: BaseException) -> None:
         # A failing sink must not turn a swallowed exception into a
         # raised one, so the write is guarded here rather than trusted.
         try:
-            sink(site, count)
+            sink(site, count, exc)
         except Exception:  # noqa: BLE001
             logger.debug(f"swallow sink failed for {site}")
 

@@ -860,7 +860,14 @@ class HeartbeatMixin:
                 e,
             )
     def _heartbeat_final_steps(self) -> None:
-        """Run auto-sleep, volition, warn, and cognition (heartbeat steps 10-13)."""
+        """Run auto-sleep, volition, warn, and cognition (heartbeat steps 10-13).
+
+        Each guarded step reports under its own site name. They previously
+        all reported as ``_heartbeat_final_steps``, so a failure in any of
+        them was indistinguishable in the tally — five different bugs, one
+        bucket, and 79 recorded occurrences that could not be attributed
+        to a step.
+        """
         # ── 9c. External world — presence decay and social pressure ──
         # The world runs on the heartbeat like every other subsystem:
         # state-gated, not timer-gated. Silent presences leave; the
@@ -873,7 +880,7 @@ class HeartbeatMixin:
             )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "genesis_conscious.mind.heartbeat._heartbeat_final_steps",
+                "genesis_conscious.mind.heartbeat.final_steps.world_tick",
                 e,
             )
 
@@ -882,7 +889,7 @@ class HeartbeatMixin:
             self._check_auto_sleep()
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "genesis_conscious.mind.heartbeat._heartbeat_final_steps",
+                "genesis_conscious.mind.heartbeat.final_steps.auto_sleep",
                 e,
             )
 
@@ -898,7 +905,7 @@ class HeartbeatMixin:
             self.warn(speak=True)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "genesis_conscious.mind.heartbeat._heartbeat_final_steps",
+                "genesis_conscious.mind.heartbeat.final_steps.warn",
                 e,
             )
 
@@ -907,7 +914,7 @@ class HeartbeatMixin:
             self.cognition.tick(dt=1.0)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
-                "genesis_conscious.mind.heartbeat._heartbeat_final_steps",
+                "genesis_conscious.mind.heartbeat.final_steps.cognition_tick",
                 e,
             )
     def _heartbeat_init_state(self) -> tuple:

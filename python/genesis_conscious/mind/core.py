@@ -621,28 +621,37 @@ class Mind(
         self.inner_life.set_sleep_stage_transition_callback(
             self._on_sleep_stage_transition
         )
-    def _journal_swallow_sink(self, site: str, count: int) -> None:
+    def _journal_swallow_sink(
+        self, site: str, count: int, exc: BaseException,
+    ) -> None:
         """Write a swallowed-exception record to the cognitive journal.
 
         The tally lives in ``genesis_client`` so both layers can use it,
         but the journal lives here in the higher layer, so the sink is
         injected at startup rather than imported from below.
 
-        The count is included because it is the useful part: "this site
-        has failed N times" says something a reader can act on in a way
-        that a single stack trace does not. Failures are recorded on the
-        first occurrence and then at exponentially spaced counts, so a
-        permanently broken site stays bounded rather than flooding the
-        journal.
+        Both the count and the exception are included. The count says
+        something a reader can act on in a way a single stack trace does
+        not; the exception says *what* is broken, without which a site
+        that fails on every cycle for a day is merely known to be broken.
+        The record previously carried only the count, which made a
+        recurring failure undiagnosable from the journal alone — the
+        exception itself was logged at DEBUG and nowhere else.
+
+        Failures are recorded on the first occurrence and then at
+        exponentially spaced counts, so carrying the exception costs no
+        more journal volume than the record already used.
         """
         journal = getattr(self, "journal", None)
         if journal is None:
             return
         journal.record(
             "error",
-            f"{site} failed and was swallowed",
+            f"{site} failed and was swallowed: {exc!r}",
             site=site,
             count=count,
+            error=repr(exc),
+            error_type=type(exc).__name__,
         )
 
     def _init_runtime_state(self) -> None:
