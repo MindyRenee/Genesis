@@ -28,6 +28,7 @@ from genesis_client.protocol import (
 )
 from genesis_client.swallow import note_swallowed
 
+from ..cognition.situation_model import SituationModel
 from ..commitment import CommitmentBoundary
 from ..infrastructure.journal import record_event
 from ..sleep import SleepStage
@@ -769,6 +770,23 @@ class SleepMixin:
         # starts the next conversation fresh.
         try:
             self.cognition.comprehension.reset()
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "genesis_conscious.mind.sleep._engage_sleep_mechanism",
+                e,
+            )
+
+        # The situation model is discarded alongside it. It holds the
+        # world the *previous* conversation described — who was where,
+        # what was being carried. Carrying that into a new session
+        # would let Genesis answer "Where is Mary?" from a story the
+        # user told hours ago and has moved on from, which is worse
+        # than not answering: it would be confidently stale.
+        try:
+            self.cognition.situation_model = SituationModel()
+            self.cognition._question_handler._situation = (
+                self.cognition.situation_model
+            )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "genesis_conscious.mind.sleep._engage_sleep_mechanism",

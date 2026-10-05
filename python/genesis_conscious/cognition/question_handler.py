@@ -19,6 +19,9 @@ Dependencies (passed to ``__init__``):
     - relation_verb: callable that converts RelationType to natural verb
     - resolve_topics: callable that resolves topic lists
     - user_profile: UserProfile for user name resolution (optional)
+    - situation_model: SituationModel for the discourse situation being
+      discussed right now (optional, but wired in production — it is
+      consulted ahead of the concept network)
 """
 
 from __future__ import annotations
@@ -39,6 +42,7 @@ if TYPE_CHECKING:
     from ..reasoning import ReasoningResult, TheoryOfMind
     from ..self import SelfComposer, SelfModel
     from ..tools.framework import ToolRegistry
+    from .situation_model import SituationModel
 
 __all__ = ["QuestionHandler"]
 
@@ -93,9 +97,17 @@ class QuestionHandler:
         relation_verb: Callable[[Any], str],
         resolve_topics: Callable[[list[str], str], list[str]],
         user_profile: UserProfile | None = None,
+        situation_model: SituationModel | None = None,
     ) -> None:
         """Wire the question handler to its concept network and language engine."""
         self._network = network
+        # The discourse situation model. Optional so the handler stays
+        # constructible without one, but wired in production: it is
+        # consulted *before* the concept network, because a question
+        # about the situation under discussion ("Where is Mary?") has
+        # an authoritative answer in the model and only a coincidental
+        # one in the network.
+        self._situation = situation_model
         self._language = language
         self._composer = composer
         self._self_composer = self_composer
@@ -213,7 +225,17 @@ class QuestionHandler:
         <referent> eat?" — the referent only exists in the resolved
         text, not in ``perception.raw_text``.
         """
-        # First, try relation-based wh-question answering.
+        # First, the discourse situation: if the question asks about
+        # the world the conversation is currently describing, the
+        # situation model holds that state directly. Asking the
+        # concept network first would let a coincidental association
+        # ("mary" has an unrelated edge in the network) outrank what
+        # the user just said.
+        result = self.question_situation(perception, emotion)
+        if result is not None:
+            return result
+
+        # Then relation-based wh-question answering over the graph.
         result = self.question_relation_query(
             perception, emotion, resolved_text=resolved_text
         )
@@ -254,6 +276,153 @@ class QuestionHandler:
         result = self.question_reflection_fallback(perception, emotion)
         return self._enrich_with_memory(
             result, perception, memory, retrieve_episode
+        )
+
+    # ─── Discourse situation (state under discussion) ───────────
+
+    # "Where is Mary?" — the wh-word, then everything up to the verb.
+    _SITUATION_WH_RE = re.compile(
+        r"\b(?:where|who|what|which)\s+(?:is|are|was|were|did|does|do)\s+"
+        r"(?:the\s+)?(.+?)\s*$",
+        re.I,
+    )
+    # "What is Mary carrying?" — verb form carries the question.
+    _SITUATION_CARRY_RE = re.compile(
+        r"\b(?:what|which)\s+(?:is|are|was|were)\s+(?:the\s+)?(.+?)\s+"
+        r"(?:carrying|holding|taking|holding onto)\b",
+        re.I,
+    )
+
+    def question_situation(
+        self, perception: Perception, emotion: EmotionalState
+    ) -> Thought | None:
+        """Answer from the situation the discourse is currently describing.
+
+        The situation model tracks who is where, holding what, in what
+        relation to whom, as the user describes it. When a question asks
+        about that state, this is the authoritative answer — the
+        concept network holds semantic knowledge, not the story being
+        told right now, and reaching for it first would let an
+        unrelated association outrank what the user just said.
+
+        Returns structured ``situation_answer`` metadata for the
+        language engine to compose words from; it never builds a
+        sentence here. The model answers only what the discourse
+        established — every branch below returns ``None`` when the
+        model holds nothing, so the question falls through to the
+        concept network, tools, and finally honest uncertainty.
+        """
+        if self._situation is None or not self._situation.entities:
+            return None
+
+        text = perception.raw_text.strip().rstrip("?").strip()
+        if not text:
+            return None
+
+        return self._situation_answer(text, emotion)
+
+    def _situation_answer(
+        self, text: str, emotion: EmotionalState
+    ) -> Thought | None:
+        """Dispatch one parsed question to the model's typed accessors.
+
+        Each branch asks the model a question it is built to answer and
+        reports the answer as data. A ``None`` from the model means the
+        discourse did not establish it, and the caller falls through.
+        """
+        model = self._situation
+        assert model is not None  # guarded by question_situation
+
+        # "What is X carrying?" — checked before the general wh parse
+        # because the verb is the informative part.
+        m = self._SITUATION_CARRY_RE.match(text)
+        if m:
+            who = m.group(1).strip()
+            carried = model.carrying(who)
+            if carried:
+                return self._situation_thought(
+                    emotion,
+                    kind="carrying",
+                    subject=who,
+                    objects=carried,
+                    confidence=0.75,
+                )
+
+        # The general form: "Where is X?" / "Who is in the kitchen?"
+        m = self._SITUATION_WH_RE.match(text)
+        if not m:
+            return None
+        rest = m.group(1).strip()
+        wh = text.split()[0].lower()
+
+        # "Who is in the kitchen?" — location as the argument.
+        at_match = re.match(r"^(?:in|at|inside)\s+(?:the\s+)?(.+?)$", rest, re.I)
+        if at_match and wh == "who":
+            place = at_match.group(1).strip()
+            present = model.who_is_at(place)
+            if present:
+                return self._situation_thought(
+                    emotion,
+                    kind="present_at",
+                    subject=place,
+                    objects=present,
+                    confidence=0.75,
+                )
+            return None
+
+        # "Where is X?" — the model's core location query.
+        if wh == "where":
+            place, candidates = model.where_is(rest)
+            if place is not None:
+                return self._situation_thought(
+                    emotion,
+                    kind="location",
+                    subject=rest,
+                    objects=[place],
+                    confidence=0.8,
+                )
+            if candidates:
+                # Uncertain locations are reported as candidates, not
+                # asserted — the discourse said "either/or".
+                return self._situation_thought(
+                    emotion,
+                    kind="location_candidates",
+                    subject=rest,
+                    objects=sorted(candidates),
+                    confidence=0.5,
+                )
+
+        return None
+
+    def _situation_thought(
+        self,
+        emotion: EmotionalState,
+        *,
+        kind: str,
+        subject: str,
+        objects: list[str],
+        confidence: float,
+    ) -> Thought:
+        """Package a situation-model answer as structured metadata.
+
+        The content is a semantic marker; the language engine composes
+        the words from ``situation_answer`` — the same division of
+        labour the relation-answer path uses.
+        """
+        meta = {
+            "situation_answer": {
+                "kind": kind,
+                "subject": subject,
+                "objects": objects,
+            }
+        }
+        return Thought(
+            content="situation_answer",
+            intent="inform",
+            emotion=emotion.label,
+            topics=[subject, *objects],
+            confidence=confidence,
+            metadata=meta,
         )
 
     # ─── Relation query (wh-questions via graph traversal) ───────

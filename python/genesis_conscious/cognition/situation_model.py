@@ -113,9 +113,53 @@ _TAKE = frozenset({
     "retrieve", "retrieved",
 })
 _DROP = frozenset({
-    "drop", "dropped", "leave", "left", "discard", "discarded",
+    "drop", "dropped", "leave", "left for", "discard", "discarded",
     "put down", "put", "set down", "abandon", "abandoned",
 })
+# A possession verb in a copula frame: comprehension yields
+# "Sandra is carrying the milk" as predicate "is" with the whole
+# verb phrase in ATTRIBUTE, so the verb arrives here as a participle
+# ("carrying", "held") rather than the lemma the _TAKE/_DROP/_GIVE
+# sets hold ("carry", "hold"). Every inflection of those families is
+# matched explicitly — stemming is not worth the ambiguity here, and a
+# missed form only costs the possession answer.
+_POSSESSIVE_VERBS = (
+    "carrying", "carry", "carried",
+    "holding", "hold", "held",
+    "taking", "take", "took", "taken",
+    "grabbing", "grab", "grabbed",
+    "picking", "pick", "picked",
+    "snatching", "snatch", "snatched",
+    "retrieving", "retrieve", "retrieved",
+    "dropping", "drop", "dropped",
+    "discarding", "discard", "discarded",
+    "abandoning", "abandon", "abandoned",
+    "putting down", "put down", "setting down", "set down",
+    "giving", "give", "gave", "given",
+    "handing", "hand", "handed",
+    "passing", "pass", "passed",
+    "offering", "offer", "offered",
+)
+# Longest-first so "putting down" wins over "putting".
+_GERUND_POSSESSION_RE = re.compile(
+    r"^(" + "|".join(sorted(_POSSESSIVE_VERBS, key=len, reverse=True)) + r")\s+"
+    r"(?:the\s+|a\s+|an\s+)?(.+?)$",
+    re.I,
+)
+# Present participle → the lemma the _TAKE/_DROP/_GIVE sets actually
+# hold. Those sets contain base and past forms only, so matching the
+# participle and then testing membership requires this map; matching
+# the participle and returning it would never hit, which is why the
+# family test below compares against the normalized verb.
+_PARTICIPLE_LEMMA = {
+    "carrying": "carry", "holding": "hold", "taking": "take",
+    "grabbing": "grab", "picking": "pick", "snatching": "snatch",
+    "retrieving": "retrieve", "dropping": "drop",
+    "discarding": "discard", "abandoning": "abandon",
+    "putting down": "put down", "setting down": "set down",
+    "giving": "give", "handing": "hand", "passing": "pass",
+    "offering": "offer", "taken": "take",
+}
 _GIVE = frozenset({
     "give", "gave", "hand", "handed", "pass", "passed", "offer",
     "offered",
@@ -690,12 +734,65 @@ class SituationModel:
 
         # ── Copula: location, negation, class, attribute ──
         if pred in _COPULA:
+            # A progressive or participial possession ("Sandra is
+            # carrying the milk", "Mary is holding the cup") reaches
+            # here as copula + ATTRIBUTE, not as a _TAKE predicate:
+            # comprehension puts the whole verb phrase in the
+            # attribute slot. Without this the verb never reaches the
+            # possession branches below, and the object is recorded
+            # as a bare attribute of Sandra instead of something she
+            # holds — so "what is Sandra carrying?" has no answer.
+            if self._apply_possessive_copula(subjects, attr or obj, uncertain):
+                return
             self._apply_copula(subjects, prop, loc, attr, uncertain, raw)
             return
 
         # Anything else still lands in the event log.
         if subjects:
             self._log(subjects[0], pred, _norm(obj) if obj else "")
+
+    def _apply_possessive_copula(
+        self, subjects: list[str], attr_text: str, uncertain: bool
+    ) -> bool:
+        """Handle "X is carrying/holding Y" — possession via copula.
+
+        Returns True when the attribute text was a possession verb and
+        has been applied, so the caller skips the ordinary attribute
+        path. The verb family is the same ``_TAKE`` / ``_DROP`` /
+        ``_GIVE`` sets the direct-predicate branches use, matched
+        morphologically because comprehension hands over the
+        participle rather than the lemma ("carrying", "held",
+        "carried").
+        """
+        if not attr_text or not subjects:
+            return False
+        text = attr_text.strip().lower()
+        # "carrying the milk" → verb, remainder.
+        m = _GERUND_POSSESSION_RE.match(text)
+        if not m:
+            return False
+        verb, remainder = m.group(1).lower(), _norm(m.group(2))
+        if not remainder:
+            return False
+
+        # Normalize the participle to the lemma the family sets hold
+        # ("carrying" → "carry"). A verb already in a base or past form
+        # passes through unchanged.
+        phrase = _PARTICIPLE_LEMMA.get(verb, verb)
+
+        if phrase in _GIVE:
+            for s in subjects:
+                self._give([s], remainder, None)
+            return True
+        if phrase in _DROP:
+            for s in subjects:
+                self._drop(s, remainder)
+            return True
+        if phrase in _TAKE:
+            for s in subjects:
+                self._take(s, remainder)
+            return True
+        return False
 
     def _apply_copula(self, subjects, prop, loc, attr, uncertain, raw) -> None:
         if loc:

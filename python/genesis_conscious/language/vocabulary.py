@@ -588,6 +588,19 @@ class Vocabulary:
             )
             if composed:
                 return [composed]
+        # Situation answers — the state of the world the discourse is
+        # describing right now ("Mary is in the kitchen", "Sandra is
+        # carrying the milk"). Placed after relation_answer because a
+        # relation answer is drawn from the concept network, which is
+        # the more durable knowledge; the situation model answers only
+        # what the current story established.
+        situation_answer = context.get("situation_answer")
+        if situation_answer and isinstance(situation_answer, dict):
+            composed = self._compose_situation_answer_content(
+                situation_answer, emotion
+            )
+            if composed:
+                return [composed]
         # If self-improvement metadata is present, compose a response
         # from its proposals, experiments, or growth data. This is how
         # it answers "what are your proposals?" — the cognition engine
@@ -1915,6 +1928,111 @@ class Vocabulary:
         if not belief:
             return None
         return f"You {user_verb} {belief}."
+
+    def _compose_situation_answer_content(
+        self,
+        situation_answer: dict[str, Any],
+        emotion: EmotionalState,
+    ) -> str | None:
+        """Compose the content slot from discourse-situation state.
+
+        The situation model tracks the world a conversation is
+        describing — who is where, who is carrying what. The question
+        handler reads that state and hands it over here as data.
+
+        The surface form comes from the concept network, not from here:
+        ``find_situation_verbs`` returns the phrasing templates seeded
+        (or learned) under ``_cat:situation_verb:<kind>``, this picks
+        one, and the entity/place it is about fills the slots. So the
+        sentences are hers — chosen from her own vocabulary and
+        changing as she learns more ways to put it — while the facts
+        are the user's, from what they described.
+
+        Keys in situation_answer:
+        - "kind": which relation was asked about — "location",
+          "location_candidates", "carrying", or "present_at"
+        - "subject": the entity (or place) the answer is about
+        - "objects": the locations, objects, or entities found
+        """
+        if self._network is None:
+            return None
+        kind = situation_answer.get("kind", "")
+        subject = situation_answer.get("subject", "")
+        objects: list[str] = list(situation_answer.get("objects", []))
+
+        if not kind or not subject or not objects:
+            return None
+
+        templates = self._network.find_situation_verbs(kind)
+        if not templates:
+            return None
+        template = self._rng.choice(templates)
+
+        # Fill-ins. Entity names arrive normalized (the model lowercases
+        # them for matching), so people are re-cased here; places and
+        # objects stay lowercase because they are common nouns. The
+        # seeded templates carry their own articles, so fill-ins are
+        # bare noun phrases — adding "the" here produced "the the
+        # milk".
+        people = [self._name_case(o) for o in objects]
+        # The handler reports `present_at` the other way round from the
+        # other kinds: it puts the *place* in "subject" and the people
+        # in "objects", because the question was "who is in X?". Map
+        # accordingly, or "John and Mary are in the john" comes out.
+        place = subject if kind == "present_at" else objects[0]
+        fill = {
+            "subject": self._name_case(subject),
+            "place": place,
+            "places": self._join_disjunction(objects),
+            "objects": self._join_list(
+                [f"the {o}" for o in objects]
+            ),
+            "who": self._join_list(people),
+            # Subject-verb agreement on the coordinated subject, so
+            # "John and Mary are" rather than "John and Mary is".
+            "be": "are" if len(people) > 1 else "is",
+        }
+        try:
+            return template.format(**fill)
+        except (KeyError, IndexError):
+            # A learned phrasing may carry slots this answer cannot
+            # fill. Skip it rather than emitting a broken sentence.
+            logger.debug(
+                "situation phrasing %r did not fit answer slots", template
+            )
+            return None
+
+    @staticmethod
+    def _name_case(name: str) -> str:
+        """Casing for a person's name as it will be spoken.
+
+        The situation model normalizes entity keys to lowercase so
+        lookups match regardless of how the user capitalized them, so a
+        proper name arrives as "mary". Capitalizing the first letter
+        restores speech form.
+        """
+        cleaned = name.strip()
+        if not cleaned:
+            return cleaned
+        return cleaned[0].upper() + cleaned[1:]
+
+    @staticmethod
+    def _join_disjunction(items: list[str]) -> str:
+        """Join alternatives: a, b, or c — for uncertain locations."""
+        if len(items) == 1:
+            return items[0]
+        if len(items) == 2:
+            return f"{items[0]} or {items[1]}"
+        return ", ".join(items[:-1]) + f", or {items[-1]}"
+
+    @staticmethod
+    def _join_list(items: list[str]) -> str:
+        """Join a list into an English coordination: a, b, and c."""
+        if len(items) == 1:
+            return items[0]
+        if len(items) == 2:
+            return f"{items[0]} and {items[1]}"
+        return ", ".join(items[:-1]) + f", and {items[-1]}"
 
     def _compose_relation_answer_content(
         self,
