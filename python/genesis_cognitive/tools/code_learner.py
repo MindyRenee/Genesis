@@ -127,13 +127,13 @@ class CodeSpacedRepetition:
     """
 
     # Base interval in seconds for the first review
-    _BASE_INTERVAL = 3600.0  # 24 hours
+    _BASE_INTERVAL = 3600.0  # 1 hour
 
     # Interval multiplier for subsequent reviews
     _INTERVAL_MULTIPLIER = 2.5
 
     # Minimum interval (don't re-analyze more often than this)
-    _MIN_INTERVAL = 300.0  # 60 minutes
+    _MIN_INTERVAL = 300.0  # 5 minutes
 
     def __init__(self) -> None:
         """Initialize per-file tracking dicts.
