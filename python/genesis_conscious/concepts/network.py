@@ -2588,6 +2588,27 @@ class ConceptNetwork(
         This preserves low-confidence concepts that have been
         connected to other concepts (they may be real but uncertain).
 
+        When an archive is attached, "remove" means *archive*, not
+        *delete*. Sleep is where this runs, unattended, and it used to
+        delete unconditionally — which is how ~7.5k concepts
+        disappeared in a single N3 pass with the archive sitting empty at
+        zero. Two things followed from that:
+
+        - Deleting ran *before* ``spill_dormant`` in the same pass, so
+          the destructive step could drop the network under the cap and
+          thereby stop the non-destructive one from ever engaging. The
+          mechanism meant to preserve knowledge was silencing the
+          mechanism that preserves it.
+        - Nothing reported the loss as a loss. It appeared as one number
+          in a journal line.
+
+        So deletion is now reachable only when there is no archive, which
+        matches the rest of the design (``spill_dormant`` also no-ops
+        without one, and the destructive prune is its documented
+        fallback). If the archive write fails, the concepts stay in
+        working memory: unbounded growth is recoverable, deleted
+        knowledge is not.
+
         Returns the list of removed concept names.
         """
         noise: list[str] = []
@@ -2610,10 +2631,52 @@ class ConceptNetwork(
         # loop. Each remove_concept call rebuilds the entire edge index
         # (O(E)), so a loop over N concepts is O(N×E). Batch removal
         # filters edges and rebuilds indices once — O(E + N).
-        if to_remove:
-            self.remove_concepts_batch(set(to_remove))
-            # Return the cids that were actually removed (a concurrent
-            # thread may have removed some between the scan and here).
-            noise = [cid for cid in to_remove if cid not in self._concepts]
+        if not to_remove:
+            return []
 
+        if self._archive is None:
+            # No store anywhere to put them: deletion is the only option.
+            self.remove_concepts_batch(set(to_remove))
+            # A concurrent thread may have removed some between the scan
+            # and here, so report only what actually went.
+            return [cid for cid in to_remove if cid not in self._concepts]
+
+        # Archive first, evict second. The write is transactional and
+        # raises on failure, so either every concept is on disk or none
+        # is — evicting an unarchived concept would be the exact silent
+        # loss this path exists to prevent.
+        items: list[tuple[str, dict, set[str]]] = []
+        for cid in to_remove:
+            candidate = self._concepts.get(cid)
+            if candidate is not None:
+                items.append(
+                    (cid, self._concept_to_dict(candidate), set(candidate.aliases)),
+                )
+        try:
+            archived = self._archive.archive_concepts_batch(items)
+        except (sqlite3.Error, RuntimeError) as e:
+            logger.error(
+                "clean_noise could not archive %d noise concepts (%s); "
+                "leaving them in working memory rather than deleting them",
+                len(items), e,
+            )
+            return []
+
+        self.remove_concepts_batch(set(to_remove))
+
+        # Verify the effect rather than trusting the batch count. These
+        # concepts have fewer than min_edges edges by definition, so
+        # there is nothing to archive or retract on their behalf.
+        still_present = [cid for cid in to_remove if cid in self._concepts]
+        if still_present:
+            logger.error(
+                "clean_noise archived %d noise concepts but %d are still "
+                "resident; working memory is not being shed",
+                archived, len(still_present),
+            )
+        logger.info(
+            "clean_noise archived %d noise concepts (archive now %d)",
+            archived, self.archive_size,
+        )
+        noise = [cid for cid in to_remove if cid not in self._concepts]
         return noise

@@ -3569,3 +3569,120 @@ def test_seed_relation_verbs_is_idempotent() -> None:
     edge_count = len(net.edges)
     net.seed_relation_verbs()
     assert len(net.edges) == edge_count
+
+
+# ── clean_noise archives rather than deletes when it can ────────────
+#
+# Sleep runs clean_noise unattended, and it used to delete
+# unconditionally. It also ran *before* spill_dormant, so the destructive
+# step could push the network under the cap and thereby stop the
+# non-destructive step from ever running. ~7.5k concepts went that way in
+# one N3 pass with the archive sitting at zero.
+
+
+def _noise_network(n: int = 8, *, archive: bool = True) -> ConceptNetwork:
+    """Isolated, low-confidence concepts — clean_noise's target."""
+    tmp = tempfile.mkdtemp(prefix="genesis-noise-")
+    net = ConceptNetwork()
+    if archive:
+        net.attach_archive(open_archive(tmp))
+    for i in range(n):
+        net.add_concept(f"fragment_{i}", confidence=0.3, origin="learned")
+    return net
+
+
+def test_clean_noise_archives_instead_of_deleting() -> None:
+    """With an archive attached, noise must be recoverable, not gone."""
+    net = _noise_network(8)
+    net.add_concept("solid", confidence=0.9, origin="learned")
+
+    removed = net.clean_noise(min_confidence=0.4, min_edges=1)
+
+    assert len(removed) == 8, "all eight fragments are isolated and low-confidence"
+    assert net.get_concept("solid") is not None, "high confidence survives"
+
+    # Working memory shed…
+    assert net.size == 1
+    # …and the knowledge is on disk rather than destroyed.
+    assert net.archive_size == 8, (
+        f"expected 8 archived, got {net.archive_size} — noise was deleted, "
+        f"not archived"
+    )
+    # And it is still recallable by name, like any spilled concept.
+    assert net.get_concept("fragment_0") is not None, (
+        "archived noise must stay recallable"
+    )
+    net._archive.close()
+
+
+def test_clean_noise_deletes_only_without_an_archive() -> None:
+    """No store anywhere means deletion is the only option left."""
+    net = _noise_network(5, archive=False)
+
+    removed = net.clean_noise(min_confidence=0.4, min_edges=1)
+
+    assert len(removed) == 5
+    assert net.size == 0
+    assert net.archive_size == 0, "no archive was ever attached"
+
+
+def test_clean_noise_keeps_concepts_when_the_archive_write_fails(caplog) -> None:
+    """A failed archive write must not escalate into deletion.
+
+    Unbounded growth is recoverable — the concepts are still in RAM and
+    still in the save file. Deleted knowledge is not. So a broken archive
+    degrades to "working memory grows", loudly, rather than silently to
+    "knowledge gone".
+    """
+    import logging
+    import sqlite3
+
+    net = _noise_network(6)
+    caplog.set_level(logging.ERROR, logger="genesis_conscious.concepts.network")
+
+    def boom(items):
+        raise sqlite3.OperationalError("disk I/O error")
+
+    net._archive.archive_concepts_batch = boom  # type: ignore[method-assign]
+
+    removed = net.clean_noise(min_confidence=0.4, min_edges=1)
+
+    assert removed == [], "nothing may be reported as removed"
+    assert net.size == 6, "the concepts must survive in working memory"
+    assert "rather than deleting" in caplog.text
+    net._archive.close()
+
+
+def test_clean_noise_reports_what_it_did(caplog) -> None:
+    """The count must be visible, so a pass is never a silent shrink."""
+    import logging
+
+    net = _noise_network(4)
+    caplog.set_level(logging.INFO, logger="genesis_conscious.concepts.network")
+
+    net.clean_noise(min_confidence=0.4, min_edges=1)
+
+    assert "archived 4 noise concepts" in caplog.text
+    assert f"archive now {net.archive_size}" in caplog.text
+    net._archive.close()
+
+
+def test_clean_noise_never_deletes_while_an_archive_is_attached() -> None:
+    """The invariant, stated directly: no archive, no destruction.
+
+    Regression guard for the ordering problem. clean_noise runs before
+    spill_dormant in the N3 pass, so while it deleted, it could push the
+    network under the cap and stop spill_dormant from ever engaging —
+    the destructive step silencing the preserving one.
+    """
+    net = _noise_network(10)
+    archived_before = net.archive_size
+
+    net.clean_noise(min_confidence=0.4, min_edges=1)
+
+    assert net.archive_size > archived_before, (
+        "an attached archive must receive the concepts"
+    )
+    for cid in (f"fragment_{i}" for i in range(10)):
+        assert net._archive.has_concept(cid), f"{cid} was lost, not archived"
+    net._archive.close()
