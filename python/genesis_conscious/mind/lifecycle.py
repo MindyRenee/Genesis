@@ -506,7 +506,7 @@ class LifecycleMixin:
                     "seeded", "structural",
                 })
                 to_remove: set[str] = set()
-                for cid, concept in network._concepts.items():
+                for cid, concept in list(network._concepts.items()):
                     if concept.origin in _PROTECTED:
                         continue
                     if (concept.activation or 0.0) >= _DEAD_THRESHOLD:

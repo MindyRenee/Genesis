@@ -3765,3 +3765,81 @@ def test_network_get_concept_does_not_consume_the_archive() -> None:
         )
         assert net.size == working_before
         net._archive.close()
+
+
+class TestConcurrentConceptMutation:
+    """Scans of the shared concept dict must survive a concurrent writer.
+
+    The learner, the archival autosave thread and the N3 consolidation
+    worker all add to `_concepts` while the main thread scans it. A scan
+    that iterates the live dict raises ``RuntimeError: dictionary changed
+    size during iteration`` — observed live in ``cortical_tick`` and
+    ``_pick_creation_topic``. Every such scan must snapshot first.
+    """
+
+    @staticmethod
+    def _seeded() -> ConceptNetwork:
+        net = ConceptNetwork()
+        for i in range(300):
+            net.add_concept(f"concept_{i}", confidence=0.6)
+        return net
+
+    @staticmethod
+    def _hammer(net: ConceptNetwork, scan, iterations: int = 60) -> None:
+        """Run `scan` while a writer thread adds concepts.
+
+        The writer sleeps between adds so the network stays bounded —
+        an unbounded writer makes each O(N) scan progressively more
+        expensive and the test quadratic.
+        """
+        import threading
+        import time
+
+        stop = threading.Event()
+        errors: list[BaseException] = []
+
+        def mutate() -> None:
+            n = 0
+            while not stop.is_set():
+                try:
+                    net.add_concept(f"learned_{n}", confidence=0.6)
+                except BaseException as e:  # noqa: BLE001
+                    errors.append(e)
+                    return
+                n += 1
+                time.sleep(0.001)
+
+        t = threading.Thread(target=mutate, daemon=True)
+        t.start()
+        try:
+            for _ in range(iterations):
+                scan()
+        except BaseException as e:  # noqa: BLE001
+            errors.append(e)
+        finally:
+            stop.set()
+            t.join(timeout=5)
+
+        assert not errors, f"concurrent scan failed: {errors[:3]}"
+
+    def test_cortical_tick_tolerates_concurrent_adds(self) -> None:
+        net = self._seeded()
+        self._hammer(
+            net,
+            lambda: net.cortical_tick(
+                arousal=0.5, gaba=0.5, ach=0.5, serotonin=0.5
+            ),
+        )
+
+    def test_rebuild_active_set_tolerates_concurrent_adds(self) -> None:
+        net = self._seeded()
+        self._hammer(net, net._rebuild_active_set)
+
+    def test_confidence_and_all_ids_tolerate_concurrent_adds(self) -> None:
+        net = self._seeded()
+
+        def scan() -> None:
+            _ = net.mean_concept_confidence
+            _ = net.all_concept_ids
+
+        self._hammer(net, scan)
