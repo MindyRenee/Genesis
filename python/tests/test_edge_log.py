@@ -136,6 +136,20 @@ class TestEdgeLog:
         log.close()
         assert len(live) == 1
 
+    def test_malformed_json_events_do_not_break_fold(self, tmp_path):
+        log = open_edge_log(tmp_path)
+        log.assert_edge("a", "b", RelationType.IS_A, 0.7, "stated", 1)
+        log.close()
+        with open(log.path, "a", encoding="utf-8") as f:
+            f.write('{"op":"assert","source":"bad","target":"x","relation":"is_a","weight":"nan"}\n')
+            f.write('{"op":"assert","source":"bad2","target":"x","relation":"is_a","created_at":{}}\n')
+            f.write('{"op":"snapshot","edges":"not-a-list"}\n')
+        reopened = open_edge_log(tmp_path)
+        live = reopened.fold()
+        reopened.close()
+        assert len(live) == 1
+        assert next(iter(live.values())).source == "a"
+
     def test_torn_tail_skipped(self, tmp_path):
         log = open_edge_log(tmp_path)
         log.assert_edge("a", "b", RelationType.IS_A, 0.7, "stated", 1)
