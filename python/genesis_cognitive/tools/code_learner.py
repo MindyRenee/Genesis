@@ -462,7 +462,13 @@ class CodeLearner:
                 break
             rel = str(path.relative_to(self.project_root))
             if rel in self._analyzed_files:
-                continue
+                # Coverage is durable, but it must not suppress re-learning
+                # when the source file itself has changed.  The investigation
+                # ledger stores a content fingerprint for exactly this case.
+                current_fingerprint = self._source_fingerprint(path)
+                known_fingerprint = self._file_fingerprints.get(rel)
+                if current_fingerprint is None or current_fingerprint == known_fingerprint:
+                    continue
 
             result = self.learn_file(str(path))
             file_results.append(result)
