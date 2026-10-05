@@ -19,7 +19,7 @@ def test_action_conditioned_trace_is_scoped_to_action() -> None:
     assert learner.get_trace("state", action="A") > 0.0
     assert learner.get_trace("state", action="B") == 0.0
 
-    learner.update(["next"], 1.0, [], action="B")
+    learner.update(["next"], 2.0, [], action="B")
 
     assert learner.get_weight("state") == 1.0
     assert learner._action_weights.get(("state", "A"), 1.0) == 1.0
