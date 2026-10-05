@@ -32,6 +32,16 @@ class ArchivalMixin:
             archive: A ``ConceptArchive`` instance.
         """
         self._archive = archive
+    def purge_archived_concepts(self, concept_ids: list[str]) -> int:
+        """Permanently remove selected concepts from long-term archive."""
+        if self._archive is None or not concept_ids:
+            return 0
+        try:
+            return self._archive.remove_concepts_batch(concept_ids)
+        except (sqlite3.Error, RuntimeError) as e:
+            logger.debug("archive concept purge failed: %s", e)
+            return 0
+
     def has_concept_anywhere(self, cid: str) -> bool:
         """Check if a concept ID exists in working memory OR the archive.
 
