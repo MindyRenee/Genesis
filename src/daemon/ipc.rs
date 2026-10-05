@@ -1043,8 +1043,37 @@ impl IpcServer {
             + Send
             + 'static,
     {
-        // Remove stale socket
-        let _ = std::fs::remove_file(&server.socket_path);
+        // Never unlink a live socket. An unconditional remove here would
+        // allow a second daemon (or an unrelated local process listening
+        // on this path) to disconnect the existing IPC server before the
+        // bind attempt. Treat a connectable path as an active endpoint;
+        // only remove it when it is demonstrably stale.
+        if server.socket_path.exists() {
+            match UnixStream::connect(&server.socket_path) {
+                Ok(_) => {
+                    eprintln!(
+                        "[ipc] socket already has a live listener: {}",
+                        server.socket_path.display()
+                    );
+                    server
+                        .shutdown_flag
+                        .store(true, std::sync::atomic::Ordering::Release);
+                    return;
+                }
+                Err(_) => {
+                    if let Err(e) = std::fs::remove_file(&server.socket_path) {
+                        eprintln!(
+                            "[ipc] failed to remove stale socket {}: {e}",
+                            server.socket_path.display()
+                        );
+                        server
+                            .shutdown_flag
+                            .store(true, std::sync::atomic::Ordering::Release);
+                        return;
+                    }
+                }
+            }
+        }
 
         // Bind under a restrictive umask so the socket file is created
         // owner-only (srwx------). The IPC protocol has no
