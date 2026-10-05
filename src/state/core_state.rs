@@ -115,7 +115,7 @@ pub const RESERVED_BYTES: usize = 64;
 /// reports [`CoreStateError::SizeMismatch`] — a variant that
 /// [`GenesisCoreState::migrate_state`] never sees, because it dispatches
 /// on version. [`GenesisCoreState::migrate_layout`] handles it.
-const LEGACY_SIZE: u32 = 3288;
+pub(crate) const LEGACY_SIZE: u32 = 3288;
 
 /// CRC32 polynomial (IEEE 802.3 — same as zlib / PNG).
 const CRC32_POLY: u32 = 0xEDB88320;
