@@ -172,11 +172,35 @@ class ConceptArchive:
             ).fetchall()
         return [r[0] for r in rows]
 
+    def peek_concept(self, concept_id: str) -> dict[str, Any] | None:
+        """Return a concept's archived data **without removing it**.
+
+        Use this for anything that only wants to look: verification,
+        inspection, reporting. :meth:`recall_concept` is a *move* — it
+        deletes the archive row on the assumption the concept is landing in
+        working memory and will be persisted by the next save. Anything
+        that recalls and then exits without saving has silently destroyed
+        what it read. That is not hypothetical: verifying a recovery with
+        ``recall_concept`` lost four concepts before this existed.
+
+        Returns ``None`` if the concept is not archived.
+        """
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT data FROM concepts WHERE concept_id = ?", (concept_id,),
+            ).fetchone()
+        return json.loads(row[0]) if row is not None else None
+
     def recall_concept(self, concept_id: str) -> dict[str, Any] | None:
         """Remove a concept from the archive and return its data dict.
 
-        Recall is destructive — the concept is moving back into working
-        memory, so its archive row and alias index entries are deleted.
+        **Destructive by design** — this is a move, not a read. The
+        concept is coming back into working memory, so its archive row and
+        alias index entries are deleted; the caller owns persisting it.
+        Calling this from anything that does not subsequently save loses
+        the concept outright. To look without consuming, use
+        :meth:`peek_concept`.
+
         Returns ``None`` if the concept is not archived.
         """
         with self._lock:

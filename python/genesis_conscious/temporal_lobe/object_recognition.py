@@ -140,10 +140,9 @@ class ObjectRecognizer:
             self._get_net()
             self._available = True
         except (OSError, FileNotFoundError, ImportError) as e:
-            note_swallowed(
-                "genesis_conscious.temporal_lobe.object_recognition.is_available",
-                e,
-            )
+            # Model not installed — the documented text-only degradation,
+            # so it must not be tallied beside genuine faults.
+            logger.debug("object recognition unavailable: %s", e)
             self._available = False
             return self._available
         except Exception as e:  # noqa: BLE001 — cv2.error and backend failures vary by build

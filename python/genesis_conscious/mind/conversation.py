@@ -31,6 +31,38 @@ logger = logging.getLogger(__name__)
 _THINK_RECOVERY_JOIN_S = 30.0
 
 
+def stream_kind(thought) -> str:
+    """Which live stream this event belongs on.
+
+    Dream content gets its own kind so the live stream and the cognitive
+    journal can tell it apart from waking thought — it used to be labeled
+    "thought" and was indistinguishable, so a night of dreaming printed
+    `genesis~ [thought]` lines all night.
+
+    Extracted from `_on_spontaneous_thought` because it is a pure rule and
+    it was the thing being got wrong. Left inline, a caller that set the
+    kind correctly on `_emit` still had it silently overwritten here,
+    because this recomputes from the event's attributes rather than
+    trusting what the caller passed. That is invisible from any test that
+    stubs the emit side, and it shipped once already.
+    """
+    intent = getattr(thought, "intent", None)
+    is_question = intent == "question" or getattr(thought, "trigger", "") == "social"
+    if is_question:
+        return "question"
+    if intent == "distress":
+        return "distress"
+    if intent == "expression":
+        return "expression"
+    if getattr(thought, "is_dream", False):
+        chain_pos = getattr(thought, "chain_position", 0)
+        return f"dream:{chain_pos}" if chain_pos > 0 else "dream"
+    chain_position = getattr(thought, "chain_position", 0)
+    if chain_position:
+        return f"thought:{chain_position}"
+    return "thought"
+
+
 class ConversationMixin:
     """Mixin for :class:`Mind` — see module docstring."""
     if TYPE_CHECKING:
@@ -287,27 +319,10 @@ class ConversationMixin:
         # at the user, not just internal musings.
         # Expression thoughts get an "expression" kind so the CLI
         # knows to speak them aloud — it wants to say something.
+        kind = stream_kind(thought)
         intent = getattr(thought, "intent", None)
-        is_question = intent == "question" or thought.trigger == "social"
+        is_question = intent == "question" or getattr(thought, "trigger", "") == "social"
         is_expression = intent == "expression"
-        is_distress = intent == "distress"
-        is_dream = getattr(thought, "is_dream", False)
-        if is_question:
-            kind = "question"
-        elif is_distress:
-            kind = "distress"
-        elif is_expression:
-            kind = "expression"
-        elif is_dream:
-            # Dream content gets its own kind so the live stream and the
-            # cognitive journal can tell it apart from waking thought —
-            # it used to be labeled "thought" and was indistinguishable.
-            chain_pos = getattr(thought, "chain_position", 0)
-            kind = f"dream:{chain_pos}" if chain_pos > 0 else "dream"
-        elif hasattr(thought, "chain_position") and thought.chain_position > 0:
-            kind = f"thought:{thought.chain_position}"
-        else:
-            kind = "thought"
         # Compose the final text via the language engine if the thought
         # carries semantic metadata. This satisfies the CRITICAL RULE —
         # Genesis's words emerge from its language engine, not from

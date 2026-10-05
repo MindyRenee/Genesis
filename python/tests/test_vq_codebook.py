@@ -110,8 +110,10 @@ class TestVQCodebook:
         cb.fit(vectors, names, iters=20)
 
         for threshold in (0.1, 0.5, 5.0):
+            # limit=None is the deliberate unbounded path; the default is
+            # capped, so comparing needs the explicit opt-in.
             assert cb.count_merge_candidates(threshold) == len(
-                cb.find_merge_candidates(threshold=threshold),
+                cb.find_merge_candidates(threshold=threshold, limit=None),
             ), f"count disagrees at threshold={threshold}"
 
     def test_limited_candidates_are_the_closest_ones(self, sample_vectors):
@@ -125,7 +127,7 @@ class TestVQCodebook:
         cb = VQCodebook(dim=8, k=3, residual_scale=0.01)
         cb.fit(vectors, names, iters=20)
 
-        every = cb.find_merge_candidates(threshold=5.0)
+        every = cb.find_merge_candidates(threshold=5.0, limit=None)
         assert len(every) > 4, "need enough candidates to make the limit bite"
         limited = cb.find_merge_candidates(threshold=5.0, limit=4)
 
@@ -155,6 +157,21 @@ class TestVQCodebook:
         cb.find_merge_candidates = spy  # type: ignore[method-assign]
         assert cb.count_merge_candidates(0.5) >= 0
         assert calls == [], "count_merge_candidates must not call the list builder"
+
+    def test_default_limit_is_bounded(self, sample_vectors):
+        """The cheap path must be the default one.
+
+        The unbounded call returned 7.7M tuples in production and cost
+        142 s of a sleep pass, for a caller that only wanted a count. A
+        cap that has to be opted *into* gets left off.
+        """
+        vectors, names = sample_vectors
+        cb = VQCodebook(dim=8, k=3, residual_scale=0.01)
+        cb.fit(vectors, names, iters=20)
+
+        everything = cb.find_merge_candidates(threshold=5.0, limit=None)
+        assert len(everything) > 32, "need enough candidates for the cap to bite"
+        assert len(cb.find_merge_candidates(threshold=5.0)) == 32
 
     def test_untrained_codebook_reports_zero(self):
         """Both entry points must be safe before training."""

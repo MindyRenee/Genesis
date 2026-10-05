@@ -84,50 +84,77 @@ class _Recorder:
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, str]] = []
+        self.is_dream_flags: list[bool] = []
 
-    def __call__(self, kind: str, text: str) -> None:
+    def __call__(self, kind: str, text: str, is_dream: bool = False) -> None:
         self.calls.append((kind, text))
+        self.is_dream_flags.append(is_dream)
 
 
-def test_dream_derived_insight_is_announced_as_a_dream() -> None:
-    """A novel connection found inside a dream must not print as a thought.
+def test_dream_derived_insight_reaches_the_dream_stream() -> None:
+    """End to end: a dream's insight must land on the dream stream.
 
-    `detect_insight` runs on every recorded thought, and a dream always
-    carries at least two concepts, so dream content reliably produced
-    insights. Those were emitted with kind="thought" unconditionally, so a
-    night's dreaming printed lines indistinguishable from waking thoughts
-    on the same `genesis~` stream.
+    This asserts on the *stream kind the receiver derives*, not on what
+    `_emit` was handed. The previous version stubbed the emit side and
+    passed while the feature was completely broken: `_emit` got the right
+    kind and `_on_spontaneous_thought` then overwrote it from the event's
+    attributes, because `_LiveEvent` had no `is_dream` to read. Only a live
+    run caught that. Asserting on the sender asserts the wrong side.
     """
+    from genesis_conscious.mind.conversation import stream_kind
+    from genesis_conscious.sleep.inner_life import _LiveEvent
+
     il = _inner_life()
     recorder = _Recorder()
     il._emit = recorder  # type: ignore[method-assign,assignment]
 
     dream = SpontaneousThought(content="alpha and beta", trigger="dream")
     dream.is_dream = True
-
     il._make_insight(dream, "alpha", "gamma", None)
 
-    kinds = [k for k, _ in recorder.calls]
-    assert kinds, "an insight should still be announced"
-    assert all(k == "dream" for k in kinds), (
-        f"dream-derived insight emitted as {kinds}; dream content must stay "
-        f"on the dream channel"
+    assert recorder.calls, "an insight should still be announced"
+    assert all(k == "dream" for k, _ in recorder.calls), (
+        f"dream-derived insight emitted as {[k for k, _ in recorder.calls]}"
     )
+    assert all(recorder.is_dream_flags), (
+        "_emit must be told the event is dream-derived; the receiver "
+        "recomputes the kind from that flag"
+    )
+    assert stream_kind(_LiveEvent("insight: x", "dream", True)) == "dream"
 
 
-def test_waking_derived_insight_is_still_announced_as_a_thought() -> None:
+def test_waking_derived_insight_stays_a_thought() -> None:
     """The other direction: waking insights must not be demoted."""
+    from genesis_conscious.mind.conversation import stream_kind
+    from genesis_conscious.sleep.inner_life import _LiveEvent
+
     il = _inner_life()
     recorder = _Recorder()
     il._emit = recorder  # type: ignore[method-assign,assignment]
 
     waking = SpontaneousThought(content="alpha and beta", trigger="spontaneous")
     assert not waking.is_dream
-
     il._make_insight(waking, "alpha", "gamma", None)
 
-    kinds = [k for k, _ in recorder.calls]
-    assert kinds and all(k == "thought" for k in kinds)
+    assert recorder.calls
+    assert all(k == "thought" for k, _ in recorder.calls)
+    assert not any(recorder.is_dream_flags)
+    assert stream_kind(_LiveEvent("insight: x", "thought", False)) == "thought"
+
+
+def test_live_event_carries_the_dream_flag() -> None:
+    """`_LiveEvent` must expose what the receiver reads.
+
+    Its `__slots__` omitted `is_dream`, so every dream-derived event was
+    indistinguishable from a waking one no matter what the sender said.
+    """
+    from genesis_conscious.sleep.inner_life import _LiveEvent
+
+    assert "is_dream" in _LiveEvent.__slots__, (
+        "the receiver reads is_dream off this object"
+    )
+    assert _LiveEvent("x", "dream", True).is_dream is True
+    assert _LiveEvent("x", "thought").is_dream is False
 
 
 def test_thought_count_separates_dreams_from_waking() -> None:
