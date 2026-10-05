@@ -1329,6 +1329,16 @@ class SemanticMemory:
         never-throw path, because a corrupt semantic store should cost
         the learned facts, not prevent the process from starting.
         """
+        # Restore replaces the persisted semantic snapshot. Keeping
+        # pre-existing entries would make restart state depend on whatever
+        # happened to populate the object before restore() was called.
+        self._facts.clear()
+        self._schemas.clear()
+        self.facts_extracted = 0
+        self.schemas_formed = 0
+        self.consolidations = 0
+        self._primed_concepts = {}
+
         facts = data.get("facts") or []
         restored = 0
         for raw in facts:
