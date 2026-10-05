@@ -392,12 +392,21 @@ class CodeLearner:
             fp = meta.get("fingerprint")
             uncertainty = meta.get("uncertainty")
             complexity = meta.get("complexity")
+            last_analyzed = meta.get("last_analyzed")
+            review_count = meta.get("review_count")
+            importance = meta.get("importance", complexity)
             if isinstance(fp, str):
                 self._file_fingerprints[rel] = fp
-            if isinstance(uncertainty, (int, float)):
+            if isinstance(uncertainty, (int, float)) and math.isfinite(float(uncertainty)):
                 self._file_uncertainty[rel] = max(0.0, min(1.0, float(uncertainty)))
-            if isinstance(complexity, (int, float)):
+            if isinstance(complexity, (int, float)) and math.isfinite(float(complexity)):
                 self._file_complexity[rel] = max(0.0, min(1.0, float(complexity)))
+            if isinstance(last_analyzed, (int, float)) and math.isfinite(float(last_analyzed)):
+                self._spaced_repetition.last_analyzed[rel] = max(0.0, float(last_analyzed))
+            if isinstance(review_count, int) and review_count >= 0:
+                self._spaced_repetition._review_counts[rel] = review_count
+            if isinstance(importance, (int, float)) and math.isfinite(float(importance)):
+                self._spaced_repetition._importance[rel] = max(0.0, min(1.0, float(importance)))
 
     def _source_fingerprint(self, path: Path) -> str | None:
         """Hash contents so source changes, not timestamps, trigger relearning."""
@@ -431,8 +440,9 @@ class CodeLearner:
             "fingerprint": fingerprint,
             "uncertainty": max(0.0, min(1.0, uncertainty)),
             "complexity": self._file_complexity.get(rel, 0.0),
-            "last_analyzed": time.time(),
+            "last_analyzed": self._spaced_repetition.last_analyzed.get(rel, time.time()),
             "review_count": self._spaced_repetition._review_counts.get(rel, 1),
+            "importance": self._spaced_repetition._importance.get(rel, 0.5),
         })
 
     # ── Public API ──────────────────────────────────────────────────
