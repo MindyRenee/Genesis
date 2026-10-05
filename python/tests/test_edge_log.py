@@ -136,6 +136,17 @@ class TestEdgeLog:
         log.close()
         assert len(live) == 1
 
+    def test_compaction_is_deterministic_for_same_edges(self, tmp_path):
+        log = open_edge_log(tmp_path)
+        log.assert_edge("b", "c", RelationType.IS_A, 0.4, "stated", 2)
+        log.assert_edge("a", "b", RelationType.IS_A, 0.7, "stated", 1)
+        log.compact()
+        first = log.path.read_text(encoding="utf-8")
+        log.compact()
+        second = log.path.read_text(encoding="utf-8")
+        log.close()
+        assert first == second
+
     def test_malformed_json_events_do_not_break_fold(self, tmp_path):
         log = open_edge_log(tmp_path)
         log.assert_edge("a", "b", RelationType.IS_A, 0.7, "stated", 1)
