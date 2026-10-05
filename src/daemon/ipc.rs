@@ -138,7 +138,8 @@ pub mod cmd {
     /// Get the interoceptive body state — CPU temperature, frequency,
     /// memory pressure, load, I/O activity, battery, thermal throttling,
     /// cognitive load, and distress level. This is how the cognitive
-    /// mind feels its own body. Response: BodyState (64 bytes).
+    /// mind feels its own body. Response: BodyState (116-byte v3
+    /// header + trailing variable-length descriptor blocks).
     pub const GET_BODY_STATE: u8 = 17;
     /// Get the body control state — what Genesis is doing to its body
     /// (CPU frequency policy, scheduling priorities, I/O priority,
@@ -148,7 +149,7 @@ pub mod cmd {
     /// Get the active inference summary — the generative self-model's
     /// projection (surprise, free energy, allostatic load, precision,
     /// dyadic attunement/synchrony, user affect, prediction errors).
-    /// Response: InferenceSignals (60 bytes).
+    /// Response: InferenceSignals (64 bytes).
     pub const GET_INFERENCE_SUMMARY: u8 = 19;
     /// Update the user affect observation — the cognitive mind's
     /// inference of the user's affective state from conversation
@@ -3131,7 +3132,9 @@ pub fn default_handler(
             // These are the active inference engine's projection:
             // surprise, free energy, allostatic load, precision,
             // dyadic attunement/synchrony, user affect, prediction
-            // errors. 60 bytes.
+            // errors. 64 bytes — `InferenceSummary.unpack` in
+            // python/genesis_client/types.py requires 64 and its bound
+            // has to keep agreeing with this.
             let mut snapshot = None;
             for _ in 0..8 {
                 snapshot = mmap.read_consistent();
