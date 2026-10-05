@@ -12,6 +12,7 @@ in ``classify``.
 from __future__ import annotations
 
 import logging
+import math
 import random
 import re
 import sqlite3
@@ -1149,6 +1150,15 @@ class ConceptNetwork(
         than defaulting to "conversation". This ensures code concepts
         created as edge endpoints are correctly labeled.
         """
+        # Reject non-finite weights before creating concepts or mutating state.
+        # A NaN/inf edge cannot be represented meaningfully in the canonical log.
+        try:
+            if not math.isfinite(float(weight)):
+                return None
+        except (TypeError, ValueError):
+            return None
+        weight = min(1.0, max(0.0, float(weight)))
+
         # Ensure both concepts exist
         src_id = self._resolve(source)
         if not src_id:
@@ -1180,14 +1190,17 @@ class ConceptNetwork(
             weight=weight,
             origin=origin,
         )
+        if self._edge_log is not None:
+            # Persist first. If the canonical write fails, do not mutate the
+            # live graph into a state that cannot be recovered from disk.
+            if not self._edge_log.assert_edge(
+                src_id, tgt_id, relation, weight, origin, edge.created_at,
+            ):
+                return None
         self._edges.append(edge)
         self._edge_index.setdefault(src_id, []).append(edge)
         self._reverse_index.setdefault(tgt_id, []).append(edge)
         self._edge_key_index[key] = edge
-        if self._edge_log is not None:
-            self._edge_log.assert_edge(
-                src_id, tgt_id, relation, weight, origin, edge.created_at,
-            )
         # Edge counts affect quality scores — invalidate the cache.
         self._quality_concept_ids_cache = None
         return edge
@@ -1216,12 +1229,21 @@ class ConceptNetwork(
         edge = self._edge_key_index.get((source, target, relation))
         if edge is None:
             return None
-        edge.weight = min(1.0, max(0.0, weight))
+        try:
+            if not math.isfinite(float(weight)):
+                return None
+        except (TypeError, ValueError):
+            return None
+        new_weight = min(1.0, max(0.0, float(weight)))
         if self._edge_log is not None:
-            self._edge_log.assert_edge(
+            # Persist first so an I/O failure cannot leave memory ahead of
+            # the canonical relationship store.
+            if not self._edge_log.assert_edge(
                 source, target, relation,
-                edge.weight, edge.origin, edge.created_at,
-            )
+                new_weight, edge.origin, edge.created_at,
+            ):
+                return None
+        edge.weight = new_weight
         return edge
 
     def get_concept(self, name: str) -> Concept | None:
