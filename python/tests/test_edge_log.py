@@ -241,6 +241,21 @@ class TestNetworkWiring:
         assert len(live) == 1
         assert next(iter(live.values())).source == "x"
 
+    def test_replace_contents_seeds_empty_log(self, tmp_path):
+        log = open_edge_log(tmp_path)
+        shared = ConceptNetwork()
+        shared.attach_edge_log(log)
+        staged = ConceptNetwork()
+        staged.add_edge("a", "b", RelationType.IS_A, 0.7, "stated")
+
+        shared.replace_contents(staged)
+
+        assert shared.edge_count == 1
+        live = log.fold()
+        assert len(live) == 1
+        assert next(iter(live.values())).source == "a"
+        log.close()
+
     def test_replace_contents_log_overrides_transplant(self, tmp_path):
         log = open_edge_log(tmp_path)
         log.assert_edge("a", "b", RelationType.IS_A, 0.7, "stated", 1)
