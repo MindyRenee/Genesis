@@ -196,6 +196,17 @@ _EXPERTISE_INDICATORS: frozenset[str] = frozenset(
     }
 )
 
+def _contains_question_indicator(text: str) -> bool:
+    """Return whether text contains a question indicator as a word/phrase."""
+    for indicator in _QUESTION_INDICATORS:
+        if " " in indicator:
+            if re.search(rf"(?<!\\w){re.escape(indicator)}(?!\\w)", text):
+                return True
+        elif re.search(rf"(?<!\\w){re.escape(indicator)}(?!\\w)", text):
+            return True
+    return False
+
+
 _NOVICE_INDICATORS: frozenset[str] = frozenset(
     {
         "what is",
