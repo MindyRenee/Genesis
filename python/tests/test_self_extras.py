@@ -747,6 +747,24 @@ def test_code_learning_reanalyzes_changed_source(tmp_path):
     assert second.functions == 2
 
 
+def test_code_learning_restores_spaced_repetition_state(tmp_path):
+    """Restart must preserve review timing rather than treating code as never reviewed."""
+    target = tmp_path / "module.py"
+    target.write_text("def first():\n    return 1\n", encoding="utf-8")
+    network = ConceptNetwork()
+    learner = CodeLearner(network=network, project_root=str(tmp_path))
+    learner.learn_file(str(target))
+    rel = "module.py"
+    expected_last = learner._spaced_repetition.last_analyzed[rel]
+    expected_reviews = learner._spaced_repetition._review_counts[rel]
+    expected_importance = learner._spaced_repetition._importance[rel]
+
+    restored = CodeLearner(network=network, project_root=str(tmp_path))
+    assert restored._spaced_repetition.last_analyzed[rel] == expected_last
+    assert restored._spaced_repetition._review_counts[rel] == expected_reviews
+    assert restored._spaced_repetition._importance[rel] == expected_importance
+    assert restored._spaced_repetition.schedule_reanalysis(rel, expected_importance) > 0
+
 def test_code_learning_persists_investigation_evidence(tmp_path):
     """A fresh learner can recover the source fingerprint and uncertainty state."""
     target = tmp_path / "module.py"
