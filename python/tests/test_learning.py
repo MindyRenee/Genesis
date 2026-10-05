@@ -20,6 +20,7 @@ from genesis_client.types import (
 from genesis_cognitive.cognition.concept_learner import ConceptLearner
 from genesis_cognitive.concepts import ConceptNetwork, EmbeddingStore, NetworkTopology, RelationType
 from genesis_cognitive.emotion import EmotionalState
+from genesis_cognitive.memory import SemanticMemory
 from genesis_cognitive.learning import (
     STDP,
     AutonomousLearner,
@@ -162,6 +163,22 @@ def _make_learner(
         get_emotion=get_emotion,
         get_plasticity_profile=get_plasticity_profile,
     )
+
+
+def test_autonomous_learner_reuses_canonical_semantic_memory() -> None:
+    """The autonomous learner must use the cognition engine's semantic store."""
+    net = ConceptNetwork()
+    reasoning = ReasoningEngine(net)
+    curiosity = CuriosityEngine(net, reasoning)
+    semantic_memory = SemanticMemory(network=net)
+
+    learner = AutonomousLearner(
+        network=net,
+        curiosity=curiosity,
+        semantic_memory=semantic_memory,
+    )
+
+    assert learner.semantic_memory is semantic_memory
 
 
 def _make_profile(
