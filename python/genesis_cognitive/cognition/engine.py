@@ -692,7 +692,9 @@ class CognitionEngine:
         # Wire episodic memory replay into semantic memory: when the
         # MemoryEngine replays an episode during sleep, its text is
         # extracted into facts and stored in the concept network.
-        self.memory.semantic_replay_callback = self.semantic_memory.extract_facts
+        self.memory.semantic_replay_callback = lambda text: self.semantic_memory.extract_facts(
+            text, reinforce_existing=False
+        )
 
     def _init_monitoring_and_self(self, data_dir: str | None) -> None:
         """Initialize monitoring, self-assessment, and self-learning (9-12.6)."""
