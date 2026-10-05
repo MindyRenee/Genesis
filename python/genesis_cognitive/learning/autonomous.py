@@ -1761,8 +1761,8 @@ class AutonomousLearner:
 
         def _absorb_local(
             src_result: SourceResult, src_label: str,
-        ) -> None:
-            """Learn from a local reference result and record performance."""
+        ) -> bool:
+            """Learn from a local reference and report actual success."""
             self._emit(
                 "learning",
                 f"Reading {src_label}: {src_result.title}",
@@ -1771,12 +1771,13 @@ class AutonomousLearner:
                 src_result.content,
                 f"{src_label}:{query}",
             )
-            if lr is not None:
-                self.curiosity.mark_resolved(topic)
-                return True
-                performance = min(1.0, len(lr.concepts_learned) / 5.0)
-                self.meta_learner.record_performance(performance)
-                self.meta_learner.adapt_rate()
+            if lr is None:
+                return False
+            self.curiosity.mark_resolved(topic)
+            performance = min(1.0, len(lr.concepts_learned) / 5.0)
+            self.meta_learner.record_performance(performance)
+            self.meta_learner.adapt_rate()
+            return True
 
         # 1. Local man pages — instant, offline, authoritative for
         #    system commands and locally-documented software (python3,
@@ -1814,7 +1815,7 @@ class AutonomousLearner:
             result = self.fetch_docs(query, language)
         except (OSError, ValueError, RuntimeError, ConnectionError) as e:
             logger.warning(f"Developer docs lookup failed for '{topic}': {e}")
-            return
+            return False
         if result is None:
             return False
         # It learned something — mark the curiosity question resolved.
