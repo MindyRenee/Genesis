@@ -577,6 +577,39 @@ def test_learn_python_file():
     assert learner.network.get_concept("python:conceptnetwork.add_concept") is not None
 
 
+
+def test_python_class_concepts_are_module_scoped(tmp_path):
+    """Same-named classes in different modules must remain distinct."""
+    first = tmp_path / "first.py"
+    second = tmp_path / "second.py"
+    first.write_text(
+        "class Shared:\n    def run(self):\n        return 1\n",
+        encoding="utf-8",
+    )
+    second.write_text(
+        "class Shared:\n    def run(self):\n        return 2\n",
+        encoding="utf-8",
+    )
+
+    learner = _make_learner(tmp_path)
+    learner.learn_file(str(first))
+    learner.learn_file(str(second))
+
+    first_class = learner.network.get_concept("python:first.shared")
+    second_class = learner.network.get_concept("python:second.shared")
+    assert first_class is not None
+    assert second_class is not None
+    assert first_class.id != second_class.id
+    assert first_class.properties["file"] == "first.py"
+    assert second_class.properties["file"] == "second.py"
+
+    first_method = learner.network.get_concept("python:first.shared.run")
+    second_method = learner.network.get_concept("python:second.shared.run")
+    assert first_method is not None
+    assert second_method is not None
+    assert first_method.properties["file"] == "first.py"
+    assert second_method.properties["file"] == "second.py"
+
 def test_learn_rust_file():
     """Analyzing a Rust file adds concepts and relationships."""
     learner = _make_learner(root=PROJECT_ROOT.parent)
