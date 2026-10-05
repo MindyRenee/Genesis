@@ -543,3 +543,34 @@ class TestCompactionFailureIsReported:
         net.sync_edge_log()
         assert net._compact_failures == 0
         log.close()
+
+
+def test_network_rejects_nonfinite_edge_weights():
+    from genesis_cognitive.concepts.network import ConceptNetwork
+    from genesis_cognitive.concepts.types import RelationType
+
+    network = ConceptNetwork()
+    assert network.add_edge("a", "b", RelationType.RELATED_TO, float("nan")) is None
+    assert network.add_edge("c", "d", RelationType.RELATED_TO, float("inf")) is None
+    assert network.get_edges("a") == []
+
+
+def test_network_does_not_mutate_weight_when_canonical_write_fails(monkeypatch):
+    from genesis_cognitive.concepts.network import ConceptNetwork
+    from genesis_cognitive.concepts.types import RelationType
+
+    network = ConceptNetwork()
+    edge = network.add_edge("a", "b", RelationType.IS_A, 0.2)
+    assert edge is not None
+
+    class FailingLog:
+        def assert_edge(self, *args, **kwargs):
+            raise OSError("disk full")
+
+    network._edge_log = FailingLog()
+    before = edge.weight
+    try:
+        network.set_edge_weight("a", "b", RelationType.IS_A, 0.9)
+    except OSError:
+        pass
+    assert edge.weight == before
