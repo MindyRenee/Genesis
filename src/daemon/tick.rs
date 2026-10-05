@@ -1027,6 +1027,11 @@ impl TickLoop {
     /// Returns (surprise, free_energy, precision, allostatic_load,
     /// tick_count) so the mind can observe the result.
     pub fn advance_neuro(&mut self, mmap: &MmapState, dt: f32) -> (f32, f32, f32, f32, u32) {
+        // Keep the dynamics bounded at the subsystem boundary as well as
+        // at IPC decoding. Autonomous callers and future in-process
+        // callers can bypass the wire-level sanitizer; a non-finite or
+        // extreme dt must never reach the pharmacodynamic integrator.
+        let dt = crate::state::sanitize::finite_clamp(dt, 0.001, 10.0);
         let call_start = std::time::Instant::now();
         let call_interval_s = self
             .subcognitive_last_call
