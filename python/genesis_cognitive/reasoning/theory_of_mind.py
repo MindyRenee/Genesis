@@ -281,7 +281,7 @@ class TheoryOfMind:
         self._infer_intentions(lower, text)
 
         # Detect questions → user is seeking knowledge
-        if any(qi in lower for qi in _QUESTION_INDICATORS):
+        if _contains_question_indicator(lower):
             # Extract the topic of the question
             topics = self._extract_topics(text)
             for topic in topics:
@@ -639,7 +639,7 @@ class TheoryOfMind:
         if len(self._model.intentions) > 10:
             self._model.intentions = self._model.intentions[-5:]
 
-        if any(qi in lower_text for qi in _QUESTION_INDICATORS):
+        if _contains_question_indicator(lower_text):
             if "why" in lower_text:
                 self._model.intentions.append("understand_reasoning")
             elif "how" in lower_text:
