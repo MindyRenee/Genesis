@@ -573,8 +573,8 @@ def test_learn_python_file():
     # The module concept should exist
     assert learner.network.get_concept("python:network") is not None
     # add_concept / add_edge should be present as concepts
-    # (methods are scoped to their class: python:ClassName.method)
-    assert learner.network.get_concept("python:conceptnetwork.add_concept") is not None
+    # (methods are scoped to their module and class: python:module.ClassName.method)
+    assert learner.network.get_concept("python:network.ConceptNetwork.add_concept") is not None
 
 
 
