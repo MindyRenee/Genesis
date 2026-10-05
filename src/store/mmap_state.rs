@@ -70,7 +70,7 @@
 //! offset 3416:  (unused, padding to page boundary)
 //! ```
 //!
-//! The state struct is 3296 bytes and the file is page-aligned, so the
+//! The state struct is 3416 bytes and the file is page-aligned, so the
 //! mapping is at least one page and the state sits at its start. (On a
 //! host with a 64 KiB page — aarch64, for instance — `page_align_up`
 //! expands the file to 64 KiB, not 4 KiB.)

@@ -1,9 +1,17 @@
 //! Inference signals — the active inference state projection.
 //!
-//! This module defines [`InferenceSignals`], a 60-byte struct that
-//! lives in the reserved region of [`GenesisCoreState`] (offset 3228).
-//! It exposes the key signals from the active inference engine to the
-//! cognitive mind, without requiring a schema version bump.
+//! This module defines [`InferenceSignals`], a 64-byte struct that
+//! lives at the tail of [`GenesisCoreState`] (offset 3352, right after
+//! the checksum). It exposes the key signals from the active inference
+//! engine to the cognitive mind, without requiring a schema version
+//! bump.
+//!
+//! The block used to sit at 3228. Schema v4 inserted the 124-byte
+//! ion layer at 3224, so it moved here; see
+//! [`crate::state::core_state::GenesisCoreState`] for the full layout.
+//! `python/genesis_client/types.py` reads this block by offset and must
+//! be updated whenever it moves — a stale offset there parses
+//! successfully out of the wrong bytes.
 //!
 //! # Active inference in Genesis
 //!
