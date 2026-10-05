@@ -519,24 +519,41 @@ class ReasoningEngine:
                 (edge.relation, edge.weight)
             )
 
-        # candidate → list of (intermediary, relation_to_candidate, weight)
-        two_hop: dict[str, list[tuple[str, RelationType, float]]] = {}
-        for neighbor, _rels in one_hop.items():
+        # candidate → paired first/second-hop evidence. Keeping the
+        # first hop paired with its second hop prevents a different
+        # relation from being selected when an intermediary has several.
+        two_hop: dict[
+            str, list[tuple[str, RelationType, float, RelationType, float]]
+        ] = {}
+        for neighbor, first_edges in one_hop.items():
             for edge in self.network.get_edges(neighbor, "out"):
                 if edge.target != concept_id and edge.target not in one_hop:
-                    two_hop.setdefault(edge.target, []).append(
-                        (neighbor, edge.relation, edge.weight)
-                    )
+                    for first_relation, first_weight in first_edges:
+                        two_hop.setdefault(edge.target, []).append(
+                            (
+                                neighbor,
+                                first_relation,
+                                first_weight,
+                                edge.relation,
+                                edge.weight,
+                            )
+                        )
 
         # Score candidates before committing — the cap should keep the
         # strongest hypotheses, not the first five in dict order.
-        scored: list[tuple[float, str, list[tuple[str, RelationType, float]]]] = []
+        scored: list[
+            tuple[
+                float,
+                str,
+                list[tuple[str, RelationType, float, RelationType, float]],
+            ]
+        ] = []
         for candidate, paths in two_hop.items():
-            # Path strength = product of hop weights, best path wins.
-            best_strength = 0.0
-            for inter, _rel, w2 in paths:
-                w1 = max((w for _r, w in one_hop.get(inter, [])), default=0.5)
-                best_strength = max(best_strength, w1 * w2)
+            # Path strength uses the weights of the same two edges.
+            best_strength = max(
+                (w1 * w2 for _inter, _r1, w1, _r2, w2 in paths),
+                default=0.0,
+            )
             # Independent support: distinct intermediaries converge on
             # the same gap. Each extra path adds less (diminishing).
             support = 1.0 - 0.5 ** len({p[0] for p in paths})
@@ -546,9 +563,8 @@ class ReasoningEngine:
 
         for score, candidate, paths in scored[:5]:
             path_relations: list[tuple[RelationType, RelationType]] = []
-            for inter, rel_to_candidate, _w in paths:
-                for rel_to_inter, _w1 in one_hop.get(inter, []):
-                    path_relations.append((rel_to_inter, rel_to_candidate))
+            for _inter, rel_to_inter, _w1, rel_to_candidate, _w2 in paths:
+                path_relations.append((rel_to_inter, rel_to_candidate))
 
             suggested_relation = self._predict_hypothesis_relation(path_relations)
             # Confidence: structural consistency (same relation both
@@ -592,20 +608,13 @@ class ReasoningEngine:
             evidence = [f"gap: no direct {concept_id} → {candidate}"]
             structured_path: list[tuple[str, str, str, float]] = []
             seen_first_hops: set[str] = set()
-            for inter, rel, w2 in paths:
-                # First hop: strongest edge to this intermediary, with
-                # its real relation type (not a pseudo-marker).
-                first = max(
-                    one_hop.get(inter, []), key=lambda rw: rw[1],
-                    default=(RelationType.RELATED_TO, 0.5),
-                )
+            for inter, first_rel, first_w1, rel, w2 in paths:
+                # Preserve the exact first hop paired with this second hop.
                 evidence.append(f"{concept_id} → {inter}")
                 evidence.append(f"{inter} {rel.value} {candidate}")
-                if inter not in seen_first_hops:
-                    seen_first_hops.add(inter)
-                    structured_path.append(
-                        (concept_id, first[0].value, inter, first[1])
-                    )
+                structured_path.append(
+                    (concept_id, first_rel.value, inter, first_w1)
+                )
                 structured_path.append((inter, rel.value, candidate, w2))
             results.append(
                 ReasoningResult(
