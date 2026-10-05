@@ -1227,9 +1227,9 @@ class CodeLearner:
         if sym.kind == "module":
             return None
         if sym.kind == "class":
-            return f"python:{sym.name}"
+            return f"python:{module_name}.{sym.name}"
         if sym.kind == "method" and len(parts) >= 2:
-            return f"python:{parts[-2]}.{parts[-1]}"
+            return f"python:{module_name}.{parts[-2]}.{parts[-1]}"
         if sym.kind == "function":
             # Nested functions don't get their own concept — they fold
             # into the enclosing callable.
