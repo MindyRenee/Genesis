@@ -1742,7 +1742,7 @@ class AutonomousLearner:
                 return topic[len(prefix):] or topic
         return topic
 
-    def _learn_code_from_docs(self, topic: str) -> None:
+    def _learn_code_from_docs(self, topic: str) -> bool:
         """Look up a code topic in developer docs instead of the dictionary.
 
         Checks local references in priority order (all offline, all
@@ -1772,6 +1772,7 @@ class AutonomousLearner:
             )
             if lr is not None:
                 self.curiosity.mark_resolved(topic)
+                return True
                 performance = min(1.0, len(lr.concepts_learned) / 5.0)
                 self.meta_learner.record_performance(performance)
                 self.meta_learner.adapt_rate()
@@ -1781,8 +1782,8 @@ class AutonomousLearner:
         #    pip, rustc, rustdoc, genesis, ...).
         man_result = self._sources.man_pages.lookup(query)
         if man_result is not None:
-            _absorb_local(man_result, "man")
-            return
+            if _absorb_local(man_result, "man"):
+                return True
 
         # 2. GNU Info pages — the tutorial layer above man pages. A
         #    man page says what flags exist; an info page explains how
@@ -1791,8 +1792,8 @@ class AutonomousLearner:
         if language in ("python", "rust") or self._is_code_topic(topic):
             info_result = self._sources.info_pages.lookup(query)
             if info_result is not None:
-                _absorb_local(info_result, "info")
-                return
+                if _absorb_local(info_result, "info"):
+                    return True
 
         # 3. Package documentation (/usr/share/doc) — the deepest layer:
         #    READMEs, INTROs, FAQs, design docs from the developers
@@ -1800,8 +1801,8 @@ class AutonomousLearner:
         if language in ("python", "rust") or self._is_code_topic(topic):
             doc_result = self._sources.package_docs.lookup(query)
             if doc_result is not None:
-                _absorb_local(doc_result, "doc")
-                return
+                if _absorb_local(doc_result, "doc"):
+                    return True
 
         # 4. No local reference — fall back to online developer docs.
         self._emit(
@@ -1814,13 +1815,14 @@ class AutonomousLearner:
             logger.warning(f"Developer docs lookup failed for '{topic}': {e}")
             return
         if result is None:
-            return
+            return False
         # It learned something — mark the curiosity question resolved.
         self.curiosity.mark_resolved(topic)
         # Meta-learning: record performance and adapt learning rate.
         performance = min(1.0, len(result.concepts_learned) / 5.0)
         self.meta_learner.record_performance(performance)
         self.meta_learner.adapt_rate()
+        return True
 
     def _handle_offline_gating(self) -> bool:
         """Handle offline gating for the learning loop.
@@ -2219,9 +2221,8 @@ class AutonomousLearner:
         # respond()).
         if self._paused:
             return
-        with self._queue_lock:
-            self._topics_searched.add(topic)
-
+        # A failed acquisition is not knowledge acquired; only successful
+        # learning should permanently mark the topic as searched.
         # Programming topics go to programming sources, not Wikipedia.
         # Wikipedia is a general encyclopedia — it's wrong for code
         # questions. Route to developer docs + GitHub instead.
@@ -2231,7 +2232,10 @@ class AutonomousLearner:
                 f"'{topic}' is a programming topic — routing to "
                 f"developer docs + GitHub, not Wikipedia",
             )
-            self._learn_code_from_docs(topic)
+            learned = self._learn_code_from_docs(topic)
+            if learned:
+                with self._queue_lock:
+                    self._topics_searched.add(topic)
             # Also search GitHub for real-world examples of this topic
             # — seeing how other projects use a concept deepens
             # understanding beyond just reading the docs.
@@ -2269,6 +2273,8 @@ class AutonomousLearner:
                 result = self._fetch_and_learn(sr.url, topic)
 
             if result:
+                with self._queue_lock:
+                    self._topics_searched.add(topic)
                 # It learned something — mark the curiosity question
                 # about this topic as resolved so it doesn't keep
                 # wondering about what it now understands.
