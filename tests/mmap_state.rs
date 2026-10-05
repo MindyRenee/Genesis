@@ -577,6 +577,14 @@ fn test_open_migrates_legacy_layout_in_place() {
 
     downgrade_to_legacy_layout(&path);
 
+    // Also exercise the real failure mode: an older writer may have
+    // left the file itself at the legacy struct length rather than at
+    // the current page-aligned mapping length.
+    {
+        let bytes = std::fs::read(&path).expect("read legacy page");
+        std::fs::write(&path, &bytes[..LEGACY_STATE_SIZE as usize]).expect("truncate legacy file");
+    }
+
     // Opening must succeed rather than refusing the file — the whole
     // point of the reserve is that a state written by the previous
     // build is still readable.
