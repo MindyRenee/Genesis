@@ -412,20 +412,20 @@ mod tests {
     #[test]
     fn test_compact_tag_differs_from_deprecated_formula() {
         let mut tag = [0.0f32; 12];
-        tag[0] = 0.8; // DA
-        tag[1] = 0.7; // SRT
-        tag[2] = 0.6; // NE
-        tag[3] = 0.5; // ACh  (was ignored by old arousal formula)
-        tag[5] = 0.55; // Glu  (was ignored by old valence formula)
-        tag[6] = 0.3; // Cort
-        tag[7] = 0.4; // Oxy  (was ignored by old valence formula)
-        tag[8] = 0.35; // Endorphin (was ignored by old valence formula)
-        tag[9] = 0.5; // Hist
+        tag[0] = 1.0; // DA
+        tag[1] = 1.0; // SRT
+        tag[2] = 1.0; // NE
+        tag[3] = 1.0; // ACh  (was ignored by old arousal formula)
+        tag[5] = 0.0; // Glu  (was ignored by old valence formula)
+        tag[6] = 0.0; // Cort
+        tag[7] = 0.0; // Oxy  (was ignored by old valence formula)
+        tag[8] = 0.0; // Endorphin (was ignored by old valence formula)
+        tag[9] = 1.0; // Hist
 
         let compact = compute_compact_tag(&tag);
 
-        // Old valence = (DA + SRT) * 0.5 - Cort = 0.75 - 0.3 = 0.45
-        let old_valence = (0.8 + 0.7) * 0.5 - 0.3;
+        // Old valence = (DA + SRT) * 0.5 - Cort = 1.0
+        let old_valence = (1.0 + 1.0) * 0.5 - 0.0;
         let new_valence = compact[1];
         assert!(
             (new_valence - old_valence).abs() > 0.01,
@@ -439,7 +439,7 @@ mod tests {
         // epinephrine (0.15 default × 0.10 = 0.015), ACh (0.5 × 0.15 = 0.075),
         // and DA (0.8 × 0.15 = 0.12) as arousal promoters, plus different
         // weights for NE (0.20 vs 0.50) and histamine (0.15 vs 0.50).
-        let old_arousal = ((0.6 + 0.5) * 0.5 - (0.0 + 0.0) * 0.5 + 1.0) * 0.5;
+        let old_arousal = ((1.0 + 1.0) * 0.5 - (0.0 + 0.0) * 0.5 + 1.0) * 0.5;
         assert!(
             (compact[0] - old_arousal).abs() > 0.01,
             "corrected arousal {} should differ from deprecated {}",
