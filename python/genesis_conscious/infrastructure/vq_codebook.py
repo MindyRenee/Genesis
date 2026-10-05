@@ -389,68 +389,95 @@ class VQCodebook:
 
     # ─── Merge candidates ───────────────────────────────────────
 
-    def find_merge_candidates(
-        self,
-        threshold: float = 0.02,
-    ) -> list[tuple[str, str, float]]:
-        """Find pairs of concepts that share a prototype with tiny residuals.
+    def count_merge_candidates(self, threshold: float) -> int:
+        """Number of within-prototype pairs closer than ``threshold``.
 
-        These are near-duplicate concepts that could be merged during
-        sleep consolidation. Two concepts are merge candidates if:
-        - They share the same prototype
-        - The L2 distance between their reconstructed vectors is below
-          ``threshold``
-
-        Args:
-            threshold: Maximum L2 distance between reconstructed vectors
-                to be considered merge candidates.
-
-        Returns:
-            List of (concept_a, concept_b, distance) tuples, sorted by
-            distance ascending.
+        This is the cheap half of :meth:`find_merge_candidates`, and it is
+        what callers usually want. The full list was being built only to
+        be counted and logged: with ~12k concepts in few prototypes that
+        is millions of tuples, and materializing them was the single
+        largest cost in an N3 sleep pass.
         """
         if not self.is_trained:
-            return []
-
-        # Group concepts by prototype
-        proto_groups: dict[int, list[int]] = {}
-        for i, pid in enumerate(self._prototype_ids):
-            proto_groups.setdefault(int(pid), []).append(i)
-
-        candidates: list[tuple[str, str, float]] = []
+            return 0
         recon = self._reconstruct_all()
-
-        for _pid, indices in proto_groups.items():
+        threshold_sq = threshold * threshold
+        total = 0
+        for indices in self._group_indices():
             if len(indices) < 2:
                 continue
             block = recon[indices]
-            # Pairwise L2 within one prototype group, vectorized.
-            #
-            # This was a Python double loop calling np.linalg.norm once
-            # per pair. With k=2048 prototypes concentrated in few groups
-            # that is millions of individual numpy calls, each with
-            # microseconds of dispatch overhead — and it ran on the inner
-            # life thread inside N3 sleep consolidation, where it held
-            # the thread past a 45 s shutdown budget. A blocked inner life
-            # also means no dreams during that window.
-            #
-            # ||a-b||^2 = ||a||^2 + ||b||^2 - 2 a·b, so the whole block
-            # is two matrix products rather than a pairwise loop.
             sq = np.einsum("ij,ij->i", block, block)
             diff = sq[:, None] + sq[None, :] - 2.0 * (block @ block.T)
             np.maximum(diff, 0.0, out=diff)
             i_idx, j_idx = np.triu_indices(len(indices), k=1)
-            close = diff[i_idx, j_idx] < threshold * threshold
-            for i, j in zip(i_idx[close], j_idx[close], strict=True):
-                a, b = int(indices[i]), int(indices[j])
+            total += int(np.count_nonzero(diff[i_idx, j_idx] < threshold_sq))
+        return total
+
+    def find_merge_candidates(
+        self,
+        threshold: float,
+        limit: int | None = None,
+    ) -> list[tuple[str, str, float]]:
+        """Closest within-prototype pairs, as (concept_a, concept_b, distance).
+
+        Sorted by distance ascending.
+
+        Args:
+            threshold: Maximum L2 distance to be considered a candidate.
+            limit: Return at most this many, the closest. ``None`` returns
+                every pair under the threshold, which is unbounded and was
+                the reason the N3 quantize pass took over two minutes.
+                Use :meth:`count_merge_candidates` when only the number
+                matters.
+        """
+        if not self.is_trained:
+            return []
+
+        candidates: list[tuple[float, str, str]] = []
+        # One reconstruction shared by every group.
+        recon = self._reconstruct_all()
+        threshold_sq = threshold * threshold
+
+        for indices in self._group_indices():
+            if len(indices) < 2:
+                continue
+            block = recon[indices]
+            # Pairwise L2 via ||a-b||^2 = ||a||^2 + ||b||^2 - 2 a·b, so a
+            # group is two matrix products rather than a Python loop with
+            # one numpy call per pair.
+            sq = np.einsum("ij,ij->i", block, block)
+            diff = sq[:, None] + sq[None, :] - 2.0 * (block @ block.T)
+            np.maximum(diff, 0.0, out=diff)
+            i_idx, j_idx = np.triu_indices(len(indices), k=1)
+            close = diff[i_idx, j_idx] < threshold_sq
+            if not close.any():
+                continue
+            ci, cj = i_idx[close], j_idx[close]
+            dist = diff[ci, cj]
+            if limit is not None and len(ci) > limit:
+                # The global top-`limit` holds at most `limit` from any one
+                # group, so capping each group here is exact, not lossy.
+                keep = np.argpartition(dist, limit - 1)[:limit]
+                ci, cj, dist = ci[keep], cj[keep], dist[keep]
+            for i, j, d in zip(ci, cj, dist, strict=True):
                 candidates.append((
-                    self._concept_names[a],
-                    self._concept_names[b],
-                    float(np.sqrt(diff[i, j])),
+                    float(d),
+                    self._concept_names[int(indices[i])],
+                    self._concept_names[int(indices[j])],
                 ))
 
-        candidates.sort(key=lambda x: x[2])
-        return candidates
+        candidates.sort(key=lambda x: x[0])
+        if limit is not None and len(candidates) > limit:
+            candidates = candidates[:limit]
+        return [(a, b, d) for d, a, b in candidates]
+
+    def _group_indices(self) -> list[list[int]]:
+        """Row indices of the reconstructed vectors, grouped by prototype."""
+        groups: dict[int, list[int]] = {}
+        for i, pid in enumerate(self._prototype_ids):
+            groups.setdefault(int(pid), []).append(i)
+        return list(groups.values())
 
     # ─── Persistence ────────────────────────────────────────────
 
