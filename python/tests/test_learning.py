@@ -20,7 +20,6 @@ from genesis_client.types import (
 from genesis_cognitive.cognition.concept_learner import ConceptLearner
 from genesis_cognitive.concepts import ConceptNetwork, EmbeddingStore, NetworkTopology, RelationType
 from genesis_cognitive.emotion import EmotionalState
-from genesis_cognitive.memory import SemanticMemory
 from genesis_cognitive.learning import (
     STDP,
     AutonomousLearner,
@@ -34,6 +33,7 @@ from genesis_cognitive.learning import (
     TDLearner,
     TDTransition,
 )
+from genesis_cognitive.memory import SemanticMemory
 from genesis_cognitive.reasoning import ReasoningEngine
 from genesis_cognitive.tools.source_registry import SourceResult
 
