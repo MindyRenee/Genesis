@@ -245,23 +245,54 @@ class SleepCompressor:
         # protect against that.
         edge_snapshot = [copy.copy(e) for e in network.edges]
 
+        # Per-phase timings. A single `elapsed_s` for the whole pass could
+        # not say which phase was slow, and the first real diagnosis of
+        # this pass had to wait on a stack dump at a shutdown timeout.
+        # These land in the sleep-compression stats line, which the journal
+        # already records, so the cost is visible every cycle.
+        phase_seconds: dict[str, float] = {}
+
+        def _timed(name: str, fn, *a):
+            t = time.time()
+            out = fn(*a)
+            phase_seconds[name] = time.time() - t
+            return out
+
         try:
             # Phase 1: Quantize
             if embeddings is not None:
-                stats.update(self._phase_quantize(network, embeddings))
+                stats.update(
+                    _timed("quantize_s", self._phase_quantize, network, embeddings),
+                )
 
             # Phase 2: Holographize
-            stats.update(self._phase_holographize(network))
+            stats.update(
+                _timed("holographize_s", self._phase_holographize, network),
+            )
 
             # Phase 3: Compact LTM
             if ltm_client is not None:
-                stats.update(self._phase_compact_ltm(network, ltm_client))
+                stats.update(
+                    _timed("compact_ltm_s", self._phase_compact_ltm, network, ltm_client),
+                )
 
             # Synaptic homeostasis (scaled by brain-wave-derived
             # consolidation intensity — deep sleep downscales more
             # aggressively, stress-disrupted sleep is gentler).
             stats.update(
-                self._apply_homeostasis(network, consolidation_intensity)
+                _timed(
+                    "homeostasis_s",
+                    self._apply_homeostasis,
+                    network,
+                    consolidation_intensity,
+                ),
+            )
+            # A compact string, so it renders in the existing
+            # sleep-compression stats line without widening the stats
+            # value type to admit a dict.
+            stats["phase_seconds"] = " ".join(
+                f"{name}={elapsed:.1f}s"
+                for name, elapsed in phase_seconds.items()
             )
 
         except Exception as e:  # noqa: BLE001
@@ -384,15 +415,21 @@ class SleepCompressor:
         stats["vq_compression_ratio"] = self.vq_codebook.compression_ratio()
 
         # Find merge candidates
-        merge_candidates = self.vq_codebook.find_merge_candidates(
+        # Count only. This used to build the full candidate list and then
+        # use it for nothing but a len() and a log line — with ~12k
+        # concepts in few prototypes that was 7.7M tuples, and
+        # materializing them was 142 s of a 175 s sleep pass. The count is
+        # exact and the list is not needed; if it ever is,
+        # `find_merge_candidates(..., limit=N)` gives the closest N.
+        n_candidates = self.vq_codebook.count_merge_candidates(
             threshold=self.merge_threshold,
         )
-        stats["merge_candidates"] = len(merge_candidates)
+        stats["merge_candidates"] = n_candidates
 
-        if merge_candidates:
+        if n_candidates:
             logger.info(
                 "VQ found %d merge candidates (threshold=%.3f)",
-                len(merge_candidates), self.merge_threshold,
+                n_candidates, self.merge_threshold,
             )
 
         return stats

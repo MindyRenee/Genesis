@@ -39,6 +39,20 @@ from genesis_client.swallow import note_swallowed, set_swallow_sink
 logger = logging.getLogger(__name__)
 
 
+def _thread_name(ident: int) -> str:
+    """Name of the thread with this ident, for shutdown diagnostics.
+
+    A shutdown stack dump that labels every frame with the *expected*
+    thread's name is unreadable when several threads are alive: frames
+    from the CLI's reader thread interleave with the worker's and read as
+    one nonsense stack.
+    """
+    for t in threading.enumerate():
+        if t.ident == ident:
+            return t.name
+    return f"0x{ident:x}"
+
+
 class LifecycleMixin:
     """Mixin for :class:`Mind` — see module docstring."""
     if TYPE_CHECKING:
@@ -632,6 +646,21 @@ class LifecycleMixin:
             logger.warning("volition workers did not clear during shutdown; continuing")
             clean_shutdown = False
 
+        # Stop the sleep-stage worker *before* the state save and the
+        # archive close below. An N3 pass writes the concept network, the
+        # canonical edge log and the SQLite archive; letting one run into
+        # either of those being closed underneath it is exactly the kind
+        # of torn state the shutdown ordering exists to prevent. It drains
+        # whatever it already accepted before exiting.
+        sleep_worker = getattr(self, "_sleep_stage_worker", None)
+        if sleep_worker is not None:
+            if not sleep_worker.stop(timeout=_SUBSYSTEM_STOP_TIMEOUTS["InnerLife"]):
+                logger.warning(
+                    "sleep-stage worker did not exit; a consolidation pass "
+                    "may still have been running",
+                )
+                clean_shutdown = False
+
         worker = self._active_think_worker
         clean_shutdown &= self._join_shutdown_thread(worker, "think")
 
@@ -768,11 +797,12 @@ class LifecycleMixin:
                         lines = tb_mod.format_stack(frame)
                         # Innermost frame first — that is the one that says
                         # what the thread is blocked on.
+                        tname = _thread_name(frame_id)
                         for entry in reversed(lines):
                             if entry.strip():
                                 logger.warning(
-                                    "%s thread 0x%x at %s",
-                                    name, frame_id, entry.strip(),
+                                    "%s waiting on %s at %s",
+                                    name, tname, entry.strip(),
                                 )
                 except Exception:
                     logger.debug("stack dump unavailable", exc_info=True)

@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections import deque
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from genesis_client.protocol import (
@@ -84,6 +86,12 @@ class SleepMixin:
         rather than making the holographic graph a write-only graveyard.
         """
         from ..sleep import SleepCompressor
+
+        # The worker that runs N3 consolidation off the inner-life
+        # thread. Created here so it is owned and stopped alongside the
+        # rest of the sleep machinery.
+        self._sleep_stage_worker = SleepStageWorker(self._run_sleep_stage_pass)
+        self._sleep_stage_worker.start()
 
         try:
             self._sleep_compressor: SleepCompressor | None = SleepCompressor(
@@ -277,8 +285,21 @@ class SleepMixin:
             # plasticity, synaptic downscaling, embeddings refresh.
             # These are expensive and belong in the deepest sleep
             # stage, not at sleep onset.
+            #
+            # Handed to a worker rather than run here. This callback is
+            # invoked from InnerLife's loop thread, and an N3 pass blocks
+            # it for the whole duration — which is why shutdown could not
+            # stop the inner life and why no dreams were generated while
+            # it ran. The notification above stays synchronous so the
+            # transition is still visible the moment it happens.
             if stage is SleepStage.N3:
-                self._consolidate_n3_heavy(consolidation_intensity)
+                worker = getattr(self, "_sleep_stage_worker", None)
+                if worker is not None:
+                    worker.submit(stage, consolidation_intensity)
+                else:
+                    # No worker (tests, or constructed without init) —
+                    # run inline rather than skip the pass entirely.
+                    self._consolidate_n3_heavy(consolidation_intensity)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "genesis_conscious.mind.sleep._on_sleep_stage_transition",
@@ -1509,3 +1530,157 @@ class SleepMixin:
             f"Dream residue: {len(dream_concepts[:10])} emotional impressions "
             f"from {len(dreams)} dream insights",
         )
+
+
+    def _run_sleep_stage_pass(self, stage: SleepStage, intensity: float) -> None:
+        """The heavy half of a stage transition, run on the worker.
+
+        Only N3 has a heavy pass. The notification and episodic
+        consolidation stay on the caller's thread so the transition is
+        visible immediately; this is the part that takes seconds.
+        """
+        if stage is SleepStage.N3:
+            self._consolidate_n3_heavy(intensity)
+
+
+class SleepStageWorker:
+    """Runs sleep-stage consolidation off the inner-life thread.
+
+    ``InnerLife._determine_dream_stage`` fires a callback when the
+    ultradian cycle enters a new stage, and that callback used to do the
+    whole N3 pass inline. N3 consolidation is heavy — vector-quantized
+    sleep compression, latent-space edge discovery, Hebbian plasticity,
+    embeddings refresh — and it writes the concept network, the canonical
+    edge log, and the archive. Running it on the inner-life thread meant
+    one long uninterruptible block in the middle of the sleep loop, so:
+
+    - the loop could not notice a stop request while it ran, which is why
+      every shutdown reported "InnerLife thread did not exit";
+    - no dreams were generated for the duration, because dream
+      generation lives on that same thread.
+
+    So the heavy pass is handed here instead. The inner-life thread only
+    enqueues and returns, and the stage notification stays synchronous so
+    the user still sees the transition the moment it happens.
+
+    Requests are a **bounded FIFO, not a coalescing slot**. Coalescing to
+    the newest stage is cheaper but would silently drop an N3 pass if a
+    REM transition arrived while N3 was still queued — and N3 is the pass
+    that matters. Stages last minutes and consolidation takes seconds, so
+    the queue is effectively always empty on arrival; the bound and the
+    drop warning exist so a pathological case is visible rather than
+    silent.
+    """
+
+    #: Requests kept before the oldest is dropped. Stage changes are
+    #: minutes apart, so this is a guard against unbounded growth, not a
+    #: working set size.
+    MAX_PENDING = 8
+
+    def __init__(self, target: Callable[[SleepStage, float], None]) -> None:
+        self._target = target
+        self._queue: deque[tuple[SleepStage, float]] = deque()
+        self._lock = threading.Lock()
+        self._wake = threading.Event()
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        """Start the worker. Idempotent."""
+        if self._thread is not None and self._thread.is_alive():
+            return
+        self._stop.clear()
+        self._thread = threading.Thread(
+            target=self._run, name="sleep-stage-worker", daemon=True,
+        )
+        self._thread.start()
+
+    def submit(self, stage: SleepStage, dt: float) -> int:
+        """Enqueue a stage transition. Returns the pending depth."""
+        dropped = None
+        with self._lock:
+            if len(self._queue) >= self.MAX_PENDING:
+                dropped = self._queue.popleft()
+            self._queue.append((stage, dt))
+            depth = len(self._queue)
+        if dropped is not None:
+            logger.warning(
+                "sleep-stage worker queue full (%d); dropped the %s pass. "
+                "Consolidation is falling behind the sleep cycle.",
+                self.MAX_PENDING, dropped[0].value.upper(),
+            )
+        self._wake.set()
+        return depth
+
+    def stop(self, timeout: float = 45.0) -> bool:
+        """Stop the worker. Returns True if it exited within `timeout`."""
+        self._stop.set()
+        self._wake.set()
+        thread = self._thread
+        if thread is None or not thread.is_alive():
+            return True
+        thread.join(timeout=timeout)
+        if thread.is_alive():
+            # Same reasoning as _join_shutdown_thread: a stop that times
+            # out is undiagnosable without a stack, and this is the pass
+            # that writes the network, edge log and archive.
+            try:
+                import sys
+                import traceback as tb_mod
+
+                for frame_id, frame in sys._current_frames().items():
+                    if frame_id == threading.get_ident():
+                        continue
+                    # Label with the thread's own name. Labelling every
+                    # thread "sleep-stage worker" made the first version of
+                    # this dump unreadable: frames from the CLI's drain
+                    # thread were interleaved with the worker's and read
+                    # as one stack.
+                    name = threading.current_thread().name
+                    for entry in reversed(tb_mod.format_stack(frame)):
+                        if entry.strip():
+                            logger.warning(
+                                "%s stuck at %s", name, entry.strip(),
+                            )
+            except Exception:
+                logger.debug("stack dump unavailable", exc_info=True)
+        return not thread.is_alive()
+
+    @property
+    def pending(self) -> int:
+        with self._lock:
+            return len(self._queue)
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            self._wake.wait(timeout=1.0)
+            if self._stop.is_set():
+                # Drain what is already queued before exiting, so a stage
+                # that was accepted is not silently lost on shutdown.
+                break
+            self._wake.clear()
+            while True:
+                with self._lock:
+                    if not self._queue:
+                        break
+                    stage, dt = self._queue.popleft()
+                try:
+                    self._target(stage, dt)
+                except Exception as e:  # noqa: BLE001
+                    note_swallowed(
+                        "genesis_conscious.mind.sleep.SleepStageWorker",
+                        e,
+                    )
+        # Final drain, bounded by the caller's join timeout.
+        while True:
+            with self._lock:
+                if not self._queue:
+                    return
+                stage, dt = self._queue.popleft()
+            try:
+                self._target(stage, dt)
+            except Exception as e:  # noqa: BLE001
+                note_swallowed(
+                    "genesis_conscious.mind.sleep.SleepStageWorker",
+                    e,
+                )
