@@ -1127,7 +1127,12 @@ class SemanticMemory:
 
         for concept_lower, display in concepts.items():
             schema = self._update_schema_for_concept(
-                concept_lower, display, as_subject, part_of_by_object, now_ms
+                concept_lower,
+                display,
+                as_subject,
+                part_of_by_object,
+                now_ms,
+                instance_increment=1,
             )
             schemas.append(schema)
 
@@ -1162,8 +1167,17 @@ class SemanticMemory:
         as_subject: dict[str, list[Fact]],
         part_of_by_object: dict[str, list[Fact]],
         now_ms: int,
+        instance_increment: int = 0,
     ) -> Schema:
-        """Build or update a schema for a single concept."""
+        """Build or update a schema for a single concept.
+
+        form_schemas receives one semantic extraction batch at a time
+        in the normal learning paths. That batch represents one source
+        episode/observation, regardless of how many facts it contains.
+        Count the batch once rather than summing fact source_count;
+        summing would turn three facts from one episode into three
+        apparent instances and inflate abstraction.
+        """
         schema = self._schemas.get(concept_lower)
         if schema is None:
             schema = Schema(
@@ -1190,11 +1204,9 @@ class SemanticMemory:
             elif rel == "relates_to":
                 schema.relations.setdefault("relates_to", set()).add(obj)
 
-        # Track instances: number of distinct source episodes is
-        # approximated by the sum of source counts of the facts
-        # involving this concept.
-        involved = as_subject.get(concept_lower, []) + part_of_by_object.get(concept_lower, [])
-        schema.instances = sum(f.source_count for f in involved)
+        # Count the observation batch once, not once per fact.
+        if instance_increment > 0:
+            schema.instances += instance_increment
         # Abstraction level: asymptotes at 1.0 as instances grow
         # (prototype convergence, Rosch 1975).
         schema.abstraction_level = 1.0 - 1.0 / (1.0 + schema.instances * 0.5)
