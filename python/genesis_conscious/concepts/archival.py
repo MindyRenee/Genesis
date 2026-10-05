@@ -291,8 +291,9 @@ class ArchivalMixin:
                         keys_to_clean.append(k)
             for k in keys_to_clean:
                 self._alias_map.pop(k, None)
-            # Remove from column index
-            for col_cids in self._column_index.values():
+            # Remove from column index. Snapshotted: a concurrent
+            # add_concept may add a column key.
+            for col_cids in list(self._column_index.values()):
                 col_cids.discard(cid)
 
         # Invalidate caches
