@@ -79,9 +79,7 @@ not — those must be generated, not recited.
   full Rust suite is 498 tests.
 - Run examples: `cargo run --example <name>`
 - Python 3.12+ (CI tests 3.12 and 3.14), dependencies pinned in
-  `python/requirements.txt`
-  (runtime) and `python/requirements-dev.txt` (lint + test). Install
-  with: `pip install -r python/requirements-dev.txt`
+  `python/requirements.txt` (runtime) and `python/requirements-dev.txt` (lint + test). Install with: `pip install -r python/requirements-dev.txt`
 - Lint: `ruff check` and `pyflakes` (both must pass)
 - Type check: `mypy python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ --ignore-missing-imports` (0 errors)
 - Optional voice deps (not in requirements.txt): `vosk`, `sounddevice`,
@@ -105,7 +103,7 @@ accumulate quickly and make the codebase harder to navigate. When
 auditing or working on a file:
 - If a file is outdated, unused, or no longer necessary, remove it
   rather than spending effort fixing it. Confirm it has no importers
-  first (grep for imports), then delete it.
+  first, then delete it.
 - Remove dead methods, unused imports, and stale comments you encounter.
 
 **Important distinction: dead vs unwired.** Not everything that appears
@@ -114,8 +112,7 @@ Before removing something that appears unused, check whether it looks
 like scaffolded work-in-progress; if unsure, ask rather than deleting.
 
 ## State integrity
-Genesis is a long-running stateful system. Always shut down via
-`./run.sh --stop` (or Ctrl-C in the running terminal) — never kill
+Genesis is a long-running stateful system. Always shut down via `./run.sh --stop` (or Ctrl-C in the running terminal) — never kill
 processes directly. Do not corrupt the mmap'd state or drive the system
 into degenerate regimes for experimentation; see the "Operational notes"
 section of the README.
@@ -149,7 +146,7 @@ written at save time; the log's fold overwrites it at restore.
   `python/tests/test_cli_lifecycle.py` and `python/tests/test_persistence.py`.
 - Transfer/learning-compounding eval lives outside this checkout
   (`../genesis-eval/eval_transfer/run_sweep.sh --replicates N`; set
-  GENESIS_DIR if the repo is elsewhere). Two-arm probe/ladder design
+  `GENESIS_DIR` if the repo is elsewhere). Two-arm probe/ladder design
   measuring whether consolidated skills lower task cost.
 - Never unlink singleton lock files during shutdown: replacing the inode
   can allow a second process to acquire a different lock for the same state.
