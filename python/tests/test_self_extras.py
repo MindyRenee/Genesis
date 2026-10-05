@@ -578,6 +578,33 @@ def test_learn_python_file():
 
 
 
+def test_python_structural_enrichment_uses_scoped_ids(tmp_path):
+    """Complexity and call ownership enrich the concepts actually created."""
+    target = tmp_path / "module.py"
+    target.write_text(
+        "class Worker:\\n"
+        "    def run(self, value):\\n"
+        "        if value:\\n"
+        "            return helper()\\n"
+        "        return 0\\n\\n"
+        "def helper():\\n"
+        "    return 1\\n",
+        encoding="utf-8",
+    )
+    learner = _make_learner(tmp_path)
+    learner.learn_file(str(target))
+
+    method = learner.network.get_concept("python:module.Worker.run")
+    assert method is not None
+    assert method.properties["complexity"] == 2
+    assert method.properties["params"] == ["self", "value"]
+
+    edges = learner.network.get_edges(
+        "python:module.Worker.run", direction="out"
+    )
+    assert any(edge.relation == RelationType.CALLS for edge in edges)
+    assert any(edge.target_id == "python:helper" for edge in edges)
+
 def test_python_class_concepts_are_module_scoped(tmp_path):
     """Same-named classes in different modules must remain distinct."""
     first = tmp_path / "first.py"
