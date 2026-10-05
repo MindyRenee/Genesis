@@ -255,18 +255,21 @@ _atexit() {
 
 trap _atexit EXIT
 
-# ── Pre-flight: ensure the release binary exists ──────────────
+# ── Pre-flight: build the release binaries from the current source ──
 # There is one canonical build: `cargo build --release`. No debug
-# fallback. If the binary is missing, fail fast with a clear message
-# instead of starting the CLI and having it die mid-launch.
+# fallback. Do this on every start: Cargo's incremental build makes an
+# unchanged tree a no-op, while a changed source tree cannot accidentally
+# run an older daemon binary. This matters for the memory-mapped state
+# schema: source and binary must agree on the on-disk layout.
 RELEASE_BIN="target/release/genesis-daemon"
+echo "[genesis] Building release binaries from the current source..."
+cargo build --release || {
+    echo "[genesis] Build failed. Genesis cannot start."
+    exit 1
+}
 if [ ! -x "$RELEASE_BIN" ]; then
-    echo "[genesis] Release binary not found at $RELEASE_BIN"
-    echo "[genesis] Building with: cargo build --release"
-    cargo build --release || {
-        echo "[genesis] Build failed. Genesis cannot start."
-        exit 1
-    }
+    echo "[genesis] Release binary was not produced at $RELEASE_BIN"
+    exit 1
 fi
 
 # Only run.sh is allowed to launch the CLI.
