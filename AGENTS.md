@@ -306,6 +306,28 @@ Other things worth knowing before experimenting:
   Interoception dampens heavy work under thermal strain, but keep an
   eye on marginal hardware.
 
+## Destructive operations need a store
+Anything that sheds concepts must route through the archive when one is
+attached, and delete only when there is nowhere to put them. `clean_noise`
+used to delete unconditionally, and because it runs at step 5 of the N3
+pass — before `spill_dormant` at step 6 — the destructive step could drop
+the network under the cap and thereby **stop the non-destructive one from
+ever engaging**. The mechanism meant to preserve knowledge was silencing
+the mechanism that preserves it. One N3 pass destroyed ~7.5k concepts
+with the archive sitting at zero.
+
+If the archive write fails, the concepts stay in working memory.
+Unbounded growth is recoverable; deleted knowledge is not.
+
+Dormancy is still a legitimate reason to shed. `clean_noise`'s policy —
+low-confidence *and* isolated — is intentional: the learner creates every
+concept at `confidence=0.4`, so without it, thousands of orphan
+fragments accumulate permanently. What changed is the destination, not
+the policy. Note the two predicates differ: spill removes *dormant*
+concepts, noise removal removes *isolated low-confidence* ones, so
+reordering the two passes does not close the hole — only routing the
+delete through the archive does.
+
 ## Concept archiving — working memory is capped, the disk is not
 `ConceptNetwork` keeps at most `max_in_memory` (15 000) concepts resident
 and spills dormant ones to `concept_archive.db`. Archiving is a
