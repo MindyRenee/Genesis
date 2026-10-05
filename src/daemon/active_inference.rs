@@ -3178,8 +3178,11 @@ impl ActiveInferenceEngine {
             for i in 0..DIM {
                 let mut bytes = [0u8; 4];
                 if file.read_exact(&mut bytes).is_err() {
-                    // Partial v2 file — keep defaults for remaining fields
-                    break;
+                    // A versioned model is only valid when its complete
+                    // schema is present. Accepting a partial v2 file would
+                    // leave the stream offset in the middle of the schema,
+                    // causing later fields to be decoded from the wrong bytes.
+                    return Self::new();
                 }
                 engine.belief_mean[i] =
                     crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), 0.0, 2.0);
@@ -3204,10 +3207,11 @@ impl ActiveInferenceEngine {
             }
             // last_free_energy
             let mut fe_bytes = [0u8; 4];
-            if file.read_exact(&mut fe_bytes).is_ok() {
-                engine.last_free_energy =
-                    crate::state::sanitize::finite_clamp(f32::from_le_bytes(fe_bytes), 0.0, 1.0);
+            if file.read_exact(&mut fe_bytes).is_err() {
+                return Self::new();
             }
+            engine.last_free_energy =
+                crate::state::sanitize::finite_clamp(f32::from_le_bytes(fe_bytes), 0.0, 1.0);
         }
 
         // ─── Action-conditioned model (v3 only) ───────────────────
@@ -3233,7 +3237,7 @@ impl ActiveInferenceEngine {
                 for j in 0..DIM {
                     let mut bytes = [0u8; 4];
                     if file.read_exact(&mut bytes).is_err() {
-                        break;
+                        return Self::new();
                     }
                     engine.action_matrix[i][j] =
                         crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), -1.0, 1.0);
@@ -3243,7 +3247,7 @@ impl ActiveInferenceEngine {
             for i in 0..DIM {
                 let mut bytes = [0u8; 4];
                 if file.read_exact(&mut bytes).is_err() {
-                    break;
+                    return Self::new();
                 }
                 engine.last_action[i] =
                     crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), -2.0, 2.0);
@@ -3302,12 +3306,10 @@ impl ActiveInferenceEngine {
         // what she wanted on every restart, which would be a silent
         // version of the very not-knowing this is meant to fix.
         if version >= 5 {
-            let mut complete = true;
             for i in 0..DIM {
                 let mut bytes = [0u8; 4];
                 if file.read_exact(&mut bytes).is_err() {
-                    complete = false;
-                    break;
+                    return Self::new();
                 }
                 // Clamp to the full chemical range, not 0.05..0.95.
                 // Cortisol and melatonin legitimately rest at zero, and
@@ -3317,13 +3319,12 @@ impl ActiveInferenceEngine {
                 engine.preferred[i] =
                     crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), 0.0, 1.0);
             }
-            if complete {
-                let mut bytes = [0u8; 4];
-                if file.read_exact(&mut bytes).is_ok() {
-                    engine.preference_precision =
-                        crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), 0.0, 1.0);
-                }
+            let mut bytes = [0u8; 4];
+            if file.read_exact(&mut bytes).is_err() {
+                return Self::new();
             }
+            engine.preference_precision =
+                crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), 0.0, 1.0);
         }
 
         engine
