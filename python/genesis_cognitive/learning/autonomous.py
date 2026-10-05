@@ -1252,11 +1252,10 @@ class AutonomousLearner:
         if not topic or not is_world_concept(topic):
             return None
 
-        # Skip topics it's already searched (avoid re-fetching)
+        # Skip topics already learned. Failed lookups remain retryable.
         with self._queue_lock:
             if topic in self._topics_searched:
                 return None
-            self._topics_searched.add(topic)
 
         # Query the source registry (Wikipedia, dictionary, cache)
         try:
@@ -1299,6 +1298,8 @@ class AutonomousLearner:
             try:
                 result = self._learn_from_content(sr, topic)
                 if result:
+                    with self._queue_lock:
+                        self._topics_searched.add(topic)
                     logger.info(
                         f"sync lookup learned '{topic}' from {sr.source_name}: "
                         f"{len(result.concepts_learned)} concepts, "
