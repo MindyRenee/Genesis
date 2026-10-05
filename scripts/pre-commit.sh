@@ -24,6 +24,8 @@ else
 fi
 cd "$REPO_ROOT"
 
+SKIPPED=0
+
 # ─── Rust ──────────────────────────────────────────────────────
 if command -v cargo >/dev/null 2>&1 && cargo metadata --no-deps --format-version 1 >/dev/null 2>&1; then
     clippy_out="$(cargo clippy --all-targets 2>&1)" || true
@@ -33,7 +35,8 @@ if command -v cargo >/dev/null 2>&1 && cargo metadata --no-deps --format-version
         exit 1
     fi
 else
-    echo "⚠ cargo not found — clippy check skipped."
+    echo "❌ cargo not found — clippy check cannot be verified."
+    SKIPPED=1
 fi
 
 # ─── Python ─────────────────────────────────────────────────────
@@ -49,7 +52,8 @@ if command -v ruff >/dev/null 2>&1; then
         exit 1
     fi
 else
-    echo "⚠ ruff not found — lint check skipped. Install: pip install -r python/requirements-dev.txt"
+    echo "❌ ruff not found — lint check cannot be verified. Install: pip install -r python/requirements-dev.txt"
+    SKIPPED=1
 fi
 
 if python3 -m pyflakes --version >/dev/null 2>&1; then
@@ -59,7 +63,8 @@ if python3 -m pyflakes --version >/dev/null 2>&1; then
         exit 1
     fi
 else
-    echo "⚠ pyflakes not found — check skipped. Install: pip install -r python/requirements-dev.txt"
+    echo "❌ pyflakes not found — check cannot be verified. Install: pip install -r python/requirements-dev.txt"
+    SKIPPED=1
 fi
 
 if python3 -m mypy --version >/dev/null 2>&1; then
@@ -69,7 +74,13 @@ if python3 -m mypy --version >/dev/null 2>&1; then
         exit 1
     fi
 else
-    echo "⚠ mypy not found — check skipped. Install: pip install -r python/requirements-dev.txt"
+    echo "❌ mypy not found — check cannot be verified. Install: pip install -r python/requirements-dev.txt"
+    SKIPPED=1
+fi
+
+if [ "$SKIPPED" -ne 0 ]; then
+    echo "❌ Verification incomplete; commit blocked."
+    exit 1
 fi
 
 echo "✓ All checks passed."
