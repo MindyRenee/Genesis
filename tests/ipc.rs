@@ -1572,6 +1572,31 @@ fn test_get_body_control() {
 }
 
 #[test]
+fn test_ipc_bind_failure_signals_shutdown() {
+    let path = temp_path("ipc-bind-failure");
+    let blocker = std::os::unix::net::UnixListener::bind(&path).expect("bind blocker");
+
+    let server = IpcServer::new(&path);
+    let flag = server.shutdown_flag();
+
+    let mmap = std::sync::Arc::new(MmapState::create(
+        temp_path("ipc-bind-state"), 1, 0
+    ).expect("state"));
+    let stm = std::sync::Arc::new(RingBuffer::create(
+        temp_path("ipc-bind-stm"), 4
+    ).expect("stm"));
+    let ltm = std::sync::Arc::new(std::sync::Mutex::new(LtmStore::create(
+        temp_path("ipc-bind-ltm")
+    ).expect("ltm")));
+
+    IpcServer::run_with_owned(&server, mmap, stm, ltm, |_m, _s, _l, _c, _p| vec![1]);
+    assert!(flag.load(std::sync::atomic::Ordering::Acquire));
+
+    drop(blocker);
+    cleanup(&path);
+}
+
+#[test]
 fn test_ipc_shutdown_waits_for_active_handler() {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicBool, Ordering};
