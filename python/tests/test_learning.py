@@ -641,6 +641,30 @@ def test_neocortical_memory_dataclass() -> None:
     assert mem.episode_count == 3
 
 
+def test_dual_system_state_round_trip(learner) -> None:
+    """Fast and slow learning stores survive serialization and restore."""
+    learner.encode_fast("tree plant garden")
+    learner.consolidate_to_slow(max_episodes=5)
+    state = learner.serialize_state()
+
+    restored = DualSystemLearner(learner.network)
+    restored.restore_state(state)
+
+    assert restored.get_statistics() == learner.get_statistics()
+    assert restored.retrieve("tree plant garden") == learner.retrieve("tree plant garden")
+
+
+def test_dual_system_restore_rejects_wrong_pattern_dimension(learner) -> None:
+    """Corrupt persisted patterns must not enter the memory substrate."""
+    learner.encode_fast("tree plant garden")
+    state = learner.serialize_state()
+    state["fast_store"][0]["pattern"] = [0.0]
+
+    restored = DualSystemLearner(learner.network)
+    with pytest.raises(ValueError, match="incorrect dimension"):
+        restored.restore_state(state)
+
+
 def test_concept_list_input(learner) -> None:
     """encode_fast accepts a list of concept names."""
     ep = learner.encode_fast(["tree", "plant", "garden"])
