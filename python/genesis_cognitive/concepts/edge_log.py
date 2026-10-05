@@ -431,7 +431,7 @@ class EdgeLog:
             )
             try:
                 with os.fdopen(fd, "w", encoding="utf-8") as f:
-                    f.write(json.dumps({"op": "snapshot", "edges": edges}) + "\n")
+                    f.write(json.dumps({"op": "snapshot", "edges": edges}, separators=(",", ":")) + "\n")
                     f.flush()
                     os.fsync(f.fileno())
                 # Close before rename so the new file is the one we append to
