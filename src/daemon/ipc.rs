@@ -324,7 +324,7 @@ pub mod error {
 
 /// Compact neurochemical summary (32 bytes) — sent in response to
 /// GetNeuroSummary. This is what the Python side reads to know how
-/// Genesis feels without transferring the full 3288-byte state.
+/// Genesis feels without transferring the full 3296-byte state.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NeuroSummary {
