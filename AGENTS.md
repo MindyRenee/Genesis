@@ -218,8 +218,8 @@ recovers the wrong tree. The canonical order, as implemented in
 
 1. `GENESIS_DATA_DIR` — explicit override, always wins.
 2. `.genesis-data-dir` — uncommitted, gitignored per-checkout pin
-   (`genesis-public` for this checkout). Its contents **are** the data
-   dir; it is not a parent directory.
+   (`~/.local/share/genesis` for this checkout). Its contents **are**
+   the data dir; it is not a parent directory.
 3. `XDG_DATA_HOME/genesis`.
 4. `~/.local/share/genesis`.
 
