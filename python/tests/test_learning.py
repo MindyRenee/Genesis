@@ -1102,6 +1102,29 @@ def test_statistics_include_trace_info(network_td_learning) -> None:
     assert stats["active_traces"] == 2  # tree + plant
 
 
+def test_action_value_persistence_roundtrip(network_td_learning) -> None:
+    """Action-conditioned values and traces survive persistence."""
+    from genesis_cognitive.persistence import (
+        _serialize_td_learner,
+        restore_td_learner,
+    )
+
+    td = TDLearner(network_td_learning, lam=0.8)
+    td.update(["tree"], reward=0.0, next_state=["plant"], action="answer", next_action="answer")
+    data = _serialize_td_learner(td)
+
+    assert data["action_weights"]
+    assert data["action_traces"]
+
+    td2 = TDLearner(network_td_learning, lam=0.0)
+    restore_td_learner(td2, data)
+    assert td2._action_weights == td._action_weights
+    assert td2.get_trace("tree", action="answer") == td.get_trace(
+        "tree", action="answer"
+    )
+
+
+
 def test_trace_persistence_roundtrip(network_td_learning) -> None:
     """Eligibility traces and λ survive serialize/restore."""
     from genesis_cognitive.persistence import (
