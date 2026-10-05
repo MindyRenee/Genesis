@@ -464,7 +464,7 @@ class GenesisClient:
         return PingResponse.unpack(resp)
 
     def get_state(self, *, timeout: float | None = None) -> CoreState:
-        """Get the full core state (3296 bytes), parsed into useful fields."""
+        """Get the full core state (3416 bytes), parsed into useful fields."""
         resp = self._request(GET_STATE, timeout=timeout)
         return CoreState.unpack(resp)
 
