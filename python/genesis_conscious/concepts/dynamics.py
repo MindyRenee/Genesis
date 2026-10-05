@@ -782,8 +782,8 @@ class DynamicsMixin:
         Uses the column index for O(k) instead of O(n) scan.
         Concepts that also belong to the dominant column are skipped.
         """
-        column_cids = self._column_index.get(column, set())
-        for cid in list(column_cids):
+        column_cids = list(self._column_index.get(column, ()))
+        for cid in column_cids:
             concept = self._concepts.get(cid)
             if concept is None:
                 continue
@@ -864,7 +864,9 @@ class DynamicsMixin:
     def _compute_column_activations(self) -> dict[str, float]:
         """Calculate mean activation level for each cortical column."""
         column_activations: dict[str, float] = {}
-        for column, cids in self._column_index.items():
+        # Both levels snapshotted: `add_concept` may add a column key
+        # and grow a membership set while this walks them.
+        for column, cids in list(self._column_index.items()):
             total = 0.0
             count = 0
             for cid in list(cids):
@@ -910,7 +912,7 @@ class DynamicsMixin:
         """
         # Get all concepts in this column using the column index
         # (avoids O(N) scan of the entire concept network).
-        column_cids = self._column_index.get(column, set())
+        column_cids = list(self._column_index.get(column, ()))
         column_concepts = [
             (cid, self._concepts[cid].activation or 0.0)
             for cid in column_cids

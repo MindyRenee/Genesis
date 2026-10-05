@@ -1895,19 +1895,25 @@ class ConceptNetwork(
         return total / count
     def get_column_concepts(self, column: str) -> list[str]:
         """Get all concept IDs in a given column."""
+        # Snapshotted: `_column_index` is a dict of *sets*, and
+        # `add_concept` grows both the inner set and (for a new column)
+        # the outer dict from the learner and consolidation threads.
+        # Iterating either live raises. See `_concepts` in dynamics.py.
         return [
-            cid for cid in self._column_index.get(column, set())
+            cid for cid in list(self._column_index.get(column, ()))
             if cid in self._concepts
         ]
     def get_columns(self) -> dict[str, int]:
         """Get all columns and their sizes.
 
         Uses the ``_column_index`` for O(columns) lookup instead of
-        scanning the entire concept network.
+        scanning the entire concept network. Both levels are
+        snapshotted: a concurrent ``add_concept`` can add a column key
+        and grow a membership set while this walks them.
         """
         return {
-            column: sum(1 for cid in cids if cid in self._concepts)
-            for column, cids in self._column_index.items()
+            column: sum(1 for cid in list(cids) if cid in self._concepts)
+            for column, cids in list(self._column_index.items())
         }
     def get_layer(self, concept_id: str) -> CorticalLayer:
         """Infer the cortical layer of a concept from its graph topology.
@@ -2439,8 +2445,9 @@ class ConceptNetwork(
             for k in keys_to_clean:
                 self._alias_map.pop(k, None)
             # Remove from the column index so stale IDs don't
-            # accumulate in column membership sets.
-            for col_cids in self._column_index.values():
+            # accumulate in column membership sets. Snapshotted:
+            # a concurrent add_concept may add a column key.
+            for col_cids in list(self._column_index.values()):
                 col_cids.discard(cid)
 
         return True
@@ -2513,8 +2520,9 @@ class ConceptNetwork(
         for k in keys_to_clean:
             self._alias_map.pop(k, None)
 
-        # Remove from the column index so stale IDs don't accumulate
-        for col_cids in self._column_index.values():
+        # Remove from the column index so stale IDs don't accumulate.
+        # Snapshotted: a concurrent add_concept may add a column key.
+        for col_cids in list(self._column_index.values()):
             col_cids.difference_update(cids)
 
         # Invalidate caches
