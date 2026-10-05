@@ -429,7 +429,7 @@ class SemanticMemory:
 
     # ── Fact extraction ──────────────────────────────────────────
 
-    def extract_facts(self, episode_text: str) -> list[Fact]:
+    def extract_facts(self, episode_text: str, *, reinforce_existing: bool = True) -> list[Fact]:
         """Extract facts (propositions) from episode text.
 
         Parses the text to identify propositions of the form:
@@ -442,6 +442,11 @@ class SemanticMemory:
 
         Extracted facts are stored and (if a concept network is
         attached) consolidated into the network as concepts and edges.
+
+        ``reinforce_existing=False`` is used for sleep replay of an
+        already-known episode. Replay may recover missing facts, but it
+        must not masquerade as new independent evidence or inflate
+        confidence repeatedly.
 
         Args:
             episode_text: The text of an episodic memory to extract
@@ -491,7 +496,7 @@ class SemanticMemory:
 
         # Store / reinforce each extracted fact.
         for fact in facts:
-            self._store_or_reinforce(fact, now_ms)
+            self._store_or_reinforce(fact, now_ms, reinforce_existing=reinforce_existing)
 
         self.facts_extracted += len(facts)
         return facts
@@ -986,13 +991,15 @@ class SemanticMemory:
 
     # ── Storage / consolidation ──────────────────────────────────
 
-    def _store_or_reinforce(self, fact: Fact, now_ms: int) -> None:
+    def _store_or_reinforce(self, fact: Fact, now_ms: int, *, reinforce_existing: bool = True) -> None:
         """Store a new fact or reinforce an existing one."""
         existing = self._facts.get(fact.key)
         if existing is None:
             self._facts[fact.key] = fact
-        else:
-            # Reinforce: increase confidence and source count.
+        elif reinforce_existing:
+            # Reinforce only when this is genuinely new evidence.
+            # Sleep replay of the same episode must not create artificial
+            # certainty merely because the episode was replayed.
             existing.source_count += 1
             existing.confidence = min(1.0, existing.confidence + 0.15)
             existing.last_reinforced = now_ms
