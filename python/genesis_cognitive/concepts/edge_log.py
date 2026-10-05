@@ -34,6 +34,7 @@ stores raw earned weights and lets the reader price them.
 from __future__ import annotations
 
 import json
+import math
 import logging
 import os
 import tempfile
@@ -346,16 +347,25 @@ class EdgeLog:
 
     @staticmethod
     def _apply(ev: dict[str, Any], live: dict[str, Edge]) -> None:
+        # The log is a durable persistence boundary. Malformed but valid JSON
+        # must be isolated to that event rather than crashing the restore.
+        if not isinstance(ev, dict):
+            return
         op = ev.get("op")
         if op == "snapshot":
+            entries = ev.get("edges", [])
+            if not isinstance(entries, list):
+                return
             live.clear()
-            for e in ev.get("edges", []):
-                EdgeLog._apply(
-                    {"op": "assert", **e}, live
-                )
+            for e in entries:
+                if isinstance(e, dict):
+                    EdgeLog._apply({"op": "assert", **e}, live)
             return
-        source, target, relation = ev.get("source"), ev.get("target"), ev.get("relation")
-        if not (source and target and relation):
+
+        source = ev.get("source")
+        target = ev.get("target")
+        relation = ev.get("relation")
+        if not all(isinstance(v, str) and v for v in (source, target, relation)):
             return
         key = edge_key(source, target, relation)
         if op == "assert":
@@ -366,15 +376,25 @@ class EdgeLog:
             if is_derivable_edge(rel, ev.get("origin", "")):
                 live.pop(key, None)
                 return
+            try:
+                weight = float(ev.get("weight", 0.5))
+                if not math.isfinite(weight):
+                    return
+                weight = max(0.0, min(1.0, weight))
+                created_at = int(ev.get("created_at", 0))
+            except (TypeError, ValueError, OverflowError):
+                return
+            origin = ev.get("origin", "inferred")
+            if not isinstance(origin, str):
+                return
             existing = live.get(key)
             live[key] = Edge(
                 source=source,
                 target=target,
                 relation=rel,
-                weight=float(ev.get("weight", 0.5)),
-                created_at=int(ev.get("created_at", 0))
-                or (existing.created_at if existing else 0),
-                origin=ev.get("origin", "inferred"),
+                weight=weight,
+                created_at=created_at or (existing.created_at if existing else 0),
+                origin=origin,
             )
         elif op == "retract":
             live.pop(key, None)
