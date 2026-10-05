@@ -223,7 +223,7 @@ class TDLearner:
         # set to the gradient value for active concepts (replacing
         # traces). Traces below _TRACE_PRUNE_THRESHOLD are pruned to
         # keep the dict bounded.
-        self._traces: dict[str, float] = {}
+        self._traces: dict[str | tuple[str, str], float] = {}
 
         # History of transitions (for analysis; eligibility traces
         # are tracked separately in _traces).
@@ -342,10 +342,12 @@ class TDLearner:
             # λ = 0: traces decay to zero immediately.
             self._traces.clear()
 
-        # 2. Resolve the active concepts and set their traces
-        #    (replacing trace: overwrite, don't accumulate).
-        #    The gradient of V(s) w.r.t. w_i is 1/count for each
-        #    active concept (matching the TD(0) equal-share credit).
+        # 2. Resolve active concepts and set their traces.
+        #    Action-conditioned traces are keyed by (concept, action).
+        #    A concept-only trace would apply a later action's TD error
+        #    to an earlier action and corrupt credit assignment.
+        #    The value gradient is 1/count because the value is normalized
+        #    by the number of active concepts.
         active_cids: list[str] = []
         for concept in state:
             resolved: str | None = self.network._resolve(concept)
@@ -354,8 +356,12 @@ class TDLearner:
 
         if active_cids:
             grad = 1.0 / len(active_cids)
-            for ac in active_cids:
-                self._traces[ac] = grad
+            if action is None:
+                for ac in active_cids:
+                    self._traces[ac] = grad
+            else:
+                for ac in active_cids:
+                    self._traces[(ac, action)] = grad
 
         # 3. Apply the TD error to ALL traced weights.
         #    With λ = 0, only the current state's concepts have
@@ -363,14 +369,17 @@ class TDLearner:
         #    With λ > 0, previously-visited concepts also get credit.
         if self._traces:
             alpha_delta = self.learning_rate * rpe
-            for tc, trace in self._traces.items():
-                if action is None:
-                    current = self._weights.get(tc, 1.0)
-                    self._weights[tc] = current + alpha_delta * trace
-                else:
-                    key = (tc, action)
-                    current = self._action_weights.get(key, self._weights.get(tc, 1.0))
+            for trace_key, trace in self._traces.items():
+                if isinstance(trace_key, tuple):
+                    concept_id, trace_action = trace_key
+                    key = (concept_id, trace_action)
+                    current = self._action_weights.get(
+                        key, self._weights.get(concept_id, 1.0)
+                    )
                     self._action_weights[key] = current + alpha_delta * trace
+                else:
+                    current = self._weights.get(trace_key, 1.0)
+                    self._weights[trace_key] = current + alpha_delta * trace
 
         # Record history
         self._history.append(
@@ -428,7 +437,7 @@ class TDLearner:
         cid = self.network._resolve(concept) or concept
         return self._weights.get(cid, 1.0)
 
-    def get_trace(self, concept: str) -> float:
+    def get_trace(self, concept: str, action: str | None = None) -> float:
         """Get the eligibility trace value for a concept.
 
         The trace reflects how recently the concept was part of an
@@ -437,11 +446,14 @@ class TDLearner:
 
         Args:
             concept: The concept name.
+            action: Optional action for an action-conditioned trace.
 
         Returns:
             The eligibility trace (0.0 if not traced).
         """
         cid = self.network._resolve(concept) or concept
+        if action is not None:
+            return self._traces.get((cid, action), 0.0)
         return self._traces.get(cid, 0.0)
 
     def reset_traces(self) -> None:
