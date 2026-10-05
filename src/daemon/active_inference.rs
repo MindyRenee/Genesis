@@ -3191,7 +3191,7 @@ impl ActiveInferenceEngine {
             for i in 0..DIM {
                 let mut bytes = [0u8; 4];
                 if file.read_exact(&mut bytes).is_err() {
-                    break;
+                    return Self::new();
                 }
                 engine.belief_var[i] =
                     crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), 1e-8, 1.0);
@@ -3200,7 +3200,7 @@ impl ActiveInferenceEngine {
             for i in 0..DIM {
                 let mut bytes = [0u8; 4];
                 if file.read_exact(&mut bytes).is_err() {
-                    break;
+                    return Self::new();
                 }
                 engine.prior_var[i] =
                     crate::state::sanitize::finite_clamp(f32::from_le_bytes(bytes), 1e-8, 1.0);
