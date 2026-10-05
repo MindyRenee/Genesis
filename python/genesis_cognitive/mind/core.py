@@ -273,6 +273,7 @@ class Mind(
             get_brain_waves=self.brain_waves,
             force_offline=self._offline,
             synapses=self.cognition.synapses,
+            semantic_memory=self.cognition.semantic_memory,
         )
         # Wire the embedding store into the learner for semantic
         # similarity and deep expectation generation. STDP uses the

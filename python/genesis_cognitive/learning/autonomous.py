@@ -621,6 +621,7 @@ class AutonomousLearner:
         get_brain_waves=None,
         force_offline: bool = False,
         synapses: SynapticStore | None = None,
+        semantic_memory: SemanticMemory | None = None,
     ) -> None:
         """Initialize the autonomous learner."""
         self.network = network
@@ -637,6 +638,7 @@ class AutonomousLearner:
         self._init_sources()
         self._init_queues()
         self._synapses = synapses or SynapticStore()
+        self._semantic_memory = semantic_memory
         self._init_learning_systems()
         self._init_posture()
 
@@ -918,7 +920,11 @@ class AutonomousLearner:
         # learner only uses parse_relationships (which catches some
         # patterns) but misses the fact consolidation path that
         # reinforces repeated facts and forms schemas.
-        self.semantic_memory: SemanticMemory = SemanticMemory(network=self.network)
+        self.semantic_memory: SemanticMemory = (
+            self._semantic_memory
+            if self._semantic_memory is not None
+            else SemanticMemory(network=self.network)
+        )
 
     def _init_posture(self) -> None:
         """Initialize plasticity-posture tracking.
