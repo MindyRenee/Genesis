@@ -424,7 +424,7 @@ class EdgeLog:
                     "origin": e.origin,
                     "created_at": e.created_at,
                 }
-                for e in live.values()
+                for _, e in sorted(live.items())
             ]
             fd, tmp = tempfile.mkstemp(
                 dir=self._path.parent, prefix="edge_log_", suffix=".tmp"
