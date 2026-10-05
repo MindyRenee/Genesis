@@ -822,9 +822,13 @@ class ConceptNetwork(
         """
         if not self._concepts:
             return 0.0
-        return sum(c.confidence for c in self._concepts.values()) / len(
-            self._concepts
-        )
+        # Snapshotted: the learner and consolidation threads mutate
+        # `_concepts` while this reads it. See `_concepts` in
+        # dynamics.py for the same guard.
+        values = list(self._concepts.values())
+        if not values:
+            return 0.0
+        return sum(c.confidence for c in values) / len(values)
     @property
     def network_density(self) -> float:
         """Edge density of the network (edges / possible directed edges).
@@ -1714,7 +1718,11 @@ class ConceptNetwork(
         # scanning all concepts (short queries are rare).
         trigram_sets = [_extract_trigrams(s) for s in search_strings]
         if not any(trigram_sets):
-            return set(self._concepts.keys())
+            # Snapshotted: `_concepts` is mutated by the learner and
+            # consolidation threads. `set(d.keys())` iterates the live
+            # view, so the list() is load-bearing, not decoration.
+            all_ids = list(self._concepts.keys())
+            return set(all_ids)
 
         # Build index lazily. Snapshot the reference into a local
         # variable — another thread (learner, inner_life) may set
@@ -1725,8 +1733,10 @@ class ConceptNetwork(
         search_index = self._search_index
         if search_index is None:
             # Another thread set it back to None — fall back to
-            # scanning all concepts (slower but correct).
-            return set(self._concepts.keys())
+            # scanning all concepts (slower but correct). Snapshotted
+            # for the same reason as above.
+            all_ids = list(self._concepts.keys())
+            return set(all_ids)
 
         # Union candidates from each search string's trigram intersection.
         # A concept is a candidate if it contains ALL trigrams of any

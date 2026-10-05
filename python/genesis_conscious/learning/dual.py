@@ -383,19 +383,22 @@ class DualSystemLearner:
         pattern = np.zeros(self.pattern_dim, dtype=np.float32)
 
         if concepts and self.embeddings is not None and self.embeddings.has_embeddings:
-            # Average the concept vectors, projected to pattern_dim
+            # Average the concept vectors, each projected to pattern_dim
+            # first (truncate or pad). Projecting per vector rather than
+            # after the mean keeps the batch rectangular: the embedding
+            # provider is injected, and a single vector of a different
+            # width makes np.mean() a ragged array.
             vecs = []
             for c in concepts:
                 v = self.embeddings.get_concept_vector(c)
-                if v is not None:
-                    vecs.append(v)
+                if v is None:
+                    continue
+                projected = np.zeros(self.pattern_dim, dtype=np.float32)
+                width = min(len(v), self.pattern_dim)
+                projected[:width] = v[:width]
+                vecs.append(projected)
             if vecs:
-                avg = np.mean(vecs, axis=0)
-                # Project to pattern_dim (truncate or pad)
-                if len(avg) >= self.pattern_dim:
-                    pattern = avg[: self.pattern_dim]
-                else:
-                    pattern[: len(avg)] = avg
+                pattern = np.mean(vecs, axis=0)
         else:
             # Hash-based fallback: deterministic bag-of-words features
             text = self._experience_key(experience)

@@ -64,7 +64,12 @@ class ArchivalMixin:
         Useful for diagnostics, deduplication checks, and any code
         that needs the complete set of known concepts.
         """
-        ids = set(self._concepts.keys())
+        # Snapshotted first: the learner adds to `_concepts`
+        # concurrently, and iterating it live raises "dictionary
+        # changed size during iteration". `set(d.keys())` iterates the
+        # live view just the same, so the list() is load-bearing.
+        working = list(self._concepts.keys())
+        ids = set(working)
         if self._archive is not None:
             try:
                 ids.update(self._archive.get_all_ids())
@@ -356,7 +361,7 @@ class ArchivalMixin:
 
         # Find spillable concepts, sorted by activation (most dormant first)
         spillable: list[tuple[float, str]] = []
-        for cid, concept in self._concepts.items():
+        for cid, concept in list(self._concepts.items()):
             if concept.origin in protected_origins:
                 continue
             activation = concept.activation or 0.0

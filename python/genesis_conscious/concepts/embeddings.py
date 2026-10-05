@@ -363,9 +363,22 @@ class EmbeddingStore:
             full[flat_start:] = self._archive_matrix[archive_idx]
             return self._cache_concept(concept_name, full)
 
-        # Compute on the fly
+        # Compute on the fly. `_compute_concept_vector` returns the flat
+        # block only (TF-IDF + GloVe) — it has no spectral or experiential
+        # block to draw from — so it comes back narrower than a hot matrix
+        # row. Expand to full width with zeros, exactly as the archive path
+        # above does. Without this a caller that mixes the two widths fails:
+        # np.mean() over them is a ragged array, and np.dot() in `_cosine`
+        # cannot align them.
         vec = self._compute_concept_vector(concept_name)
-        return self._cache_concept(concept_name, vec)
+        if vec is None:
+            return None
+        full = np.zeros(self._dim, dtype=np.float32)
+        flat_start = self._spectral_dim + self._experiential_dim
+        width = min(len(vec), max(0, self._dim - flat_start))
+        if width > 0:
+            full[flat_start : flat_start + width] = vec[:width]
+        return self._cache_concept(concept_name, full)
 
     def _cache_concept(
         self, concept_name: str, vec: np.ndarray | None

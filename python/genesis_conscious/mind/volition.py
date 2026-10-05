@@ -1408,7 +1408,11 @@ class VolitionMixin:
         already_built: set[str] = set()
         try:
             network = self.cognition.network
-            for _name, node in network._concepts.items():
+            # Snapshot first: the concept dict is shared with the
+            # learning and consolidation threads, which add to it
+            # concurrently. Iterating it live raises "dictionary changed
+            # size during iteration".
+            for _name, node in list(network._concepts.items()):
                 if node.properties.get("type") == "project":
                     # The definition is "a Python project Genesis
                     # created about <topic>" — extract the topic.
@@ -1464,9 +1468,10 @@ class VolitionMixin:
         # Fall back to a random high-confidence concept
         try:
             network = self.cognition.network
+            # Snapshotted, not iterated live — see the note above.
             concepts = [
                 (name, node.confidence)
-                for name, node in network._concepts.items()
+                for name, node in list(network._concepts.items())
                 if node.confidence > 0.5
                 and name not in ("genesis", "creator", "code", "python", "rust")
                 and not _is_code_symbol(name)

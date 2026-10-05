@@ -480,7 +480,7 @@ class DynamicsMixin:
         if self._active_ids is None:
             self._active_ids = {
                 cid
-                for cid, c in self._concepts.items()
+                for cid, c in list(self._concepts.items())
                 if (c.activation or 0.0) > 0.0
             }
             self._ticks_since_sweep = 0
@@ -508,7 +508,7 @@ class DynamicsMixin:
         # ─── 6. Return what's on its mind ───────────────────────
         return {
             cid: concept.activation
-            for cid in self._active_ids
+            for cid in list(self._active_ids or ())
             if (concept := self._concepts.get(cid)) is not None
             and (concept.activation or 0.0) > 0.1
         }
@@ -707,7 +707,10 @@ class DynamicsMixin:
         entire network. O(N), run every ``SWEEP_INTERVAL_TICKS``.
         """
         active: set[str] = set()
-        for cid, concept in self._concepts.items():
+        # Snapshotted: the learning and consolidation threads add to
+        # `_concepts` concurrently, and iterating it live raises
+        # "dictionary changed size during iteration".
+        for cid, concept in list(self._concepts.items()):
             activation = concept.activation or 0.0
             if activation >= ACTIVATION_NOISE_FLOOR:
                 active.add(cid)

@@ -481,7 +481,7 @@ class ConsolidationMixin:
 
         # Find dormant concepts (same criteria as spill_dormant)
         dormant_ids: set[str] = set()
-        for cid, concept in self._concepts.items():
+        for cid, concept in list(self._concepts.items()):
             if concept.origin in protected:
                 continue
             if (concept.activation or 0.0) >= activation_threshold:
