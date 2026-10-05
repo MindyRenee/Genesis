@@ -11,7 +11,7 @@ executes the neurochemical dynamics, memory consolidation, and
 generative-model work the cognitive mind requests over a Unix socket.
 A Python *cognitive layer* handles perception, reasoning, language,
 introspection, and self-modeling. The two share a checksummed,
-versioned binary state file (3,288 bytes, schema pinned by layout
+versioned binary state file (3,296 bytes, schema pinned by layout
 asserts) and a Unix socket.
 
 The daemon is lease-driven: while the mind is alive it is a bus
