@@ -383,7 +383,13 @@ impl MmapState {
         // SAFETY: `fd` is a valid open file descriptor.
         unsafe { Self::lock_file(fd) }?;
 
-        // Check file size — must be at least the state struct size.
+        // Check file size. Current files are at least the current
+        // struct size, but a known legacy v3 file is intentionally
+        // smaller because the inference-signals tail grew from 60 to
+        // 64 bytes. That layout is migrated below after the mapping is
+        // established. Reject anything smaller than the known legacy
+        // layout rather than trying to interpret arbitrary/truncated
+        // bytes as a Genesis state.
         let metadata = match file.metadata() {
             Ok(metadata) => metadata,
             Err(e) => {
@@ -392,7 +398,7 @@ impl MmapState {
                 return Err(StateFileError::Io(e));
             }
         };
-        if metadata.len() < GenesisCoreState::SIZE as u64 {
+        if metadata.len() < crate::state::core_state::LEGACY_SIZE as u64 {
             // SAFETY: `fd` is valid and the open lock is held.
             unsafe { Self::unlock_file(fd) };
             return Err(StateFileError::FileTooSmall {
