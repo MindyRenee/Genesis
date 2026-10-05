@@ -140,6 +140,7 @@ from .memory_store import MemoryStore
 from .question_handler import QuestionHandler
 from .response_styler import ResponseStyler
 from .self_inquiry import SelfInquiryHandler
+from .situation_model import SituationModel
 from .topic_resolver import TopicResolver
 
 if TYPE_CHECKING:
@@ -335,9 +336,21 @@ class CognitionEngine:
             goals_getter=lambda: self._goals,
             mission_getter=lambda: self._mission,
         )
+        # Situation model — the state of the world the current
+        # discourse describes. Distinct from the concept network:
+        # the network holds semantic knowledge ("a tardigrade is a
+        # microscopic animal") while this holds the episodic
+        # situation being talked about right now ("Mary is in the
+        # bathroom"). Fed from every comprehended turn, and consulted
+        # by the question handler before the concept network, so
+        # "Where is Mary?" asked mid-story is answered from what she
+        # just heard rather than from the web.
+        self.situation_model = SituationModel()
+
         # Question handler — extracted subsystem for question routing.
         self._question_handler = QuestionHandler(
             network=self.network,
+            situation_model=self.situation_model,
             language=self.language,
             composer=self.composer,
             self_composer=self.self_composer,
@@ -1035,6 +1048,14 @@ class CognitionEngine:
         # Without this, find_relation_verbs() returns [] for every relation
         # and _compose_natural_fact falls back to the bare semantic triple.
         self.network.seed_relation_verbs()
+        # Situation verbs — the phrasings for the discourse situation
+        # model ("who is where", "who is holding what"). Same
+        # mechanism as the relation verbs above: seeds become
+        # EXPRESSES neighbours of a hub, and the language layer picks
+        # from the graph at composition time. They are building blocks
+        # she composes with, not sentences she recites — the fill-ins
+        # (the entity, the place) come from what the user described.
+        self.network.seed_situation_verbs()
 
         # Seed visual and object concepts — its "what" pathway vocabulary.
         # These are the categories its inferotemporal cortex (object
@@ -5960,6 +5981,21 @@ class CognitionEngine:
         if comprehension_result.propositions:
             entities = [p.subject for p in comprehension_result.propositions if p.subject]
             self.comprehension.set_recent_entities(entities[-5:])
+
+        # ── Feed the discourse situation model ──────────────────
+        # Only statements and commands mutate the state being
+        # described; the model itself records questions as the
+        # interlocutor's intentions without moving anything. A
+        # failure here must not cost the turn — the model is an
+        # observer of comprehension, and losing it degrades
+        # mid-story question answering rather than breaking anything.
+        try:
+            self.situation_model.update(comprehension_result)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "genesis_conscious.cognition.engine._think_comprehend_and_predict",
+                e,
+            )
 
     _INTRO_RE: ClassVar[re.Pattern[str]] = re.compile(
         r"\b(?:my name is|i'?m|i am)\s+([a-z][a-z'-]*)", re.IGNORECASE

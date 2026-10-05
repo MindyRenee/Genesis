@@ -751,6 +751,12 @@ class GenerativeEngine(LanguageEngine):
             # objects, direction) that the question handler traversed,
             # instead of the handler building the words itself.
             "relation_answer": thought.metadata.get("relation_answer"),
+            # Situation answer metadata — the state of the world the
+            # current discourse describes (who is where, holding
+            # what). The question handler supplies the structured
+            # state it read; the vocabulary composes the words, so the
+            # same discipline applies as for relation answers.
+            "situation_answer": thought.metadata.get("situation_answer"),
             # Self-improvement metadata — lets the vocabulary compose a
             # response from its proposals, experiments, or growth data
             # instead of reciting the raw admin summary.

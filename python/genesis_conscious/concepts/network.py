@@ -1493,6 +1493,96 @@ class ConceptNetwork(
                         cid, hub_id, RelationType.EXPRESSES,
                         weight=0.6, origin="relation_verb_seed",
                     )
+    _SITUATION_VERB_SEEDS: ClassVar[dict[str, list[str]]] = {
+        # "Where is X?" — the subject and its location.
+        "location": [
+            "{subject} is in the {place}",
+            "{subject} is at the {place}",
+            "{subject} is over in the {place}",
+            "{subject} can be found in the {place}",
+        ],
+        # "Where might X be?" — the discourse said either/or.
+        "location_candidates": [
+            "{subject} is in the {places}",
+            "{subject} is somewhere around the {places}",
+            "{subject} could be in the {places}",
+        ],
+        # "What is X carrying?" The templates carry their own articles,
+        # so the fill-in is a bare noun phrase.
+        "carrying": [
+            "{subject} is carrying {objects}",
+            "{subject} has {objects} with them",
+            "{subject} is holding {objects}",
+        ],
+        # "Who is in the kitchen?" — the fill-ins are who was found and
+        # where, so {who} precedes {place} here.
+        "present_at": [
+            "{who} {be} in the {place}",
+            "the {place} has {who} in it",
+            "{who} {be} found in the {place}",
+        ],
+    }
+
+    def seed_situation_verbs(self) -> None:
+        """Seed situation-model phrasings into the concept network.
+
+        The discourse situation model answers "who is where" and "who
+        is holding what", and those answers need surface form. Each
+        phrasing here is a *template* with ``{subject}``/``{place}``/
+        ``{objects}``/``{who}``/``{be}`` slots; the language layer picks
+        one from the graph and fills it with the entity and place the
+        user actually described.
+
+        Seeds, not responses: she chooses among these and fills them
+        at composition time, and nothing here says what she says about
+        any particular situation. Learned phrasings join the same hub
+        through ``EXPRESSES``, so the graph is where both live.
+        """
+        for kind, phrases in self._SITUATION_VERB_SEEDS.items():
+            hub_id = f"_cat:situation_verb:{kind}"
+            if self.get_concept(hub_id) is None:
+                self.add_concept(hub_id, confidence=0.7, origin="structural")
+            for phrase in phrases:
+                cid = "_utt:" + re.sub(
+                    r"[{}]", "", phrase.replace(" ", "_")
+                ).lower().rstrip("_")
+                if not cid or len(cid) < 2:
+                    continue
+                if self.get_concept(cid) is None:
+                    self.add_concept(
+                        cid, origin="structural",
+                        properties={"template": phrase},
+                    )
+                existing = self.get_neighbors(cid, RelationType.EXPRESSES)
+                if not any(n[0] == hub_id for n in existing):
+                    self.add_edge(
+                        cid, hub_id, RelationType.EXPRESSES,
+                        weight=0.6, origin="situation_verb_seed",
+                    )
+
+    def find_situation_verbs(self, kind: str) -> list[str]:
+        """Find phrasing templates for a situation-model answer kind.
+
+        Traverses EXPRESSES edges from the ``_cat:situation_verb:<kind>``
+        hub and returns the stored templates verbatim. Empty when the
+        hub has not been seeded.
+        """
+        hub_id = f"_cat:situation_verb:{kind}"
+        neighbors = self.get_neighbors(hub_id, RelationType.EXPRESSES)
+        if not neighbors:
+            return []
+        results: list[str] = []
+        for n in neighbors:
+            concept = self.get_concept(n[0])
+            if concept is None:
+                continue
+            template = concept.properties.get("template")
+            if isinstance(template, str):
+                results.append(template)
+            else:
+                results.append(n[0].replace("_", " "))
+        return results
+
     def find_relation_verbs(self, relation: RelationType) -> list[str]:
         """Find verb phrases for a relation type.
 
