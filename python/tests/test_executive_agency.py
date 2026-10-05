@@ -50,12 +50,21 @@ def test_acting_loop_registers_with_existing_executive() -> None:
     from genesis_cognitive.tools.agency import ActingLoop
     from genesis_cognitive.tools.framework import ToolRegistry
 
+    class CountingExecutive(ExecutiveFunction):
+        def __init__(self) -> None:
+            super().__init__()
+            self.form_calls = 0
+
+        def form_intention(self, *args, **kwargs):
+            self.form_calls += 1
+            return super().form_intention(*args, **kwargs)
+
     with TemporaryDirectory() as tmp:
         data = Path(tmp) / 'data'
         repo = Path(tmp) / 'repo'
         data.mkdir()
         repo.mkdir()
-        executive = ExecutiveFunction()
+        executive = CountingExecutive()
         loop = ActingLoop(
             network=ConceptNetwork(), tools=ToolRegistry(),
             data_dir=str(data), project_root=str(repo), offline=True,
@@ -67,6 +76,7 @@ def test_acting_loop_registers_with_existing_executive() -> None:
         assert result.executive_intention is not None
         assert result.executive_intention.objective == "learn:photosynthesis"
         assert executive.intentions
+        assert executive.form_calls == 1
 
 def test_executive_round_trips_persistent_intentions() -> None:
     executive = ExecutiveFunction()
