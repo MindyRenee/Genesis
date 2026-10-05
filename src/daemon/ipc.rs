@@ -999,6 +999,11 @@ impl LtmAccess for LtmStore {
 pub struct IpcServer {
     socket_path: PathBuf,
     shutdown_flag: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    /// Whether this server instance successfully bound the socket.
+    /// Drop may unlink only a socket owned by this instance; in
+    /// particular, a startup attempt that discovers a live listener
+    /// must never remove that listener's endpoint when it returns.
+    owns_socket: std::sync::atomic::AtomicBool,
 }
 
 impl IpcServer {
@@ -1007,6 +1012,7 @@ impl IpcServer {
         Self {
             socket_path: socket_path.as_ref().to_path_buf(),
             shutdown_flag: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            owns_socket: std::sync::atomic::AtomicBool::new(false),
         }
     }
 
@@ -1093,7 +1099,14 @@ impl IpcServer {
         unsafe { libc::umask(old_umask) };
 
         let listener = match bind_result {
-            Ok(l) => l,
+            Ok(l) => {
+                // From this point on, this instance owns the pathname and
+                // is responsible for removing it during Drop.
+                server
+                    .owns_socket
+                    .store(true, std::sync::atomic::Ordering::Release);
+                l
+            }
             Err(e) => {
                 // IPC is a required control plane for the cognitive mind.
                 // A daemon that stays alive without its socket cannot be
@@ -1289,7 +1302,16 @@ impl IpcServer {
 
 impl Drop for IpcServer {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.socket_path);
+        // Only unlink a socket that this instance actually bound. A
+        // startup attempt may have returned because another listener was
+        // already live at this path; removing it here would undo the
+        // live-socket protection above.
+        if self
+            .owns_socket
+            .load(std::sync::atomic::Ordering::Acquire)
+        {
+            let _ = std::fs::remove_file(&self.socket_path);
+        }
     }
 }
 
