@@ -201,6 +201,19 @@ _HARMS_RE = re.compile(
 )
 # "X is opposite of Y" / "X contrasts with Y"
 _OPPOSITE_RE = re.compile(
+    r"\\b([A-Za-z][\\w]*(?:\\s+[A-Za-z][\\w]*)*)\\s+"
+    r"(?:is\\s+(?:the\\s+)?opposite\\s+of|contrasts?\\s+with)\\s+"
+    r"([A-Za-z][\\w]*(?:\\s+[A-Za-z][\\w]*)*)\\b",
+    re.IGNORECASE,
+)
+_CONTRADICTS_RE = re.compile(
+    r"\\b([A-Za-z][\\w]*(?:\\s+[A-Za-z][\\w]*)*)\\s+"
+    r"(?:contradicts?|conflicts?\\s+with)\\s+"
+    r"([A-Za-z][\\w]*(?:\\s+[A-Za-z][\\w]*)*)\\b",
+    re.IGNORECASE,
+)
+
+_OPPOSITE_RE = re.compile(
     r"\b([A-Za-z][\w]*(?:\s+[A-Za-z][\w]*)*)\s+"
     r"(?:is\s+(?:the\s+)?opposite\s+of|contrasts\s+with)\s+"
     r"([A-Za-z][\w]*(?:\s+[A-Za-z][\w]*)*)\b",
@@ -528,10 +541,33 @@ class SemanticMemory:
         self._extract_part_of_facts(clause, now_ms, facts)
         self._extract_relates_action_facts(clause, now_ms, facts)
         self._extract_typed_relation_facts(clause, now_ms, facts)
+        self._extract_contradiction_facts(clause, now_ms, facts)
         self._extract_is_a_facts(clause, now_ms, facts)
         self._extract_has_facts(clause, now_ms, facts)
 
         return facts
+
+    def _extract_contradiction_facts(
+        self, clause: str, now_ms: int, facts: list[Fact]
+    ) -> None:
+        """Extract explicit contradiction and opposition relations."""
+        for pattern, relation in (
+            (_CONTRADICTS_RE, "contradicts"),
+            (_OPPOSITE_RE, "opposite_of"),
+        ):
+            for match in pattern.finditer(clause):
+                subject, obj = _normalise_pair(match.group(1), match.group(2))
+                if subject and obj:
+                    facts.append(
+                        Fact(
+                            subject=subject,
+                            relation=relation,
+                            object=obj,
+                            confidence=0.7,
+                            extracted_at=now_ms,
+                            last_reinforced=now_ms,
+                        )
+                    )
 
     def _extract_part_of_facts(
         self, clause: str, now_ms: int, facts: list[Fact]
