@@ -64,6 +64,7 @@ class FileLearningResult:
     functions: int
     classes: int  # or structs for Rust
     lines: int
+    analyzed: bool = True
 
 
 @dataclass(slots=True)
@@ -571,6 +572,12 @@ class CodeLearner:
                 classes=0,
                 lines=0,
             )
+
+        # A read/parse failure returns an explicit unsuccessful result.
+        # Do not mark that file learned: otherwise a transient filesystem
+        # error or syntax error becomes durable false coverage.
+        if not result.analyzed:
+            return result
 
         self._analyzed_files.add(rel)
 
@@ -1362,4 +1369,5 @@ class CodeLearner:
             functions=0,
             classes=0,
             lines=0,
+            analyzed=False,
         )
