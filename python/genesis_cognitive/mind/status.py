@@ -434,7 +434,7 @@ class StatusMixin:
         string.
 
         ``core_state`` is the already-fetched state — passing it avoids
-        a redundant get_state() IPC call + 3288-byte unpack for each
+        a redundant get_state() IPC call + 3296-byte unpack for each
         warning phrase. Without this, warn() with 8 warning conditions
         would unpack the state 9 times.
         """
