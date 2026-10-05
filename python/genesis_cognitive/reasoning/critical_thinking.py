@@ -413,22 +413,13 @@ class CriticalThinkingEngine:
                 origin=edge.origin,
                 supports=True,
             ))
-        for rel_str, target, weight in result.knowledge:
-            edge = self._find_edge(result, rel_str, target)
-            if edge is not None and (edge.source, rel_str, edge.target) in seen_pairs:
-                continue
-            origin = edge.origin if edge else "inferred"
-            reliability = self._source_reliability(origin)
-            source_concept = edge.source if edge else ""
-            evidence.append(EvidenceItem(
-                source_concept=source_concept,
-                relation=rel_str,
-                target_concept=target,
-                raw_weight=weight,
-                source_reliability=reliability,
-                origin=origin,
-                supports=True,
-            ))
+        # knowledge is a language/composition payload: its triples omit
+        # the source concept by design. It is therefore not provenance and
+        # must not be treated as evidence here. Doing so would either invent
+        # an inferred evidence item or attach the triple to an unrelated
+        # network edge with the same relation and target.
+        # Structured path and parseable evidence carry the actual
+        # source/relation/target provenance and are used above/below.
         # Also check the evidence chain for stated relationships.
         for ev in result.evidence:
             parsed = self._parse_evidence_string(ev)
