@@ -602,10 +602,22 @@ class LifecycleMixin:
                 e,
             )# user pressed Ctrl+C — still try to save
             clean_shutdown = False
+        # Subsystems get a shutdown budget matched to the longest
+        # uninterruptible phase they can legitimately be in. Inner life
+        # drives sleep-stage transitions synchronously, and an N3
+        # consolidation pass takes ~20 s — longer than the default 5 s
+        # join. Interrupting one mid-pass is the thing to avoid, since it
+        # is writing to the concept network, the edge log, and the
+        # archive at the same time. So it is given room to finish what it
+        # started, and the wait is bounded so a genuine hang still
+        # surfaces rather than blocking shutdown forever.
+        _SUBSYSTEM_STOP_TIMEOUTS = {"InnerLife": 45.0}
         for subsystem in (self.learner, self.inner_life, self.regulator):
+            name = type(subsystem).__name__
             clean_shutdown &= self._join_shutdown_thread(
                 getattr(subsystem, "_thread", None),
-                type(subsystem).__name__,
+                name,
+                timeout=_SUBSYSTEM_STOP_TIMEOUTS.get(name, 5.0),
             )
 
         # Volition workers are tracked only by name. Suppression above
@@ -729,12 +741,46 @@ class LifecycleMixin:
             logger.warning("%s shutdown requested from its own thread", name)
             return False
         deadline = time.monotonic() + timeout
+        started = time.monotonic()
         while thread.is_alive():
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                logger.warning("%s thread did not exit during shutdown", name)
+                logger.warning(
+                    "%s thread did not exit within %.0fs during shutdown",
+                    name, timeout,
+                )
+                # Dump every thread's stack. A shutdown timeout is
+                # otherwise undiagnosable: the log says a thread would not
+                # stop and nothing says what it is blocked in, so the only
+                # way to find out is to reproduce it under a debugger.
+                #
+                # `sys._current_frames()` rather than
+                # `faulthandler.dump_traceback(file=...)`: the latter needs
+                # a real file descriptor and raises on a StringIO, which
+                # is what silently swallowed the first attempt at this.
+                try:
+                    import sys
+                    import traceback as tb_mod
+
+                    for frame_id, frame in sys._current_frames().items():
+                        if frame_id == threading.get_ident():
+                            continue
+                        lines = tb_mod.format_stack(frame)
+                        # Innermost frame first — that is the one that says
+                        # what the thread is blocked on.
+                        for entry in reversed(lines):
+                            if entry.strip():
+                                logger.warning(
+                                    "%s thread 0x%x at %s",
+                                    name, frame_id, entry.strip(),
+                                )
+                except Exception:
+                    logger.debug("stack dump unavailable", exc_info=True)
                 return False
             thread.join(timeout=min(0.5, remaining))
+        waited = time.monotonic() - started
+        if waited > 0.5:
+            logger.info("%s thread exited after %.1fs", name, waited)
         return True
 
     def _load_saved_state(self) -> None:

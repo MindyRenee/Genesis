@@ -794,6 +794,20 @@ class InnerLife:
                 # independent of the thought-generation gap).
                 self._update_sleep_inertia(now)
 
+                # Honour a stop request at phase boundaries. The wait at
+                # the bottom of the loop returns immediately when the
+                # event is set, but nothing between here and there did —
+                # and during N3 this body runs a full sleep-stage
+                # transition, which takes ~20 s. Shutdown gave the join
+                # 5 s, so stopping her mid-consolidation reliably reported
+                # "thread did not exit" even though the thread was
+                # behaving correctly. Checking between phases lets a stop
+                # land promptly while still allowing the phase in flight
+                # to finish, which matters because interrupting a
+                # consolidation mid-pass is what we actually want to avoid.
+                if self._stop_event.is_set():
+                    break
+
                 # Check if enough time has passed since last thought
                 if now - self._last_thought_time >= self._min_thought_gap:
                     self._run_thought_generation(now)
