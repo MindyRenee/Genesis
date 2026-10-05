@@ -586,10 +586,16 @@ class SleepMixin:
                 "sleepiness", emotion, focused=True
             )
             if thought and thought.content and thought.confidence > 0.3:
-                self._emit_live_thought("thought", thought.content)
+                # Thought.content is semantic substrate, not final speech.
+                # Route sleep-onset expression through the same language
+                # generator used by ordinary cognition.
+                spoken = self.language.render(thought, emotion)
+                if not spoken:
+                    return
+                self._emit_live_thought("thought", spoken)
                 if self._on_speak is not None:
                     try:
-                        self._on_speak(thought.content)
+                        self._on_speak(spoken)
                     except Exception as e:  # noqa: BLE001
                         logger.debug(f"drowsiness speak failed: {e}")
         except Exception as e:  # noqa: BLE001
