@@ -1544,6 +1544,7 @@ class AutonomousLearner:
                 "curiosity_queue": list(self._curiosity_queue),
                 "surprise_baseline": self._surprise_baseline,
                 "predicted_reward": self._predicted_reward,
+                "dual_system": self.dual_system.serialize_state(),
             }
 
     def restore_state(self, data: dict) -> None:
@@ -1567,6 +1568,10 @@ class AutonomousLearner:
             )
             self._surprise_baseline = data.get("surprise_baseline", 0.0)
             self._predicted_reward = data.get("predicted_reward", 0.0)
+
+        dual_state = data.get("dual_system")
+        if dual_state is not None:
+            self.dual_system.restore_state(dual_state)
 
     # ─── On-demand documentation fetching ──────────────────────
 
