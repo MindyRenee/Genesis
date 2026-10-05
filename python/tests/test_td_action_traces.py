@@ -11,19 +11,23 @@ def _network() -> ConceptNetwork:
     return network
 
 
-def test_action_conditioned_trace_is_scoped_to_action() -> None:
-    """A trace for action A must not receive action B's later TD error."""
+def test_action_conditioned_traces_preserve_temporal_credit() -> None:
+    """A prior action trace receives later TD error with decayed credit."""
     learner = TDLearner(_network(), lam=0.8, discount=0.9)
 
     learner.update(["state"], 0.0, ["next"], action="A", next_action="A")
-    assert learner.get_trace("state", action="A") > 0.0
+    assert learner.get_trace("state", action="A") == 1.0
     assert learner.get_trace("state", action="B") == 0.0
 
     learner.update(["next"], 2.0, [], action="B")
 
-    assert learner.get_weight("state") == 1.0
-    assert learner._action_weights.get(("state", "A"), 1.0) == 1.0
-    assert learner._action_weights.get(("state", "B"), 1.0) != 1.0
+    # The A trace remains eligible but decays by gamma*lambda.
+    assert learner.get_trace("state", action="A") == 0.72
+    # B was not active in the first transition; its trace is independent.
+    assert learner.get_trace("state", action="B") == 0.0
+    # The later TD error therefore changes A through its retained trace.
+    assert learner._action_weights[("state", "A")] != 1.0
+    assert learner._action_weights.get(("state", "B"), 1.0) == 1.0
 
 
 def test_action_conditioned_traces_decay_independently() -> None:
