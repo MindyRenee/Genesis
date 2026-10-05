@@ -708,8 +708,16 @@ class ConceptNetwork(
         # network deserialized (legacy JSON projections included) is
         # overridden. Concepts and aliases keep the staged data; edges
         # come from the log alone.
-        if self._edge_log is not None and not self._edge_log.is_empty:
-            self._load_from_edge_log()
+        if self._edge_log is not None:
+            if not self._edge_log.is_empty:
+                self._load_from_edge_log()
+            elif self._edges:
+                # A newly attached/empty log has no canonical history yet.
+                # Seed it from the restored canonical projection so the
+                # live graph and its source of truth cannot diverge after
+                # transactional state restore.
+                self._strip_derivable_edges()
+                self._edge_log.snapshot(self._edges)
     def concept_quality(self, concept_id: str) -> float:
         """Structural quality score for a concept (0.0 to 1.0).
 
