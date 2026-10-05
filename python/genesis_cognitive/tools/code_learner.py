@@ -1106,7 +1106,7 @@ class CodeLearner:
         rel: str,
     ) -> None:
         """Add a class and its methods as concepts."""
-        class_concept = f"python:{node.name}"
+        class_concept = f"python:{module_name}.{node.name}"
         self.network.add_concept(
             class_concept,
             confidence=_SELF_CONFIDENCE,
@@ -1142,7 +1142,7 @@ class CodeLearner:
         # Methods
         for child in node.body:
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                method_concept = f"python:{node.name}.{child.name}"
+                method_concept = f"python:{module_name}.{node.name}.{child.name}"
                 self.network.add_concept(
                     method_concept,
                     confidence=_SELF_CONFIDENCE,
