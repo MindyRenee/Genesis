@@ -28,7 +28,7 @@ fn test_struct_sizes() {
     assert_eq!(core::mem::size_of::<MemoryPointers>(), 120);
     assert_eq!(core::mem::size_of::<ModuleEntry>(), 32);
     assert_eq!(core::mem::size_of::<RuntimeManifest>(), 536);
-    // 3288 + 4 for InferenceSignals.policy_authority, absorbed by the
+    // Legacy layout was 3288 bytes; current InferenceSignals.policy_authority is
     // reserved region, which is defined as exactly the signals size.
     assert_eq!(core::mem::size_of::<GenesisCoreState>(), 3296);
 }
