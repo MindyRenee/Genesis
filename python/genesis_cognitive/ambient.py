@@ -44,6 +44,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from genesis_cognitive.android_tools import find_termux_command
+
 __all__ = ["AmbientListener", "contains_wake_word", "strip_wake_word"]
 
 logger = logging.getLogger(__name__)
@@ -238,7 +240,7 @@ class AmbientListener:
         # the normal Linux ALSA/sounddevice path. Use Termux:API to obtain
         # a short recording, then feed that PCM/WAV data to the same Vosk
         # recognizer used by the desktop listener.
-        if shutil.which("termux-microphone-record"):
+        if find_termux_command("termux-microphone-record"):
             self._listen_loop_android()
             return
 
