@@ -33,7 +33,7 @@ else
     git -C "$REPO_DIR" pull --ff-only origin "$BRANCH"
 fi
 
-if ! proot-distro list | grep -q "^$DISTRO "; then
+if ! proot-distro list 2>/dev/null | grep -Eq "(^|[[:space:]])$DISTRO([[:space:]]|$)"; then
     echo "[genesis-android] Installing Debian PRoot..."
     proot-distro install "$DISTRO"
 fi
