@@ -587,8 +587,23 @@ mod global_step_tests {
         field.add_transport(identity_transport("second", "first")).unwrap();
         field.fibers[1].engine.damping[0] = f64::NAN;
 
-        let before = field.clone();
+        let before_first_state = field.fibers[0].state().unwrap();
+        let before_second_state = field.fibers[1].state().unwrap();
+        let before_first_clock = field.fibers[0].engine_clock;
+        let before_second_clock = field.fibers[1].engine_clock;
+        let before_disagreement = field.disagreement;
+        let before_temperature = field.temperature;
+        let before_cooling_rate = field.cooling_rate;
+
         assert_eq!(field.step(0.1), Err(FieldError::InvalidDynamics));
-        assert_eq!(field, before);
+
+        assert_eq!(field.fibers[0].state().unwrap(), before_first_state);
+        assert_eq!(field.fibers[1].state().unwrap(), before_second_state);
+        assert_eq!(field.fibers[0].engine_clock, before_first_clock);
+        assert_eq!(field.fibers[1].engine_clock, before_second_clock);
+        assert!(field.fibers[1].engine.damping[0].is_nan());
+        assert_eq!(field.disagreement, before_disagreement);
+        assert_eq!(field.temperature, before_temperature);
+        assert_eq!(field.cooling_rate, before_cooling_rate);
     }
 }
