@@ -49,8 +49,8 @@ impl SystemFiber {
  pub fn new(id:impl Into<String>,manifold:PoincareBall,layers:Vec<SubsystemLayer>)->Result<Self,FieldError>{if layers.iter().any(|l|l.state.len()!=manifold.dimension()){return Err(FieldError::DimensionMismatch)}if layers.iter().any(|l|!l.gain.is_finite()){return Err(FieldError::InvalidDynamics)}Ok(Self{id:id.into(),engine_clock:0.0,engine:SystemEngine::zero(layers.len(),manifold.dimension()),manifold,layers})}
  pub fn with_engine(id:impl Into<String>,manifold:PoincareBall,layers:Vec<SubsystemLayer>,engine:SystemEngine)->Result<Self,FieldError>{if engine.biases.len()!=layers.len(){return Err(FieldError::LayerMismatch)}if engine.dimension()!=manifold.dimension(){return Err(FieldError::DimensionMismatch)}engine.validate()?;let mut fiber=Self::new(id,manifold,layers)?;fiber.engine=engine;Ok(fiber)}
  pub fn layer(&self,id:&str)->Option<&SubsystemLayer>{self.layers.iter().find(|l|l.id==id)} pub fn layer_mut(&mut self,id:&str)->Option<&mut SubsystemLayer>{self.layers.iter_mut().find(|l|l.id==id)}
- pub fn step(&mut self,dt:f64)->Result<(),FieldError>{if !dt.is_finite()||dt<0.0{return Err(FieldError::InvalidTime)}let effective_dt=dt*self.engine.time_scale;if !effective_dt.is_finite()||effective_dt<0.0{return Err(FieldError::InvalidTime)}if effective_dt==0.0{return Ok(())}if self.layers.iter().any(|l|!l.gain.is_finite()){return Err(FieldError::InvalidDynamics)}let initial=self.layer_states();let scaled_derivatives=|ds:Vec<Vector>|->Vec<Vector>{ds.into_iter().enumerate().map(|(i,d)|d.into_iter().map(|x|x*self.layers[i].gain).collect()).collect()};let add_stage=|state:&[Vector],slope:&[Vector],scale:f64|->Vec<Vector>{state.iter().zip(slope).map(|(x,dx)|x.iter().zip(dx).map(|(v,dv)|v+scale*dv).collect()).collect()};let k1=scaled_derivatives(self.engine.derivatives(&self.layers)?);let state2=add_stage(&initial,&k1,effective_dt*0.5);let mut stage_layers=self.layers.clone();for(layer,state)in stage_layers.iter_mut().zip(state2){layer.state=state}let k2=scaled_derivatives(self.engine.derivatives(&stage_layers)?);let state3=add_stage(&initial,&k2,effective_dt*0.5);for(layer,state)in stage_layers.iter_mut().zip(state3){layer.state=state}let k3=scaled_derivatives(self.engine.derivatives(&stage_layers)?);let state4=add_stage(&initial,&k3,effective_dt);for(layer,state)in stage_layers.iter_mut().zip(state4){layer.state=state}let k4=scaled_derivatives(self.engine.derivatives(&stage_layers)?);let mut next_layers=self.layers.clone();for(i,layer)in next_layers.iter_mut().enumerate(){for j in 0..layer.state.len(){layer.state[j]=initial[i][j]+effective_dt*(k1[i][j]+2.0*k2[i][j]+2.0*k3[i][j]+k4[i][j])/6.0;}layer.state=self.manifold.project(&layer.state)?;}let next_clock=self.engine_clock+effective_dt;if !next_clock.is_finite(){return Err(FieldError::InvalidTime)}self.layers=next_layers;self.engine_clock=next_clock;Ok(())}
- pub fn evolve(&mut self,derivatives:&[Vector],dt:f64)->Result<(),FieldError>{if !dt.is_finite()||dt<0.0{return Err(FieldError::InvalidTime)}if derivatives.len()!=self.layers.len(){return Err(FieldError::LayerMismatch)}let mut next_layers=self.layers.clone();for(layer,derivative)in next_layers.iter_mut().zip(derivatives){layer.evolve(derivative,dt)?;layer.state=self.manifold.project(&layer.state)?;}let next_clock=self.engine_clock+dt;if !next_clock.is_finite(){return Err(FieldError::InvalidTime)}self.layers=next_layers;self.engine_clock=next_clock;Ok(())}
+ pub fn step(&mut self,dt:f64)->Result<(),FieldError>{if !self.engine_clock.is_finite()||self.engine_clock<0.0{return Err(FieldError::InvalidTime)}if !dt.is_finite()||dt<0.0{return Err(FieldError::InvalidTime)}let effective_dt=dt*self.engine.time_scale;if !effective_dt.is_finite()||effective_dt<0.0{return Err(FieldError::InvalidTime)}if effective_dt==0.0{return Ok(())}if self.layers.iter().any(|l|!l.gain.is_finite()){return Err(FieldError::InvalidDynamics)}let initial=self.layer_states();let scaled_derivatives=|ds:Vec<Vector>|->Vec<Vector>{ds.into_iter().enumerate().map(|(i,d)|d.into_iter().map(|x|x*self.layers[i].gain).collect()).collect()};let add_stage=|state:&[Vector],slope:&[Vector],scale:f64|->Vec<Vector>{state.iter().zip(slope).map(|(x,dx)|x.iter().zip(dx).map(|(v,dv)|v+scale*dv).collect()).collect()};let k1=scaled_derivatives(self.engine.derivatives(&self.layers)?);let state2=add_stage(&initial,&k1,effective_dt*0.5);let mut stage_layers=self.layers.clone();for(layer,state)in stage_layers.iter_mut().zip(state2){layer.state=state}let k2=scaled_derivatives(self.engine.derivatives(&stage_layers)?);let state3=add_stage(&initial,&k2,effective_dt*0.5);for(layer,state)in stage_layers.iter_mut().zip(state3){layer.state=state}let k3=scaled_derivatives(self.engine.derivatives(&stage_layers)?);let state4=add_stage(&initial,&k3,effective_dt);for(layer,state)in stage_layers.iter_mut().zip(state4){layer.state=state}let k4=scaled_derivatives(self.engine.derivatives(&stage_layers)?);let mut next_layers=self.layers.clone();for(i,layer)in next_layers.iter_mut().enumerate(){for j in 0..layer.state.len(){layer.state[j]=initial[i][j]+effective_dt*(k1[i][j]+2.0*k2[i][j]+2.0*k3[i][j]+k4[i][j])/6.0;}layer.state=self.manifold.project(&layer.state)?;}let next_clock=self.engine_clock+effective_dt;if !next_clock.is_finite(){return Err(FieldError::InvalidTime)}self.layers=next_layers;self.engine_clock=next_clock;Ok(())}
+ pub fn evolve(&mut self,derivatives:&[Vector],dt:f64)->Result<(),FieldError>{if !self.engine_clock.is_finite()||self.engine_clock<0.0{return Err(FieldError::InvalidTime)}if !dt.is_finite()||dt<0.0{return Err(FieldError::InvalidTime)}if derivatives.len()!=self.layers.len(){return Err(FieldError::LayerMismatch)}let mut next_layers=self.layers.clone();for(layer,derivative)in next_layers.iter_mut().zip(derivatives){layer.evolve(derivative,dt)?;layer.state=self.manifold.project(&layer.state)?;}let next_clock=self.engine_clock+dt;if !next_clock.is_finite(){return Err(FieldError::InvalidTime)}self.layers=next_layers;self.engine_clock=next_clock;Ok(())}
  pub fn state(&self)->Result<Vector,FieldError>{if self.layers.is_empty(){return Err(FieldError::EmptyState)}self.manifold.origin_barycenter(&self.layers.iter().map(|l|l.state.clone()).collect::<Vec<_>>())} pub fn layer_states(&self)->Vec<Vector>{self.layers.iter().map(|l|l.state.clone()).collect()}
 }
 
@@ -75,6 +75,31 @@ fn identity(n:usize)->Matrix{let mut m=vec![vec![0.0;n];n];for i in 0..n{m[i][i]
 fn mat_mul(a:&Matrix,b:&Matrix)->Matrix{let n=a.len();let mut out=vec![vec![0.0;n];n];for i in 0..n{for j in 0..n{for k in 0..n{out[i][j]+=a[i][k]*b[k][j];}}}out}
 fn mat_vec(a:&Matrix,x:&Vector)->Result<Vector,FieldError>{if a.len()!=x.len()||a.iter().any(|r|r.len()!=x.len()){return Err(FieldError::DimensionMismatch)}let mut out=vec![0.0;x.len()];for i in 0..a.len(){out[i]=dot(&a[i],x);}if out.iter().any(|v|!v.is_finite()){return Err(FieldError::NonFiniteState)}Ok(out)}
 fn matrix_distance(a:&Matrix,b:&Matrix)->Result<f64,FieldError>{if a.len()!=b.len()||a.iter().zip(b).any(|(x,y)|x.len()!=y.len()){return Err(FieldError::DimensionMismatch)}let mut sum=0.0;for(row_a,row_b)in a.iter().zip(b){for(x,y)in row_a.iter().zip(row_b){if !x.is_finite()||!y.is_finite(){return Err(FieldError::NonFiniteState)}let delta=x-y;if !delta.is_finite(){return Err(FieldError::NonFiniteState)}let term=delta*delta;if !term.is_finite(){return Err(FieldError::NonFiniteState)}sum+=term;if !sum.is_finite(){return Err(FieldError::NonFiniteState)}}}Ok(sum.sqrt())}
+#[cfg(test)]
+mod clock_integrity_tests {
+    use super::*;
+
+    #[test]
+    fn step_rejects_invalid_existing_clock() {
+        let manifold = PoincareBall::new(1, 1.0).unwrap();
+        let mut fiber = SystemFiber::new("x", manifold, vec![
+            SubsystemLayer::new("layer", vec![0.0]),
+        ]).unwrap();
+        fiber.engine_clock = f64::NAN;
+        assert_eq!(fiber.step(0.1), Err(FieldError::InvalidTime));
+    }
+
+    #[test]
+    fn evolve_rejects_negative_existing_clock() {
+        let manifold = PoincareBall::new(1, 1.0).unwrap();
+        let mut fiber = SystemFiber::new("x", manifold, vec![
+            SubsystemLayer::new("layer", vec![0.0]),
+        ]).unwrap();
+        fiber.engine_clock = -1.0;
+        assert_eq!(fiber.evolve(&[vec![0.0]], 0.1), Err(FieldError::InvalidTime));
+    }
+}
+
 #[cfg(test)]
 mod matrix_distance_regression {
     use super::*;
