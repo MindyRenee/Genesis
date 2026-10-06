@@ -8,7 +8,7 @@
 use crate::state::neurochemical::NeurochemicalId;
 use crate::state::GenesisCoreState;
 
-use super::{FieldError, GaugeTransport, GlobalField, PoincareBall, SubsystemLayer, SystemEngine, Vector};
+use super::{FieldError, GaugeTransport, GlobalField, PoincareBall, SubsystemLayer, SystemEngine, SystemFiber, Vector};
 
 pub const LATENT_DIMENSION: usize = 6;
 
