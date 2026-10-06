@@ -467,26 +467,14 @@ impl MmapState {
         // uninitialised.
         let mut snapshot = unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) };
         if let Err(e) = snapshot.verify() {
-            // Two kinds of mismatch are repairable in place, and the
-            // order of `verify()` decides which one we are looking at:
-            // it checks the version before the size.
             match e {
-                // Old version label, layout still current: migrate the
-                // version (and the chemical initialization that came
-                // with it).
                 crate::state::CoreStateError::VersionMismatch { found: 2, .. } => {
-                    // SAFETY: `ptr`/`fd` are exclusively owned here — no
-                    // `MmapState` exists yet — and the flock is held.
                     snapshot =
                         unsafe { Self::migrate_and_snapshot(ptr, fd, |s| s.migrate_state(2))? };
                 }
-                // Correct version, older struct size: the reserve at
-                // the end of the struct grew (see
-                // `GenesisCoreState::migrate_layout`), so no field
-                // before the signals block moved but the file is too
-                // short to read as-is.
-                crate::state::CoreStateError::SizeMismatch { found, .. } => {
-                    // SAFETY: as above.
+                crate::state::CoreStateError::SizeMismatch { found, .. }
+                    if found == crate::state::core_state::LEGACY_SIZE =>
+                {
                     snapshot = unsafe {
                         Self::migrate_and_snapshot(ptr, fd, |s| {
                             s.migrate_layout(found)?;
@@ -495,15 +483,7 @@ impl MmapState {
                         })?
                     };
                 }
-                // Anything else — bad magic, a version we do not know,
-                // a size we cannot migrate from — is not a migration,
-                // it is a damaged or foreign file. Per the state
-                // integrity rules it is a startup error to be repaired
-                // explicitly, never something to paper over by starting
-                // fresh.
                 other => {
-                    // SAFETY: unlock before cleanup; fd/ptr are
-                    // exclusively owned. No other references exist.
                     unsafe {
                         Self::unlock_file(fd);
                         munmap(ptr as *mut c_void, mapped_len());
