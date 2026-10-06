@@ -126,8 +126,10 @@ class ProtoSelfState:
         valence: Emotional valence (-1..1).
         tone: Global neurochemical tone (0..1).
         plasticity: Plasticity gate (0..1).
-        homeostatic_balance: How balanced the internal state is (0..1).
-            High = stable/homeostatic; low = disrupted/allostatic.
+        homeostatic_balance: A proxy for regulatory stability (0..1).
+            High = closer to nominal physiological-state proxies; low =
+            greater deviation. This excludes affective valence, which is
+            not itself a homeostatic set point.
         chemicals: Raw neurochemical levels (if available).
         timestamp: When this snapshot was taken.
     """
@@ -241,8 +243,9 @@ class ProtoSelf:
     ) -> ProtoSelfState:
         """Update the proto-self from current neurochemistry.
 
-        Called whenever the neurochemical state is read. Computes
-        homeostatic balance from the stability of recent states.
+        Called whenever the neurochemical state is read. Computes a
+        bounded regulatory-balance proxy from nominal physiological-state
+        axes; affective valence is kept separate from this measure.
 
         Args:
             arousal: Current arousal level (0..1).
