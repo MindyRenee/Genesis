@@ -218,7 +218,8 @@ class PredictionContext:
     expectations before perception processes the next input. It
     captures the state of the conversation and the mind at the moment
     of prediction — what was just discussed, what concepts are active,
-    how the mind feels. This is the generative model's input.
+    and contextual state such as affect and time. Only fields backed
+    by learned conditional structure currently influence prediction.
 
     Attributes:
         recent_intents: The sequence of recent user intents, most
@@ -229,12 +230,12 @@ class PredictionContext:
             concept network. Used by the concept co-occurrence model
             (Level 1).
         emotional_state: Optional label of the current emotional state
-            (e.g. "curious", "anxious"). Emotional state biases
-            predictions — a curious mind expects exploration; an
-            anxious mind expects threat-related topics.
-        time_of_day: Optional hour (0–23). Circadian modulation of
-            conversational patterns (e.g. late-night conversations tend
-            toward philosophy).
+            (e.g. "curious", "anxious"). Captured as contextual state for
+            future learned conditional models; it does not currently
+            alter the transition probabilities directly.
+        time_of_day: Optional hour (0–23). Captured for future learned
+            circadian/context conditioning; it does not currently alter
+            the transition probabilities directly.
     """
 
     recent_intents: list[str] = field(default_factory=list)
