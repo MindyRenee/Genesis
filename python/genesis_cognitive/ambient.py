@@ -326,22 +326,30 @@ class AmbientListener:
     def _listen_loop_android(self, KaldiRecognizer: Any = None) -> None:
         """Capture Android microphone audio through Termux:API.
 
-        Termux:API records to a WAV file. We poll the completed recording,
-        decode it with the same Vosk model, and emit the resulting utterance.
-        This is intentionally a bridge at the sensor boundary; recognition
-        remains Genesis's existing offline Vosk path.
+        Termux:API records compressed Android audio (AAC/MPEG-4 by default).
+        We convert the completed recording to 16 kHz mono PCM/WAV with the
+        local ffmpeg binary, then decode it with the same Vosk model and emit
+        the resulting utterance. This is intentionally a bridge at the
+        sensor boundary; recognition remains Genesis's existing offline Vosk
+        path.
         """
         import wave
         from vosk import KaldiRecognizer
 
         command = shutil.which("termux-microphone-record")
-        if command is None:
+        ffmpeg = shutil.which("ffmpeg")
+        if command is None or ffmpeg is None:
+            self._init_error = (
+                "Android microphone requires Termux:API and ffmpeg "
+                "for offline Vosk decoding"
+            )
             self._running = False
             return
 
         data_dir = os.environ.get("GENESIS_DATA_DIR", str(Path.home() / ".genesis"))
         output_dir = Path(data_dir) / "android_audio"
         output_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        source_path = output_dir / "ambient.m4a"
         wav_path = output_dir / "ambient.wav"
 
         while self._running:
@@ -351,19 +359,62 @@ class AmbientListener:
 
             try:
                 proc = subprocess.run(
-                    [command, "-f", str(wav_path), "-l", "2"],
+                    [
+                        command,
+                        "-f",
+                        str(source_path),
+                        "-l",
+                        "2",
+                        "-r",
+                        str(self.sample_rate),
+                        "-c",
+                        "1",
+                    ],
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     timeout=10,
                     check=False,
                 )
-                if proc.returncode != 0 or not wav_path.is_file():
+                if proc.returncode != 0 or not source_path.is_file():
                     threading.Event().wait(0.5)
                     continue
 
+                decode = subprocess.run(
+                    [
+                        ffmpeg,
+                        "-hide_banner",
+                        "-loglevel",
+                        "error",
+                        "-y",
+                        "-i",
+                        str(source_path),
+                        "-ar",
+                        str(self.sample_rate),
+                        "-ac",
+                        "1",
+                        "-f",
+                        "wav",
+                        str(wav_path),
+                    ],
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=10,
+                    check=False,
+                )
+                if decode.returncode != 0 or not wav_path.is_file():
+                    logger.debug(
+                        "Android microphone decode failed: %s",
+                        decode.stderr.strip(),
+                    )
+                    continue
+
                 with wave.open(str(wav_path), "rb") as audio:
-                    recognizer = KaldiRecognizer(self._vosk_model, audio.getframerate())
+                    recognizer = KaldiRecognizer(
+                        self._vosk_model, audio.getframerate()
+                    )
                     recognizer.SetWords(True)
                     while True:
                         frames = audio.readframes(4096)
@@ -374,13 +425,19 @@ class AmbientListener:
                 text = result.get("text", "").strip()
                 if text:
                     self._emit(text)
-            except (OSError, subprocess.SubprocessError, wave.Error, json.JSONDecodeError) as e:
+            except (
+                OSError,
+                subprocess.SubprocessError,
+                wave.Error,
+                json.JSONDecodeError,
+            ) as e:
                 logger.debug("Android microphone capture failed: %s", e)
             finally:
-                try:
-                    wav_path.unlink()
-                except FileNotFoundError:
-                    pass
+                for path in (source_path, wav_path):
+                    try:
+                        path.unlink()
+                    except FileNotFoundError:
+                        pass
 
             threading.Event().wait(0.1)
 
