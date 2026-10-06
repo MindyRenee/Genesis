@@ -373,6 +373,8 @@ class DecisionEngine:
         # 3. Consult TD value function for each candidate.
         if self.td_learner is not None:
             for candidate in candidates:
+                if candidate.inhibited:
+                    continue
                 candidate.td_value = self._lookup_td_value(
                     candidate, topics,
                 )
