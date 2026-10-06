@@ -165,6 +165,7 @@ pub struct BodyControlState {
 #[cfg(target_os = "android")]
 fn helper_path() -> Option<&'static str> { None }
 
+#[cfg(not(target_os = "android"))]
 fn helper_path() -> Option<&'static str> {
     static PATH: OnceLock<Option<String>> = OnceLock::new();
     PATH.get_or_init(|| {
