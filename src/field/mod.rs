@@ -41,7 +41,7 @@ impl PoincareBall {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SubsystemLayer { pub id:String, pub state:Vector, pub gain:f64 }
-impl SubsystemLayer { pub fn new(id:impl Into<String>,state:Vector)->Self{Self{id:id.into(),state,gain:1.0}} pub fn evolve(&mut self,derivative:&[f64],dt:f64)->Result<(),FieldError>{if derivative.len()!=self.state.len()||!dt.is_finite()||dt<0.0{return Err(FieldError::DimensionMismatch)}if !self.gain.is_finite(){return Err(FieldError::InvalidDynamics)}if derivative.iter().any(|v|!v.is_finite()){return Err(FieldError::NonFiniteState)}for(x,dx)in self.state.iter_mut().zip(derivative){*x+=dt*self.gain*dx;}if self.state.iter().any(|v|!v.is_finite()){return Err(FieldError::NonFiniteState)}Ok(())} }
+impl SubsystemLayer { pub fn new(id:impl Into<String>,state:Vector)->Self{Self{id:id.into(),state,gain:1.0}} pub fn evolve(&mut self,derivative:&[f64],dt:f64)->Result<(),FieldError>{if derivative.len()!=self.state.len(){return Err(FieldError::DimensionMismatch)}if !dt.is_finite()||dt<0.0{return Err(FieldError::InvalidTime)}if !self.gain.is_finite(){return Err(FieldError::InvalidDynamics)}if derivative.iter().any(|v|!v.is_finite()){return Err(FieldError::NonFiniteState)}let mut next=self.state.clone();for(x,dx)in next.iter_mut().zip(derivative){*x+=dt*self.gain*dx;}if next.iter().any(|v|!v.is_finite()){return Err(FieldError::NonFiniteState)}self.state=next;Ok(())} }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SystemFiber { pub id:String,pub engine_clock:f64,pub manifold:PoincareBall,pub layers:Vec<SubsystemLayer>,pub engine:SystemEngine }
@@ -75,6 +75,19 @@ fn identity(n:usize)->Matrix{let mut m=vec![vec![0.0;n];n];for i in 0..n{m[i][i]
 fn mat_mul(a:&Matrix,b:&Matrix)->Matrix{let n=a.len();let mut out=vec![vec![0.0;n];n];for i in 0..n{for j in 0..n{for k in 0..n{out[i][j]+=a[i][k]*b[k][j];}}}out}
 fn mat_vec(a:&Matrix,x:&Vector)->Result<Vector,FieldError>{if a.len()!=x.len()||a.iter().any(|r|r.len()!=x.len()){return Err(FieldError::DimensionMismatch)}let mut out=vec![0.0;x.len()];for i in 0..a.len(){out[i]=dot(&a[i],x);}if out.iter().any(|v|!v.is_finite()){return Err(FieldError::NonFiniteState)}Ok(out)}
 fn matrix_distance(a:&Matrix,b:&Matrix)->Result<f64,FieldError>{if a.len()!=b.len()||a.iter().zip(b).any(|(x,y)|x.len()!=y.len()){return Err(FieldError::DimensionMismatch)}let mut sum=0.0;for(row_a,row_b)in a.iter().zip(b){for(x,y)in row_a.iter().zip(row_b){if !x.is_finite()||!y.is_finite(){return Err(FieldError::NonFiniteState)}let delta=x-y;if !delta.is_finite(){return Err(FieldError::NonFiniteState)}let term=delta*delta;if !term.is_finite(){return Err(FieldError::NonFiniteState)}sum+=term;if !sum.is_finite(){return Err(FieldError::NonFiniteState)}}}Ok(sum.sqrt())}
+#[cfg(test)]
+mod subsystem_layer_integrity_tests {
+    use super::*;
+
+    #[test]
+    fn evolve_reports_invalid_time_separately_from_dimension_mismatch() {
+        let mut layer = SubsystemLayer::new("x", vec![0.0, 0.0]);
+        assert_eq!(layer.evolve(&[1.0, 1.0], f64::NAN), Err(FieldError::InvalidTime));
+        assert_eq!(layer.evolve(&[1.0], 0.1), Err(FieldError::DimensionMismatch));
+        assert_eq!(layer.state, vec![0.0, 0.0]);
+    }
+}
+
 #[cfg(test)]
 mod distance_integrity_tests {
     use super::*;
