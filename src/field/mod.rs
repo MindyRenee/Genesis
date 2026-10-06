@@ -128,7 +128,41 @@ impl PoincareBall {
         self.project(&scaled(v,z))
     }
     fn validate_point(&self,x:&[f64])->Result<(),FieldError>{if self.contains(x){Ok(())}else{Err(FieldError::InvalidPoint)}}
-    pub fn origin_barycenter(&self,points:&[Vector])->Result<Vector,FieldError>{if points.is_empty(){return Err(FieldError::EmptyState)}let mut tangent=vec![0.0;self.dimension];for p in points{let v=self.log_origin(p)?;for(dst,src)in tangent.iter_mut().zip(v){*dst+=src/points.len() as f64;}}self.exp_origin(&tangent)}
+    pub fn origin_barycenter(&self,points:&[Vector])->Result<Vector,FieldError>{
+        if points.is_empty() {
+            return Err(FieldError::EmptyState);
+        }
+        if points.iter().any(|p| p.len() != self.dimension) {
+            return Err(FieldError::DimensionMismatch);
+        }
+        let tangents = points.iter()
+            .map(|p| self.log_origin(p))
+            .collect::<Result<Vec<_>, _>>()?;
+        let scale = tangents.iter()
+            .flatten()
+            .fold(0.0_f64, |m, &v| m.max(v.abs()));
+        if !scale.is_finite() {
+            return Err(FieldError::NonFiniteState);
+        }
+        if scale == 0.0 {
+            return self.exp_origin(&vec![0.0; self.dimension]);
+        }
+        let count = points.len() as f64;
+        let mut mean = vec![0.0; self.dimension];
+        for tangent in &tangents {
+            for (dst, &src) in mean.iter_mut().zip(tangent) {
+                *dst += (src / scale) / count;
+            }
+        }
+        if mean.iter().any(|v| !v.is_finite()) {
+            return Err(FieldError::NonFiniteState);
+        }
+        let mean = scaled(&mean, scale);
+        if mean.iter().any(|v| !v.is_finite()) {
+            return Err(FieldError::NonFiniteState);
+        }
+        self.exp_origin(&mean)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -345,6 +379,16 @@ mod tests {
         let x = m.exp_origin(&v).unwrap();
         assert!(x.iter().all(|value| value.is_finite()));
         assert!(m.contains(&x));
+    }
+
+    #[test]
+    fn barycenter_handles_cancelling_extreme_tangents() {
+        let m = PoincareBall::new(2, 1.0e-300).unwrap();
+        let a = vec![1.0e149, 0.0];
+        let b = vec![-1.0e149, 0.0];
+        let center = m.origin_barycenter(&[a, b]).unwrap();
+        assert!(center.iter().all(|v| v.is_finite()));
+        assert!(norm(&center) < 1.0e-12);
     }
 
     #[test]
