@@ -238,7 +238,7 @@ class AmbientListener:
         # a short recording, then feed that PCM/WAV data to the same Vosk
         # recognizer used by the desktop listener.
         if shutil.which("termux-microphone-record"):
-            self._listen_loop_android(KaldiRecognizer=None)
+            self._listen_loop_android()
             return
 
         import sounddevice as sd
@@ -323,7 +323,7 @@ class AmbientListener:
             logger.exception(f"Ambient listener crashed: {e}")
             self._running = False
 
-    def _listen_loop_android(self, KaldiRecognizer: Any = None) -> None:
+    def _listen_loop_android(self) -> None:
         """Capture Android microphone audio through Termux:API.
 
         Termux:API records compressed Android audio (AAC/MPEG-4 by default).
