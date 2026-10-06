@@ -17,20 +17,20 @@ pub type Vector = Vec<f64>;
 pub type Matrix = Vec<Vector>;
 
 fn dot(a: &[f64], b: &[f64]) -> f64 {
-    let scale = a
-        .iter()
-        .zip(b)
-        .fold(0.0_f64, |scale, (&x, &y)| scale.max(x.abs()).max(y.abs()));
-    if scale == 0.0 {
+    let scale_a = a.iter().fold(0.0_f64, |scale, &x| scale.max(x.abs()));
+    let scale_b = b.iter().fold(0.0_f64, |scale, &x| scale.max(x.abs()));
+    if scale_a == 0.0 || scale_b == 0.0 {
         return 0.0;
     }
     let normalized = a
         .iter()
         .zip(b)
-        .map(|(&x, &y)| (x / scale) * (y / scale))
+        .map(|(&x, &y)| (x / scale_a) * (y / scale_b))
         .sum::<f64>();
-    let scaled_sum = scale * normalized;
-    scale * scaled_sum
+    if normalized == 0.0 {
+        return 0.0;
+    }
+    (normalized * scale_a) * scale_b
 }
 fn norm(a: &[f64]) -> f64 { a.iter().fold(0.0_f64, |acc, &x| acc.hypot(x)) }
 fn scaled(a: &[f64], s: f64) -> Vector { a.iter().map(|x| x * s).collect() }
