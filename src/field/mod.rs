@@ -76,8 +76,57 @@ impl PoincareBall {
         Ok(projected)
     }
     pub fn distance(&self,x:&[f64],y:&[f64])->Result<f64,FieldError>{self.validate_point(x)?;self.validate_point(y)?;let sqrt_c=self.curvature.sqrt();let ux=scaled(x,sqrt_c);let uy=scaled(y,sqrt_c);let nx=dot(&ux,&ux);let ny=dot(&uy,&uy);let dxy=norm(&sub(&ux,&uy));if !nx.is_finite()||!ny.is_finite()||!dxy.is_finite(){return Err(FieldError::NonFiniteState)}let denom=(1.0-nx).max(EPS)*(1.0-ny).max(EPS);let arg=1.0+2.0*dxy*dxy/denom;if !arg.is_finite(){return Err(FieldError::NonFiniteState)}let distance=arg.max(1.0).acosh()/sqrt_c;if !distance.is_finite(){return Err(FieldError::NonFiniteState)}Ok(distance)}
-    pub fn log_origin(&self,x:&[f64])->Result<Vector,FieldError>{self.validate_point(x)?;let r=norm(x);if r<EPS{return Ok(vec![0.0;self.dimension])}let scaled_r=self.curvature.sqrt()*r;let atanh_arg=scaled_r.min(1.0-f64::EPSILON);let z=atanh_arg.atanh()*2.0/scaled_r;Ok(scaled(x,z))}
-    pub fn exp_origin(&self,v:&[f64])->Result<Vector,FieldError>{if v.len()!=self.dimension||v.iter().any(|x|!x.is_finite()){return Err(FieldError::DimensionMismatch)}let r=norm(v);if r<EPS{return Ok(v.to_vec())}let sqrt_c=self.curvature.sqrt();let scaled_r=sqrt_c*r;let z=if scaled_r.is_finite(){2.0*(scaled_r/2.0).tanh()/scaled_r}else{2.0*(1.0/sqrt_c)/r};self.project(&scaled(v,z))}
+    pub fn log_origin(&self,x:&[f64])->Result<Vector,FieldError>{
+        self.validate_point(x)?;
+        let r = norm(x);
+        if !r.is_finite() {
+            return Err(FieldError::NonFiniteState);
+        }
+        if r < EPS {
+            return Ok(vec![0.0; self.dimension]);
+        }
+        let sqrt_c = self.curvature.sqrt();
+        let scaled_r = sqrt_c * r;
+        if !scaled_r.is_finite() || scaled_r <= 0.0 {
+            return Err(FieldError::NonFiniteState);
+        }
+        let atanh_arg = scaled_r.min(1.0 - f64::EPSILON);
+        let z = atanh_arg.atanh() * 2.0 / scaled_r;
+        if !z.is_finite() || z <= 0.0 {
+            return Err(FieldError::NonFiniteState);
+        }
+        let tangent = scaled(x, z);
+        if tangent.iter().any(|v| !v.is_finite()) {
+            return Err(FieldError::NonFiniteState);
+        }
+        Ok(tangent)
+    }
+    pub fn exp_origin(&self,v:&[f64])->Result<Vector,FieldError>{
+        if v.len()!=self.dimension {
+            return Err(FieldError::DimensionMismatch);
+        }
+        if v.iter().any(|x|!x.is_finite()) {
+            return Err(FieldError::NonFiniteState);
+        }
+        let r=norm(v);
+        if !r.is_finite() {
+            return Err(FieldError::NonFiniteState);
+        }
+        if r<EPS {
+            return Ok(v.to_vec());
+        }
+        let sqrt_c=self.curvature.sqrt();
+        let scaled_r=sqrt_c*r;
+        let z=if scaled_r.is_finite(){
+            2.0*(scaled_r/2.0).tanh()/scaled_r
+        }else{
+            2.0*(1.0/sqrt_c)/r
+        };
+        if !z.is_finite() || z <= 0.0 {
+            return Err(FieldError::NonFiniteState);
+        }
+        self.project(&scaled(v,z))
+    }
     fn validate_point(&self,x:&[f64])->Result<(),FieldError>{if self.contains(x){Ok(())}else{Err(FieldError::InvalidPoint)}}
     pub fn origin_barycenter(&self,points:&[Vector])->Result<Vector,FieldError>{if points.is_empty(){return Err(FieldError::EmptyState)}let mut tangent=vec![0.0;self.dimension];for p in points{let v=self.log_origin(p)?;for(dst,src)in tangent.iter_mut().zip(v){*dst+=src/points.len() as f64;}}self.exp_origin(&tangent)}
 }
@@ -235,6 +284,13 @@ mod tests {
         let d = m.distance(&[0.0, 0.0], &x).unwrap();
         let tangent = m.log_origin(&x).unwrap();
         assert!((d - norm(&tangent)).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn exp_and_log_reject_nonfinite_inputs_with_state_error() {
+        let m = PoincareBall::new(2, 1.0).unwrap();
+        assert_eq!(m.exp_origin(&[f64::NAN, 0.0]), Err(FieldError::NonFiniteState));
+        assert_eq!(m.log_origin(&[f64::NAN, 0.0]), Err(FieldError::InvalidPoint));
     }
 
     #[test]
