@@ -141,12 +141,13 @@ impl SystemEngine {
             for source in 0..n {
                 out[target][source] = self.couplings[target][source].clone();
             }
+            let r2 = dot(&layers[target].state, &layers[target].state);
             for k in 0..d {
                 for j in 0..d {
                     let xk = layers[target].state[k];
                     let xj = layers[target].state[j];
-                    let r2 = dot(&layers[target].state, &layers[target].state);
-                    let nonlinear = self.saturation[target] * (if k == j { r2 } else { 0.0 } + 2.0 * xk * xj);
+                    let nonlinear = self.saturation[target]
+                        * (if k == j { r2 } else { 0.0 } + 2.0 * xk * xj);
                     out[target][target][k][j] -= nonlinear;
                 }
                 out[target][target][k][k] -= self.damping[target];
@@ -226,6 +227,26 @@ impl SystemEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn jacobian_matches_finite_difference_for_nonlinear_layer() {
+        let engine = SystemEngine::zero(1, 2)
+            .with_damping(vec![0.4]).unwrap()
+            .with_saturation(vec![0.7]).unwrap();
+        let layers = vec![SubsystemLayer::new("a", vec![0.2, -0.3])];
+        let analytic = engine.jacobian(&layers).unwrap()[0][0].clone();
+        let eps = 1e-7;
+        let base = engine.derivatives(&layers).unwrap()[0].clone();
+        for j in 0..2 {
+            let mut perturbed = layers.clone();
+            perturbed[0].state[j] += eps;
+            let value = engine.derivatives(&perturbed).unwrap()[0].clone();
+            for i in 0..2 {
+                let finite_difference = (value[i] - base[i]) / eps;
+                assert!((analytic[i][j] - finite_difference).abs() < 1e-6);
+            }
+        }
+    }
 
     #[test]
     fn damped_engine_reduces_unforced_state() {
