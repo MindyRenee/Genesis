@@ -1,6 +1,3 @@
-pub mod engine;
-pub use engine::SystemEngine;
-
 //! Machine-native field architecture for Genesis.
 //!
 //! A major system is a SystemFiber; its subsystems are the layers of that
