@@ -218,8 +218,7 @@ class PredictionContext:
     expectations before perception processes the next input. It
     captures the state of the conversation and the mind at the moment
     of prediction — what was just discussed, what concepts are active,
-    and contextual state such as affect and time. Only fields backed
-    by learned conditional structure currently influence prediction.
+    how the mind feels. This is the generative model's input.
 
     Attributes:
         recent_intents: The sequence of recent user intents, most
@@ -230,12 +229,12 @@ class PredictionContext:
             concept network. Used by the concept co-occurrence model
             (Level 1).
         emotional_state: Optional label of the current emotional state
-            (e.g. "curious", "anxious"). Captured as contextual state for
-            future learned conditional models; it does not currently
-            alter the transition probabilities directly.
-        time_of_day: Optional hour (0–23). Captured for future learned
-            circadian/context conditioning; it does not currently alter
-            the transition probabilities directly.
+            (e.g. "curious", "anxious"). Emotional state biases
+            predictions — a curious mind expects exploration; an
+            anxious mind expects threat-related topics.
+        time_of_day: Optional hour (0–23). Circadian modulation of
+            conversational patterns (e.g. late-night conversations tend
+            toward philosophy).
     """
 
     recent_intents: list[str] = field(default_factory=list)
@@ -362,6 +361,14 @@ class PredictiveCodingLayer:
         # — used as a global prior so rare but important intents
         # (greetings, farewells) are always represented.
         self._intent_marginal: dict[str, float] = defaultdict(float)
+        # Context-conditioned intent models learned from the state present
+        # when an input arrives. No hand-authored emotion/time mapping.
+        self._emotion_intents: dict[str, dict[str, float]] = defaultdict(
+            lambda: defaultdict(lambda: self.smoothing_prior)
+        )
+        self._hour_intents: dict[int, dict[str, float]] = defaultdict(
+            lambda: defaultdict(lambda: self.smoothing_prior)
+        )
         # Level 1: concept → {co_occurring_concept → count}
         self._concept_cooccurrence: dict[str, dict[str, float]] = defaultdict(
             lambda: defaultdict(lambda: self.smoothing_prior)
@@ -498,6 +505,18 @@ class PredictiveCodingLayer:
             for intent, bias in topic_prior.items():
                 dist[intent] = dist.get(intent, 0.0) + bias
 
+        # Context-conditioned priors learned from the internal state
+        # at prediction time. They are weak evidence: learned counts
+        # nudge the distribution rather than replacing transition history.
+        if context.emotional_state:
+            self._mix_conditioned_intents(
+                dist, self._emotion_intents.get(context.emotional_state.lower())
+            )
+        if 0 <= context.time_of_day <= 23:
+            self._mix_conditioned_intents(
+                dist, self._hour_intents.get(context.time_of_day)
+            )
+
         # Mix in a global marginal prior. This keeps rare but
         # important intents (greetings, farewells) in the running even
         # when the last-seen transition is very peaked. The global
@@ -581,6 +600,22 @@ class PredictiveCodingLayer:
         evidence = min(1.0, self._prediction_count / 10.0)
         confidence = best_prob * evidence
         return ranked, confidence
+
+    @staticmethod
+    def _mix_conditioned_intents(
+        dist: dict[str, float],
+        counts: dict[str, float] | None,
+    ) -> None:
+        """Add a weak learned conditional-intent prior to the distribution."""
+        if not counts:
+            return
+        total = sum(counts.values())
+        if total <= 0:
+            return
+        # Sparse contextual evidence must not dominate sequence history.
+        context_weight = min(0.20, total / 50.0)
+        for intent, count in counts.items():
+            dist[intent] = dist.get(intent, 0.0) + context_weight * (count / total)
 
     def _topic_intent_prior(self, topic: str) -> dict[str, float]:
         """A soft top-down prior mapping a predicted topic to likely intents.
@@ -876,6 +911,14 @@ class PredictiveCodingLayer:
             self._intent_transitions[last_intent][actual_intent] += effective_lr
             # Track global intent frequency for the marginal prior.
             self._intent_marginal[actual_intent] += effective_lr
+
+        # Learn the relationship between the state present before the
+        # input and the intent that actually arrived. This makes
+        # emotional and circadian context genuine learned predictors.
+        if context.emotional_state:
+            self._emotion_intents[context.emotional_state.lower()][actual_intent] += effective_lr
+        if 0 <= context.time_of_day <= 23:
+            self._hour_intents[context.time_of_day][actual_intent] += effective_lr
 
         # ── Level 1: update concept co-occurrence model ──
         self._update_concept_cooccurrence(actual_topics, error.magnitude)
