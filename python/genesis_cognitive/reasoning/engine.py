@@ -607,7 +607,6 @@ class ReasoningEngine:
                 )
             evidence = [f"gap: no direct {concept_id} → {candidate}"]
             structured_path: list[tuple[str, str, str, float]] = []
-            seen_first_hops: set[str] = set()
             for inter, first_rel, first_w1, rel, w2 in paths:
                 # Preserve the exact first hop paired with this second hop.
                 evidence.append(f"{concept_id} → {inter}")
