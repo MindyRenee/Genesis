@@ -1,5 +1,6 @@
 """Regression tests for semantic persistence replacement."""
-from genesis_cognitive.memory.semantic import Fact, SemanticMemory
+from genesis_cognitive.memory.semantic import SemanticMemory
+
 
 def test_restore_replaces_existing_semantic_state():
     memory = SemanticMemory()
