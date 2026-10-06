@@ -1,3 +1,5 @@
+pub mod engine;
+
 //! Machine-native field architecture for Genesis.
 //!
 //! A major system is a SystemFiber; its subsystems are the layers of that
@@ -118,6 +120,7 @@ pub struct SystemFiber {
     pub engine_clock: f64,
     pub manifold: PoincareBall,
     pub layers: Vec<SubsystemLayer>,
+    pub engine: SystemEngine,
 }
 
 impl SystemFiber {
@@ -125,10 +128,24 @@ impl SystemFiber {
         if layers.iter().any(|l| l.state.len() != manifold.dimension()) {
             return Err(FieldError::DimensionMismatch);
         }
-        Ok(Self { id: id.into(), engine_clock: 0.0, manifold, layers })
+        let engine = SystemEngine::zero(layers.len(), manifold.dimension());
+        Ok(Self { id: id.into(), engine_clock: 0.0, manifold, layers, engine })
     }
+    pub fn with_engine(id: impl Into<String>, manifold: PoincareBall, layers: Vec<SubsystemLayer>, engine: SystemEngine) -> Result<Self, FieldError> {
+        if engine.biases.len() != layers.len() { return Err(FieldError::LayerMismatch); }
+        let mut fiber = Self::new(id, manifold, layers)?;
+        fiber.engine = engine;
+        Ok(fiber)
+    }
+
     pub fn layer(&self, id: &str) -> Option<&SubsystemLayer> { self.layers.iter().find(|l| l.id == id) }
     pub fn layer_mut(&mut self, id: &str) -> Option<&mut SubsystemLayer> { self.layers.iter_mut().find(|l| l.id == id) }
+
+    pub fn step(&mut self, dt: f64) -> Result<(), FieldError> {
+        if !dt.is_finite() || dt < 0.0 { return Err(FieldError::InvalidTime); }
+        let derivatives = self.engine.derivatives(&self.layers)?;
+        self.evolve(&derivatives, dt * self.engine.time_scale)
+    }
 
     pub fn evolve(&mut self, derivatives: &[Vector], dt: f64) -> Result<(), FieldError> {
         if derivatives.len() != self.layers.len() { return Err(FieldError::LayerMismatch); }
@@ -284,6 +301,20 @@ mod tests {
         ]).unwrap();
         assert_eq!(fiber.layers.len(), 2);
         assert_eq!(fiber.layer("emotion").unwrap().id, "emotion");
+    }
+
+    #[test]
+    fn engine_can_drive_a_fiber_without_external_derivatives() {
+        let m = PoincareBall::new(1, 1.0).unwrap();
+        let layers = vec![SubsystemLayer::new("a", vec![0.1]), SubsystemLayer::new("b", vec![0.2])];
+        let engine = SystemEngine::new(
+            vec![vec![vec![vec![0.5]], vec![vec![1.0]]], vec![vec![vec![-1.0]], vec![vec![0.0]]]],
+            vec![vec![0.0], vec![vec![0.0]]], 1.0
+        ).unwrap();
+        let mut fiber = SystemFiber::with_engine("dynamic", m, layers, engine).unwrap();
+        fiber.step(0.1).unwrap();
+        assert!(fiber.layer("a").unwrap().state[0] > 0.1);
+        assert!(fiber.layer("b").unwrap().state[0] < 0.2);
     }
 
     #[test]
