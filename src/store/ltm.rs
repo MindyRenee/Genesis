@@ -896,7 +896,7 @@ impl LtmStore {
             })
             .count();
         let bundle_count = reconciled_store.bundles.episode_count() as usize;
-        let needs_rebuild = migrated_meta > 0 || (bundle_count > real_count * 2 && real_count > 0);
+        let needs_rebuild = migrated_meta > 0 || bundle_count != real_count;
         if needs_rebuild {
             eprintln!(
                 "[ltm] Bundle store has {bundle_count} episodes but only \
