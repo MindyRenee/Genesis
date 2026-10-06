@@ -892,8 +892,10 @@ impl MmapState {
         // async-signal-safe and does not allocate.
         let rc = unsafe { flock(fd, LOCK_EX | LOCK_NB) };
         if rc != 0 {
-            let errno = unsafe { *libc::__errno_location() };
-            if errno == libc::EWOULDBLOCK {
+            // Use Rust's platform-neutral errno accessor. Android's
+            // Bionic libc does not expose glibc's __errno_location().
+            let errno = std::io::Error::last_os_error().raw_os_error();
+            if errno == Some(libc::EWOULDBLOCK) || errno == Some(libc::EAGAIN) {
                 return Err(StateFileError::FileLockBusy);
             }
             return Err(StateFileError::Io(std::io::Error::last_os_error()));
