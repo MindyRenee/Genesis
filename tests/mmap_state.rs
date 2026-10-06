@@ -142,6 +142,50 @@ fn test_open_recomputes_stale_neurochemical_derived_state() {
     cleanup(&path);
 }
 
+#[test]
+fn test_open_migrates_legacy_3288_byte_state() {
+    let path = temp_path("legacy_3288");
+
+    // Build a valid current state, then serialize the exact pre-policy-authority
+    // layout. This models the on-disk file produced by the previous binary:
+    // the field was appended to the tail, so all earlier state remains intact.
+    {
+        let mmap = MmapState::create(&path, 123, now_ms()).expect("create");
+        mmap.modify(now_ms(), |state| {
+            state.zones.transition_to(CognitiveZone::Coding, now_ms());
+            state.header.state_size = genesis::state::core_state::LEGACY_SIZE as u32;
+            state.inference_signals.policy_authority = 0.0;
+            state.checksum = state.compute_checksum();
+        })
+        .expect("prepare legacy state");
+    }
+
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&path)
+        .expect("open legacy file")
+        .set_len(genesis::state::core_state::LEGACY_SIZE as u64)
+        .expect("truncate to legacy size");
+
+    let mmap = MmapState::open(&path).expect("legacy state should migrate");
+    let state = mmap.read();
+
+    assert_eq!(state.header.instance_id, 123);
+    assert_eq!(state.header.state_size, GenesisCoreState::SIZE as u32);
+    assert_eq!(state.zones.zone(), CognitiveZone::Coding);
+    assert_eq!(state.inference_signals.policy_authority, 0.0);
+    assert!(state.verify().is_ok());
+    assert!(state.verify_checksum().is_ok());
+
+    // Migration must also restore the page-backed file size so a subsequent
+    // open cannot see the old 3288-byte extent.
+    let len = std::fs::metadata(&path).expect("metadata").len();
+    assert!(len >= 4096);
+
+    drop(mmap);
+    cleanup(&path);
+}
+
 // ─── open_or_create ───────────────────────────────────────────
 
 #[test]
