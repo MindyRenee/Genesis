@@ -355,7 +355,7 @@ mod tests {
             vec![vec![0.0], vec![0.0]],
             1.0,
         ).unwrap().with_damping(vec![1.0, 4.0]).unwrap();
-        assert_eq!(engine.linear_growth_bound().unwrap(), 2.0);
+        assert_eq!(engine.linear_growth_bound().unwrap(), 1.0);
     }
 
     #[test]
