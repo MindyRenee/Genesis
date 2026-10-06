@@ -563,9 +563,23 @@ _TOPIC_WORD_RE = re.compile(r"[a-z'-]+(?:-[a-z'-]+)*")
 _SENTIMENT_WORD_RE = re.compile(r"[a-z']+")
 _NUMBER_RE = re.compile(r"\b(\d+)\b")
 _NAME_PATTERNS = [
-    re.compile(r"my name is ([\w]+(?:\s+[\w]+)*?)(?:[,.!?]|$)", re.IGNORECASE),
-    re.compile(r"call me ([\w]+(?:\s+[\w]+)*?)(?:[,.!?]|$)", re.IGNORECASE),
-    re.compile(r"i am called ([\w]+(?:\s+[\w]+)*?)(?:[,.!?]|$)", re.IGNORECASE),
+    # Bound the capture so "my name is Alice and I live in Utah" does not
+    # turn the entire remainder of the utterance into the person's name.
+    # Up to four tokens permits ordinary multi-part names while common
+    # conjunctions/pronouns provide a natural boundary when punctuation
+    # is absent.
+    re.compile(
+        r"my name is ([\\w]+(?:\\s+[\\w]+){0,3}?)(?=\\s+(?:and|but|i|my|we)\\b|[,.!?]|$)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"call me ([\\w]+(?:\\s+[\\w]+){0,3}?)(?=\\s+(?:and|but|i|my|we)\\b|[,.!?]|$)",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"i am called ([\\w]+(?:\\s+[\\w]+){0,3}?)(?=\\s+(?:and|but|i|my|we)\\b|[,.!?]|$)",
+        re.IGNORECASE,
+    ),
 ]
 _ABOUT_GENESIS_RE = re.compile(r"\b(you|your|yourself|genesis)\b")
 # Negation: only first-person subject/possessive ("I", "my") negates
