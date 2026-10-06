@@ -6,8 +6,8 @@ learning and procedural-memory components remain shared subsystems.
 
 from __future__ import annotations
 
-from .basal_ganglia import ActionBid, BasalGangliaSelector, SelectionResult
 from .._views import view_getattr
+from .basal_ganglia import ActionBid, BasalGangliaSelector, SelectionResult
 
 _EXPORTS: dict[str, str] = {
     "TDLearner": "learning",
@@ -19,6 +19,17 @@ _EXPORTS: dict[str, str] = {
     "SkillStrategy": "memory",
 }
 
-__all__ = sorted((*_EXPORTS, "ActionBid", "BasalGangliaSelector", "SelectionResult"))
+__all__ = [
+    "ActionBid",
+    "BasalGangliaSelector",
+    "HABIT_THRESHOLD",
+    "HabitBias",
+    "ProceduralMemory",
+    "SelectionResult",
+    "Skill",
+    "SkillStrategy",
+    "TDLearner",
+    "TDTransition",
+]
 
-__getattr__ = view_getattr(_EXPORTS, __name__)
+__getattr__ = view_getattr(_EXPORTS)
