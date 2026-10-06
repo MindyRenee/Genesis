@@ -340,7 +340,7 @@ class AmbientListener:
 
         from vosk import KaldiRecognizer
 
-        command = shutil.which("termux-microphone-record")
+        command = find_termux_command("termux-microphone-record")
         ffmpeg = shutil.which("ffmpeg")
         if command is None or ffmpeg is None:
             self._init_error = (
