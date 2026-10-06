@@ -402,7 +402,6 @@ class Voice:
             self._play_proc = proc
             if blocking:
                 proc.wait(timeout=60)
-                self._done_speaking()
             else:
                 threading.Thread(
                     target=self._wait_for_termux_tts,
