@@ -54,8 +54,8 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..concepts import ConceptNetwork
-    from ..action_selection import BasalGangliaSelector
+    from ..action_selection import ActionBid, BasalGangliaSelector
+from ..concepts import ConceptNetwork
     from ..executive import ExecutiveFunction
     from ..learning.td import TDLearner
     from .engine import ReasoningResult
