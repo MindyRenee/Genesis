@@ -272,6 +272,56 @@ impl GlobalField {
         Ok(())
     }
 
+    fn transport_paths(&self, from: &str, to: &str, max_paths: usize) -> Vec<TransportPath> {
+        fn walk(
+            field: &GlobalField,
+            node: &str,
+            to: &str,
+            matrix: Matrix,
+            nodes: Vec<String>,
+            seen: &mut Vec<String>,
+            out: &mut Vec<TransportPath>,
+            max_paths: usize,
+        ) {
+            if out.len() >= max_paths { return; }
+            if node == to {
+                out.push(TransportPath { nodes, matrix });
+                return;
+            }
+            for edge in field.transports.iter().filter(|e| e.from == node) {
+                if seen.iter().any(|id| id == &edge.to) { continue; }
+                seen.push(edge.to.clone());
+                let next = mat_mul(&edge.matrix, &matrix);
+                let mut next_nodes = nodes.clone();
+                next_nodes.push(edge.to.clone());
+                walk(field, &edge.to, to, next, next_nodes, seen, out, max_paths);
+                seen.pop();
+            }
+        }
+        let mut out = Vec::new();
+        let mut seen = vec![from.to_string()];
+        walk(self, from, to, identity(self.manifold.dimension()), vec![from.to_string()], &mut seen, &mut out, max_paths.max(1));
+        out
+    }
+
+    pub fn path_disagreement(&self, from: &str, to: &str) -> Result<Option<PathDisagreement>, FieldError> {
+        let paths = self.transport_paths(from, to, 32);
+        if paths.len() < 2 { return Ok(None); }
+        let mut spread = 0.0;
+        for i in 0..paths.len() {
+            for j in (i + 1)..paths.len() {
+                let diff = matrix_distance(&paths[i].matrix, &paths[j].matrix)?;
+                spread = spread.max(diff);
+            }
+        }
+        Ok(Some(PathDisagreement {
+            from: from.to_string(),
+            to: to.to_string(),
+            paths,
+            tangent_spread: spread,
+        }))
+    }
+
     fn path_matrix(&self, from: &str, to: &str) -> Result<Vec<Vector>, FieldError> {
         let n = self.manifold.dimension();
         let mut queue: Vec<(String, Vec<Vector>)> = vec![(from.to_string(), identity(n))];
@@ -349,11 +399,39 @@ fn mat_mul(a: &[Vector], b: &[Vector]) -> Vec<Vector> {
     out
 }
 
+fn matrix_distance(a: &[Vector], b: &[Vector]) -> Result<f64, FieldError> {
+    if a.len() != b.len() || a.iter().zip(b).any(|(x,y)| x.len() != y.len()) {
+        return Err(FieldError::DimensionMismatch);
+    }
+    let mut sum = 0.0;
+    for (ra, rb) in a.iter().zip(b) {
+        for (a, b) in ra.iter().zip(rb) {
+            let d = a - b;
+            sum += d * d;
+        }
+    }
+    Ok(sum.sqrt())
+}
+
 fn matrix_apply(m: &[Vector], x: &[f64]) -> Result<Vector, FieldError> {
     if m.len() != x.len() || m.iter().any(|r| r.len() != x.len()) {
         return Err(FieldError::DimensionMismatch);
     }
     Ok(m.iter().map(|r| dot(r, x)).collect())
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct TransportPath {
+    pub nodes: Vec<String>,
+    pub matrix: Matrix,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PathDisagreement {
+    pub from: String,
+    pub to: String,
+    pub paths: Vec<TransportPath>,
+    pub tangent_spread: f64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
