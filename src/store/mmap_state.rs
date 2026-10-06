@@ -552,43 +552,34 @@ impl MmapState {
             }
         }
 
-        // Repair an inverted seqlock parity.
-        //
-        // `header.seq_lock` is excluded from the CRC (it changes on
-        // every write), and the write order is: data -> checksum store
-        // -> `seq_lock` to even. A crash, or a partial page writeback —
-        // the kernel offers no atomicity for a 4 KiB page and walks it
-        // in address order, so bytes 40..48 can reach disk while bytes
-        // 3224..3228 have not — can therefore leave a disk image that
-        // is fully written, CRC-valid, and holding an ODD `seq_lock`.
-        // Nothing in `verify()`/`verify_checksum()` looks at it.
-        //
-        // The consequence is severe and permanent. `read_consistent`
-        // rejects an odd `seq_lock`, so every `GET_STATE` /
-        // `GET_NEURO_SUMMARY` / `PING` fails until a write happens. Then
-        // the first `write_begin` increments an odd value to an even
-        // one, which readers read as "stable" — publishing a torn
-        // snapshot mid-transaction — and `write_end` increments that to
-        // odd again, blinding every reader for the rest of the process.
-        //
-        // Repair the parity while the flock is held. No checksum
-        // recomputation is needed: `seq_lock` is outside the CRC.
-        // The counter is driven through a raw atomic — no reference
-        // into the mapping is formed.
-        // SAFETY: `ptr` is a valid, mmap'd, page-aligned region of
-        // exactly `FILE_SIZE` bytes; the flock is held and no
-        // `MmapState` has been returned to the caller. The offset is
-        // `SEQ_LOCK_OFFSET` (layout-pinned, 8-byte aligned).
-        if unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) }
+        // Repair an inverted seqlock parity while the open-time flock is held.
+        // The sequence counter is excluded from the CRC, so parity repair does
+        // not require recomputing the state checksum.
+        // SAFETY: ptr is a valid mapped GenesisCoreState and the flock excludes
+        // all other writers until ownership is returned below.
+        let seq_lock = unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreState) }
             .header
-            .seq_lock
-            & 1
-            == 1
-        {
-            let seq = unsafe { AtomicU64::from_ptr(ptr.add(Self::SEQ_LOCK_OFFSET) as *mut u64) };
+            .seq_lock;
+        if seq_lock & 1 == 1 {
+            let seq = unsafe {
+                AtomicU64::from_ptr(ptr.add(Self::SEQ_LOCK_OFFSET) as *mut u64)
+            };
             seq.fetch_add(1, Ordering::Release);
         }
 
+        // The verification/migration transaction is complete. Release the
+        // open-time flock before returning the live mapping; subsequent
+        // writers synchronize through MmapState::write_lock plus this file
+        // lock in their normal write path.
+        unsafe { Self::unlock_file(fd) };
+
+        Ok(Self {
+            ptr,
+            fd,
+            created: false,
+            write_lock: std::sync::Mutex::new(()),
+        })
+    }
 
     /// Get a mutable reference to the core state.
     ///
