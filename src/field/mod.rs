@@ -343,19 +343,18 @@ impl GlobalField {
     }
 
     fn path_matrix(&self, from: &str, to: &str) -> Result<Vec<Vector>, FieldError> {
-        let n = self.manifold.dimension();
-        let mut queue: Vec<(String, Vec<Vector>)> = vec![(from.to_string(), identity(n))];
-        let mut seen = vec![from.to_string()];
-        while let Some((node, matrix)) = queue.first().cloned() {
-            queue.remove(0);
-            if node == to { return Ok(matrix); }
-            for edge in self.transports.iter().filter(|e| e.from == node) {
-                if seen.iter().any(|id| id == &edge.to) { continue; }
-                seen.push(edge.to.clone());
-                queue.push((edge.to.clone(), mat_mul(&edge.matrix, &matrix)));
+        let paths = self.transport_paths(from, to, 2);
+        match paths.as_slice() {
+            [] => Err(FieldError::MissingTransport),
+            [path] => Ok(path.matrix.clone()),
+            [first, second, ..] => {
+                let spread = matrix_distance(&first.matrix, &second.matrix)?;
+                if spread > 1.0e-9 {
+                    return Err(FieldError::TransportMismatch);
+                }
+                Ok(first.matrix.clone())
             }
         }
-        Err(FieldError::MissingTransport)
     }
 
     pub fn transported_states(&self) -> Result<Vec<Vector>, FieldError> {
@@ -614,6 +613,40 @@ mod tests {
             matrix: vec![vec![1.0, 0.0], vec![1.0]],
         };
         assert_eq!(global.add_transport(transport), Err(FieldError::TransportMismatch));
+    }
+
+    #[test]
+    fn inconsistent_transport_paths_are_rejected() {
+        let m = PoincareBall::new(1, 1.0).unwrap();
+        let mut global = GlobalField::new(m.clone());
+        for id in ["a", "b", "c"] {
+            global.add_fiber(SystemFiber::new(
+                id,
+                m.clone(),
+                vec![SubsystemLayer::new("s", vec![0.0])],
+            ).unwrap()).unwrap();
+        }
+        global.add_transport(GaugeTransport::new("a", "b", vec![vec![1.0]]).unwrap()).unwrap();
+        global.add_transport(GaugeTransport::new("b", "c", vec![vec![1.0]]).unwrap()).unwrap();
+        global.add_transport(GaugeTransport::new("a", "c", vec![vec![2.0]]).unwrap()).unwrap();
+        assert_eq!(global.transported_states(), Err(FieldError::TransportMismatch));
+    }
+
+    #[test]
+    fn consistent_multiple_transport_paths_are_accepted() {
+        let m = PoincareBall::new(1, 1.0).unwrap();
+        let mut global = GlobalField::new(m.clone());
+        for id in ["a", "b", "c"] {
+            global.add_fiber(SystemFiber::new(
+                id,
+                m.clone(),
+                vec![SubsystemLayer::new("s", vec![0.0])],
+            ).unwrap()).unwrap();
+        }
+        global.add_transport(GaugeTransport::new("a", "b", vec![vec![1.0]]).unwrap()).unwrap();
+        global.add_transport(GaugeTransport::new("b", "c", vec![vec![1.0]]).unwrap()).unwrap();
+        global.add_transport(GaugeTransport::new("a", "c", vec![vec![1.0]]).unwrap()).unwrap();
+        assert!(global.transported_states().is_ok());
     }
 
     #[test]
