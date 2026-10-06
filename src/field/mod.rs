@@ -11,6 +11,8 @@ use std::fmt;
 
 pub mod engine;
 pub use engine::SystemEngine;
+pub mod runtime;
+pub use runtime::{FieldIntegration, FieldRuntime, LATENT_DIMENSION};
 
 const EPS: f64 = 1.0e-12;
 pub type Vector = Vec<f64>;
