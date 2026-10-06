@@ -79,7 +79,7 @@ impl SystemEngine {
     }
 
     pub fn dimension(&self) -> usize { self.biases.first().map_or(0, Vector::len) }
-    fn validate(&self) -> Result<(usize, usize), FieldError> {
+    pub(crate) fn validate(&self) -> Result<(usize, usize), FieldError> {
         let n = self.biases.len();
         let d = self.biases.first().map_or(0, Vector::len);
         if n == 0 || d == 0
