@@ -390,11 +390,19 @@ impl GlobalField {
         let reference_id = self.fibers[0].id.clone();
         let consensus_tangent = self.manifold.log_origin(&consensus)?;
 
-        for fiber in &mut self.fibers {
-            let local_target = if fiber.id == reference_id {
-                consensus.clone()
+        let local_targets: Vec<Vector> = self.fibers.iter().map(|fiber| {
+            if fiber.id == reference_id {
+                Ok(consensus.clone())
             } else {
                 let path = self.path_matrix(&fiber.id, &reference_id)?;
+                let inverse = matrix_inverse(&path)?;
+                let local_tangent = matrix_apply(&inverse, &consensus_tangent)?;
+                self.manifold.exp_origin(&local_tangent)
+            }
+        }).collect::<Result<_, FieldError>>()?;
+
+        for (fiber, local_target) in self.fibers.iter_mut().zip(local_targets) {
+            let local_target = local_target;
                 let inverse = matrix_inverse(&path)?;
                 let local_tangent = matrix_apply(&inverse, &consensus_tangent)?;
                 self.manifold.exp_origin(&local_tangent)?
