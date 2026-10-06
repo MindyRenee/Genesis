@@ -75,7 +75,7 @@ fn identity(n:usize)->Matrix{let mut m=vec![vec![0.0;n];n];for i in 0..n{m[i][i]
 fn mat_mul(a:&Matrix,b:&Matrix)->Matrix{let n=a.len();let mut out=vec![vec![0.0;n];n];for i in 0..n{for j in 0..n{for k in 0..n{out[i][j]+=a[i][k]*b[k][j];}}}out}
 fn mat_vec(a:&Matrix,x:&Vector)->Result<Vector,FieldError>{if a.len()!=x.len()||a.iter().any(|r|r.len()!=x.len()){return Err(FieldError::DimensionMismatch)}let mut out=vec![0.0;x.len()];for i in 0..a.len(){out[i]=dot(&a[i],x);}if out.iter().any(|v|!v.is_finite()){return Err(FieldError::NonFiniteState)}Ok(out)}
 fn matrix_distance(a:&Matrix,b:&Matrix)->Result<f64,FieldError>{if a.len()!=b.len()||a.iter().zip(b).any(|(x,y)|x.len()!=y.len()){return Err(FieldError::DimensionMismatch)}let mut sum=0.0;for(row_a,row_b)in a.iter().zip(b){for(x,y)in row_a.iter().zip(row_b){sum+=(x-y)*(x-y);}}Ok(sum.sqrt())}
-fn matrix_inverse(a:&Matrix)->Result<Matrix,FieldError>{let n=a.len();if n==0||a.iter().any(|r|r.len()!=n){return Err(FieldError::DimensionMismatch)}let mut aug=vec![vec![0.0;2*n];n];for i in 0..n{for j in 0..n{aug[i][j]=a[i][j];}aug[i][n+i]=1.0;}for col in 0..n{let mut pivot=col;for row in col+1..n{if aug[row][col].abs()>aug[pivot][col].abs(){pivot=row;}}if aug[pivot][col].abs()<EPS{return Err(FieldError::NonInvertibleTransport)}aug.swap(col,pivot);let p=aug[col][col];for j in 0..2*n{aug[col][j]/=p;}for row in 0..n{if row==col{continue}let factor=aug[row][col];for j in 0..2*n{aug[row][j]-=factor*aug[col][j];}}}Ok(aug.into_iter().map(|row|row[n..].to_vec()).collect())}
+fn matrix_inverse(a:&Matrix)->Result<Matrix,FieldError>{let n=a.len();if n==0||a.iter().any(|r|r.len()!=n||r.iter().any(|v|!v.is_finite())){return Err(FieldError::InvalidTransport)}let scale=a.iter().flatten().fold(0.0_f64,|m,&v|m.max(v.abs()));if scale==0.0{return Err(FieldError::NonInvertibleTransport)}let pivot_tol=EPS*scale;let mut aug=vec![vec![0.0;2*n];n];for i in 0..n{for j in 0..n{aug[i][j]=a[i][j];}aug[i][n+i]=1.0;}for col in 0..n{let mut pivot=col;for row in col+1..n{if aug[row][col].abs()>aug[pivot][col].abs(){pivot=row;}}if aug[pivot][col].abs()<=pivot_tol{return Err(FieldError::NonInvertibleTransport)}aug.swap(col,pivot);let p=aug[col][col];for j in 0..2*n{aug[col][j]/=p;}for row in 0..n{if row==col{continue}let factor=aug[row][col];for j in 0..2*n{aug[row][j]-=factor*aug[col][j];}}}if aug.iter().flatten().any(|v|!v.is_finite()){return Err(FieldError::NonFiniteState)}Ok(aug.into_iter().map(|row|row[n..].to_vec()).collect())}
 
 #[derive(Debug,Clone,PartialEq)]
 pub enum FieldError{DimensionMismatch,GeometryMismatch,InvalidGeometry,InvalidPoint,InvalidTransport,TransportMismatch,MissingTransport,NonInvertibleTransport,NonFiniteState,LayerMismatch,EmptyState,InvalidTime,InvalidDynamics,DuplicateId}
@@ -157,6 +157,20 @@ mod tests {
         let m = PoincareBall::new(1, 1.0).unwrap();
         let fiber = SystemFiber::new("empty", m, Vec::new()).unwrap();
         assert_eq!(fiber.state(), Err(FieldError::EmptyState));
+    }
+
+    #[test]
+    fn inverse_accepts_uniformly_scaled_invertible_transport() {
+        let matrix = vec![vec![1.0e-15, 0.0], vec![0.0, 2.0e-15]];
+        let inverse = matrix_inverse(&matrix).unwrap();
+        assert!((inverse[0][0] - 1.0e15).abs() / 1.0e15 < 1.0e-12);
+        assert!((inverse[1][1] - 5.0e14).abs() / 5.0e14 < 1.0e-12);
+    }
+
+    #[test]
+    fn inverse_rejects_singular_transport() {
+        let matrix = vec![vec![1.0, 2.0], vec![2.0, 4.0]];
+        assert_eq!(matrix_inverse(&matrix), Err(FieldError::NonInvertibleTransport));
     }
 
     #[test]
