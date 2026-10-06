@@ -34,13 +34,13 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
-import re
 import threading
 from collections import deque
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 __all__ = ["AmbientListener", "contains_wake_word", "strip_wake_word"]
@@ -333,8 +333,8 @@ class AmbientListener:
         sensor boundary; recognition remains Genesis's existing offline Vosk
         path.
         """
-        import wave
         from vosk import KaldiRecognizer
+        import wave
 
         command = shutil.which("termux-microphone-record")
         ffmpeg = shutil.which("ffmpeg")
