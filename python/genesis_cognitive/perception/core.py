@@ -1332,10 +1332,11 @@ def _build_perception(
 
 def _detect_context_flags(lower: str) -> tuple[bool, bool, bool, bool, bool]:
     """Detect the five is_about_* context flags from the lowercased text."""
-    is_about_genesis = (
-        bool(_ABOUT_GENESIS_RE.search(lower) and not _ABOUT_USER_NEG_RE.search(lower))
-        or "genesis" in lower
-    )
+    # These flags are independent semantic references, not mutually
+    # exclusive subjects. "I like your code" is simultaneously about the
+    # user and Genesis. Do not let the presence of first-person language
+    # erase an explicit second-person/self reference.
+    is_about_genesis = bool(_ABOUT_GENESIS_RE.search(lower)) or "genesis" in lower
     is_about_user = bool(_ABOUT_USER_RE.search(lower))
     is_about_code = _match_any(_CODE_PATTERNS, lower)
     is_about_emotion = _match_any(_EMOTION_PATTERNS, lower) or "feel" in lower
