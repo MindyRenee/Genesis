@@ -569,15 +569,15 @@ _NAME_PATTERNS = [
     # conjunctions/pronouns provide a natural boundary when punctuation
     # is absent.
     re.compile(
-        r"my name is ([\\w]+(?:\\s+[\\w]+){0,3}?)(?=\\s+(?:and|but|i|my|we)\\b|[,.!?]|$)",
+        r"my name is ([\w]+(?:\s+[\w]+){0,3}?)(?=\s+(?:and|but|i|my|we)\b|[,.!?]|$)",
         re.IGNORECASE,
     ),
     re.compile(
-        r"call me ([\\w]+(?:\\s+[\\w]+){0,3}?)(?=\\s+(?:and|but|i|my|we)\\b|[,.!?]|$)",
+        r"call me ([\w]+(?:\s+[\w]+){0,3}?)(?=\s+(?:and|but|i|my|we)\b|[,.!?]|$)",
         re.IGNORECASE,
     ),
     re.compile(
-        r"i am called ([\\w]+(?:\\s+[\\w]+){0,3}?)(?=\\s+(?:and|but|i|my|we)\\b|[,.!?]|$)",
+        r"i am called ([\w]+(?:\s+[\w]+){0,3}?)(?=\s+(?:and|but|i|my|we)\b|[,.!?]|$)",
         re.IGNORECASE,
     ),
 ]
