@@ -1,4 +1,3 @@
-# [android-headless-stub]
 #[cfg(target_os = "android")]
 fn main() {
     eprintln!("retina: camera capture is unavailable on Android; Genesis is running headless.");
