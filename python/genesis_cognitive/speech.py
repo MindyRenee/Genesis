@@ -37,6 +37,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+from genesis_cognitive.android_tools import find_termux_command
+
 # ─── Paths ────────────────────────────────────────────────────────
 _VOICES_DIR = Path(__file__).parent.parent / "voices"
 _PIPER_BIN = _VOICES_DIR / "piper"
@@ -148,7 +150,7 @@ class Voice:
 
     def __init__(self) -> None:
         """Detect available TTS backends and load the Piper voice model."""
-        self._termux_tts = shutil.which("termux-tts-speak")
+        self._termux_tts = find_termux_command("termux-tts-speak")
         self._piper_available = self._check_piper()
         self._espeak_available = self._check_espeak()
         self._model = _select_piper_model()
