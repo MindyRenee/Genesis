@@ -83,6 +83,12 @@ impl PoincareBall {
         if self.contains(x) { Ok(()) } else { Err(FieldError::InvalidPoint) }
     }
 
+    /// Compute a consensus by averaging logarithmic coordinates at the origin.
+    ///
+    /// This is a coordinate-defined tangent-space barycenter, not the intrinsic
+    /// Fréchet/Karcher mean of the hyperbolic manifold. Keeping that distinction
+    /// explicit prevents a convenient computational operator from being treated
+    /// as a geometry-independent mean.
     pub fn origin_barycenter(&self, points: &[Vector]) -> Result<Vector, FieldError> {
         if points.is_empty() { return Err(FieldError::EmptyState); }
         let mut tangent = vec![0.0; self.dimension];
@@ -521,6 +527,19 @@ mod tests {
         let m = PoincareBall::new(3, 1.0).unwrap();
         let p = vec![0.1, 0.2, -0.1];
         assert!(m.distance(&p, &p).unwrap().abs() < 1e-10);
+    }
+
+    #[test]
+    fn origin_barycenter_is_order_independent() {
+        let m = PoincareBall::new(2, 1.0).unwrap();
+        let points = vec![vec![0.1, 0.0], vec![0.0, 0.2], vec![0.2, 0.1]];
+        let mut reversed = points.clone();
+        reversed.reverse();
+        let a = m.origin_barycenter(&points).unwrap();
+        let b = m.origin_barycenter(&reversed).unwrap();
+        for (x, y) in a.iter().zip(b) {
+            assert!((x - y).abs() < 1e-12);
+        }
     }
 
     #[test]
