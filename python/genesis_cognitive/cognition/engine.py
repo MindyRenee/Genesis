@@ -3682,11 +3682,15 @@ class CognitionEngine:
         )
         active_concepts = [name for _, name in active_items]
 
+        # Predict from Genesis's state *before* this input is perceived.
+        # This keeps the top-down context causally prior to the observation.
+        pre_input_emotion = self._build_meta_emotion()
         prediction_context = PredictionContext(
             recent_intents=recent_intents,
             recent_topics=recent_topics,
             active_concepts=active_concepts,
-            emotional_state="",  # filled after emotion assessment
+            emotional_state=pre_input_emotion.label,
+            time_of_day=time.localtime().tm_hour,
         )
         prediction = self.predictive_coding.predict(prediction_context)
         return comprehension_result, learning_events, prediction, recent_turns
