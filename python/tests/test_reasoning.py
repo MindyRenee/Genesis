@@ -1048,7 +1048,7 @@ def test_meta_reason_get_strategy_stats() -> None:
         ("hello world", "general"),
     ],
 )
-def test_tom_question_indicator_is_word_bounded() -> None:
+def test_meta_reason_classify_problem(phrase, expected_category) -> None:
     """Question detection must not match question words inside other words."""
     from genesis_cognitive.reasoning.theory_of_mind import TheoryOfMind
 
@@ -1059,8 +1059,8 @@ def test_tom_question_indicator_is_word_bounded() -> None:
     assert "learn_method" in tom.get_user_model().intentions
 
 
-def test_meta_reason_classify_problem(phrase, expected_category) -> None:
-    """_classify_problem identifies the problem category from keywords."""
+def test_tom_question_indicator_is_word_bounded() -> None:
+    """Question detection must not match question words inside other words."""
     mr = MetaReasoning()
     assert mr._classify_problem(phrase) == expected_category
 
