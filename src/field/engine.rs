@@ -276,7 +276,7 @@ mod tests {
         let engine = SystemEngine::zero(1, 2).with_saturation(vec![2.0]).unwrap();
         let layers = vec![SubsystemLayer::new("a", vec![2.0, 1.0])];
         let d = engine.derivatives(&layers).unwrap();
-        let radius_sq = 5.0;
+        let radius_sq: f64 = 5.0;
         assert!((d[0][0] + 20.0).abs() < 1e-12);
         assert!((d[0][1] + 10.0).abs() < 1e-12);
         assert_eq!(d[0][0] / d[0][1], layers[0].state[0] / layers[0].state[1]);
