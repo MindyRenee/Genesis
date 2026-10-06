@@ -300,6 +300,6 @@ _EXPORTS: dict[str, str] = {
     "SkillStrategy": "memory",
 }
 
-__all__ = sorted({* _EXPORTS, "ActionBid", "BasalGangliaSelector", "SelectionResult"})
+__all__ = sorted((*_EXPORTS, "ActionBid", "BasalGangliaSelector", "SelectionResult"))
 
 __getattr__ = view_getattr(_EXPORTS, __name__)
