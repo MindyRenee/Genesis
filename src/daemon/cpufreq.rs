@@ -159,6 +159,12 @@ pub struct BodyControlState {
 ///
 /// Returns `None` if the script cannot be found, in which case cpufreq
 /// control silently no-ops (graceful degradation).
+// Android exposes no Linux CPUFreq sysfs contract to Genesis. The phone's
+// thermal/power scheduler remains Android's responsibility; Genesis still
+// observes whatever portable body signals are available.
+#[cfg(target_os = "android")]
+fn helper_path() -> Option<&'static str> { None }
+
 fn helper_path() -> Option<&'static str> {
     static PATH: OnceLock<Option<String>> = OnceLock::new();
     PATH.get_or_init(|| {
