@@ -32,4 +32,4 @@ __all__ = [
     "TDTransition",
 ]
 
-__getattr__ = view_getattr(_EXPORTS)
+__getattr__ = view_getattr(_EXPORTS, __name__)
