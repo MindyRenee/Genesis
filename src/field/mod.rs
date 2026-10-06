@@ -391,8 +391,8 @@ impl GlobalField {
         let consensus = self.manifold.origin_barycenter(&states)?;
         let mut disagreement = 0.0;
         for state in &states {
-            let delta = sub(state, &consensus);
-            disagreement += dot(&delta, &delta);
+            let distance = self.manifold.distance(state, &consensus)?;
+            disagreement += distance * distance;
         }
         self.disagreement = disagreement / states.len() as f64;
 
@@ -413,11 +413,13 @@ impl GlobalField {
         }).collect::<Result<_, FieldError>>()?;
 
         for (fiber, local_target) in self.fibers.iter_mut().zip(local_targets) {
+            let current_tangent = self.manifold.log_origin(&fiber.state()?)?;
+            let target_tangent = self.manifold.log_origin(&local_target)?;
+            let correction = scaled(&sub(&target_tangent, &current_tangent), target);
             for layer in &mut fiber.layers {
-                let delta = sub(&layer.state, &local_target);
-                layer.state = self.manifold.project(
-                    &add(&layer.state, &scaled(&delta, -target))
-                )?;
+                let layer_tangent = self.manifold.log_origin(&layer.state)?;
+                let corrected = add(&layer_tangent, &correction);
+                layer.state = self.manifold.exp_origin(&corrected)?;
             }
         }
         self.temperature = (self.temperature - self.cooling_rate * dt).max(0.0);
@@ -661,6 +663,34 @@ mod tests {
         assert!(global.disagreement > before);
         assert!((global.fibers[0].layers[0].state[0] - 0.3).abs() < 0.01);
         assert!((global.fibers[1].layers[0].state[0] - 0.3).abs() < 0.01);
+    }
+
+    #[test]
+    fn synchronization_preserves_subsystem_separation() {
+        let m = PoincareBall::new(2, 1.0).unwrap();
+        let mut global = GlobalField::new(m.clone());
+        global.add_fiber(SystemFiber::new(
+            "a",
+            m.clone(),
+            vec![
+                SubsystemLayer::new("l1", vec![0.1, 0.0]),
+                SubsystemLayer::new("l2", vec![0.0, 0.1]),
+            ],
+        ).unwrap()).unwrap();
+        global.add_fiber(SystemFiber::new(
+            "b",
+            m.clone(),
+            vec![
+                SubsystemLayer::new("l1", vec![0.3, 0.0]),
+                SubsystemLayer::new("l2", vec![0.0, 0.3]),
+            ],
+        ).unwrap()).unwrap();
+        global.add_transport(GaugeTransport::new("a", "b", identity(2)).unwrap()).unwrap();
+
+        let before = sub(&global.fibers[0].layers[0].state, &global.fibers[0].layers[1].state);
+        global.synchronize(0.1).unwrap();
+        let after = sub(&global.fibers[0].layers[0].state, &global.fibers[0].layers[1].state);
+        assert!((norm(&before) - norm(&after)).abs() < 1e-9);
     }
 
     #[test]
