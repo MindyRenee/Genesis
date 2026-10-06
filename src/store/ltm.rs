@@ -700,6 +700,32 @@ impl LtmStore {
                 .try_into()
                 .expect("entry slice length equals INDEX_ENTRY_SIZE");
             let entry = IndexEntry::from_bytes(entry_bytes);
+
+            // Episode IDs are the primary key used by both the metadata
+            // index and the bundle code. A zero or duplicate ID makes
+            // the in-memory HashMap silently overwrite an earlier entry,
+            // causing retrieval to return the wrong episode. Treat either
+            // condition as on-disk corruption instead.
+            if entry.episode_id == 0 || id_to_idx.contains_key(&entry.episode_id) {
+                return Err(LtmError::Io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("LTM metadata contains invalid or duplicate episode ID {}", entry.episode_id),
+                )));
+            }
+
+            // These values are persisted and later used in arithmetic and
+            // ordering. Reject non-finite floats at the trust boundary
+            // rather than allowing a valid-looking metadata file to inject
+            // NaN into retrieval or salience sorting.
+            if !entry.salience.is_finite()
+                || entry.emotional_tag.iter().any(|v| !v.is_finite())
+            {
+                return Err(LtmError::Io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("LTM metadata entry {} contains non-finite values", entry.episode_id),
+                )));
+            }
+
             let idx = entries.len();
             if !entry.is_deleted() {
                 // Archived episodes stay in id_to_idx (retrievable
@@ -746,8 +772,30 @@ impl LtmStore {
             .read_exact(&mut offset_bytes)
             .map_err(LtmError::Io)?;
         let next_write_offset = u64::from_le_bytes(offset_bytes);
-        let data_file_len = data_file.metadata().map(|m| m.len()).unwrap_or(0);
-        if next_write_offset < 16 || (data_file_len > 0 && next_write_offset > data_file_len) {
+        let data_file_len = data_file.metadata().map_err(LtmError::Io)?.len();
+
+        // Every non-deleted episode must point to a complete payload record.
+        // Validate this once at startup so a corrupt metadata entry cannot
+        // later seek outside the data file or allocate based on an invalid
+        // compressed length during retrieval.
+        for entry in &entries {
+            if entry.is_deleted() {
+                continue;
+            }
+            if entry.data_offset < 16
+                || entry.data_offset.checked_add(4 + entry.compressed_len as u64)
+                    .is_none_or(|end| end > data_file_len)
+                || entry.compressed_len as usize > MAX_COMPRESSED_SIZE
+                || entry.uncompressed_len as usize > MAX_PAYLOAD_SIZE
+            {
+                return Err(LtmError::Io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("LTM episode {} points to an invalid payload", entry.episode_id),
+                )));
+            }
+        }
+
+        if next_write_offset < 16 || next_write_offset > data_file_len {
             return Err(LtmError::Io(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 format!(
