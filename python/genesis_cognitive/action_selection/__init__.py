@@ -276,6 +276,8 @@ from __future__ import annotations
 
 from .._views import view_getattr
 
+from .basal_ganglia import ActionBid, BasalGangliaSelector, SelectionResult
+
 # The basal ganglia's functions are implemented by multi-subsystem modules
 # that stay at the top level. This subsystem lazily re-exports the ones
 # whose primary function is basal-ganglia circuitry — the striatum's
@@ -298,6 +300,6 @@ _EXPORTS: dict[str, str] = {
     "SkillStrategy": "memory",
 }
 
-__all__ = sorted(_EXPORTS)
+__all__ = sorted({* _EXPORTS, "ActionBid", "BasalGangliaSelector", "SelectionResult"})
 
 __getattr__ = view_getattr(_EXPORTS, __name__)
