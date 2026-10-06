@@ -142,6 +142,7 @@ __all__ = [
     "ReasoningResult",
     "ReasoningStrategy",
     "ReasoningType",
+    "ResourceState",
     "RevisionRecord",
     "SkillMatch",
     "Solution",
