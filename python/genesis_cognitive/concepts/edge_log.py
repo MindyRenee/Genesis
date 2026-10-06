@@ -34,8 +34,8 @@ stores raw earned weights and lets the reader price them.
 from __future__ import annotations
 
 import json
-import math
 import logging
+import math
 import os
 import tempfile
 import threading
