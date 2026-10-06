@@ -100,6 +100,11 @@ from genesis_cognitive.mind import Mind
 from genesis_cognitive.mind.thresholds import AUTO_WAKE_MIN_SLEEP_S
 from genesis_cognitive.speech import Voice, VoiceInput
 
+try:
+    from genesis_cognitive.android_camera import capture_android_camera
+except ImportError:
+    capture_android_camera = None
+
 # Script directory — used to locate the project root. Python already
 # adds the script's directory to sys.path[0], so genesis_cognitive and
 # genesis_client are importable without explicit path manipulation.
@@ -1706,6 +1711,27 @@ def _cmd_look(mind: Mind, rest: str) -> str:
                 metadata={"vision_empty": True},
             )
         return f"\n  genesis> {result}\n"
+
+    # On Android/Termux there is no V4L2 camera device. Use the
+    # Termux:API camera bridge as the physical camera adapter instead.
+    if capture_android_camera is not None:
+        try:
+            android_path = capture_android_camera(mind.data_dir)
+        except Exception as e:  # noqa: BLE001
+            logger.debug("Android camera capture failed: %s", e)
+            android_path = None
+        if android_path:
+            result_holder: dict[str, str] = {}
+            t = threading.Thread(
+                target=lambda: result_holder.__setitem__(
+                    "value", mind.look_at_image(android_path)
+                ),
+                daemon=True,
+            )
+            t.start()
+            t.join(timeout=15.0)
+            if not t.is_alive() and result_holder.get("value"):
+                return f"\\n  genesis> {result_holder['value']}\\n"
 
     # Default: look through the retina
     retina_holder: dict[str, str] = {}
