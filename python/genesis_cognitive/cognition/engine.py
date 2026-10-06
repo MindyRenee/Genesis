@@ -5790,7 +5790,9 @@ class CognitionEngine:
         # Apply dopamine signal from TD learning
         dopamine_signal = self.td_learner.get_dopamine_signal()
         if abs(dopamine_signal) > 0.001:
-            self.client.neuro_impulse(0, abs(dopamine_signal))  # dopamine
+            # Preserve the sign of the RPE. A negative RPE is a dopamine
+            # dip, not a positive dopamine impulse with a smaller magnitude.
+            self.client.neuro_impulse(0, dopamine_signal)  # dopamine
         return td_rpe
 
     def _think_self_directed_learning(
