@@ -15,7 +15,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-__all__ = ["ActionBid", "SelectionResult", "BasalGangliaSelector"]
+__all__ = ["ActionBid", "BasalGangliaSelector", "SelectionResult"]
 
 
 def _clip(value: float, lower: float, upper: float) -> float:
