@@ -33,6 +33,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import shutil
+import subprocess
 import re
 import threading
 from collections import deque
@@ -231,6 +234,14 @@ class AmbientListener:
         """
         import queue
 
+        # Android/Termux does not expose the Android microphone through
+        # the normal Linux ALSA/sounddevice path. Use Termux:API to obtain
+        # a short recording, then feed that PCM/WAV data to the same Vosk
+        # recognizer used by the desktop listener.
+        if shutil.which("termux-microphone-record"):
+            self._listen_loop_android(KaldiRecognizer=None)
+            return
+
         import sounddevice as sd
         from vosk import KaldiRecognizer
 
@@ -312,6 +323,67 @@ class AmbientListener:
         except Exception as e:
             logger.exception(f"Ambient listener crashed: {e}")
             self._running = False
+
+    def _listen_loop_android(self, KaldiRecognizer: Any = None) -> None:
+        """Capture Android microphone audio through Termux:API.
+
+        Termux:API records to a WAV file. We poll the completed recording,
+        decode it with the same Vosk model, and emit the resulting utterance.
+        This is intentionally a bridge at the sensor boundary; recognition
+        remains Genesis's existing offline Vosk path.
+        """
+        import wave
+        from vosk import KaldiRecognizer
+
+        command = shutil.which("termux-microphone-record")
+        if command is None:
+            self._running = False
+            return
+
+        data_dir = os.environ.get("GENESIS_DATA_DIR", str(Path.home() / ".genesis"))
+        output_dir = Path(data_dir) / "android_audio"
+        output_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        wav_path = output_dir / "ambient.wav"
+
+        while self._running:
+            if self._is_speaking is not None and self._is_speaking():
+                threading.Event().wait(0.25)
+                continue
+
+            try:
+                proc = subprocess.run(
+                    [command, "-f", str(wav_path), "-l", "2"],
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=10,
+                    check=False,
+                )
+                if proc.returncode != 0 or not wav_path.is_file():
+                    threading.Event().wait(0.5)
+                    continue
+
+                with wave.open(str(wav_path), "rb") as audio:
+                    recognizer = KaldiRecognizer(self._vosk_model, audio.getframerate())
+                    recognizer.SetWords(True)
+                    while True:
+                        frames = audio.readframes(4096)
+                        if not frames:
+                            break
+                        recognizer.AcceptWaveform(frames)
+                    result = json.loads(recognizer.FinalResult())
+                text = result.get("text", "").strip()
+                if text:
+                    self._emit(text)
+            except (OSError, subprocess.SubprocessError, wave.Error, json.JSONDecodeError) as e:
+                logger.debug("Android microphone capture failed: %s", e)
+            finally:
+                try:
+                    wav_path.unlink()
+                except FileNotFoundError:
+                    pass
+
+            threading.Event().wait(0.1)
 
     def _handle_final_result(self, recognizer: Any, final_queue: Any) -> None:
         """Parse a final Vosk result and queue accepted text.
