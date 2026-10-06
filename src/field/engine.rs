@@ -63,6 +63,8 @@ impl SystemEngine {
         Ok(Self { couplings, biases, time_scale })
     }
 
+    pub fn dimension(&self) -> usize { self.biases.first().map_or(0, Vector::len) }
+
     pub fn derivatives(&self, layers: &[SubsystemLayer]) -> Result<Vec<Vector>, FieldError> {
         if layers.len() != self.biases.len() {
             return Err(FieldError::LayerMismatch);
