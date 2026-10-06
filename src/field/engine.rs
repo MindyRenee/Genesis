@@ -387,7 +387,7 @@ mod tests {
                 vec![vec![vec![0.5]], vec![vec![1.0]]],
                 vec![vec![vec![-1.0]], vec![vec![0.0]]],
             ],
-            vec![vec![0.0], vec![vec![0.0]]],
+            vec![vec![0.0], vec![0.0]],
             1.0,
         ).unwrap();
         let layers = vec![
