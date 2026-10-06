@@ -134,6 +134,7 @@ impl SystemFiber {
     }
     pub fn with_engine(id: impl Into<String>, manifold: PoincareBall, layers: Vec<SubsystemLayer>, engine: SystemEngine) -> Result<Self, FieldError> {
         if engine.biases.len() != layers.len() { return Err(FieldError::LayerMismatch); }
+        if engine.dimension() != manifold.dimension() { return Err(FieldError::DimensionMismatch); }
         let mut fiber = Self::new(id, manifold, layers)?;
         fiber.engine = engine;
         Ok(fiber)
@@ -375,10 +376,23 @@ impl GlobalField {
 
         let gain = self.integration_gain.max(0.0);
         let target = (gain * dt).clamp(0.0, 1.0);
+        let reference_id = self.fibers[0].id.clone();
+        let consensus_tangent = self.manifold.log_origin(&consensus)?;
+
         for fiber in &mut self.fibers {
+            let local_target = if fiber.id == reference_id {
+                consensus.clone()
+            } else {
+                let path = self.path_matrix(&fiber.id, &reference_id)?;
+                let inverse = matrix_inverse(&path)?;
+                let local_tangent = matrix_apply(&inverse, &consensus_tangent)?;
+                self.manifold.exp_origin(&local_tangent)?
+            };
             for layer in &mut fiber.layers {
-                let delta = sub(&layer.state, &consensus);
-                layer.state = self.manifold.project(&add(&layer.state, &scaled(&delta, -target)))?;
+                let delta = sub(&layer.state, &local_target);
+                layer.state = self.manifold.project(
+                    &add(&layer.state, &scaled(&delta, -target))
+                )?;
             }
         }
         self.temperature = (self.temperature - self.cooling_rate * dt).max(0.0);
@@ -397,6 +411,31 @@ fn mat_mul(a: &[Vector], b: &[Vector]) -> Vec<Vector> {
     let mut out = vec![vec![0.0; n]; n];
     for i in 0..n { for j in 0..n { for k in 0..n { out[i][j] += a[i][k] * b[k][j]; } } }
     out
+}
+
+fn matrix_inverse(a: &[Vector]) -> Result<Matrix, FieldError> {
+    let n = a.len();
+    if n == 0 || a.iter().any(|row| row.len() != n || row.iter().any(|v| !v.is_finite())) {
+        return Err(FieldError::InvalidTransport);
+    }
+    let mut aug = vec![vec![0.0; 2 * n]; n];
+    for i in 0..n {
+        for j in 0..n { aug[i][j] = a[i][j]; }
+        aug[i][n + i] = 1.0;
+    }
+    for col in 0..n {
+        let pivot = (col..n).max_by(|&i,&j| aug[i][col].abs().partial_cmp(&aug[j][col].abs()).unwrap()).unwrap();
+        if aug[pivot][col].abs() <= EPS { return Err(FieldError::NonInvertibleTransport); }
+        aug.swap(col, pivot);
+        let p = aug[col][col];
+        for j in 0..2*n { aug[col][j] /= p; }
+        for i in 0..n {
+            if i == col { continue; }
+            let factor = aug[i][col];
+            for j in 0..2*n { aug[i][j] -= factor * aug[col][j]; }
+        }
+    }
+    Ok(aug.into_iter().map(|row| row[n..].to_vec()).collect())
 }
 
 fn matrix_distance(a: &[Vector], b: &[Vector]) -> Result<f64, FieldError> {
@@ -438,6 +477,7 @@ pub struct PathDisagreement {
 pub enum FieldError {
     InvalidGeometry, InvalidPoint, DimensionMismatch, EmptyState, LayerMismatch,
     InvalidTransport, TransportMismatch, GeometryMismatch, InvalidTime, MissingTransport,
+    InvalidDynamics, NonFiniteState, DuplicateId, NonInvertibleTransport,
 }
 
 impl fmt::Display for FieldError {
