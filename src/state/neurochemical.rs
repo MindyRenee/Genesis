@@ -633,8 +633,12 @@ impl NeurochemicalId {
     ///   activated. Adrenal medulla release.
     /// - **Melatonin** (0.10): Driven by circadian oscillator, near
     ///   zero during day, high at night.
-    /// - **Cortisol** (0.0): Stress hormone, zero at rest.
-    /// - **CRH** (0.0): Stress hormone, zero at rest.
+    /// - **Cortisol** (0.0): normalized stress-drive state. This is not
+    ///   a plasma concentration; a zero baseline means no modeled
+    ///   stress increment above the machine's resting operating state.
+    /// - **CRH** (0.0): normalized HPA stress-drive state. This is not
+    ///   a claim that biological CRH concentration is literally zero
+    ///   at rest.
     pub const fn default_baseline(self) -> f32 {
         match self {
             Self::Glutamate => 0.60,       // ~2 µM — main excitatory, highest
@@ -653,8 +657,11 @@ impl NeurochemicalId {
             Self::Vasopressin => 0.20,     // low tonic peptide
             Self::Epinephrine => 0.15,     // very low unless stressed
             Self::Melatonin => 0.10,       // circadian-driven
-            Self::Cortisol => 0.0,         // stress hormone — zero at rest
-            Self::CRH => 0.0,              // stress hormone — zero at rest
+            // These two fields are normalized stress-drive variables,
+            // not literal biological concentrations. Zero is the
+            // modeled resting stress increment.
+            Self::Cortisol => 0.0,
+            Self::CRH => 0.0
         }
     }
 
