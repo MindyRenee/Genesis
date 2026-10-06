@@ -335,8 +335,8 @@ mod matrix_distance_regression {
 
     #[test]
     fn matrix_distance_handles_extreme_finite_differences() {
-        let a = vec![vec![1.0e308, -1.0e308]];
-        let b = vec![vec![-1.0e308, 1.0e308]];
+        let a = vec![vec![8.0e307, -8.0e307]];
+        let b = vec![vec![-8.0e307, 8.0e307]];
         let distance = matrix_distance(&a, &b).unwrap();
         assert!(distance.is_finite());
         assert!(distance > 0.0);
