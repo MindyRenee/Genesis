@@ -365,7 +365,11 @@ class EdgeLog:
         source = ev.get("source")
         target = ev.get("target")
         relation = ev.get("relation")
-        if not all(isinstance(v, str) and v for v in (source, target, relation)):
+        if not isinstance(source, str) or not source:
+            return
+        if not isinstance(target, str) or not target:
+            return
+        if not isinstance(relation, str) or not relation:
             return
         key = edge_key(source, target, relation)
         if op == "assert":
