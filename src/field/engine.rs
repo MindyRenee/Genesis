@@ -102,6 +102,37 @@ impl SystemEngine {
         Ok(self)
     }
 
+    /// Conservative upper bound on instantaneous linear growth in the
+    /// infinity norm. A negative value is a sufficient condition for
+    /// contraction of the linearized dynamics; a non-negative value is not
+    /// a proof of instability.
+    pub fn linear_growth_bound(&self) -> Result<f64, FieldError> {
+        let n = self.biases.len();
+        let d = self.dimension();
+        if n == 0 || d == 0 || self.couplings.len() != n
+            || self.couplings.iter().any(|row| row.len() != n)
+        {
+            return Err(FieldError::DimensionMismatch);
+        }
+        let mut bound = f64::NEG_INFINITY;
+        for target in 0..n {
+            for coordinate in 0..d {
+                let mut row_sum = -self.damping[target];
+                for source in 0..n {
+                    let row = &self.couplings[target][source][coordinate];
+                    if row.len() != d {
+                        return Err(FieldError::DimensionMismatch);
+                    }
+                    for value in row {
+                        row_sum += value.abs();
+                    }
+                }
+                bound = bound.max(row_sum);
+            }
+        }
+        Ok(bound)
+    }
+
     pub fn derivatives(&self, layers: &[SubsystemLayer]) -> Result<Vec<Vector>, FieldError> {
         if layers.len() != self.biases.len() {
             return Err(FieldError::LayerMismatch);
@@ -159,6 +190,14 @@ mod tests {
         assert!((d[0][1] + 10.0).abs() < 1e-12);
         assert_eq!(d[0][0] / d[0][1], layers[0].state[0] / layers[0].state[1]);
         assert!((radius_sq - 5.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn negative_linear_growth_bound_is_a_contraction_certificate() {
+        let engine = SystemEngine::zero(2, 1)
+            .with_damping(vec![2.0, 3.0]).unwrap();
+        let bound = engine.linear_growth_bound().unwrap();
+        assert_eq!(bound, -2.0);
     }
 
     #[test]
