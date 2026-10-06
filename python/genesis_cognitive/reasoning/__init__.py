@@ -59,6 +59,7 @@ from .decision import (
     CandidateAction,
     DecisionEngine,
     DecisionOutcome,
+    ResourceState,
 )
 from .drift_diffusion import (
     DecisionResult,
@@ -115,6 +116,7 @@ __all__ = [
     "CriticalThinkingEngine",
     "DecisionEngine",
     "DecisionOutcome",
+    "ResourceState",
     "DecisionResult",
     "DriftDiffusionModel",
     "EffectPrediction",
