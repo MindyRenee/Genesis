@@ -575,17 +575,17 @@ mod global_step_tests {
             manifold.clone(),
             vec![SubsystemLayer::new("state", vec![0.1])],
         ).unwrap();
-        let mut second = SystemFiber::new(
+        let second = SystemFiber::new(
             "second",
             manifold.clone(),
             vec![SubsystemLayer::new("state", vec![0.2])],
         ).unwrap();
-        second.engine.damping[0] = f64::NAN;
 
         let mut field = GlobalField::new(manifold);
         field.add_fiber(first).unwrap();
         field.add_fiber(second).unwrap();
         field.add_transport(identity_transport("second", "first")).unwrap();
+        field.fibers[1].engine.damping[0] = f64::NAN;
 
         let before = field.clone();
         assert_eq!(field.step(0.1), Err(FieldError::InvalidDynamics));
