@@ -225,16 +225,45 @@ impl GlobalField {
         }
         self.fibers.push(fiber); Ok(())
     }
-    pub fn add_transport(&mut self, transport: GaugeTransport) { self.transports.push(transport); }
+    pub fn add_transport(&mut self, transport: GaugeTransport) -> Result<(), FieldError> {
+        if transport.from == transport.to
+            || self.fibers.iter().all(|f| f.id != transport.from)
+            || self.fibers.iter().all(|f| f.id != transport.to)
+            || transport.matrix.len() != self.manifold.dimension()
+        {
+            return Err(FieldError::TransportMismatch);
+        }
+        self.transports.push(transport);
+        Ok(())
+    }
+
+    fn path_matrix(&self, from: &str, to: &str) -> Result<Vec<Vector>, FieldError> {
+        let n = self.manifold.dimension();
+        let mut queue: Vec<(String, Vec<Vector>)> = vec![(from.to_string(), identity(n))];
+        let mut seen = vec![from.to_string()];
+        while let Some((node, matrix)) = queue.first().cloned() {
+            queue.remove(0);
+            if node == to { return Ok(matrix); }
+            for edge in self.transports.iter().filter(|e| e.from == node) {
+                if seen.iter().any(|id| id == &edge.to) { continue; }
+                seen.push(edge.to.clone());
+                queue.push((edge.to.clone(), mat_mul(&edge.matrix, &matrix)));
+            }
+        }
+        Err(FieldError::MissingTransport)
+    }
 
     pub fn transported_states(&self) -> Result<Vec<Vector>, FieldError> {
         let mut out = Vec::with_capacity(self.fibers.len());
         for fiber in &self.fibers {
-            let mut state = fiber.state()?;
-            for bridge in self.transports.iter().filter(|b| b.from == fiber.id) {
-                state = self.manifold.project(&bridge.apply(&state)?)?;
-            }
-            out.push(state);
+            let state = fiber.state()?;
+            let mapped = if fiber.id == self.fibers[0].id {
+                state
+            } else {
+                let matrix = self.path_matrix(&fiber.id, &self.fibers[0].id)?;
+                self.manifold.project(&matrix_apply(&matrix, &state)?)?
+            };
+            out.push(mapped);
         }
         Ok(out)
     }
@@ -262,10 +291,30 @@ impl GlobalField {
     }
 }
 
+
+
+fn identity(n: usize) -> Vec<Vector> {
+    (0..n).map(|i| (0..n).map(|j| if i == j { 1.0 } else { 0.0 }).collect()).collect()
+}
+
+fn mat_mul(a: &[Vector], b: &[Vector]) -> Vec<Vector> {
+    let n = a.len();
+    let mut out = vec![vec![0.0; n]; n];
+    for i in 0..n { for j in 0..n { for k in 0..n { out[i][j] += a[i][k] * b[k][j]; } } }
+    out
+}
+
+fn matrix_apply(m: &[Vector], x: &[f64]) -> Result<Vector, FieldError> {
+    if m.len() != x.len() || m.iter().any(|r| r.len() != x.len()) {
+        return Err(FieldError::DimensionMismatch);
+    }
+    Ok(m.iter().map(|r| dot(r, x)).collect())
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FieldError {
     InvalidGeometry, InvalidPoint, DimensionMismatch, EmptyState, LayerMismatch,
-    InvalidTransport, TransportMismatch, GeometryMismatch, InvalidTime,
+    InvalidTransport, TransportMismatch, GeometryMismatch, InvalidTime, MissingTransport,
 }
 
 impl fmt::Display for FieldError {
