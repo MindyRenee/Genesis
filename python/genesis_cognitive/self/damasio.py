@@ -254,8 +254,12 @@ class ProtoSelf:
         Returns:
             The new ProtoSelfState.
         """
-        # Compute homeostatic balance from recent stability
-        balance = self._compute_homeostatic_balance(arousal, valence, tone, plasticity)
+        # Compute regulatory balance from physiological-state proxies.
+        # Valence is deliberately excluded: it is an affective evaluation,
+        # not a homeostatic set point. A sustained positive or negative
+        # valence therefore must not, by itself, be interpreted as bodily
+        # dysregulation.
+        balance = self._compute_homeostatic_balance(arousal, tone, plasticity)
 
         new_state = ProtoSelfState(
             arousal=arousal,
@@ -304,7 +308,7 @@ class ProtoSelf:
         return self._history[-1] if self._history else None
 
     def _compute_homeostatic_balance(
-        self, arousal: float, valence: float, tone: float, plasticity: float
+        self, arousal: float, tone: float, plasticity: float
     ) -> float:
         """Compute how homeostatically balanced the current state is.
 
@@ -312,28 +316,32 @@ class ProtoSelf:
         Low balance = state is far from baseline (disrupted/allostatic).
 
         Args:
-            arousal, valence, tone, plasticity: Current state values.
+            arousal, tone, plasticity: Current physiological-state proxies.
+                Valence is intentionally excluded because affective valence
+                is not a homeostatic set point.
 
         Returns:
             A float in [0, 1] representing homeostatic balance.
         """
         # Baseline values
         baseline_arousal = 0.5
-        baseline_valence = 0.0
         baseline_tone = 0.5
         baseline_plasticity = 0.5
 
-        # Distance from baseline (normalized)
+        # Distance from nominal regulatory-state proxies. Valence is not
+        # included: positive and negative affect can both occur without a
+        # corresponding failure of physiological regulation.
         dist = (
             (arousal - baseline_arousal) ** 2
-            + (valence - baseline_valence) ** 2
             + (tone - baseline_tone) ** 2
             + (plasticity - baseline_plasticity) ** 2
         ) ** 0.5
 
-        # Convert distance to balance (closer to baseline = more balanced)
-        # Max distance ~ sqrt(4*0.5^2) = 1.0, so balance = 1 - dist
-        return max(0.0, min(1.0, 1.0 - dist))
+        # Normalize against the maximum possible deviation from the
+        # midpoint across these three [0, 1] axes. Nominal state = 1;
+        # maximum deviation = 0.
+        max_dist = (3 * 0.5**2) ** 0.5
+        return max(0.0, min(1.0, 1.0 - dist / max_dist))
 
 
 class CoreSelf:
