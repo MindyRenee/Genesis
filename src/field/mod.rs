@@ -118,9 +118,9 @@ impl PoincareBall {
         let sqrt_c=self.curvature.sqrt();
         let scaled_r=sqrt_c*r;
         let z=if scaled_r.is_finite(){
-            2.0*(scaled_r/2.0).tanh()/scaled_r
+            (scaled_r/2.0).tanh()/scaled_r
         }else{
-            2.0*(1.0/sqrt_c)/r
+            (1.0/sqrt_c)/r
         };
         if !z.is_finite() || z <= 0.0 {
             return Err(FieldError::NonFiniteState);
