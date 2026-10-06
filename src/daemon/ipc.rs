@@ -1151,10 +1151,19 @@ impl IpcServer {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                     continue;
                 }
-                Err(e) => {
-                    eprintln!("[ipc] accept error: {e}");
-                    std::thread::sleep(std::time::Duration::from_millis(100));
+                Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {
                     continue;
+                }
+                Err(e) => {
+                    // Non-retryable listener errors (for example EBADF or
+                    // a closed listener) must terminate the IPC loop. A
+                    // permanent error here would otherwise spin forever at
+                    // 10 Hz and leave the daemon's control plane wedged.
+                    eprintln!("[ipc] fatal accept error: {e}");
+                    server
+                        .shutdown_flag
+                        .store(true, std::sync::atomic::Ordering::Release);
+                    break;
                 }
             };
 
