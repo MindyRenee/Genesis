@@ -34,7 +34,7 @@ impl PoincareBall {
     pub fn project(&self, x: &[f64]) -> Result<Vector, FieldError> { if x.len() != self.dimension || x.iter().any(|v| !v.is_finite()) { return Err(FieldError::DimensionMismatch); } let r=self.scaled_radius(); let n=norm(x); if n<r{return Ok(x.to_vec())} let target=r*(1.0-1.0e-9); Ok(scaled(x,target/n)) }
     pub fn distance(&self,x:&[f64],y:&[f64])->Result<f64,FieldError>{self.validate_point(x)?;self.validate_point(y)?;let sqrt_c=self.curvature.sqrt();let ux=scaled(x,sqrt_c);let uy=scaled(y,sqrt_c);let nx=dot(&ux,&ux);let ny=dot(&uy,&uy);let dxy=norm(&sub(&ux,&uy));let denom=(1.0-nx).max(EPS)*(1.0-ny).max(EPS);let arg=1.0+2.0*dxy*dxy/denom;Ok(arg.max(1.0).acosh()/sqrt_c)}
     pub fn log_origin(&self,x:&[f64])->Result<Vector,FieldError>{self.validate_point(x)?;let r=norm(x);if r<EPS{return Ok(vec![0.0;self.dimension])}let scaled_r=self.curvature.sqrt()*r;let atanh_arg=scaled_r.min(1.0-f64::EPSILON);let z=atanh_arg.atanh()*2.0/scaled_r;Ok(scaled(x,z))}
-    pub fn exp_origin(&self,v:&[f64])->Result<Vector,FieldError>{if v.len()!=self.dimension||v.iter().any(|x|!x.is_finite()){return Err(FieldError::DimensionMismatch)}let r=norm(v);if r<EPS{return Ok(v.to_vec())}let sqrt_c=self.curvature.sqrt();let scaled_r=sqrt_c*r;let z=if scaled_r.is_finite(){(scaled_r/2.0).tanh()/scaled_r}else{(1.0/sqrt_c)/r};self.project(&scaled(v,z))}
+    pub fn exp_origin(&self,v:&[f64])->Result<Vector,FieldError>{if v.len()!=self.dimension||v.iter().any(|x|!x.is_finite()){return Err(FieldError::DimensionMismatch)}let r=norm(v);if r<EPS{return Ok(v.to_vec())}let sqrt_c=self.curvature.sqrt();let scaled_r=sqrt_c*r;let z=if scaled_r.is_finite(){2.0*(scaled_r/2.0).tanh()/scaled_r}else{(1.0/sqrt_c)/r};self.project(&scaled(v,z))}
     fn validate_point(&self,x:&[f64])->Result<(),FieldError>{if self.contains(x){Ok(())}else{Err(FieldError::InvalidPoint)}}
     pub fn origin_barycenter(&self,points:&[Vector])->Result<Vector,FieldError>{if points.is_empty(){return Err(FieldError::EmptyState)}let mut tangent=vec![0.0;self.dimension];for p in points{let v=self.log_origin(p)?;for(dst,src)in tangent.iter_mut().zip(v){*dst+=src/points.len() as f64;}}self.exp_origin(&tangent)}
 }
@@ -69,26 +69,81 @@ pub struct PathDisagreement{pub from:String,pub to:String,pub paths:Vec<Transpor
 
 #[derive(Clone,Debug,PartialEq)]
 pub struct GlobalField{pub manifold:PoincareBall,pub fibers:Vec<SystemFiber>,pub transports:Vec<GaugeTransport>,pub integration_gain:f64,pub disagreement:f64,pub temperature:f64,pub cooling_rate:f64}
-impl GlobalField{pub fn new(manifold:PoincareBall)->Self{Self{manifold,fibers:Vec::new(),transports:Vec::new(),integration_gain:1.0,disagreement:0.0,temperature:1.0,cooling_rate:0.1}}pub fn add_fiber(&mut self,fiber:SystemFiber)->Result<(),FieldError>{if fiber.manifold.dimension()!=self.manifold.dimension()||(fiber.manifold.curvature()-self.manifold.curvature()).abs()>EPS{return Err(FieldError::GeometryMismatch)}if self.fibers.iter().any(|f|f.id==fiber.id){return Err(FieldError::DuplicateId)}self.fibers.push(fiber);Ok(())}pub fn add_transport(&mut self,transport:GaugeTransport)->Result<(),FieldError>{let n=self.manifold.dimension();if transport.from==transport.to||!self.fibers.iter().any(|f|f.id==transport.from)||!self.fibers.iter().any(|f|f.id==transport.to)||transport.matrix.len()!=n||transport.matrix.iter().any(|r|r.len()!=n||r.iter().any(|v|!v.is_finite())){return Err(FieldError::TransportMismatch)}self.transports.push(transport);Ok(())}fn transport_paths(&self,from:&str,to:&str,max_paths:usize)->Vec<TransportPath>{fn walk(field:&GlobalField,node:&str,to:&str,matrix:Matrix,nodes:Vec<String>,seen:&mut Vec<String>,out:&mut Vec<TransportPath>,max_paths:usize){if out.len()>=max_paths{return}if node==to{out.push(TransportPath{nodes,matrix});return}for edge in field.transports.iter().filter(|e|e.from==node){if seen.iter().any(|id|id==&edge.to){continue}seen.push(edge.to.clone());let next=mat_mul(&edge.matrix,&matrix);let mut next_nodes=nodes.clone();next_nodes.push(edge.to.clone());walk(field,&edge.to,to,next,next_nodes,seen,out,max_paths);seen.pop()}}let mut out=Vec::new();let mut seen=vec![from.to_string()];walk(self,from,to,identity(self.manifold.dimension()),vec![from.to_string()],&mut seen,&mut out,max_paths.max(1));out}pub fn path_disagreement(&self,from:&str,to:&str)->Result<Option<PathDisagreement>,FieldError>{let paths=self.transport_paths(from,to,32);if paths.len()<2{return Ok(None)}let mut spread=0.0;for i in 0..paths.len(){for j in i+1..paths.len(){spread=spread.max(matrix_distance(&paths[i].matrix,&paths[j].matrix)?);}}Ok(Some(PathDisagreement{from:from.into(),to:to.into(),paths,tangent_spread:spread}))}fn path_matrix(&self,from:&str,to:&str)->Result<Matrix,FieldError>{let paths=self.transport_paths(from,to,2);match paths.as_slice(){[]=>Err(FieldError::MissingTransport),[p]=>Ok(p.matrix.clone()),[a,b,..]=>{if matrix_distance(&a.matrix,&b.matrix)?>1.0e-9{Err(FieldError::TransportMismatch)}else{Ok(a.matrix.clone())}}}}pub fn transported_states(&self)->Result<Vec<Vector>,FieldError>{if self.fibers.is_empty(){return Ok(Vec::new())}let reference=&self.fibers[0];let mut states=vec![reference.state()?];for fiber in self.fibers.iter().skip(1){let state=fiber.state()?;let matrix=self.path_matrix(&fiber.id,&reference.id)?;let transport=GaugeTransport::new(fiber.id.clone(),reference.id.clone(),matrix)?;states.push(transport.apply_on_manifold(&fiber.manifold,&reference.manifold,&state)?)}Ok(states)}pub fn consensus(&self)->Result<Option<Vector>,FieldError>{let states=self.transported_states()?;if states.is_empty(){Ok(None)}else{Ok(Some(self.manifold.origin_barycenter(&states)?))}}pub fn synchronize(&mut self,dt:f64)->Result<Option<Vector>,FieldError>{if !dt.is_finite()||dt<0.0{return Err(FieldError::InvalidTime)}let states=self.transported_states()?;if states.is_empty(){return Ok(None)}let consensus=self.manifold.origin_barycenter(&states)?;let mut disagreement=0.0;for state in &states{let d=self.manifold.distance(state,&consensus)?;disagreement+=d*d;}self.disagreement=disagreement/states.len() as f64;let target=(self.integration_gain.max(0.0)*dt).clamp(0.0,1.0);let reference_id=self.fibers[0].id.clone();let consensus_tangent=self.manifold.log_origin(&consensus)?;let local_targets:Vec<Vector>=self.fibers.iter().map(|fiber|{if fiber.id==reference_id{Ok(consensus.clone())}else{let path=self.path_matrix(&fiber.id,&reference_id)?;let inverse=matrix_inverse(&path)?;self.manifold.exp_origin(&matrix_apply(&inverse,&consensus_tangent)?)}}).collect::<Result<_,FieldError>>()?;for(fiber,target_state)in self.fibers.iter_mut().zip(local_targets){let current_tangent=self.manifold.log_origin(&fiber.state()?)?;let target_tangent=self.manifold.log_origin(&target_state)?;let correction=scaled(&sub(&target_tangent,&current_tangent),target);for layer in &mut fiber.layers{let lt=self.manifold.log_origin(&layer.state)?;layer.state=self.manifold.exp_origin(&add(&lt,&correction))?}}self.temperature=(self.temperature-self.cooling_rate*dt).max(0.0);Ok(Some(consensus))}}
+impl GlobalField{pub fn new(manifold:PoincareBall)->Self{Self{manifold,fibers:Vec::new(),transports:Vec::new(),integration_gain:1.0,disagreement:0.0,temperature:1.0,cooling_rate:0.1}}pub fn add_fiber(&mut self,fiber:SystemFiber)->Result<(),FieldError>{if fiber.manifold.dimension()!=self.manifold.dimension()||(fiber.manifold.curvature()-self.manifold.curvature()).abs()>EPS{return Err(FieldError::GeometryMismatch)}if self.fibers.iter().any(|f|f.id==fiber.id){return Err(FieldError::DuplicateId)}self.fibers.push(fiber);Ok(())}pub fn add_transport(&mut self,transport:GaugeTransport)->Result<(),FieldError>{let n=self.manifold.dimension();if transport.from==transport.to||!self.fibers.iter().any(|f|f.id==transport.from)||!self.fibers.iter().any(|f|f.id==transport.to)||transport.matrix.len()!=n||transport.matrix.iter().any(|r|r.len()!=n||r.iter().any(|v|!v.is_finite())){return Err(FieldError::TransportMismatch)}self.transports.push(transport);Ok(())}fn transport_paths(&self,from:&str,to:&str,max_paths:usize)->Vec<TransportPath>{fn walk(field:&GlobalField,node:&str,to:&str,matrix:Matrix,nodes:Vec<String>,seen:&mut Vec<String>,out:&mut Vec<TransportPath>,max_paths:usize){if out.len()>=max_paths{return}if node==to{out.push(TransportPath{nodes,matrix});return}for edge in field.transports.iter().filter(|e|e.from==node){if seen.iter().any(|id|id==&edge.to){continue}seen.push(edge.to.clone());let next=mat_mul(&edge.matrix,&matrix);let mut next_nodes=nodes.clone();next_nodes.push(edge.to.clone());walk(field,&edge.to,to,next,next_nodes,seen,max_paths);seen.pop()}}let mut out=Vec::new();let mut seen=vec![from.to_string()];walk(self,from,to,identity(self.manifold.dimension()),vec![from.to_string()],&mut seen,&mut out,max_paths.max(1));out}pub fn path_disagreement(&self,from:&str,to:&str)->Result<Option<PathDisagreement>,FieldError>{let paths=self.transport_paths(from,to,32);if paths.len()<2{return Ok(None)}let mut spread=0.0;for i in 0..paths.len(){for j in i+1..paths.len(){spread=spread.max(matrix_distance(&paths[i].matrix,&paths[j].matrix)?);}}Ok(Some(PathDisagreement{from:from.into(),to:to.into(),paths,tangent_spread:spread}))}fn path_matrix(&self,from:&str,to:&str)->Result<Matrix,FieldError>{let paths=self.transport_paths(from,to,2);match paths.as_slice(){[]=>Err(FieldError::MissingTransport),[p]=>Ok(p.matrix.clone()),[a,b,..]=>{if matrix_distance(&a.matrix,&b.matrix)?>1.0e-9{Err(FieldError::TransportMismatch)}else{Ok(a.matrix.clone())}}}}pub fn transported_states(&self)->Result<Vec<Vector>,FieldError>{if self.fibers.is_empty(){return Ok(Vec::new())}let reference=&self.fibers[0];let mut states=vec![reference.state()?];for fiber in self.fibers.iter().skip(1){let state=fiber.state()?;let matrix=self.path_matrix(&fiber.id,&reference.id)?;let transport=GaugeTransport::new(fiber.id.clone(),reference.id.clone(),matrix)?;states.push(transport.apply_on_manifold(&fiber.manifold,&reference.manifold,&state)?)}Ok(states)}pub fn consensus(&self)->Result<Option<Vector>,FieldError>{let states=self.transported_states()?;if states.is_empty(){Ok(None)}else{Ok(Some(self.manifold.origin_barycenter(&states)?))}}pub fn synchronize(&mut self,dt:f64)->Result<Option<Vector>,FieldError>{if !dt.is_finite()||dt<0.0{return Err(FieldError::InvalidTime)}let states=self.transported_states()?;if states.is_empty(){return Ok(None)}let consensus=self.manifold.origin_barycenter(&states)?;let mut disagreement=0.0;for state in &states{let d=self.manifold.distance(state,&consensus)?;disagreement+=d*d;}self.disagreement=disagreement/states.len() as f64;let gain=(self.integration_gain.max(0.0)*dt).clamp(0.0,1.0);let reference_id=self.fibers[0].id.clone();let consensus_tangent=self.manifold.log_origin(&consensus)?;for i in 1..self.fibers.len(){let matrix=self.path_matrix(&self.fibers[i].id,&reference_id)?;let inv=matrix_inverse(&matrix)?;let local_target_tangent=mat_vec(&inv,&consensus_tangent)?;let current=self.fibers[i].state()?;let current_tangent=self.fibers[i].manifold.log_origin(&current)?;let correction=scaled(&sub(&local_target_tangent,&current_tangent),gain);for layer in &mut self.fibers[i].layers{let tangent=self.fibers[i].manifold.log_origin(&layer.state)?;let next=self.fibers[i].manifold.exp_origin(&add(&tangent,&correction))?;layer.state=next;}}self.temperature=(self.temperature-self.cooling_rate*dt).max(0.0);Ok(Some(consensus))}}
 
-fn identity(n:usize)->Matrix{(0..n).map(|i|(0..n).map(|j|if i==j{1.0}else{0.0}).collect()).collect()}
-fn mat_mul(a:&Matrix,b:&Matrix)->Matrix{let n=a.len();let mut out=vec![vec![0.0;n];n];for i in 0..n{for j in 0..n{for k in 0..n{out[i][j]+=a[i][k]*b[k][j]}}}out}
-fn matrix_inverse(a:&Matrix)->Result<Matrix,FieldError>{let n=a.len();if n==0||a.iter().any(|r|r.len()!=n||r.iter().any(|v|!v.is_finite())){return Err(FieldError::InvalidTransport)}let mut aug=vec![vec![0.0;2*n];n];for i in 0..n{for j in 0..n{aug[i][j]=a[i][j]}aug[i][n+i]=1.0}for col in 0..n{let pivot=(col..n).max_by(|&i,&j|aug[i][col].abs().partial_cmp(&aug[j][col].abs()).unwrap()).unwrap();if aug[pivot][col].abs()<=EPS{return Err(FieldError::NonInvertibleTransport)}aug.swap(col,pivot);let p=aug[col][col];for j in 0..2*n{aug[col][j]/=p}for i in 0..n{if i==col{continue}let f=aug[i][col];for j in 0..2*n{aug[i][j]-=f*aug[col][j]}}}Ok(aug.into_iter().map(|r|r[n..].to_vec()).collect())}
-fn matrix_distance(a:&Matrix,b:&Matrix)->Result<f64,FieldError>{if a.len()!=b.len()||a.iter().zip(b).any(|(x,y)|x.len()!=y.len()){return Err(FieldError::DimensionMismatch)}let mut sum=0.0;for(ra,rb)in a.iter().zip(b){for(x,y)in ra.iter().zip(rb){let d=x-y;sum+=d*d}}Ok(sum.sqrt())}
-fn matrix_apply(m:&Matrix,x:&[f64])->Result<Vector,FieldError>{if m.len()!=x.len()||m.iter().any(|r|r.len()!=x.len()){return Err(FieldError::DimensionMismatch)}let out:Vector=m.iter().map(|r|dot(r,x)).collect();if out.iter().any(|v|!v.is_finite()){return Err(FieldError::NonFiniteState)}Ok(out)}
+fn identity(n:usize)->Matrix{let mut m=vec![vec![0.0;n];n];for i in 0..n{m[i][i]=1.0;}m}
+fn mat_mul(a:&Matrix,b:&Matrix)->Matrix{let n=a.len();let mut out=vec![vec![0.0;n];n];for i in 0..n{for j in 0..n{for k in 0..n{out[i][j]+=a[i][k]*b[k][j];}}}out}
+fn mat_vec(a:&Matrix,x:&Vector)->Result<Vector,FieldError>{if a.len()!=x.len()||a.iter().any(|r|r.len()!=x.len()){return Err(FieldError::DimensionMismatch)}let mut out=vec![0.0;x.len()];for i in 0..a.len(){out[i]=dot(&a[i],x);}if out.iter().any(|v|!v.is_finite()){return Err(FieldError::NonFiniteState)}Ok(out)}
+fn matrix_distance(a:&Matrix,b:&Matrix)->Result<f64,FieldError>{if a.len()!=b.len()||a.iter().zip(b).any(|(x,y)|x.len()!=y.len()){return Err(FieldError::DimensionMismatch)}let mut sum=0.0;for(row_a,row_b)in a.iter().zip(b){for(x,y)in row_a.iter().zip(row_b){sum+=(x-y)*(x-y);}}Ok(sum.sqrt())}
+fn matrix_inverse(a:&Matrix)->Result<Matrix,FieldError>{let n=a.len();if n==0||a.iter().any(|r|r.len()!=n){return Err(FieldError::DimensionMismatch)}let mut aug=vec![vec![0.0;2*n];n];for i in 0..n{for j in 0..n{aug[i][j]=a[i][j];}aug[i][n+i]=1.0;}for col in 0..n{let mut pivot=col;for row in col+1..n{if aug[row][col].abs()>aug[pivot][col].abs(){pivot=row;}}if aug[pivot][col].abs()<EPS{return Err(FieldError::NonInvertibleTransport)}aug.swap(col,pivot);let p=aug[col][col];for j in 0..2*n{aug[col][j]/=p;}for row in 0..n{if row==col{continue}let factor=aug[row][col];for j in 0..2*n{aug[row][j]-=factor*aug[col][j];}}}Ok(aug.into_iter().map(|row|row[n..].to_vec()).collect())}
 
-#[derive(Clone,Debug,PartialEq,Eq)]
-pub enum FieldError{InvalidGeometry,InvalidPoint,DimensionMismatch,EmptyState,LayerMismatch,InvalidTransport,TransportMismatch,GeometryMismatch,InvalidTime,MissingTransport,InvalidDynamics,NonFiniteState,DuplicateId,NonInvertibleTransport}
-impl fmt::Display for FieldError{fn fmt(&self,f:&mut fmt::Formatter<'_>)->fmt::Result{write!(f,"{self:?}")}}impl std::error::Error for FieldError{}
+#[derive(Debug,Clone,PartialEq)]
+pub enum FieldError{DimensionMismatch,GeometryMismatch,InvalidGeometry,InvalidPoint,InvalidTransport,TransportMismatch,MissingTransport,NonInvertibleTransport,NonFiniteState,LayerMismatch,EmptyState,InvalidTime,InvalidDynamics,DuplicateId}
+impl fmt::Display for FieldError{fn fmt(&self,f:&mut fmt::Formatter<'_>)->fmt::Result{write!(f,"{self:?}")}}
+impl std::error::Error for FieldError{}
 
 #[cfg(test)]
-mod tests{use super::*;
-#[test]fn hyperbolic_distance_is_zero_at_same_point(){let m=PoincareBall::new(3,1.0).unwrap();let p=vec![0.1,0.2,-0.1];assert!(m.distance(&p,&p).unwrap().abs()<1e-10)}
-#[test]fn origin_barycenter_is_order_independent(){let m=PoincareBall::new(2,1.0).unwrap();let points=vec![vec![0.1,0.0],vec![0.0,0.2],vec![0.2,0.1]];let mut reversed=points.clone();reversed.reverse();let a=m.origin_barycenter(&points).unwrap();let b=m.origin_barycenter(&reversed).unwrap();for(x,y)in a.iter().zip(b){assert!((x-y).abs()<1e-12)}}
-#[test]fn geometry_norm_handles_large_finite_coordinates(){let m=PoincareBall::new(2,1e-300).unwrap();let p=vec![1e149,1e149];assert!(m.contains(&p));assert!(m.log_origin(&p).unwrap().iter().all(|x|x.is_finite()))}
-#[test]fn distance_handles_large_coordinates_without_overflow(){let m=PoincareBall::new(2,1e-300).unwrap();let d=m.distance(&[1e149,0.0],&[-1e149,0.0]).unwrap();assert!(d.is_finite()&&d>0.0)}
-#[test]fn exp_log_round_trip(){let m=PoincareBall::new(3,1.0).unwrap();let v=vec![0.1,-0.2,0.05];let p=m.exp_origin(&v).unwrap();let recovered=m.log_origin(&p).unwrap();for(a,b)in v.iter().zip(recovered){assert!((a-b).abs()<1e-10)}}
-#[test]fn exp_origin_extreme_tangent_remains_finite(){let m=PoincareBall::new(1,1.0).unwrap();let p=m.exp_origin(&[1e308]).unwrap();assert!(p[0].is_finite()&&m.contains(&p))}
-#[test]fn fiber_rejects_nonfinite_layer_gain(){let m=PoincareBall::new(1,1.0).unwrap();let layer=SubsystemLayer{id:"a".into(),state:vec![0.0],gain:f64::NAN};assert_eq!(SystemFiber::new("x",m,vec![layer]),Err(FieldError::InvalidDynamics))}
-#[test]fn empty_fiber_has_no_aggregate_system_state(){let m=PoincareBall::new(2,1.0).unwrap();let fiber=SystemFiber::new("empty",m,Vec::new()).unwrap();assert_eq!(fiber.state(),Err(FieldError::EmptyState))}
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exp_log_round_trip() {
+        let m = PoincareBall::new(2, 1.0).unwrap();
+        let x = vec![0.2, -0.3];
+        let tangent = m.log_origin(&x).unwrap();
+        let recovered = m.exp_origin(&tangent).unwrap();
+        for (a, b) in x.iter().zip(recovered.iter()) { assert!((a - b).abs() < 1.0e-12); }
+    }
+
+    #[test]
+    fn exp_log_round_trip_near_boundary() {
+        let m = PoincareBall::new(2, 1.0).unwrap();
+        let x = vec![0.999_999, 0.0];
+        let tangent = m.log_origin(&x).unwrap();
+        let recovered = m.exp_origin(&tangent).unwrap();
+        assert!((x[0] - recovered[0]).abs() < 1.0e-9);
+        assert!(m.contains(&recovered));
+    }
+
+    #[test]
+    fn geometry_norm_handles_large_finite_coordinates() {
+        let m = PoincareBall::new(2, 1.0e-300).unwrap();
+        let p = vec![1.0e149, 1.0e149];
+        assert!(m.contains(&p));
+        let v = m.log_origin(&p).unwrap();
+        assert!(v.iter().all(|x| x.is_finite()));
+    }
+
+    #[test]
+    fn distance_handles_large_coordinates_without_overflow() {
+        let m = PoincareBall::new(2, 1.0e-300).unwrap();
+        let x = vec![1.0e149, 0.0];
+        let y = vec![-1.0e149, 0.0];
+        let d = m.distance(&x, &y).unwrap();
+        assert!(d.is_finite());
+        assert!(d > 0.0);
+    }
+
+    #[test]
+    fn exp_log_round_trip_extreme_tangent_is_finite() {
+        let m = PoincareBall::new(2, 1.0).unwrap();
+        let v = vec![1.0e308, 0.0];
+        let x = m.exp_origin(&v).unwrap();
+        assert!(x.iter().all(|value| value.is_finite()));
+        assert!(m.contains(&x));
+    }
+
+    #[test]
+    fn empty_fiber_has_no_aggregate_system_state() {
+        let m = PoincareBall::new(1, 1.0).unwrap();
+        let fiber = SystemFiber::new("empty", m, Vec::new()).unwrap();
+        assert_eq!(fiber.state(), Err(FieldError::EmptyState));
+    }
+
+    #[test]
+    fn fiber_rejects_nonfinite_layer_gain() {
+        let m = PoincareBall::new(1, 1.0).unwrap();
+        let layer = SubsystemLayer { id: "a".into(), state: vec![0.0], gain: f64::NAN };
+        assert_eq!(SystemFiber::new("x", m, vec![layer]), Err(FieldError::InvalidDynamics));
+    }
 }
