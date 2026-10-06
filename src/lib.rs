@@ -2,8 +2,10 @@
 
 pub mod cognition;
 pub mod daemon;
+pub mod field;
 pub mod state;
 pub mod store;
 
+pub use field::{BraidTrajectory, FieldError, GaugeTransport, GlobalField, PoincareBall, SubsystemLayer, SystemFiber, Vector};
 pub use state::GenesisCoreState;
 pub use store::{MmapState, StateFileError};
