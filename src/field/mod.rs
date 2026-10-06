@@ -143,13 +143,23 @@ impl SystemFiber {
     pub fn layer(&self, id: &str) -> Option<&SubsystemLayer> { self.layers.iter().find(|l| l.id == id) }
     pub fn layer_mut(&mut self, id: &str) -> Option<&mut SubsystemLayer> { self.layers.iter_mut().find(|l| l.id == id) }
 
+    /// Advance the fiber by an external elapsed interval.
+    ///
+    /// `dt` is the shared/global elapsed time. `time_scale` converts that
+    /// interval into this engine's internal dynamical time. The engine clock
+    /// records the converted interval.
     pub fn step(&mut self, dt: f64) -> Result<(), FieldError> {
         if !dt.is_finite() || dt < 0.0 { return Err(FieldError::InvalidTime); }
+        let effective_dt = dt * self.engine.time_scale;
+        if !effective_dt.is_finite() || effective_dt < 0.0 {
+            return Err(FieldError::InvalidTime);
+        }
         let derivatives = self.engine.derivatives(&self.layers)?;
-        self.evolve(&derivatives, dt * self.engine.time_scale)
+        self.evolve(&derivatives, effective_dt)
     }
 
     pub fn evolve(&mut self, derivatives: &[Vector], dt: f64) -> Result<(), FieldError> {
+        if !dt.is_finite() || dt < 0.0 { return Err(FieldError::InvalidTime); }
         if derivatives.len() != self.layers.len() { return Err(FieldError::LayerMismatch); }
         for (layer, derivative) in self.layers.iter_mut().zip(derivatives) {
             layer.evolve(derivative, dt)?;
