@@ -515,6 +515,32 @@ impl MmapState {
             return Err(StateFileError::VerificationFailed(e));
         }
 
+        // Re-anchor the circadian oscillator to the current local wall clock on every
+        // daemon restart. The oscillator is a zeitgeber-driven phase, not persistent
+        // elapsed-time state: preserving the old phase across a restart would shift
+        // sleep/wake chemistry by the downtime duration. Recompute all derived fields
+        // afterward because circadian phase contributes to effective levels and the
+        // emergent summary values.
+        let open_now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        snapshot
+            .neurochemicals
+            .set_circadian_phase(local_phase_of_day(open_now_ms));
+        snapshot.neurochemicals.recompute_derived();
+        snapshot.header.last_updated = open_now_ms;
+        snapshot.checksum = snapshot.compute_checksum();
+        unsafe { Self::publish_stack(ptr, &snapshot) };
+        if let Err(e) = Self::do_msync(ptr, mapped_len()) {
+            unsafe {
+                Self::unlock_file(fd);
+                munmap(ptr as *mut c_void, mapped_len());
+                close(fd);
+            }
+            return Err(e);
+        }
+
         // Scrub any non-finite float before the state is published to
         // any reader. The CRC cannot catch this: a state file that
         // legitimately contains NaN is byte-exact and passes both
