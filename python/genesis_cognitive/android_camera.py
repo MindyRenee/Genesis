@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 import time
 from pathlib import Path
+
+from genesis_cognitive.android_tools import find_termux_command
 
 _COMMAND = "termux-camera-photo"
 _DEFAULT_CAMERA = "0"
@@ -14,7 +15,7 @@ _TIMEOUT_SECONDS = 20
 
 
 def _camera_command() -> str | None:
-    return shutil.which(_COMMAND)
+    return find_termux_command(_COMMAND)
 
 
 def capture_android_camera(data_dir: str | os.PathLike[str]) -> str | None:
