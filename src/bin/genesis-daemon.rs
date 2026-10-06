@@ -227,8 +227,18 @@ fn main() {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0);
-    let mmap = match MmapState::open_or_create(&state_path, 1, now_ms) {
+    let mmap = match MmapState::open(&state_path) {
         Ok(m) => m,
+        Err(genesis::store::StateFileError::NotFound) => match MmapState::create(&state_path, 1, now_ms) {
+            Ok(m) => m,
+            Err(e) => {
+                eprintln!(
+                    "[genesis] FATAL: failed to create core state {}: {e}",
+                    state_path.display()
+                );
+                std::process::exit(1);
+            }
+        },
         Err(e) => {
             eprintln!(
                 "[genesis] FATAL: failed to open core state {}: {e}",
@@ -648,25 +658,3 @@ fn setup_signal_handlers(
 
     // Watcher thread: polls the static and forwards to the caller's flag
     let flag = shutdown_flag.clone();
-    std::thread::spawn(move || {
-        loop {
-            if SHUTDOWN_REQUESTED.load(Ordering::Relaxed) {
-                eprintln!("\n[genesis] Received shutdown signal, stopping...");
-                flag.store(true, Ordering::Relaxed);
-                break;
-            }
-            // Shutdown can also be initiated without a signal (the IPC
-            // SHUTDOWN command sets the IPC server's flag and the main
-            // thread then sets this one). Exit in that case too so the
-            // main thread's join doesn't hang.
-            if flag.load(Ordering::Relaxed) {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(50));
-        }
-    })
-}
-
-// Static atomic for signal handler communication
-use std::sync::atomic::AtomicBool;
-static SHUTDOWN_REQUESTED: AtomicBool = AtomicBool::new(false);
