@@ -4314,6 +4314,24 @@ class CognitionEngine:
         ]
         topics = thought.topics if thought.topics else []
 
+        # Feed the latest embodied hardware constraint into the decision
+        # engine. Sensing remains owned by the heartbeat/self-model boundary;
+        # decision-making consumes only this immutable snapshot.
+        body = self.self_model.body_model
+        from ..reasoning.decision import ResourceState
+        self.decision_engine.update_resource_state(
+            ResourceState(
+                available=body.hardware_sensors_present > 0,
+                hardware_distressed=body.body_hardware_distressed,
+                psi_cpu=body.psi_cpu,
+                psi_io=body.psi_io,
+                psi_mem=body.psi_mem,
+                throttle_state=body.throttle_state,
+                on_ac_power=body.on_ac_power,
+                energy_reserve=body.energy_reserve,
+            )
+        )
+
         # Make the decision.
         outcome = self.decision_engine.decide(
             default_action=default_action,
