@@ -606,29 +606,9 @@ impl MmapState {
             == 1
         {
             let seq = unsafe { AtomicU64::from_ptr(ptr.add(Self::SEQ_LOCK_OFFSET) as *mut u64) };
-        seq.fetch_add(1, Ordering::AcqRel);
-        // The whole-state publish below includes `header.seq_lock`. The
-        // stack snapshot was captured before we changed the mapped
-        // sequence, so writing it verbatim would overwrite the odd
-        // in-progress value with the old even value. The final
-        // `fetch_add` would then make the published state permanently
-        // odd, causing every subsequent `read_consistent()` to fail.
-        // Keep the stack copy's sequence field synchronized with the
-        // odd value that currently marks this transaction in progress.
-        let write_seq = seq.load(Ordering::Acquire);
-        debug_assert_ne!(write_seq & 1, 0);
-        let mut published = *prepared;
-        published.header.seq_lock = write_seq;
-        fence(Ordering::Acquire);
-        // SAFETY: `ptr` is a valid writable mapping of at least SIZE
-        // bytes; `published` is a valid stack value (`Copy`, so this
-        // moves bytes without borrowing the mapping). Volatile: the
-        // compiler must emit the store.
-        unsafe { core::ptr::write_volatile(ptr as *mut GenesisCoreState, published) };
-        fence(Ordering::Release);
-        // SAFETY: same atomic as above; Release publishes the bytes.
-        seq.fetch_add(1, Ordering::Release);
-    }
+            seq.fetch_add(1, Ordering::Release);
+        }
+
 
     /// Get a mutable reference to the core state.
     ///
