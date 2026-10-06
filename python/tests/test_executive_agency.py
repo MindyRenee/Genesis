@@ -179,3 +179,22 @@ def test_world_and_improvement_signals_map_to_real_actuators() -> None:
         "inspect:python/genesis_cognitive/executive.py",
     }
     assert all(i.actionable for i in items)
+
+
+def test_executive_does_not_reselect_active_intention() -> None:
+    """An intention already in flight must not be selected a second time."""
+    executive = ExecutiveFunction()
+    intention = executive.form_intention(
+        "learn:already-running",
+        priority=0.9,
+        confidence=0.9,
+    )
+    assert executive.select_intention([intention]) is intention
+    assert intention.status == "active"
+
+    competing = executive.form_intention(
+        "learn:next-topic",
+        priority=0.5,
+        confidence=0.9,
+    )
+    assert executive.select_intention([intention, competing]) is competing
