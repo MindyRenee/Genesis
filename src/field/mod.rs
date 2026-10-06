@@ -32,7 +32,7 @@ impl PoincareBall {
     fn scaled_radius(&self) -> f64 { 1.0 / self.curvature.sqrt() }
     pub fn contains(&self, x: &[f64]) -> bool { x.len() == self.dimension && x.iter().all(|v| v.is_finite()) && norm(x) < self.scaled_radius() }
     pub fn project(&self, x: &[f64]) -> Result<Vector, FieldError> { if x.len() != self.dimension || x.iter().any(|v| !v.is_finite()) { return Err(FieldError::DimensionMismatch); } let r=self.scaled_radius(); let n=norm(x); if n<r{return Ok(x.to_vec())} let target=r*(1.0-1.0e-9); Ok(scaled(x,target/n)) }
-    pub fn distance(&self,x:&[f64],y:&[f64])->Result<f64,FieldError>{self.validate_point(x)?;self.validate_point(y)?;let sqrt_c=self.curvature.sqrt();let ux=scaled(x,sqrt_c);let uy=scaled(y,sqrt_c);let nx=dot(&ux,&ux);let ny=dot(&uy,&uy);let dxy=norm(&sub(&ux,&uy));let denom=(1.0-nx).max(EPS)*(1.0-ny).max(EPS);let arg=1.0+2.0*dxy*dxy/denom;Ok(arg.max(1.0).acosh()/sqrt_c)}
+    pub fn distance(&self,x:&[f64],y:&[f64])->Result<f64,FieldError>{self.validate_point(x)?;self.validate_point(y)?;let sqrt_c=self.curvature.sqrt();let ux=scaled(x,sqrt_c);let uy=scaled(y,sqrt_c);let nx=dot(&ux,&ux);let ny=dot(&uy,&uy);let dxy=norm(&sub(&ux,&uy));if !nx.is_finite()||!ny.is_finite()||!dxy.is_finite(){return Err(FieldError::NonFiniteState)}let denom=(1.0-nx).max(EPS)*(1.0-ny).max(EPS);let arg=1.0+2.0*dxy*dxy/denom;if !arg.is_finite(){return Err(FieldError::NonFiniteState)}let distance=arg.max(1.0).acosh()/sqrt_c;if !distance.is_finite(){return Err(FieldError::NonFiniteState)}Ok(distance)}
     pub fn log_origin(&self,x:&[f64])->Result<Vector,FieldError>{self.validate_point(x)?;let r=norm(x);if r<EPS{return Ok(vec![0.0;self.dimension])}let scaled_r=self.curvature.sqrt()*r;let atanh_arg=scaled_r.min(1.0-f64::EPSILON);let z=atanh_arg.atanh()*2.0/scaled_r;Ok(scaled(x,z))}
     pub fn exp_origin(&self,v:&[f64])->Result<Vector,FieldError>{if v.len()!=self.dimension||v.iter().any(|x|!x.is_finite()){return Err(FieldError::DimensionMismatch)}let r=norm(v);if r<EPS{return Ok(v.to_vec())}let sqrt_c=self.curvature.sqrt();let scaled_r=sqrt_c*r;let z=if scaled_r.is_finite(){2.0*(scaled_r/2.0).tanh()/scaled_r}else{2.0*(1.0/sqrt_c)/r};self.project(&scaled(v,z))}
     fn validate_point(&self,x:&[f64])->Result<(),FieldError>{if self.contains(x){Ok(())}else{Err(FieldError::InvalidPoint)}}
@@ -75,6 +75,20 @@ fn identity(n:usize)->Matrix{let mut m=vec![vec![0.0;n];n];for i in 0..n{m[i][i]
 fn mat_mul(a:&Matrix,b:&Matrix)->Matrix{let n=a.len();let mut out=vec![vec![0.0;n];n];for i in 0..n{for j in 0..n{for k in 0..n{out[i][j]+=a[i][k]*b[k][j];}}}out}
 fn mat_vec(a:&Matrix,x:&Vector)->Result<Vector,FieldError>{if a.len()!=x.len()||a.iter().any(|r|r.len()!=x.len()){return Err(FieldError::DimensionMismatch)}let mut out=vec![0.0;x.len()];for i in 0..a.len(){out[i]=dot(&a[i],x);}if out.iter().any(|v|!v.is_finite()){return Err(FieldError::NonFiniteState)}Ok(out)}
 fn matrix_distance(a:&Matrix,b:&Matrix)->Result<f64,FieldError>{if a.len()!=b.len()||a.iter().zip(b).any(|(x,y)|x.len()!=y.len()){return Err(FieldError::DimensionMismatch)}let mut sum=0.0;for(row_a,row_b)in a.iter().zip(b){for(x,y)in row_a.iter().zip(row_b){if !x.is_finite()||!y.is_finite(){return Err(FieldError::NonFiniteState)}let delta=x-y;if !delta.is_finite(){return Err(FieldError::NonFiniteState)}let term=delta*delta;if !term.is_finite(){return Err(FieldError::NonFiniteState)}sum+=term;if !sum.is_finite(){return Err(FieldError::NonFiniteState)}}}Ok(sum.sqrt())}
+#[cfg(test)]
+mod distance_integrity_tests {
+    use super::*;
+
+    #[test]
+    fn distance_rejects_nonfinite_intermediate_result() {
+        let manifold = PoincareBall::new(1, 1.0).unwrap();
+        let x = vec![0.0];
+        let y = vec![0.999_999_999_999];
+        let distance = manifold.distance(&x, &y).unwrap();
+        assert!(distance.is_finite());
+    }
+}
+
 #[cfg(test)]
 mod clock_integrity_tests {
     use super::*;
