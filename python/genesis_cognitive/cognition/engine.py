@@ -904,10 +904,6 @@ class CognitionEngine:
     def _init_state(self) -> None:
         """Initialize persistent state variables."""
         self._last_state: CognitiveState | None = None
-        # Cache the most recent live neurochemical summary.  This must be
-        # initialized before extracted subsystems can call its getter.
-        self._last_summary: NeuroSummary | None = None
-
         # The last active inference reading (generative self-model).
         # None if the daemon couldn't be reached or hasn't been read yet.
         self._last_inference_reading: Any = None
