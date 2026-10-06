@@ -1565,8 +1565,23 @@ class EmotionalRegulator:
         # Stronger responses for extreme states. These complement the
         # maintenance layer — both can fire in the same cycle.
 
+        # Overwhelm is a stronger state than ordinary stress and must
+        # be handled first. The numeric stress predicate below can also
+        # match an overwhelmed state (high arousal + negative valence);
+        # checking stress first would therefore swallow the stronger
+        # intervention and make the overwhelmed branch unreachable for
+        # the normal affective-space representation.
+        if emotion.label == "overwhelmed":
+            self._raw_impulse(CHEM_CORTISOL, -1.0)
+            self._raw_impulse(CHEM_NOREPINEPHRINE, -1.0)
+            self._raw_impulse(CHEM_GABA, 0.5 * self._social_modulation)
+            self._raw_impulse(CHEM_SEROTONIN, 0.3 * self._social_modulation)
+            self._raw_impulse(CHEM_BDNF, 0.2 * self._social_modulation)
+            actions.append("reducing overwhelm")
+            self._last_cause = "overwhelm"
+
         # If stressed → active calming, targeting the feedback loops
-        if emotion.label == "stressed" or (
+        elif emotion.label == "stressed" or (
             emotion.arousal > self.config.high_arousal_threshold
             and emotion.valence < self.config.negative_valence_threshold
         ):
@@ -1597,16 +1612,6 @@ class EmotionalRegulator:
             self._raw_impulse(CHEM_BDNF, 0.15 * self._social_modulation)
             actions.append("calming myself")
             self._last_cause = "stress_cortisol"
-
-        # If overwhelmed → stronger intervention
-        elif emotion.label == "overwhelmed":
-            self._raw_impulse(CHEM_CORTISOL, -1.0)
-            self._raw_impulse(CHEM_NOREPINEPHRINE, -1.0)
-            self._raw_impulse(CHEM_GABA, 0.5 * self._social_modulation)
-            self._raw_impulse(CHEM_SEROTONIN, 0.3 * self._social_modulation)
-            self._raw_impulse(CHEM_BDNF, 0.2 * self._social_modulation)
-            actions.append("reducing overwhelm")
-            self._last_cause = "overwhelm"
 
         # If drowsy → a clear alertness nudge. Adenosine suppression is
         # strong enough to counter drift but still lets natural sleep
