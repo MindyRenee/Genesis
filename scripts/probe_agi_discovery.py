@@ -104,9 +104,9 @@ def explore(
         # Genesis receives positive and negative evidence rather than being
         # handed the answer.
         for action in trial.actions:
-            before = dict(context.signature.state and {
+            before = {
                 rule.feature_key: trial.feature_value
-            } or {})
+            }
             outcome = environment_step(rule, trial, action)
             after = dict(outcome["state"])
             transition = competence.record_transition(
@@ -219,12 +219,6 @@ def main() -> None:
 
     # Cross-domain test. The environment has an analogous rule, but the
     # surface action/state vocabulary is different.
-    archive_rule = HiddenRule(
-        domain="archive",
-        feature_key="ochre",
-        true_action_prefix="index_",
-        false_action_prefix="index_false_",
-    )
     transfer_task = make_trial("archive", "ulna", True)
     transfer_context = recognize(competence, transfer_task)
     transfer_matches = [
