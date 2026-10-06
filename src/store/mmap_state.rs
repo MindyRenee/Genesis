@@ -586,24 +586,103 @@ impl MmapState {
     /// # Safety
     ///
     /// The caller must ensure that no other thread in this process is
-    /// reading or writing the state simultaneously. Readers use [`read`]
-    /// / [`read_consistent`] which copy bytes through raw pointers and
-    /// never create a `&` to the mmap'd memory, so they do not alias
-    /// with the `&mut` returned here. The concern is solely preventing
-    /// multiple writers.
-    ///
-    /// In production code, use [`modify`] instead — it runs the
-    /// closure on a stack copy and publishes without ever forming a
-    /// mapping reference. This method is exposed ONLY for
-    /// single-threaded test code that needs to pass
-    /// `&mut GenesisCoreState` to an engine that takes it by
-    /// reference; no production path calls it (verified: the only
-    /// in-tree callers are tests).
+    /// reading or writing the state simultaneously.
     #[allow(clippy::mut_from_ref)]
     pub unsafe fn state_mut(&self) -> &mut GenesisCoreState {
-        // SAFETY: Caller guarantees no concurrent access. `self.ptr`
-        // is a valid mmap'd region for the lifetime of `self`.
         unsafe { &mut *(self.ptr as *mut GenesisCoreState) }
+    }
+
+    pub fn read(&self) -> GenesisCoreState {
+        unsafe { core::ptr::read_volatile(self.ptr as *const GenesisCoreState) }
+    }
+
+    pub fn read_consistent(&self) -> Option<GenesisCoreState> {
+        let state_ptr = self.ptr as *const GenesisCoreState;
+        let seq_lock_ptr = unsafe {
+            core::ptr::addr_of!((*state_ptr).header.seq_lock) as *mut u64
+        };
+        let seq = unsafe { AtomicU64::from_ptr(seq_lock_ptr) };
+        let lock1 = seq.load(Ordering::Acquire);
+        if lock1 & 1 != 0 {
+            return None;
+        }
+        fence(Ordering::Acquire);
+        let copy = unsafe { core::ptr::read_volatile(state_ptr) };
+        fence(Ordering::Acquire);
+        let lock2 = seq.load(Ordering::Relaxed);
+        if lock1 != lock2 || lock2 & 1 != 0 {
+            return None;
+        }
+        Some(copy)
+    }
+
+    pub fn modify<F>(&self, now_ms: u64, f: F) -> Result<(), StateFileError>
+    where
+        F: FnOnce(&mut GenesisCoreState),
+    {
+        let _guard = self
+            .write_lock
+            .lock()
+            .map_err(|_| StateFileError::LockFailed)?;
+        unsafe { Self::lock_file(self.fd) }?;
+        let mut next = self.read();
+        next.header.last_updated = now_ms;
+        next.header.heartbeat = next.header.heartbeat.wrapping_add(1);
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&mut next)));
+        match result {
+            Ok(()) => {
+                next.checksum = next.compute_checksum();
+                unsafe { Self::publish_stack(self.ptr, &next) };
+                unsafe { Self::unlock_file(self.fd) };
+                Ok(())
+            }
+            Err(payload) => {
+                unsafe { Self::unlock_file(self.fd) };
+                std::panic::resume_unwind(payload);
+            }
+        }
+    }
+
+    pub fn sync(&self) -> Result<(), StateFileError> {
+        let _guard = self
+            .write_lock
+            .lock()
+            .map_err(|_| StateFileError::LockFailed)?;
+        unsafe { Self::lock_file(self.fd) }?;
+        let result = Self::do_msync(self.ptr, mapped_len());
+        unsafe { Self::unlock_file(self.fd) };
+        result
+    }
+
+    pub fn sync_async(&self) -> Result<(), StateFileError> {
+        let Ok(_guard) = self.write_lock.try_lock() else {
+            return Ok(());
+        };
+        let rc = unsafe { msync(self.ptr as *mut c_void, mapped_len(), MS_ASYNC) };
+        if rc != 0 {
+            return Err(StateFileError::MsyncFailed);
+        }
+        Ok(())
+    }
+
+    pub fn was_created(&self) -> bool {
+        self.created
+    }
+
+    const SEQ_LOCK_OFFSET: usize = core::mem::offset_of!(GenesisCoreState, header)
+        + core::mem::offset_of!(crate::state::header::CoreStateHeader, seq_lock);
+
+    unsafe fn publish_stack(ptr: *mut u8, prepared: &GenesisCoreState) {
+        let seq = unsafe { AtomicU64::from_ptr(ptr.add(Self::SEQ_LOCK_OFFSET) as *mut u64) };
+        seq.fetch_add(1, Ordering::AcqRel);
+        let write_seq = seq.load(Ordering::Acquire);
+        debug_assert_ne!(write_seq & 1, 0);
+        let mut published = *prepared;
+        published.header.seq_lock = write_seq;
+        fence(Ordering::Acquire);
+        unsafe { core::ptr::write_volatile(ptr as *mut GenesisCoreState, published) };
+        fence(Ordering::Release);
+        seq.fetch_add(1, Ordering::Release);
     }
 
     fn do_mmap(fd: i32) -> Result<*mut u8, StateFileError> {
