@@ -136,6 +136,9 @@ impl SystemFiber {
         if layers.iter().any(|l| l.state.len() != manifold.dimension()) {
             return Err(FieldError::DimensionMismatch);
         }
+        if layers.iter().any(|l| !l.gain.is_finite()) {
+            return Err(FieldError::InvalidDynamics);
+        }
         let engine = SystemEngine::zero(layers.len(), manifold.dimension());
         Ok(Self { id: id.into(), engine_clock: 0.0, manifold, layers, engine })
     }
@@ -168,6 +171,9 @@ impl SystemFiber {
         // Integrate the engine's continuous-time field with classical RK4.
         // The engine remains the source of dynamics; the integrator only
         // advances that field in time. Layer gains are applied at each stage.
+        if self.layers.iter().any(|layer| !layer.gain.is_finite()) {
+            return Err(FieldError::InvalidDynamics);
+        }
         let initial = self.layer_states();
         let scaled = |derivatives: Vec<Vector>| -> Vec<Vector> {
             derivatives.into_iter().enumerate().map(|(i, d)| {
@@ -199,7 +205,11 @@ impl SystemFiber {
             }
             layer.state = self.manifold.project(&layer.state)?;
         }
-        self.engine_clock += effective_dt;
+        let next_clock = self.engine_clock + effective_dt;
+        if !next_clock.is_finite() {
+            return Err(FieldError::InvalidTime);
+        }
+        self.engine_clock = next_clock;
         Ok(())
     }
 
@@ -602,6 +612,13 @@ mod tests {
         let p = m.exp_origin(&v).unwrap();
         let recovered = m.log_origin(&p).unwrap();
         for (a, b) in v.iter().zip(recovered) { assert!((a - b).abs() < 1e-10); }
+    }
+
+    #[test]
+    fn fiber_rejects_nonfinite_layer_gain() {
+        let m = PoincareBall::new(1, 1.0).unwrap();
+        let layer = SubsystemLayer { id: "a".into(), state: vec![0.0], gain: f64::NAN };
+        assert_eq!(SystemFiber::new("x", m, vec![layer]), Err(FieldError::InvalidDynamics));
     }
 
     #[test]
