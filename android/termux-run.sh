@@ -32,8 +32,7 @@ echo "[genesis-android] Android microphone: Termux:API + ffmpeg + Vosk"
 echo "[genesis-android] Android speaker: Termux:API TTS"
 echo
 
-exec proot-distro login "$DISTRO" \
-    --bind "$REPO_DIR:/workspace/Genesis" \
+exec proot-distro login --bind "$REPO_DIR:/workspace/Genesis" "$DISTRO" \
     -- /bin/bash -lc '
         set -e
         cd /workspace/Genesis
