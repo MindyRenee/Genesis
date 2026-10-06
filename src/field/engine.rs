@@ -7,14 +7,30 @@
 use super::{FieldError, Matrix, SubsystemLayer, Vector};
 
 fn dot(a: &[f64], b: &[f64]) -> f64 {
-    a.iter().zip(b).map(|(x, y)| x * y).sum()
+    let scale = a
+        .iter()
+        .zip(b)
+        .fold(0.0_f64, |scale, (&x, &y)| scale.max(x.abs()).max(y.abs()));
+    if scale == 0.0 {
+        return 0.0;
+    }
+    let normalized = a
+        .iter()
+        .zip(b)
+        .map(|(&x, &y)| (x / scale) * (y / scale))
+        .sum::<f64>();
+    scale * scale * normalized
 }
 
 fn mat_vec(m: &[Vector], x: &[f64]) -> Result<Vector, FieldError> {
     if m.is_empty() || m.iter().any(|r| r.len() != x.len()) {
         return Err(FieldError::DimensionMismatch);
     }
-    Ok(m.iter().map(|row| dot(row, x)).collect())
+    let out: Vector = m.iter().map(|row| dot(row, x)).collect();
+    if out.iter().any(|value| !value.is_finite()) {
+        return Err(FieldError::NonFiniteState);
+    }
+    Ok(out)
 }
 
 /// Coupled continuous-time dynamical system over subsystem layers.
@@ -247,6 +263,17 @@ impl SystemEngine {
             return Err(FieldError::NonFiniteState);
         }
         Ok(out)
+    }
+}
+
+#[cfg(test)]
+mod numerical_integrity_tests {
+    use super::*;
+
+    #[test]
+    fn dot_preserves_finite_cancellation_without_intermediate_overflow() {
+        let value = dot(&[1.0e308, 1.0e308], &[1.0e308, -1.0e308]);
+        assert_eq!(value, 0.0);
     }
 }
 
