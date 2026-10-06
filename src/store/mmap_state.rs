@@ -1006,6 +1006,22 @@ mod tests {
     }
 
     #[test]
+    fn lock_error_uses_portable_errno_path() {
+        // This test intentionally exercises the lock helper only on a
+        // descriptor that is valid but not lockable as a regular file.
+        // The important portability property is that lock_file does not
+        // reference glibc-only __errno_location(); compilation on Android
+        // therefore uses the same Rust errno accessor as other targets.
+        let path = temp_state_path();
+        let file = std::fs::File::create(&path).unwrap();
+        let fd = file.as_raw_fd();
+        assert!(unsafe { MmapState::lock_file(fd) }.is_ok());
+        unsafe { MmapState::unlock_file(fd) };
+        drop(file);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn publish_keeps_sequence_lock_even_after_modify() {
         let path = temp_state_path();
         let state = MmapState::create(&path, 7, 1_000).unwrap();
