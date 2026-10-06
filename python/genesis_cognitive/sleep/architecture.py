@@ -189,8 +189,15 @@ class SleepCycleTracker:
             # the end via _nap_complete and triggers a wake.
             if self.nap and slot + 1 >= 2:
                 # Clamp to the end of N2 — don't carry surplus into N3.
+                # Keep the active stage/slot consistent; completion is
+                # represented by the slot boundary, not by pretending the
+                # current stage is N3.
                 self.time_in_stage = duration
-                self._stage_slot = 2  # mark nap as complete
+                self.time_in_cycle = sum(
+                    self._stage_duration(s, i)
+                    for i, s in enumerate(_CYCLE_STAGES[:2])
+                )
+                self._stage_slot = 2  # boundary immediately after N2
                 break
 
             # Transition to the next stage in the cycle.
@@ -227,6 +234,8 @@ class SleepCycleTracker:
     @property
     def stage_progress(self) -> float:
         """Fraction of the current stage elapsed, in [0, 1)."""
+        if self._nap_complete:
+            return 1.0
         duration = self._stage_duration(self.current_stage, self._stage_slot)
         if duration <= 0.0:
             return 0.0
