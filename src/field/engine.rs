@@ -29,6 +29,10 @@ pub struct SystemEngine {
     /// Per-layer dissipative coefficient. Positive values make the local
     /// dynamics contractive; zero preserves the undamped linear system.
     pub damping: Vec<f64>,
+    /// Isotropic nonlinear saturation coefficient per layer. The term is
+    /// -saturation * ||state||² * state, which bounds growth without choosing
+    /// a coordinate-specific activation function.
+    pub saturation: Vec<f64>,
     pub time_scale: f64,
 }
 
@@ -41,6 +45,7 @@ impl SystemEngine {
             ],
             biases: vec![vec![0.0; dimension]; layer_count],
             damping: vec![0.0; layer_count],
+            saturation: vec![0.0; layer_count],
             time_scale: 1.0,
         }
     }
@@ -64,7 +69,13 @@ impl SystemEngine {
         {
             return Err(FieldError::DimensionMismatch);
         }
-        Ok(Self { couplings, biases, damping: vec![0.0; n], time_scale })
+        Ok(Self {
+            couplings,
+            biases,
+            damping: vec![0.0; n],
+            saturation: vec![0.0; n],
+            time_scale,
+        })
     }
 
     pub fn dimension(&self) -> usize { self.biases.first().map_or(0, Vector::len) }
@@ -80,6 +91,17 @@ impl SystemEngine {
         Ok(self)
     }
 
+    /// Set non-negative isotropic nonlinear saturation for every layer.
+    pub fn with_saturation(mut self, saturation: Vec<f64>) -> Result<Self, FieldError> {
+        if saturation.len() != self.biases.len()
+            || saturation.iter().any(|x| !x.is_finite() || *x < 0.0)
+        {
+            return Err(FieldError::InvalidDynamics);
+        }
+        self.saturation = saturation;
+        Ok(self)
+    }
+
     pub fn derivatives(&self, layers: &[SubsystemLayer]) -> Result<Vec<Vector>, FieldError> {
         if layers.len() != self.biases.len() {
             return Err(FieldError::LayerMismatch);
@@ -91,8 +113,10 @@ impl SystemEngine {
 
         let mut out = self.biases.clone();
         for (i, layer) in layers.iter().enumerate() {
+            let radius_sq = dot(&layer.state, &layer.state);
             for (dst, state) in out[i].iter_mut().zip(&layer.state) {
                 *dst -= self.damping[i] * state;
+                *dst -= self.saturation[i] * radius_sq * state;
             }
         }
         for target in 0..layers.len() {
@@ -123,6 +147,18 @@ mod tests {
         let layers = vec![SubsystemLayer::new("a", vec![0.5])];
         let d = engine.derivatives(&layers).unwrap();
         assert!((d[0][0] + 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn isotropic_saturation_limits_growth_direction() {
+        let engine = SystemEngine::zero(1, 2).with_saturation(vec![2.0]).unwrap();
+        let layers = vec![SubsystemLayer::new("a", vec![2.0, 1.0])];
+        let d = engine.derivatives(&layers).unwrap();
+        let radius_sq = 5.0;
+        assert!((d[0][0] + 20.0).abs() < 1e-12);
+        assert!((d[0][1] + 10.0).abs() < 1e-12);
+        assert_eq!(d[0][0] / d[0][1], layers[0].state[0] / layers[0].state[1]);
+        assert!((radius_sq - 5.0).abs() < 1e-12);
     }
 
     #[test]
