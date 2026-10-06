@@ -17,7 +17,9 @@ pub type Vector = Vec<f64>;
 pub type Matrix = Vec<Vector>;
 
 fn dot(a: &[f64], b: &[f64]) -> f64 { a.iter().zip(b).map(|(x, y)| x * y).sum() }
-fn norm(a: &[f64]) -> f64 { dot(a, a).sqrt() }
+fn norm(a: &[f64]) -> f64 {
+    a.iter().fold(0.0_f64, |acc, &x| acc.hypot(x))
+}
 fn scaled(a: &[f64], s: f64) -> Vector { a.iter().map(|x| x * s).collect() }
 fn add(a: &[f64], b: &[f64]) -> Vector { a.iter().zip(b).map(|(x, y)| x + y).collect() }
 fn sub(a: &[f64], b: &[f64]) -> Vector { a.iter().zip(b).map(|(x, y)| x - y).collect() }
@@ -63,8 +65,12 @@ impl PoincareBall {
         self.validate_point(x)?;
         let r = norm(x);
         if r < EPS { return Ok(vec![0.0; self.dimension]); }
-        let z = (self.curvature.sqrt() * r).atanh() * 2.0
-            / (self.curvature.sqrt() * r);
+        let scaled_r = self.curvature.sqrt() * r;
+        // Floating-point roundoff can turn a mathematically valid radius
+        // slightly below one into exactly one. Keep atanh's argument inside
+        // its finite domain rather than manufacturing an infinite tangent.
+        let atanh_arg = scaled_r.min(1.0 - f64::EPSILON);
+        let z = atanh_arg.atanh() * 2.0 / scaled_r;
         Ok(scaled(x, z))
     }
 
@@ -603,6 +609,15 @@ mod tests {
         for (x, y) in a.iter().zip(b) {
             assert!((x - y).abs() < 1e-12);
         }
+    }
+
+    #[test]
+    fn geometry_norm_handles_large_finite_coordinates() {
+        let m = PoincareBall::new(2, 1.0e-300).unwrap();
+        let p = vec![1.0e149, 1.0e149];
+        assert!(m.contains(&p));
+        let v = m.log_origin(&p).unwrap();
+        assert!(v.iter().all(|x| x.is_finite()));
     }
 
     #[test]
