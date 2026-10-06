@@ -53,12 +53,18 @@ impl PoincareBall {
 
     pub fn distance(&self, x: &[f64], y: &[f64]) -> Result<f64, FieldError> {
         self.validate_point(x)?; self.validate_point(y)?;
-        let c = self.curvature;
-        let nx = c * dot(x, x); let ny = c * dot(y, y);
-        let dxy = norm(&sub(x, y));
+        let sqrt_c = self.curvature.sqrt();
+        // Scale into the unit ball before forming squared norms or
+        // differences. This avoids overflow when curvature is very small
+        // and coordinates are correspondingly large.
+        let ux = scaled(x, sqrt_c);
+        let uy = scaled(y, sqrt_c);
+        let nx = dot(&ux, &ux);
+        let ny = dot(&uy, &uy);
+        let dxy = norm(&sub(&ux, &uy));
         let denom = (1.0 - nx).max(EPS) * (1.0 - ny).max(EPS);
-        let arg = 1.0 + 2.0 * c * dxy * dxy / denom;
-        Ok(arg.max(1.0).acosh() / c.sqrt())
+        let arg = 1.0 + 2.0 * dxy * dxy / denom;
+        Ok(arg.max(1.0).acosh() / sqrt_c)
     }
 
     pub fn log_origin(&self, x: &[f64]) -> Result<Vector, FieldError> {
@@ -609,6 +615,16 @@ mod tests {
         for (x, y) in a.iter().zip(b) {
             assert!((x - y).abs() < 1e-12);
         }
+    }
+
+    #[test]
+    fn distance_handles_large_coordinates_without_overflow() {
+        let m = PoincareBall::new(2, 1.0e-300).unwrap();
+        let x = vec![1.0e149, 0.0];
+        let y = vec![-1.0e149, 0.0];
+        let d = m.distance(&x, &y).unwrap();
+        assert!(d.is_finite());
+        assert!(d > 0.0);
     }
 
     #[test]
