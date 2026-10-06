@@ -1373,3 +1373,47 @@ impl std::fmt::Display for StateFileError {
 }
 
 impl std::error::Error for StateFileError {}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::core_state::LEGACY_SIZE;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_state_path() -> std::path::PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("genesis-mmap-state-{nonce}-{}", std::process::id()))
+    }
+
+    #[test]
+    fn open_migrates_legacy_v3_state_size_without_losing_state() {
+        let path = temp_state_path();
+        let now_ms = 1_800_000_000_000u64;
+
+        let state = MmapState::create(&path, 42, now_ms).unwrap();
+        state
+            .modify(now_ms + 1, |s| {
+                s.header.state_size = LEGACY_SIZE;
+                s.inference_signals.policy_authority = 0.0;
+            })
+            .unwrap();
+        state.sync().unwrap();
+        drop(state);
+
+        let reopened = MmapState::open(&path).unwrap();
+        let snapshot = reopened.read_consistent().expect("migrated state must be readable");
+
+        assert_eq!(snapshot.header.state_size, GenesisCoreState::SIZE as u32);
+        assert_eq!(snapshot.header.instance_id, 42);
+        assert_eq!(snapshot.inference_signals.policy_authority, 0.0);
+        assert_eq!(snapshot.verify(), Ok(()));
+        assert_eq!(snapshot.verify_checksum(), Ok(()));
+
+        drop(reopened);
+        let _ = std::fs::remove_file(&path);
+    }
+}
