@@ -402,11 +402,6 @@ impl GlobalField {
         }).collect::<Result<_, FieldError>>()?;
 
         for (fiber, local_target) in self.fibers.iter_mut().zip(local_targets) {
-            let local_target = local_target;
-                let inverse = matrix_inverse(&path)?;
-                let local_tangent = matrix_apply(&inverse, &consensus_tangent)?;
-                self.manifold.exp_origin(&local_tangent)?
-            };
             for layer in &mut fiber.layers {
                 let delta = sub(&layer.state, &local_target);
                 layer.state = self.manifold.project(
