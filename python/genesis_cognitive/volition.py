@@ -23,7 +23,7 @@ class Urge:
     decay: float = 0.0005
     cooldown: float = 120.0
     value: float = 0.0
-    last_action: float = 0.0
+    last_action: float = 0.0  # monotonic-clock timestamp
     stimuli: dict[str, float] = field(default_factory=dict)
     update_fn: Callable[[str, dict[str, object], float], float] | None = None
 
@@ -40,12 +40,12 @@ class Urge:
 
     def is_ready(self) -> bool:
         """Whether the urge is above threshold and off cooldown."""
-        now = time.time()
+        now = time.monotonic()
         return self.value >= self.threshold and (now - self.last_action) >= self.cooldown
 
     def consume(self) -> None:
         """Mark the urge as just acted on."""
-        self.last_action = time.time()
+        self.last_action = time.monotonic()
         self.value = 0.0
 
 
@@ -55,7 +55,7 @@ class VolitionEngine:
     def __init__(self) -> None:
         """Initialize an empty urge registry and record the first tick time."""
         self.urges: dict[str, Urge] = {}
-        self._last_tick = time.time()
+        self._last_tick = time.monotonic()
 
     def register(self, urge: Urge) -> None:
         """Add an urge to the engine."""
@@ -68,13 +68,17 @@ class VolitionEngine:
     def tick(self, context: dict[str, object]) -> list[str]:
         """Advance all urges and return the names of those that are ready.
 
+        The engine uses a monotonic clock for elapsed-time accounting so
+        wall-clock corrections (NTP, manual changes, DST) cannot create a
+        negative ``dt`` or prematurely satisfy a cooldown.
+
         Ready urges are **not** consumed — the caller must call
         :meth:`consume` for each urge it actually acts on. This lets
         the caller apply external filters (e.g. wake-delay gating)
         without wasting an urge's cooldown on a fire that was filtered
         out before it could run.
         """
-        now = time.time()
+        now = time.monotonic()
         dt = now - self._last_tick
         self._last_tick = now
 
