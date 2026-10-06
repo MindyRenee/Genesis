@@ -1,4 +1,5 @@
 pub mod engine;
+pub use engine::SystemEngine;
 
 //! Machine-native field architecture for Genesis.
 //!
