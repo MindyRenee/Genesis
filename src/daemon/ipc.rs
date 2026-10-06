@@ -1122,19 +1122,23 @@ impl IpcServer {
             }
         };
 
-        // The bind succeeded: this instance now owns the endpoint.
-        // Set ownership before entering the accept loop so Drop can safely
-        // clean up the socket on every normal return path.
+        // Set non-blocking before advertising readiness. A failure here
+        // would otherwise leave a bound listener that can block forever in
+        // accept(), preventing the shutdown flag from being observed.
+        if let Err(e) = listener.set_nonblocking(true) {
+            eprintln!("[ipc] failed to configure nonblocking listener: {e}");
+            server
+                .shutdown_flag
+                .store(true, std::sync::atomic::Ordering::Release);
+            return;
+        }
+
+        // The bind and listener configuration both succeeded: this instance
+        // now owns the endpoint and can safely advertise IPC readiness.
         server
             .owns_socket
             .store(true, std::sync::atomic::Ordering::Release);
-        eprintln!(
-            "[ipc] listening on {}",
-            server.socket_path.display()
-        );
-
-        // Set non-blocking so we can poll for shutdown
-        let _ = listener.set_nonblocking(true);
+        eprintln!("[ipc] listening on {}", server.socket_path.display());
         let mut client_threads = Vec::new();
 
         while !server
