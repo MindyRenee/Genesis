@@ -14,6 +14,7 @@ pub use engine::SystemEngine;
 
 const EPS: f64 = 1.0e-12;
 pub type Vector = Vec<f64>;
+pub type Matrix = Vec<Vector>;
 
 fn dot(a: &[f64], b: &[f64]) -> f64 { a.iter().zip(b).map(|(x, y)| x * y).sum() }
 fn norm(a: &[f64]) -> f64 { dot(a, a).sqrt() }
@@ -318,7 +319,7 @@ impl GlobalField {
     pub fn path_disagreement(&self, from: &str, to: &str) -> Result<Option<PathDisagreement>, FieldError> {
         let paths = self.transport_paths(from, to, 32);
         if paths.len() < 2 { return Ok(None); }
-        let mut spread = 0.0;
+        let mut spread: f64 = 0.0;
         for i in 0..paths.len() {
             for j in (i + 1)..paths.len() {
                 let diff = matrix_distance(&paths[i].matrix, &paths[j].matrix)?;
