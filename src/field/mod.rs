@@ -270,13 +270,21 @@ impl GlobalField {
             || (fiber.manifold.curvature() - self.manifold.curvature()).abs() > EPS {
             return Err(FieldError::GeometryMismatch);
         }
-        self.fibers.push(fiber); Ok(())
+        if self.fibers.iter().any(|existing| existing.id == fiber.id) {
+            return Err(FieldError::DuplicateId);
+        }
+        self.fibers.push(fiber);
+        Ok(())
     }
     pub fn add_transport(&mut self, transport: GaugeTransport) -> Result<(), FieldError> {
+        let dimension = self.manifold.dimension();
         if transport.from == transport.to
             || self.fibers.iter().all(|f| f.id != transport.from)
             || self.fibers.iter().all(|f| f.id != transport.to)
-            || transport.matrix.len() != self.manifold.dimension()
+            || transport.matrix.len() != dimension
+            || transport.matrix.iter().any(|row| {
+                row.len() != dimension || row.iter().any(|value| !value.is_finite())
+            })
         {
             return Err(FieldError::TransportMismatch);
         }
@@ -351,10 +359,14 @@ impl GlobalField {
     }
 
     pub fn transported_states(&self) -> Result<Vec<Vector>, FieldError> {
+        if self.fibers.is_empty() {
+            return Ok(Vec::new());
+        }
+        let reference_id = &self.fibers[0].id;
         let mut out = Vec::with_capacity(self.fibers.len());
         for fiber in &self.fibers {
             let state = fiber.state()?;
-            let mapped = if fiber.id == self.fibers[0].id {
+            let mapped = if &fiber.id == reference_id {
                 state
             } else {
                 let matrix = self.path_matrix(&fiber.id, &self.fibers[0].id)?;
@@ -562,6 +574,46 @@ mod tests {
                 vec![SubsystemLayer::new("state", vec![0.01 * i as f64, 0.0])]).unwrap()).unwrap();
         }
         assert_eq!(global.fibers.len(), 3);
+    }
+
+    #[test]
+    fn empty_field_has_no_transported_states() {
+        let m = PoincareBall::new(2, 1.0).unwrap();
+        let global = GlobalField::new(m);
+        assert!(global.transported_states().unwrap().is_empty());
+        assert_eq!(global.consensus().unwrap(), None);
+    }
+
+    #[test]
+    fn duplicate_fiber_ids_are_rejected() {
+        let m = PoincareBall::new(1, 1.0).unwrap();
+        let mut global = GlobalField::new(m.clone());
+        let make = || SystemFiber::new(
+            "same",
+            m.clone(),
+            vec![SubsystemLayer::new("s", vec![0.0])],
+        ).unwrap();
+        global.add_fiber(make()).unwrap();
+        assert_eq!(global.add_fiber(make()), Err(FieldError::DuplicateId));
+    }
+
+    #[test]
+    fn transport_boundary_rejects_non_square_matrix() {
+        let m = PoincareBall::new(2, 1.0).unwrap();
+        let mut global = GlobalField::new(m.clone());
+        for id in ["a", "b"] {
+            global.add_fiber(SystemFiber::new(
+                id,
+                m.clone(),
+                vec![SubsystemLayer::new("s", vec![0.0, 0.0])],
+            ).unwrap()).unwrap();
+        }
+        let transport = GaugeTransport {
+            from: "a".into(),
+            to: "b".into(),
+            matrix: vec![vec![1.0, 0.0], vec![1.0]],
+        };
+        assert_eq!(global.add_transport(transport), Err(FieldError::TransportMismatch));
     }
 
     #[test]
