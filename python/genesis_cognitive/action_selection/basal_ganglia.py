@@ -12,8 +12,8 @@ TD prediction error is identical to measured dopamine concentration.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import math
+from dataclasses import dataclass
 
 __all__ = ["ActionBid", "SelectionResult", "BasalGangliaSelector"]
 
