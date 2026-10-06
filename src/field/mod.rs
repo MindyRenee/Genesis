@@ -161,8 +161,46 @@ impl SystemFiber {
         if !effective_dt.is_finite() || effective_dt < 0.0 {
             return Err(FieldError::InvalidTime);
         }
-        let derivatives = self.engine.derivatives(&self.layers)?;
-        self.evolve(&derivatives, effective_dt)
+        if effective_dt == 0.0 {
+            return Ok(());
+        }
+
+        // Integrate the engine's continuous-time field with classical RK4.
+        // The engine remains the source of dynamics; the integrator only
+        // advances that field in time. Layer gains are applied at each stage.
+        let initial = self.layer_states();
+        let scaled = |derivatives: Vec<Vector>| -> Vec<Vector> {
+            derivatives.into_iter().enumerate().map(|(i, d)| {
+                d.into_iter().map(|x| x * self.layers[i].gain).collect()
+            }).collect()
+        };
+        let add_stage = |state: &[Vector], slope: &[Vector], scale: f64| -> Vec<Vector> {
+            state.iter().zip(slope).map(|(x, dx)| {
+                x.iter().zip(dx).map(|(v, dv)| v + scale * dv).collect()
+            }).collect()
+        };
+
+        let k1 = scaled(self.engine.derivatives(&self.layers)?);
+        let state2 = add_stage(&initial, &k1, effective_dt * 0.5);
+        let mut stage_layers = self.layers.clone();
+        for (layer, state) in stage_layers.iter_mut().zip(state2) { layer.state = state; }
+        let k2 = scaled(self.engine.derivatives(&stage_layers)?);
+        let state3 = add_stage(&initial, &k2, effective_dt * 0.5);
+        for (layer, state) in stage_layers.iter_mut().zip(state3) { layer.state = state; }
+        let k3 = scaled(self.engine.derivatives(&stage_layers)?);
+        let state4 = add_stage(&initial, &k3, effective_dt);
+        for (layer, state) in stage_layers.iter_mut().zip(state4) { layer.state = state; }
+        let k4 = scaled(self.engine.derivatives(&stage_layers)?);
+
+        for (i, layer) in self.layers.iter_mut().enumerate() {
+            for j in 0..layer.state.len() {
+                layer.state[j] = initial[i][j]
+                    + effective_dt * (k1[i][j] + 2.0 * k2[i][j] + 2.0 * k3[i][j] + k4[i][j]) / 6.0;
+            }
+            layer.state = self.manifold.project(&layer.state)?;
+        }
+        self.engine_clock += effective_dt;
+        Ok(())
     }
 
     pub fn evolve(&mut self, derivatives: &[Vector], dt: f64) -> Result<(), FieldError> {
@@ -594,6 +632,20 @@ mod tests {
         ]).unwrap();
         assert_eq!(fiber.layers.len(), 2);
         assert_eq!(fiber.layer("emotion").unwrap().id, "emotion");
+    }
+
+    #[test]
+    fn fiber_step_uses_continuous_dynamics_without_euler_bias() {
+        let m = PoincareBall::new(1, 1.0).unwrap();
+        let mut fiber = SystemFiber::with_engine(
+            "exp",
+            m,
+            vec![SubsystemLayer::new("x", vec![0.1])],
+            SystemEngine::zero(1, 1).with_damping(vec![1.0]).unwrap(),
+        ).unwrap();
+        fiber.step(0.1).unwrap();
+        let expected = 0.1 * (-0.1f64).exp();
+        assert!((fiber.layers[0].state[0] - expected).abs() < 1e-7);
     }
 
     #[test]
