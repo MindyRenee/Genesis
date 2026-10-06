@@ -116,7 +116,6 @@ __all__ = [
     "CriticalThinkingEngine",
     "DecisionEngine",
     "DecisionOutcome",
-    "ResourceState",
     "DecisionResult",
     "DriftDiffusionModel",
     "EffectPrediction",
