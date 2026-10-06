@@ -20,9 +20,9 @@ _EXPORTS: dict[str, str] = {
 }
 
 __all__ = [
+    "HABIT_THRESHOLD",
     "ActionBid",
     "BasalGangliaSelector",
-    "HABIT_THRESHOLD",
     "HabitBias",
     "ProceduralMemory",
     "SelectionResult",
