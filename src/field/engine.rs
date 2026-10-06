@@ -79,6 +79,30 @@ impl SystemEngine {
     }
 
     pub fn dimension(&self) -> usize { self.biases.first().map_or(0, Vector::len) }
+    fn validate(&self) -> Result<(usize, usize), FieldError> {
+        let n = self.biases.len();
+        let d = self.biases.first().map_or(0, Vector::len);
+        if n == 0 || d == 0
+            || self.couplings.len() != n
+            || self.damping.len() != n
+            || self.saturation.len() != n
+            || !self.time_scale.is_finite()
+            || self.time_scale <= 0.0
+            || self.biases.iter().any(|b| b.len() != d || b.iter().any(|x| !x.is_finite()))
+            || self.damping.iter().any(|x| !x.is_finite() || *x < 0.0)
+            || self.saturation.iter().any(|x| !x.is_finite() || *x < 0.0)
+            || self.couplings.iter().any(|row| {
+                row.len() != n || row.iter().any(|m| {
+                    m.len() != d || m.iter().any(|r| {
+                        r.len() != d || r.iter().any(|x| !x.is_finite())
+                    })
+                })
+            })
+        {
+            return Err(FieldError::InvalidDynamics);
+        }
+        Ok((n, d))
+    }
 
     /// Set non-negative local damping for every subsystem layer.
     pub fn with_damping(mut self, damping: Vec<f64>) -> Result<Self, FieldError> {
@@ -107,8 +131,7 @@ impl SystemEngine {
     /// For the local term -s ||x||² x, the derivative is
     /// -s (||x||² I + 2 x xᵀ). Coupling and damping are added directly.
     pub fn jacobian(&self, layers: &[SubsystemLayer]) -> Result<Vec<Vec<Matrix>>, FieldError> {
-        let n = self.biases.len();
-        let d = self.dimension();
+        let (n, d) = self.validate()?;
         if layers.len() != n { return Err(FieldError::LayerMismatch); }
         if d == 0 || layers.iter().any(|l| l.state.len() != d) {
             return Err(FieldError::DimensionMismatch);
@@ -140,8 +163,7 @@ impl SystemEngine {
     /// contraction of the linearized dynamics; a non-negative value is not
     /// a proof of instability.
     pub fn linear_growth_bound(&self) -> Result<f64, FieldError> {
-        let n = self.biases.len();
-        let d = self.dimension();
+        let (n, d) = self.validate()?;
         if n == 0 || d == 0 || self.couplings.len() != n
             || self.couplings.iter().any(|row| row.len() != n)
         {
@@ -167,10 +189,10 @@ impl SystemEngine {
     }
 
     pub fn derivatives(&self, layers: &[SubsystemLayer]) -> Result<Vec<Vector>, FieldError> {
-        if layers.len() != self.biases.len() {
+        let (n, d) = self.validate()?;
+        if layers.len() != n {
             return Err(FieldError::LayerMismatch);
         }
-        let d = self.biases.first().map_or(0, Vector::len);
         if layers.iter().any(|l| l.state.len() != d) {
             return Err(FieldError::DimensionMismatch);
         }
@@ -231,6 +253,16 @@ mod tests {
             .with_damping(vec![2.0, 3.0]).unwrap();
         let bound = engine.linear_growth_bound().unwrap();
         assert_eq!(bound, -2.0);
+    }
+
+    #[test]
+    fn public_engine_mutation_cannot_bypass_dynamics_validation() {
+        let mut engine = SystemEngine::zero(1, 1);
+        engine.damping = vec![-1.0];
+        let layers = vec![SubsystemLayer::new("a", vec![0.1])];
+        assert_eq!(engine.derivatives(&layers), Err(FieldError::InvalidDynamics));
+        assert_eq!(engine.jacobian(&layers), Err(FieldError::InvalidDynamics));
+        assert_eq!(engine.linear_growth_bound(), Err(FieldError::InvalidDynamics));
     }
 
     #[test]
