@@ -396,7 +396,7 @@ class ExecutiveFunction:
         actionable = [
             c for c in candidates
             if c.actionable
-            and c.status not in {"completed", "abandoned"}
+            and c.status == "pending"
             and (
                 allowed_kinds is None
                 or c.objective.split(":", 1)[0] in allowed_kinds
