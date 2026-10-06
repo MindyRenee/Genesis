@@ -194,6 +194,9 @@ impl SystemEngine {
                     }
                     for value in row {
                         row_sum += value.abs();
+                        if !row_sum.is_finite() {
+                            return Err(FieldError::NonFiniteState);
+                        }
                     }
                 }
                 bound = bound.max(row_sum);
@@ -247,6 +250,14 @@ impl SystemEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn growth_bound_rejects_overflowing_accumulation() {
+        let mut engine = SystemEngine::zero(1, 2);
+        engine.couplings[0][0][0][0] = f64::MAX;
+        engine.couplings[0][0][0][1] = f64::MAX;
+        assert_eq!(engine.linear_growth_bound(), Err(FieldError::NonFiniteState));
+    }
 
     #[test]
     fn jacobian_matches_finite_difference_for_nonlinear_layer() {
