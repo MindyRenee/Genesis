@@ -102,6 +102,39 @@ impl SystemEngine {
         Ok(self)
     }
 
+    /// State-dependent Jacobian of the complete nonlinear vector field.
+    ///
+    /// For the local term -s ||x||² x, the derivative is
+    /// -s (||x||² I + 2 x xᵀ). Coupling and damping are added directly.
+    pub fn jacobian(&self, layers: &[SubsystemLayer]) -> Result<Vec<Vec<Matrix>>, FieldError> {
+        let n = self.biases.len();
+        let d = self.dimension();
+        if layers.len() != n { return Err(FieldError::LayerMismatch); }
+        if d == 0 || layers.iter().any(|l| l.state.len() != d) {
+            return Err(FieldError::DimensionMismatch);
+        }
+        let mut out = vec![vec![vec![vec![0.0; d]; d]; n]; n];
+        for target in 0..n {
+            for source in 0..n {
+                out[target][source] = self.couplings[target][source].clone();
+            }
+            for k in 0..d {
+                for j in 0..d {
+                    let xk = layers[target].state[k];
+                    let xj = layers[target].state[j];
+                    let r2 = dot(&layers[target].state, &layers[target].state);
+                    let nonlinear = self.saturation[target] * (if k == j { r2 } else { 0.0 } + 2.0 * xk * xj);
+                    out[target][target][k][j] -= nonlinear;
+                }
+                out[target][target][k][k] -= self.damping[target];
+            }
+        }
+        if out.iter().flatten().flatten().flatten().any(|x| !x.is_finite()) {
+            return Err(FieldError::NonFiniteState);
+        }
+        Ok(out)
+    }
+
     /// Conservative upper bound on instantaneous linear growth in the
     /// infinity norm. A negative value is a sufficient condition for
     /// contraction of the linearized dynamics; a non-negative value is not
