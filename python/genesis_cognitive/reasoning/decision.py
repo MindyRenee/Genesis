@@ -55,6 +55,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..concepts import ConceptNetwork
+    from ..action_selection import BasalGangliaSelector
     from ..executive import ExecutiveFunction
     from ..learning.td import TDLearner
     from .engine import ReasoningResult
@@ -158,6 +159,8 @@ class CandidateAction:
     rationale: str = ""
     td_value: float = 0.0
     inhibited: bool = False
+    bg_disinhibition: float = 0.0
+    bg_conflict: float = 0.0
 
     def score(self, criterion: str) -> float:
         """Get the score for a specific criterion."""
@@ -276,6 +279,9 @@ class DecisionEngine:
         self.td_learner = td_learner
         self.value_weights = value_weights or dict(_DEFAULT_VALUE_WEIGHTS)
         self.resource_state = resource_state or ResourceState()
+        # Computational basal-ganglia selector. It receives the evaluated
+        # candidate saliences; it does not generate candidate actions.
+        self.action_selector = BasalGangliaSelector(hyperdirect_gain=0.3)
         self._decisions: list[DecisionOutcome] = []
         self._overrides: int = 0
         self._inhibitions: int = 0
@@ -386,8 +392,40 @@ class DecisionEngine:
                     min(1.0, candidate.composite_score + candidate.td_value * 0.1),
                 )
 
-        # 4. Select the best candidate.
-        selected = max(candidates, key=lambda c: c.composite_score)
+        # 4. Basal-ganglia action selection.
+        #
+        # Candidate generation/evaluation belongs to cognition. The
+        # selector performs the separate competition/gating computation:
+        # salience -> striatal drive -> STN/global threshold ->
+        # selective disinhibition.
+        selectable = [
+            c for c in candidates
+            if not c.inhibited and c.action_type != ActionType.WITHHOLD
+        ]
+        dopamine_rpe = 0.0
+        if self.td_learner is not None:
+            dopamine_rpe = self.td_learner.get_dopamine_signal()
+        bg_result = self.action_selector.select(
+            [
+                ActionBid(action=c.action_type.value, salience=c.composite_score)
+                for c in selectable
+            ],
+            dopamine_rpe=dopamine_rpe,
+        )
+        by_action = {c.action_type.value: c for c in selectable}
+        for c in selectable:
+            c.bg_disinhibition = bg_result.disinhibition.get(c.action_type.value, 0.0)
+            c.bg_conflict = bg_result.conflict
+
+        if bg_result.selected is None:
+            selected = next(
+                (c for c in candidates if c.action_type == ActionType.WITHHOLD),
+                max(candidates, key=lambda c: c.composite_score),
+            )
+            bg_inhibited = True
+        else:
+            selected = by_action[bg_result.selected]
+            bg_inhibited = False
         overridden = selected.action_type != default_action
 
         # 5. Check for uncertainty-driven action switching.
@@ -414,7 +452,7 @@ class DecisionEngine:
         # the executive's stop-signal threshold. Passing ``1.0 - score``
         # would invert the semantics: weak candidates would get strong
         # impulses and never be inhibited, making this path dead code.
-        inhibition_applied = False
+        inhibition_applied = bg_inhibited
         if (
             self.executive is not None
             and selected.composite_score < _INHIBITION_THRESHOLD
@@ -463,7 +501,7 @@ class DecisionEngine:
                 f"high uncertainty ({uncertainty:.2f})"
             )
         if inhibition_applied:
-            notes.append("response inhibited by executive function")
+            notes.append("response gated by basal-ganglia conflict threshold")
         if self.resource_state.constrained:
             notes.append("resource-constrained: hardware reports distress")
 
