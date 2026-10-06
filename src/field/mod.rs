@@ -217,7 +217,33 @@ fn mat_mul(a:&Matrix,b:&Matrix)->Result<Matrix,FieldError>{
     Ok(out)
 }
 fn mat_vec(a:&Matrix,x:&Vector)->Result<Vector,FieldError>{if a.len()!=x.len()||a.iter().any(|r|r.len()!=x.len()){return Err(FieldError::DimensionMismatch)}let mut out=vec![0.0;x.len()];for i in 0..a.len(){out[i]=dot(&a[i],x);}if out.iter().any(|v|!v.is_finite()){return Err(FieldError::NonFiniteState)}Ok(out)}
-fn matrix_distance(a:&Matrix,b:&Matrix)->Result<f64,FieldError>{if a.len()!=b.len()||a.iter().zip(b).any(|(x,y)|x.len()!=y.len()){return Err(FieldError::DimensionMismatch)}let mut sum=0.0;for(row_a,row_b)in a.iter().zip(b){for(x,y)in row_a.iter().zip(row_b){if !x.is_finite()||!y.is_finite(){return Err(FieldError::NonFiniteState)}let delta=x-y;if !delta.is_finite(){return Err(FieldError::NonFiniteState)}let term=delta*delta;if !term.is_finite(){return Err(FieldError::NonFiniteState)}sum+=term;if !sum.is_finite(){return Err(FieldError::NonFiniteState)}}}Ok(sum.sqrt())}
+fn matrix_distance(a:&Matrix,b:&Matrix)->Result<f64,FieldError>{
+    if a.len()!=b.len()||a.iter().zip(b).any(|(x,y)|x.len()!=y.len()){
+        return Err(FieldError::DimensionMismatch);
+    }
+    let mut scale=0.0_f64;
+    for (row_a,row_b) in a.iter().zip(b) {
+        for (&x,&y) in row_a.iter().zip(row_b) {
+            if !x.is_finite()||!y.is_finite(){return Err(FieldError::NonFiniteState);}
+            let delta=x-y;
+            if !delta.is_finite(){return Err(FieldError::NonFiniteState);}
+            scale=scale.max(delta.abs());
+        }
+    }
+    if scale==0.0{return Ok(0.0);}
+    if !scale.is_finite(){return Err(FieldError::NonFiniteState);}
+    let normalized_sum=a.iter().zip(b).flat_map(|(row_a,row_b)|row_a.iter().zip(row_b))
+        .map(|(&x,&y)|{
+            let delta=x-y;
+            let normalized=delta/scale;
+            normalized*normalized
+        })
+        .sum::<f64>();
+    if !normalized_sum.is_finite(){return Err(FieldError::NonFiniteState);}
+    let distance=scale*normalized_sum.sqrt();
+    if !distance.is_finite(){return Err(FieldError::NonFiniteState);}
+    Ok(distance)
+}
 #[cfg(test)]
 mod vector_numerics_tests {
     use super::*;
@@ -290,6 +316,15 @@ mod matrix_distance_regression {
         let b = vec![vec![1.0e308, 0.0], vec![-1.0e308, 0.0]];
         let product = mat_mul(&a, &b).unwrap();
         assert_eq!(product, vec![vec![0.0, 0.0], vec![0.0, 0.0]]);
+    }
+
+    #[test]
+    fn matrix_distance_handles_extreme_finite_differences() {
+        let a = vec![vec![1.0e308, -1.0e308]];
+        let b = vec![vec![-1.0e308, 1.0e308]];
+        let distance = matrix_distance(&a, &b).unwrap();
+        assert!(distance.is_finite());
+        assert!(distance > 0.0);
     }
 
     #[test]
