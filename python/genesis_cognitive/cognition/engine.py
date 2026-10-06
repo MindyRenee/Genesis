@@ -4392,7 +4392,11 @@ class CognitionEngine:
         doesn't override deliberation.
         """
         plan = self.executive.current_plan
-        if plan is None or not plan.steps:
+        if plan is None or not plan.steps or plan.confidence <= 0.0:
+            # An ungrounded plan has no transition/outcome model and
+            # therefore must not bias cognition merely because it picked
+            # the first supplied action. ExecutiveFunction.plan() marks
+            # such plans with zero confidence.
             return thought
         selected_action = plan.steps[0]
         # Map plan actions to thought intents.
