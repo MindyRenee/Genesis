@@ -145,7 +145,11 @@ impl SystemEngine {
             let r2 = if saturation == 0.0 {
                 0.0
             } else {
-                dot(&layers[target].state, &layers[target].state)
+                let value = dot(&layers[target].state, &layers[target].state);
+                if !value.is_finite() {
+                    return Err(FieldError::NonFiniteState);
+                }
+                value
             };
             for k in 0..d {
                 for j in 0..d {
@@ -176,7 +180,6 @@ impl SystemEngine {
     /// state-dependent and can stabilize trajectories even when the linear
     /// origin is not contractive.
     pub fn linear_growth_bound(&self) -> Result<f64, FieldError> {
-        self.validate()?;
         let (n, d) = self.validate()?;
         if n == 0 || d == 0 || self.couplings.len() != n
             || self.couplings.iter().any(|row| row.len() != n)
