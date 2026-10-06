@@ -46,7 +46,35 @@ impl PoincareBall {
     pub fn curvature(&self) -> f64 { self.curvature }
     fn scaled_radius(&self) -> f64 { 1.0 / self.curvature.sqrt() }
     pub fn contains(&self, x: &[f64]) -> bool { x.len() == self.dimension && x.iter().all(|v| v.is_finite()) && norm(x) < self.scaled_radius() }
-    pub fn project(&self, x: &[f64]) -> Result<Vector, FieldError> { if x.len() != self.dimension || x.iter().any(|v| !v.is_finite()) { return Err(FieldError::DimensionMismatch); } let r=self.scaled_radius(); let n=norm(x); if n<r{return Ok(x.to_vec())} let target=r*(1.0-1.0e-9); Ok(scaled(x,target/n)) }
+    pub fn project(&self, x: &[f64]) -> Result<Vector, FieldError> {
+        if x.len() != self.dimension {
+            return Err(FieldError::DimensionMismatch);
+        }
+        if x.iter().any(|v| !v.is_finite()) {
+            return Err(FieldError::NonFiniteState);
+        }
+        let r = self.scaled_radius();
+        let n = norm(x);
+        if !n.is_finite() {
+            return Err(FieldError::NonFiniteState);
+        }
+        if n < r {
+            return Ok(x.to_vec());
+        }
+        let target = r * (1.0 - 1.0e-9);
+        if !target.is_finite() || target <= 0.0 {
+            return Err(FieldError::InvalidGeometry);
+        }
+        let scale = target / n;
+        if !scale.is_finite() || scale <= 0.0 {
+            return Err(FieldError::NonFiniteState);
+        }
+        let projected = scaled(x, scale);
+        if projected.iter().any(|v| !v.is_finite()) || !self.contains(&projected) {
+            return Err(FieldError::NonFiniteState);
+        }
+        Ok(projected)
+    }
     pub fn distance(&self,x:&[f64],y:&[f64])->Result<f64,FieldError>{self.validate_point(x)?;self.validate_point(y)?;let sqrt_c=self.curvature.sqrt();let ux=scaled(x,sqrt_c);let uy=scaled(y,sqrt_c);let nx=dot(&ux,&ux);let ny=dot(&uy,&uy);let dxy=norm(&sub(&ux,&uy));if !nx.is_finite()||!ny.is_finite()||!dxy.is_finite(){return Err(FieldError::NonFiniteState)}let denom=(1.0-nx).max(EPS)*(1.0-ny).max(EPS);let arg=1.0+2.0*dxy*dxy/denom;if !arg.is_finite(){return Err(FieldError::NonFiniteState)}let distance=arg.max(1.0).acosh()/sqrt_c;if !distance.is_finite(){return Err(FieldError::NonFiniteState)}Ok(distance)}
     pub fn log_origin(&self,x:&[f64])->Result<Vector,FieldError>{self.validate_point(x)?;let r=norm(x);if r<EPS{return Ok(vec![0.0;self.dimension])}let scaled_r=self.curvature.sqrt()*r;let atanh_arg=scaled_r.min(1.0-f64::EPSILON);let z=atanh_arg.atanh()*2.0/scaled_r;Ok(scaled(x,z))}
     pub fn exp_origin(&self,v:&[f64])->Result<Vector,FieldError>{if v.len()!=self.dimension||v.iter().any(|x|!x.is_finite()){return Err(FieldError::DimensionMismatch)}let r=norm(v);if r<EPS{return Ok(v.to_vec())}let sqrt_c=self.curvature.sqrt();let scaled_r=sqrt_c*r;let z=if scaled_r.is_finite(){2.0*(scaled_r/2.0).tanh()/scaled_r}else{2.0*(1.0/sqrt_c)/r};self.project(&scaled(v,z))}
@@ -226,6 +254,13 @@ mod tests {
         let recovered = m.exp_origin(&tangent).unwrap();
         assert!((x[0]-recovered[0]).abs() < 1.0e-9);
         assert!(m.contains(&recovered));
+    }
+
+    #[test]
+    fn project_rejects_finite_coordinates_whose_norm_overflows() {
+        let m = PoincareBall::new(4, 1.0).unwrap();
+        let x = vec![f64::MAX; 4];
+        assert_eq!(m.project(&x), Err(FieldError::NonFiniteState));
     }
 
     #[test]
