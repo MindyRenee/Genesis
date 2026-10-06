@@ -100,10 +100,13 @@ from genesis_cognitive.mind import Mind
 from genesis_cognitive.mind.thresholds import AUTO_WAKE_MIN_SLEEP_S
 from genesis_cognitive.speech import Voice, VoiceInput
 
+capture_android_camera: Callable[[str | os.PathLike[str]], str | None] | None
 try:
-    from genesis_cognitive.android_camera import capture_android_camera
+    from genesis_cognitive.android_camera import capture_android_camera as _capture_android_camera
 except ImportError:
     capture_android_camera = None
+else:
+    capture_android_camera = _capture_android_camera
 
 # Script directory — used to locate the project root. Python already
 # adds the script's directory to sys.path[0], so genesis_cognitive and
@@ -1721,17 +1724,17 @@ def _cmd_look(mind: Mind, rest: str) -> str:
             logger.debug("Android camera capture failed: %s", e)
             android_path = None
         if android_path:
-            result_holder: dict[str, str] = {}
+            android_result_holder: dict[str, str] = {}
             t = threading.Thread(
-                target=lambda: result_holder.__setitem__(
+                target=lambda: android_result_holder.__setitem__(
                     "value", mind.look_at_image(android_path)
                 ),
                 daemon=True,
             )
             t.start()
             t.join(timeout=15.0)
-            if not t.is_alive() and result_holder.get("value"):
-                return f"\\n  genesis> {result_holder['value']}\\n"
+            if not t.is_alive() and android_result_holder.get("value"):
+                return f"\\n  genesis> {android_result_holder['value']}\\n"
 
     # Default: look through the retina
     retina_holder: dict[str, str] = {}
