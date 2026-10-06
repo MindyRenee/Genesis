@@ -195,7 +195,7 @@ def transfer_episode(
         "transfer_available": bool(foreign),
         "action_rebinding_tested": False,
         "success": None,
-        "goal": goal[0].to_dict() if hasattr(goal[0], "to_dict") else str(goal[0]),
+        "goal": str(goal[0]),
     }
 
 
@@ -258,9 +258,9 @@ def main() -> None:
             ),
         },
         "interpretation": [
-            "A positive result means the tested competence substrate learned "
-            "an externally verified procedure and exposed it across a "
-            "structurally analogous domain.",
+            "A positive acquisition result means the competence substrate "
+            "learned an externally verified procedure through environment "
+            "feedback.",
             "This does not establish AGI: the environment is deterministic "
             "and deliberately small.",
             "A stronger subsequent probe should vary task rules, hide the "
