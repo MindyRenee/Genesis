@@ -50,6 +50,7 @@ use crate::state::neurochemical::{NeuroTickParams, NeurochemicalId};
 use crate::state::{CognitiveZone, MentalPhase, ModuleId, ModuleStatus, subcognitive_flag};
 use crate::store::ring_buffer::EventType;
 use crate::store::{LtmStore, MmapState, RingBuffer};
+use crate::field::{FieldIntegration, FieldRuntime};
 
 use super::active_inference::{
     ActiveInferenceEngine, DyadicSignals, apply_inference_feedback, impulse_offset_to_rate,
@@ -169,6 +170,10 @@ pub struct TickLoop {
     /// Dyadic affective model — a coupled generative model of the
     /// user's affective state, with oxytocin-mediated attunement.
     pub dyadic_model: DyadicAffectModel,
+    /// Live multi-fiber integration substrate for the major daemon systems.
+    pub field_runtime: FieldRuntime,
+    /// Most recent cross-system field integration result.
+    last_field_integration: Option<FieldIntegration>,
     /// Metaplasticity boost multiplier from the last inference cycle.
     /// High surprise → faster coupling-matrix learning on the next
     /// tick. Reset to 1.0 after each application.
@@ -233,6 +238,10 @@ impl TickLoop {
             last_body_state: super::interoception::BodyState::neutral(),
             inference_engine: ActiveInferenceEngine::new(),
             dyadic_model: DyadicAffectModel::new(),
+            field_runtime: FieldRuntime::new().expect("field topology must be constructible"),
+            last_field_integration: None,
+            field_runtime: FieldRuntime::new().expect("field topology must be constructible"),
+            last_field_integration: None,
             metaplasticity_boost: 1.0,
             last_freq_policy: super::cpufreq::FreqPolicy::default(),
             last_daemon_nice: 0,
@@ -1004,6 +1013,11 @@ impl TickLoop {
         result
     }
 
+    /// Most recent multi-fiber integration result.
+    pub fn field_integration(&self) -> Option<&FieldIntegration> {
+        self.last_field_integration.as_ref()
+    }
+
     /// Total ticks run.
     pub fn tick_count(&self) -> u64 {
         self.tick_count
@@ -1216,6 +1230,17 @@ impl TickLoop {
             // The inference cycle already ran — we just couldn't write
             // the feedback. Return the result so the cognitive mind
             // still sees the prediction errors and free energy.
+        }
+
+        // Integrate the post-feedback state through the new multi-fiber
+        // topology. The core state remains authoritative; the field is the
+        // shared substrate through which body, prediction, and agency can
+        // disagree, converge, and later acquire learned transport laws.
+        if let Some(snapshot) = mmap.read_consistent() {
+            match self.field_runtime.observe(&snapshot, dt as f64) {
+                Ok(integration) => self.last_field_integration = Some(integration),
+                Err(e) => eprintln!("[tick] field integration skipped: {e}"),
+            }
         }
 
         (
