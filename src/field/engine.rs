@@ -163,6 +163,10 @@ impl SystemEngine {
     /// infinity norm. A negative value is a sufficient condition for
     /// contraction of the linearized dynamics; a non-negative value is not
     /// a proof of instability.
+    ///
+    /// This bound deliberately excludes nonlinear saturation. Saturation is
+    /// state-dependent and can stabilize trajectories even when the linear
+    /// origin is not contractive.
     pub fn linear_growth_bound(&self) -> Result<f64, FieldError> {
         let (n, d) = self.validate()?;
         if n == 0 || d == 0 || self.couplings.len() != n
@@ -254,6 +258,16 @@ mod tests {
         let layers = vec![SubsystemLayer::new("a", vec![0.5])];
         let d = engine.derivatives(&layers).unwrap();
         assert!((d[0][0] + 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn saturation_dissipates_radial_growth() {
+        let engine = SystemEngine::zero(1, 1)
+            .with_saturation(vec![2.0]).unwrap();
+        let layers = vec![SubsystemLayer::new("a", vec![2.0])];
+        let d = engine.derivatives(&layers).unwrap();
+        assert!(d[0][0] < 0.0);
+        assert!((d[0][0] + 16.0).abs() < 1e-12);
     }
 
     #[test]
