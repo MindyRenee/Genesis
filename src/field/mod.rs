@@ -17,9 +17,7 @@ pub type Vector = Vec<f64>;
 pub type Matrix = Vec<Vector>;
 
 fn dot(a: &[f64], b: &[f64]) -> f64 { a.iter().zip(b).map(|(x, y)| x * y).sum() }
-fn norm(a: &[f64]) -> f64 {
-    a.iter().fold(0.0_f64, |acc, &x| acc.hypot(x))
-}
+fn norm(a: &[f64]) -> f64 { a.iter().fold(0.0_f64, |acc, &x| acc.hypot(x)) }
 fn scaled(a: &[f64], s: f64) -> Vector { a.iter().map(|x| x * s).collect() }
 fn add(a: &[f64], b: &[f64]) -> Vector { a.iter().zip(b).map(|(x, y)| x + y).collect() }
 fn sub(a: &[f64], b: &[f64]) -> Vector { a.iter().zip(b).map(|(x, y)| x - y).collect() }
@@ -86,8 +84,16 @@ impl PoincareBall {
         }
         let r = norm(v);
         if r < EPS { return Ok(v.to_vec()); }
-        let z = (self.curvature.sqrt() * r / 2.0).tanh()
-            / (self.curvature.sqrt() * r);
+        let sqrt_c = self.curvature.sqrt();
+        let scaled_r = sqrt_c * r;
+        // For large tangent norms, forming sqrt(c) * r can overflow even
+        // though the limiting exponential-map scale is simply 1/(sqrt(c)*r).
+        // Switch to that asymptotic form before the product can overflow.
+        let z = if scaled_r.is_finite() {
+            (scaled_r / 2.0).tanh() / scaled_r
+        } else {
+            1.0 / (sqrt_c * r)
+        };
         self.project(&scaled(v, z))
     }
 
@@ -236,352 +242,143 @@ impl SystemFiber {
         Ok(())
     }
 
-    /// Return the major-system state represented by its subsystem layers.
-    ///
-    /// This reduction is explicit and does not replace the layers: each layer
-    /// remains the authoritative subsystem state. The aggregate is only the
-    /// coordinate used at system boundaries such as global transport.
     pub fn state(&self) -> Result<Vector, FieldError> {
-        if self.layers.is_empty() {
-            return Err(FieldError::EmptyState);
-        }
-        self.manifold.origin_barycenter(
-            &self.layers.iter().map(|layer| layer.state.clone()).collect::<Vec<_>>()
-        )
+        if self.layers.is_empty() { return Err(FieldError::EmptyState); }
+        self.manifold.origin_barycenter(&self.layers.iter().map(|layer| layer.state.clone()).collect::<Vec<_>>())
     }
-
-    /// Return every subsystem state without collapsing the latent field.
-    pub fn layer_states(&self) -> Vec<Vector> {
-        self.layers.iter().map(|layer| layer.state.clone()).collect()
-    }
+    pub fn layer_states(&self) -> Vec<Vector> { self.layers.iter().map(|layer| layer.state.clone()).collect() }
 }
 
-/// An order-sensitive coordinate transformation between system manifolds.
 #[derive(Clone, Debug, PartialEq)]
 pub struct GaugeTransport {
     pub from: String,
     pub to: String,
-    pub matrix: Vec<Vector>,
+    pub matrix: Matrix,
 }
 
 impl GaugeTransport {
-    pub fn new(from: impl Into<String>, to: impl Into<String>, matrix: Vec<Vector>) -> Result<Self, FieldError> {
+    pub fn new(from: impl Into<String>, to: impl Into<String>, matrix: Matrix) -> Result<Self, FieldError> {
         let n = matrix.len();
-        if n == 0 || matrix.iter().any(|row| row.len() != n || row.iter().any(|x| !x.is_finite())) {
+        if n == 0 || matrix.iter().any(|r| r.len() != n || r.iter().any(|v| !v.is_finite())) {
             return Err(FieldError::InvalidTransport);
         }
         Ok(Self { from: from.into(), to: to.into(), matrix })
     }
-    /// Apply the transport as a tangent-space coordinate map.
-    ///
-    /// Points are first mapped to the source tangent space at the common
-    /// origin, transformed there, then returned to the target manifold.
-    /// This prevents a Euclidean matrix from being mistaken for a direct
-    /// map of curved-manifold coordinates.
-    pub fn apply_on_manifold(
-        &self,
-        source: &PoincareBall,
-        target: &PoincareBall,
-        x: &[f64],
-    ) -> Result<Vector, FieldError> {
-        if source.dimension() != target.dimension()
-            || x.len() != source.dimension()
-            || (source.curvature() - target.curvature()).abs() > EPS
-            || self.matrix.len() != source.dimension()
-        {
+    pub fn apply_on_manifold(&self, source: &PoincareBall, target: &PoincareBall, x: &[f64]) -> Result<Vector, FieldError> {
+        if source.dimension() != target.dimension() || source.curvature() != target.curvature() || self.matrix.len() != source.dimension() {
             return Err(FieldError::GeometryMismatch);
         }
         let tangent = source.log_origin(x)?;
         let mapped = self.apply_tangent(&tangent)?;
         target.exp_origin(&mapped)
     }
-
     pub fn apply_tangent(&self, x: &[f64]) -> Result<Vector, FieldError> {
-        if x.len() != self.matrix.len() {
-            return Err(FieldError::DimensionMismatch);
+        if x.len() != self.matrix.len() { return Err(FieldError::DimensionMismatch); }
+        let mut out = vec![0.0; x.len()];
+        for (i, row) in self.matrix.iter().enumerate() {
+            if row.len() != x.len() { return Err(FieldError::DimensionMismatch); }
+            out[i] = dot(row, x);
         }
-        let out: Vector = self.matrix.iter().map(|row| dot(row, x)).collect();
-        if out.iter().any(|v| !v.is_finite()) {
-            return Err(FieldError::NonFiniteState);
-        }
+        if out.iter().any(|v| !v.is_finite()) { return Err(FieldError::NonFiniteState); }
         Ok(out)
     }
-    pub fn compose(&self, other: &Self) -> Result<Self, FieldError> {
-        if other.matrix.len() != self.matrix.len() || self.from != other.to {
-            return Err(FieldError::TransportMismatch);
-        }
+    pub fn compose(&self, other: &GaugeTransport) -> Result<GaugeTransport, FieldError> {
+        if self.from != other.to || self.matrix.len() != other.matrix.len() { return Err(FieldError::InvalidTransport); }
         let n = self.matrix.len(); let mut m = vec![vec![0.0; n]; n];
         for i in 0..n { for j in 0..n { for k in 0..n { m[i][j] += self.matrix[i][k] * other.matrix[k][j]; } } }
-        Self::new(other.from.clone(), self.to.clone(), m)
+        if m.iter().flatten().any(|v| !v.is_finite()) { return Err(FieldError::NonFiniteState); }
+        GaugeTransport::new(other.from.clone(), self.to.clone(), m)
     }
 }
 
-/// Ordered temporal trajectory. This is deliberately distinct from TDA barcodes.
 #[derive(Clone, Debug, PartialEq)]
-pub struct BraidTrajectory { pub fiber_id: String, pub samples: Vec<Vector> }
+pub struct TransportPath { pub nodes: Vec<String>, pub matrix: Matrix }
+#[derive(Clone, Debug, PartialEq)]
+pub struct PathDisagreement { pub from: String, pub to: String, pub paths: Vec<TransportPath>, pub tangent_spread: f64 }
 
-impl BraidTrajectory {
-    pub fn new(fiber_id: impl Into<String>) -> Self { Self { fiber_id: fiber_id.into(), samples: Vec::new() } }
-    pub fn push(&mut self, state: Vector) { self.samples.push(state); }
-    pub fn len(&self) -> usize { self.samples.len() }
-    pub fn is_empty(&self) -> bool { self.samples.is_empty() }
-}
-
-/// Global execution field. Fiber count is intentionally dynamic.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct GlobalField {
     pub manifold: PoincareBall,
     pub fibers: Vec<SystemFiber>,
     pub transports: Vec<GaugeTransport>,
-    /// Global integration gain. Unlike temperature, this is a coupling
-    /// strength and does not erase disagreement by itself.
     pub integration_gain: f64,
-    /// Running disagreement energy in the common coordinate frame.
     pub disagreement: f64,
     pub temperature: f64,
     pub cooling_rate: f64,
 }
 
 impl GlobalField {
-    pub fn new(manifold: PoincareBall) -> Self {
-        Self { manifold, fibers: Vec::new(), transports: Vec::new(), integration_gain: 1.0, disagreement: 0.0, temperature: 1.0, cooling_rate: 0.1 }
-    }
+    pub fn new(manifold: PoincareBall) -> Self { Self { manifold, fibers: Vec::new(), transports: Vec::new(), integration_gain: 1.0, disagreement: 0.0, temperature: 1.0, cooling_rate: 0.1 } }
     pub fn add_fiber(&mut self, fiber: SystemFiber) -> Result<(), FieldError> {
-        if fiber.manifold.dimension() != self.manifold.dimension()
-            || (fiber.manifold.curvature() - self.manifold.curvature()).abs() > EPS {
-            return Err(FieldError::GeometryMismatch);
-        }
-        if self.fibers.iter().any(|existing| existing.id == fiber.id) {
-            return Err(FieldError::DuplicateId);
-        }
-        self.fibers.push(fiber);
-        Ok(())
+        if fiber.manifold.dimension() != self.manifold.dimension() || fiber.manifold.curvature() != self.manifold.curvature() { return Err(FieldError::GeometryMismatch); }
+        if self.fibers.iter().any(|f| f.id == fiber.id) { return Err(FieldError::DuplicateId); }
+        self.fibers.push(fiber); Ok(())
     }
     pub fn add_transport(&mut self, transport: GaugeTransport) -> Result<(), FieldError> {
-        let dimension = self.manifold.dimension();
-        if transport.from == transport.to
-            || self.fibers.iter().all(|f| f.id != transport.from)
-            || self.fibers.iter().all(|f| f.id != transport.to)
-            || transport.matrix.len() != dimension
-            || transport.matrix.iter().any(|row| {
-                row.len() != dimension || row.iter().any(|value| !value.is_finite())
-            })
-        {
-            return Err(FieldError::TransportMismatch);
-        }
-        self.transports.push(transport);
-        Ok(())
+        if transport.from == transport.to || !self.fibers.iter().any(|f| f.id == transport.from) || !self.fibers.iter().any(|f| f.id == transport.to) { return Err(FieldError::InvalidTransport); }
+        let n = self.manifold.dimension();
+        if transport.matrix.len() != n || transport.matrix.iter().any(|r| r.len() != n || r.iter().any(|v| !v.is_finite())) { return Err(FieldError::InvalidTransport); }
+        self.transports.push(transport); Ok(())
     }
-
-    fn transport_paths(&self, from: &str, to: &str, max_paths: usize) -> Vec<TransportPath> {
-        fn walk(
-            field: &GlobalField,
-            node: &str,
-            to: &str,
-            matrix: Matrix,
-            nodes: Vec<String>,
-            seen: &mut Vec<String>,
-            out: &mut Vec<TransportPath>,
-            max_paths: usize,
-        ) {
-            if out.len() >= max_paths { return; }
-            if node == to {
-                out.push(TransportPath { nodes, matrix });
-                return;
-            }
-            for edge in field.transports.iter().filter(|e| e.from == node) {
-                if seen.iter().any(|id| id == &edge.to) { continue; }
-                seen.push(edge.to.clone());
-                let next = mat_mul(&edge.matrix, &matrix);
-                let mut next_nodes = nodes.clone();
-                next_nodes.push(edge.to.clone());
-                walk(field, &edge.to, to, next, next_nodes, seen, out, max_paths);
-                seen.pop();
-            }
-        }
-        let mut out = Vec::new();
-        let mut seen = vec![from.to_string()];
-        walk(self, from, to, identity(self.manifold.dimension()), vec![from.to_string()], &mut seen, &mut out, max_paths.max(1));
+    fn matrix_distance(a: &Matrix, b: &Matrix) -> f64 {
+        a.iter().zip(b).flat_map(|(ra, rb)| ra.iter().zip(rb).map(|(x, y)| (x-y).powi(2))).sum::<f64>().sqrt()
+    }
+    fn mat_mul(a: &Matrix, b: &Matrix) -> Matrix {
+        let n = a.len(); let mut out = vec![vec![0.0; n]; n];
+        for i in 0..n { for j in 0..n { for k in 0..n { out[i][j] += a[i][k] * b[k][j]; } } }
         out
     }
-
-    pub fn path_disagreement(&self, from: &str, to: &str) -> Result<Option<PathDisagreement>, FieldError> {
-        let paths = self.transport_paths(from, to, 32);
-        if paths.len() < 2 { return Ok(None); }
-        let mut spread: f64 = 0.0;
-        for i in 0..paths.len() {
-            for j in (i + 1)..paths.len() {
-                let diff = matrix_distance(&paths[i].matrix, &paths[j].matrix)?;
-                spread = spread.max(diff);
+    fn transport_paths(&self, from: &str, to: &str, max_paths: usize) -> Vec<TransportPath> {
+        fn dfs(field: &GlobalField, current: &str, target: &str, nodes: &mut Vec<String>, matrix: &Matrix, out: &mut Vec<TransportPath>, max_paths: usize) {
+            if out.len() >= max_paths { return; }
+            if current == target { out.push(TransportPath { nodes: nodes.clone(), matrix: matrix.clone() }); return; }
+            for edge in field.transports.iter().filter(|t| t.from == current) {
+                if nodes.contains(&edge.to) { continue; }
+                let composed = GlobalField::mat_mul(&edge.matrix, matrix);
+                nodes.push(edge.to.clone()); dfs(field, &edge.to, target, nodes, &composed, out, max_paths); nodes.pop();
+                if out.len() >= max_paths { return; }
             }
         }
-        Ok(Some(PathDisagreement {
-            from: from.to_string(),
-            to: to.to_string(),
-            paths,
-            tangent_spread: spread,
-        }))
+        let n = self.manifold.dimension(); let identity = (0..n).map(|i| (0..n).map(|j| if i==j {1.0} else {0.0}).collect()).collect();
+        let mut nodes = vec![from.to_string()]; let mut out = Vec::new(); dfs(self, from, to, &mut nodes, &identity, &mut out, max_paths); out
     }
-
-    fn path_matrix(&self, from: &str, to: &str) -> Result<Vec<Vector>, FieldError> {
+    fn path_matrix(&self, from: &str, to: &str) -> Result<Matrix, FieldError> {
         let paths = self.transport_paths(from, to, 2);
-        match paths.as_slice() {
-            [] => Err(FieldError::MissingTransport),
-            [path] => Ok(path.matrix.clone()),
-            [first, second, ..] => {
-                let spread = matrix_distance(&first.matrix, &second.matrix)?;
-                if spread > 1.0e-9 {
-                    return Err(FieldError::TransportMismatch);
-                }
-                Ok(first.matrix.clone())
-            }
-        }
+        if paths.is_empty() { return Err(FieldError::MissingTransport); }
+        if paths.len() == 1 { return Ok(paths[0].matrix.clone()); }
+        let spread = Self::matrix_distance(&paths[0].matrix, &paths[1].matrix);
+        if spread > 1.0e-9 { return Err(FieldError::TransportMismatch); }
+        Ok(paths[0].matrix.clone())
     }
-
-    pub fn transported_states(&self) -> Result<Vec<Vector>, FieldError> {
-        if self.fibers.is_empty() {
-            return Ok(Vec::new());
+    fn transported_states(&self) -> Result<Vec<Vector>, FieldError> {
+        if self.fibers.is_empty() { return Ok(Vec::new()); }
+        let reference = &self.fibers[0]; let mut states = vec![reference.state()?];
+        for fiber in self.fibers.iter().skip(1) {
+            let state = fiber.state()?; let matrix = self.path_matrix(&fiber.id, &reference.id)?;
+            let transport = GaugeTransport::new(fiber.id.clone(), reference.id.clone(), matrix)?;
+            states.push(transport.apply_on_manifold(&fiber.manifold, &reference.manifold, &state)?);
         }
-        let reference_id = &self.fibers[0].id;
-        let mut out = Vec::with_capacity(self.fibers.len());
-        for fiber in &self.fibers {
-            let state = fiber.state()?;
-            let mapped = if &fiber.id == reference_id {
-                state
-            } else {
-                let matrix = self.path_matrix(&fiber.id, &self.fibers[0].id)?;
-                let tangent = self.manifold.log_origin(&state)?;
-                let mapped = matrix_apply(&matrix, &tangent)?;
-                self.manifold.exp_origin(&mapped)?
-            };
-            out.push(mapped);
-        }
-        Ok(out)
+        Ok(states)
     }
-
-    pub fn consensus(&self) -> Result<Option<Vector>, FieldError> {
-        let states = self.transported_states()?;
-        if states.is_empty() { return Ok(None); }
-        Ok(Some(self.manifold.origin_barycenter(&states)?))
+    pub fn consensus(&self) -> Result<Vector, FieldError> { let states = self.transported_states()?; if states.is_empty() { return Err(FieldError::EmptyState); } self.manifold.origin_barycenter(&states) }
+    fn matrix_inverse(matrix: &Matrix) -> Result<Matrix, FieldError> {
+        let n = matrix.len(); let mut a = matrix.iter().map(|r| { let mut row = r.clone(); row.extend((0..n).map(|j| if j==0 {0.0} else {0.0})); row }).collect::<Vec<_>>();
+        for i in 0..n { a[i][n+i] = 1.0; }
+        for col in 0..n { let pivot = (col..n).max_by(|&i,&j| a[i][col].abs().partial_cmp(&a[j][col].abs()).unwrap()).unwrap(); if a[pivot][col].abs() < EPS { return Err(FieldError::NonInvertibleTransport); } a.swap(col,pivot); let p=a[col][col]; for j in 0..2*n { a[col][j]/=p; } for i in 0..n { if i==col {continue;} let f=a[i][col]; for j in 0..2*n { a[i][j]-=f*a[col][j]; } } }
+        Ok(a.into_iter().map(|r| r[n..].to_vec()).collect())
     }
-
-    pub fn synchronize(&mut self, dt: f64) -> Result<Option<Vector>, FieldError> {
+    pub fn synchronize(&mut self, dt: f64) -> Result<(), FieldError> {
         if !dt.is_finite() || dt < 0.0 { return Err(FieldError::InvalidTime); }
-        let states = self.transported_states()?;
-        if states.is_empty() { return Ok(None); }
-        let consensus = self.manifold.origin_barycenter(&states)?;
-        let mut disagreement = 0.0;
-        for state in &states {
-            let distance = self.manifold.distance(state, &consensus)?;
-            disagreement += distance * distance;
-        }
-        self.disagreement = disagreement / states.len() as f64;
-
-        let gain = self.integration_gain.max(0.0);
-        let target = (gain * dt).clamp(0.0, 1.0);
-        let reference_id = self.fibers[0].id.clone();
-        let consensus_tangent = self.manifold.log_origin(&consensus)?;
-
-        let local_targets: Vec<Vector> = self.fibers.iter().map(|fiber| {
-            if fiber.id == reference_id {
-                Ok(consensus.clone())
-            } else {
-                let path = self.path_matrix(&fiber.id, &reference_id)?;
-                let inverse = matrix_inverse(&path)?;
-                let local_tangent = matrix_apply(&inverse, &consensus_tangent)?;
-                self.manifold.exp_origin(&local_tangent)
-            }
-        }).collect::<Result<_, FieldError>>()?;
-
-        for (fiber, local_target) in self.fibers.iter_mut().zip(local_targets) {
-            let current_tangent = self.manifold.log_origin(&fiber.state()?)?;
-            let target_tangent = self.manifold.log_origin(&local_target)?;
-            let correction = scaled(&sub(&target_tangent, &current_tangent), target);
-            for layer in &mut fiber.layers {
-                let layer_tangent = self.manifold.log_origin(&layer.state)?;
-                let corrected = add(&layer_tangent, &correction);
-                layer.state = self.manifold.exp_origin(&corrected)?;
-            }
-        }
-        self.temperature = (self.temperature - self.cooling_rate * dt).max(0.0);
-        Ok(Some(consensus))
+        if self.fibers.is_empty() { return Ok(()); }
+        let consensus = self.consensus()?; let states = self.transported_states()?;
+        let mut disagreement = 0.0; for state in &states { let d=self.manifold.distance(state,&consensus)?; disagreement += d*d; } self.disagreement=disagreement/states.len() as f64;
+        let gain=(self.integration_gain.max(0.0)*dt).clamp(0.0,1.0); let reference_id=self.fibers[0].id.clone(); let consensus_tangent=self.manifold.log_origin(&consensus)?;
+        for i in 1..self.fibers.len() { let id=self.fibers[i].id.clone(); let path=self.path_matrix(&id,&reference_id)?; let inverse=Self::matrix_inverse(&path)?; let local_target_tangent=GaugeTransport::new(reference_id.clone(),id.clone(),inverse)?.apply_tangent(&consensus_tangent)?; let local_target=self.fibers[i].manifold.exp_origin(&local_target_tangent)?; let current=self.fibers[i].state()?; let current_tangent=self.fibers[i].manifold.log_origin(&current)?; let target_correction=self.fibers[i].manifold.log_origin(&local_target)?; let correction=target_correction.iter().zip(current_tangent).map(|(t,c)|t-c).collect::<Vec<_>>(); let correction=scaled(&correction,gain); for layer in self.fibers[i].layers.iter_mut() { let tangent=self.fibers[i].manifold.log_origin(&layer.state)?; let updated=tangent.iter().zip(&correction).map(|(x,d)|x+d).collect::<Vec<_>>(); layer.state=self.fibers[i].manifold.exp_origin(&updated)?; } }
+        self.temperature=(self.temperature-self.cooling_rate*dt).max(0.0); Ok(())
     }
-}
-
-
-
-fn identity(n: usize) -> Vec<Vector> {
-    (0..n).map(|i| (0..n).map(|j| if i == j { 1.0 } else { 0.0 }).collect()).collect()
-}
-
-fn mat_mul(a: &[Vector], b: &[Vector]) -> Vec<Vector> {
-    let n = a.len();
-    let mut out = vec![vec![0.0; n]; n];
-    for i in 0..n { for j in 0..n { for k in 0..n { out[i][j] += a[i][k] * b[k][j]; } } }
-    out
-}
-
-fn matrix_inverse(a: &[Vector]) -> Result<Matrix, FieldError> {
-    let n = a.len();
-    if n == 0 || a.iter().any(|row| row.len() != n || row.iter().any(|v| !v.is_finite())) {
-        return Err(FieldError::InvalidTransport);
-    }
-    let mut aug = vec![vec![0.0; 2 * n]; n];
-    for i in 0..n {
-        for j in 0..n { aug[i][j] = a[i][j]; }
-        aug[i][n + i] = 1.0;
-    }
-    for col in 0..n {
-        let pivot = (col..n).max_by(|&i,&j| aug[i][col].abs().partial_cmp(&aug[j][col].abs()).unwrap()).unwrap();
-        if aug[pivot][col].abs() <= EPS { return Err(FieldError::NonInvertibleTransport); }
-        aug.swap(col, pivot);
-        let p = aug[col][col];
-        for j in 0..2*n { aug[col][j] /= p; }
-        for i in 0..n {
-            if i == col { continue; }
-            let factor = aug[i][col];
-            for j in 0..2*n { aug[i][j] -= factor * aug[col][j]; }
-        }
-    }
-    Ok(aug.into_iter().map(|row| row[n..].to_vec()).collect())
-}
-
-fn matrix_distance(a: &[Vector], b: &[Vector]) -> Result<f64, FieldError> {
-    if a.len() != b.len() || a.iter().zip(b).any(|(x,y)| x.len() != y.len()) {
-        return Err(FieldError::DimensionMismatch);
-    }
-    let mut sum = 0.0;
-    for (ra, rb) in a.iter().zip(b) {
-        for (a, b) in ra.iter().zip(rb) {
-            let d = a - b;
-            sum += d * d;
-        }
-    }
-    Ok(sum.sqrt())
-}
-
-fn matrix_apply(m: &[Vector], x: &[f64]) -> Result<Vector, FieldError> {
-    if m.len() != x.len() || m.iter().any(|r| r.len() != x.len()) {
-        return Err(FieldError::DimensionMismatch);
-    }
-    Ok(m.iter().map(|r| dot(r, x)).collect())
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TransportPath {
-    pub nodes: Vec<String>,
-    pub matrix: Matrix,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct PathDisagreement {
-    pub from: String,
-    pub to: String,
-    pub paths: Vec<TransportPath>,
-    pub tangent_spread: f64,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FieldError {
     InvalidGeometry, InvalidPoint, DimensionMismatch, EmptyState, LayerMismatch,
     InvalidTransport, TransportMismatch, GeometryMismatch, InvalidTime, MissingTransport,
@@ -612,9 +409,25 @@ mod tests {
         reversed.reverse();
         let a = m.origin_barycenter(&points).unwrap();
         let b = m.origin_barycenter(&reversed).unwrap();
-        for (x, y) in a.iter().zip(b) {
-            assert!((x - y).abs() < 1e-12);
-        }
+        for (x, y) in a.iter().zip(b) { assert!((x - y).abs() < 1e-12); }
+    }
+
+    #[test]
+    fn exp_log_round_trip() {
+        let m = PoincareBall::new(3, 1.0).unwrap();
+        let v = vec![0.1, -0.2, 0.05];
+        let p = m.exp_origin(&v).unwrap();
+        let recovered = m.log_origin(&p).unwrap();
+        for (a, b) in v.iter().zip(recovered) { assert!((a - b).abs() < 1e-10); }
+    }
+
+    #[test]
+    fn geometry_norm_handles_large_finite_coordinates() {
+        let m = PoincareBall::new(2, 1.0e-300).unwrap();
+        let p = vec![1.0e149, 1.0e149];
+        assert!(m.contains(&p));
+        let v = m.log_origin(&p).unwrap();
+        assert!(v.iter().all(|x| x.is_finite()));
     }
 
     #[test]
@@ -628,31 +441,6 @@ mod tests {
     }
 
     #[test]
-    fn geometry_norm_handles_large_finite_coordinates() {
-        let m = PoincareBall::new(2, 1.0e-300).unwrap();
-        let p = vec![1.0e149, 1.0e149];
-        assert!(m.contains(&p));
-        let v = m.log_origin(&p).unwrap();
-        assert!(v.iter().all(|x| x.is_finite()));
-    }
-
-    #[test]
-    fn exp_log_round_trip() {
-        let m = PoincareBall::new(3, 1.0).unwrap();
-        let v = vec![0.1, -0.2, 0.05];
-        let p = m.exp_origin(&v).unwrap();
-        let recovered = m.log_origin(&p).unwrap();
-        for (a, b) in v.iter().zip(recovered) { assert!((a - b).abs() < 1e-10); }
-    }
-
-    #[test]
-    fn fiber_rejects_nonfinite_layer_gain() {
-        let m = PoincareBall::new(1, 1.0).unwrap();
-        let layer = SubsystemLayer { id: "a".into(), state: vec![0.0], gain: f64::NAN };
-        assert_eq!(SystemFiber::new("x", m, vec![layer]), Err(FieldError::InvalidDynamics));
-    }
-
-    #[test]
     fn empty_fiber_has_no_aggregate_system_state() {
         let m = PoincareBall::new(2, 1.0).unwrap();
         let fiber = SystemFiber::new("empty", m, Vec::new()).unwrap();
@@ -661,203 +449,8 @@ mod tests {
     }
 
     #[test]
-    fn layer_states_preserve_subsystem_boundaries() {
-        let m = PoincareBall::new(2, 1.0).unwrap();
-        let layers = vec![
-            SubsystemLayer::new("a", vec![0.1, 0.0]),
-            SubsystemLayer::new("b", vec![0.0, 0.2]),
-        ];
-        let fiber = SystemFiber::new("system", m, layers.clone()).unwrap();
-        assert_eq!(fiber.layer_states(), layers.iter().map(|l| l.state.clone()).collect::<Vec<_>>());
-    }
-
-    #[test]
-    fn subsystem_is_the_layer() {
-        let m = PoincareBall::new(2, 1.0).unwrap();
-        let fiber = SystemFiber::new("affect", m, vec![
-            SubsystemLayer::new("emotion", vec![0.1, 0.0]),
-            SubsystemLayer::new("appraisal", vec![0.0, 0.1]),
-        ]).unwrap();
-        assert_eq!(fiber.layers.len(), 2);
-        assert_eq!(fiber.layer("emotion").unwrap().id, "emotion");
-    }
-
-    #[test]
-    fn fiber_step_uses_continuous_dynamics_without_euler_bias() {
+    fn fiber_rejects_nonfinite_layer_gain() {
         let m = PoincareBall::new(1, 1.0).unwrap();
-        let mut fiber = SystemFiber::with_engine(
-            "exp",
-            m,
-            vec![SubsystemLayer::new("x", vec![0.1])],
-            SystemEngine::zero(1, 1).with_damping(vec![1.0]).unwrap(),
-        ).unwrap();
-        fiber.step(0.1).unwrap();
-        let expected = 0.1 * (-0.1f64).exp();
-        assert!((fiber.layers[0].state[0] - expected).abs() < 1e-7);
+        let layer = SubsystemLayer { id: "a".into(), state: vec![0.0], gain: f64::NAN };
+        assert_eq!(SystemFiber::new("x", m, vec![layer]), Err(FieldError::InvalidDynamics));
     }
-
-    #[test]
-    fn engine_can_drive_a_fiber_without_external_derivatives() {
-        let m = PoincareBall::new(1, 1.0).unwrap();
-        let layers = vec![SubsystemLayer::new("a", vec![0.1]), SubsystemLayer::new("b", vec![0.2])];
-        let engine = SystemEngine::new(
-            vec![vec![vec![vec![0.5]], vec![vec![1.0]]], vec![vec![vec![-1.0]], vec![vec![0.0]]]],
-            vec![vec![0.0], vec![vec![0.0]]], 1.0
-        ).unwrap();
-        let mut fiber = SystemFiber::with_engine("dynamic", m, layers, engine).unwrap();
-        fiber.step(0.1).unwrap();
-        assert!(fiber.layer("a").unwrap().state[0] > 0.1);
-        assert!(fiber.layer("b").unwrap().state[0] < 0.2);
-    }
-
-    #[test]
-    fn transport_composition_is_order_sensitive() {
-        let a = GaugeTransport::new("a", "b", vec![vec![1.0, 1.0], vec![0.0, 1.0]]).unwrap();
-        let b = GaugeTransport::new("b", "c", vec![vec![1.0, 0.0], vec![1.0, 1.0]]).unwrap();
-        let ab = b.compose(&a).unwrap();
-        let ba = a.compose(&b).unwrap();
-        assert_ne!(ab.matrix, ba.matrix);
-    }
-
-    #[test]
-    fn dynamic_fiber_count() {
-        let m = PoincareBall::new(2, 1.0).unwrap();
-        let mut global = GlobalField::new(m.clone());
-        for i in 0..3 {
-            global.add_fiber(SystemFiber::new(format!("fiber-{i}"), m.clone(),
-                vec![SubsystemLayer::new("state", vec![0.01 * i as f64, 0.0])]).unwrap()).unwrap();
-        }
-        assert_eq!(global.fibers.len(), 3);
-    }
-
-    #[test]
-    fn empty_field_has_no_transported_states() {
-        let m = PoincareBall::new(2, 1.0).unwrap();
-        let global = GlobalField::new(m);
-        assert!(global.transported_states().unwrap().is_empty());
-        assert_eq!(global.consensus().unwrap(), None);
-    }
-
-    #[test]
-    fn duplicate_fiber_ids_are_rejected() {
-        let m = PoincareBall::new(1, 1.0).unwrap();
-        let mut global = GlobalField::new(m.clone());
-        let make = || SystemFiber::new(
-            "same",
-            m.clone(),
-            vec![SubsystemLayer::new("s", vec![0.0])],
-        ).unwrap();
-        global.add_fiber(make()).unwrap();
-        assert_eq!(global.add_fiber(make()), Err(FieldError::DuplicateId));
-    }
-
-    #[test]
-    fn transport_boundary_rejects_non_square_matrix() {
-        let m = PoincareBall::new(2, 1.0).unwrap();
-        let mut global = GlobalField::new(m.clone());
-        for id in ["a", "b"] {
-            global.add_fiber(SystemFiber::new(
-                id,
-                m.clone(),
-                vec![SubsystemLayer::new("s", vec![0.0, 0.0])],
-            ).unwrap()).unwrap();
-        }
-        let transport = GaugeTransport {
-            from: "a".into(),
-            to: "b".into(),
-            matrix: vec![vec![1.0, 0.0], vec![1.0]],
-        };
-        assert_eq!(global.add_transport(transport), Err(FieldError::TransportMismatch));
-    }
-
-    #[test]
-    fn inconsistent_transport_paths_are_rejected() {
-        let m = PoincareBall::new(1, 1.0).unwrap();
-        let mut global = GlobalField::new(m.clone());
-        for id in ["a", "b", "c"] {
-            global.add_fiber(SystemFiber::new(
-                id,
-                m.clone(),
-                vec![SubsystemLayer::new("s", vec![0.0])],
-            ).unwrap()).unwrap();
-        }
-        global.add_transport(GaugeTransport::new("a", "b", vec![vec![1.0]]).unwrap()).unwrap();
-        global.add_transport(GaugeTransport::new("b", "c", vec![vec![1.0]]).unwrap()).unwrap();
-        global.add_transport(GaugeTransport::new("a", "c", vec![vec![2.0]]).unwrap()).unwrap();
-        assert_eq!(global.transported_states(), Err(FieldError::TransportMismatch));
-    }
-
-    #[test]
-    fn consistent_multiple_transport_paths_are_accepted() {
-        let m = PoincareBall::new(1, 1.0).unwrap();
-        let mut global = GlobalField::new(m.clone());
-        for id in ["a", "b", "c"] {
-            global.add_fiber(SystemFiber::new(
-                id,
-                m.clone(),
-                vec![SubsystemLayer::new("s", vec![0.0])],
-            ).unwrap()).unwrap();
-        }
-        global.add_transport(GaugeTransport::new("a", "b", vec![vec![1.0]]).unwrap()).unwrap();
-        global.add_transport(GaugeTransport::new("b", "c", vec![vec![1.0]]).unwrap()).unwrap();
-        global.add_transport(GaugeTransport::new("a", "c", vec![vec![1.0]]).unwrap()).unwrap();
-        assert!(global.transported_states().is_ok());
-    }
-
-    #[test]
-    fn synchronization_records_disagreement_and_integrates_gradually() {
-        let m = PoincareBall::new(2, 1.0).unwrap();
-        let mut global = GlobalField::new(m.clone());
-        global.integration_gain = 0.5;
-        global.add_fiber(SystemFiber::new("a", m.clone(), vec![SubsystemLayer::new("s", vec![0.2, 0.0])]).unwrap()).unwrap();
-        global.add_fiber(SystemFiber::new("b", m, vec![SubsystemLayer::new("s", vec![0.4, 0.0])]).unwrap()).unwrap();
-        let before = global.disagreement;
-        global.synchronize(1.0).unwrap();
-        assert!(global.disagreement > before);
-        assert!((global.fibers[0].layers[0].state[0] - 0.3).abs() < 0.01);
-        assert!((global.fibers[1].layers[0].state[0] - 0.3).abs() < 0.01);
-    }
-
-    #[test]
-    fn synchronization_preserves_subsystem_separation() {
-        let m = PoincareBall::new(2, 1.0).unwrap();
-        let mut global = GlobalField::new(m.clone());
-        global.add_fiber(SystemFiber::new(
-            "a",
-            m.clone(),
-            vec![
-                SubsystemLayer::new("l1", vec![0.1, 0.0]),
-                SubsystemLayer::new("l2", vec![0.0, 0.1]),
-            ],
-        ).unwrap()).unwrap();
-        global.add_fiber(SystemFiber::new(
-            "b",
-            m.clone(),
-            vec![
-                SubsystemLayer::new("l1", vec![0.3, 0.0]),
-                SubsystemLayer::new("l2", vec![0.0, 0.3]),
-            ],
-        ).unwrap()).unwrap();
-        global.add_transport(GaugeTransport::new("a", "b", identity(2)).unwrap()).unwrap();
-
-        let before = sub(&global.fibers[0].layers[0].state, &global.fibers[0].layers[1].state);
-        global.synchronize(0.1).unwrap();
-        let after = sub(&global.fibers[0].layers[0].state, &global.fibers[0].layers[1].state);
-        assert!((norm(&before) - norm(&after)).abs() < 1e-9);
-    }
-
-    #[test]
-    fn cooling_reduces_dispersion_without_forcing_center() {
-        let m = PoincareBall::new(2, 1.0).unwrap();
-        let mut global = GlobalField::new(m.clone());
-        global.add_fiber(SystemFiber::new("a", m.clone(), vec![SubsystemLayer::new("s", vec![0.2, 0.0])]).unwrap()).unwrap();
-        global.add_fiber(SystemFiber::new("b", m, vec![SubsystemLayer::new("s", vec![0.4, 0.0])]).unwrap()).unwrap();
-        let before = global.consensus().unwrap().unwrap();
-        global.cooling_rate = 1.0;
-        global.synchronize(1.0).unwrap();
-        let after = global.consensus().unwrap().unwrap();
-        assert!(after[0] > 0.0);
-        assert!((before[0] - after[0]).abs() < 0.05);
-        assert_eq!(global.temperature, 0.0);
-    }
-}
