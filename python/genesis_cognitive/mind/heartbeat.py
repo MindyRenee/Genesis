@@ -436,10 +436,13 @@ class HeartbeatMixin:
                     name for name in ready
                     if elapsed >= self.WAKE_VOLITION_DELAYS.get(name, 60.0)
                 ]
-            for name in ready:
-                self.volition.consume(name)
             if ready:
-                self._act_on_volition(ready)
+                started = self._act_on_volition(ready)
+                # Consume only urges that were actually admitted to an
+                # action worker. Gating, an occupied worker slot, or an
+                # unknown performer must not erase a ready urge.
+                for name in started:
+                    self.volition.consume(name)
         except Exception as e:  # noqa: BLE001
             logger.debug(f"volition tick failed: {e}")
     def _heartbeat_advance_neuro(
