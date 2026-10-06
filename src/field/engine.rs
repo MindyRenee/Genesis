@@ -7,19 +7,25 @@
 use super::{FieldError, Matrix, SubsystemLayer, Vector};
 
 fn dot(a: &[f64], b: &[f64]) -> f64 {
-    let scale = a
-        .iter()
-        .zip(b)
-        .fold(0.0_f64, |scale, (&x, &y)| scale.max(x.abs()).max(y.abs()));
-    if scale == 0.0 {
+    let scale_a = a.iter().fold(0.0_f64, |scale, &x| scale.max(x.abs()));
+    let scale_b = b.iter().fold(0.0_f64, |scale, &y| scale.max(y.abs()));
+    if scale_a == 0.0 || scale_b == 0.0 {
         return 0.0;
     }
     let normalized = a
         .iter()
         .zip(b)
-        .map(|(&x, &y)| (x / scale) * (y / scale))
+        .map(|(&x, &y)| (x / scale_a) * (y / scale_b))
         .sum::<f64>();
-    scale * scale * normalized
+    if normalized == 0.0 {
+        return 0.0;
+    }
+    let (small, large) = if scale_a <= scale_b { (scale_a, scale_b) } else { (scale_b, scale_a) };
+    let partial = normalized * small;
+    if !partial.is_finite() {
+        return f64::NAN;
+    }
+    partial * large
 }
 
 fn mat_vec(m: &[Vector], x: &[f64]) -> Result<Vector, FieldError> {
