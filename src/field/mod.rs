@@ -210,13 +210,18 @@ pub struct GlobalField {
     pub manifold: PoincareBall,
     pub fibers: Vec<SystemFiber>,
     pub transports: Vec<GaugeTransport>,
+    /// Global integration gain. Unlike temperature, this is a coupling
+    /// strength and does not erase disagreement by itself.
+    pub integration_gain: f64,
+    /// Running disagreement energy in the common coordinate frame.
+    pub disagreement: f64,
     pub temperature: f64,
     pub cooling_rate: f64,
 }
 
 impl GlobalField {
     pub fn new(manifold: PoincareBall) -> Self {
-        Self { manifold, fibers: Vec::new(), transports: Vec::new(), temperature: 1.0, cooling_rate: 0.1 }
+        Self { manifold, fibers: Vec::new(), transports: Vec::new(), integration_gain: 1.0, disagreement: 0.0, temperature: 1.0, cooling_rate: 0.1 }
     }
     pub fn add_fiber(&mut self, fiber: SystemFiber) -> Result<(), FieldError> {
         if fiber.manifold.dimension() != self.manifold.dimension()
@@ -279,14 +284,22 @@ impl GlobalField {
         let states = self.transported_states()?;
         if states.is_empty() { return Ok(None); }
         let consensus = self.manifold.origin_barycenter(&states)?;
-        let target = (self.temperature - self.cooling_rate * dt).max(0.0);
+        let mut disagreement = 0.0;
+        for state in &states {
+            let delta = sub(state, &consensus);
+            disagreement += dot(&delta, &delta);
+        }
+        self.disagreement = disagreement / states.len() as f64;
+
+        let gain = self.integration_gain.max(0.0);
+        let target = (gain * dt).clamp(0.0, 1.0);
         for fiber in &mut self.fibers {
             for layer in &mut fiber.layers {
                 let delta = sub(&layer.state, &consensus);
-                layer.state = self.manifold.project(&add(&consensus, &scaled(&delta, target)))?;
+                layer.state = self.manifold.project(&add(&layer.state, &scaled(&delta, -target)))?;
             }
         }
-        self.temperature = target;
+        self.temperature = (self.temperature - self.cooling_rate * dt).max(0.0);
         Ok(Some(consensus))
     }
 }
@@ -385,6 +398,20 @@ mod tests {
                 vec![SubsystemLayer::new("state", vec![0.01 * i as f64, 0.0])]).unwrap()).unwrap();
         }
         assert_eq!(global.fibers.len(), 3);
+    }
+
+    #[test]
+    fn synchronization_records_disagreement_and_integrates_gradually() {
+        let m = PoincareBall::new(2, 1.0).unwrap();
+        let mut global = GlobalField::new(m.clone());
+        global.integration_gain = 0.5;
+        global.add_fiber(SystemFiber::new("a", m.clone(), vec![SubsystemLayer::new("s", vec![0.2, 0.0])]).unwrap()).unwrap();
+        global.add_fiber(SystemFiber::new("b", m, vec![SubsystemLayer::new("s", vec![0.4, 0.0])]).unwrap()).unwrap();
+        let before = global.disagreement;
+        global.synchronize(1.0).unwrap();
+        assert!(global.disagreement > before);
+        assert!((global.fibers[0].layers[0].state[0] - 0.3).abs() < 0.01);
+        assert!((global.fibers[1].layers[0].state[0] - 0.3).abs() < 0.01);
     }
 
     #[test]
