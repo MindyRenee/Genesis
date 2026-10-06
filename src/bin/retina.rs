@@ -1,3 +1,10 @@
+# [android-headless-stub]
+#[cfg(target_os = "android")]
+fn main() {
+    eprintln!("retina: camera capture is unavailable on Android; Genesis is running headless.");
+}
+
+#[cfg(not(target_os = "android"))]
 use std::ffi::CString;
 use std::process;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
