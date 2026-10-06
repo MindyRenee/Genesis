@@ -168,6 +168,7 @@ impl SystemEngine {
     /// state-dependent and can stabilize trajectories even when the linear
     /// origin is not contractive.
     pub fn linear_growth_bound(&self) -> Result<f64, FieldError> {
+        self.validate()?;
         let (n, d) = self.validate()?;
         if n == 0 || d == 0 || self.couplings.len() != n
             || self.couplings.iter().any(|row| row.len() != n)
@@ -280,6 +281,19 @@ mod tests {
         assert!((d[0][1] + 10.0).abs() < 1e-12);
         assert_eq!(d[0][0] / d[0][1], layers[0].state[0] / layers[0].state[1]);
         assert!((radius_sq - 5.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn coupled_growth_bound_includes_cross_subsystem_gain() {
+        let engine = SystemEngine::new(
+            vec![
+                vec![vec![vec![0.0]], vec![vec![2.0]]],
+                vec![vec![vec![3.0]], vec![vec![0.0]]],
+            ],
+            vec![vec![0.0], vec![vec![0.0]]],
+            1.0,
+        ).unwrap().with_damping(vec![1.0, 4.0]).unwrap();
+        assert_eq!(engine.linear_growth_bound().unwrap(), 2.0);
     }
 
     #[test]
