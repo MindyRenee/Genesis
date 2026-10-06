@@ -16,7 +16,22 @@ const EPS: f64 = 1.0e-12;
 pub type Vector = Vec<f64>;
 pub type Matrix = Vec<Vector>;
 
-fn dot(a: &[f64], b: &[f64]) -> f64 { a.iter().zip(b).map(|(x, y)| x * y).sum() }
+fn dot(a: &[f64], b: &[f64]) -> f64 {
+    let scale = a
+        .iter()
+        .zip(b)
+        .fold(0.0_f64, |scale, (&x, &y)| scale.max(x.abs()).max(y.abs()));
+    if scale == 0.0 {
+        return 0.0;
+    }
+    let normalized = a
+        .iter()
+        .zip(b)
+        .map(|(&x, &y)| (x / scale) * (y / scale))
+        .sum::<f64>();
+    let scaled_sum = scale * normalized;
+    scale * scaled_sum
+}
 fn norm(a: &[f64]) -> f64 { a.iter().fold(0.0_f64, |acc, &x| acc.hypot(x)) }
 fn scaled(a: &[f64], s: f64) -> Vector { a.iter().map(|x| x * s).collect() }
 fn add(a: &[f64], b: &[f64]) -> Vector { a.iter().zip(b).map(|(x, y)| x + y).collect() }
@@ -75,6 +90,16 @@ fn identity(n:usize)->Matrix{let mut m=vec![vec![0.0;n];n];for i in 0..n{m[i][i]
 fn mat_mul(a:&Matrix,b:&Matrix)->Matrix{let n=a.len();let mut out=vec![vec![0.0;n];n];for i in 0..n{for j in 0..n{for k in 0..n{out[i][j]+=a[i][k]*b[k][j];}}}out}
 fn mat_vec(a:&Matrix,x:&Vector)->Result<Vector,FieldError>{if a.len()!=x.len()||a.iter().any(|r|r.len()!=x.len()){return Err(FieldError::DimensionMismatch)}let mut out=vec![0.0;x.len()];for i in 0..a.len(){out[i]=dot(&a[i],x);}if out.iter().any(|v|!v.is_finite()){return Err(FieldError::NonFiniteState)}Ok(out)}
 fn matrix_distance(a:&Matrix,b:&Matrix)->Result<f64,FieldError>{if a.len()!=b.len()||a.iter().zip(b).any(|(x,y)|x.len()!=y.len()){return Err(FieldError::DimensionMismatch)}let mut sum=0.0;for(row_a,row_b)in a.iter().zip(b){for(x,y)in row_a.iter().zip(row_b){if !x.is_finite()||!y.is_finite(){return Err(FieldError::NonFiniteState)}let delta=x-y;if !delta.is_finite(){return Err(FieldError::NonFiniteState)}let term=delta*delta;if !term.is_finite(){return Err(FieldError::NonFiniteState)}sum+=term;if !sum.is_finite(){return Err(FieldError::NonFiniteState)}}}Ok(sum.sqrt())}
+#[cfg(test)]
+mod vector_numerics_tests {
+    use super::*;
+
+    #[test]
+    fn dot_handles_large_cancelling_products() {
+        assert_eq!(dot(&[1.0e308, 1.0e308], &[1.0e308, -1.0e308]), 0.0);
+    }
+}
+
 #[cfg(test)]
 mod subsystem_layer_integrity_tests {
     use super::*;
