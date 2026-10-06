@@ -63,7 +63,8 @@ def environment_step(
         rule.true_action_prefix if trial.feature_value
         else rule.false_action_prefix
     )
-    success = action.startswith(expected_prefix)
+    expected_action = f"{expected_prefix}{trial.target}"
+    success = action == expected_action
     # The environment exposes only consequences, never the hidden rule.
     return {
         "domain": trial.domain,
