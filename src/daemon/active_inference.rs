@@ -2865,9 +2865,9 @@ impl ActiveInferenceEngine {
 
     /// Persist the generative model to disk.
     ///
-    /// The model file format (version 4):
+    /// The model file format (version 5):
     /// - 4 bytes: magic "AIFE"
-    /// - 4 bytes: version (u32) = 3
+    /// - 4 bytes: version (u32) = 5
     /// - 18×18×4 bytes: transition matrix A (row-major f32)
     /// - 18×4 bytes: bias vector (f32)
     /// - 4 bytes: precision (f32)
@@ -2885,7 +2885,7 @@ impl ActiveInferenceEngine {
     /// - 4 bytes: surprise_var_ema (f32) [v4]
     /// - 4 bytes: maturity_error_ema (f32) [v4]
     ///
-    /// Total: 2988 (v3) + 8 = 2996 bytes
+    /// Total: 3068 bytes (v5, including the 18-element preference vector)
     /// Move her preference toward states she actually fares well in.
     ///
     /// The seed is the genetic defaults, but those are what her
