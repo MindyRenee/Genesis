@@ -1364,10 +1364,12 @@ class SemanticMemory:
             # confidence and impossible negative source counts before they
             # can poison ranking or consolidation.
             if not math.isfinite(fact.confidence):
-                raise ValueError("non-finite fact confidence")
+                logger.warning("skipping persisted fact with non-finite confidence")
+                continue
             fact.confidence = min(1.0, max(0.0, fact.confidence))
             if fact.source_count < 0:
-                raise ValueError("negative fact source_count")
+                logger.warning("skipping persisted fact with negative source_count")
+                continue
             self._facts[fact.key] = fact
             restored += 1
 
