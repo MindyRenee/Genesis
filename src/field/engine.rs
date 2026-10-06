@@ -26,6 +26,9 @@ fn mat_vec(m: &[Vector], x: &[f64]) -> Result<Vector, FieldError> {
 pub struct SystemEngine {
     pub couplings: Vec<Vec<Matrix>>,
     pub biases: Vec<Vector>,
+    /// Per-layer dissipative coefficient. Positive values make the local
+    /// dynamics contractive; zero preserves the undamped linear system.
+    pub damping: Vec<f64>,
     pub time_scale: f64,
 }
 
@@ -37,6 +40,7 @@ impl SystemEngine {
                 layer_count
             ],
             biases: vec![vec![0.0; dimension]; layer_count],
+            damping: vec![0.0; layer_count],
             time_scale: 1.0,
         }
     }
@@ -60,10 +64,21 @@ impl SystemEngine {
         {
             return Err(FieldError::DimensionMismatch);
         }
-        Ok(Self { couplings, biases, time_scale })
+        Ok(Self { couplings, biases, damping: vec![0.0; n], time_scale })
     }
 
     pub fn dimension(&self) -> usize { self.biases.first().map_or(0, Vector::len) }
+
+    /// Set non-negative local damping for every subsystem layer.
+    pub fn with_damping(mut self, damping: Vec<f64>) -> Result<Self, FieldError> {
+        if damping.len() != self.biases.len()
+            || damping.iter().any(|x| !x.is_finite() || *x < 0.0)
+        {
+            return Err(FieldError::InvalidDynamics);
+        }
+        self.damping = damping;
+        Ok(self)
+    }
 
     pub fn derivatives(&self, layers: &[SubsystemLayer]) -> Result<Vec<Vector>, FieldError> {
         if layers.len() != self.biases.len() {
@@ -75,6 +90,11 @@ impl SystemEngine {
         }
 
         let mut out = self.biases.clone();
+        for (i, layer) in layers.iter().enumerate() {
+            for (dst, state) in out[i].iter_mut().zip(&layer.state) {
+                *dst -= self.damping[i] * state;
+            }
+        }
         for target in 0..layers.len() {
             for source in 0..layers.len() {
                 let contribution = mat_vec(
