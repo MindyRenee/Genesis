@@ -241,7 +241,7 @@ class VolitionMixin:
             "concept_growth": concept_growth,
             "social_isolation": social_isolation,
         }
-    def _act_on_volition(self, ready: list[str]) -> None:
+    def _act_on_volition(self, ready: list[str]) -> list[str]:
         """Run each ready urge action in its own background thread.
 
         Uses a bounded semaphore so that at most
@@ -295,6 +295,7 @@ class VolitionMixin:
             "reach_out": self._perform_reach_out,
             "safeguard": self._perform_safeguard,
         }
+        started: list[str] = []
         for name in ready:
             fn = performers.get(name)
             if fn is None:
@@ -305,6 +306,7 @@ class VolitionMixin:
                 if not self._volition_sem.acquire(blocking=False):
                     break
                 self._volition_active.add(name)
+                started.append(name)
             try:
                 threading.Thread(
                     target=self._run_volition_action, args=(name, fn), daemon=True
@@ -313,7 +315,10 @@ class VolitionMixin:
                 with self._volition_lock:
                     self._volition_active.discard(name)
                 self._volition_sem.release()
+                if name in started:
+                    started.remove(name)
                 logger.warning(f"failed to start volition action {name}: {e}")
+        return started
     def _run_volition_action(self, name: str, fn) -> None:
         """Wrap a volition action so it clears the active flag when done."""
         try:
