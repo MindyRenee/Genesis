@@ -36,7 +36,7 @@ def test_normal_observation_still_reinforces_existing_fact() -> None:
 
     memory.extract_facts("Cats are mammals.")
 
-    fact = memory.get_fact("cats", "is_a", "mammals")
+    fact = memory._facts.get(("cats", "is_a", "mammals"))
     assert fact is not None
     assert fact.source_count == 2
     assert fact.confidence == 0.65
