@@ -364,7 +364,7 @@ mod matrix_distance_regression {
 fn matrix_inverse(a:&Matrix)->Result<Matrix,FieldError>{let n=a.len();if n==0||a.iter().any(|r|r.len()!=n||r.iter().any(|v|!v.is_finite())){return Err(FieldError::InvalidTransport)}let scale=a.iter().flatten().fold(0.0_f64,|m,&v|m.max(v.abs()));if scale==0.0{return Err(FieldError::NonInvertibleTransport)}let pivot_tol=EPS*scale;let mut aug=vec![vec![0.0;2*n];n];for i in 0..n{for j in 0..n{aug[i][j]=a[i][j];}aug[i][n+i]=1.0;}for col in 0..n{let mut pivot=col;for row in col+1..n{if aug[row][col].abs()>aug[pivot][col].abs(){pivot=row;}}if aug[pivot][col].abs()<=pivot_tol{return Err(FieldError::NonInvertibleTransport)}aug.swap(col,pivot);let p=aug[col][col];for j in 0..2*n{aug[col][j]/=p;}for row in 0..n{if row==col{continue}let factor=aug[row][col];for j in 0..2*n{aug[row][j]-=factor*aug[col][j];}}}if aug.iter().flatten().any(|v|!v.is_finite()){return Err(FieldError::NonFiniteState)}Ok(aug.into_iter().map(|row|row[n..].to_vec()).collect())}
 
 #[derive(Debug,Clone,PartialEq)]
-pub enum FieldError{DimensionMismatch,GeometryMismatch,InvalidGeometry,InvalidPoint,InvalidTransport,TransportMismatch,MissingTransport,NonInvertibleTransport,NonFiniteState,LayerMismatch,EmptyState,InvalidTime,InvalidDynamics,DuplicateId}
+pub enum FieldError{DimensionMismatch,GeometryMismatch,InvalidGeometry,InvalidPoint,InvalidTransport,TransportMismatch,MissingTransport,NonInvertibleTransport,NonFiniteState,LayerMismatch,EmptyState,InvalidTime,InvalidDynamics,DuplicateId,MissingFiber}
 impl fmt::Display for FieldError{fn fmt(&self,f:&mut fmt::Formatter<'_>)->fmt::Result{write!(f,"{self:?}")}}
 impl std::error::Error for FieldError{}
 
