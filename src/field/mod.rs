@@ -179,9 +179,39 @@ impl GaugeTransport {
         }
         Ok(Self { from: from.into(), to: to.into(), matrix })
     }
-    pub fn apply(&self, x: &[f64]) -> Result<Vector, FieldError> {
-        if x.len() != self.matrix.len() { return Err(FieldError::DimensionMismatch); }
-        Ok(self.matrix.iter().map(|row| dot(row, x)).collect())
+    /// Apply the transport as a tangent-space coordinate map.
+    ///
+    /// Points are first mapped to the source tangent space at the common
+    /// origin, transformed there, then returned to the target manifold.
+    /// This prevents a Euclidean matrix from being mistaken for a direct
+    /// map of curved-manifold coordinates.
+    pub fn apply_on_manifold(
+        &self,
+        source: &PoincareBall,
+        target: &PoincareBall,
+        x: &[f64],
+    ) -> Result<Vector, FieldError> {
+        if source.dimension() != target.dimension()
+            || x.len() != source.dimension()
+            || (source.curvature() - target.curvature()).abs() > EPS
+            || self.matrix.len() != source.dimension()
+        {
+            return Err(FieldError::GeometryMismatch);
+        }
+        let tangent = source.log_origin(x)?;
+        let mapped = self.apply_tangent(&tangent)?;
+        target.exp_origin(&mapped)
+    }
+
+    pub fn apply_tangent(&self, x: &[f64]) -> Result<Vector, FieldError> {
+        if x.len() != self.matrix.len() {
+            return Err(FieldError::DimensionMismatch);
+        }
+        let out: Vector = self.matrix.iter().map(|row| dot(row, x)).collect();
+        if out.iter().any(|v| !v.is_finite()) {
+            return Err(FieldError::NonFiniteState);
+        }
+        Ok(out)
     }
     pub fn compose(&self, other: &Self) -> Result<Self, FieldError> {
         if other.matrix.len() != self.matrix.len() || self.from != other.to {
@@ -266,7 +296,9 @@ impl GlobalField {
                 state
             } else {
                 let matrix = self.path_matrix(&fiber.id, &self.fibers[0].id)?;
-                self.manifold.project(&matrix_apply(&matrix, &state)?)?
+                let tangent = self.manifold.log_origin(&state)?;
+                let mapped = matrix_apply(&matrix, &tangent)?;
+                self.manifold.exp_origin(&mapped)?
             };
             out.push(mapped);
         }
