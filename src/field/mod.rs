@@ -176,8 +176,23 @@ impl SystemFiber {
         Ok(())
     }
 
+    /// Return the major-system state represented by its subsystem layers.
+    ///
+    /// This reduction is explicit and does not replace the layers: each layer
+    /// remains the authoritative subsystem state. The aggregate is only the
+    /// coordinate used at system boundaries such as global transport.
     pub fn state(&self) -> Result<Vector, FieldError> {
-        self.manifold.origin_barycenter(&self.layers.iter().map(|l| l.state.clone()).collect::<Vec<_>>())
+        if self.layers.is_empty() {
+            return Err(FieldError::EmptyState);
+        }
+        self.manifold.origin_barycenter(
+            &self.layers.iter().map(|layer| layer.state.clone()).collect::<Vec<_>>()
+        )
+    }
+
+    /// Return every subsystem state without collapsing the latent field.
+    pub fn layer_states(&self) -> Vec<Vector> {
+        self.layers.iter().map(|layer| layer.state.clone()).collect()
     }
 }
 
@@ -549,6 +564,25 @@ mod tests {
         let p = m.exp_origin(&v).unwrap();
         let recovered = m.log_origin(&p).unwrap();
         for (a, b) in v.iter().zip(recovered) { assert!((a - b).abs() < 1e-10); }
+    }
+
+    #[test]
+    fn empty_fiber_has_no_aggregate_system_state() {
+        let m = PoincareBall::new(2, 1.0).unwrap();
+        let fiber = SystemFiber::new("empty", m, Vec::new()).unwrap();
+        assert_eq!(fiber.state(), Err(FieldError::EmptyState));
+        assert!(fiber.layer_states().is_empty());
+    }
+
+    #[test]
+    fn layer_states_preserve_subsystem_boundaries() {
+        let m = PoincareBall::new(2, 1.0).unwrap();
+        let layers = vec![
+            SubsystemLayer::new("a", vec![0.1, 0.0]),
+            SubsystemLayer::new("b", vec![0.0, 0.2]),
+        ];
+        let fiber = SystemFiber::new("system", m, layers.clone()).unwrap();
+        assert_eq!(fiber.layer_states(), layers.iter().map(|l| l.state.clone()).collect::<Vec<_>>());
     }
 
     #[test]
