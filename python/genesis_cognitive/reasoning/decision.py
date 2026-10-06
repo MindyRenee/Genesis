@@ -53,9 +53,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from ..action_selection import ActionBid, BasalGangliaSelector
+
 if TYPE_CHECKING:
-    from ..action_selection import ActionBid, BasalGangliaSelector
-from ..concepts import ConceptNetwork
+    from ..concepts import ConceptNetwork
     from ..executive import ExecutiveFunction
     from ..learning.td import TDLearner
     from .engine import ReasoningResult
