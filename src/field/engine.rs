@@ -118,6 +118,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn damped_engine_reduces_unforced_state() {
+        let engine = SystemEngine::zero(1, 1).with_damping(vec![2.0]).unwrap();
+        let layers = vec![SubsystemLayer::new("a", vec![0.5])];
+        let d = engine.derivatives(&layers).unwrap();
+        assert!((d[0][0] + 1.0).abs() < 1e-12);
+    }
+
+    #[test]
     fn coupled_engine_produces_state_derivatives() {
         let engine = SystemEngine::new(
             vec![
