@@ -373,11 +373,46 @@ class AmbientListener:
                     ],
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    text=True,
                     timeout=10,
                     check=False,
                 )
-                if proc.returncode != 0 or not source_path.is_file():
+                if proc.returncode != 0:
+                    logger.debug(
+                        "Android microphone start failed: %s",
+                        proc.stderr.strip(),
+                    )
+                    threading.Event().wait(0.5)
+                    continue
+
+                # Termux:API starts recording asynchronously. The command
+                # returning only means the recorder accepted the request;
+                # the MPEG-4 container is not finalized until recording
+                # actually stops. Poll the API status before handing the
+                # file to ffmpeg, otherwise the container metadata can be
+                # incomplete and decoding races the recorder.
+                deadline = time.monotonic() + 5.0
+                while self._running and time.monotonic() < deadline:
+                    status = subprocess.run(
+                        [command, "-i"],
+                        stdin=subprocess.DEVNULL,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        timeout=2,
+                        check=False,
+                    )
+                    if status.returncode == 0:
+                        try:
+                            info = json.loads(status.stdout)
+                        except json.JSONDecodeError:
+                            info = {}
+                        if not info.get("isRecording", False):
+                            break
+                    threading.Event().wait(0.1)
+
+                if not source_path.is_file():
                     threading.Event().wait(0.5)
                     continue
 
