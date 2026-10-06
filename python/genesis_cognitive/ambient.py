@@ -333,8 +333,9 @@ class AmbientListener:
         sensor boundary; recognition remains Genesis's existing offline Vosk
         path.
         """
-        from vosk import KaldiRecognizer
         import wave
+
+        from vosk import KaldiRecognizer
 
         command = shutil.which("termux-microphone-record")
         ffmpeg = shutil.which("ffmpeg")
