@@ -39,6 +39,7 @@ import subprocess
 import re
 import threading
 from collections import deque
+from pathlib import Path
 from collections.abc import Callable
 from typing import Any
 
@@ -156,8 +157,6 @@ class AmbientListener:
 
     def _init_vosk(self) -> bool:
         """Load the Vosk model. Returns True on success."""
-        from pathlib import Path
-
         model_dir = Path.home() / ".local" / "share" / "vosk-models" / "vosk-model-small-en-us-0.15"
         if not model_dir.exists():
             self._init_error = f"Vosk model not found at {model_dir}"
