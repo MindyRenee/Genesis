@@ -1058,6 +1058,16 @@ def restore_predictive_coding(
 
     predictive_coding._topic_transitions = _to_nested_dict(data.get("topic_transitions", {}))
     predictive_coding._intent_transitions = _to_nested_dict(data.get("intent_transitions", {}))
+    predictive_coding._emotion_intents = _to_nested_dict(data.get("emotion_intents", {}))
+    raw_hours = data.get("hour_intents", {})
+    predictive_coding._hour_intents = defaultdict(
+        lambda: defaultdict(lambda: sp),
+        {
+            int(k): defaultdict(lambda: sp, values)
+            for k, values in raw_hours.items()
+            if str(k).lstrip("-").isdigit()
+        },
+    )
     predictive_coding._concept_cooccurrence = _to_nested_dict(data.get("concept_cooccurrence", {}))
     predictive_coding._surprise_ema = data.get("surprise_ema", 0.0)
     predictive_coding._accuracy_ema = data.get("accuracy_ema", 1.0)
@@ -1643,6 +1653,14 @@ def _serialize_predictive_coding(
         "intent_transitions": {
             k: dict(v)
             for k, v in _snapshot(predictive_coding._intent_transitions.items)
+        },
+        "emotion_intents": {
+            k: dict(v)
+            for k, v in _snapshot(predictive_coding._emotion_intents.items)
+        },
+        "hour_intents": {
+            str(k): dict(v)
+            for k, v in _snapshot(predictive_coding._hour_intents.items)
         },
         "concept_cooccurrence": {
             k: dict(v)
