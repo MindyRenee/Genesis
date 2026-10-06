@@ -5,7 +5,6 @@ Different backends can be dropped in:
 
 - GenerativeEngine: compositional generation from grammar + vocabulary
   + voice (the default)
-- LLMEngine: (future) wraps a language model when one is available
 
 The interface is deliberately simple: a Thought goes in, a string
 comes out. The complexity is in the implementation.
@@ -65,8 +64,8 @@ class Thought:
 
     Thoughts are not strings — they're semantic structures. This allows
     different language engines to render the same thought differently.
-    A template engine produces rule-based text; an LLM could produce
-    more natural variation.
+    A compositional engine produces variation from the system's own
+    grammar, vocabulary, semantic graph, and learned language statistics.
 
     Fields:
         content: The main semantic content (what the thought is about)
