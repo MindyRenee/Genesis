@@ -1676,6 +1676,15 @@ def test_proto_self_homeostatic_balance_low_when_disrupted() -> None:
     state = proto.update(arousal=1.0, valence=1.0, tone=1.0, plasticity=1.0)
     assert state.homeostatic_balance < 0.5  # far from baseline
 
+def test_proto_self_homeostatic_balance_ignores_affective_valence() -> None:
+    """Affective valence alone does not constitute homeostatic disruption."""
+    proto = ProtoSelf()
+    positive = proto.update(arousal=0.5, valence=0.9, tone=0.5, plasticity=0.5)
+    negative = proto.update(arousal=0.5, valence=-0.9, tone=0.5, plasticity=0.5)
+    assert positive.homeostatic_balance == 1.0
+    assert negative.homeostatic_balance == 1.0
+
+
 
 def test_proto_self_history_trimmed() -> None:
     """History is trimmed to max_history."""
