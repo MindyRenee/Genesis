@@ -1585,15 +1585,19 @@ fn test_ipc_bind_failure_signals_shutdown() {
     let stm = std::sync::Arc::new(RingBuffer::create(
         temp_path("ipc-bind-stm", "bin"), 4
     ).expect("stm"));
-    let ltm = std::sync::Arc::new(std::sync::Mutex::new(LtmStore::create(
-        temp_base("ipc-bind-ltm")
-    ).expect("ltm")));
+    let ltm_base = temp_base("ipc-bind-ltm");
+    let ltm = std::sync::Arc::new(std::sync::Mutex::new(
+        LtmStore::create(&ltm_base, 64).expect("ltm"),
+    ));
 
     IpcServer::run_with_owned(&server, mmap, stm, ltm, |_m, _s, _l, _c, _p| vec![1]);
     assert!(flag.load(std::sync::atomic::Ordering::Acquire));
 
     drop(blocker);
-    cleanup(&path);
+    let _ = std::fs::remove_file(&path);
+    let _ = std::fs::remove_file(ltm_base.with_extension("bundles"));
+    let _ = std::fs::remove_file(ltm_base.with_extension("meta"));
+    let _ = std::fs::remove_file(ltm_base.with_extension("dat"));
 }
 
 #[test]
