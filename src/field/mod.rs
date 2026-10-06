@@ -12,6 +12,9 @@ pub use engine::SystemEngine;
 
 use std::fmt;
 
+pub mod engine;
+pub use engine::SystemEngine;
+
 const EPS: f64 = 1.0e-12;
 pub type Vector = Vec<f64>;
 
