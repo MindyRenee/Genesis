@@ -59,10 +59,33 @@ if TYPE_CHECKING:
     from ..learning.td import TDLearner
     from .engine import ReasoningResult
 
-__all__ = ["ActionType", "CandidateAction", "DecisionEngine", "DecisionOutcome"]
+__all__ = ["ActionType", "CandidateAction", "DecisionEngine", "DecisionOutcome", "ResourceState"]
 
 logger = logging.getLogger(__name__)
 
+
+@dataclass(frozen=True, slots=True)
+class ResourceState:
+    """Snapshot of machine-resource constraints available to cognition.
+
+    This boundary object does not invent thermal or battery thresholds:
+    ``hardware_distressed`` is the daemon's own verdict, while pressure
+    channels are kernel measurements. Missing data is unavailable.
+    """
+
+    available: bool = False
+    hardware_distressed: bool = False
+    psi_cpu: float = 0.0
+    psi_io: float = 0.0
+    psi_mem: float = 0.0
+    throttle_state: float = 0.0
+    on_ac_power: bool = True
+    energy_reserve: float = 1.0
+
+    @property
+    def constrained(self) -> bool:
+        """Whether the substrate currently reports an execution constraint."""
+        return self.available and self.hardware_distressed
 
 class ActionType(Enum):
     """The kinds of actions Genesis can take in response to input.
@@ -234,6 +257,7 @@ class DecisionEngine:
         executive: ExecutiveFunction | None = None,
         td_learner: TDLearner | None = None,
         value_weights: dict[str, float] | None = None,
+        resource_state: ResourceState | None = None,
     ) -> None:
         """Initialize the decision engine.
 
@@ -251,6 +275,7 @@ class DecisionEngine:
         self.executive = executive
         self.td_learner = td_learner
         self.value_weights = value_weights or dict(_DEFAULT_VALUE_WEIGHTS)
+        self.resource_state = resource_state or ResourceState()
         self._decisions: list[DecisionOutcome] = []
         self._overrides: int = 0
         self._inhibitions: int = 0
@@ -275,6 +300,10 @@ class DecisionEngine:
     def uncertainty_switch_count(self) -> int:
         """Times an action was switched due to uncertainty."""
         return self._uncertainty_switches
+
+    def update_resource_state(self, state: ResourceState | None) -> None:
+        """Update the latest embodied constraint snapshot."""
+        self.resource_state = state or ResourceState()
 
     # ─── Public API ───────────────────────────────────────────────
 
@@ -315,8 +344,22 @@ class DecisionEngine:
             default_action, perception_intent, reasoning_results, goals,
         )
 
+        # Hardware distress is a substrate constraint, not an affective
+        # preference. Do not spend execution capacity on exploratory
+        # investigation while the daemon reports that the hardware is
+        # distressed. Other conversational/recovery actions remain viable.
+        if self.resource_state.constrained:
+            for candidate in candidates:
+                if candidate.action_type == ActionType.INVESTIGATE:
+                    candidate.inhibited = True
+                    candidate.criteria_scores["resource"] = 0.0
+                    candidate.composite_score = 0.0
+                    candidate.rationale = "investigate: blocked by hardware distress"
+
         # 2. Evaluate each candidate.
         for candidate in candidates:
+            if candidate.inhibited:
+                continue
             self._evaluate_candidate(
                 candidate,
                 reasoning_results=reasoning_results,
@@ -419,6 +462,8 @@ class DecisionEngine:
             )
         if inhibition_applied:
             notes.append("response inhibited by executive function")
+        if self.resource_state.constrained:
+            notes.append("resource-constrained: hardware reports distress")
 
         result = DecisionOutcome(
             selected=selected,
