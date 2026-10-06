@@ -141,13 +141,21 @@ impl SystemEngine {
             for source in 0..n {
                 out[target][source] = self.couplings[target][source].clone();
             }
-            let r2 = dot(&layers[target].state, &layers[target].state);
+            let saturation = self.saturation[target];
+            let r2 = if saturation == 0.0 {
+                0.0
+            } else {
+                dot(&layers[target].state, &layers[target].state)
+            };
             for k in 0..d {
                 for j in 0..d {
-                    let xk = layers[target].state[k];
-                    let xj = layers[target].state[j];
-                    let nonlinear = self.saturation[target]
-                        * (if k == j { r2 } else { 0.0 } + 2.0 * xk * xj);
+                    let nonlinear = if saturation == 0.0 {
+                        0.0
+                    } else {
+                        let xk = layers[target].state[k];
+                        let xj = layers[target].state[j];
+                        saturation * ((if k == j { r2 } else { 0.0 }) + 2.0 * xk * xj)
+                    };
                     out[target][target][k][j] -= nonlinear;
                 }
                 out[target][target][k][k] -= self.damping[target];
@@ -205,10 +213,17 @@ impl SystemEngine {
 
         let mut out = self.biases.clone();
         for (i, layer) in layers.iter().enumerate() {
-            let radius_sq = dot(&layer.state, &layer.state);
+            if self.saturation[i] != 0.0 {
+                let radius_sq = dot(&layer.state, &layer.state);
+                if !radius_sq.is_finite() {
+                    return Err(FieldError::NonFiniteState);
+                }
+                for (dst, state) in out[i].iter_mut().zip(&layer.state) {
+                    *dst -= self.saturation[i] * radius_sq * state;
+                }
+            }
             for (dst, state) in out[i].iter_mut().zip(&layer.state) {
                 *dst -= self.damping[i] * state;
-                *dst -= self.saturation[i] * radius_sq * state;
             }
         }
         for target in 0..layers.len() {
@@ -302,6 +317,16 @@ mod tests {
             .with_damping(vec![2.0, 3.0]).unwrap();
         let bound = engine.linear_growth_bound().unwrap();
         assert_eq!(bound, -2.0);
+    }
+
+    #[test]
+    fn zero_saturation_handles_large_finite_state_without_zero_times_infinity() {
+        let engine = SystemEngine::zero(1, 2);
+        let layers = vec![SubsystemLayer::new("a", vec![1.0e308, -1.0e308])];
+        let jacobian = engine.jacobian(&layers).unwrap();
+        assert_eq!(jacobian[0][0], vec![vec![0.0, 0.0], vec![0.0, 0.0]]);
+        let derivatives = engine.derivatives(&layers).unwrap();
+        assert_eq!(derivatives, vec![vec![0.0, 0.0]]);
     }
 
     #[test]
