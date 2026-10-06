@@ -581,6 +581,22 @@ impl MmapState {
         })
     }
 
+    /// Open an existing state file, or create it if it does not exist.
+    ///
+    /// Existing state is always verified and migrated by open(); creation
+    /// happens only for a genuinely missing path.
+    pub fn open_or_create(
+        path: impl AsRef<Path>,
+        instance_id: u64,
+        now_ms: u64,
+    ) -> Result<Self, StateFileError> {
+        match Self::open(path.as_ref()) {
+            Ok(state) => Ok(state),
+            Err(StateFileError::NotFound) => Self::create(path, instance_id, now_ms),
+            Err(error) => Err(error),
+        }
+    }
+
     /// Get a mutable reference to the core state.
     ///
     /// # Safety
