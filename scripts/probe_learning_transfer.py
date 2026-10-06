@@ -119,15 +119,26 @@ def start_daemon(data_dir: str) -> subprocess.Popen[bytes]:
 
 
 def stop_daemon(proc: subprocess.Popen[bytes], socket_path: str) -> None:
+    """Shut the isolated daemon down through Genesis's supported lifecycle path."""
+    data_dir = str(Path(socket_path).resolve().parent)
     try:
         client = GenesisClient(socket_path)
         client.connect()
         client.shutdown()
         client.disconnect()
         proc.wait(timeout=5.0)
+        return
     except Exception:  # noqa: BLE001
-        proc.kill()
-        proc.wait()
+        # Do not SIGKILL a stateful Genesis daemon. Delegate shutdown to
+        # run.sh, which validates the per-instance PID/process identity and
+        # waits for the daemon to finish saving state.
+        subprocess.run(
+            ["./run.sh", "--stop"],
+            cwd=Path(__file__).resolve().parents[1],
+            env={**os.environ, "GENESIS_DATA_DIR": data_dir},
+            check=False,
+        )
+        proc.wait(timeout=120.0)
 
 
 def snapshot(network: ConceptNetwork, engine: CognitionEngine) -> dict[str, Any]:
