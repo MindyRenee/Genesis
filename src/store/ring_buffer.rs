@@ -915,7 +915,8 @@ impl RingBuffer {
 
         // Advance head
         header.head = (slot + 1) % cap;
-        // This counter is defined as monotonic; wrapping at u64::MAX would violate\n        // that invariant and could make persisted telemetry appear to go backwards.\n        header.total_written = header.total_written.saturating_add(1);
+        // This counter is defined as monotonic; wrapping at u64::MAX would violate
+        // that invariant and could make persisted telemetry appear to go backwards.\n        header.total_written = header.total_written.saturating_add(1);
 
         // Update count and tail
         if header.count < cap {
