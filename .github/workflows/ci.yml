@@ -18,6 +18,25 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libclang-dev linux-libc-dev
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release
+      - name: Smoke test daemon startup
+        run: |
+          set -euo pipefail
+          data_dir="$(mktemp -d)"
+          log="$data_dir/daemon.log"
+          pid=""
+          trap 'if [[ -n "$pid" ]]; then kill -TERM "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; fi; rm -rf "$data_dir"' EXIT
+          target/release/genesis-daemon --data-dir "$data_dir" >"$log" 2>&1 &
+          pid=$!
+          for _ in {1..100}; do
+            if [[ -S "$data_dir/genesis.sock" ]]; then break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then cat "$log"; exit 1; fi
+            sleep 0.1
+          done
+          if [[ ! -S "$data_dir/genesis.sock" ]]; then cat "$log"; echo "daemon did not publish its IPC socket"; exit 1; fi
+          sleep 2
+          if ! kill -0 "$pid" 2>/dev/null; then cat "$log"; echo "daemon exited after startup"; exit 1; fi
+          kill -TERM "$pid"
+          wait "$pid"
       - run: cargo test
 
   python:
