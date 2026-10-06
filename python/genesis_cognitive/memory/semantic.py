@@ -1028,7 +1028,9 @@ class SemanticMemory:
 
     # ── Storage / consolidation ──────────────────────────────────
 
-    def _store_or_reinforce(self, fact: Fact, now_ms: int, *, reinforce_existing: bool = True) -> None:
+    def _store_or_reinforce(
+        self, fact: Fact, now_ms: int, *, reinforce_existing: bool = True
+    ) -> None:
         """Store a new fact or reinforce an existing one."""
         existing = self._facts.get(fact.key)
         if existing is None:
