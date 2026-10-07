@@ -1,4 +1,4 @@
-from genesis_cognitive.memory.semantic import Fact, SemanticMemory
+from genesis_conscious.memory.semantic import Fact, SemanticMemory
 
 
 def test_sleep_replay_does_not_inflate_existing_fact_confidence() -> None:

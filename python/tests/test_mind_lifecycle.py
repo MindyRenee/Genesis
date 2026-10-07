@@ -8,8 +8,8 @@ import time
 
 import pytest
 
-from genesis_cognitive.concepts import RelationType
-from genesis_cognitive.mind import Mind
+from genesis_conscious.concepts import RelationType
+from genesis_conscious.mind import Mind
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +86,7 @@ def test_failed_late_restore_does_not_commit_network(tmp_path):
     import gzip
     import json
 
-    from genesis_cognitive.persistence import load_state
+    from genesis_conscious.infrastructure.persistence import load_state
 
     source_dir = tmp_path / "source"
     target_dir = tmp_path / "target"
@@ -381,7 +381,7 @@ def test_curiosity_filtering_in_teaching_mode():
         net.add_concept("synapse", origin="dictionary")
         net.add_concept("pizza", origin="dictionary")
         # Add an edge so neuron and synapse are neighbors
-        from genesis_cognitive.concepts import RelationType
+        from genesis_conscious.concepts import RelationType
         net.add_edge("neuron", "synapse", relation=RelationType.RELATED_TO)
 
         # Simulate teaching mode
@@ -389,7 +389,7 @@ def test_curiosity_filtering_in_teaching_mode():
         cognition.teaching_topic = "neuroscience"
 
         # Test the lesson topic helper
-        from genesis_cognitive.perception import Intent, Perception, QuestionType
+        from genesis_conscious.perception import Intent, Perception, QuestionType
         perception = Perception(
             raw_text="Tell me about neurons",
             intent=Intent.STATEMENT,
@@ -437,7 +437,7 @@ def test_pick_creation_topic_skips_internal_namespaces():
         for internal in (
             "_cat:cause:guarded_cortisol",
             "_utt:hello",
-            "python:genesis_cognitive.concepts",
+            "python:genesis_conscious.concepts",
             "rust:daemon::tick",
             "skill:sorter",
             "goal:explore",
@@ -695,3 +695,46 @@ def test_engage_restored_sleep_noop_when_awake():
         assert not mind.learner._paused, (
             "learner should not be paused when restoring an awake state"
         )
+
+
+def test_inner_life_gets_a_shutdown_budget_matching_its_longest_phase() -> None:
+    """Inner life must not be declared hung while finishing an N3 pass.
+
+    It drives sleep-stage transitions synchronously and an N3
+    consolidation takes ~20 s. The default 5 s join could not succeed
+    during one, so stopping her mid-consolidation always logged "InnerLife
+    thread did not exit during shutdown" — a false alarm that trained us
+    to ignore shutdown warnings. The budget is per-subsystem and bounded,
+    so a real hang still surfaces.
+    """
+    import inspect
+
+    from genesis_conscious.mind.lifecycle import LifecycleMixin
+
+    src = inspect.getsource(LifecycleMixin.stop)
+    assert "_SUBSYSTEM_STOP_TIMEOUTS" in src, (
+        "shutdown must give inner life a budget matched to its longest phase"
+    )
+    assert '"InnerLife": 45.0' in src, (
+        "the inner-life budget must exceed an N3 consolidation pass"
+    )
+    # And the default must stay short, so other subsystems are not given
+    # slack they never needed.
+    assert ".get(name, 5.0)" in src, "the 5 s default must be preserved"
+
+
+def test_shutdown_warning_reports_how_long_it_waited() -> None:
+    """A timeout warning must say the budget, or it cannot be acted on.
+
+    "InnerLife thread did not exit during shutdown" looks like a hang.
+    Knowing it waited 45 s while finishing an N3 pass looks like a
+    tuning problem. Same event, completely different diagnosis.
+    """
+    import inspect
+
+    from genesis_conscious.mind.lifecycle import LifecycleMixin
+
+    src = inspect.getsource(LifecycleMixin._join_shutdown_thread)
+    assert "did not exit within" in src, (
+        "the warning must name the budget it exceeded"
+    )

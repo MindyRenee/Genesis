@@ -1,20 +1,20 @@
 """Task competence — schema recognition, affordances, and skill reuse."""
 
-from genesis_cognitive.concepts import ConceptNetwork
-from genesis_cognitive.narrative import NarrativeEngine
-from genesis_cognitive.persistence import (
+from genesis_conscious.concepts import ConceptNetwork
+from genesis_conscious.infrastructure.narrative import NarrativeEngine
+from genesis_conscious.infrastructure.persistence import (
     load_state,
     restore_task_competence,
     save_state,
 )
-from genesis_cognitive.reasoning import (
+from genesis_conscious.reasoning import (
     GoalCondition,
     ProcedureStep,
     TaskCompetence,
     TaskContext,
 )
-from genesis_cognitive.self import ReflectionEngine, SelfModel
-from genesis_cognitive.spatial import Grid, SpatialReasoner
+from genesis_conscious.self import ReflectionEngine, SelfModel
+from genesis_conscious.spatial import Grid, SpatialReasoner
 
 
 def _grid(rows: list[list[int]]) -> Grid:
@@ -349,7 +349,7 @@ class TestTaskCompetence:
 
 
     def test_verified_skill_is_grounded_in_concept_network(self):
-        from genesis_cognitive.concepts import ConceptNetwork, RelationType
+        from genesis_conscious.concepts import ConceptNetwork, RelationType
 
         net = ConceptNetwork()
         competence = TaskCompetence(network=net)
@@ -728,7 +728,7 @@ class TestSpatialCompetenceAdapter:
 
     def test_math_episodes_consolidate_solver_verified_skills(self):
         """try_math records episodes; '2+3' and '5+7' share a schema."""
-        from genesis_cognitive.reasoning.math_reasoning import try_math
+        from genesis_conscious.reasoning.math_reasoning import try_math
 
         competence = TaskCompetence()
         r1 = try_math("what is 2 + 3", task_competence=competence)
@@ -755,7 +755,7 @@ class TestSpatialCompetenceAdapter:
         )
 
     def test_math_failure_marks_schema_not_skill(self):
-        from genesis_cognitive.reasoning.math_reasoning import try_math
+        from genesis_conscious.reasoning.math_reasoning import try_math
 
         competence = TaskCompetence()
         result = try_math(
@@ -771,7 +771,7 @@ class TestSpatialCompetenceAdapter:
         )
 
     def test_non_math_question_records_no_episode(self):
-        from genesis_cognitive.reasoning.math_reasoning import try_math
+        from genesis_conscious.reasoning.math_reasoning import try_math
 
         competence = TaskCompetence()
         assert try_math("hello there friend", task_competence=competence) is None
@@ -849,7 +849,7 @@ class TestSpatialCompetenceAdapter:
 
     def test_skill_macros_proposed_beyond_first_step(self):
         """_expand_hypothesis offers skills to nonempty hypotheses."""
-        from genesis_cognitive.spatial.solver import SpatialHypothesis
+        from genesis_conscious.spatial.solver import SpatialHypothesis
 
         competence = TaskCompetence()
         first = SpatialReasoner(task_competence=competence)
@@ -929,7 +929,7 @@ class _NavEnv:
 
 class TestAgentCompetenceAdapter:
     def test_steps_feed_shared_transition_model(self):
-        from genesis_cognitive.spatial import SpatialAgent, frame_to_grid
+        from genesis_conscious.spatial import SpatialAgent, frame_to_grid
 
         competence = TaskCompetence()
         env = _NavEnv()
@@ -957,7 +957,7 @@ class TestAgentCompetenceAdapter:
         assert by_key["avatar.c"].delta == 1.0
 
     def test_win_consolidates_control_map_for_transfer(self):
-        from genesis_cognitive.spatial import SpatialAgent
+        from genesis_conscious.spatial import SpatialAgent
 
         competence = TaskCompetence()
         env = _NavEnv()
@@ -1009,7 +1009,7 @@ class TestAgentCompetenceAdapter:
         assert all(s.attempts == 0 for s in agent2.stats.values())
 
     def test_game_over_demotes_adopted_skill(self):
-        from genesis_cognitive.spatial import SpatialAgent
+        from genesis_conscious.spatial import SpatialAgent
 
         competence = TaskCompetence()
         env = _NavEnv()
@@ -1043,7 +1043,7 @@ class TestAgentCompetenceAdapter:
 
     def test_surprise_renews_exploration(self):
         """A transition that defies the learned model raises epsilon."""
-        from genesis_cognitive.spatial import SpatialAgent
+        from genesis_conscious.spatial import SpatialAgent
 
         competence = TaskCompetence()
         env = _NavEnv(goal=(3, 5))
@@ -1066,7 +1066,7 @@ class TestAgentCompetenceAdapter:
 
     def test_hazard_role_prior_lowers_evidence_bar(self):
         """A won env with a mover teaches 'hazard' as a role prior."""
-        from genesis_cognitive.spatial import SpatialAgent
+        from genesis_conscious.spatial import SpatialAgent
 
         competence = TaskCompetence()
         env = _NavEnv()
@@ -1119,7 +1119,7 @@ class TestAgentCompetenceAdapter:
         accrues motion evidence — a teleporting spawn can never fake
         a trajectory, no matter how often the color "moves".
         """
-        from genesis_cognitive.spatial import SpatialAgent
+        from genesis_conscious.spatial import SpatialAgent
 
         def frame(apos, mpos):
             g = [[0] * 11 for _ in range(11)]
@@ -1151,7 +1151,7 @@ class TestAgentCompetenceAdapter:
     def test_hazard_speed_prior_marks_first_sighting(self):
         """Hazard dynamics transfer: a prior carrying the family's
         mover speed lets one matching observation suffice."""
-        from genesis_cognitive.spatial import SpatialAgent
+        from genesis_conscious.spatial import SpatialAgent
 
         competence = TaskCompetence()
         env = _NavEnv()
@@ -1204,7 +1204,7 @@ class TestAgentCompetenceAdapter:
         """Failed exploration still transfers: the schema's transition
         model carries the control map even when no skill consolidated.
         """
-        from genesis_cognitive.spatial import SpatialAgent
+        from genesis_conscious.spatial import SpatialAgent
 
         competence = TaskCompetence()
         env = _NavEnv()
@@ -1236,7 +1236,7 @@ class TestAgentCompetenceAdapter:
 
 def _planning_network() -> ConceptNetwork:
     """fire depends on oxygen and fuel; oxygen causes circulation."""
-    from genesis_cognitive.concepts import RelationType
+    from genesis_conscious.concepts import RelationType
 
     net = ConceptNetwork()
     for c in ("fire", "heat", "oxygen", "fuel", "circulation"):
@@ -1260,7 +1260,7 @@ def _run_plan(planner, plan, *, succeed: bool = True) -> None:
 
 class TestPlanningCompetenceAdapter:
     def test_step_outcomes_feed_transition_model(self):
-        from genesis_cognitive.reasoning import PlanningEngine
+        from genesis_conscious.reasoning import PlanningEngine
 
         competence = TaskCompetence()
         planner = PlanningEngine(
@@ -1277,7 +1277,7 @@ class TestPlanningCompetenceAdapter:
         assert op.effects["step.status"].changed == 1
 
     def test_completed_plan_consolidates_procedure(self):
-        from genesis_cognitive.reasoning import PlanningEngine, PlanStatus
+        from genesis_conscious.reasoning import PlanningEngine, PlanStatus
 
         competence = TaskCompetence()
         planner = PlanningEngine(
@@ -1294,7 +1294,7 @@ class TestPlanningCompetenceAdapter:
         assert plan.task_context.schema.successes == 1
 
     def test_similar_goal_borrows_verified_prior(self):
-        from genesis_cognitive.reasoning import PlanningEngine
+        from genesis_conscious.reasoning import PlanningEngine
 
         competence = TaskCompetence()
         planner = PlanningEngine(
@@ -1313,7 +1313,7 @@ class TestPlanningCompetenceAdapter:
 
     def test_plan_skill_provenance_matches_weakest_step(self):
         """A consolidated plan claims only what its steps earned."""
-        from genesis_cognitive.reasoning import PlanningEngine
+        from genesis_conscious.reasoning import PlanningEngine
 
         # Steps marked by an epistemic verifier → "solver" skill.
         competence = TaskCompetence()
@@ -1355,7 +1355,7 @@ class TestPlanningCompetenceAdapter:
         assert solver_lift > reported_lift > 0.0
 
     def test_step_verification_survives_plan_persistence(self):
-        from genesis_cognitive.reasoning import PlanningEngine
+        from genesis_conscious.reasoning import PlanningEngine
 
         planner = PlanningEngine(_planning_network())
         plan = planner.create_plan("fire", "understand")
@@ -1371,7 +1371,7 @@ class TestPlanningCompetenceAdapter:
         assert rplan.steps[0].verification == "solver"
 
     def test_blocked_plan_records_failure_without_skill(self):
-        from genesis_cognitive.reasoning import PlanningEngine, PlanStatus
+        from genesis_conscious.reasoning import PlanningEngine, PlanStatus
 
         competence = TaskCompetence()
         net = ConceptNetwork()
@@ -1398,12 +1398,12 @@ class TestAssemblyCompetenceAdapter:
     def _puzzle(rows: int, cols: int, seed: int):
         import random
 
-        from genesis_cognitive.assembly import PiecePuzzle
+        from genesis_conscious.assembly import PiecePuzzle
 
         return PiecePuzzle.generate(rows, cols, random.Random(seed))
 
     def test_agent_solves_puzzle_and_consolidates_skill(self):
-        from genesis_cognitive.assembly import AssemblyAgent
+        from genesis_conscious.assembly import AssemblyAgent
 
         competence = TaskCompetence()
         agent = AssemblyAgent(seed=1, task_competence=competence)
@@ -1427,7 +1427,7 @@ class TestAssemblyCompetenceAdapter:
 
     def test_learned_affordance_orders_constraint_satisfaction(self):
         """The discovered rule: more satisfied edges → lower cost."""
-        from genesis_cognitive.assembly import AssemblyAgent
+        from genesis_conscious.assembly import AssemblyAgent
 
         competence = TaskCompetence()
         agent = AssemblyAgent(seed=1, task_competence=competence)
@@ -1446,7 +1446,7 @@ class TestAssemblyCompetenceAdapter:
         assert costs[min(costs)] > 0.0
 
     def test_skill_prior_transfers_to_new_instance(self):
-        from genesis_cognitive.assembly import AssemblyAgent
+        from genesis_conscious.assembly import AssemblyAgent
 
         competence = TaskCompetence()
         first = AssemblyAgent(seed=1, task_competence=competence)
@@ -1467,7 +1467,7 @@ class TestAssemblyCompetenceAdapter:
         assert warm.steps < cold.steps
 
     def test_unsolvable_puzzle_marks_adopted_skill_failed(self):
-        from genesis_cognitive.assembly import AssemblyAgent, Piece
+        from genesis_conscious.assembly import AssemblyAgent, Piece
 
         competence = TaskCompetence()
         first = AssemblyAgent(seed=1, task_competence=competence)

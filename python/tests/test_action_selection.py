@@ -6,7 +6,7 @@ import math
 
 import pytest
 
-from genesis_cognitive.action_selection import (
+from genesis_conscious.basal_ganglia import (
     ActionBid,
     BasalGangliaSelector,
 )

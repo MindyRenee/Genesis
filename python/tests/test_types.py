@@ -367,9 +367,9 @@ def test_similar_results_valid() -> None:
 
 
 def test_core_state_unpack() -> None:
-    """A 3296-byte buffer unpacks the key fields correctly.
+    """A 3416-byte buffer unpacks the key fields correctly.
 
-    Tests the v3 schema (18 chemicals, 3296 bytes). The offsets are:
+    Tests the v4 schema (18 chemicals, 3416 bytes). The offsets are:
     - Header: 0-55 (56 bytes)
     - NeurochemicalVector: 56-2471 (2416 bytes)
       - chemicals[18]: 56-1063 (1008 bytes, 18 × 56 each)
@@ -389,7 +389,7 @@ def test_core_state_unpack() -> None:
       - consolidation_weight: 2636
       - retrieval_weight: 2640
     """
-    data = bytearray(3296)
+    data = bytearray(3416)
 
     # Header fields
     struct.pack_into("<Q", data, 16, 1000)   # created_at
@@ -438,10 +438,41 @@ def test_core_state_unpack() -> None:
     assert approx_equal(state.retrieval_weight, 0.60)
 
 
+def test_core_state_reads_inference_signals_from_the_v4_offset() -> None:
+    """The inference block is read from 3352, not the v3 offset of 3228.
+
+    Schema v4 inserted the 124-byte ion block at 3224, so the v3 offset
+    now lands inside IonState. Reading it there does not fail — it
+    returns ion concentrations wearing the field names of inference
+    signals, which is worse than an error because the regulator
+    consumes `allostasis_load` as real regulatory burden.
+    """
+    data = bytearray(3416)
+    # Poison the ion block at the old offset so a v3 read would be
+    # unambiguously wrong rather than accidentally plausible.
+    for off in range(3228, 3292, 4):
+        struct.pack_into("<f", data, off, 9.99)
+    # Field offsets are relative to 3352: 14 f32s in declaration order,
+    # then inference_tick_count (u32) at +56, then policy_authority.
+    struct.pack_into("<f", data, 3352, 0.1111)   # surprise_ema
+    struct.pack_into("<f", data, 3356, 0.2222)   # free_energy
+    struct.pack_into("<f", data, 3364, 0.7777)   # allostasis_load
+    struct.pack_into("<f", data, 3404, 0.6666)   # model_maturity
+    struct.pack_into("<I", data, 3408, 4242)    # inference_tick_count
+
+    state = CoreState.unpack(bytes(data))
+    assert state.inference is not None
+    assert approx_equal(state.inference.surprise_ema, 0.1111)
+    assert approx_equal(state.inference.free_energy, 0.2222)
+    assert approx_equal(state.inference.allostasis_load, 0.7777)
+    assert approx_equal(state.inference.model_maturity, 0.6666)
+    assert state.inference.inference_tick_count == 4242
+
+
 def test_core_state_too_short() -> None:
-    """A buffer shorter than 3296 bytes raises ValueError."""
+    """A buffer shorter than 3416 bytes raises ValueError."""
     try:
-        CoreState.unpack(b"\x00" * 3287)
+        CoreState.unpack(b"\x00" * 3407)
         raise AssertionError()
     except ValueError as e:
         logger.debug(repr(e))

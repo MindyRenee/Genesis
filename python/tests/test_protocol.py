@@ -16,12 +16,16 @@ from genesis_client.client import GenesisClient
 from genesis_client.exceptions import ConnectionError, ProtocolError
 from genesis_client.protocol import (
     ADVANCE_NEURO,
+    ADVANCE_PHYSICS,
     CHEM_BDNF,
     CHEM_CORTISOL,
     CHEM_DOPAMINE,
     CHEM_NAMES,
     CHEM_SEROTONIN,
+    DT_NOMINAL_STEP,
+    GET_ION_SUMMARY,
     GET_NEURO_SUMMARY,
+    GET_SENSOR_PRESENCE,
     GET_STATE,
     HANDSHAKE,
     MODULE_ATTENTION,
@@ -226,6 +230,11 @@ def test_command_ids():
     assert STORE_EPISODE == 32
     assert PING == 8
     assert SHUTDOWN == 12
+    # The ion layer is additive and continues past ADVANCE_PHYSICS.
+    # genesis2 used 36, but this tree already spent 36 on
+    # GET_SENSOR_PRESENCE, so GET_ION_SUMMARY must not collide.
+    assert GET_ION_SUMMARY == 40
+    assert GET_SENSOR_PRESENCE == 36
 
 
 def test_chemical_ids():
@@ -299,6 +308,9 @@ def test_protocol_version():
     layer (pulse, throttle, PSI, battery cycles, entropy,
     clocksource, suspend caps) and added SET_WAKE_ALARM.
     """
+    # PROTOCOL_VERSION is the *wire protocol* version and is unaffected
+    # by the schema bump that added the ion layer (schema v4 lives in
+    # the state file, not the IPC framing).
     assert PROTOCOL_VERSION == 3
 
 
@@ -546,31 +558,71 @@ def test_client_does_not_false_positive_on_data_first_byte():
         (-5.0, 0.001),   # negative (clock anomaly) — clamped to min
     ],
 )
-def test_client_advance_neuro_clamps_dt(dt_sent, dt_expected):
-    """advance_neuro must clamp dt to the daemon's [0.001, 10.0] range.
+def test_advance_physics_clamps_dt(dt_sent, dt_expected):
+    """advance_physics must clamp dt to the body's [0.001, 10.0] range.
 
-    The mind passes raw measured elapsed time; the client enforces the
-    daemon's dt contract at the boundary so longer stalls are
-    truncated rather than rejected. Without this, its neurochemical
-    clock would lag the wall clock whenever the loop stalls.
+    This is the evaluation-only command, whose whole purpose is to let
+    an offline assay vary dt as its independent variable. It enforces
+    the same bounds the daemon applies to its own measured elapsed time,
+    so an experiment cannot request a step the production integrator
+    would refuse.
     """
     import struct
 
     client, _ = _client_with_socket()
-    # Valid ADVANCE_NEURO response: ack + 4×f32 + u32 = 21 bytes.
-    ok_resp = b"\x01" + b"\x00\x00\x80\x3F" * 4 + b"\x00" * 4
+    # Valid response: ack + 4x f32 + u32 = 21 bytes (same shape as
+    # ADVANCE_NEURO, so the decode path is shared).
+    ok_resp = b"\x01" + b"\x00\x00\x80\x3f" * 4 + b"\x00" * 4
     assert len(ok_resp) == 21
     with (
         patch("genesis_client.client.write_message") as send,
-        patch("genesis_client.client.read_message", return_value=(ADVANCE_NEURO, ok_resp)),
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(ADVANCE_PHYSICS, ok_resp),
+        ),
     ):
-        result = client.advance_neuro(dt=dt_sent)
+        result = client.advance_physics(dt_sent)
 
     assert result is not None
-    # The payload sent must be the clamped dt, packed as f32 LE.
     sent_payload = send.call_args[0][2]
     (packed_dt,) = struct.unpack("<f", sent_payload)
     assert abs(packed_dt - dt_expected) < 1e-6
+
+
+def test_advance_neuro_takes_no_dt_from_the_caller():
+    """The production command must not accept a caller-chosen step.
+
+    Time ownership is the daemon's. `advance_neuro` takes no `dt` and
+    sends the nominal step as a placeholder the daemon ignores, so the
+    coupling that let the mind dictate the body's integration rate cannot
+    be reintroduced from this layer. Pinning the signature means a
+    future caller passing `dt=` fails loudly instead of quietly
+    reintroducing two clocks on one body.
+    """
+    import inspect
+
+    params = inspect.signature(GenesisClient.advance_neuro).parameters
+    assert "dt" not in params, (
+        "advance_neuro must not accept dt; the daemon owns time"
+    )
+
+    client, _ = _client_with_socket()
+    ok_resp = b"\x01" + b"\x00\x00\x80\x3f" * 4 + b"\x00" * 4
+    with (
+        patch("genesis_client.client.write_message") as send,
+        patch(
+            "genesis_client.client.read_message",
+            return_value=(ADVANCE_NEURO, ok_resp),
+        ),
+    ):
+        assert client.advance_neuro() is not None
+
+    # Whatever is on the wire is the nominal step, not a caller's choice.
+    import struct
+
+    (packed,) = struct.unpack("<f", send.call_args[0][2])
+    assert abs(packed - DT_NOMINAL_STEP) < 1e-6
+
 
 
 def test_protocol_error_is_os_error():
@@ -765,3 +817,46 @@ def run_all():
 if __name__ == "__main__":
     success = run_all()
     sys.exit(0 if success else 1)
+
+
+def test_ion_summary_unpack_matches_wire_layout():
+    """IonSummary decodes the daemon's fixed 108-byte block.
+
+    The daemon serializes 27 little-endian f32 in a pinned field order
+    (four IonId arrays, then eleven scalars). If either side reorders a
+    field the payload still unpacks — it just reports the wrong ion —
+    so the test pins the order rather than only the width.
+    """
+    import struct
+
+    from genesis_client.types import IonSummary
+
+    values = [float(i) for i in range(27)]
+    raw = struct.pack("<27f", *values)
+    ions = IonSummary.unpack(raw)
+
+    assert len(raw) == 108
+    assert ions.intracellular_mm == (0.0, 1.0, 2.0, 3.0)
+    assert ions.extracellular_mm == (4.0, 5.0, 6.0, 7.0)
+    assert ions.reversal_potential_mv == (8.0, 9.0, 10.0, 11.0)
+    assert ions.conductance == (12.0, 13.0, 14.0, 15.0)
+    assert ions.membrane_potential_mv == 16.0
+    assert ions.nak_pump_rate == 17.0
+    assert ions.kcl_cotransporter_flux == 18.0
+    assert ions.ncx_flux == 19.0
+    assert ions.atp_availability == 20.0
+    assert ions.calcium_signal == 21.0
+    assert ions.chloride_efficacy == 22.0
+    assert ions.excitability == 23.0
+    assert ions.gradient_integrity == 24.0
+    assert ions.energy_load == 25.0
+    assert ions.net_membrane_current == 26.0
+
+    # IonId order is calcium, chloride, potassium, sodium.
+    assert ions.ion_names == ("calcium", "chloride", "potassium", "sodium")
+    assert ions.intracellular("potassium") == 2.0
+    assert ions.extracellular("sodium") == 7.0
+    assert ions.reversal_potential("calcium") == 8.0
+
+    with pytest.raises(ValueError, match="108 bytes"):
+        IonSummary.unpack(raw[:107])

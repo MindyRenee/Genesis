@@ -1,7 +1,7 @@
 """Regression tests for goal-directed decision candidate generation."""
 
-from genesis_cognitive.concepts import ConceptNetwork
-from genesis_cognitive.reasoning import ActionType, DecisionEngine, ResourceState
+from genesis_conscious.concepts import ConceptNetwork
+from genesis_conscious.reasoning import ActionType, DecisionEngine, ResourceState
 
 
 def test_active_goals_make_investigation_selectable() -> None:

@@ -1,12 +1,14 @@
 """Tests for the language-to-concept grounding boundary."""
 
-from genesis_cognitive.concepts.network import ConceptNetwork
-from genesis_cognitive.language.comprehension import (
+import pytest
+
+from genesis_conscious.concepts.network import ConceptNetwork
+from genesis_conscious.language.comprehension import (
     ComprehensionEngine,
     Proposition,
     SemanticRole,
 )
-from genesis_cognitive.language.grounding import SemanticGrounder
+from genesis_conscious.language.grounding import SemanticGrounder
 
 
 def test_grounder_binds_existing_concepts_without_mutating_network() -> None:
@@ -127,3 +129,8 @@ def test_grounder_context_changes_selected_sense() -> None:
 
     assert financial.subject.concept_id == "bank"
     assert river.subject.concept_id == "bank#2"
+
+pytestmark = [
+    pytest.mark.usefixtures("learned_sentiment"),
+    pytest.mark.usefixtures("learned_verbs"),
+]

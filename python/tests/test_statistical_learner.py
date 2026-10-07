@@ -8,13 +8,13 @@ slot selection and generator realization scoring.
 
 import pytest
 
-from genesis_cognitive.emotion import EmotionalState
-from genesis_cognitive.language.statistical_learner import (
+from genesis_conscious.language.statistical_learner import (
     NGramModel,
     StatisticalLanguageLearner,
 )
-from genesis_cognitive.language.vocabulary import Vocabulary
-from genesis_cognitive.self import PersonalityTraits, SelfModel
+from genesis_conscious.language.vocabulary import Vocabulary
+from genesis_conscious.limbic_system.emotion import EmotionalState
+from genesis_conscious.self import PersonalityTraits, SelfModel
 
 # ─── NGramModel ───────────────────────────────────────────────────
 
@@ -373,7 +373,7 @@ def test_vocabulary_no_fluency_model_works():
 
 def test_prediction_alignment_neutral_without_data():
     """Without learned data, prediction alignment is neutral (0.5)."""
-    from genesis_cognitive.language.generator import GenerativeEngine
+    from genesis_conscious.language.generator import GenerativeEngine
 
     engine = GenerativeEngine(SelfModel(born_at=0), seed=42)
     assert engine._prediction_alignment("anything goes here") == 0.5
@@ -381,7 +381,7 @@ def test_prediction_alignment_neutral_without_data():
 
 def test_prediction_alignment_higher_for_predicted_text():
     """Text following the learner's predictions scores higher."""
-    from genesis_cognitive.language.generator import GenerativeEngine
+    from genesis_conscious.language.generator import GenerativeEngine
 
     engine = GenerativeEngine(SelfModel(born_at=0), seed=42)
     # Teach a strong pattern: "the cat sat" repeated many times
@@ -396,7 +396,7 @@ def test_prediction_alignment_higher_for_predicted_text():
 
 def test_prediction_alignment_neutral_for_short_text():
     """Very short text gets neutral alignment."""
-    from genesis_cognitive.language.generator import GenerativeEngine
+    from genesis_conscious.language.generator import GenerativeEngine
 
     engine = GenerativeEngine(SelfModel(born_at=0), seed=42)
     engine.acquire_from_input("the cat sat on the mat")

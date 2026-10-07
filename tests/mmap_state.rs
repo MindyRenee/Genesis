@@ -871,3 +871,97 @@ fn test_cross_process_lock_released_after_modify() {
 
     cleanup(&path);
 }
+
+/// The seqlock counter must be left EVEN by a publish, and readers
+/// must keep succeeding afterwards.
+///
+/// `MmapState::publish_stack` writes the payload in two ranges that
+/// skip `header.seq_lock`. An earlier version wrote the whole struct
+/// in one `write_volatile`, which republished the *stale* `seq_lock`
+/// value captured in the pre-write snapshot: the trailing atomic
+/// increment then landed the counter on odd, so every subsequent
+/// `read_consistent` in the process rejected the snapshot and every
+/// IPC read failed with READ_FAILED — permanently, for the life of
+/// the daemon. It also briefly restored an even counter *between* the
+/// pre- and post-increment, i.e. mid-payload, which is exactly the
+/// torn read the seqlock exists to prevent.
+///
+/// This test pins both invariants: parity after publish, and a reader
+/// that still works after many writes.
+#[test]
+fn test_publish_leaves_seqlock_even_and_readable() {
+    let path = temp_path("seqlock_parity");
+
+    let mmap = MmapState::create(&path, 1, now_ms()).expect("create");
+
+    let seq_offset = std::mem::offset_of!(GenesisCoreState, header)
+        + std::mem::offset_of!(genesis::state::header::CoreStateHeader, seq_lock);
+
+    for i in 0..64u64 {
+        mmap.modify(now_ms() + i, |state| {
+            state.header.heartbeat = state.header.heartbeat.wrapping_add(7);
+        })
+        .expect("modify");
+
+        // A consistent read must succeed after every publish — if the
+        // counter latched odd, this is where it shows up.
+        let snapshot = mmap
+            .read_consistent()
+            .expect("read_consistent must succeed after publish");
+        // Each `modify` bumps the heartbeat by 1 itself (the write
+        // transaction's own stamp) and the closure adds 7 more.
+        assert_eq!(
+            snapshot.header.heartbeat,
+            (i + 1) * 8,
+            "payload must be published intact"
+        );
+    }
+
+    // Parity is observable through the raw file bytes, independent of
+    // the reader: an odd counter on disk is what strands every reader.
+    let bytes = std::fs::read(&path).expect("read state file");
+    let seq = u64::from_le_bytes(
+        bytes[seq_offset..seq_offset + 8]
+            .try_into()
+            .expect("8 bytes"),
+    );
+    assert_eq!(seq & 1, 0, "seqlock must be even after publish (got {seq})");
+
+    mmap.sync().expect("sync");
+    cleanup(&path);
+}
+
+/// A panicking closure must leave the published state exactly as it
+/// was: the mutation runs on a stack copy, so the mapping is never
+/// dirtied and the seqlock is never left odd.
+#[test]
+fn test_panicking_modify_leaves_state_and_parity_intact() {
+    let path = temp_path("modify_panic");
+
+    let mmap = MmapState::create(&path, 1, now_ms()).expect("create");
+    mmap.modify(now_ms(), |state| {
+        state.zones.transition_to(CognitiveZone::Coding, now_ms());
+    })
+    .expect("first modify");
+
+    let before = mmap.read_consistent().expect("read before panic");
+
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        mmap.modify(now_ms(), |state| {
+            state.zones.transition_to(CognitiveZone::Learning, now_ms());
+            panic!("closure panic");
+        })
+    }));
+    assert!(result.is_err(), "panic must propagate");
+
+    let after = mmap
+        .read_consistent()
+        .expect("read after panic — counter must not be stuck odd");
+    assert_eq!(
+        after.zones.zone(),
+        before.zones.zone(),
+        "a panicking closure must not publish its partial mutation"
+    );
+
+    cleanup(&path);
+}

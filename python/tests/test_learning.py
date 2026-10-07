@@ -17,10 +17,9 @@ from genesis_client.types import (
     LEARNING_POSTURE_RECOVERING,
     PlasticityProfile,
 )
-from genesis_cognitive.cognition.concept_learner import ConceptLearner
-from genesis_cognitive.concepts import ConceptNetwork, EmbeddingStore, NetworkTopology, RelationType
-from genesis_cognitive.emotion import EmotionalState
-from genesis_cognitive.learning import (
+from genesis_conscious.cognition.concept_learner import ConceptLearner
+from genesis_conscious.concepts import ConceptNetwork, EmbeddingStore, NetworkTopology, RelationType
+from genesis_conscious.learning import (
     STDP,
     AutonomousLearner,
     CuriosityEngine,
@@ -33,9 +32,10 @@ from genesis_cognitive.learning import (
     TDLearner,
     TDTransition,
 )
-from genesis_cognitive.memory import SemanticMemory
-from genesis_cognitive.reasoning import ReasoningEngine
-from genesis_cognitive.tools.source_registry import SourceResult
+from genesis_conscious.limbic_system.emotion import EmotionalState
+from genesis_conscious.memory import SemanticMemory
+from genesis_conscious.reasoning import ReasoningEngine
+from genesis_conscious.tools.source_registry import SourceResult
 
 logger = logging.getLogger(__name__)
 
@@ -1104,7 +1104,7 @@ def test_statistics_include_trace_info(network_td_learning) -> None:
 
 def test_action_value_persistence_roundtrip(network_td_learning) -> None:
     """Action-conditioned values and traces survive persistence."""
-    from genesis_cognitive.persistence import (
+    from genesis_conscious.infrastructure.persistence import (
         _serialize_td_learner,
         restore_td_learner,
     )
@@ -1127,7 +1127,7 @@ def test_action_value_persistence_roundtrip(network_td_learning) -> None:
 
 def test_trace_persistence_roundtrip(network_td_learning) -> None:
     """Eligibility traces and λ survive serialize/restore."""
-    from genesis_cognitive.persistence import (
+    from genesis_conscious.infrastructure.persistence import (
         _serialize_td_learner,
         restore_td_learner,
     )
@@ -1148,7 +1148,7 @@ def test_trace_persistence_roundtrip(network_td_learning) -> None:
 
 def test_restore_old_save_without_traces(network_td_learning) -> None:
     """Restoring a pre-TD(λ) save (no traces/lam keys) doesn't crash."""
-    from genesis_cognitive.persistence import restore_td_learner
+    from genesis_conscious.infrastructure.persistence import restore_td_learner
 
     td = TDLearner(network_td_learning, lam=0.8)
     old_data = {
@@ -1931,7 +1931,7 @@ def test_local_study_keeps_learned_origin() -> None:
 
 def test_web_study_records_concept_sources_capped() -> None:
     """Concepts remember where they were read, bounded in size."""
-    from genesis_cognitive.concepts.edge_log import WEB_SOURCES_CAP
+    from genesis_conscious.concepts.edge_log import WEB_SOURCES_CAP
 
     learner = _make_learner()
     created = learner._extract_and_add_concepts(

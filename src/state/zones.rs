@@ -424,6 +424,102 @@ impl ActiveZones {
 }
 
 // ─────────────────────────────────────────────────────────────────
+//  Transition telemetry
+// ─────────────────────────────────────────────────────────────────
+//
+// Phase transitions are a stated contribution, but nothing measured
+// them: `zone_duration_ms` holds exactly one sample — the last
+// transition's duration, overwritten every time — and there was no
+// count at all. So neither how often Genesis changes phase nor how
+// long it spends in each was answerable, and a mind that oscillated
+// between two phases looked identical to one that settled.
+//
+// This accumulates transition counts and time-in-phase outside the
+// mmap'd state. `ActiveZones` is exactly 96 bytes, filling its slot
+// between `memory` at 2568 and `checksum` at 3224 with no reserved
+// tail, so adding fields here would shift every later offset and force
+// a layout migration — a large, risky change for two counters. Keeping
+// the telemetry process-local avoids that, at the cost that it resets
+// on restart; the counts are a rate, and the zone history is
+// re-accumulated from the first transition after startup.
+//
+// Served by its own additive command (GET_ZONE_TRANSITIONS) for the
+// same reason as the sensor mask: the BodyState layouts are pinned by
+// desc_len arithmetic, so a new field is a new layout and a protocol
+// bump. A `u32` count per zone plus a `u64` total is 48 bytes on the
+// wire and changes nothing existing.
+
+/// How many distinct zones/phases are tracked. Sized to the
+/// `CognitiveZone` and `MentalPhase` discriminants; an index beyond
+/// this is ignored rather than panicking, since a new variant must not
+/// be able to fault the telemetry path.
+pub const TRACKED_STATES: usize = 8;
+
+/// Transition counts and accumulated dwell time, per state index.
+///
+/// `counts[i]` is how many times state `i` was entered; `ms[i]` the
+/// total milliseconds spent there. Both are monotonic for the life of
+/// the process.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct TransitionTally {
+    /// Times each state index was entered.
+    pub counts: [u32; TRACKED_STATES],
+    /// Milliseconds accumulated in each state index.
+    pub ms: [u64; TRACKED_STATES],
+    /// Milliseconds spent in the state entered most recently, so a
+    /// caller can see the current dwell without waiting for the next
+    /// transition to close it out.
+    pub current_since_ms: u64,
+    /// Index of the most recently entered state.
+    pub current: u8,
+}
+
+impl TransitionTally {
+    /// Record a transition into `next` at `now_ms`, closing out the
+    /// time accumulated in the previous state.
+    ///
+    /// Safe to call with the same state twice: that is not a
+    /// transition, and counting it would inflate the rate exactly when
+    /// the system is most stable.
+    pub fn record(&mut self, next: u8, now_ms: u64) -> bool {
+        let idx = next as usize;
+        if idx >= TRACKED_STATES {
+            return false;
+        }
+        if next == self.current && self.counts[idx] > 0 {
+            // Same state: keep accumulating, count nothing.
+            return false;
+        }
+        if self.counts[self.current as usize] > 0 {
+            self.ms[self.current as usize] = self.ms[self.current as usize]
+                .saturating_add(now_ms.saturating_sub(self.current_since_ms));
+        }
+        self.counts[idx] = self.counts[idx].saturating_add(1);
+        self.current = next;
+        self.current_since_ms = now_ms;
+        true
+    }
+
+    /// Total time in `idx` including the in-progress dwell.
+    pub fn total_ms(&self, idx: u8, now_ms: u64) -> u64 {
+        let i = idx as usize;
+        if i >= TRACKED_STATES {
+            return 0;
+        }
+        let mut total = self.ms[i];
+        if self.current == idx && self.counts[i] > 0 {
+            total = total.saturating_add(now_ms.saturating_sub(self.current_since_ms));
+        }
+        total
+    }
+
+    /// Total transitions across all states.
+    pub fn total_transitions(&self) -> u64 {
+        self.counts.iter().map(|c| *c as u64).sum()
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────
 //  Compile-time layout assertions
 // ─────────────────────────────────────────────────────────────────
 

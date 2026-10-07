@@ -27,7 +27,7 @@
 //! physiology holds her defaults). This file covers the authorship half.
 
 use genesis::daemon::TickLoop;
-use genesis::state::neurochemical::{NeurochemicalId, NEUROCHEMICAL_COUNT};
+use genesis::state::neurochemical::{NEUROCHEMICAL_COUNT, NeurochemicalId};
 use genesis::store::{LtmStore, MmapState, RingBuffer};
 
 struct Sys {
@@ -80,7 +80,10 @@ impl Drop for Sys {
 fn levels(sys: &Sys) -> Vec<f32> {
     let s = sys.mmap.read_consistent().expect("read state");
     (0..NEUROCHEMICAL_COUNT)
-        .map(|i| s.neurochemicals.effective(NeurochemicalId::from_u8(i as u8)))
+        .map(|i| {
+            s.neurochemicals
+                .effective(NeurochemicalId::from_u8(i as u8))
+        })
         .collect()
 }
 
@@ -134,7 +137,10 @@ fn body_state_does_not_move_her_chemistry() {
         );
     }
     println!("\nlargest body-driven difference: {worst:.5} ({worst_name})");
-    println!("advice retained for a hot body: {} impulses", hot.advised.len());
+    println!(
+        "advice retained for a hot body: {} impulses",
+        hot.advised.len()
+    );
 }
 
 struct Arm {
@@ -148,7 +154,7 @@ fn run_arm(extreme: bool) -> Arm {
 
     // Settle first, so both arms start from the same resting state.
     for _ in 0..200 {
-        tl.advance_neuro(&sys.mmap, 1.0);
+        tl.advance_physics(&sys.mmap, 1.0);
     }
 
     if extreme {

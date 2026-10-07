@@ -1,5 +1,5 @@
 """Regression tests for concept-network restore caches."""
-from genesis_cognitive.concepts import ConceptNetwork
+from genesis_conscious.concepts import ConceptNetwork
 
 
 def test_replace_contents_invalidates_sparse_activation_index():

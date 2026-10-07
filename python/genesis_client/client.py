@@ -6,7 +6,7 @@ domain socket and provides a clean, Pythonic API for all IPC commands.
 
 The protocol is request-response only. Subcognitive→cognitive
 notifications (phase changes, dream insights) are handled separately
-by ``genesis_cognitive.notifications``, a pull-based queue that
+by ``genesis_conscious.infrastructure.notifications``, a pull-based queue that
 detects state changes during the polling cycle — not by this client.
 
 # Usage
@@ -72,6 +72,7 @@ from .protocol import (
     _U32,
     _U64,
     ADVANCE_NEURO,
+    ADVANCE_PHYSICS,
     APPLY_BODY_CONTROL,
     ARCHIVE_EPISODE,
     ASSOCIATE,
@@ -82,24 +83,33 @@ from .protocol import (
     CHEM_OXYTOCIN,
     CONSOLIDATE,
     DREAM,
+    DT_MAX,
+    DT_MIN,
+    DT_NOMINAL_STEP,
+    EMOTIONAL_TAG_SIZE,
     FIND_SIMILAR,
     GET_BODY_CONTROL,
     GET_BODY_STATE,
     GET_INFERENCE_SUMMARY,
+    GET_ION_SUMMARY,
     GET_MEMORY_STATS,
     GET_NEURO_SUMMARY,
     GET_PHASE,
     GET_PLASTICITY_PROFILE,
+    GET_PROCESS_HEALTH,
     GET_RECENT_EPISODES,
+    GET_SENSOR_PRESENCE,
     # Command IDs
     GET_STATE,
     GET_SUBSYSTEM_TELEMETRY,
+    GET_ZONE_TRANSITIONS,
     HANDSHAKE,
     # Module IDs (for validation and store_observation)
     MODULE_GUARDRAILS,
     MODULE_SENSORY,
     # Module status (for heartbeat_module)
     MODULE_STATUS_ERROR,
+    MODULE_STATUS_IDLE,
     MODULE_STATUS_RUNNING,
     NEURO_ADJUST_BASELINE,
     NEURO_IMPULSE,
@@ -127,20 +137,25 @@ from .protocol import (
     read_message,
     write_message,
 )
+from .swallow import note_swallowed
 from .types import (
     BodyControlState,
     BodyState,
     CoreState,
     Episode,
     InferenceSummary,
+    IonSummary,
     MemoryStats,
     NeuroSummary,
     PhaseInfo,
     PingResponse,
     PlasticityProfile,
+    ProcessHealth,
     RecentEpisode,
+    SensorPresence,
     SimilarEpisode,
     SubsystemReport,
+    ZoneTransitions,
     unpack_recent_episodes,
     unpack_similar_results,
 )
@@ -201,7 +216,10 @@ class GenesisClient:
             try:
                 self._sock.close()
             except OSError as e:
-                logger.debug(f'_close_socket failed: {e}')
+                note_swallowed(
+                    "genesis_client.client._close_socket",
+                    e,
+                )
             self._sock = None
 
     def _connect(self) -> None:
@@ -260,7 +278,10 @@ class GenesisClient:
                 try:
                     self._sock.close()
                 except OSError as e:
-                    logger.debug(repr(e))
+                    note_swallowed(
+                        "genesis_client.client.disconnect",
+                        e,
+                    )
                 self._sock = None
 
     def __enter__(self) -> GenesisClient:
@@ -400,7 +421,10 @@ class GenesisClient:
                     try:
                         sock.settimeout(old_timeout)
                     except OSError as e:
-                        logger.debug(f"failed to restore socket timeout: {e}")
+                        note_swallowed(
+                            "genesis_client.client._request",
+                            e,
+                        )
 
                 if resp_cmd != cmd_id:
                     self.disconnect()
@@ -440,9 +464,26 @@ class GenesisClient:
         return PingResponse.unpack(resp)
 
     def get_state(self, *, timeout: float | None = None) -> CoreState:
-        """Get the full core state (3296 bytes), parsed into useful fields."""
+        """Get the full core state (3416 bytes), parsed into useful fields."""
         resp = self._request(GET_STATE, timeout=timeout)
         return CoreState.unpack(resp)
+
+    def get_ion_summary(self, *, timeout: float | None = None) -> IonSummary:
+        """Get the electrochemical ion summary (108 bytes).
+
+        Exposes calcium, chloride, potassium, and sodium concentrations,
+        reversal potentials, conductances, membrane voltage, transporter
+        fluxes, ATP availability, and normalized excitability/plasticity
+        signals from the substrate's biophysical layer.
+
+        The ion layer is authoritative state owned by the daemon, so
+        this is a pure observation — there is no request payload and no
+        way for the caller to step it. Absent sensors or an older daemon
+        surface as an exception here, which is why interoception treats
+        a missing summary as "no reading", never as a resting one.
+        """
+        resp = self._request(GET_ION_SUMMARY, timeout=timeout)
+        return IonSummary.unpack(resp)
 
     def get_neuro_summary(self, *, timeout: float | None = None) -> NeuroSummary:
         """Get the compact neurochemical summary (32 bytes).
@@ -474,6 +515,60 @@ class GenesisClient:
         """
         resp = self._request(GET_BODY_STATE, timeout=timeout)
         return BodyState.unpack(resp)
+
+    def get_process_health(self, *, timeout: float | None = None) -> ProcessHealth:
+        """Get which of Genesis's own processes are alive, and death count.
+
+        A subsystem that dies used to disappear from
+        ``get_subsystem_telemetry`` with no record, so a crashed retina
+        looked exactly like one that was never started — the reader saw
+        a shorter list and could not tell why.
+
+        ``deaths`` counts alive→not-alive transitions since startup, so
+        it separates a loss from an absence. A subsystem that was never
+        running does not count.
+        """
+        resp = self._request(GET_PROCESS_HEALTH, timeout=timeout)
+        return ProcessHealth.unpack(resp)
+
+    def get_zone_transitions(self, *, timeout: float | None = None) -> ZoneTransitions:
+        """Get how often Genesis has changed zone and phase, and dwell times.
+
+        Neither was measured before: the mmap'd zone record held a
+        single duration sample that every transition overwrote, with no
+        count at all. So a mind oscillating between two phases was
+        indistinguishable from one that had settled.
+
+        Zone and phase are returned separately because they are driven
+        by different mechanisms — the zone follows intentions, the
+        phase follows neurochemistry — and oscillating in one while
+        stable in the other is a distinct fault.
+
+        Counts are process-local and reset when the daemon restarts, so
+        they read as a rate rather than a lifetime total.
+        """
+        resp = self._request(GET_ZONE_TRANSITIONS, timeout=timeout)
+        return ZoneTransitions.unpack(resp)
+
+    def get_sensor_presence(self, *, timeout: float | None = None) -> SensorPresence:
+        """Get which optional hardware sensors this machine actually has.
+
+        ``GET_BODY_STATE`` returns ~30 values with no per-channel
+        validity, so a channel backed by no sensor reads the same as one
+        reporting a healthy zero. This distinguishes them: a set bit
+        means the matching ``BodyState`` field carries a real reading.
+
+        A zero mask is returned — never an error — when the daemon is
+        older than this command or no interoception read has completed
+        yet. That is the safe direction: nothing is claimed to be
+        measured, so callers must not treat an unverified channel as
+        evidence about the machine.
+        """
+        try:
+            resp = self._request(GET_SENSOR_PRESENCE, timeout=timeout)
+        except (ConnectionError, OSError):
+            return SensorPresence(mask=0)
+        return SensorPresence.unpack(resp)
 
     def get_subsystem_telemetry(self, *, timeout: float | None = None) -> SubsystemReport:
         """Get per-subsystem silicon telemetry — which part of it is firing.
@@ -603,14 +698,17 @@ class GenesisClient:
             event_type: Event type ID (0=UserInput, 1=Output, etc.)
             source_module: Module ID that produced this event.
             salience: Importance score [0.0, 1.0].
-            emotional_tag: 12 effective neurochemical levels.
+            emotional_tag: EMOTIONAL_TAG_SIZE effective neurochemical levels.
             text: Event description (max 188 bytes).
 
         Returns:
             True if the event was stored successfully.
         """
-        if len(emotional_tag) != 12:
-            raise ValueError(f"emotional_tag must have 12 elements, got {len(emotional_tag)}")
+        if len(emotional_tag) != EMOTIONAL_TAG_SIZE:
+            raise ValueError(
+                f"emotional_tag must have {EMOTIONAL_TAG_SIZE} elements, "
+                f"got {len(emotional_tag)}"
+            )
         if not (0 <= event_type <= 255):
             raise ValueError(f"event_type must be 0-255, got {event_type}")
         if not (0 <= source_module <= 255):
@@ -661,7 +759,7 @@ class GenesisClient:
             event_type: Event type ID (0=UserInput, 1=Output, etc.)
             source_module: Module ID that produced this event.
             salience: Importance score [0.0, 1.0].
-            emotional_tag: 12 effective neurochemical levels.
+            emotional_tag: EMOTIONAL_TAG_SIZE effective neurochemical levels.
             text: Event description (max 65535 bytes — the wire protocol's
             u16 text_len limit). The LTM store itself can handle up to
             256 KB per episode; the bottleneck is the u16 length field.
@@ -670,8 +768,11 @@ class GenesisClient:
             The real LTM episode ID on success, or None if the store
             failed.
         """
-        if len(emotional_tag) != 12:
-            raise ValueError(f"emotional_tag must have 12 elements, got {len(emotional_tag)}")
+        if len(emotional_tag) != EMOTIONAL_TAG_SIZE:
+            raise ValueError(
+                f"emotional_tag must have {EMOTIONAL_TAG_SIZE} elements, "
+                f"got {len(emotional_tag)}"
+            )
         if not (0 <= event_type <= 255):
             raise ValueError(f"event_type must be 0-255, got {event_type}")
         if not (0 <= source_module <= 255):
@@ -945,27 +1046,41 @@ class GenesisClient:
     # associate, dream, read sensors, and control the body.
 
     def advance_neuro(
-        self, dt: float = 0.2, *, timeout: float | None = None
+        self, *, timeout: float | None = None
     ) -> tuple[float, float, float, float, int] | None:
-        """Advance neurochemical dynamics by dt and run active inference.
+        """Advance the body's neurochemistry and run active inference.
 
-        This is the core physics integration step. The mind calls
-        this when brain waves say it's time to advance.
+        There is deliberately no ``dt`` parameter. The daemon owns time:
+        it is the body, it integrates at TICK_INTERVAL_MS on its own
+        clock, and it measures its own elapsed interval. Accepting a
+        caller-supplied step is what allowed the mind to dictate the
+        body's integration rate — the coupling that had neurochemistry
+        advancing in ~1-second lumps while its rate constants, the
+        circadian oscillator, and the sleep machinery were all tuned for
+        200 ms.
 
-        ``dt`` is the simulated time to advance, in seconds. It is
-        clamped to the daemon's accepted range [0.001, 10.0] (the
-        same bounds the daemon enforces) so that elapsed-time callers
-        can pass raw measured intervals: longer stalls are truncated
-        rather than rejected.
+        The 4-byte dt field remains on the wire so the frame layout and
+        PROTOCOL_VERSION are unchanged, but the daemon reads and ignores
+        it. What is sent is the nominal step, purely as a placeholder.
+
+        The returned signals are also available from shared memory
+        (``CoreState.inference``), so a caller that only wants to read
+        them does not need this call at all.
 
         Returns:
             (surprise, free_energy, precision, allostatic_load,
              tick_count) or None on error.
         """
-        # Mirror the daemon's dt validation (ipc.rs clamps to
-        # [0.001, 10.0]) so callers can pass unclamped elapsed time.
-        dt = min(10.0, max(0.001, dt))
-        resp = self._request(ADVANCE_NEURO, _F32.pack(dt), timeout=timeout)
+        resp = self._request(
+            ADVANCE_NEURO, _F32.pack(DT_NOMINAL_STEP), timeout=timeout
+        )
+        return self._decode_advance(resp)
+
+    @staticmethod
+    def _decode_advance(
+        resp: bytes | None,
+    ) -> tuple[float, float, float, float, int] | None:
+        """Decode the 21-byte advance response shared by both commands."""
         if not resp or resp[0] != 1 or len(resp) < 21:
             return None
         surprise = _F32.unpack(resp[1:5])[0]
@@ -974,6 +1089,38 @@ class GenesisClient:
         allostatic = _F32.unpack(resp[13:17])[0]
         tick_count = _U32.unpack(resp[17:21])[0]
         return (surprise, free_energy, precision, allostatic, tick_count)
+
+    def advance_physics(
+        self, dt: float, *, timeout: float | None = None
+    ) -> tuple[float, float, float, float, int] | None:
+        """Advance the body by an explicit step. **Evaluation only.**
+
+        The production path is :meth:`advance_neuro`, which takes no step
+        because the daemon owns time. This command exists for offline
+        experiments that need `dt` as an independent variable -- the
+        causal assay advances a fixed number of ticks and measures the
+        per-tick response to an impulse, so it cannot use the daemon's
+        wall clock.
+
+        Only ever call this against an isolated daemon in a temporary
+        data directory (``eval/harness.py``). Driving the live daemon with
+        it would put two clocks on the body again, which is the coupling
+        this was split apart to remove.
+
+        Args:
+            dt: Simulated seconds to advance. Clamped to the same
+                ``DT_MIN..DT_MAX`` range the body applies to its own
+                elapsed time, so an experiment cannot request a step the
+                production integrator would refuse.
+
+        Returns:
+            (surprise, free_energy, precision, allostatic_load,
+             tick_count) or None on error.
+        """
+        dt = min(DT_MAX, max(DT_MIN, dt))
+        resp = self._request(ADVANCE_PHYSICS, _F32.pack(dt), timeout=timeout)
+        return self._decode_advance(resp)
+
 
     def consolidate(self, *, timeout: float | None = None) -> int:
         """Consolidate STM → LTM. Returns episodes promoted."""
@@ -1044,6 +1191,8 @@ class GenesisClient:
         status: int,
         cpu_share: float | None = None,
         *,
+        task_id: int | None = None,
+        error_code: int | None = None,
         timeout: float | None = None,
     ) -> bool:
         """Update a module's status in the runtime manifest.
@@ -1062,6 +1211,16 @@ class GenesisClient:
                     process's measured work. Written into the
                     manifest's ``cpu_share`` and served by
                     GET_SUBSYSTEM_TELEMETRY's module section.
+            task_id: Optional identifier for what the module is working
+                    on (0 = none). Serves the manifest's ``task_id``.
+            error_code: Optional error the module has hit (0 = none).
+                    Serves the manifest's ``error_code``, so a failed
+                    part is distinguishable from one that never ran.
+                    Pass 0 to clear a previous error.
+
+        All three optional fields are appended in that order, so a
+        daemon that predates ``task_id`` simply ignores the extra
+        bytes.
 
         Returns:
             True if the status was updated successfully.
@@ -1079,6 +1238,10 @@ class GenesisClient:
             payload += struct.pack(
                 "<f", max(0.0, min(1.0, float(cpu_share)))
             )
+        if task_id is not None:
+            payload += struct.pack("<Q", max(0, int(task_id)))
+        if error_code is not None:
+            payload += struct.pack("<I", max(0, int(error_code) & 0xFFFFFFFF))
         resp = self._request(
             UPDATE_MODULE_STATUS,
             bytes(payload),
@@ -1147,6 +1310,8 @@ class GenesisClient:
         module_id: int,
         cpu_share: float | None = None,
         *,
+        task_id: int | None = None,
+        error_code: int | None = None,
         timeout: float | None = None,
     ) -> bool:
         """Send a heartbeat for a module (status stays Running).
@@ -1155,14 +1320,33 @@ class GenesisClient:
         the module's status as Running and refreshes its heartbeat
         timestamp.
 
+        A heartbeat with no measured work reports ``Idle`` rather than
+        ``Running``: "alive but not working" and "working hard" are
+        different facts, and the manifest has a status for each. A
+        module with an error keeps ``Error`` so the failure is not
+        overwritten by a routine heartbeat.
+
         Args:
             module_id: Module ID (6=Sensory, 7=Motor, etc.)
             cpu_share: Optional self-reported activity fraction
                     [0,1] for this module.
+            task_id: Optional identifier for what the module is on.
+            error_code: Optional error the module has hit (0 = none).
 
         Returns:
             True if the heartbeat was recorded.
         """
+        if error_code:
+            status = MODULE_STATUS_ERROR
+        elif cpu_share is not None and cpu_share <= 0.0:
+            status = MODULE_STATUS_IDLE
+        else:
+            status = MODULE_STATUS_RUNNING
         return self.update_module_status(
-            module_id, MODULE_STATUS_RUNNING, cpu_share, timeout=timeout
+            module_id,
+            status,
+            cpu_share,
+            task_id=task_id,
+            error_code=error_code,
+            timeout=timeout,
         )

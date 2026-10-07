@@ -9,14 +9,13 @@ import logging
 
 import pytest
 
-from genesis_cognitive.brain_waves import BrainWave, BrainWaveState
-from genesis_cognitive.cognition import CognitiveState
-from genesis_cognitive.concepts import ConceptNetwork, RelationType
-from genesis_cognitive.emotion import EmotionalState
-from genesis_cognitive.language.base import Thought
-from genesis_cognitive.memory import MemoryContext
-from genesis_cognitive.perception import Intent, Perception, QuestionType
-from genesis_cognitive.self import (
+from genesis_conscious.cognition import CognitiveState
+from genesis_conscious.concepts import ConceptNetwork, RelationType
+from genesis_conscious.language.base import Thought
+from genesis_conscious.limbic_system.emotion import EmotionalState
+from genesis_conscious.memory import MemoryContext
+from genesis_conscious.perception import Intent, Perception, QuestionType
+from genesis_conscious.self import (
     AnswerAssessment,
     AutobiographicalSelf,
     CapabilityProfile,
@@ -36,6 +35,7 @@ from genesis_cognitive.self import (
     SelfComposer,
     SelfModel,
 )
+from genesis_conscious.thalamus.brain_waves import BrainWave, BrainWaveState
 
 logger = logging.getLogger(__name__)
 
@@ -988,7 +988,7 @@ def _make_emotion(
 
 def _make_network_with_emotion_words() -> ConceptNetwork:
     """A concept network with learned emotion-word associations."""
-    from genesis_cognitive.concepts import RelationType
+    from genesis_conscious.concepts import RelationType
 
     net = _make_network()
     # Add emotion words with category properties AND EXPRESSES edges
@@ -1033,7 +1033,7 @@ def _make_brain_waves() -> BrainWaveState:
         powers={
             BrainWave.ALPHA: 0.5,
             BrainWave.THETA: 0.2,
-            BrainWave.BETA: 0.2,
+            BrainWave.BETA2: 0.2,
             BrainWave.DELTA: 0.05,
             BrainWave.GAMMA: 0.05,
         },
@@ -2064,7 +2064,7 @@ def test_self_model_sees_her_own_hardware_body() -> None:
     or any of the other hardware signals. She could not know she was
     hot, or out of power, or being stalled.
     """
-    from genesis_cognitive.self.model import SelfModel as SM
+    from genesis_conscious.self.model import SelfModel as SM
 
     body = SM().update_hardware_body(_FullBody())
 
@@ -2088,7 +2088,7 @@ def test_absent_sensor_is_distinguishable_from_measured_zero() -> None:
     reading, and a need derived from the body could be inferred from
     silence. `hardware_sensors_present` counts what actually reported.
     """
-    from genesis_cognitive.self.model import SelfModel as SM
+    from genesis_conscious.self.model import SelfModel as SM
 
     class _PartialBody:
         cpu_temp_c = 60.0
@@ -2113,7 +2113,7 @@ def test_stale_hardware_reading_is_not_actionable() -> None:
     """A need computed from a stale body reading is a hallucinated need."""
     import time as _time
 
-    from genesis_cognitive.self.model import SelfModel as SM
+    from genesis_conscious.self.model import SelfModel as SM
 
     model = SM()
     body = model.update_hardware_body(_FullBody())
@@ -2130,7 +2130,7 @@ def test_stale_hardware_reading_is_not_actionable() -> None:
 
 def test_non_finite_sensor_reading_is_not_a_measurement() -> None:
     """A NaN or inf from a sensor must not enter the self-model."""
-    from genesis_cognitive.self.model import SelfModel as SM
+    from genesis_conscious.self.model import SelfModel as SM
 
     class _BrokenBody:
         cpu_temp_c = float("nan")
@@ -2152,7 +2152,7 @@ def test_hardware_staleness_constant_is_not_a_serialized_field() -> None:
     """
     import dataclasses
 
-    from genesis_cognitive.self.model import ComputationalSubstrate
+    from genesis_conscious.self.model import ComputationalSubstrate
 
     field_names = {f.name for f in dataclasses.fields(ComputationalSubstrate)}
     assert "HARDWARE_STALE_SECONDS" not in field_names

@@ -12,20 +12,12 @@ use genesis::MmapState;
 use genesis::state::neurochemical::NeurochemicalId;
 
 fn main() {
-    // Same resolution as run.sh: XDG_DATA_HOME (or ~/.local/share),
-    // with GENESIS_DATA_DIR kept as a manual override.
-    let path = std::env::var("GENESIS_DATA_DIR").unwrap_or_else(|_| {
-        let base = std::env::var("XDG_DATA_HOME").unwrap_or_else(|_| {
-            format!(
-                "{}/.local/share",
-                std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
-            )
-        });
-        format!("{}/genesis", base)
-    });
-    let state_file = format!("{}/core_state.bin", path);
+    // Resolution lives in one place so it cannot drift from run.sh or
+    // the other tools; see genesis::data_dir.
+    let path = genesis::data_dir();
+    let state_file = path.join("core_state.bin");
 
-    println!("Opening state file: {}", state_file);
+    println!("Opening state file: {}", state_file.display());
     let mmap = match MmapState::open(&state_file) {
         Ok(m) => {
             println!(

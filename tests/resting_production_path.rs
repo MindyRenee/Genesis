@@ -112,7 +112,7 @@ fn run_arm(label: &str, sleep_us: Option<u64>) {
 
     let mut checkpoints: Vec<Trace> = Vec::new();
     for t in 0..TICKS {
-        tl.advance_neuro(&sys.mmap, DT);
+        tl.advance_physics(&sys.mmap, DT);
         if let Some(us) = sleep_us {
             std::thread::sleep(std::time::Duration::from_micros(us));
         }
@@ -126,7 +126,12 @@ fn run_arm(label: &str, sleep_us: Option<u64>) {
                 // comparing two different numbers.
                 let raw: Vec<f32> = TRACKED
                     .iter()
-                    .map(|id| s.neurochemicals.get(*id).map(|c| c.level).unwrap_or(f32::NAN))
+                    .map(|id| {
+                        s.neurochemicals
+                            .get(*id)
+                            .map(|c| c.level)
+                            .unwrap_or(f32::NAN)
+                    })
                     .collect();
                 let eff: Vec<f32> = TRACKED
                     .iter()
@@ -145,16 +150,7 @@ fn run_arm(label: &str, sleep_us: Option<u64>) {
     for (t, raw, eff, arousal, phase) in &checkpoints {
         println!(
             "{:>6}{:>8.3}{:>8.3}{:>8.3}{:>8.3}{:>8.3}{:>8.3}{:>8.3}   {:>8.3}  phase={}",
-            t,
-            eff[0],
-            eff[1],
-            eff[2],
-            eff[3],
-            eff[4],
-            eff[5],
-            raw[0],
-            arousal,
-            phase
+            t, eff[0], eff[1], eff[2], eff[3], eff[4], eff[5], raw[0], arousal, phase
         );
     }
 

@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
+import os
 import sqlite3
 import sys
 from collections import Counter
@@ -29,11 +30,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "python"))
 
-from genesis_cognitive.concepts.edge_log import (
+from genesis_conscious.concepts.edge_log import (
     EdgeLog,
     is_derivable_edge,
 )
-from genesis_cognitive.concepts.types import RelationType
+from genesis_conscious.concepts.types import RelationType
 
 
 def _load_cognitive_state(path: Path) -> dict:
@@ -160,7 +161,7 @@ def migrate(data_dir: Path, write: bool, force: bool) -> int:
         log = EdgeLog(tmp)
         # Fold the classified set through the same event semantics the
         # runtime uses: snapshot is the migration's birth record.
-        from genesis_cognitive.concepts.types import Edge
+        from genesis_conscious.concepts.types import Edge
 
         log.snapshot([
             Edge(
@@ -186,12 +187,38 @@ def migrate(data_dir: Path, write: bool, force: bool) -> int:
     return 0
 
 
+def _default_data_dir() -> str:
+    """Resolve the data dir the way run.sh does.
+
+    GENESIS_DATA_DIR, then the checkout's .genesis-data-dir pin, then
+    XDG_DATA_HOME, then ~/.local/share. The pin outranks XDG_DATA_HOME
+    because the latter is ambient launcher environment, not Genesis
+    config — a Flatpak or sandboxed host sets it, and migrating the wrong
+    checkout's edges would rewrite its canonical log from stale data.
+    """
+    # Blank counts as unset, matching run.sh and config.py.
+    explicit = (os.environ.get("GENESIS_DATA_DIR") or "").strip()
+    if explicit:
+        return explicit
+    pin = Path(__file__).resolve().parent.parent / ".genesis-data-dir"
+    if pin.is_file():
+        pinned = pin.read_text().splitlines()[0].strip()
+        if pinned:
+            return pinned
+    return str(
+        Path(
+            os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share")),
+        )
+        / "genesis",
+    )
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
         "--data-dir",
-        default=str(Path.home() / ".local/share/genesis"),
-        help="Genesis data directory",
+        default=_default_data_dir(),
+        help="Genesis data directory (default: same resolution as run.sh)",
     )
     p.add_argument("--write", action="store_true", help="commit the migration")
     p.add_argument("--force", action="store_true", help="overwrite an existing non-empty log")

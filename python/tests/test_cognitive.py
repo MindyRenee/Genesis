@@ -15,11 +15,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import logging
 
+import pytest
+
 from genesis_client import NeuroSummary
 from genesis_client.protocol import PHASE_FLOW, PHASE_SLEEPING, PHASE_STRESS
-from genesis_cognitive.emotion import EmotionalState, assess_emotion
-from genesis_cognitive.perception import Intent, QuestionType, perceive
-from genesis_cognitive.self import SelfModel
+from genesis_conscious.limbic_system.emotion import (
+    EmotionalState,
+    EmotionCategory,
+    assess_emotion,
+)
+from genesis_conscious.perception import Intent, QuestionType, perceive
+from genesis_conscious.self import SelfModel
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +158,7 @@ def test_emotion_structural_state():
         phase=0,
     )
     emo = assess_emotion(summary)
-    from genesis_cognitive.emotion import CognitiveMode, EmotionCategory
+    from genesis_conscious.limbic_system.emotion import CognitiveMode, EmotionCategory
     assert emo.category == EmotionCategory.NEUTRAL
     assert emo.cognitive_mode == CognitiveMode.STEADY
 
@@ -164,8 +170,8 @@ def test_learn_emotion_word_from_labeling():
     """Emotion word learning associates words with categories."""
     from unittest.mock import MagicMock
 
-    from genesis_cognitive.cognition import CognitionEngine
-    from genesis_cognitive.concepts import ConceptNetwork
+    from genesis_conscious.cognition import CognitionEngine
+    from genesis_conscious.concepts import ConceptNetwork
 
     # Create a minimal mock for the client
     client = MagicMock()
@@ -179,7 +185,7 @@ def test_learn_emotion_word_from_labeling():
     cog = CognitionEngine.__new__(CognitionEngine)
     cog.network = ConceptNetwork()
     cog._rng = __import__("random").Random(42)
-    from genesis_cognitive.cognition.concept_learner import ConceptLearner
+    from genesis_conscious.cognition.concept_learner import ConceptLearner
     cog._concept_learner = ConceptLearner(network=cog.network)
 
     # Test labeling
@@ -205,7 +211,7 @@ def test_learn_emotion_word_from_labeling():
 
     # Verify relationships were created between words
     # for the same category (SIMILAR_TO edges)
-    from genesis_cognitive.concepts import RelationType
+    from genesis_conscious.concepts import RelationType
     neighbors = cog.network.get_neighbors("positive", RelationType.SIMILAR_TO)
     neighbor_ids = [n[0] for n in neighbors]
     assert "content" in neighbor_ids
@@ -222,13 +228,13 @@ def test_learn_emotion_word_from_labeling():
 
 def test_learn_emotion_word_skips_non_emotion_words():
     """Emotion word learning skips common non-emotion words."""
-    from genesis_cognitive.cognition import CognitionEngine
-    from genesis_cognitive.concepts import ConceptNetwork
+    from genesis_conscious.cognition import CognitionEngine
+    from genesis_conscious.concepts import ConceptNetwork
 
     cog = CognitionEngine.__new__(CognitionEngine)
     cog.network = ConceptNetwork()
     cog._rng = __import__("random").Random(42)
-    from genesis_cognitive.cognition.concept_learner import ConceptLearner
+    from genesis_conscious.cognition.concept_learner import ConceptLearner
     cog._concept_learner = ConceptLearner(network=cog.network)
 
     emotion = EmotionalState(
@@ -242,13 +248,13 @@ def test_learn_emotion_word_skips_non_emotion_words():
 
 def test_learn_emotion_word_different_patterns():
     """Emotion word learning recognizes different labeling patterns."""
-    from genesis_cognitive.cognition import CognitionEngine
-    from genesis_cognitive.concepts import ConceptNetwork
+    from genesis_conscious.cognition import CognitionEngine
+    from genesis_conscious.concepts import ConceptNetwork
 
     cog = CognitionEngine.__new__(CognitionEngine)
     cog.network = ConceptNetwork()
     cog._rng = __import__("random").Random(42)
-    from genesis_cognitive.cognition.concept_learner import ConceptLearner
+    from genesis_conscious.cognition.concept_learner import ConceptLearner
     cog._concept_learner = ConceptLearner(network=cog.network)
 
     emotion = EmotionalState(
@@ -473,15 +479,16 @@ def _run_mind_tests(mind) -> None:
     logger.info(f"  PASS  introspection: '{introspection[:50]}...'")
 
     # Test 7: Emotional state changed
+    # Derived from the enum rather than a hand-written list. The list
+    # had rotted in both directions: it still asserted "active" and
+    # "calm", which are not labels at all, while omitting eight that are
+    # — including `drowsy`, which is what a freshly-started mind
+    # actually reports, so this assertion failed on a correct system.
     emotion = mind.feel()
-    assert emotion.label in (
-        "positive",
-        "neutral",
-        "excited",
-        "content",
-        "active",
-        "in flow",
-        "calm",
+    valid_labels = {category.value for category in EmotionCategory}
+    assert emotion.label in valid_labels, (
+        f"unknown emotional label {emotion.label!r}; "
+        f"expected one of {sorted(valid_labels)}"
     )
     logger.info(f"  PASS  emotion: {emotion.label}")
 
@@ -496,7 +503,7 @@ def _cleanup_test_daemon(proc, data_dir: str) -> None:
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     subprocess.run(
         ["bash", os.path.join(project_root, "run.sh"), "--stop"],
-        env={**os.environ, "XDG_DATA_HOME": os.path.dirname(data_dir)},
+        env={**os.environ, "GENESIS_DATA_DIR": data_dir},
         check=True,
         timeout=130,
     )
@@ -535,7 +542,7 @@ def test_integration_mind():
 
         time.sleep(0.5)
 
-        from genesis_cognitive import Mind
+        from genesis_conscious import Mind
 
         mind = Mind(socket_path, offline=True)
         try:
@@ -576,3 +583,6 @@ def run_all():
 if __name__ == "__main__":
     success = run_all()
     sys.exit(0 if success else 1)
+
+
+pytestmark = pytest.mark.usefixtures("learned_sentiment")

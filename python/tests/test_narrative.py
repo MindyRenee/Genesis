@@ -12,9 +12,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import logging
 
-from genesis_cognitive.concepts import ConceptNetwork
-from genesis_cognitive.emotion import EmotionalState
-from genesis_cognitive.narrative import (
+from genesis_conscious.concepts import ConceptNetwork
+from genesis_conscious.infrastructure.narrative import (
     AutobiographicalLevel,
     HierarchyNode,
     LifeChapter,
@@ -25,7 +24,8 @@ from genesis_cognitive.narrative import (
     TemporalLink,
     TemporalLinkType,
 )
-from genesis_cognitive.self import SelfModel
+from genesis_conscious.limbic_system.emotion import EmotionalState
+from genesis_conscious.self import SelfModel
 
 logger = logging.getLogger(__name__)
 

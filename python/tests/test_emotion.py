@@ -19,13 +19,13 @@ from genesis_client.protocol import (
     CHEM_NOREPINEPHRINE,
     CHEM_SEROTONIN,
 )
-from genesis_cognitive.emotion import EmotionalState
-from genesis_cognitive.emotional_regulator import (
+from genesis_conscious.language.sentiment import analyze_sentiment
+from genesis_conscious.limbic_system.emotion import EmotionalState
+from genesis_conscious.limbic_system.emotional_regulator import (
     AllostaticLoadTracker,
     EmotionalRegulator,
     InteroceptionSystem,
 )
-from genesis_cognitive.language.sentiment import analyze_sentiment
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ def capture_impulses() -> tuple[EmotionalRegulator, list[tuple[int, float]]]:
         neuro_impulse=mock_impulse,
     )
     # Mock interoception to a calm state so tests are deterministic.
-    from genesis_cognitive.emotional_regulator import InternalState
+    from genesis_conscious.limbic_system.emotional_regulator import InternalState
 
     calm_state = InternalState(
         cpu_usage=0.0,
@@ -394,7 +394,7 @@ def test_puzzle_response_dampened_when_stressed() -> None:
 
 def test_interoception_latency_uses_observed_response_not_benchmark() -> None:
     """Latency must come from the real interaction path, not a microbenchmark."""
-    from genesis_cognitive.emotional_regulator import InteroceptionSystem
+    from genesis_conscious.limbic_system.emotional_regulator import InteroceptionSystem
 
     intero = InteroceptionSystem()
     state = intero.sense_internal_state()
@@ -427,7 +427,7 @@ def test_update_from_body_state_maps_all_fields() -> None:
     1000, producing a meaningless tiny number.
     """
     from genesis_client.types import BodyState
-    from genesis_cognitive.emotional_regulator import InteroceptionSystem
+    from genesis_conscious.limbic_system.emotional_regulator import InteroceptionSystem
 
     # Build a BodyState with distinctive values
     body = BodyState(
@@ -1266,7 +1266,7 @@ def _intero(cpu_usage: float, tmp_path) -> InteroceptionSystem:
     and these tests would be measuring disconnection rather than the
     layer under test.
     """
-    from genesis_cognitive.emotional_regulator import InteroceptionSystem
+    from genesis_conscious.limbic_system.emotional_regulator import InteroceptionSystem
 
     sock = tmp_path / "genesis.sock"
     sock.write_text("")
@@ -1350,7 +1350,7 @@ def test_stale_body_reading_stops_contributing_stress(tmp_path) -> None:
     still the honest answer — but the stress contribution decays, so a
     daemon that died mid-overload doesn't read as permanent distress.
     """
-    from genesis_cognitive.emotional_regulator import InteroceptionSystem
+    from genesis_conscious.limbic_system.emotional_regulator import InteroceptionSystem
 
     io = _intero(5.0, tmp_path)
     io.update_from_body_state(_fake_body())
@@ -1421,10 +1421,180 @@ def test_arousal_modifier_follows_combined_stress(tmp_path) -> None:
 
 def test_process_layer_still_works_offline() -> None:
     """Without a daemon, the process layer must still sense distress."""
-    from genesis_cognitive.emotional_regulator import InteroceptionSystem
+    from genesis_conscious.limbic_system.emotional_regulator import InteroceptionSystem
 
     io = InteroceptionSystem(socket_path="/nonexistent/genesis.sock")
     state = io.sense_internal_state()
     assert state.daemon_connected is False
     # A missing daemon is itself distress.
     assert state.stress_level >= io.config.daemon_disconnect_stress
+
+
+def test_own_pids_filters_zero_and_dead(tmp_path) -> None:
+    """The shared PID set must never count PID 0 or stale pidfiles.
+
+    Regression: `_sense_memory_usage` collected pidfile PIDs verbatim,
+    so a `0` pidfile or a dead PID counted a stranger's RSS as
+    cognitive load until the probe happened to swallow it.
+    CPU and memory must also agree on the same process tree.
+    """
+    import os
+
+    sock = tmp_path / "genesis.sock"
+    sock.write_text("")
+    io = InteroceptionSystem(socket_path=str(sock))
+    (tmp_path / "genesis_daemon.pid").write_text("0")
+    (tmp_path / "genesis_retina.pid").write_text(str(os.getpid()))
+    pids = io._own_pids()
+    assert 0 not in pids
+    assert pids.count(os.getpid()) == 1
+
+    (tmp_path / "genesis_daemon.pid").write_text("99999999")
+    io._daemon_pid = None
+    io._retina_pid = None
+    pids = io._own_pids()
+    assert 99999999 not in pids
+
+
+# ======================================================================
+# Disconnected sensors
+#
+# Genesis ships with CPU load and silicon temperature disconnected: those
+# thresholds were calibrated against other hardware and read ordinary
+# work on this machine as strain, which then drove cortisol. A
+# miscalibration is indistinguishable from distress to the layer above,
+# so the sensor is dropped instead of trusted.
+#
+# These cover that path. The suite-wide `connected_sensors` fixture
+# pins the opposite configuration, because the rest of the body layer's
+# logic is only observable with readings present — so without these,
+# the disconnected branch would be the untested default.
+# ======================================================================
+
+def test_disconnected_cpu_is_never_read(tmp_path, monkeypatch) -> None:
+    """The gate sits in the reader, so a disconnected sensor reports nothing.
+
+    Checked against the real reader rather than a stub: `_intero`
+    replaces `_sense_cpu_usage` outright, which would step over the very
+    gate under test.
+    """
+    monkeypatch.setenv("GENESIS_DISCONNECTED_SENSORS", "cpu_usage")
+    sock = tmp_path / "genesis.sock"
+    sock.write_text("")
+    io = InteroceptionSystem(socket_path=str(sock))
+    assert io._sense_cpu_usage() == 0.0
+
+
+def test_disconnected_cpu_contributes_no_stress(tmp_path, monkeypatch) -> None:
+    """A pinned CPU spike must not read as distress.
+
+    `stress_load` is the daemon's aggregate CPU-capacity signal, so it
+    is gated along with the reading it derives from: with the CPU
+    disconnected, a load of 1.3 no longer registers either.
+    """
+    monkeypatch.setenv("GENESIS_DISCONNECTED_SENSORS", "cpu_usage")
+    io = _intero(99.0, tmp_path)  # far past any stress threshold
+    io.sense_internal_state()
+    state = io.last_state
+    assert state is not None
+    assert state.stress_level < 1e-6, (
+        f"disconnected CPU still drove stress: {state.stress_level}"
+    )
+
+
+def test_disconnected_temp_reports_neutral(tmp_path, monkeypatch) -> None:
+    """A disconnected temperature reports 0, not the stale reading.
+
+    Zero is the honest "no reading" for a field in degrees Celsius: it
+    is not a temperature live silicon reports, so a consumer reading it
+    cannot mistake it for a real measurement.
+    """
+    monkeypatch.setenv("GENESIS_DISCONNECTED_SENSORS", "cpu_temp_c")
+    io = _intero(5.0, tmp_path)
+    io.update_from_body_state(_fake_body(cognitive_load=0.1, stress_load=0.0))
+    state = io.last_state
+    assert state is not None
+    assert state.cpu_temp_c == 0.0
+
+
+def test_other_sensors_survive_disconnection(tmp_path, monkeypatch) -> None:
+    """Disconnecting two sensors must not deafen the rest of the body layer.
+
+    The switch exists to drop two miscalibrated readings, not to silence
+    interoception: the remaining hardware fields are still carried
+    through from the daemon untouched.
+    """
+    monkeypatch.setenv("GENESIS_DISCONNECTED_SENSORS", "cpu_usage,cpu_temp_c")
+    io = _intero(5.0, tmp_path)
+    io.update_from_body_state(_fake_body(cognitive_load=0.1, stress_load=0.0))
+    state = io.last_state
+    assert state is not None
+    assert state.cpu_temp_c == 0.0, "temperature should be the neutral no-reading"
+    assert state.energy_reserve == 0.22
+    assert state.pulse_hz == 2400.0
+    assert state.psi_cpu == 0.3
+    assert state.cache_miss_rate == 0.11
+    assert state.body_distressed is True
+
+
+def test_connected_cpu_stress_still_lands(tmp_path, monkeypatch) -> None:
+    """The gate is the only difference — connect the CPU and stress returns.
+
+    Without this, the disconnected tests would also pass against a body
+    layer that had simply stopped computing stress at all.
+    """
+    monkeypatch.setenv("GENESIS_DISCONNECTED_SENSORS", "none")
+    io = _intero(5.0, tmp_path)
+    io.update_from_body_state(_fake_body(cognitive_load=0.1))
+    state = io.last_state
+    assert state is not None
+    # stress_load 1.3 -> (1.3-1.0)/0.5 = 0.6
+    assert abs(state.stress_level - 0.6) < 1e-6, state.stress_level
+
+
+def test_cognitive_load_still_stresses_when_sensors_disconnected(
+    tmp_path, monkeypatch
+) -> None:
+    """Her own effort is not a hardware sensor, so it survives."""
+    monkeypatch.setenv("GENESIS_DISCONNECTED_SENSORS", "cpu_usage,cpu_temp_c")
+    io = _intero(5.0, tmp_path)
+    io.update_from_body_state(_fake_body(cognitive_load=0.95, stress_load=0.0))
+    state = io.last_state
+    assert state is not None
+    # (0.95-0.70)/0.30 = 0.8333
+    assert abs(state.stress_level - 0.8333) < 1e-3, state.stress_level
+
+
+def test_disconnected_sensors_parses_none_and_whitespace(monkeypatch) -> None:
+    """`none` and blank entries mean "connect everything"."""
+    from genesis_conscious.limbic_system.emotional_regulator import (
+        disconnected_sensors,
+        sensor_connected,
+    )
+
+    monkeypatch.setenv("GENESIS_DISCONNECTED_SENSORS", "none")
+    assert disconnected_sensors() == frozenset()
+    assert sensor_connected("cpu_usage")
+
+    monkeypatch.setenv("GENESIS_DISCONNECTED_SENSORS", " , cpu_usage , ,")
+    assert disconnected_sensors() == frozenset({"cpu_usage"})
+    assert not sensor_connected("cpu_usage")
+    assert sensor_connected("cpu_temp_c")
+
+
+def test_sensor_set_is_read_at_call_time(monkeypatch) -> None:
+    """Connectivity follows the environment, not import order.
+
+    The set used to be frozen into a module constant at import, so it
+    was unreachable to configure after startup and untestable without
+    reimporting the module.
+    """
+    from genesis_conscious.limbic_system.emotional_regulator import sensor_connected
+
+    monkeypatch.setenv("GENESIS_DISCONNECTED_SENSORS", "cpu_usage")
+    assert not sensor_connected("cpu_usage")
+    monkeypatch.setenv("GENESIS_DISCONNECTED_SENSORS", "none")
+    assert sensor_connected("cpu_usage")
+
+
+pytestmark = pytest.mark.usefixtures("learned_sentiment")

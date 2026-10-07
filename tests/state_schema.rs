@@ -30,7 +30,7 @@ fn test_struct_sizes() {
     assert_eq!(core::mem::size_of::<RuntimeManifest>(), 536);
     // Legacy layout was 3288 bytes; current InferenceSignals.policy_authority is
     // reserved region, which is defined as exactly the signals size.
-    assert_eq!(core::mem::size_of::<GenesisCoreState>(), 3296);
+    assert_eq!(core::mem::size_of::<GenesisCoreState>(), 3416);
 }
 
 // ─── Field offset assertions ──────────────────────────────────
@@ -88,14 +88,26 @@ fn test_field_offsets() {
     assert_eq!(offset_of!(MemoryPointers, plasticity_gate), 76);
     assert_eq!(offset_of!(MemoryPointers, working_set), 80);
 
-    // GenesisCoreState — v3.2 layout
+    // GenesisCoreState — v4 layout
     assert_eq!(offset_of!(GenesisCoreState, header), 0);
     assert_eq!(offset_of!(GenesisCoreState, neurochemicals), 56);
     assert_eq!(offset_of!(GenesisCoreState, zones), 2472);
     assert_eq!(offset_of!(GenesisCoreState, memory), 2568);
     assert_eq!(offset_of!(GenesisCoreState, manifest), 2688);
-    assert_eq!(offset_of!(GenesisCoreState, checksum), 3224);
-    assert_eq!(offset_of!(GenesisCoreState, inference_signals), 3228);
+    assert_eq!(offset_of!(GenesisCoreState, ions), 3224);
+    assert_eq!(offset_of!(GenesisCoreState, checksum), 3348);
+    assert_eq!(offset_of!(GenesisCoreState, inference_signals), 3352);
+
+    // The v3 layout is pinned too: it is the byte-exact description
+    // migration decodes, so its offsets must not drift.
+    assert_eq!(offset_of!(GenesisCoreStateV3, header), 0);
+    assert_eq!(offset_of!(GenesisCoreStateV3, neurochemicals), 56);
+    assert_eq!(offset_of!(GenesisCoreStateV3, zones), 2472);
+    assert_eq!(offset_of!(GenesisCoreStateV3, memory), 2568);
+    assert_eq!(offset_of!(GenesisCoreStateV3, manifest), 2688);
+    assert_eq!(offset_of!(GenesisCoreStateV3, checksum), 3224);
+    assert_eq!(offset_of!(GenesisCoreStateV3, inference_signals), 3228);
+    assert_eq!(core::mem::size_of::<GenesisCoreStateV3>(), 3296);
 }
 
 // ─── Checksum ─────────────────────────────────────────────────
@@ -185,8 +197,8 @@ fn test_v2_to_v3_migration() {
     // Migrate v2 → v3
     state.migrate_state(2).expect("migration should succeed");
 
-    // Version should now be 3
-    assert_eq!(state.header.version, 3);
+    // Version should now be current (v4).
+    assert_eq!(state.header.version, genesis::state::header::SCHEMA_VERSION);
 
     // Verify should now pass
     assert!(state.verify().is_ok(), "migrated state should be valid");
@@ -259,11 +271,11 @@ fn test_v2_to_v3_migration_zeroed_id_field() {
     // Verify should fail (version mismatch)
     assert!(state.verify().is_err());
 
-    // Migrate v2 → v3 — this must succeed despite zeroed id fields.
+    // Migrate v2 → current — this must succeed despite zeroed id fields.
     state.migrate_state(2).expect("migration should succeed");
 
-    // Version should now be 3
-    assert_eq!(state.header.version, 3);
+    // Version should now be current (v4).
+    assert_eq!(state.header.version, genesis::state::header::SCHEMA_VERSION);
     assert!(state.verify().is_ok(), "migrated state should be valid");
 
     // Every new chemical must have its `id` field restored and be
@@ -2781,10 +2793,7 @@ fn test_wake_recovery_restores_depleted_neurochemicals() {
     // SAFETY: single-threaded test — no concurrent writers.
     unsafe { state.write_begin(0) };
     {
-        let bdnf = state
-            .neurochemicals
-            .get_mut(NeurochemicalId::BDNF)
-            .unwrap();
+        let bdnf = state.neurochemicals.get_mut(NeurochemicalId::BDNF).unwrap();
         bdnf.level = 0.10;
         bdnf.baseline = 0.45;
     }
@@ -2812,8 +2821,16 @@ fn test_wake_recovery_restores_depleted_neurochemicals() {
         .level = 0.0;
     state.write_end();
 
-    let bdnf_before = state.neurochemicals.get(NeurochemicalId::BDNF).unwrap().level;
-    let da_before = state.neurochemicals.get(NeurochemicalId::Dopamine).unwrap().level;
+    let bdnf_before = state
+        .neurochemicals
+        .get(NeurochemicalId::BDNF)
+        .unwrap()
+        .level;
+    let da_before = state
+        .neurochemicals
+        .get(NeurochemicalId::Dopamine)
+        .unwrap()
+        .level;
 
     // Apply wake recovery.
     // SAFETY: single-threaded test — no concurrent writers.
@@ -2821,8 +2838,16 @@ fn test_wake_recovery_restores_depleted_neurochemicals() {
     state.neurochemicals.wake_recovery();
     state.write_end();
 
-    let bdnf_after = state.neurochemicals.get(NeurochemicalId::BDNF).unwrap().level;
-    let da_after = state.neurochemicals.get(NeurochemicalId::Dopamine).unwrap().level;
+    let bdnf_after = state
+        .neurochemicals
+        .get(NeurochemicalId::BDNF)
+        .unwrap()
+        .level;
+    let da_after = state
+        .neurochemicals
+        .get(NeurochemicalId::Dopamine)
+        .unwrap()
+        .level;
 
     // Levels should be boosted 50% of the way toward baseline.
     // BDNF: 0.10 + (0.45 - 0.10) * 0.5 = 0.275
@@ -2857,10 +2882,7 @@ fn test_wake_recovery_resensitizes_receptors() {
     // SAFETY: single-threaded test — no concurrent writers.
     unsafe { state.write_begin(0) };
     {
-        let bdnf = state
-            .neurochemicals
-            .get_mut(NeurochemicalId::BDNF)
-            .unwrap();
+        let bdnf = state.neurochemicals.get_mut(NeurochemicalId::BDNF).unwrap();
         bdnf.level = 0.82;
         bdnf.baseline = 0.65;
         bdnf.receptor_sensitivity = 0.6;
@@ -2925,10 +2947,7 @@ fn test_wake_recovery_skipped_when_cortisol_high() {
     // SAFETY: single-threaded test — no concurrent writers.
     unsafe { state.write_begin(0) };
     {
-        let bdnf = state
-            .neurochemicals
-            .get_mut(NeurochemicalId::BDNF)
-            .unwrap();
+        let bdnf = state.neurochemicals.get_mut(NeurochemicalId::BDNF).unwrap();
         bdnf.level = 0.10;
         bdnf.baseline = 0.45;
     }
@@ -2939,7 +2958,11 @@ fn test_wake_recovery_skipped_when_cortisol_high() {
         .level = 0.5; // high cortisol
     state.write_end();
 
-    let bdnf_before = state.neurochemicals.get(NeurochemicalId::BDNF).unwrap().level;
+    let bdnf_before = state
+        .neurochemicals
+        .get(NeurochemicalId::BDNF)
+        .unwrap()
+        .level;
 
     // Apply wake recovery — should be skipped.
     // SAFETY: single-threaded test — no concurrent writers.
@@ -2947,7 +2970,11 @@ fn test_wake_recovery_skipped_when_cortisol_high() {
     state.neurochemicals.wake_recovery();
     state.write_end();
 
-    let bdnf_after = state.neurochemicals.get(NeurochemicalId::BDNF).unwrap().level;
+    let bdnf_after = state
+        .neurochemicals
+        .get(NeurochemicalId::BDNF)
+        .unwrap()
+        .level;
 
     // BDNF should NOT be boosted (cortisol is high).
     assert!(
@@ -2998,8 +3025,8 @@ fn measured_peaks() -> [f32; 18] {
 #[test]
 fn test_every_phase_gate_is_inside_the_reachable_envelope() {
     use genesis::state::neurochemical::{
-        ALERT_HISTAMINE_GATE, ALERT_NOREPI_GATE, FLOW_ACETYLCHOLINE_GATE,
-        FLOW_DOPAMINE_GATE, STRESS_CORTISOL_GATE, STRESS_NOREPI_GATE,
+        ALERT_HISTAMINE_GATE, ALERT_NOREPI_GATE, FLOW_ACETYLCHOLINE_GATE, FLOW_DOPAMINE_GATE,
+        STRESS_CORTISOL_GATE, STRESS_NOREPI_GATE,
     };
     let p = measured_peaks();
     let at = |id: NeurochemicalId| p[id as usize];
@@ -3112,5 +3139,64 @@ fn test_encoding_weight_is_discriminating() {
     assert!(
         rest_lo < rest_hi,
         "encoding should be dynamic, got a flat {rest_lo}"
+    );
+}
+
+/// Schema v3 → v4: the ion layer was inserted ahead of the checksum, so
+/// a v3 file cannot be reinterpreted in place. This pins the two
+/// properties the migration depends on — the legacy struct really is
+/// the old byte layout, and widening it yields a valid current state
+/// with resting ion concentrations rather than whatever the widened
+/// bytes happened to contain.
+#[test]
+fn test_v3_to_v4_migration_seeds_ions() {
+    let v3 = GenesisCoreStateV3 {
+        header: CoreStateHeader::new(1, 3296, 1_000),
+        neurochemicals: NeurochemicalVector::new(1_000),
+        zones: ActiveZones::new(1_000),
+        memory: MemoryPointers::new(),
+        manifest: RuntimeManifest::new(),
+        checksum: 0,
+        inference_signals: InferenceSignals::new(),
+    };
+    // The legacy type must be exactly the historical layout: the
+    // checksum sat immediately after the manifest, with no ion block.
+    assert_eq!(core::mem::offset_of!(GenesisCoreStateV3, checksum), 3224);
+    assert_eq!(core::mem::size_of::<GenesisCoreStateV3>(), 3296);
+
+    let mut state = v3.into_current();
+    state
+        .migrate_state(3)
+        .expect("v3 → v4 migration should succeed");
+
+    assert_eq!(state.header.version, SCHEMA_VERSION);
+    assert_eq!(
+        state.header.state_size as usize,
+        core::mem::size_of::<GenesisCoreState>()
+    );
+    assert!(state.verify().is_ok(), "migrated state should verify");
+
+    // Ions start at physiological resting values, not at the
+    // resting_intracellular constants being unreachable-by-accident.
+    assert!(
+        state.ions.membrane_potential_mv < 0.0,
+        "resting Vm is negative"
+    );
+    assert!(state.ions.atp_availability > 0.0);
+    // Resting gradients are intact and chloride is inhibitory-tonic.
+    // `calcium_signal` is normalized against resting Ca2+, so it is 0
+    // at rest by construction and says nothing about seeding.
+    assert!((state.ions.gradient_integrity - 1.0).abs() < 1e-6);
+    assert!(state.ions.chloride_efficacy > 0.0);
+    // Sodium must sit outside potassium: the pump maintains the
+    // gradient, and a swapped pair would mean the arrays were widened
+    // in the wrong order.
+    assert!(
+        state.ions.extracellular(IonId::Sodium) > state.ions.intracellular(IonId::Sodium),
+        "Na+ gradient must be outward"
+    );
+    assert!(
+        state.ions.intracellular(IonId::Potassium) > state.ions.extracellular(IonId::Potassium),
+        "K+ gradient must be inward"
     );
 }

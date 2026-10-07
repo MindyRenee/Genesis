@@ -18,8 +18,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from genesis_client.types import Episode, MemoryStats, SimilarEpisode
-from genesis_cognitive.concepts import ConceptNetwork, RelationType
-from genesis_cognitive.memory import (
+from genesis_conscious.concepts import ConceptNetwork, RelationType
+from genesis_conscious.memory import (
     AttractorNetwork,
     MemoryContext,
     MemoryEngine,
@@ -29,13 +29,13 @@ from genesis_cognitive.memory import (
     SourceTag,
     SpacedRepetitionScheduler,
 )
-from genesis_cognitive.memory.systems import (
+from genesis_conscious.memory.systems import (
     EmotionalMemorySystem,
     PrimingSystem,
     SpreadingActivation,
     _emotional_similarity,
 )
-from genesis_cognitive.sleep import SleepStage
+from genesis_conscious.sleep import SleepStage
 
 logger = logging.getLogger(__name__)
 
@@ -1690,7 +1690,7 @@ def test_replay_empty_store_does_nothing():
 
 def test_replay_integrated_with_n3_consolidation():
     """N3 consolidation should include experience replay."""
-    from genesis_cognitive.sleep import SleepStage
+    from genesis_conscious.sleep import SleepStage
 
     client = _make_mock_client_recons(ltm_count=1)
     engine = MemoryEngine(client=client)

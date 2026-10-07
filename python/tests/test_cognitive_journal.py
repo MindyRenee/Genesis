@@ -26,13 +26,14 @@ import pytest
 
 import genesis_cli
 from genesis_client.ltm_index import scan_ltm_index
-from genesis_cognitive.cognitive_journal import (
+from genesis_conscious.infrastructure.journal import (
     JOURNAL_FILENAME,
     CognitiveJournal,
     record_error,
+    record_event,
     set_active,
 )
-from genesis_cognitive.mind import Mind
+from genesis_conscious.mind import Mind
 
 
 def _read_events(path: Path) -> list[dict]:
@@ -316,3 +317,57 @@ def test_safeguard_action_does_not_crash_on_property(tmp_path):
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
+
+
+def test_record_event_writes_transitions(tmp_path):
+    """State transitions are recordable, not just swallowed errors.
+
+    Sleep onset, wake and meditation boundaries were previously
+    unrecorded whenever nothing notable happened during them, so the
+    number and duration of sleep episodes could not be reconstructed
+    from any durable state. `record_error` only captured failures;
+    this is the companion for unrecorded *changes*.
+    """
+    journal = CognitiveJournal(tmp_path)
+    set_active(journal)
+    try:
+        record_event("sleep_onset", "sleep episode began", consolidated=0, nap=False)
+        record_event("wake", "sleep episode ended", duration_secs=12.5)
+    finally:
+        set_active(None)
+        journal.close()
+
+    lines = [
+        json.loads(line)
+        for line in (tmp_path / JOURNAL_FILENAME).read_text().splitlines()
+    ]
+    kinds = [line["kind"] for line in lines]
+    assert kinds == ["sleep_onset", "wake"]
+    # A sleep that consolidated nothing is still an episode.
+    assert lines[0]["consolidated"] == 0
+    assert lines[1]["duration_secs"] == 12.5
+    assert all("ts" in line for line in lines)
+
+
+def test_record_event_noop_without_active_journal():
+    """No active journal must not raise."""
+    set_active(None)
+    record_event("test.transition", "should vanish")  # no raise, no write
+
+
+def test_record_event_keeps_events_and_errors_distinct(tmp_path):
+    """The two record kinds stay separable in the same journal."""
+    journal = CognitiveJournal(tmp_path)
+    set_active(journal)
+    try:
+        record_error("test.site", RuntimeError("boom"))
+        record_event("test.transition", "something changed")
+    finally:
+        set_active(None)
+        journal.close()
+
+    lines = [
+        json.loads(line)
+        for line in (tmp_path / JOURNAL_FILENAME).read_text().splitlines()
+    ]
+    assert [line["kind"] for line in lines] == ["error", "test.transition"]

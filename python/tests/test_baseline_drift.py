@@ -10,13 +10,13 @@ from __future__ import annotations
 import pytest
 
 from genesis_client.protocol import CHEM_NAMES, PHASE_ACTIVE, PHASE_STRESS
-from genesis_cognitive.eval import (
+from genesis_conscious.eval import (
     DEFAULT_BASELINES,
     Snapshot,
     check_snapshot_vs_defaults,
     compare_snapshots,
 )
-from genesis_cognitive.eval.assay import AssayResult, ChemicalEffect
+from genesis_conscious.eval.assay import AssayResult, ChemicalEffect
 
 
 def _resting_snapshot() -> Snapshot:

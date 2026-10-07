@@ -23,7 +23,6 @@ use genesis::state::neurochemical::{
 };
 use genesis::state::zones::MentalPhase;
 
-
 /// Her actual resting state: every chemical at its genetic default.
 ///
 /// The allostatic tests previously drove all 18 chemicals to 0.5 and
@@ -1257,7 +1256,7 @@ fn test_core_state_has_inference_signals() {
     assert_eq!(state.inference_signals.inference_tick_count, 0);
 
     // Grown by 4 for policy_authority, which the reserve absorbed.
-    assert_eq!(core::mem::size_of::<GenesisCoreState>(), 3296);
+    assert_eq!(core::mem::size_of::<GenesisCoreState>(), 3416);
     // A fresh state must not come up having delegated policy choice to
     // the engine — the grant is hers to make.
     assert_eq!(state.inference_signals.policy_authority, 0.0);
@@ -1874,7 +1873,6 @@ fn test_engine_save_load_v3_round_trip() {
     // Clean up
     let _ = std::fs::remove_file(&path);
 }
-
 
 #[test]
 fn test_policy_selection_remains_stochastic_at_high_precision() {

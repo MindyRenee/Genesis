@@ -8,11 +8,11 @@ from dataclasses import dataclass
 import pytest
 
 from genesis_client.types import NeuroSummary, RecentEpisode
-from genesis_cognitive.concepts import ConceptNetwork, RelationType
-from genesis_cognitive.emotion import EmotionalState
-from genesis_cognitive.mind import Mind
-from genesis_cognitive.reasoning import ReasoningEngine, ReasoningType
-from genesis_cognitive.sleep import (
+from genesis_conscious.concepts import ConceptNetwork, RelationType
+from genesis_conscious.limbic_system.emotion import EmotionalState
+from genesis_conscious.mind import Mind
+from genesis_conscious.reasoning import ReasoningEngine, ReasoningType
+from genesis_conscious.sleep import (
     DreamInsight,
     DreamProposal,
     DreamSynthesisEngine,
@@ -1175,8 +1175,8 @@ def test_wake_readiness_returns_ready_when_awake():
 
 def test_wake_readiness_blocks_on_n3():
     """wake_readiness() should return False when in N3 deep sleep."""
-    from genesis_cognitive.brain_waves import SleepStage
-    from genesis_cognitive.sleep.architecture import SleepCycleTracker
+    from genesis_conscious.sleep.architecture import SleepCycleTracker
+    from genesis_conscious.thalamus.brain_waves import SleepStage
 
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_wake_readiness_mind(data_dir)
@@ -1234,8 +1234,8 @@ def test_wake_readiness_blocks_on_low_bdnf():
 
 def test_wake_readiness_ready_when_all_signals_pass():
     """wake_readiness() should return True when all signals indicate readiness."""
-    from genesis_cognitive.brain_waves import SleepStage
-    from genesis_cognitive.sleep.architecture import SleepCycleTracker
+    from genesis_conscious.sleep.architecture import SleepCycleTracker
+    from genesis_conscious.thalamus.brain_waves import SleepStage
 
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_wake_readiness_mind(
@@ -1305,7 +1305,7 @@ def test_auto_wake_fires_after_min_sleep_window():
     """Auto-wake still fires once the minimum sleep window has elapsed."""
     import time as _time
 
-    from genesis_cognitive.mind.thresholds import AUTO_WAKE_MIN_SLEEP_S
+    from genesis_conscious.mind.thresholds import AUTO_WAKE_MIN_SLEEP_S
 
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_wake_readiness_mind(data_dir, adenosine=0.1)
@@ -1340,14 +1340,14 @@ def test_auto_wake_window_does_not_block_user_initiated_sleep():
 
 def _make_inner_life_for_lucid(seed: int = 42):
     """Build an InnerLife with a small network for lucid dream tests."""
-    from genesis_cognitive import (
+    from genesis_conscious import (
         ConceptNetwork,
         CuriosityEngine,
         ReasoningEngine,
         ReflectionEngine,
         RelationType,
     )
-    from genesis_cognitive.sleep import InnerLife
+    from genesis_conscious.sleep import InnerLife
 
     net = ConceptNetwork()
     for name in ("alpha", "beta", "gamma", "delta", "epsilon"):
@@ -1493,14 +1493,14 @@ def _make_emotion() -> EmotionalState:
 
 def _make_inner_life_for_dream_composition():
     """InnerLife over a network holding a speakable/unspeakable pair."""
-    from genesis_cognitive import (
+    from genesis_conscious import (
         ConceptNetwork,
         CuriosityEngine,
         ReasoningEngine,
         ReflectionEngine,
         RelationType,
     )
-    from genesis_cognitive.sleep import InnerLife
+    from genesis_conscious.sleep import InnerLife
 
     net = ConceptNetwork()
     net.add_concept(
@@ -1565,7 +1565,7 @@ def test_dream_thought_chain_seeds_survive_anchor_only_content():
     look like it mentions a single concept, and every chain after the
     first link would collapse.
     """
-    from genesis_cognitive.sleep.thoughts import SpontaneousThought
+    from genesis_conscious.sleep.thoughts import SpontaneousThought
 
     il = _make_inner_life_for_dream_composition()
     thought = SpontaneousThought(
@@ -1597,7 +1597,7 @@ def test_dream_thought_speech_never_contains_the_raw_pair():
     """
     import time
 
-    from genesis_cognitive import GenerativeEngine, PersonalityTraits, SelfModel
+    from genesis_conscious import GenerativeEngine, PersonalityTraits, SelfModel
 
     il = _make_inner_life_for_dream_composition()
     engine = GenerativeEngine(
@@ -1636,8 +1636,8 @@ def test_echoed_placeholder_is_suppressed_despite_grammar_decoration():
     """
     import time
 
-    from genesis_cognitive import GenerativeEngine, PersonalityTraits, SelfModel
-    from genesis_cognitive.sleep.thoughts import SpontaneousThought
+    from genesis_conscious import GenerativeEngine, PersonalityTraits, SelfModel
+    from genesis_conscious.sleep.thoughts import SpontaneousThought
 
     # No definition, no edges, noisy target: composition can only echo.
     net = ConceptNetwork()

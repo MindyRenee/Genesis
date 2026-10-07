@@ -41,20 +41,28 @@ cd "$ROOT"
 # cleans a different tree than the instance that is actually running.
 # Precedence, mirroring run.sh exactly:
 #   1. GENESIS_DATA_DIR  — explicit env always wins
-#   2. XDG_DATA_HOME     — set means explicit env config; wins
-#   3. .genesis-data-dir — uncommitted per-checkout pin. Its contents
+#   2. .genesis-data-dir — uncommitted per-checkout pin. Its contents
 #      ARE the data dir (run.sh assigns it straight to
-#      GENESIS_DATA_DIR); it is not a parent directory.
+#      GENESIS_DATA_DIR); it is not a parent directory. It outranks
+#      XDG_DATA_HOME, which is ambient launcher environment rather than
+#      Genesis config.
+#   3. XDG_DATA_HOME     — set means explicit env config
 #   4. ~/.local/share/genesis
 # The `.genesis-data-dir` case was previously missing, so a checkout
 # pinned to its own state directory had hygiene report "no runtime
 # directory", or clean a different tree entirely.
+# Blank means unset, so this agrees with run.sh, config.py, and
+# src/data_dir.rs instead of resolving to a whitespace "directory".
+if [ -n "${GENESIS_DATA_DIR:-}" ] && [ -z "${GENESIS_DATA_DIR//[[:space:]]/}" ]; then
+    unset GENESIS_DATA_DIR
+fi
+
 if [ -n "${GENESIS_DATA_DIR:-}" ]; then
     RUNTIME_DIR="$GENESIS_DATA_DIR"
-elif [ -n "${XDG_DATA_HOME:-}" ]; then
-    RUNTIME_DIR="$XDG_DATA_HOME/genesis"
 elif [ -f ".genesis-data-dir" ]; then
     RUNTIME_DIR=$(head -n1 .genesis-data-dir)
+elif [ -n "${XDG_DATA_HOME:-}" ]; then
+    RUNTIME_DIR="$XDG_DATA_HOME/genesis"
 else
     RUNTIME_DIR="$HOME/.local/share/genesis"
 fi
@@ -124,7 +132,7 @@ ARTIFACT_DIRS=(
 # Source directories — never touched by --clean
 SOURCE_DIRS=(
     "src"
-    "python/genesis_cognitive"
+    "python/genesis_conscious"
     "python/genesis_client"
     "python/genesis_cli.py"
     "python/tests"
@@ -466,23 +474,30 @@ do_check() {
     local py_issues=""
     if command -v ruff >/dev/null 2>&1; then
         local ruff_out
-        ruff_out=$(ruff check python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ scripts/ 2>&1 || true)
-        if echo "$ruff_out" | grep -qE "F401|F811|F841|Found"; then
-            py_issues="${py_issues}$(echo "$ruff_out" | grep -E "F401|F811|F841")"
+        ruff_out=$(ruff check python/genesis_conscious/ python/genesis_client/ python/genesis_cli.py python/tests/ scripts/ 2>&1 || true)
+        # Report the whole ruff output when ruff found anything, not just
+        # the F401/F811/F841 lines. Filtering to those rules meant any
+        # other violation — an unsorted import block, say — left
+        # `py_issues` empty and this section printed a green tick while
+        # ruff was reporting an error one command away. A check that
+        # cannot fail is worse than no check: it was hiding the very
+        # regression it exists to catch.
+        if ! echo "$ruff_out" | grep -q "^All checks passed"; then
+            py_issues="${py_issues}${ruff_out}"$'\n'
         fi
     fi
     if command -v pyflakes >/dev/null 2>&1; then
         local pf_out
-        pf_out=$(pyflakes python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ scripts/*.py 2>&1 || true)
+        pf_out=$(pyflakes python/genesis_conscious/ python/genesis_client/ python/genesis_cli.py python/tests/ scripts/*.py 2>&1 || true)
         if [ -n "$pf_out" ]; then
-            py_issues="${py_issues}${pf_out}"
+            py_issues="${py_issues}${pf_out}"$'\n'
         fi
     fi
     if [ -n "$py_issues" ]; then
         echo "$py_issues" | while read -r line; do echo "  ${YELLOW}⚠${NC} $line"; done
         issues=$(( issues + 1 ))
     else
-        echo "  ${GREEN}✓${NC} no unused imports / undefined names"
+        echo "  ${GREEN}✓${NC} no ruff / pyflakes findings"
     fi
 
     # Unreferenced functions and methods. Reported separately and NOT
@@ -494,7 +509,7 @@ do_check() {
     # protocols), so its output needs review rather than a hard gate.
     if command -v vulture >/dev/null 2>&1; then
         local vulture_out
-        vulture_out=$(vulture python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py \
+        vulture_out=$(vulture python/genesis_conscious/ python/genesis_client/ python/genesis_cli.py \
             --min-confidence 80 2>&1 | head -20 || true)
         if [ -n "$vulture_out" ]; then
             local v_count
@@ -758,6 +773,7 @@ Usage:
   scripts/hygiene.sh --clean-cache    Remove only caches + bytecode
   scripts/hygiene.sh --clean-debug    Remove only the debug build
   scripts/hygiene.sh --clean-runtime  Remove orphaned runtime backups
+  scripts/hygiene.sh --data-dir       Print the resolved runtime data dir, then exit
   scripts/hygiene.sh --help           This message
 
 Two locations are tracked:
@@ -783,6 +799,7 @@ case "${1:-}" in
     --clean-cache) do_clean cache ;;
     --clean-debug) do_clean debug ;;
     --clean-runtime) do_clean runtime ;;
+    --data-dir)    echo "$RUNTIME_DIR" ;;
     --help|-h)     do_help ;;
     *)
         echo "Unknown option: $1"

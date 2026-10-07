@@ -23,6 +23,7 @@ from .exceptions import ConnectionError
 
 __all__ = [
     "ADVANCE_NEURO",
+    "ADVANCE_PHYSICS",
     "APPLY_BODY_CONTROL",
     "ARCHIVE_EPISODE",
     "ASSOCIATE",
@@ -59,13 +60,17 @@ __all__ = [
     "GET_BODY_CONTROL",
     "GET_BODY_STATE",
     "GET_INFERENCE_SUMMARY",
+    "GET_ION_SUMMARY",
     "GET_MEMORY_STATS",
     "GET_NEURO_SUMMARY",
     "GET_PHASE",
     "GET_PLASTICITY_PROFILE",
+    "GET_PROCESS_HEALTH",
     "GET_RECENT_EPISODES",
+    "GET_SENSOR_PRESENCE",
     "GET_STATE",
     "GET_SUBSYSTEM_TELEMETRY",
+    "GET_ZONE_TRANSITIONS",
     "HANDSHAKE",
     "MAX_MESSAGE_LEN",
     "MODULE_ATTENTION",
@@ -108,12 +113,33 @@ __all__ = [
     "RETRIEVE_EPISODE",
     "SAVE_INFERENCE",
     "SEARCH_EPISODES",
+    "SENSOR_AC_ADAPTER",
+    "SENSOR_BATTERY",
+    "SENSOR_BATTERY_CYCLES",
+    "SENSOR_CORE_VOLTAGE",
+    "SENSOR_FAN",
+    "SENSOR_FREQUENCY",
+    "SENSOR_GPE",
+    "SENSOR_LOCAL_TIMER",
+    "SENSOR_MAX_FREQUENCY",
+    "SENSOR_MEMORY",
+    "SENSOR_NAMES",
+    "SENSOR_PERF_COUNTERS",
+    "SENSOR_POWER",
+    "SENSOR_PSI",
+    "SENSOR_RAPL",
+    "SENSOR_SUPPLY_VOLTAGE",
+    "SENSOR_TEMPERATURE",
     "SET_POLICY_AUTHORITY",
     "SET_WAKE_ALARM",
     "SET_ZONE",
     "SHUTDOWN",
     "STORE_EPISODE",
     "STORE_EVENT",
+    "SUBSYSTEM_COGNITIVE",
+    "SUBSYSTEM_DAEMON",
+    "SUBSYSTEM_NAMES",
+    "SUBSYSTEM_RETINA",
     "SYNC",
     "UPDATE_MODULE_STATUS",
     "UPDATE_USER_AFFECT",
@@ -147,6 +173,23 @@ __all__ = [
 # own limit (1 MiB) so legitimate responses are not rejected.
 MAX_MESSAGE_LEN = 1 << 20  # 1 MiB
 
+# The electrochemical ion layer: a compact 108-byte snapshot of
+# calcium/chloride/potassium/sodium state. Additive — it adds a new
+# opcode and touches no existing layout, so PROTOCOL_VERSION is
+# unaffected.
+#
+# NOTE: this tree already spent command id 36 on GET_SENSOR_PRESENCE,
+# so the ion layer continues past ADVANCE_PHYSICS at 40 rather than
+# reusing genesis2's 36.
+GET_ION_SUMMARY = 40
+
+# Number of neurochemical levels in the ``emotional_tag`` vector sent
+# with STORE_EVENT / STORE_EPISODE. Fixed by the wire layout: the
+# daemon reads ``[f32; 12]`` (see ``STORE_EPISODE`` in src/daemon/ipc.rs)
+# and passes the values through positionally, so sender and receiver
+# must agree on the width or the tag is silently truncated.
+EMOTIONAL_TAG_SIZE = 12
+
 # ─── Command IDs ──────────────────────────────────────────────
 
 GET_STATE = 1
@@ -173,7 +216,20 @@ SEARCH_EPISODES = 22
 NEURO_ADJUST_BASELINE = 23
 
 # Reactive commands (mind-driven, not tick-driven)
+#
+# ADVANCE_NEURO carries a 4-byte dt placeholder that the daemon reads and
+# ignores: the daemon owns time and measures its own elapsed interval.
+# Mind.advance_neuro takes no `dt`, so the coupling cannot be
+# reintroduced from this layer. The bounds below are what the *body*
+# applies to itself; the brain-wave oscillator uses the identical range so
+# the two clocks accept the same intervals (see DT_MIN).
 ADVANCE_NEURO = 24
+
+# Advance the body by an explicit step. Evaluation only, against an
+# isolated daemon -- the causal assay varies dt as its independent
+# variable and reads per-tick response. Mirrors ipc.rs
+# `cmd::ADVANCE_PHYSICS`.
+ADVANCE_PHYSICS = 39
 CONSOLIDATE = 25
 ASSOCIATE = 26
 DREAM = 27
@@ -195,6 +251,86 @@ SET_WAKE_ALARM = 34
 # policy on Genesis's behalf. Request: [f32 authority] in [0,1].
 # Response: [u8 ack] + [f32 applied].
 SET_POLICY_AUTHORITY = 35
+
+# Which optional hardware sensors this machine actually has.
+# Response: [u16 mask] — a bitmask of SENSOR_* below. A set bit means
+# the matching BodyState field carries a real reading; a clear bit
+# means there is no sensor and the value is a placeholder. Zero means
+# nothing has been discovered yet, which is the safe direction.
+#
+# Additive: no BodyState layout changed, so PROTOCOL_VERSION stays 3.
+# A daemon that predates this rejects it as an unknown command, which
+# the client turns into an empty mask.
+GET_SENSOR_PRESENCE = 36
+
+# How many times Genesis changed task zone and emergent phase, and how
+# long it spent in each.
+# Response: [u8 zone_count] then per zone [u32 count][u64 total_ms],
+#           then [u8 phase_count] then per phase the same 12-byte record.
+# Indices are the CognitiveZone and MentalPhase discriminants. Counts
+# are process-local and reset on restart.
+# Additive: no BodyState layout changed.
+GET_ZONE_TRANSITIONS = 37
+
+# Which of Genesis's own processes are alive, and how many have died.
+# Response: [u16 alive_mask][u16 deaths][u8 last_death]
+# Bit n of alive_mask is set while subsystem n runs (0=daemon,
+# 1=cognitive, 2=retina). A subsystem that was never running does not
+# count as a death. last_death is 0xff when nothing has been lost.
+# A subsystem that dies used to vanish from the telemetry with no
+# trace; this makes the loss countable.
+# Additive: no BodyState layout changed.
+GET_PROCESS_HEALTH = 38
+
+SUBSYSTEM_DAEMON = 0
+SUBSYSTEM_COGNITIVE = 1
+SUBSYSTEM_RETINA = 2
+
+SUBSYSTEM_NAMES: dict[int, str] = {
+    SUBSYSTEM_DAEMON: "daemon",
+    SUBSYSTEM_COGNITIVE: "cognitive",
+    SUBSYSTEM_RETINA: "retina",
+}
+
+# ─── Sensor presence bits (must match
+#     src/daemon/interoception.rs `pub mod sensor`) ─────────────
+SENSOR_TEMPERATURE = 1 << 0
+SENSOR_FREQUENCY = 1 << 1
+SENSOR_MAX_FREQUENCY = 1 << 2
+SENSOR_BATTERY = 1 << 3
+SENSOR_AC_ADAPTER = 1 << 4
+SENSOR_FAN = 1 << 5
+SENSOR_POWER = 1 << 6
+SENSOR_CORE_VOLTAGE = 1 << 7
+SENSOR_SUPPLY_VOLTAGE = 1 << 8
+SENSOR_RAPL = 1 << 9
+SENSOR_PERF_COUNTERS = 1 << 10
+SENSOR_GPE = 1 << 11
+SENSOR_LOCAL_TIMER = 1 << 12
+SENSOR_MEMORY = 1 << 13
+SENSOR_PSI = 1 << 14
+SENSOR_BATTERY_CYCLES = 1 << 15
+
+# Bit position -> channel name, for reporting. Order matches the Rust
+# `SENSOR_BITS` table so both sides list absences in the same order.
+SENSOR_NAMES: dict[int, str] = {
+    SENSOR_TEMPERATURE: "temperature",
+    SENSOR_FREQUENCY: "frequency",
+    SENSOR_MAX_FREQUENCY: "max frequency",
+    SENSOR_BATTERY: "battery",
+    SENSOR_AC_ADAPTER: "AC adapter",
+    SENSOR_FAN: "fan PWM",
+    SENSOR_POWER: "power draw",
+    SENSOR_CORE_VOLTAGE: "core voltage",
+    SENSOR_SUPPLY_VOLTAGE: "supply voltage",
+    SENSOR_RAPL: "RAPL power domains",
+    SENSOR_PERF_COUNTERS: "perf counters",
+    SENSOR_GPE: "EC GPE counter",
+    SENSOR_LOCAL_TIMER: "local timer counters",
+    SENSOR_MEMORY: "total memory",
+    SENSOR_PSI: "pressure stall information",
+    SENSOR_BATTERY_CYCLES: "battery cycle count",
+}
 
 # ─── Error response codes ─────────────────────────────────────
 # When a command fails, the daemon returns a single-byte response
@@ -248,12 +384,39 @@ def error_name(code: int) -> str:
 
 PROTOCOL_VERSION = 3
 
+# ─── Simulation-step bounds ───────────────────────────────────
+# The daemon clamps ADVANCE_NEURO's dt to this range (ipc.rs,
+# ADVANCE_NEURO handler). The cognitive layer must use the *same*
+# ceiling for every wall-clock-driven simulation step, or two
+# clocks measuring the same elapsed time disagree and drift apart
+# without limit.
+#
+# This was a live bug: brain_waves.py clamped its own dt to 1.0 s
+# while chemistry accepted 10.0 s, so any heartbeat slower than 1 s
+# silently advanced chemistry by the full interval but the waves by
+# at most 1 s. Past that point the wave clock fell behind the body
+# clock by up to 90% and never recovered, because the loss was
+# discarded rather than deferred.
+#
+# A step longer than this is a genuine stall (suspend, GC pause),
+# not a frame boundary. Sub-stepping covers it below.
+DT_MIN = 0.001
+DT_MAX = 10.0
+
+# The body's nominal integration step: TICK_INTERVAL_MS (200 ms) on the
+# Rust side. Sent as the placeholder for the ADVANCE_NEURO dt field,
+# which the daemon reads and ignores — it measures its own elapsed time.
+# Mirrored here only so the wire value matches what the body is tuned
+# for; it does not select the step.
+DT_NOMINAL_STEP = 0.2
+
 # ─── Notification IDs (server → client, unsolicited) ─────────
 #
 # Reserved / unwired: the IPC channel is strictly request-response,
 # so the daemon never sends these today. The cognitive mind detects
 # phase changes and dream insights by polling instead — see
-# ``genesis_cognitive/notifications.py`` (a pull-based queue). These
+# ``genesis_conscious/infrastructure/notifications.py`` (a pull-based
+# queue). These
 # IDs reserve the 100+ opcode range for a future push mechanism and
 # mirror the Rust ``notify`` module in ``src/daemon/ipc.rs``.
 

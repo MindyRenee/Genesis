@@ -1,7 +1,7 @@
 """Regression tests for critical-thinking evidence provenance."""
 
-from genesis_cognitive.concepts import ConceptNetwork, RelationType
-from genesis_cognitive.reasoning import (
+from genesis_conscious.concepts import ConceptNetwork, RelationType
+from genesis_conscious.reasoning import (
     CriticalThinkingEngine,
     ReasoningResult,
     ReasoningType,

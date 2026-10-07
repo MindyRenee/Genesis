@@ -12,14 +12,14 @@ from __future__ import annotations
 import json
 import random
 
-from genesis_cognitive.reasoning import TaskCompetence
-from genesis_cognitive.relations import (
+from genesis_conscious.reasoning import TaskCompetence
+from genesis_conscious.relations import (
     Arrangement,
     Goal,
     RelationsAgent,
     Thing,
 )
-from genesis_cognitive.spatial.practice import (
+from genesis_conscious.spatial.practice import (
     SpatialPractice,
     normalize_offered,
 )
@@ -167,7 +167,7 @@ class TestRelationsAgent:
         the shared "constrain" role claims the analogy and the
         normalized support axis carries it — the shape transfers,
         never the bindings."""
-        from genesis_cognitive.sorter import ShapeSorter, SorterAgent
+        from genesis_conscious.sorter import ShapeSorter, SorterAgent
 
         competence = TaskCompetence()
         warm = SorterAgent(seed=1, task_competence=competence)
@@ -193,7 +193,7 @@ class TestRelationsAgent:
     def test_role_overlap_without_support_axis_not_offered(self):
         """Role overlap alone is not an analogy: a foreign skill that
         publishes no normalized support axis is never offered."""
-        from genesis_cognitive.reasoning import (
+        from genesis_conscious.reasoning import (
             GoalCondition,
             ProcedureStep,
         )
@@ -311,7 +311,7 @@ class TestRelationsOffered:
             )
         )
         practice = SpatialPractice(str(tmp_path))
-        from genesis_cognitive.spatial.solver import SpatialReasoner
+        from genesis_conscious.spatial.solver import SpatialReasoner
 
         result = practice.attempt(SpatialReasoner())
         assert result is not None
