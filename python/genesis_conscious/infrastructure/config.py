@@ -133,6 +133,12 @@ class VolitionConfig:
     # Normalization denominator for the speech queue size.
     speech_queue_size_normalization: float = 5.0
 
+    # Seconds after which an unaudited codebase counts as fully
+    # "overdue" for the bug_scan urge's recency stimulus. The audit
+    # appetite is discharged by scanning itself, so this sets the
+    # natural re-audit period; open-bug count does not drive it.
+    bug_scan_recency_seconds: float = 1800.0
+
     # Default set of urges. Order matters: earlier registrations are not
     # treated specially by ``VolitionEngine``; this list just defines
     # the built-in urges.
@@ -144,7 +150,15 @@ class VolitionConfig:
                 growth=0.001,
                 decay=0.0005,
                 cooldown=180.0,
-                stimuli={"bug_count": 0.01, "idle_seconds": 0.02},
+                # The audit appetite: grows with time since the last
+                # completed scan and is discharged by scanning itself.
+                # Open-bug count must NOT drive re-scanning — a scan
+                # discovers issues but does not resolve them, so a
+                # count-driven urge can never discharge and re-fires
+                # on every cooldown. The open-work state drives the
+                # improve urge instead, which is the behavior that
+                # actually discharges it (autonomous mechanical fixes).
+                stimuli={"scan_recency": 0.001},
             ),
             UrgeConfig(
                 name="code_learning",
