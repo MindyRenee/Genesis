@@ -527,12 +527,12 @@ _EXPORTS: dict[str, str] = {
     "EdgeProposer": "concepts",
     "NetworkTopology": "concepts",
     # The auditory-temporal pathway: cochlea -> A1 -> Wernicke's area
-    "AmbientListener": "ambient",
+    "AmbientListener": "perception.ambient",
     # Speech motor interface — anatomically frontal (Broca's + motor
     # cortex) but functionally part of the temporal-centered language
     # network
-    "Voice": "speech",
-    "VoiceInput": "speech",
+    "Voice": "temporal_lobe.speech",
+    "VoiceInput": "temporal_lobe.speech",
 }
 
 # The five eager names stay in a literal list so static checkers
