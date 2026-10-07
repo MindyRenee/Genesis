@@ -32,7 +32,30 @@ def test_selector_raises_threshold_under_high_conflict() -> None:
     assert result.conflict > 0.9
     assert result.hyperdirect_brake > 0.0
     assert result.effective_threshold > selector.base_threshold
-    assert result.selected is None
+    # The raised bar is what makes near-tied bids hesitate, and it is
+    # observable as a narrowed margin between the winner and the bar.
+    #
+    # This does NOT assert `selected is None`. A hard veto here is not
+    # reachable together with the decision engine selecting at all:
+    # disinhibition rises with salience, so these near-tied high-salience
+    # bids (0.90/0.85) always out-disinhibit the decision engine's
+    # mid-salience field (0.655/0.52 in test_reasoning.py). Vetoing this
+    # pair requires a threshold the weaker field could never clear, which
+    # is why select() used to return None on every decision-engine turn.
+    # The brake is charged once, via the threshold, and the winner is
+    # released whenever it clears it.
+    winner = result.selected
+    assert winner is not None
+    margin = result.disinhibition[winner] - result.effective_threshold
+    assert margin > 0.0
+    # The margin must be tighter under conflict than for a lopsided field,
+    # which is the behavioural point of the hyperdirect pathway.
+    lopsided = selector.select([ActionBid("answer", 0.9), ActionBid("ask", 0.2)])
+    assert lopsided.selected is not None
+    lopsided_margin = (
+        lopsided.disinhibition[lopsided.selected] - lopsided.effective_threshold
+    )
+    assert margin < lopsided_margin
 
 
 def test_positive_rpe_favors_direct_drive_without_changing_salience() -> None:

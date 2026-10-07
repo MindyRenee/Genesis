@@ -2547,6 +2547,21 @@ def _build_critical_network() -> ConceptNetwork:
     return net
 
 
+# Knowledge triples carry no subject (that is the composition contract),
+# so the test helper has to supply one that matches a real network edge.
+# The obvious "fire {rel} {tgt}" guess fabricates a self-loop for the
+# `enables` triple ("fire enables fire") when the network actually holds
+# `oxygen ENABLES fire`, so the edge never resolves and the second source
+# is silently dropped. Map the triples this network actually contains.
+_KNOWLEDGE_SOURCES: dict[tuple[str, str], tuple[str, str, str]] = {
+    ("causes", "heat"): ("fire", "causes", "heat"),
+    ("enables", "fire"): ("oxygen", "enables", "fire"),
+    ("prevents", "fire"): ("water", "prevents", "fire"),
+    ("contradicts", "ice"): ("fire", "contradicts", "ice"),
+    ("similar_to", "ice"): ("fire", "similar_to", "ice"),
+}
+
+
 def _make_result(
     conclusion: str = "fire causes heat",
     confidence: float = 0.7,
@@ -2562,7 +2577,13 @@ def _make_result(
     if knowledge is None:
         knowledge = [("causes", "heat", 0.8)]
     if evidence is None:
-        evidence = [f"fire {rel} {tgt}" for rel, tgt, _w in knowledge]
+        evidence = [
+            f"{src} {rel} {tgt}"
+            for rel, tgt, _w in knowledge
+            for src, rel, tgt in (
+                _KNOWLEDGE_SOURCES.get((rel, tgt), ("fire", rel, tgt)),
+            )
+        ]
     return ReasoningResult(
         conclusion=conclusion,
         reasoning_type=ReasoningType.DEDUCTIVE,

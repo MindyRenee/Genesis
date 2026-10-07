@@ -200,20 +200,14 @@ _HARMS_RE = re.compile(
     r"([A-Za-z][\w]*(?:\s+[A-Za-z][\w]*)*)\b",
     re.IGNORECASE,
 )
-# "X is opposite of Y" / "X contrasts with Y"
-_OPPOSITE_RE = re.compile(
-    r"\\b([A-Za-z][\\w]*(?:\\s+[A-Za-z][\\w]*)*)\\s+"
-    r"(?:is\\s+(?:the\\s+)?opposite\\s+of|contrasts?\\s+with)\\s+"
-    r"([A-Za-z][\\w]*(?:\\s+[A-Za-z][\\w]*)*)\\b",
-    re.IGNORECASE,
-)
+# "X contradicts Y" / "X conflicts with Y"
 _CONTRADICTS_RE = re.compile(
-    r"\\b([A-Za-z][\\w]*(?:\\s+[A-Za-z][\\w]*)*)\\s+"
-    r"(?:contradicts?|conflicts?\\s+with)\\s+"
-    r"([A-Za-z][\\w]*(?:\\s+[A-Za-z][\\w]*)*)\\b",
+    r"\b([A-Za-z][\w]*(?:\s+[A-Za-z][\w]*)*)\s+"
+    r"(?:contradicts?|conflicts?\s+with)\s+"
+    r"([A-Za-z][\w]*(?:\s+[A-Za-z][\w]*)*)\b",
     re.IGNORECASE,
 )
-
+# "X is opposite of Y" / "X contrasts with Y"
 _OPPOSITE_RE = re.compile(
     r"\b([A-Za-z][\w]*(?:\s+[A-Za-z][\w]*)*)\s+"
     r"(?:is\s+(?:the\s+)?opposite\s+of|contrasts\s+with)\s+"
@@ -1455,14 +1449,23 @@ class SemanticMemory:
 # ─── Helpers ──────────────────────────────────────────────────────────
 
 
+# Pronouns never head a proposition, so a subject whose first word is
+# one of these is rejected outright rather than trimmed: "they are here"
+# carries no recoverable subject. Kept separate from
+# _SUBJECT_PREFIX_WORDS because a trailing modal is different — "free
+# will" ends with one but is a legitimate subject.
+_SUBJECT_PRONOUNS = frozenset({
+    "i", "me", "we", "us", "you", "he", "she", "it", "they", "them",
+    "him", "her",
+})
+
 # Words that end an evidential clause prefix inside a captured subject:
 # "i think that ferrets are cute" captures "i think that ferrets" —
 # everything through the last such word is the speaker's framing
 # (pronoun + reporting verb), not the proposition's subject.
 _SUBJECT_PREFIX_WORDS = frozenset({
     # pronouns
-    "i", "me", "we", "us", "you", "he", "she", "it", "they", "them",
-    "him", "her",
+    *_SUBJECT_PRONOUNS,
     # auxiliaries / modals
     "am", "is", "are", "was", "were", "be", "been",
     "do", "does", "did", "have", "has", "had",
@@ -1499,7 +1502,10 @@ def _clean_subject(phrase: str) -> str:
     words = phrase.split()
     cut = -1
     for i, w in enumerate(words):
-        if w in _SUBJECT_PREFIX_WORDS:
+        # A prefix word only introduces a clause if something follows it.
+        # "free will" ends with the modal, so cutting there would leave
+        # nothing — the phrase is a subject in its own right.
+        if w in _SUBJECT_PREFIX_WORDS and i + 1 < len(words):
             cut = i
     words = words[cut + 1:]
     if words and words[0] in _SUBJECT_BREAK_WORDS:
@@ -1508,6 +1514,11 @@ def _clean_subject(phrase: str) -> str:
         if w in _SUBJECT_BREAK_WORDS:
             words = words[:i]
             break
+    # A pronoun cannot head a subject: "they are here" must yield
+    # nothing, not the pronoun itself. (A trailing modal is exempt above,
+    # which is why "free will" still survives.)
+    if words and words[0] in _SUBJECT_PRONOUNS:
+        return ""
     return " ".join(words)
 
 

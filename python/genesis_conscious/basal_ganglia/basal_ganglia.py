@@ -59,10 +59,20 @@ class BasalGangliaSelector:
         D2_i = clip(s_i * (1 - k * RPE), 0, max_drive)
         STN  = control_gain * mean(D2_i)
         GPi_i = tonic_output + STN + hyperdirect - D1_i
-        disinhibition_i = tonic_output - GPi_i
+        disinhibition_i = max(0, tonic_output - STN - hyperdirect + D1_i)
+
+    The conflict brake enters exactly once, via the threshold:
+
+        threshold = base_threshold + hyperdirect_gain * conflict
 
     The action with greatest disinhibition is selected only when it clears
-    the conflict-adjusted threshold.
+    that threshold.
+
+    The prior form subtracted ``tonic_output`` from ``GPi_i`` even though
+    ``GPi_i`` already contained it, cancelling and then double-counting
+    the tonic term; combined with a brake-raised threshold, near-tied bids
+    drove every action's disinhibition to zero and select() returned
+    ``None`` on every turn.
 
     This is deliberately a reduced-order model. It preserves the
     computational roles of focused striatal inhibition, diffuse STN
@@ -155,8 +165,25 @@ class BasalGangliaSelector:
             else _clip(conflict, 0.0, 1.0)
         )
         hyperdirect_brake = self.hyperdirect_gain * effective_conflict
+        # Conflict raises the release bar: near-tied bids are exactly the
+        # case where the model should hesitate, so the threshold carries
+        # the brake. The disinhibition sum below deliberately omits it to
+        # avoid charging the winner twice for one conflict.
         effective_threshold = self.base_threshold + hyperdirect_brake
 
+        # GPi output inhibition is the summed inhibition arriving at the
+        # GPi: tonic background + striatal (STn) control + the
+        # hyperdirect conflict brake, offset by the action's own D1
+        # drive (dopamine disinhibits the direct pathway).
+        #
+        # `tonic_output` is *one* term of that sum. It was previously
+        # also subtracted again on the next line, which cancelled and
+        # then double-counted it: every action's disinhibition collapsed
+        # to max(0, tonic - (tonic + ...)) = 0. With two competing bids
+        # the derived conflict is ~0.79, so the brake alone exceeded
+        # tonic and *no* action could ever clear the threshold --
+        # select() returned None and DecisionEngine fell back to
+        # WITHHOLD on every turn.
         output_inhibition = {
             action: (
                 self.tonic_output + stn_control
@@ -164,8 +191,16 @@ class BasalGangliaSelector:
             )
             for action in salience
         }
+        # Disinhibition is what survives the GPi sum, floored at zero.
+        # `tonic_output` and `hyperdirect_brake` are each applied once:
+        # tonic is the background term of the sum (not a further
+        # subtraction, which would cancel it), and the brake is carried
+        # by the threshold instead.
         disinhibition = {
-            action: max(0.0, self.tonic_output - output_inhibition[action])
+            action: max(
+                0.0,
+                self.tonic_output - stn_control + d1_drive[action],
+            )
             for action in salience
         }
 
