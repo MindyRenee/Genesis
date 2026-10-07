@@ -153,7 +153,7 @@ fn test_open_migrates_legacy_3288_byte_state() {
         let mmap = MmapState::create(&path, 123, now_ms()).expect("create");
         mmap.modify(now_ms(), |state| {
             state.zones.transition_to(CognitiveZone::Coding, now_ms());
-            state.header.state_size = genesis::state::core_state::LEGACY_SIZE as u32;
+            state.header.state_size = genesis::state::core_state::LEGACY_SIZE;
             state.inference_signals.policy_authority = 0.0;
             state.checksum = state.compute_checksum();
         })
