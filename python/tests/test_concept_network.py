@@ -3843,3 +3843,18 @@ class TestConcurrentConceptMutation:
             _ = net.all_concept_ids
 
         self._hammer(net, scan)
+
+
+def test_sleep_consolidation_wires_semantic_hub_detection(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Sleep consolidation must refresh semantic-hub status after graph maintenance."""
+    network = ConceptNetwork()
+    called: list[bool] = []
+
+    def detect() -> list[str]:
+        called.append(True)
+        return []
+
+    monkeypatch.setattr(network, "detect_semantic_hubs", detect)
+    network.consolidate_during_sleep()
+
+    assert called == [True]

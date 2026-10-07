@@ -161,12 +161,10 @@ class Concept:
     # high-betweenness convergence zones (Damasio) that integrate
     # information across the network.
     #
-    # NOT ACTIVE: detect_semantic_hubs() has no callers, so nothing
-    # sets this flag and the 1.3x activation-spread / 0.7x decay
-    # multipliers in concepts/dynamics.py are unreachable. The field
-    # still round-trips through persistence, so a stale True from an
-    # older state file would silently activate those paths — see
-    # Concepts.dynamics for the branches that read it.
+    # Set by detect_semantic_hubs() during sleep consolidation. The
+    # resulting flag feeds the activation-spread and decay multipliers in
+    # concepts/dynamics.py. It round-trips through persistence so hub
+    # status survives restart until the next topology consolidation.
     is_semantic_hub: bool = False
 
     def describe(self) -> str:
