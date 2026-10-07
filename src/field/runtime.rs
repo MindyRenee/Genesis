@@ -5,10 +5,13 @@
 //! cross-system disagreement. The persisted core state remains authoritative;
 //! this is the integration substrate rather than a second source of truth.
 
-use crate::state::neurochemical::NeurochemicalId;
 use crate::state::GenesisCoreState;
+use crate::state::neurochemical::NeurochemicalId;
 
-use super::{FieldError, GaugeTransport, GlobalField, PoincareBall, SubsystemLayer, SystemEngine, SystemFiber, Vector};
+use super::{
+    FieldError, GaugeTransport, GlobalField, PoincareBall, SubsystemLayer, SystemEngine,
+    SystemFiber, Vector,
+};
 
 pub const LATENT_DIMENSION: usize = 6;
 
@@ -45,11 +48,7 @@ impl FieldRuntime {
             ("prediction", "agency"),
             ("agency", "body"),
         ] {
-            field.add_transport(GaugeTransport::new(
-                from,
-                to,
-                identity(LATENT_DIMENSION),
-            )?)?;
+            field.add_transport(GaugeTransport::new(from, to, identity(LATENT_DIMENSION))?)?;
         }
 
         Ok(Self { field })
@@ -93,8 +92,8 @@ impl FieldRuntime {
 
 fn identity(n: usize) -> Vec<Vec<f64>> {
     let mut matrix = vec![vec![0.0; n]; n];
-    for i in 0..n {
-        matrix[i][i] = 1.0;
+    for (i, row) in matrix.iter_mut().enumerate() {
+        row[i] = 1.0;
     }
     matrix
 }
@@ -162,7 +161,12 @@ mod tests {
     #[test]
     fn topology_has_explicit_major_systems() {
         let runtime = FieldRuntime::new().unwrap();
-        let ids: Vec<_> = runtime.field().fibers.iter().map(|f| f.id.as_str()).collect();
+        let ids: Vec<_> = runtime
+            .field()
+            .fibers
+            .iter()
+            .map(|f| f.id.as_str())
+            .collect();
         assert_eq!(ids, vec!["body", "prediction", "agency"]);
         assert_eq!(runtime.field().transports.len(), 3);
     }

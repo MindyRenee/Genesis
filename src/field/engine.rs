@@ -20,7 +20,11 @@ fn dot(a: &[f64], b: &[f64]) -> f64 {
     if normalized == 0.0 {
         return 0.0;
     }
-    let (small, large) = if scale_a <= scale_b { (scale_a, scale_b) } else { (scale_b, scale_a) };
+    let (small, large) = if scale_a <= scale_b {
+        (scale_a, scale_b)
+    } else {
+        (scale_b, scale_a)
+    };
     let partial = normalized * small;
     if !partial.is_finite() {
         return f64::NAN;
@@ -61,10 +65,7 @@ pub struct SystemEngine {
 impl SystemEngine {
     pub fn zero(layer_count: usize, dimension: usize) -> Self {
         Self {
-            couplings: vec![
-                vec![vec![vec![0.0; dimension]; dimension]; layer_count];
-                layer_count
-            ],
+            couplings: vec![vec![vec![vec![0.0; dimension]; dimension]; layer_count]; layer_count],
             biases: vec![vec![0.0; dimension]; layer_count],
             damping: vec![0.0; layer_count],
             saturation: vec![0.0; layer_count],
@@ -82,11 +83,17 @@ impl SystemEngine {
         }
         let n = biases.len();
         let d = biases.first().map_or(0, Vector::len);
-        if n == 0 || d == 0 || couplings.len() != n
+        if n == 0
+            || d == 0
+            || couplings.len() != n
             || couplings.iter().any(|row| row.len() != n)
-            || biases.iter().any(|b| b.len() != d || b.iter().any(|x| !x.is_finite()))
+            || biases
+                .iter()
+                .any(|b| b.len() != d || b.iter().any(|x| !x.is_finite()))
             || couplings.iter().flatten().any(|m| {
-                m.len() != d || m.iter().any(|r| r.len() != d || r.iter().any(|x| !x.is_finite()))
+                m.len() != d
+                    || m.iter()
+                        .any(|r| r.len() != d || r.iter().any(|x| !x.is_finite()))
             })
         {
             return Err(FieldError::DimensionMismatch);
@@ -100,25 +107,32 @@ impl SystemEngine {
         })
     }
 
-    pub fn dimension(&self) -> usize { self.biases.first().map_or(0, Vector::len) }
+    pub fn dimension(&self) -> usize {
+        self.biases.first().map_or(0, Vector::len)
+    }
     pub(crate) fn validate(&self) -> Result<(usize, usize), FieldError> {
         let n = self.biases.len();
         let d = self.biases.first().map_or(0, Vector::len);
-        if n == 0 || d == 0
+        if n == 0
+            || d == 0
             || self.couplings.len() != n
             || self.damping.len() != n
             || self.saturation.len() != n
             || !self.time_scale.is_finite()
             || self.time_scale <= 0.0
-            || self.biases.iter().any(|b| b.len() != d || b.iter().any(|x| !x.is_finite()))
+            || self
+                .biases
+                .iter()
+                .any(|b| b.len() != d || b.iter().any(|x| !x.is_finite()))
             || self.damping.iter().any(|x| !x.is_finite() || *x < 0.0)
             || self.saturation.iter().any(|x| !x.is_finite() || *x < 0.0)
             || self.couplings.iter().any(|row| {
-                row.len() != n || row.iter().any(|m| {
-                    m.len() != d || m.iter().any(|r| {
-                        r.len() != d || r.iter().any(|x| !x.is_finite())
+                row.len() != n
+                    || row.iter().any(|m| {
+                        m.len() != d
+                            || m.iter()
+                                .any(|r| r.len() != d || r.iter().any(|x| !x.is_finite()))
                     })
-                })
             })
         {
             return Err(FieldError::InvalidDynamics);
@@ -128,8 +142,7 @@ impl SystemEngine {
 
     /// Set non-negative local damping for every subsystem layer.
     pub fn with_damping(mut self, damping: Vec<f64>) -> Result<Self, FieldError> {
-        if damping.len() != self.biases.len()
-            || damping.iter().any(|x| !x.is_finite() || *x < 0.0)
+        if damping.len() != self.biases.len() || damping.iter().any(|x| !x.is_finite() || *x < 0.0)
         {
             return Err(FieldError::InvalidDynamics);
         }
@@ -154,14 +167,16 @@ impl SystemEngine {
     /// -s (||x||² I + 2 x xᵀ). Coupling and damping are added directly.
     pub fn jacobian(&self, layers: &[SubsystemLayer]) -> Result<Vec<Vec<Matrix>>, FieldError> {
         let (n, d) = self.validate()?;
-        if layers.len() != n { return Err(FieldError::LayerMismatch); }
+        if layers.len() != n {
+            return Err(FieldError::LayerMismatch);
+        }
         if d == 0 || layers.iter().any(|l| l.state.len() != d) {
             return Err(FieldError::DimensionMismatch);
         }
         let mut out = vec![vec![vec![vec![0.0; d]; d]; n]; n];
-        for target in 0..n {
-            for source in 0..n {
-                out[target][source] = self.couplings[target][source].clone();
+        for (target, couplings) in self.couplings.iter().enumerate() {
+            for (source, coupling) in couplings.iter().enumerate() {
+                out[target][source] = coupling.clone();
             }
             let saturation = self.saturation[target];
             let r2 = if saturation == 0.0 {
@@ -173,21 +188,28 @@ impl SystemEngine {
                 }
                 value
             };
-            for k in 0..d {
-                for j in 0..d {
+            let state = &layers[target].state;
+            for (k, row) in out[target][target].iter_mut().enumerate() {
+                for (j, cell) in row.iter_mut().enumerate() {
                     let nonlinear = if saturation == 0.0 {
                         0.0
                     } else {
-                        let xk = layers[target].state[k];
-                        let xj = layers[target].state[j];
+                        let xk = state[k];
+                        let xj = state[j];
                         saturation * ((if k == j { r2 } else { 0.0 }) + 2.0 * xk * xj)
                     };
-                    out[target][target][k][j] -= nonlinear;
+                    *cell -= nonlinear;
                 }
-                out[target][target][k][k] -= self.damping[target];
+                row[k] -= self.damping[target];
             }
         }
-        if out.iter().flatten().flatten().flatten().any(|x| !x.is_finite()) {
+        if out
+            .iter()
+            .flatten()
+            .flatten()
+            .flatten()
+            .any(|x| !x.is_finite())
+        {
             return Err(FieldError::NonFiniteState);
         }
         Ok(out)
@@ -203,7 +225,9 @@ impl SystemEngine {
     /// origin is not contractive.
     pub fn linear_growth_bound(&self) -> Result<f64, FieldError> {
         let (n, d) = self.validate()?;
-        if n == 0 || d == 0 || self.couplings.len() != n
+        if n == 0
+            || d == 0
+            || self.couplings.len() != n
             || self.couplings.iter().any(|row| row.len() != n)
         {
             return Err(FieldError::DimensionMismatch);
@@ -254,13 +278,10 @@ impl SystemEngine {
                 *dst -= self.damping[i] * state;
             }
         }
-        for target in 0..layers.len() {
-            for source in 0..layers.len() {
-                let contribution = mat_vec(
-                    &self.couplings[target][source],
-                    &layers[source].state,
-                )?;
-                for (dst, src) in out[target].iter_mut().zip(contribution) {
+        for (target, out_row) in out.iter_mut().enumerate() {
+            for (source, layer) in layers.iter().enumerate() {
+                let contribution = mat_vec(&self.couplings[target][source], &layer.state)?;
+                for (dst, src) in out_row.iter_mut().zip(contribution) {
                     *dst += src;
                 }
             }
@@ -292,14 +313,19 @@ mod tests {
         let mut engine = SystemEngine::zero(1, 2);
         engine.couplings[0][0][0][0] = f64::MAX;
         engine.couplings[0][0][0][1] = f64::MAX;
-        assert_eq!(engine.linear_growth_bound(), Err(FieldError::NonFiniteState));
+        assert_eq!(
+            engine.linear_growth_bound(),
+            Err(FieldError::NonFiniteState)
+        );
     }
 
     #[test]
     fn jacobian_matches_finite_difference_for_nonlinear_layer() {
         let engine = SystemEngine::zero(1, 2)
-            .with_damping(vec![0.4]).unwrap()
-            .with_saturation(vec![0.7]).unwrap();
+            .with_damping(vec![0.4])
+            .unwrap()
+            .with_saturation(vec![0.7])
+            .unwrap();
         let layers = vec![SubsystemLayer::new("a", vec![0.2, -0.3])];
         let analytic = engine.jacobian(&layers).unwrap()[0][0].clone();
         let eps = 1e-7;
@@ -308,9 +334,9 @@ mod tests {
             let mut perturbed = layers.clone();
             perturbed[0].state[j] += eps;
             let value = engine.derivatives(&perturbed).unwrap()[0].clone();
-            for i in 0..2 {
+            for (i, analytic_row) in analytic.iter().enumerate() {
                 let finite_difference = (value[i] - base[i]) / eps;
-                assert!((analytic[i][j] - finite_difference).abs() < 1e-6);
+                assert!((analytic_row[j] - finite_difference).abs() < 1e-6);
             }
         }
     }
@@ -325,8 +351,7 @@ mod tests {
 
     #[test]
     fn saturation_dissipates_radial_growth() {
-        let engine = SystemEngine::zero(1, 1)
-            .with_saturation(vec![2.0]).unwrap();
+        let engine = SystemEngine::zero(1, 1).with_saturation(vec![2.0]).unwrap();
         let layers = vec![SubsystemLayer::new("a", vec![2.0])];
         let d = engine.derivatives(&layers).unwrap();
         assert!(d[0][0] < 0.0);
@@ -354,14 +379,18 @@ mod tests {
             ],
             vec![vec![0.0], vec![0.0]],
             1.0,
-        ).unwrap().with_damping(vec![1.0, 4.0]).unwrap();
+        )
+        .unwrap()
+        .with_damping(vec![1.0, 4.0])
+        .unwrap();
         assert_eq!(engine.linear_growth_bound().unwrap(), 1.0);
     }
 
     #[test]
     fn negative_linear_growth_bound_is_a_contraction_certificate() {
         let engine = SystemEngine::zero(2, 1)
-            .with_damping(vec![2.0, 3.0]).unwrap();
+            .with_damping(vec![2.0, 3.0])
+            .unwrap();
         let bound = engine.linear_growth_bound().unwrap();
         assert_eq!(bound, -2.0);
     }
@@ -381,9 +410,15 @@ mod tests {
         let mut engine = SystemEngine::zero(1, 1);
         engine.damping = vec![-1.0];
         let layers = vec![SubsystemLayer::new("a", vec![0.1])];
-        assert_eq!(engine.derivatives(&layers), Err(FieldError::InvalidDynamics));
+        assert_eq!(
+            engine.derivatives(&layers),
+            Err(FieldError::InvalidDynamics)
+        );
         assert_eq!(engine.jacobian(&layers), Err(FieldError::InvalidDynamics));
-        assert_eq!(engine.linear_growth_bound(), Err(FieldError::InvalidDynamics));
+        assert_eq!(
+            engine.linear_growth_bound(),
+            Err(FieldError::InvalidDynamics)
+        );
     }
 
     #[test]
@@ -395,7 +430,8 @@ mod tests {
             ],
             vec![vec![0.0], vec![0.0]],
             1.0,
-        ).unwrap();
+        )
+        .unwrap();
         let layers = vec![
             SubsystemLayer::new("a", vec![0.1]),
             SubsystemLayer::new("b", vec![0.2]),
