@@ -688,20 +688,28 @@ class CriticalThinkingEngine:
         - HEDGE: weak evidence or disconfirming evidence present.
         - ACCEPT: strong evidence, no fallacies, good confidence.
         """
-        # Reject: strong disconfirmation or fallacies with low confidence.
+        # Contradiction outranks everything: a claim the evidence
+        # actively refutes is REJECT regardless of its other defects.
+        if disconfirming and revised_confidence < 0.2:
+            return AssessmentRecommendation.REJECT
+
+        # Unverified is not refuted. A claim with no supporting evidence
+        # has nothing to reject it — only nothing to back it — so it is
+        # INVESTIGATE. This must precede the fallacy check below:
+        # `unsupported_assertion` is *defined* as "no supporting
+        # evidence", so testing the fallacy first sent every unverified
+        # confident-sounding claim to REJECT and the INVESTIGATE branch
+        # was reachable only for claims that were already fine.
+        if not supporting:
+            return AssessmentRecommendation.INVESTIGATE
+
+        # Reject: serious fallacies on an already-low-confidence claim.
         has_serious_fallacy = (
             "unsupported_assertion" in fallacies
             or "circular_reasoning" in fallacies
         )
-        if fallacies and has_serious_fallacy:
-            if revised_confidence < 0.3:
-                return AssessmentRecommendation.REJECT
-        if disconfirming and revised_confidence < 0.2:
+        if fallacies and has_serious_fallacy and revised_confidence < 0.3:
             return AssessmentRecommendation.REJECT
-
-        # Investigate: no supporting evidence.
-        if not supporting:
-            return AssessmentRecommendation.INVESTIGATE
 
         # Hedge: weak evidence or disconfirming evidence.
         if disconfirming or revised_confidence < 0.4 or fallacies:

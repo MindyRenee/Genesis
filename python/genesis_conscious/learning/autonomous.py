@@ -1926,7 +1926,16 @@ class AutonomousLearner:
                     # No topics — block until one is added. No timer.
                     # The learner is genuinely idle until curiosity
                     # generates a topic or the user asks something.
+                    #
+                    # Re-check the stop flag after the clear: stop()
+                    # signals by setting this same event, so an
+                    # unconditional clear() here would discard a stop
+                    # request that arrived just before it, and the
+                    # thread would then block for the full 120s while
+                    # the caller has already given up on the join.
                     self._topic_event.clear()
+                    if not self._running:
+                        break
                     self._topic_event.wait(timeout=120)
                     continue
 

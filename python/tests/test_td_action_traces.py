@@ -1,5 +1,7 @@
 """Regression tests for action-conditioned TD credit assignment."""
 
+import pytest
+
 from genesis_conscious.concepts import ConceptNetwork
 from genesis_conscious.learning.td import TDLearner
 
@@ -22,7 +24,8 @@ def test_action_conditioned_traces_preserve_temporal_credit() -> None:
     learner.update(["next"], 2.0, [], action="B")
 
     # The A trace remains eligible but decays by gamma*lambda.
-    assert learner.get_trace("state", action="A") == 0.72
+    # gamma*lambda is 0.72 in binary floating point, not exactly 0.72.
+    assert learner.get_trace("state", action="A") == pytest.approx(0.72)
     # B was not active in the first transition; its trace is independent.
     assert learner.get_trace("state", action="B") == 0.0
     # The later TD error therefore changes A through its retained trace.
@@ -37,5 +40,5 @@ def test_action_conditioned_traces_decay_independently() -> None:
     learner.update(["state"], 0.0, [], action="A")
     learner.update(["state"], 0.0, [], action="B")
 
-    assert learner.get_trace("state", action="A") == 0.72
+    assert learner.get_trace("state", action="A") == pytest.approx(0.72)
     assert learner.get_trace("state", action="B") == 1.0

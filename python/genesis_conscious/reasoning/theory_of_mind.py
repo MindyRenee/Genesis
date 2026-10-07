@@ -197,12 +197,19 @@ _EXPERTISE_INDICATORS: frozenset[str] = frozenset(
 )
 
 def _contains_question_indicator(text: str) -> bool:
-    """Return whether text contains a question indicator as a word/phrase."""
+    """Return whether text contains a question indicator as a word/phrase.
+
+    The lookarounds anchor on real word boundaries so an indicator is
+    only matched as a whole word or phrase: "how" must not fire inside
+    "somehow". The escaped-backslash spelling below (``\\\\w``) compiled
+    to a literal backslash followed by ``w``, so the boundary was never
+    enforced and every substring counted.
+    """
     for indicator in _QUESTION_INDICATORS:
         if " " in indicator:
-            if re.search(rf"(?<!\\w){re.escape(indicator)}(?!\\w)", text):
+            if re.search(rf"(?<!\w){re.escape(indicator)}(?!\w)", text):
                 return True
-        elif re.search(rf"(?<!\\w){re.escape(indicator)}(?!\\w)", text):
+        elif re.search(rf"(?<!\w){re.escape(indicator)}(?!\w)", text):
             return True
     return False
 
@@ -651,9 +658,19 @@ class TheoryOfMind:
             self._model.intentions = self._model.intentions[-5:]
 
         if _contains_question_indicator(lower_text):
-            if "why" in lower_text:
+            # Substring tests would misread "somehow" as "how"; the
+            # indicator matched as a whole word is the one to classify.
+            matched = next(
+                (
+                    qi
+                    for qi in _QUESTION_INDICATORS
+                    if re.search(rf"(?<!\w){re.escape(qi)}(?!\w)", lower_text)
+                ),
+                None,
+            )
+            if matched == "why":
                 self._model.intentions.append("understand_reasoning")
-            elif "how" in lower_text:
+            elif matched == "how":
                 self._model.intentions.append("learn_method")
             else:
                 self._model.intentions.append("seek_information")

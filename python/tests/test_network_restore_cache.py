@@ -6,7 +6,8 @@ def test_replace_contents_invalidates_sparse_activation_index():
     old = ConceptNetwork()
     old.add_concept("old")
     old.get_concept("old").activation = 0.8
-    old.tick()
+    # cortical_tick() builds _active_ids lazily on first call.
+    old.cortical_tick()
     assert old._active_ids is not None
 
     fresh = ConceptNetwork()
