@@ -583,6 +583,11 @@ class ConsolidationMixin:
         # and removed zero-edge concepts before _attach_orphans_to_hubs
         # ever had a chance to connect them.
         bridges_created = self._run_sleep_associative_processing()
+        # Semantic-hub status is derived from the post-bridging graph so the
+        # dynamics layer can apply its hub spread/decay modifiers. Sleep is
+        # the topology-maintenance boundary, avoiding centrality analysis on
+        # every cortical tick.
+        self.detect_semantic_hubs()
 
         # ── 5: Remove noise (sleep takes out the trash) ──────────
         # Now prune concepts that STILL have no edges after hub
