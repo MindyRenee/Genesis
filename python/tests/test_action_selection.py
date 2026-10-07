@@ -32,18 +32,9 @@ def test_selector_raises_threshold_under_high_conflict() -> None:
     assert result.conflict > 0.9
     assert result.hyperdirect_brake > 0.0
     assert result.effective_threshold > selector.base_threshold
-    # The raised bar is what makes near-tied bids hesitate, and it is
-    # observable as a narrowed margin between the winner and the bar.
-    #
-    # This does NOT assert `selected is None`. A hard veto here is not
-    # reachable together with the decision engine selecting at all:
-    # disinhibition rises with salience, so these near-tied high-salience
-    # bids (0.90/0.85) always out-disinhibit the decision engine's
-    # mid-salience field (0.655/0.52 in test_reasoning.py). Vetoing this
-    # pair requires a threshold the weaker field could never clear, which
-    # is why select() used to return None on every decision-engine turn.
-    # The brake is charged once, via the threshold, and the winner is
-    # released whenever it clears it.
+    # A mild brake narrows the release margin without vetoing, which is
+    # the behaviour the decision engine relies on: its mid-salience
+    # candidate field must still select something.
     winner = result.selected
     assert winner is not None
     margin = result.disinhibition[winner] - result.effective_threshold
@@ -56,6 +47,26 @@ def test_selector_raises_threshold_under_high_conflict() -> None:
         lopsided.disinhibition[lopsided.selected] - lopsided.effective_threshold
     )
     assert margin < lopsided_margin
+
+
+def test_selector_vetoes_when_brake_exceeds_the_winner() -> None:
+    """A strong hyperdirect brake blocks release entirely.
+
+    The veto path -- ``selected is None`` -- is what DecisionEngine
+    treats as "hold back this turn". It needs a brake large enough to
+    push the threshold above the best action's disinhibition, which for
+    these bids means ``hyperdirect_gain`` well above the 0.8 default.
+    At the default gain the brake narrows the margin (covered by
+    ``test_selector_raises_threshold_under_high_conflict``) and the
+    winner is still released.
+    """
+    selector = BasalGangliaSelector(hyperdirect_gain=2.0)
+    result = selector.select(
+        [ActionBid("answer", 0.9), ActionBid("ask", 0.85)],
+    )
+
+    assert result.selected is None
+    assert result.effective_threshold > max(result.disinhibition.values())
 
 
 def test_positive_rpe_favors_direct_drive_without_changing_salience() -> None:
