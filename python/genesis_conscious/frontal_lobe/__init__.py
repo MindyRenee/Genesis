@@ -434,12 +434,12 @@ from .._views import view_getattr
 #   from genesis_conscious.frontal_lobe import ExecutiveFunction
 _EXPORTS: dict[str, str] = {
     # Executive function, planning, inhibition, task-switching (PFC)
-    "ActionPlan": "executive",
-    "ExecutiveFunction": "executive",
-    "InhibitionResult": "executive",
-    "SwitchResult": "executive",
-    "Task": "executive",
-    "TaskState": "executive",
+    "ActionPlan": "frontal_lobe.executive",
+    "ExecutiveFunction": "frontal_lobe.executive",
+    "InhibitionResult": "frontal_lobe.executive",
+    "SwitchResult": "frontal_lobe.executive",
+    "Task": "frontal_lobe.executive",
+    "TaskState": "frontal_lobe.executive",
     # Reasoning, decision-making, problem solving, theory of mind
     # (PFC / frontoparietal / mPFC+TPJ)
     "AnalogyEngine": "reasoning",
@@ -467,8 +467,8 @@ _EXPORTS: dict[str, str] = {
     "CognitiveState": "cognition",
     "Goal": "cognition",
     # Volition — internal urges / motivation-to-action (ACC)
-    "Urge": "volition",
-    "VolitionEngine": "volition",
+    "Urge": "frontal_lobe.volition",
+    "VolitionEngine": "frontal_lobe.volition",
     # Generative thought and question composition (DLPFC)
     "QuestionComposer": "cognition.question_composer",
     "ThoughtComposer": "cognition.thought_composer",
@@ -479,13 +479,13 @@ _EXPORTS: dict[str, str] = {
     "MetaCognitiveRouter": "cognition.meta_cognitive_router",
     "Route": "cognition.meta_cognitive_router",
     # Autobiographical self / narrative continuity (PFC + temporal)
-    "LifeChapter": "narrative",
-    "LifeEvent": "narrative",
-    "NarrativeEngine": "narrative",
+    "LifeChapter": "infrastructure.narrative",
+    "LifeEvent": "infrastructure.narrative",
+    "NarrativeEngine": "infrastructure.narrative",
     # Metacognition on its own code — reading, auditing, improving
-    "BugReport": "bug_reporter",
-    "BugReporter": "bug_reporter",
-    "BugScanResult": "bug_reporter",
+    "BugReport": "infrastructure.bug_reporter",
+    "BugReporter": "infrastructure.bug_reporter",
+    "BugScanResult": "infrastructure.bug_reporter",
     "CodeLearner": "tools.code_learner",
     "CodeLearningResult": "tools.code_learner",
     "AutonomousLearner": "learning",
@@ -494,8 +494,8 @@ _EXPORTS: dict[str, str] = {
     "ExplorationResult": "tools.explorer",
     "Explorer": "tools.explorer",
     # Creative expression — affective art and code generation
-    "Canvas": "canvas",
-    "DrawingResult": "canvas",
+    "Canvas": "frontal_lobe.canvas",
+    "DrawingResult": "frontal_lobe.canvas",
     "DomainKnowledge": "tools.project_composer",
     "compose_main_module": "tools.project_composer",
     "ProjectResult": "tools.project_creator",
@@ -506,10 +506,10 @@ _EXPORTS: dict[str, str] = {
     "ToolResult": "tools.framework",
     "get_tools": "tools.framework",
     # Cognitive access broadcast — PFC is the primary broadcaster;
-    # the relay is the physical relay (also in relay/)
-    "GlobalWorkspace": "global_workspace",
-    "WorkspaceItem": "global_workspace",
-    "WorkspaceModule": "global_workspace",
+    # the relay is the physical relay (also re-exported by thalamus)
+    "GlobalWorkspace": "frontal_lobe.global_workspace",
+    "WorkspaceItem": "frontal_lobe.global_workspace",
+    "WorkspaceModule": "frontal_lobe.global_workspace",
     # Language production — Broca's area (left inferior frontal
     # gyrus). Comprehension (Wernicke's) is in auditory.
     "GenerativeEngine": "language",

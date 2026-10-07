@@ -324,9 +324,9 @@ from .._views import view_getattr
 #   from genesis_conscious.parietal_lobe import AttentionSystem
 _EXPORTS: dict[str, str] = {
     # Selective/sustained/divided attention — intraparietal sulcus
-    "AttentionFocus": "attention",
-    "AttentionSystem": "attention",
-    "AttentionType": "attention",
+    "AttentionFocus": "parietal_lobe.attention",
+    "AttentionSystem": "parietal_lobe.attention",
+    "AttentionType": "parietal_lobe.attention",
     # Multisensory integration — the superior parietal lobule binds
     # the modalities into a unified percept
     "IntegratedPerception": "perception",
@@ -335,8 +335,8 @@ _EXPORTS: dict[str, str] = {
     "Perception": "perception",
     # Interoception of the machine environment — the parietal subsystem's
     # spatial/body awareness extended to the hardware it lives on
-    "SystemMonitor": "system_monitor",
-    "SystemSnapshot": "system_monitor",
+    "SystemMonitor": "parietal_lobe.system_monitor",
+    "SystemSnapshot": "parietal_lobe.system_monitor",
     # Perceptual-symbolic reasoning — object perception, spatial
     # relations, and transformation search. The dorsal stream made
     # explicit: perception computes structure, cognition reasons over it.

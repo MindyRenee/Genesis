@@ -370,18 +370,18 @@ from .._views import view_getattr
 #   from genesis_conscious.limbic_system import EmotionalState
 _EXPORTS: dict[str, str] = {
     # Amygdala — emotional evaluation: neurochemistry -> state
-    "CauseCategory": "emotion",
-    "CognitiveMode": "emotion",
-    "EmotionalState": "emotion",
-    "EmotionCategory": "emotion",
-    "assess_emotion": "emotion",
+    "CauseCategory": "limbic_system.emotion",
+    "CognitiveMode": "limbic_system.emotion",
+    "EmotionalState": "limbic_system.emotion",
+    "EmotionCategory": "limbic_system.emotion",
+    "assess_emotion": "limbic_system.emotion",
     # Prefrontal-limbic control loop — self-regulation, HPA axis,
     # allostatic load (hypothalamic homeostasis)
-    "AllostaticLoadTracker": "emotional_regulator",
-    "AllostaticState": "emotional_regulator",
-    "EmotionalRegulator": "emotional_regulator",
-    "HPAAxis": "emotional_regulator",
-    "HPAState": "emotional_regulator",
+    "AllostaticLoadTracker": "limbic_system.emotional_regulator",
+    "AllostaticState": "limbic_system.emotional_regulator",
+    "EmotionalRegulator": "limbic_system.emotional_regulator",
+    "HPAAxis": "limbic_system.emotional_regulator",
+    "HPAState": "limbic_system.emotional_regulator",
     # Insula / proto-self — the Damasio hierarchy: proto-self (body),
     # core self (feeling), autobiographical self (identity; cortical)
     "AutobiographicalSelf": "self",
@@ -405,10 +405,10 @@ _EXPORTS: dict[str, str] = {
     # Amygdala evaluation of language — sentiment tagging
     "analyze_sentiment": "language.sentiment",
     # Reward/motivation tracking — the dopamine sense of progress
-    "GrowthLedger": "growth_ledger",
-    "GrowthMilestone": "growth_ledger",
+    "GrowthLedger": "infrastructure.growth_ledger",
+    "GrowthMilestone": "infrastructure.growth_ledger",
     # Social bonding — the oxytocin-mediated attachment model
-    "UserProfile": "user_profile",
+    "UserProfile": "infrastructure.user_profile",
 }
 
 __all__ = sorted(_EXPORTS)

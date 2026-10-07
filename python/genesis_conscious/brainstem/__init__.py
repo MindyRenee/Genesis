@@ -208,7 +208,7 @@ from .._views import view_getattr
 # anatomy is a real connection layer, not just documentation.
 _EXPORTS: dict[str, str] = {
     # The five arousal states — the output of the flip-flop switches
-    "SleepStage": "brain_waves",
+    "SleepStage": "thalamus.brain_waves",
     # The N1 -> N2 -> N3 -> N2 -> REM ultradian progression — the
     # implemented analogue of the LCRIM limit cycle
     "SleepCycleTracker": "sleep",
