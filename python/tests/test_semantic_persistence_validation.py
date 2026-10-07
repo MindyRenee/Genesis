@@ -1,5 +1,5 @@
 """Regression tests for semantic persistence validation."""
-from genesis_cognitive.memory.semantic import SemanticMemory
+from genesis_conscious.memory.semantic import SemanticMemory
 
 
 def test_restore_rejects_nonfinite_fact_confidence():

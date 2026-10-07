@@ -108,7 +108,6 @@ pub const DT: f32 = 0.1;
 /// the system remains stable while still exhibiting coupled dynamics.
 pub const COUPLING_SCALE: f32 = 0.15;
 
-
 /// Gain applied to the consolidation net drive before its sigmoid.
 ///
 /// This is deliberately *not* the arousal gain: consolidation has its
@@ -422,9 +421,6 @@ pub const AUTORECEPTOR_THRESHOLD: f32 = 0.15;
 /// See the homeostatic force computation in `tick_with_params` for
 /// the full rationale and calibration.
 pub const AUTORECEPTOR_GAIN: f32 = 200.0;
-
-
-
 
 /// Functional rescue: receptor turnover and effective-deviation scaling.
 ///
@@ -1977,15 +1973,13 @@ impl NeurochemicalVector {
                 // NaN through. self.arousal was finite_clamped above,
                 // but defense-in-depth protects against future code
                 // reordering.
-                self.arousal =
-                    crate::state::sanitize::finite_clamp(self.arousal, 0.10, 0.25);
+                self.arousal = crate::state::sanitize::finite_clamp(self.arousal, 0.10, 0.25);
             }
             MentalPhase::REM => {
                 // REM: moderate arousal ("paradoxical sleep")
                 // Hard-clamp to 0.35-0.55 — EEG looks awake but mind
                 // is asleep.
-                self.arousal =
-                    crate::state::sanitize::finite_clamp(self.arousal, 0.35, 0.55);
+                self.arousal = crate::state::sanitize::finite_clamp(self.arousal, 0.35, 0.55);
             }
             _ => {}
         }
@@ -2103,18 +2097,15 @@ impl NeurochemicalVector {
             // Move each adaptation factor 50% of the way back to 1.0.
             let sensitivity = self.chemicals[i].receptor_sensitivity;
             if sensitivity < 0.9 {
-                self.chemicals[i].receptor_sensitivity =
-                    sensitivity + (1.0 - sensitivity) * 0.5;
+                self.chemicals[i].receptor_sensitivity = sensitivity + (1.0 - sensitivity) * 0.5;
             }
             let desens = self.chemicals[i].desensitization_factor;
             if desens < 0.9 {
-                self.chemicals[i].desensitization_factor =
-                    desens + (1.0 - desens) * 0.5;
+                self.chemicals[i].desensitization_factor = desens + (1.0 - desens) * 0.5;
             }
             let intern = self.chemicals[i].internalization_factor;
             if intern < 0.9 {
-                self.chemicals[i].internalization_factor =
-                    intern + (1.0 - intern) * 0.5;
+                self.chemicals[i].internalization_factor = intern + (1.0 - intern) * 0.5;
             }
         }
         // Recompute derived fields (effective levels, arousal, valence,
@@ -2804,7 +2795,15 @@ impl NeurochemicalVector {
         }
 
         let homeostatic_rate = params.homeostatic_rate;
-        let damping = params.damping;
+        // Damping is a velocity *retention* factor applied as
+        // `damping.powf(dt_scale)`, so it must lie in (0, 1]: at 1.0
+        // velocity is fully retained, below 1.0 it decays. A value
+        // above 1 (or NaN) would make the integrator amplify velocity
+        // instead of damping it — exponential growth in every
+        // chemical — and nothing else on this path would stop it. Clamp
+        // at the dynamics boundary so the parameter cannot express
+        // that regime, whatever a caller passes.
+        let damping = crate::state::sanitize::finite_clamp(params.damping, 1.0e-6, 1.0);
         let adaptation_rate = params.adaptation_rate;
         let baseline_adaptation_rate = params.baseline_adaptation_rate;
         // Validate dt at the dynamics boundary — the IPC handler clamps
@@ -2905,6 +2904,18 @@ impl NeurochemicalVector {
         // directly from self.chemicals[i].baseline inside the loop — no
         // need for a separate snapshot array since baselines don't change
         // during this step (only levels and velocities do).
+        //
+        // Re-derived per sub-step, deliberately. The snapshot exists to
+        // stop a single step from feeding back into itself mid-loop, NOT
+        // to freeze the coupling inputs for the whole call. When the
+        // daemon sub-steps to cover a longer interval (see
+        // `TickLoop::neuro_substeps`), holding one snapshot meant every
+        // sub-step drove off the same stale levels — so the number of
+        // sub-steps changed the answer, which is precisely the
+        // step-size dependence the sub-stepping was meant to remove.
+        // Endocannabinoid was the worst case: its synthesis is driven by
+        // glutamate + GABA activity, and integrating a stale drive
+        // repeatedly diverged ~10x more than any other chemical.
         let eff_snapshot = self.effective_levels;
 
         // Dopamine subtype-weighted effective level for coupling.
@@ -3487,8 +3498,8 @@ impl NeurochemicalVector {
             let dt_hours = f64::from(dt_scale) * f64::from(DT) / 3600.0;
             let lower_asymptote = 0.20; // resting level; the baseline never moves
             let current_level = f64::from(self.chemicals[adn_idx].level);
-            let new_level = lower_asymptote
-                + (-dt_hours / chi_s).exp() * (current_level - lower_asymptote);
+            let new_level =
+                lower_asymptote + (-dt_hours / chi_s).exp() * (current_level - lower_asymptote);
             self.chemicals[adn_idx].level =
                 crate::state::sanitize::finite_clamp(new_level as f32, 0.0, 1.0);
         } else {
@@ -3603,15 +3614,11 @@ impl NeurochemicalVector {
         // relaxes. A Schmitt trigger on the acetylcholine level
         // expresses that: once the ramp is under way it runs to
         // completion, and only discharges in REM.
-        let ach_now = f64::from(
-            self.chemicals[NeurochemicalId::Acetylcholine as usize].level,
-        );
-        let adn_now_for_latch = f64::from(
-            self.chemicals[NeurochemicalId::Adenosine as usize].level,
-        );
-        let rebound_engaged = adn_now_for_latch < 0.80
-            || current_phase == MentalPhase::REM
-            || ach_now > 0.50;
+        let ach_now = f64::from(self.chemicals[NeurochemicalId::Acetylcholine as usize].level);
+        let adn_now_for_latch =
+            f64::from(self.chemicals[NeurochemicalId::Adenosine as usize].level);
+        let rebound_engaged =
+            adn_now_for_latch < 0.80 || current_phase == MentalPhase::REM || ach_now > 0.50;
 
         // Serotonergic REM-off profile.
         //
@@ -3703,8 +3710,7 @@ impl NeurochemicalVector {
             let ach_chem = &self.chemicals[ach_idx];
             let receptor_health = f64::from(ach_chem.receptor_sensitivity)
                 * f64::from(ach_chem.desensitization_factor)
-                * f64::from(ach_chem.internalization_factor)
-                .max(1e-3);
+                * f64::from(ach_chem.internalization_factor).max(1e-3);
             let level_target = (ach_target / receptor_health).clamp(0.0, 1.0);
             let current_ach = f64::from(self.chemicals[ach_idx].level);
             let new_ach = level_target - (-ach_rate).exp() * (level_target - current_ach);
@@ -3851,14 +3857,21 @@ impl NeurochemicalVector {
         // homeostatic force pull cortisol back to baseline.
         //
         // This models the biological upregulation of 11β-HSD2 under
-        // sustained high cortisol. See CORTISOL_CLEARANCE_RATE for
-        // the full rationale.
-        // `dt_scale` is correct here: direct level update, time-invariant.
-        let eff_clearance = CORTISOL_CLEARANCE_RATE * cort_excess * dt_scale;
-        // Clamp the clearance to at most 50% per tick to prevent
-        // overshoot under large dt_scale values.
-        self.chemicals[cort_idx].level *=
-            1.0 - crate::state::sanitize::finite_clamp(eff_clearance, 0.0, 0.5);
+        // sustained high cortisol. See CORTISOL_CLEARANCE_RATE for the
+        // full rationale.
+        //
+        // The decay is exponential, not `level *= 1 - rate` (Euler). The
+        // Euler form is only first-order accurate and is step-size
+        // dependent: at dt_scale 5 (a 1 s step) it removes 5x the
+        // fraction that 5 steps of 0.2 s would, so cortisol settled at a
+        // different level purely because of *how often* the body was
+        // ticked. That is exactly the coupling defect this file is
+        // being fixed for — the body's chemistry must not depend on the
+        // caller's cadence. `exp(-x)` with x = rate * dt / DT composes
+        // exactly over sub-steps, matching every other decay here and
+        // the AChE clearance a few lines above.
+        let clearance_exponent = CORTISOL_CLEARANCE_RATE * cort_excess * dt_scale;
+        self.chemicals[cort_idx].level *= (-clearance_exponent).exp();
         self.chemicals[cort_idx].level =
             crate::state::sanitize::finite_clamp(self.chemicals[cort_idx].level, 0.0, 1.0);
 
@@ -4376,7 +4389,9 @@ impl NeurochemicalVector {
     /// # Parameters
     /// - `homeostatic_rate`: how fast chemicals return to baseline
     ///   (typically 0.001–0.01)
-    /// - `damping`: velocity decay per tick (typically 0.85–0.95)
+    /// - `damping`: velocity retention over the reference interval `DT`
+    ///   (typically 0.85–0.95). Clamped to (0, 1] at the dynamics
+    ///   boundary so it cannot express exponential growth.
     /// - `adaptation_rate`: how fast receptor sensitivity adapts
     ///   (typically 0.0001–0.001, much slower than homeostatic drift)
     /// - `baseline_adaptation_rate`: how fast baselines shift

@@ -27,7 +27,7 @@ pub const MAGIC: [u8; 4] = *b"GNSX";
 ///   stale. Migration from v2 to v3 initializes the 6 new chemicals
 ///   at defaults (in case they were zeroed by an older binary) and
 ///   fills the new coupling matrix rows/columns.
-pub const SCHEMA_VERSION: u32 = 3;
+pub const SCHEMA_VERSION: u32 = 4;
 
 /// Header for the memory-mapped core state.
 ///

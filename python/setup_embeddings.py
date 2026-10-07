@@ -10,7 +10,9 @@ for words it hasn't explicitly learned.
 Usage:
     python3 setup_embeddings.py [--data-dir DIR] [--dim 50]
 
-If no data dir is specified, defaults to ~/.local/share/genesis.
+If no data dir is specified, it is resolved the way run.sh does:
+GENESIS_DATA_DIR, then the checkout's .genesis-data-dir pin, then
+XDG_DATA_HOME, then ~/.local/share.
 """
 
 from __future__ import annotations
@@ -19,9 +21,10 @@ import os
 import sys
 import tempfile
 import zipfile
-from pathlib import Path
 
 import numpy as np
+
+from genesis_conscious.infrastructure.config import default_data_dir
 
 # ─── Config ──────────────────────────────────────────────────────
 
@@ -33,11 +36,17 @@ GLOVE_DIM = 50  # 50d is compact and sufficient for semantic similarity
 
 
 def _parse_setup_args() -> tuple[str, int]:
-    """Parse --data-dir and --dim from command-line arguments."""
+    """Parse --data-dir and --dim from command-line arguments.
+
+    The default comes from ``default_data_dir()`` so it honors the
+    checkout's .genesis-data-dir pin rather than assuming
+    ~/.local/share/genesis — building an embedding index against another
+    checkout's concept set is silently wrong, not merely inconvenient.
+    """
     data_dir = (
         sys.argv[sys.argv.index("--data-dir") + 1]
         if "--data-dir" in sys.argv
-        else str(Path.home() / ".local" / "share" / "genesis")
+        else str(default_data_dir())
     )
     dim = int(sys.argv[sys.argv.index("--dim") + 1]) if "--dim" in sys.argv else GLOVE_DIM
     return data_dir, dim
@@ -49,8 +58,8 @@ def _load_concept_vocab(data_dir: str) -> tuple[object, set[str]] | None:
     Returns (network, vocab) or None if no saved state is found.
     """
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from genesis_cognitive.concepts import ConceptNetwork
-    from genesis_cognitive.persistence import load_state, restore_network
+    from genesis_conscious.concepts import ConceptNetwork
+    from genesis_conscious.infrastructure.persistence import load_state, restore_network
 
     print(f"Loading concept network from {data_dir}...")
     data = load_state(data_dir)

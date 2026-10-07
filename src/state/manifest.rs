@@ -151,7 +151,21 @@ pub struct ModuleEntry {
     pub last_heartbeat: u64,
     /// Approximate CPU usage share, in `[0.0, 1.0]`.
     pub cpu_share: f32,
-    /// Memory usage in megabytes.
+    /// Resident memory attributed to this module, in megabytes.
+    ///
+    /// Only meaningful for a module that owns a process of its own — in
+    /// practice `Subcognitive`. The cognitive mind is a *single*
+    /// process hosting language, memory, reasoning, sensory, motor and
+    /// metacognition alike, so there is no honest way to divide its
+    /// resident set between them: any per-module split would be
+    /// invention. Those entries therefore stay 0, which means "not
+    /// separately measurable" rather than "uses no memory".
+    ///
+    /// The process tree's total is carried on `Subcognitive` so that
+    /// `RuntimeManifest::total_mem_mb`, which sums this field, reports
+    /// the whole tree's resident set correctly. Per-process figures
+    /// where they are genuinely distinct are available from
+    /// `GET_SUBSYSTEM_TELEMETRY`.
     pub mem_usage_mb: f32,
 }
 
@@ -207,6 +221,30 @@ impl ModuleEntry {
     pub fn heartbeat(&mut self, now_ms: u64) {
         self.last_heartbeat = now_ms;
     }
+
+    /// Record that the module is working on `task_id`.
+    ///
+    /// The field existed in the layout but nothing ever wrote it, so
+    /// "which task is this brain part on" was unanswerable. The mind
+    /// reports its current task alongside its status, which is the only
+    /// place that knows the answer.
+    pub fn set_task(&mut self, task_id: u64) {
+        self.task_id = task_id;
+    }
+
+    /// Record an error for this module.
+    ///
+    /// Without a producer, a module that had failed looked identical to
+    /// one that had never been exercised — a dead subsystem read as
+    /// healthy. Zero clears the error.
+    pub fn set_error(&mut self, error_code: u32) {
+        self.error_code = error_code;
+    }
+
+    /// Whether this module has recorded an error.
+    pub fn has_error(&self) -> bool {
+        self.error_code != 0
+    }
 }
 
 /// The runtime manifest — all module states plus aggregate metrics.
@@ -216,11 +254,13 @@ impl ModuleEntry {
 /// offset  field            type           notes
 /// ------  -----            ----           -----
 ///   0     modules          [ModuleEntry;16] 16×32 = 512 bytes
-/// 512     uptime_ms        u64            process uptime in ms
+/// 512     uptime_ms        u64            ms since state file creation
 /// 520     total_cpu_load   f32            aggregate CPU [0.0,1.0]
 /// 524     total_mem_mb     f32            aggregate memory (MB)
 /// 528     active_count     u8             modules in non-Stopped state
-/// 529     _pad             [u8;7]         alignment to 8
+/// 529     idle_count       u8             alive but doing no measured work
+/// 530     error_count      u8             modules reporting an error
+/// 531     _pad             [u8;5]         alignment to 8
 /// ```
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -228,7 +268,9 @@ pub struct RuntimeManifest {
     /// Fixed array of module entries. Unused slots have `module_id = 0`
     /// and `status = Stopped`.
     pub modules: [ModuleEntry; MAX_MODULES],
-    /// Process uptime in milliseconds.
+    /// Milliseconds since the state file was created — so the process
+    /// lifetime of the Genesis that has held this state file, which is
+    /// what survives a restart.
     pub uptime_ms: u64,
     /// Aggregate CPU load across all modules [0.0, 1.0].
     pub total_cpu_load: f32,
@@ -236,8 +278,15 @@ pub struct RuntimeManifest {
     pub total_mem_mb: f32,
     /// Number of modules currently in a non-Stopped state.
     pub active_count: u8,
+    /// How many of those are `Idle` — alive but doing no measured work.
+    /// Distinguishes "present" from "working", which `active_count`
+    /// alone conflated.
+    pub idle_count: u8,
+    /// How many modules have recorded an error. A non-zero value means
+    /// part of the mind has failed, which nothing previously reported.
+    pub error_count: u8,
     /// Alignment padding to 8 bytes.
-    pub _pad: [u8; 7],
+    pub _pad: [u8; 5],
 }
 
 impl RuntimeManifest {
@@ -280,7 +329,9 @@ impl RuntimeManifest {
             total_cpu_load: 0.0,
             total_mem_mb: 0.0,
             active_count: 0,
-            _pad: [0; 7],
+            idle_count: 0,
+            error_count: 0,
+            _pad: [0; 5],
         }
     }
 
@@ -320,16 +371,30 @@ impl RuntimeManifest {
         let mut active = 0u8;
         let mut cpu = 0.0f32;
         let mut mem = 0.0f32;
+        let mut idle = 0u8;
+        let mut failed = 0u8;
 
         for m in &self.modules {
             if m.status().is_alive() {
                 active += 1;
                 cpu += m.cpu_share;
                 mem += m.mem_usage_mb;
+                // "Running" and "Idle" are both alive, but only one is
+                // doing work. `active_count` alone conflated them, so
+                // a mind with every part alive-but-idle read as fully
+                // busy.
+                if m.status() == ModuleStatus::Idle {
+                    idle += 1;
+                }
+                if m.has_error() {
+                    failed += 1;
+                }
             }
         }
 
         self.active_count = active;
+        self.idle_count = idle;
+        self.error_count = failed;
         // Route the aggregates through the NaN primitive. `f32::min`
         // returns the *non-NaN* operand, so `NaN.min(1.0) == 1.0` —
         // an accumulator poisoned by one bad `cpu_share` would yield a

@@ -14,7 +14,7 @@ import math
 
 import pytest
 
-from genesis_cognitive.self.cognitive_trajectory import CognitiveTrajectoryModel
+from genesis_conscious.self.cognitive_trajectory import CognitiveTrajectoryModel
 
 # Persistence decay: predict(x) → x * 0.7
 _DECAY = 0.7

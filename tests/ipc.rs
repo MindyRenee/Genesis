@@ -161,8 +161,9 @@ fn test_get_state() {
 
     // The state should have valid magic
     assert!(state.verify().is_ok(), "state should be valid");
-    // Schema version should be 3 (v3: 18-chemical layout)
-    assert_eq!(state.header.version, 3);
+    // Schema version should be current (v4: 18-chemical layout plus
+    // the ion layer inserted ahead of the checksum).
+    assert_eq!(state.header.version, genesis::state::header::SCHEMA_VERSION);
 }
 
 // ─── Get neuro summary ────────────────────────────────────────
@@ -307,9 +308,7 @@ fn test_set_zone_applies_despite_stale_override() {
     sys.start_server();
 
     let mut client = sys.client();
-    client
-        .set_zone(CognitiveZone::Sleeping)
-        .expect("set_zone");
+    client.set_zone(CognitiveZone::Sleeping).expect("set_zone");
 
     let state = client.get_state().expect("get_state");
     assert_eq!(
@@ -1473,13 +1472,22 @@ fn test_get_lobe_telemetry() {
         .expect("get_subsystem_telemetry");
     let subsystems = &report.subsystems;
     assert_eq!(subsystems.len(), 3);
-    assert_eq!(subsystems[0].subsystem, 0, "first subsystem should be daemon (0)");
+    assert_eq!(
+        subsystems[0].subsystem, 0,
+        "first subsystem should be daemon (0)"
+    );
     assert_eq!(subsystems[0].pid, 100);
     assert!((subsystems[0].cpu - 0.05).abs() < 0.001);
-    assert_eq!(subsystems[1].subsystem, 1, "second subsystem should be cognitive (1)");
+    assert_eq!(
+        subsystems[1].subsystem, 1,
+        "second subsystem should be cognitive (1)"
+    );
     assert!((subsystems[1].cache_miss_rate - 0.08).abs() < 0.001);
     assert!((subsystems[1].branch_miss_rate - 0.03).abs() < 0.001);
-    assert_eq!(subsystems[2].subsystem, 2, "third subsystem should be retina (2)");
+    assert_eq!(
+        subsystems[2].subsystem, 2,
+        "third subsystem should be retina (2)"
+    );
     assert!((subsystems[2].io - 0.3).abs() < 0.001);
 
     // Module section: language (4) was set Running — it should
@@ -1692,4 +1700,39 @@ fn test_ipc_shutdown_waits_for_active_handler() {
     let _ = std::fs::remove_file(ltm_base.with_extension("dat"));
     let _ = std::fs::remove_file(ltm_base.with_extension("idx"));
     let _ = std::fs::remove_file(&socket_path);
+}
+
+/// The electrochemical layer crosses the wire as a fixed 108-byte
+/// block. This pins the two things a client depends on: the daemon
+/// answers `GET_ION_SUMMARY` with exactly that width, and the values
+/// it reports are the seeded resting state rather than zeros — a
+/// silently-zeroed ion layer would read as "no gradient" and be
+/// indistinguishable from a healthy resting cell.
+#[test]
+fn test_get_ion_summary() {
+    let mut sys = IpcTestSystem::new("ionsummary");
+    sys.start_server();
+
+    let mut client = sys.client();
+    let ions = client.get_ion_summary().expect("get_ion_summary");
+
+    assert_eq!(
+        core::mem::size_of::<genesis::daemon::ipc::IonSummary>(),
+        108
+    );
+
+    // Resting membrane potential is negative, and the sodium gradient
+    // runs outward while potassium runs inward. IonId order is calcium,
+    // chloride, potassium, sodium.
+    assert!(ions.membrane_potential_mv < 0.0, "resting Vm is negative");
+    assert!(
+        ions.extracellular_mm[3] > ions.intracellular_mm[3],
+        "Na+ outward"
+    );
+    assert!(
+        ions.intracellular_mm[2] > ions.extracellular_mm[2],
+        "K+ inward"
+    );
+    assert!(ions.atp_availability > 0.0);
+    assert!(ions.gradient_integrity > 0.9);
 }

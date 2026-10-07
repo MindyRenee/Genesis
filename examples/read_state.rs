@@ -3,19 +3,10 @@ use genesis::state::neurochemical::NeurochemicalId;
 use genesis::store::mmap_state::MmapState;
 
 fn main() {
-    // Same resolution as run.sh: XDG_DATA_HOME (or ~/.local/share),
-    // with GENESIS_DATA_DIR kept as a manual override.
-    let path = std::env::var("GENESIS_DATA_DIR")
-        .map(|d| format!("{d}/core_state.bin"))
-        .unwrap_or_else(|_| {
-            let base = std::env::var("XDG_DATA_HOME").unwrap_or_else(|_| {
-                format!(
-                    "{}/.local/share",
-                    std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
-                )
-            });
-            format!("{}/genesis/core_state.bin", base)
-        });
+    // Resolution lives in one place so it cannot drift from run.sh or
+    // the other tools; see genesis::data_dir.
+    let path = genesis::data_dir().join("core_state.bin");
+    let path = path.to_string_lossy().into_owned();
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)

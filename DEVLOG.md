@@ -246,8 +246,8 @@ The full architecture went public: coupled neurochemical dynamics,
 active inference, closed-loop embodiment, no LLM, and it runs on a
 2014 HP Pavilion with ~5 GB RAM.
 
-Evidence: initial public commit `8d656b0`; the paper is in
-`paper/genesis.tex`.
+Evidence: initial public commit `8d656b0`; the paper was in
+`paper/genesis.tex`, removed in `cb3f7f5`.
 
 ## The standing evidence base
 

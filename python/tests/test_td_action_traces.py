@@ -1,7 +1,7 @@
 """Regression tests for action-conditioned TD credit assignment."""
 
-from genesis_cognitive.concepts import ConceptNetwork
-from genesis_cognitive.learning.td import TDLearner
+from genesis_conscious.concepts import ConceptNetwork
+from genesis_conscious.learning.td import TDLearner
 
 
 def _network() -> ConceptNetwork:

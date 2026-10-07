@@ -8,13 +8,8 @@ import logging
 
 import pytest
 
-from genesis_cognitive.attention import (
-    AttentionFocus,
-    AttentionSystem,
-    AttentionType,
-)
-from genesis_cognitive.concepts import ConceptNetwork, RelationType
-from genesis_cognitive.executive import (
+from genesis_conscious.concepts import ConceptNetwork, RelationType
+from genesis_conscious.frontal_lobe.executive import (
     ActionPlan,
     ExecutiveFunction,
     InhibitionResult,
@@ -22,11 +17,11 @@ from genesis_cognitive.executive import (
     Task,
     TaskState,
 )
-from genesis_cognitive.global_workspace import (
+from genesis_conscious.frontal_lobe.global_workspace import (
     GlobalWorkspace,
     WorkspaceItem,
 )
-from genesis_cognitive.memory import (
+from genesis_conscious.memory import (
     HABIT_THRESHOLD,
     CentralExecutive,
     ConversationThread,
@@ -38,6 +33,11 @@ from genesis_cognitive.memory import (
     Turn,
     VisuoSpatialSketchpad,
     WorkingMemory,
+)
+from genesis_conscious.parietal_lobe.attention import (
+    AttentionFocus,
+    AttentionSystem,
+    AttentionType,
 )
 
 logger = logging.getLogger(__name__)
@@ -975,7 +975,7 @@ def test_gw_recurrent_ignition_tagged() -> None:
 
 def test_damasio_recurrent_trigger_salience() -> None:
     """Recurrent ignitions register as more salient to the core self."""
-    from genesis_cognitive.self.damasio import DamasioSelfHierarchy
+    from genesis_conscious.self.damasio import DamasioSelfHierarchy
 
     recurrent = WorkspaceItem(
         content="emerged",
@@ -1064,7 +1064,7 @@ def test_gw_on_ignition_not_subliminal() -> None:
 
 def test_safeguard_urge_registered() -> None:
     """The safeguard urge ships in the default urge set."""
-    from genesis_cognitive.config import MindConfig
+    from genesis_conscious.infrastructure.config import MindConfig
 
     urges = {u.name: u for u in MindConfig().volition.urges}
     assert "safeguard" in urges
@@ -1080,8 +1080,8 @@ def test_safeguard_urge_registered() -> None:
 
 def test_safeguard_urge_dynamics() -> None:
     """Safeguard fires under sustained threat, not on a transient."""
-    from genesis_cognitive.config import MindConfig
-    from genesis_cognitive.volition import Urge
+    from genesis_conscious.frontal_lobe.volition import Urge
+    from genesis_conscious.infrastructure.config import MindConfig
 
     cfg = next(u for u in MindConfig().volition.urges if u.name == "safeguard")
     urge = Urge(
@@ -1198,7 +1198,7 @@ def test_gw_integration_no_topics_neutral() -> None:
 
 def test_damasio_annotate_self_model_unified() -> None:
     """High integration adds field-unified tag."""
-    from genesis_cognitive.self.damasio import DamasioSelfHierarchy
+    from genesis_conscious.self.damasio import DamasioSelfHierarchy
 
     damasio = DamasioSelfHierarchy()
     damasio.annotate_self_model("self-coherent", False, integration=0.8)
@@ -1208,7 +1208,7 @@ def test_damasio_annotate_self_model_unified() -> None:
 
 def test_damasio_annotate_self_model_fragmented() -> None:
     """Low integration adds field-fragmented tag."""
-    from genesis_cognitive.self.damasio import DamasioSelfHierarchy
+    from genesis_conscious.self.damasio import DamasioSelfHierarchy
 
     damasio = DamasioSelfHierarchy()
     damasio.annotate_self_model("self-surprised", True, integration=0.1)
@@ -1217,7 +1217,7 @@ def test_damasio_annotate_self_model_fragmented() -> None:
 
 def test_damasio_annotate_self_model_neutral() -> None:
     """Mid-range integration adds no field tag."""
-    from genesis_cognitive.self.damasio import DamasioSelfHierarchy
+    from genesis_conscious.self.damasio import DamasioSelfHierarchy
 
     damasio = DamasioSelfHierarchy()
     damasio.annotate_self_model("self-coherent", False, integration=0.4)
@@ -1233,7 +1233,7 @@ def test_damasio_annotate_self_model_neutral() -> None:
 
 def test_cognitive_state_has_coherence_field() -> None:
     """CognitiveState has a self_model_coherence field."""
-    from genesis_cognitive.cognition.engine import CognitiveState
+    from genesis_conscious.cognition.engine import CognitiveState
 
     state = CognitiveState.__dataclass_fields__
     assert "self_model_coherence" in state
@@ -1241,7 +1241,7 @@ def test_cognitive_state_has_coherence_field() -> None:
 
 def test_cognitive_state_describe_includes_coherence() -> None:
     """describe() includes coherence when set."""
-    from genesis_cognitive.cognition.engine import CognitiveState
+    from genesis_conscious.cognition.engine import CognitiveState
 
     # Verify the field exists and defaults to None
     fields = CognitiveState.__dataclass_fields__
@@ -2752,7 +2752,7 @@ class TestPersistence:
     def test_old_format_backward_compat(self) -> None:
         """Old save files with 'response' (string) instead of 'strategy'
         (dict) should load with a default strategy, not crash."""
-        from genesis_cognitive.persistence import restore_procedural_memory
+        from genesis_conscious.infrastructure.persistence import restore_procedural_memory
 
         old_data = {
             "skills": [
@@ -2783,7 +2783,7 @@ class TestPersistence:
 
     def test_new_format_round_trip(self) -> None:
         """New format with strategy dict should serialize and restore."""
-        from genesis_cognitive.persistence import (
+        from genesis_conscious.infrastructure.persistence import (
             _serialize_procedural_memory,
             restore_procedural_memory,
         )

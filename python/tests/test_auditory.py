@@ -6,8 +6,8 @@ import math
 
 import numpy as np
 
-from genesis_cognitive.auditory import AuditoryCortex, SoundEvent
-from genesis_cognitive.auditory.auditory import (
+from genesis_conscious.temporal_lobe import AuditoryCortex, SoundEvent
+from genesis_conscious.temporal_lobe.auditory import (
     _classify_sound,
     _compute_features,
     _describe_sound,

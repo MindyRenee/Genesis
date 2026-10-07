@@ -18,8 +18,8 @@ from unittest.mock import patch
 
 import pytest
 
-from genesis_cognitive.concepts import ConceptNetwork, RelationType
-from genesis_cognitive.self import (
+from genesis_conscious.concepts import ConceptNetwork, RelationType
+from genesis_conscious.self import (
     ExperimentRecord,
     FeedbackRecord,
     HeuristicExperiment,
@@ -30,7 +30,7 @@ from genesis_cognitive.self import (
     SelfDirectedLearner,
     SelfImprovementEngine,
 )
-from genesis_cognitive.self.learning import (
+from genesis_conscious.self.learning import (
     _CAUSES_RE,
     _DEFINITION_RE,
     _DEPENDS_RE,
@@ -42,7 +42,7 @@ from genesis_cognitive.self.learning import (
     _SIMILAR_RE,
     _normalize_concept,
 )
-from genesis_cognitive.tools.framework import ToolResult
+from genesis_conscious.tools.framework import ToolResult
 
 logger = logging.getLogger(__name__)
 
@@ -179,7 +179,7 @@ def bar(y):
         engine._last_generation_time = 0.0
 
         # We need to point the engine at the right directory
-        # The engine scans python/genesis_cognitive by default,
+        # The engine scans python/genesis_conscious by default,
         # so let's test with a custom path
         proposals = engine.generate_proposals(max_proposals=5)
         # May find proposals from the project's actual code
@@ -832,13 +832,13 @@ class TestFeedbackRecord:
 
 
 def _make_importable_pkg(tmpdir: str) -> str:
-    """Create a temp ``python/genesis_cognitive/`` package skeleton.
+    """Create a temp ``python/genesis_conscious/`` package skeleton.
 
     Returns the tmpdir (to be used as project_root). The package
     __init__ is empty so importing submodules does not pull in the
     real cognitive-mind dependency graph.
     """
-    pkg = os.path.join(tmpdir, "python", "genesis_cognitive")
+    pkg = os.path.join(tmpdir, "python", "genesis_conscious")
     os.makedirs(pkg)
     with open(os.path.join(pkg, "__init__.py"), "w"):
         pass
@@ -858,7 +858,7 @@ class TestAutonomousAllowlist:
     def test_cognitive_submodule_allowed(self):
         """Test cognitive submodule allowed."""
         assert SelfImprovementEngine._is_autonomous_allowed(
-            "python/genesis_cognitive/perception.py"
+            "python/genesis_conscious/perception.py"
         )
 
     def test_client_submodule_allowed(self):
@@ -917,63 +917,63 @@ class TestProtectedCore:
     def test_cognition_engine_protected(self):
         """Cognition engine is protected from autonomous fixes."""
         assert not SelfImprovementEngine._is_autonomous_allowed(
-            "python/genesis_cognitive/cognition/engine.py"
+            "python/genesis_conscious/cognition/engine.py"
         )
 
     def test_language_generator_protected(self):
         """Language generator is protected from autonomous fixes."""
         assert not SelfImprovementEngine._is_autonomous_allowed(
-            "python/genesis_cognitive/language/generator.py"
+            "python/genesis_conscious/language/generator.py"
         )
 
     def test_language_graph_walk_protected(self):
         """Language graph_walk is protected from autonomous fixes."""
         assert not SelfImprovementEngine._is_autonomous_allowed(
-            "python/genesis_cognitive/language/graph_walk.py"
+            "python/genesis_conscious/language/graph_walk.py"
         )
 
     def test_language_vocabulary_protected(self):
         """Language vocabulary is protected from autonomous fixes."""
         assert not SelfImprovementEngine._is_autonomous_allowed(
-            "python/genesis_cognitive/language/vocabulary.py"
+            "python/genesis_conscious/language/vocabulary.py"
         )
 
     def test_mind_protected(self):
         """Mind is protected from autonomous fixes."""
         assert not SelfImprovementEngine._is_autonomous_allowed(
-            "python/genesis_cognitive/mind.py"
+            "python/genesis_conscious/mind.py"
         )
 
     def test_cognition_engine_still_own_source(self):
         """Protected core files are still own-source (can have proposals)."""
         assert SelfImprovementEngine._is_own_source(
-            "python/genesis_cognitive/cognition/engine.py"
+            "python/genesis_conscious/cognition/engine.py"
         )
 
     def test_language_still_own_source(self):
         """Language files are still own-source (can have proposals)."""
         assert SelfImprovementEngine._is_own_source(
-            "python/genesis_cognitive/language/generator.py"
+            "python/genesis_conscious/language/generator.py"
         )
 
     def test_non_core_cognitive_still_allowed(self):
         """Non-core cognitive files are still autonomously fixable."""
         assert SelfImprovementEngine._is_autonomous_allowed(
-            "python/genesis_cognitive/perception.py"
+            "python/genesis_conscious/perception.py"
         )
 
     def test_protected_core_experiment_blocked(self):
         """Experiments cannot touch protected core files."""
-        from genesis_cognitive.self.improvement import HeuristicExperiment
+        from genesis_conscious.self.improvement import HeuristicExperiment
         assert not HeuristicExperiment._is_allowlisted(
-            "python/genesis_cognitive/cognition/engine.py"
+            "python/genesis_conscious/cognition/engine.py"
         )
 
     def test_protected_core_still_experimentable(self):
         """Protected core files are still experimentable (proposals OK)."""
-        from genesis_cognitive.self.improvement import HeuristicExperiment
+        from genesis_conscious.self.improvement import HeuristicExperiment
         assert HeuristicExperiment._is_experimentable(
-            "python/genesis_cognitive/cognition/engine.py"
+            "python/genesis_conscious/cognition/engine.py"
         )
 
 
@@ -984,9 +984,9 @@ class TestModuleNameFor:
         """Test cognitive submodule."""
         assert (
             SelfImprovementEngine._module_name_for(
-                "python/genesis_cognitive/perception.py"
+                "python/genesis_conscious/perception.py"
             )
-            == "genesis_cognitive.perception"
+            == "genesis_conscious.perception"
         )
 
     def test_client_submodule(self):
@@ -1027,7 +1027,7 @@ class TestModuleNameFor:
         """Test pycache returns none."""
         assert (
             SelfImprovementEngine._module_name_for(
-                "python/genesis_cognitive/__pycache__/foo.cpython-312.pyc"
+                "python/genesis_conscious/__pycache__/foo.cpython-312.pyc"
             )
             is None
         )
@@ -1048,7 +1048,7 @@ class TestImportGate:
     These prove that a source change which passes py_compile but
     raises at import time (e.g. a broken module-level re.compile) is
     rejected and reverted — the exact defect that broke
-    genesis_cognitive.perception and left it in the repository.
+    genesis_conscious.perception and left it in the repository.
     """
 
     def test_broken_import_is_reverted(self):
@@ -1056,7 +1056,7 @@ class TestImportGate:
         tmpdir = tempfile.mkdtemp()
         _make_importable_pkg(tmpdir)
         mod_path = os.path.join(
-            tmpdir, "python", "genesis_cognitive", "broken_mod.py"
+            tmpdir, "python", "genesis_conscious", "broken_mod.py"
         )
         original = '"""Valid module."""\nx = 1\n'
         # Valid Python syntax (py_compile passes) but re.compile
@@ -1070,7 +1070,7 @@ class TestImportGate:
             file_path=Path(mod_path),
             original_source=original,
             fixed_source=broken,
-            rel_path="python/genesis_cognitive/broken_mod.py",
+            rel_path="python/genesis_conscious/broken_mod.py",
         )
 
         assert result is False, "broken-import change must be rejected"
@@ -1082,7 +1082,7 @@ class TestImportGate:
         tmpdir = tempfile.mkdtemp()
         _make_importable_pkg(tmpdir)
         mod_path = os.path.join(
-            tmpdir, "python", "genesis_cognitive", "good_mod.py"
+            tmpdir, "python", "genesis_conscious", "good_mod.py"
         )
         original = '"""Old."""\nx = 1\n'
         fixed = '"""New."""\nx = 2\n'
@@ -1095,14 +1095,14 @@ class TestImportGate:
             lambda name, **kw: ToolResult(success=True, output="mocked")
         )})()
         with patch(
-            "genesis_cognitive.self.improvement.get_tools",
+            "genesis_conscious.self.improvement.get_tools",
             return_value=mock_tools,
         ):
             result = engine._validate_and_write_fix(
                 file_path=Path(mod_path),
                 original_source=original,
                 fixed_source=fixed,
-                rel_path="python/genesis_cognitive/good_mod.py",
+                rel_path="python/genesis_conscious/good_mod.py",
             )
 
         assert result is True, "valid change must be accepted"
@@ -1114,7 +1114,7 @@ class TestImportGate:
         tmpdir = tempfile.mkdtemp()
         _make_importable_pkg(tmpdir)
         mod_path = os.path.join(
-            tmpdir, "python", "genesis_cognitive", "good_mod.py"
+            tmpdir, "python", "genesis_conscious", "good_mod.py"
         )
         original = '"""Old."""\nx = 1\n'
         fixed = '"""New."""\nx = 2\n'
@@ -1126,14 +1126,14 @@ class TestImportGate:
             lambda name, **kw: ToolResult(success=False, error="tests failed")
         )})()
         with patch(
-            "genesis_cognitive.self.improvement.get_tools",
+            "genesis_conscious.self.improvement.get_tools",
             return_value=mock_tools,
         ):
             result = engine._validate_and_write_fix(
                 file_path=Path(mod_path),
                 original_source=original,
                 fixed_source=fixed,
-                rel_path="python/genesis_cognitive/good_mod.py",
+                rel_path="python/genesis_conscious/good_mod.py",
             )
 
         assert result is False, "test failure must reject the change"
@@ -1632,7 +1632,7 @@ def test_would_create_cycle_non_hierarchical() -> None:
 def temp_project(tmp_path: Path) -> Path:
     """Create a temporary project with an allowlisted file and verify script."""
     # Create the allowlisted file
-    src_dir = tmp_path / "python" / "genesis_cognitive" / "learning"
+    src_dir = tmp_path / "python" / "genesis_conscious" / "learning"
     src_dir.mkdir(parents=True)
     heuristic_file = src_dir / "autonomous.py"
     heuristic_file.write_text(
@@ -1706,7 +1706,7 @@ class TestHeuristicExperimentGuardrails:
         """Files not on the allowlist should be skipped.
 
         The allowlist now covers all experimentable files (Genesis's own
-        Python source under genesis_cognitive/ or genesis_client/).
+        Python source under genesis_conscious/ or genesis_client/).
         Non-experimentable files — tests, config, Rust, scripts — are
         still rejected. We verify with a test file.
         """
@@ -1744,7 +1744,7 @@ class TestHeuristicExperimentGuardrails:
             )
 
         record = experiment.run_experiment(
-            file_path="python/genesis_cognitive/learning/autonomous.py",
+            file_path="python/genesis_conscious/learning/autonomous.py",
             original_code='_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")',
             proposed_code='_CONCEPT_RE = re.compile(r"\\b([a-z_]+)\\b")',
             description="allow underscores in concepts",
@@ -1756,7 +1756,7 @@ class TestHeuristicExperimentGuardrails:
     def test_original_code_not_found_is_reverted(self, experiment):
         """If the original code snippet doesn't exist, should revert."""
         record = experiment.run_experiment(
-            file_path="python/genesis_cognitive/learning/autonomous.py",
+            file_path="python/genesis_conscious/learning/autonomous.py",
             original_code="THIS_DOES_NOT_EXIST",
             proposed_code="replacement",
             description="test",
@@ -1771,12 +1771,12 @@ class TestHeuristicExperimentExecution:
 
     def test_successful_experiment_applies_change(self, experiment, temp_project):
         """A valid change that passes verification should be applied."""
-        file_path = temp_project / "python" / "genesis_cognitive" / "learning" / "autonomous.py"
+        file_path = temp_project / "python" / "genesis_conscious" / "learning" / "autonomous.py"
         original = '_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")'
         proposed = '_CONCEPT_RE = re.compile(r"\\b([a-z_]+)\\b")'
 
         record = experiment.run_experiment(
-            file_path="python/genesis_cognitive/learning/autonomous.py",
+            file_path="python/genesis_conscious/learning/autonomous.py",
             original_code=original,
             proposed_code=proposed,
             description="allow underscores in concepts",
@@ -1791,13 +1791,13 @@ class TestHeuristicExperimentExecution:
 
     def test_py_compile_failure_reverts(self, experiment, temp_project):
         """A change that breaks py_compile should be reverted."""
-        file_path = temp_project / "python" / "genesis_cognitive" / "learning" / "autonomous.py"
+        file_path = temp_project / "python" / "genesis_conscious" / "learning" / "autonomous.py"
         original = '_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")'
         # Intentionally broken Python
         proposed = '_CONCEPT_RE = re.compile(r"\\b([a-z'  # unclosed
 
         record = experiment.run_experiment(
-            file_path="python/genesis_cognitive/learning/autonomous.py",
+            file_path="python/genesis_conscious/learning/autonomous.py",
             original_code=original,
             proposed_code=proposed,
             description="broken change",
@@ -1820,12 +1820,12 @@ class TestHeuristicExperimentExecution:
         verify_script.chmod(0o755)
 
         experiment = HeuristicExperiment(engine, project_root=str(temp_project))
-        file_path = temp_project / "python" / "genesis_cognitive" / "learning" / "autonomous.py"
+        file_path = temp_project / "python" / "genesis_conscious" / "learning" / "autonomous.py"
         original = '_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")'
         proposed = '_CONCEPT_RE = re.compile(r"\\b([a-z_]+)\\b")'
 
         record = experiment.run_experiment(
-            file_path="python/genesis_cognitive/learning/autonomous.py",
+            file_path="python/genesis_conscious/learning/autonomous.py",
             original_code=original,
             proposed_code=proposed,
             description="test with failing verify",
@@ -1840,7 +1840,7 @@ class TestHeuristicExperimentExecution:
     def test_no_change_produces_revert(self, experiment):
         """If the replacement is identical to original, should revert."""
         record = experiment.run_experiment(
-            file_path="python/genesis_cognitive/learning/autonomous.py",
+            file_path="python/genesis_conscious/learning/autonomous.py",
             original_code='_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")',
             proposed_code='_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")',
             description="no-op change",
@@ -1856,7 +1856,7 @@ class TestHeuristicExperimentAuditLog:
     def test_applied_experiments_are_logged(self, experiment):
         """Successfully applied experiments should be in the audit log."""
         experiment.run_experiment(
-            file_path="python/genesis_cognitive/learning/autonomous.py",
+            file_path="python/genesis_conscious/learning/autonomous.py",
             original_code='_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")',
             proposed_code='_CONCEPT_RE = re.compile(r"\\b([a-z_]+)\\b")',
             description="allow underscores",
@@ -1877,7 +1877,7 @@ class TestHeuristicExperimentAuditLog:
 
         # This will pass py_compile but fail verify → reverted + logged
         experiment.run_experiment(
-            file_path="python/genesis_cognitive/learning/autonomous.py",
+            file_path="python/genesis_conscious/learning/autonomous.py",
             original_code='_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")',
             proposed_code='_CONCEPT_RE = re.compile(r"\\b([a-z_]+)\\b")',
             description="test revert",
@@ -2353,7 +2353,7 @@ def test_is_meaningful_rejects_internal_namespaces():
     for word in (
         "_cat:cause:guarded_cortisol",
         "_utt:hello",
-        "python:genesis_cognitive.concepts",
+        "python:genesis_conscious.concepts",
         "rust:daemon::tick",
         "skill:sorter",
         "goal:explore",

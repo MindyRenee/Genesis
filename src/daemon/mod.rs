@@ -51,8 +51,8 @@ pub mod association;
 pub mod consolidation;
 pub mod cpufreq;
 pub mod dyadic_model;
-pub mod interoception;
 pub mod hpa_development;
+pub mod interoception;
 pub mod ipc;
 /// RTC wake alarm — scheduling its own return from suspension.
 pub mod rtc_wake;
@@ -63,7 +63,8 @@ pub use association::{ASSOCIATION_THRESHOLD, AssociationEngine, AssociationResul
 pub use consolidation::{ConsolidationEngine, ConsolidationResult};
 pub use cpufreq::{
     BodyControlState, BoostState, CPUFREQ_INTERVAL_TICKS, FreqPolicy, apply_policy,
-    capture_hardware_state, derive_boost, derive_policy, freq_range, restore_hardware_state,
+    capture_hardware_state, derive_boost, derive_policy, freq_range, policy_was_applied,
+    report_body_control_outcome, restore_hardware_state,
 };
 pub use dyadic_model::{DyadicAffectModel, DyadicResult, UserAffectObservation};
 pub use interoception::{BodyState, INTEROCEPTION_INTERVAL_TICKS, Interoceptor};

@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 import genesis_cli
-from genesis_cognitive.mind.lifecycle import LifecycleMixin
+from genesis_conscious.mind.lifecycle import LifecycleMixin
 
 
 def test_shutdown_waits_for_slow_daemon_within_grace_window(tmp_path):
@@ -152,7 +152,11 @@ def _run_shell_helpers(code, data_dir):
     helpers = source.split("# ─── Parse arguments", 1)[0]
     return subprocess.run(
         ["bash", "-c", helpers + "\n" + code],
-        env={**os.environ, "XDG_DATA_HOME": str(data_dir)},
+        # GENESIS_DATA_DIR, not XDG_DATA_HOME: run.sh's per-checkout
+        # .genesis-data-dir pin outranks XDG_DATA_HOME, so setting the
+        # latter would leave DATA_DIR pointing at the developer's real
+        # state directory and these tests would read its pid files.
+        env={**os.environ, "GENESIS_DATA_DIR": str(Path(data_dir) / "genesis")},
         capture_output=True, text=True, timeout=5,
     )
 
@@ -232,7 +236,7 @@ _stop_all
 
 @pytest.mark.parametrize("raw", [b"{", b'{"version":2,"reflection":null}'])
 def test_failed_mind_start_preserves_saved_state(tmp_path, raw):
-    from genesis_cognitive.mind import Mind
+    from genesis_conscious.mind import Mind
 
     path = tmp_path / "cognitive_state.json"
     path.write_bytes(raw)
@@ -254,8 +258,11 @@ def test_daemon_start_timeout_reaps_child(tmp_path):
         patch.object(genesis_cli.subprocess, "Popen", return_value=proc),
         patch.object(genesis_cli, "DAEMON_START_TIMEOUT", 0),
     ):
-        with pytest.raises(RuntimeError, match="didn't start"):
+        with pytest.raises(RuntimeError, match="didn't become ready") as exc:
             genesis_cli._start_daemon("/unused/daemon", str(tmp_path), str(tmp_path / "sock"))
+    # The failure must point at the log: a bare "didn't start" hides
+    # the actual initialization error, which is diagnosable only there.
+    assert "daemon.log" in str(exc.value)
     proc.terminate.assert_called_once()
     proc.wait.assert_called_once()
     proc.kill.assert_not_called()
@@ -332,7 +339,7 @@ def test_startup_failure_still_shuts_down(tmp_path, failing_step):
 
 
 def test_shutdown_reports_failed_final_save(tmp_path):
-    from genesis_cognitive.mind import Mind
+    from genesis_conscious.mind import Mind
 
     mind = Mind(str(tmp_path / "genesis.sock"), offline=True)
     mind._running = True
@@ -344,7 +351,7 @@ def test_shutdown_reports_failed_final_save(tmp_path):
 
 
 def test_shutdown_waits_for_autosave_before_saving(tmp_path):
-    from genesis_cognitive.mind import Mind
+    from genesis_conscious.mind import Mind
 
     mind = Mind(str(tmp_path / "genesis.sock"), offline=True)
     mind._running = True

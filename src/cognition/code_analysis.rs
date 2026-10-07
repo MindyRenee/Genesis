@@ -1111,7 +1111,11 @@ impl<'ast> Visit<'ast> for UnitVisitor {
             is_async: false,
             is_unsafe: node.unsafety.is_some(),
             has_body: node.content.is_some(),
-            statement_count: node.content.as_ref().map(|(_, items)| items.len()).unwrap_or(0),
+            statement_count: node
+                .content
+                .as_ref()
+                .map(|(_, items)| items.len())
+                .unwrap_or(0),
             branch_count: 0,
             loop_count: 0,
             doc_comments: self.extract_doc_comments(&node.attrs),

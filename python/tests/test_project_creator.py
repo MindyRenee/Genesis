@@ -3,8 +3,8 @@
 import tempfile
 from pathlib import Path
 
-from genesis_cognitive.concepts import ConceptNetwork
-from genesis_cognitive.tools.framework import (
+from genesis_conscious.concepts import ConceptNetwork
+from genesis_conscious.tools.framework import (
     ToolRegistry,
     delete_file,
     list_dir,
@@ -13,12 +13,12 @@ from genesis_cognitive.tools.framework import (
     run_shell,
     write_file,
 )
-from genesis_cognitive.tools.project_composer import (
+from genesis_conscious.tools.project_composer import (
     compose_main_module,
     compose_test_module,
     gather_knowledge,
 )
-from genesis_cognitive.tools.project_creator import (
+from genesis_conscious.tools.project_creator import (
     MAX_PROJECT_SIZE_BYTES,
     _sanitize_name,
     archive_project,
@@ -157,7 +157,7 @@ def test_sanitize_name_defaults_to_project() -> None:
 
 def _seeded_network() -> ConceptNetwork:
     """Build a small concept network with real typed edges for tests."""
-    from genesis_cognitive.concepts import RelationType
+    from genesis_conscious.concepts import RelationType
     net = ConceptNetwork()
     net.add_concept(
         "memory", confidence=0.9,
@@ -246,7 +246,7 @@ def test_compose_test_module_compiles() -> None:
 
 def test_compose_main_module_adaptive_structure() -> None:
     """Different domains produce different relation functions."""
-    from genesis_cognitive.concepts import RelationType
+    from genesis_conscious.concepts import RelationType
     net = ConceptNetwork()
     net.add_concept("fire", confidence=0.8, properties={"definition": "combustion"})
     net.add_concept("smoke", confidence=0.7, properties={"definition": "visible particles"})
@@ -320,7 +320,7 @@ def test_create_project_refuses_internal_symbol_topics() -> None:
         for topic in (
             "_cat:cause:guarded_cortisol",
             "_utt:hello",
-            "python:genesis_cognitive.concepts",
+            "python:genesis_conscious.concepts",
             "skill:sorter",
             "goal:explore",
             "domain:grid",

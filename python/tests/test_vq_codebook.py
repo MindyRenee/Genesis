@@ -5,7 +5,7 @@ import os
 import numpy as np
 import pytest
 
-from genesis_cognitive.vq_codebook import VQCodebook
+from genesis_conscious.infrastructure.vq_codebook import VQCodebook
 
 
 @pytest.fixture
@@ -96,6 +96,88 @@ class TestVQCodebook:
         # All pairs should have distance < threshold
         for _a, _b, dist in candidates:
             assert dist < 0.1
+
+    def test_count_merge_candidates_matches_the_full_list(self, sample_vectors):
+        """The cheap count must agree with the expensive list.
+
+        `count_merge_candidates` exists because the full list was being
+        materialized only to be counted — 7.7M tuples in production, and
+        142 s of a 175 s sleep pass. If the two ever disagree, the stat
+        becomes fiction, so they are pinned together.
+        """
+        vectors, names = sample_vectors
+        cb = VQCodebook(dim=8, k=3, residual_scale=0.01)
+        cb.fit(vectors, names, iters=20)
+
+        for threshold in (0.1, 0.5, 5.0):
+            # limit=None is the deliberate unbounded path; the default is
+            # capped, so comparing needs the explicit opt-in.
+            assert cb.count_merge_candidates(threshold) == len(
+                cb.find_merge_candidates(threshold=threshold, limit=None),
+            ), f"count disagrees at threshold={threshold}"
+
+    def test_limited_candidates_are_the_closest_ones(self, sample_vectors):
+        """A limit must truncate, not sample.
+
+        The per-group cap uses argpartition before the global sort, so
+        this checks the two agree — that the cheapest pairs per group are
+        the ones that survive, and the global order still holds.
+        """
+        vectors, names = sample_vectors
+        cb = VQCodebook(dim=8, k=3, residual_scale=0.01)
+        cb.fit(vectors, names, iters=20)
+
+        every = cb.find_merge_candidates(threshold=5.0, limit=None)
+        assert len(every) > 4, "need enough candidates to make the limit bite"
+        limited = cb.find_merge_candidates(threshold=5.0, limit=4)
+
+        assert len(limited) == 4
+        assert limited == sorted(every, key=lambda c: c[2])[:4], (
+            "limit must return the closest pairs in order"
+        )
+        assert all(limited[i][2] <= limited[i + 1][2] for i in range(len(limited) - 1))
+
+    def test_count_does_not_materialize_candidates(self, sample_vectors):
+        """The whole point: counting must not build the list.
+
+        Guards against someone "simplifying" the caller back to
+        `len(find_merge_candidates(...))`, which is what cost 142 s.
+        """
+        vectors, names = sample_vectors
+        cb = VQCodebook(dim=8, k=3, residual_scale=0.01)
+        cb.fit(vectors, names, iters=20)
+
+        calls: list[int] = []
+        real = cb.find_merge_candidates
+
+        def spy(threshold, limit=None):
+            calls.append(1)
+            return real(threshold, limit=limit)
+
+        cb.find_merge_candidates = spy  # type: ignore[method-assign]
+        assert cb.count_merge_candidates(0.5) >= 0
+        assert calls == [], "count_merge_candidates must not call the list builder"
+
+    def test_default_limit_is_bounded(self, sample_vectors):
+        """The cheap path must be the default one.
+
+        The unbounded call returned 7.7M tuples in production and cost
+        142 s of a sleep pass, for a caller that only wanted a count. A
+        cap that has to be opted *into* gets left off.
+        """
+        vectors, names = sample_vectors
+        cb = VQCodebook(dim=8, k=3, residual_scale=0.01)
+        cb.fit(vectors, names, iters=20)
+
+        everything = cb.find_merge_candidates(threshold=5.0, limit=None)
+        assert len(everything) > 32, "need enough candidates for the cap to bite"
+        assert len(cb.find_merge_candidates(threshold=5.0)) == 32
+
+    def test_untrained_codebook_reports_zero(self):
+        """Both entry points must be safe before training."""
+        cb = VQCodebook(dim=8, k=3)
+        assert cb.count_merge_candidates(0.1) == 0
+        assert cb.find_merge_candidates(threshold=0.1) == []
 
     def test_save_load_roundtrip(self, sample_vectors, tmp_path):
         """Save and load should preserve the codebook."""

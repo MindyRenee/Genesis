@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from genesis_cognitive.concepts import (
+from genesis_conscious.concepts import (
     ConceptNetwork,
     EmbeddingStore,
     RelationType,
@@ -152,7 +152,7 @@ class TestEdgeProposer:
         self, store: EmbeddingStore, small_network: ConceptNetwork
     ) -> None:
         """Test propose finds candidates."""
-        from genesis_cognitive.concepts import EdgeProposer
+        from genesis_conscious.concepts import EdgeProposer
 
         proposer = EdgeProposer(small_network, store, threshold=0.1, max_per_session=10)
         proposals = proposer.propose_edges()
@@ -163,7 +163,7 @@ class TestEdgeProposer:
         self, store: EmbeddingStore, small_network: ConceptNetwork
     ) -> None:
         """Test accept writes edges."""
-        from genesis_cognitive.concepts import EdgeProposer
+        from genesis_conscious.concepts import EdgeProposer
 
         proposer = EdgeProposer(small_network, store, threshold=0.1, max_per_session=10)
         proposals = proposer.propose_edges()
@@ -179,7 +179,7 @@ class TestEdgeProposer:
         self, store: EmbeddingStore, small_network: ConceptNetwork
     ) -> None:
         """Test does not propose existing edges."""
-        from genesis_cognitive.concepts import EdgeProposer
+        from genesis_conscious.concepts import EdgeProposer
 
         proposer = EdgeProposer(small_network, store, threshold=0.0, max_per_session=50)
         proposals = proposer.propose_edges()
@@ -525,7 +525,7 @@ class TestColdLayer:
         self, small_network: ConceptNetwork, tmp_path: Path
     ) -> None:
         """Archived concepts are embedded in the cold layer."""
-        from genesis_cognitive.concepts.archive import open_archive
+        from genesis_conscious.concepts.archive import open_archive
 
         archive = open_archive(tmp_path / "archive")
         archive.archive_concept(
@@ -552,7 +552,7 @@ class TestColdLayer:
     ) -> None:
         """Text search falls back to the cold layer when the hot
         matrix can't fill k results."""
-        from genesis_cognitive.concepts.archive import open_archive
+        from genesis_conscious.concepts.archive import open_archive
 
         archive = open_archive(tmp_path / "archive")
         archive.archive_concept(
@@ -583,7 +583,7 @@ class TestColdLayer:
     ) -> None:
         """A concept recalled to working memory after the cold build
         is filtered out of cold results (its hot row wins)."""
-        from genesis_cognitive.concepts.archive import open_archive
+        from genesis_conscious.concepts.archive import open_archive
 
         archive = open_archive(tmp_path / "archive")
         archive.archive_concept(
@@ -617,7 +617,7 @@ class TestColdLayer:
     ) -> None:
         """get_concept_vector returns a cold vector for archived
         concepts, expanded to full width."""
-        from genesis_cognitive.concepts.archive import open_archive
+        from genesis_conscious.concepts.archive import open_archive
 
         archive = open_archive(tmp_path / "archive")
         archive.archive_concept(
@@ -637,3 +637,47 @@ class TestColdLayer:
         toroidal_end = store._spectral_dim + store._experiential_dim
         assert np.allclose(vec[:toroidal_end], 0.0)
         archive.close()
+
+    def test_get_concept_vector_for_computed_is_full_width(
+        self, small_network: ConceptNetwork, tmp_path: Path
+    ) -> None:
+        """A vector computed on the fly is expanded to full width.
+
+        `_compute_concept_vector` returns the flat block only (TF-IDF +
+        GloVe), so it is narrower than a hot matrix row. Callers that mix
+        the two widths break: np.mean() over a ragged batch raises, and
+        np.dot() in `_cosine` cannot align them.
+        """
+        store = EmbeddingStore(small_network, data_dir=str(tmp_path))
+        store._ensure_loaded()
+
+        hot = store.get_concept_vector("tree")
+        assert hot is not None
+        assert hot.shape[0] == store.dimensionality
+
+        # Force the on-the-fly path for the same concept by hiding it
+        # from the hot index and the ad-hoc cache.
+        store._concept_to_idx.pop("tree", None)
+        store._concept_cache.pop("tree", None)
+        computed = store.get_concept_vector("tree")
+
+        assert computed is not None
+        # Both paths agree on width, so a caller may batch them.
+        assert computed.shape[0] == hot.shape[0] == store.dimensionality
+        assert (
+            np.mean([hot, computed], axis=0).shape[0] == store.dimensionality
+        )
+
+    def test_every_vector_width_agrees(
+        self, small_network: ConceptNetwork, tmp_path: Path
+    ) -> None:
+        """Hot, cold and computed vectors are all the same width."""
+        store = EmbeddingStore(small_network, data_dir=str(tmp_path))
+        store._ensure_loaded()
+
+        widths = set()
+        for name in ("tree", "plant", "water"):
+            vec = store.get_concept_vector(name)
+            if vec is not None:
+                widths.add(vec.shape[0])
+        assert widths in (set(), {store.dimensionality})

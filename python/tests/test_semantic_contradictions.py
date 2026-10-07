@@ -1,4 +1,4 @@
-from genesis_cognitive.memory.semantic import SemanticMemory
+from genesis_conscious.memory.semantic import SemanticMemory
 
 
 def test_explicit_contradiction_is_stored_as_semantic_fact() -> None:

@@ -18,12 +18,25 @@ set -m
 
 cd "$(dirname "$0")" || exit 1
 
+# An exported-but-blank GENESIS_DATA_DIR is treated as unset. Otherwise
+# it is a non-empty string, every `[ -z "$GENESIS_DATA_DIR" ]` guard below
+# reads as "explicitly configured", and the data dir resolves to a
+# garbage path built from the current directory (e.g. "<cwd>/genesis").
+# Other resolvers normalize this the same way; see the order in
+# src/data_dir.rs and python/tests/test_data_dir_conformance.py.
+if [ -n "${GENESIS_DATA_DIR:-}" ] && [ -z "${GENESIS_DATA_DIR//[[:space:]]/}" ]; then
+    unset GENESIS_DATA_DIR
+fi
+
 # Per-checkout data-dir override: an uncommitted .genesis-data-dir file
 # pins this checkout to its own state directory, so independent
 # checkouts stay fully disconnected without exporting GENESIS_DATA_DIR.
-# It is a default, not an override — explicit env config
-# (GENESIS_DATA_DIR or XDG_DATA_HOME) always wins.
-if [ -z "${GENESIS_DATA_DIR:-}" ] && [ -z "${XDG_DATA_HOME:-}" ] && [ -f .genesis-data-dir ]; then
+# The pin outranks XDG_DATA_HOME, which is ambient environment rather
+# than Genesis config: a launcher (Flatpak/sandboxed agent host) can
+# point XDG_DATA_HOME somewhere else entirely, and honoring that would
+# silently fork this checkout into a second, divergent state directory.
+# Only an explicit GENESIS_DATA_DIR still overrides the pin.
+if [ -z "${GENESIS_DATA_DIR:-}" ] && [ -f .genesis-data-dir ]; then
     GENESIS_DATA_DIR=$(head -n1 .genesis-data-dir)
     export GENESIS_DATA_DIR
 fi
@@ -226,8 +239,12 @@ if [ -f "$MARKER" ]; then
         echo "    $marker_content"
         echo "  This instance's state belongs to that tree. Two checkouts"
         echo "  sharing one data dir corrupt each other's developmental"
-        echo "  record. Use XDG_DATA_HOME or remove the state if you really"
-        echo "  intend to continue from here."
+        echo "  record."
+        echo "  To point this checkout elsewhere, set GENESIS_DATA_DIR or"
+        echo "  edit .genesis-data-dir — note that XDG_DATA_HOME ranks"
+        echo "  *below* the pin, so setting it will not redirect a pinned"
+        echo "  checkout. Otherwise remove the state if you really intend to"
+        echo "  continue from here."
     fi
 else
     echo "$PWD" > "$MARKER"

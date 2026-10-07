@@ -24,7 +24,7 @@ from prune_dead_concepts import (
     prune_state,
 )
 
-from genesis_cognitive.concepts import (
+from genesis_conscious.concepts import (
     QUALITY_THRESHOLD,
     Concept,
     ConceptCategory,
@@ -37,8 +37,9 @@ from genesis_cognitive.concepts import (
     is_world_concept,
     open_archive,
 )
-from genesis_cognitive.memory import SemanticMemory
-from genesis_cognitive.memory.semantic import _relation_to_edge
+from genesis_conscious.concepts.edge_log import open_edge_log
+from genesis_conscious.memory import SemanticMemory
+from genesis_conscious.memory.semantic import _relation_to_edge
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ def _c(net: ConceptNetwork, name: str) -> Concept:
 
 def test_network_quality_properties() -> None:
     """Mean edge weight, concept confidence, and density are exposed."""
-    from genesis_cognitive.concepts import (
+    from genesis_conscious.concepts import (
         ConceptNetwork,
         RelationType,
     )
@@ -1103,7 +1104,7 @@ def test_cortical_tick_stability() -> None:
 def test_utterance_words_provenance() -> None:
     """Utterance word retrieval exposes seed vs learned provenance."""
     net = ConceptNetwork()
-    from genesis_cognitive.language import Vocabulary
+    from genesis_conscious.language import Vocabulary
     Vocabulary(seed=42, network=net)  # seeds utterance words into net
 
     items = net.find_utterance_words_with_provenance("greeting_word")
@@ -1606,6 +1607,134 @@ def test_spill_dormant_concepts() -> None:
         net._archive.close()
 
 
+def test_spill_dormant_with_edge_log_retracts_edges() -> None:
+    """Spilling with an edge log attached retracts the log entries.
+
+    Regression: `_archive_spilled_edges` passed the *serialized* relation
+    string to `EdgeLog.retract_edge`, which expects a `RelationType` and
+    calls `.value` on it. That raised `AttributeError`, which the narrow
+    `(OSError, ValueError)` handler did not catch, so it escaped and
+    aborted the whole spill — after the concepts had already been
+    committed to the archive but *before* working memory was trimmed.
+    Net effect: archiving silently failed forever on any instance with a
+    live edge log, which is every current one.
+
+    Both halves matter: the concepts must leave working memory, and the
+    canonical log must stop asserting edges anchored to concepts that no
+    longer exist in it.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        net = ConceptNetwork()
+        net.attach_archive(open_archive(tmpdir))
+        log = open_edge_log(tmpdir)
+        net.attach_edge_log(log)
+
+        for i in range(10):
+            net.add_concept(f"dormant_{i}", confidence=0.4, origin="learned")
+
+        net.add_edge("dormant_0", "dormant_1", RelationType.RELATED_TO)
+        net.add_edge("dormant_2", "dormant_3", RelationType.PART_OF)
+        assert len(log.fold()) == 2
+
+        # `add_edge` activates both endpoints, so force dormancy after
+        # the graph is wired — otherwise the four edge endpoints sit
+        # above the threshold and never spill.
+        for i in range(10):
+            c = net.get_concept(f"dormant_{i}")
+            assert c is not None
+            c.activation = 0.0
+
+        spilled = net.spill_dormant(activation_threshold=0.01, max_in_memory=0)
+
+        # Everything is dormant, so all 10 spill and working memory is
+        # emptied.
+        assert spilled == 10
+        assert net.size == 0
+        assert net.archive_size == 10
+
+        # The archive holds the edges, and the canonical log no longer
+        # asserts them — otherwise `sync_edge_log` would re-promote them
+        # and re-anchor them to absent concepts.
+        assert len(net._archive.recall_edges("dormant_0")) == 1
+        assert len(net._archive.recall_edges("dormant_2")) == 1
+        assert len(log.fold()) == 0
+
+        log.close()
+        net._archive.close()
+
+
+def test_spill_reports_when_it_trims_nothing(caplog) -> None:
+    """A no-op spill explains itself instead of silently returning 0.
+
+    "Under budget", "no archive", and "nothing is dormant" all return 0.
+    A caller that only sees the number cannot tell healthy idleness from
+    a broken spill, which is how a real spill failure presented for a
+    long time as the flat fact "archived is zero".
+    """
+    import logging
+
+    caplog.set_level(logging.DEBUG, logger="genesis_conscious.concepts.archival")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        net = _make_network_with_archive(tmpdir)
+        for i in range(5):
+            net.add_concept(f"c{i}", confidence=0.4, origin="learned")
+
+        # Under budget.
+        assert net.spill_dormant(max_in_memory=100) == 0
+        assert "within the 100 budget" in caplog.text
+
+        # Over budget, but nothing is dormant.
+        caplog.clear()
+        for i in range(5):
+            c = net.get_concept(f"c{i}")
+            assert c is not None
+            c.activation = 0.9
+        assert net.spill_dormant(max_in_memory=2) == 0
+        assert "none are dormant" in caplog.text
+
+        # No archive attached at all.
+        caplog.clear()
+        bare = ConceptNetwork()
+        bare.add_concept("x", origin="learned")
+        assert bare.spill_dormant() == 0
+        assert "no archive attached" in caplog.text
+
+        net._archive.close()
+
+
+def test_spill_warns_if_working_memory_did_not_shrink(caplog) -> None:
+    """A reported spill that leaves working memory unchanged is an error.
+
+    This is the shape of the failure that went unnoticed: concepts
+    written to the archive, then an exception aborted the trim, and the
+    caller carried on. Working memory stayed over budget forever while
+    every report said the spill had run.
+    """
+    import logging
+
+    caplog.set_level(logging.ERROR, logger="genesis_conscious.concepts.archival")
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        net = _make_network_with_archive(tmpdir)
+        for i in range(6):
+            net.add_concept(f"d{i}", confidence=0.4, origin="learned")
+            c = net.get_concept(f"d{i}")
+            assert c is not None
+            c.activation = 0.0
+
+        # Simulate the trim silently failing to take effect.
+        net._remove_spilled_from_working_memory = lambda to_spill: None  # type: ignore[method-assign]
+
+        spilled = net.spill_dormant(max_in_memory=2)
+        assert spilled > 0, "the batch itself still commits to the archive"
+        assert net.size == 6, "working memory was left untouched"
+        assert "did not shrink" in caplog.text
+        assert "ERROR" in caplog.text or caplog.records
+
+        net._archive.close()
+
+
 def test_spill_protected_origins() -> None:
     """Protected origin concepts are never spilled."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -1924,7 +2053,7 @@ def test_is_world_concept_accepts_genuine_concepts(concept_id: str) -> None:
         # Code symbols
         "python:mind.deny_site",
         "rust:state.neurochemical",
-        "python:genesis_cognitive.concepts.conceptnetwork",
+        "python:genesis_conscious.concepts.conceptnetwork",
         "python:brain_waves.compute_gamma_synchrony",
         # Structural hubs
         "_cat:emotion:joy",
@@ -2046,9 +2175,9 @@ def test_world_concept_ids_empty_network() -> None:
 def test_curiosity_engine_skips_non_world_concepts() -> None:
     """The curiosity engine should not generate questions about
     code symbols or function words."""
-    from genesis_cognitive.emotion import EmotionalState
-    from genesis_cognitive.learning import CuriosityEngine
-    from genesis_cognitive.reasoning import ReasoningEngine
+    from genesis_conscious.learning import CuriosityEngine
+    from genesis_conscious.limbic_system.emotion import EmotionalState
+    from genesis_conscious.reasoning import ReasoningEngine
 
     net = ConceptNetwork()
     # Add a code symbol with high activation
@@ -2093,8 +2222,8 @@ def test_curiosity_engine_skips_non_world_concepts() -> None:
 
 def test_autonomous_learner_add_topic_rejects_garbage() -> None:
     """add_topic should reject code symbols and function words."""
-    from genesis_cognitive.learning import AutonomousLearner, CuriosityEngine
-    from genesis_cognitive.reasoning import ReasoningEngine
+    from genesis_conscious.learning import AutonomousLearner, CuriosityEngine
+    from genesis_conscious.reasoning import ReasoningEngine
 
     net = ConceptNetwork()
     reasoning = ReasoningEngine(net)
@@ -2354,9 +2483,9 @@ def test_dream_concept_ids_falls_back_to_world() -> None:
 def test_curiosity_engine_prefers_quality_concepts() -> None:
     """When selecting from activation (idle curiosity), the curiosity
     engine should prefer high-quality concepts over low-quality ones."""
-    from genesis_cognitive.emotion import EmotionalState
-    from genesis_cognitive.learning import CuriosityEngine
-    from genesis_cognitive.reasoning import ReasoningEngine
+    from genesis_conscious.learning import CuriosityEngine
+    from genesis_conscious.limbic_system.emotion import EmotionalState
+    from genesis_conscious.reasoning import ReasoningEngine
 
     net = ConceptNetwork()
     reasoning = ReasoningEngine(net)
@@ -3440,3 +3569,277 @@ def test_seed_relation_verbs_is_idempotent() -> None:
     edge_count = len(net.edges)
     net.seed_relation_verbs()
     assert len(net.edges) == edge_count
+
+
+# ── clean_noise archives rather than deletes when it can ────────────
+#
+# Sleep runs clean_noise unattended, and it used to delete
+# unconditionally. It also ran *before* spill_dormant, so the destructive
+# step could push the network under the cap and thereby stop the
+# non-destructive step from ever running. ~7.5k concepts went that way in
+# one N3 pass with the archive sitting at zero.
+
+
+def _noise_network(n: int = 8, *, archive: bool = True) -> ConceptNetwork:
+    """Isolated, low-confidence concepts — clean_noise's target."""
+    tmp = tempfile.mkdtemp(prefix="genesis-noise-")
+    net = ConceptNetwork()
+    if archive:
+        net.attach_archive(open_archive(tmp))
+    for i in range(n):
+        net.add_concept(f"fragment_{i}", confidence=0.3, origin="learned")
+    return net
+
+
+def test_clean_noise_archives_instead_of_deleting() -> None:
+    """With an archive attached, noise must be recoverable, not gone."""
+    net = _noise_network(8)
+    net.add_concept("solid", confidence=0.9, origin="learned")
+
+    removed = net.clean_noise(min_confidence=0.4, min_edges=1)
+
+    assert len(removed) == 8, "all eight fragments are isolated and low-confidence"
+    assert net.get_concept("solid") is not None, "high confidence survives"
+
+    # Working memory shed…
+    assert net.size == 1
+    # …and the knowledge is on disk rather than destroyed.
+    assert net.archive_size == 8, (
+        f"expected 8 archived, got {net.archive_size} — noise was deleted, "
+        f"not archived"
+    )
+    # And it is still recallable by name, like any spilled concept.
+    assert net.get_concept("fragment_0") is not None, (
+        "archived noise must stay recallable"
+    )
+    net._archive.close()
+
+
+def test_clean_noise_deletes_only_without_an_archive() -> None:
+    """No store anywhere means deletion is the only option left."""
+    net = _noise_network(5, archive=False)
+
+    removed = net.clean_noise(min_confidence=0.4, min_edges=1)
+
+    assert len(removed) == 5
+    assert net.size == 0
+    assert net.archive_size == 0, "no archive was ever attached"
+
+
+def test_clean_noise_keeps_concepts_when_the_archive_write_fails(caplog) -> None:
+    """A failed archive write must not escalate into deletion.
+
+    Unbounded growth is recoverable — the concepts are still in RAM and
+    still in the save file. Deleted knowledge is not. So a broken archive
+    degrades to "working memory grows", loudly, rather than silently to
+    "knowledge gone".
+    """
+    import logging
+    import sqlite3
+
+    net = _noise_network(6)
+    caplog.set_level(logging.ERROR, logger="genesis_conscious.concepts.network")
+
+    def boom(items):
+        raise sqlite3.OperationalError("disk I/O error")
+
+    net._archive.archive_concepts_batch = boom  # type: ignore[method-assign]
+
+    removed = net.clean_noise(min_confidence=0.4, min_edges=1)
+
+    assert removed == [], "nothing may be reported as removed"
+    assert net.size == 6, "the concepts must survive in working memory"
+    assert "rather than deleting" in caplog.text
+    net._archive.close()
+
+
+def test_clean_noise_reports_what_it_did(caplog) -> None:
+    """The count must be visible, so a pass is never a silent shrink."""
+    import logging
+
+    net = _noise_network(4)
+    caplog.set_level(logging.INFO, logger="genesis_conscious.concepts.network")
+
+    net.clean_noise(min_confidence=0.4, min_edges=1)
+
+    assert "archived 4 noise concepts" in caplog.text
+    assert f"archive now {net.archive_size}" in caplog.text
+    net._archive.close()
+
+
+def test_clean_noise_never_deletes_while_an_archive_is_attached() -> None:
+    """The invariant, stated directly: no archive, no destruction.
+
+    Regression guard for the ordering problem. clean_noise runs before
+    spill_dormant in the N3 pass, so while it deleted, it could push the
+    network under the cap and stop spill_dormant from ever engaging —
+    the destructive step silencing the preserving one.
+    """
+    net = _noise_network(10)
+    archived_before = net.archive_size
+
+    net.clean_noise(min_confidence=0.4, min_edges=1)
+
+    assert net.archive_size > archived_before, (
+        "an attached archive must receive the concepts"
+    )
+    for cid in (f"fragment_{i}" for i in range(10)):
+        assert net._archive.has_concept(cid), f"{cid} was lost, not archived"
+    net._archive.close()
+
+
+# ── Reading the archive must not consume it ─────────────────────────
+#
+# `recall_concept` is a move: it deletes the archive row on the
+# assumption the concept is landing in working memory and will be
+# persisted. Verifying a recovery with it destroyed four concepts before
+# `peek_concept` existed, because nothing was saved afterwards.
+
+
+def test_peek_concept_does_not_consume() -> None:
+    """A read of archived data must leave the archive intact."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        archive = open_archive(tmpdir)
+        archive.archive_concept("frag", {"id": "frag", "confidence": 0.4}, set())
+        assert archive.count() == 1
+
+        peeked = archive.peek_concept("frag")
+        assert peeked is not None and peeked["id"] == "frag"
+        assert archive.count() == 1, "peek consumed the concept"
+        # And repeatedly — inspection must be idempotent.
+        assert archive.peek_concept("frag") is not None
+        assert archive.count() == 1
+        archive.close()
+
+
+def test_peek_missing_concept_returns_none() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        archive = open_archive(tmpdir)
+        assert archive.peek_concept("absent") is None
+        archive.close()
+
+
+def test_recall_is_still_a_move() -> None:
+    """The destructive path stays destructive — that is its job.
+
+    Pinned so the split cannot be 'fixed' by quietly making recall a copy:
+    the live recall path relies on the row being deleted, and
+    `dedupe_archive` exists to clean up the duplicate that leaving it
+    behind would create.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        archive = open_archive(tmpdir)
+        archive.archive_concept("moved", {"id": "moved", "confidence": 0.4}, {"alias"})
+        assert archive.count() == 1
+
+        data = archive.recall_concept("moved")
+        assert data is not None
+        assert archive.count() == 0, "recall must consume the archive row"
+        archive.close()
+
+
+def test_network_get_concept_does_not_consume_the_archive() -> None:
+    """The end-to-end hazard: resolving a name must not archive-delete it.
+
+    `get_concept` is what inspection and reporting call. If resolving an
+    archived name emptied the archive, then any read-only pass over her
+    knowledge would quietly erode it.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        net = _make_network_with_archive(tmpdir)
+        net.add_concept("resident", confidence=0.5, origin="learned")
+        resident = net.get_concept("resident")
+        assert resident is not None
+        net._archive.archive_concept(
+            "resident", net._concept_to_dict(resident), set(),
+        )
+        archived_before = net.archive_size
+        working_before = net.size
+        assert archived_before == 1
+
+        for _ in range(3):
+            net.get_concept("resident")
+
+        assert net.archive_size == 1, (
+            f"archive went {archived_before} -> {net.archive_size} by reading"
+        )
+        assert net.size == working_before
+        net._archive.close()
+
+
+class TestConcurrentConceptMutation:
+    """Scans of the shared concept dict must survive a concurrent writer.
+
+    The learner, the archival autosave thread and the N3 consolidation
+    worker all add to `_concepts` while the main thread scans it. A scan
+    that iterates the live dict raises ``RuntimeError: dictionary changed
+    size during iteration`` — observed live in ``cortical_tick`` and
+    ``_pick_creation_topic``. Every such scan must snapshot first.
+    """
+
+    @staticmethod
+    def _seeded() -> ConceptNetwork:
+        net = ConceptNetwork()
+        for i in range(300):
+            net.add_concept(f"concept_{i}", confidence=0.6)
+        return net
+
+    @staticmethod
+    def _hammer(net: ConceptNetwork, scan, iterations: int = 60) -> None:
+        """Run `scan` while a writer thread adds concepts.
+
+        The writer sleeps between adds so the network stays bounded —
+        an unbounded writer makes each O(N) scan progressively more
+        expensive and the test quadratic.
+        """
+        import threading
+        import time
+
+        stop = threading.Event()
+        errors: list[BaseException] = []
+
+        def mutate() -> None:
+            n = 0
+            while not stop.is_set():
+                try:
+                    net.add_concept(f"learned_{n}", confidence=0.6)
+                except BaseException as e:  # noqa: BLE001
+                    errors.append(e)
+                    return
+                n += 1
+                time.sleep(0.001)
+
+        t = threading.Thread(target=mutate, daemon=True)
+        t.start()
+        try:
+            for _ in range(iterations):
+                scan()
+        except BaseException as e:  # noqa: BLE001
+            errors.append(e)
+        finally:
+            stop.set()
+            t.join(timeout=5)
+
+        assert not errors, f"concurrent scan failed: {errors[:3]}"
+
+    def test_cortical_tick_tolerates_concurrent_adds(self) -> None:
+        net = self._seeded()
+        self._hammer(
+            net,
+            lambda: net.cortical_tick(
+                arousal=0.5, gaba=0.5, ach=0.5, serotonin=0.5
+            ),
+        )
+
+    def test_rebuild_active_set_tolerates_concurrent_adds(self) -> None:
+        net = self._seeded()
+        self._hammer(net, net._rebuild_active_set)
+
+    def test_confidence_and_all_ids_tolerate_concurrent_adds(self) -> None:
+        net = self._seeded()
+
+        def scan() -> None:
+            _ = net.mean_concept_confidence
+            _ = net.all_concept_ids
+
+        self._hammer(net, scan)

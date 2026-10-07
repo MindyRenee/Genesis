@@ -14,15 +14,15 @@ import math
 import pytest
 
 from genesis_client.protocol import CHEM_NAMES, PHASE_NAMES
-from genesis_cognitive.eval import (
+from genesis_conscious.eval import (
     check_snapshot_vs_defaults,
     compare_snapshots,
     isolated_daemon,
     run_chemical_assay,
 )
-from genesis_cognitive.eval.assay import ASSAY_DT
-from genesis_cognitive.eval.baseline import Snapshot, capture_snapshot
-from genesis_cognitive.eval.harness import find_daemon_binary, settle
+from genesis_conscious.eval.assay import ASSAY_DT
+from genesis_conscious.eval.baseline import Snapshot, capture_snapshot
+from genesis_conscious.eval.harness import find_daemon_binary, settle
 
 pytestmark = pytest.mark.slow
 
@@ -116,7 +116,7 @@ def test_dopamine_impulse_is_rewarding() -> None:
         settle(client, ticks=SETTLE, dt=ASSAY_DT)
         pre = client.get_state()
         assert client.neuro_impulse(0, 0.30)
-        client.advance_neuro(dt=ASSAY_DT)
+        client.advance_physics(ASSAY_DT)
         post = client.get_state()
     assert post.chemicals["dopamine"] - pre.chemicals["dopamine"] > 0.05
     assert post.valence - pre.valence > 0.0
@@ -129,7 +129,7 @@ def test_cortisol_impulse_is_aversive() -> None:
         settle(client, ticks=SETTLE, dt=ASSAY_DT)
         pre = client.get_state()
         assert client.neuro_impulse(6, 0.30)
-        client.advance_neuro(dt=ASSAY_DT)
+        client.advance_physics(ASSAY_DT)
         post = client.get_state()
     assert post.chemicals["cortisol"] - pre.chemicals["cortisol"] > 0.05
     assert post.valence - pre.valence < 0.0
@@ -150,7 +150,7 @@ def test_crh_cascade_is_maturation_gated_on_fresh_daemon() -> None:
         pre = client.get_state()
         assert client.neuro_impulse(14, 0.30)
         for _ in range(10):
-            client.advance_neuro(dt=ASSAY_DT)
+            client.advance_physics(ASSAY_DT)
         post = client.get_state()
     assert post.chemicals["crh"] - pre.chemicals["crh"] > 0.0
     assert abs(post.chemicals["cortisol"] - pre.chemicals["cortisol"]) < 0.02

@@ -13,11 +13,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import logging
 
-from genesis_cognitive.cognition.thought_composer import ThoughtComposer
-from genesis_cognitive.concepts import ConceptNetwork, RelationType
-from genesis_cognitive.emotion import EmotionalState
-from genesis_cognitive.memory import Turn, WorkingMemory
-from genesis_cognitive.reasoning import ReasoningEngine
+from genesis_conscious.cognition.thought_composer import ThoughtComposer
+from genesis_conscious.concepts import ConceptNetwork, RelationType
+from genesis_conscious.limbic_system.emotion import EmotionalState
+from genesis_conscious.memory import Turn, WorkingMemory
+from genesis_conscious.reasoning import ReasoningEngine
 
 logger = logging.getLogger(__name__)
 

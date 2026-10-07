@@ -46,8 +46,7 @@ const UNMODULATED: [NeurochemicalId; 6] = [
 
 /// Chemicals whose equilibrium is legitimately circadian-modulated.
 /// Tracked for reporting, excluded from the assertion.
-const MODULATED: [NeurochemicalId; 2] =
-    [NeurochemicalId::Dopamine, NeurochemicalId::Histamine];
+const MODULATED: [NeurochemicalId; 2] = [NeurochemicalId::Dopamine, NeurochemicalId::Histamine];
 
 const TICKS: u32 = 14_000;
 const TOLERANCE: f32 = 0.01;
@@ -83,7 +82,10 @@ fn run(coupling_scale: f32) -> Vec<(NeurochemicalId, f32, f32)> {
 fn homeostasis_alone_returns_chemicals_to_genetic_defaults() {
     let levels = run(0.0);
 
-    println!("\n{:>14}{:>10}{:>12}{:>12}", "chemical", "genetic", "level", "deviation");
+    println!(
+        "\n{:>14}{:>10}{:>12}{:>12}",
+        "chemical", "genetic", "level", "deviation"
+    );
     for (id, level, _) in &levels {
         let g = id.default_baseline();
         let modulated = MODULATED.contains(id);
@@ -93,7 +95,11 @@ fn homeostasis_alone_returns_chemicals_to_genetic_defaults() {
             g,
             level,
             level - g,
-            if modulated { "  (circadian-modulated)" } else { "" }
+            if modulated {
+                "  (circadian-modulated)"
+            } else {
+                ""
+            }
         );
     }
 
