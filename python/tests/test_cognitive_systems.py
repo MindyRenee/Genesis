@@ -5,6 +5,8 @@ working memory, columnar math.
 """
 
 import logging
+import os
+import tempfile
 
 import pytest
 
@@ -1104,6 +1106,122 @@ def test_safeguard_urge_dynamics() -> None:
             fired_at = t
             break
     assert fired_at is not None and fired_at < 60
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Volition drive decomposition — audit appetite vs open-work state
+# ═══════════════════════════════════════════════════════════════════
+#
+# The bug_scan urge is an *appetite*: it grows with time since the
+# last completed scan and is discharged by scanning itself. The
+# open-bug count is a *state*: it drives the improve urge (the
+# behavior that resolves bugs) and discharges only when bugs are
+# fixed. Conflating them made bug_scan compulsive — a count-driven
+# urge can never be discharged by scanning, so it re-fired on every
+# cooldown forever.
+
+
+def test_bug_scan_urge_driven_by_recency_not_bug_count() -> None:
+    """bug_scan's stimulus is audit recency; improve keeps the open count."""
+    from genesis_conscious.infrastructure.config import MindConfig
+
+    urges = {u.name: u for u in MindConfig().volition.urges}
+    assert "scan_recency" in urges["bug_scan"].stimuli
+    assert "bug_count" not in urges["bug_scan"].stimuli
+    # The open-work state drives the fixing behavior, not the looking.
+    assert "bug_count" in urges["improve"].stimuli
+
+
+def test_bug_scan_urge_ignores_bug_count() -> None:
+    """A pile of open bugs must not, by itself, fire the scan urge."""
+    from genesis_conscious.frontal_lobe.volition import Urge
+    from genesis_conscious.infrastructure.config import MindConfig
+
+    cfg = next(u for u in MindConfig().volition.urges if u.name == "bug_scan")
+    urge = Urge(
+        name=cfg.name,
+        threshold=cfg.threshold,
+        growth=cfg.growth,
+        decay=cfg.decay,
+        cooldown=cfg.cooldown,
+        stimuli=dict(cfg.stimuli),
+    )
+    # The old pathological context: bug_count pinned at 1.0 forever.
+    # With recency absent, the urge must stay below threshold well
+    # past the old cooldown window.
+    for _ in range(300):
+        urge.tick({"bug_count": 1.0, "scan_recency": 0.0}, 1.0)
+    assert not urge.is_ready()
+
+
+def test_bug_scan_urge_discharged_by_scan() -> None:
+    """A completed scan discharges the appetite; it regrows and re-fires."""
+    from genesis_conscious.frontal_lobe.volition import Urge
+    from genesis_conscious.infrastructure.config import MindConfig
+
+    cfg = next(u for u in MindConfig().volition.urges if u.name == "bug_scan")
+    urge = Urge(
+        name=cfg.name,
+        threshold=cfg.threshold,
+        growth=cfg.growth,
+        decay=cfg.decay,
+        cooldown=cfg.cooldown,
+        stimuli=dict(cfg.stimuli),
+    )
+    # Never scanned — fully due. Fires within ~10 minutes.
+    fired_at = None
+    for t in range(1, 900):
+        urge.tick({"scan_recency": 1.0}, 1.0)
+        if urge.is_ready():
+            fired_at = t
+            break
+    assert fired_at is not None
+    urge.consume()
+    # The scan discharges the appetite: recency resets to 0 and the
+    # urge must not re-fire through the cooldown window.
+    for _ in range(300):
+        urge.tick({"scan_recency": 0.0}, 1.0)
+    assert not urge.is_ready()
+    # The appetite regrows — the periodic audit is preserved. The
+    # real-clock cooldown is simulated as elapsed (last_action reset)
+    # because this loop runs in milliseconds, not seconds.
+    urge.last_action = 0.0
+    for _ in range(1200):
+        urge.tick({"scan_recency": 1.0}, 1.0)
+        if urge.is_ready():
+            break
+    else:
+        pytest.fail("audit appetite never regrew after a completed scan")
+
+
+def test_open_bug_count_excludes_resolved() -> None:
+    """open_bug_count counts open issues only — no resolved padding."""
+    import json as _json
+
+    from genesis_conscious.infrastructure.bug_reporter import BugReporter
+
+    root = tempfile.mkdtemp()
+    log_dir = os.path.join(root, "genesis_data")
+    os.makedirs(log_dir)
+    log_path = os.path.join(log_dir, "bug_reports.jsonl")
+    entries = [
+        {"file": "a.py", "line": 1, "severity": "warning",
+         "category": "style", "description": "open one"},
+        {"file": "b.py", "line": 2, "severity": "warning",
+         "category": "style", "description": "open two"},
+        {"file": "c.py", "line": 3, "severity": "warning",
+         "category": "style", "description": "resolved in place",
+         "status": "resolved", "resolved_at": "2026-10-07T00:00:00"},
+    ]
+    with open(log_path, "w", encoding="utf-8") as f:
+        for entry in entries:
+            f.write(_json.dumps(entry) + "\n")
+    reporter = BugReporter(project_root=root)
+    assert reporter.open_bug_count() == 2
+    # recent_bugs pads from history; the drive signal must not.
+    assert len(reporter.recent_bugs(10)) >= 2
+    # No log at all — zero open work, not an error.
+    assert BugReporter(project_root=tempfile.mkdtemp()).open_bug_count() == 0
 
 
 def test_gw_registered_modules_property() -> None:

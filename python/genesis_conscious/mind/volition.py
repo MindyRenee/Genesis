@@ -52,6 +52,9 @@ class VolitionMixin:
                 )
             )
 
+        # Monotonic timestamp of the last completed bug scan
+        # (0.0 = never scanned — the audit appetite starts fully due).
+        self._bug_scan_last_completed: float = 0.0
         return engine
     def self_invoke(self, command: str, args: str = "") -> str | None:
         """Invoke a slash command from its own cognitive process.
@@ -127,11 +130,29 @@ class VolitionMixin:
           below stress phase but above resting)
         """
         idle = max(0.0, time.time() - self._last_interaction_time)
+        # Open bugs only — the resolved padding in recent_bugs() exists
+        # for the track-record display, not for drives. The improve urge
+        # (the behavior that resolves bugs) consumes this signal; the
+        # bug_scan urge must not, because scanning cannot discharge it.
         try:
-            bug_count = min(1.0, len(self.bug_reporter.recent_bugs(1000)) / 20.0)
+            bug_count = min(1.0, self.bug_reporter.open_bug_count() / 20.0)
         except Exception as e:  # noqa: BLE001
             logger.warning(f"bug count failed: {e}")
             bug_count = 0.0
+        # Audit recency for the bug_scan urge — time since the last
+        # completed scan, normalized to the audit period. Never
+        # scanned counts as fully due. The scan itself discharges
+        # this (see _perform_bug_scan), so the urge paces real
+        # audits instead of re-firing on an unresolvable count.
+        since_scan = time.monotonic() - self._bug_scan_last_completed
+        scan_recency = (
+            1.0
+            if self._bug_scan_last_completed == 0.0
+            else min(
+                1.0,
+                since_scan / self.config.volition.bug_scan_recency_seconds,
+            )
+        )
         try:
             pending = min(1.0, len(self.self_improvement.get_pending_proposals()) / 5.0)
         except Exception as e:  # noqa: BLE001
@@ -237,6 +258,7 @@ class VolitionMixin:
 
         return {
             "bug_count": bug_count,
+            "scan_recency": scan_recency,
             "pending_proposals": pending,
             "curiosity": curiosity,
             "idle_seconds": min(
@@ -490,6 +512,9 @@ class VolitionMixin:
         self._emit_volition_thought(("bug", "code", "scan"), "thinking")
         try:
             result = self.bug_reporter.scan(max_files=20)
+            # The audit appetite is discharged by the scan itself —
+            # record completion whether or not anything new was found.
+            self._bug_scan_last_completed = time.monotonic()
             if result.new_bugs:
                 self._emit_live_thought(
                     "code",

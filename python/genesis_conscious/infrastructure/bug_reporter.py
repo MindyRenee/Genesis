@@ -1683,6 +1683,40 @@ class BugReporter:
         """Get the knowledge mapping for a bug category."""
         return _BUG_PATTERN_KNOWLEDGE.get(category)
 
+    def open_bug_count(self) -> int:
+        """Count currently-open issues, without padding from history.
+
+        Unlike :meth:`recent_bugs`, this never fills the result with
+        resolved issues — it is the honest open-work signal for drives
+        that discharge only when issues are actually fixed. Resolved
+        entries marked in place by :meth:`scan` are excluded.
+        """
+        count = 0
+        if not self.log_path.exists():
+            return count
+        try:
+            lines = self.log_path.read_text(encoding="utf-8").strip().split("\n")
+        except OSError as e:
+            note_swallowed(
+                "genesis_conscious.infrastructure.bug_reporter.open_bug_count",
+                e,
+            )
+            return count
+        for line in lines:
+            if not line.strip():
+                continue
+            try:
+                data = json.loads(line)
+            except json.JSONDecodeError as e:
+                note_swallowed(
+                    "genesis_conscious.infrastructure.bug_reporter.open_bug_count",
+                    e,
+                )
+                continue
+            if data.get("status", "open") == "open":
+                count += 1
+        return count
+
     def recent_bugs(self, n: int = 10) -> list[BugReport]:
         """Return the most recent bugs from the running list.
 
