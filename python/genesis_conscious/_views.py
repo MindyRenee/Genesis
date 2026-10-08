@@ -1,9 +1,9 @@
 """Internal helper for the brain-region view packages.
 
-Each brain region package (``control/``, ``affect/``,
-``action_selection/``, ``motor_learning/``, ``relay/``, ``autonomics/``,
-and the re-export layers of ``association/``, ``auditory/``,
-``vision/``) is a documented *view* over the top-level
+Each brain region package (``frontal_lobe/``, ``temporal_lobe/``,
+``parietal_lobe/``, ``occipital_lobe/``, ``limbic_system/``,
+``basal_ganglia/``, ``cerebellum/``, ``thalamus/``, ``brainstem/``)
+is a documented *view* over the top-level
 cognitive modules. The modules themselves are multi-subsystem and stay
 at the top level; the region package re-exports them so the anatomy
 is a real connection layer:

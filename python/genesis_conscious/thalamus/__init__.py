@@ -197,7 +197,7 @@ Referenced but not re-exported:
     (top-level) attention.py
         The parietal-prefrontal attention system. The TRN gating it
         exercises is documented here; the module itself is
-        re-exported by association.
+        re-exported by parietal_lobe.
 """
 
 from __future__ import annotations

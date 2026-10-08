@@ -195,8 +195,8 @@ Referenced but not re-exported (documented in their own subsystems):
         Dream CONTENT synthesis (edge proposal/validation) and
         mind-wandering are cortical — default-mode-network and
         hippocampal-replay processes riding on the state the
-        brainstem sets. See auditory (hippocampus) and
-        control (mind-wandering / autobiographical content).
+        brainstem sets. See temporal_lobe (hippocampus) and
+        frontal_lobe (mind-wandering / autobiographical content).
 """
 
 from __future__ import annotations

@@ -311,12 +311,12 @@ predictive coding hierarchy.
 This folder therefore contains the full ventral stream pipeline
 (V1 -> V4 -> VTC -> MTL bridge), with the understanding that VTC and
 MTL are anatomically temporal subsystem structures that are functionally
-part of the occipital subsystem's processing stream. When the temporal
-subsystem folder is created, it will reference these modules as
-projections FROM the occipital subsystem.
+part of the occipital subsystem's processing stream. temporal_lobe owns
+them anatomically and occipital_lobe projects them (see its
+_EXPORTS) rather than duplicating them.
 
-The dorsal stream (V1 -> MT/V5 -> parietal) will be organized under
-the parietal subsystem folder when created.
+The dorsal stream (V1 -> MT/V5 -> parietal) is organized under
+the parietal subsystem (parietal_lobe/motion.py).
 
 
 ════════════════════════════════════════════════════════════════════════
@@ -334,7 +334,7 @@ MODULE ORGANIZATION
     vtc.py             Ventral temporal cortex — incremental PCA of
                        V4 activations, axis-based feature space.
 
-    memory_bridge.py      MTL bridge — ridge-regression projection from
+    mtl_bridge.py           MTL bridge — ridge-regression projection from
                        VTC space to concept embeddings, one-shot
                        learning, generative path for imagination.
 
@@ -408,9 +408,18 @@ _EXPORTS: dict[str, str] = {
     "TrainingExample": "temporal_lobe.mtl_bridge",
     "VTCFeatureSpace": "temporal_lobe.vtc",
     "Vision": "perception.vision",
+    # Fusiform face area — occipitotemporal: YuNet detection, SFace
+    # 128-d embeddings. Co-claimed with temporal_lobe (the ventral
+    # stream's people endpoint).
+    "DetectedFace": "perception.recognition",
+    "FaceRecognizer": "perception.recognition",
+    "KnownFace": "perception.recognition",
 }
 
 __all__ = [
+    "DetectedFace",
+    "FaceRecognizer",
+    "KnownFace",
     "MemoryBridge",
     "Retina",
     "TrainingExample",

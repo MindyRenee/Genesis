@@ -22,7 +22,7 @@ Key functions:
 
 The temporal subsystem receives input from:
     - Occipital subsystem (ventral stream: V1 -> V4 -> VTC -> IT)
-    - Auditory nerve (cochlea -> autonomics -> relay -> A1)
+    - Auditory nerve (cochlea -> brainstem -> thalamus -> A1)
     - Parietal subsystem (spatial context for object-location binding)
     - Frontal subsystem (top-down attention and retrieval cues)
 
@@ -51,7 +51,9 @@ Pipeline (ventral "what" stream, continued from occipital subsystem):
 
 Pipeline (auditory "what" stream):
 
-    cochlea -> autonomics -> relay
+The auditory "what" stream:
+
+    cochlea -> brainstem -> thalamus (MGN)
         |
         v
     [A1] Primary auditory cortex (auditory.py)
@@ -233,6 +235,80 @@ In practice, YOLOv5s handles all of this internally. We treat it
 as a black-box approximation of IT cortex.
 
 
+Dream Synthesis (structurally-similar far-pair proposal + waking validation)
+-----------------------------------------------------------------------------
+
+During REM (high acetylcholine, low norepinephrine) the synthesizer
+goes beyond random association: it finds concept pairs that are
+*structurally similar but far apart* in the graph — same relation
+signature, distant positions — and proposes novel typed edges
+between them as hypotheticals at low confidence:
+
+    hypothetical edge weight = 0.15
+
+On the next wake (or a dream-review pass), each hypothetical is
+validated by abductive/analogical inference over independent
+evidence. An edge supported by >= 2 corroborating paths is promoted:
+
+    promoted edge weight = 0.45
+
+Unsupported hypotheticals decay. This is the sleep-time generation
+of genuinely new structure — the same far-transfer mechanism
+analogical reasoning uses while awake, run unconstrained.
+
+In Genesis: sleep/dream_synthesis.py DreamSynthesisEngine implements
+the propose/validate cycle; DreamProposal, DreamValidationResult,
+and DreamInsight are its records.
+
+
+Sleep Compression (bounded memory, honestly modeled)
+------------------------------------------------------
+
+The compressor keeps Genesis bounded: VQ codebook retraining
+(re-quantizing the embedding space), edge migration into the
+holographic graph, and episode summarization with raw-episode
+deletion past the LTM cap.
+
+Modeling note: this is *memory compaction*, inspired by but not
+equivalent to biological consolidation. Biological systems
+consolidation is selective replay and systems-level transformation
+in which hippocampal episodic traces are gradually integrated into
+neocortical semantic networks (Rasch & Born, 2013) — it is not
+destructive deletion. The compact-LTM phase here deletes raw
+episodes after summarization; that is an engineering bound, not a
+claim about biology.
+
+In Genesis: sleep/compression.py SleepCompressor implements the
+pass (VQ iters, salience threshold, homeostasis scale, and merge
+threshold are its tuning surface).
+
+
+STDP (timing-dependent synaptic efficacy)
+-------------------------------------------
+
+STDP is a timing-dependent learning rule over a synaptic substrate
+deliberately separate from the semantic graph: ConceptNetwork edges
+encode explicit semantic relationships, embeddings encode
+representational similarity, and synaptic efficacy encodes learned
+directed strength between active units. For Δt = t_post − t_pre:
+
+    Δt > 0:  Δw = +A⁺ · exp(-Δt / τ⁺)     (LTP — pre before post)
+    Δt < 0:  Δw = −A⁻ · exp(Δt / τ⁻)      (LTD — post before pre)
+
+    τ⁺ = τ⁻ = 20 ms, A⁺ = 0.01, A⁻ = 0.012, window = 40 ms
+
+The slight A⁻ > A⁺ bias is homeostatic — unpaired activity tends
+weakly toward depression rather than runaway potentiation. The
+timing rule is followed by a three-factor neuromodulatory gate:
+eligibility alone does not write; the neuromodulatory context
+decides whether the timed pairing consolidates.
+
+In Genesis: learning/stdp.py STDP over learning/synapses.py
+SynapticStore. HebbianPlasticity (above, claimed from learning/) is
+the correlation-based counterpart that adapts the embedding space;
+STDP is the timing-based rule that adapts the efficacy substrate.
+
+
 ════════════════════════════════════════════════════════════════════════
 BRAIN WAVES
 ════════════════════════════════════════════════════════════════════════
@@ -322,7 +398,8 @@ and is referenced by this subsystem, the frontal subsystem, and the basal
 ganglia. This subsystem documents the hippocampal components as
 temporal subsystem functions.
 
-The MTL bridge (in vision/) is anatomically temporal but
+The MTL bridge (temporal_lobe/mtl_bridge.py, projected through
+occipital_lobe) is anatomically temporal but
 functionally part of the ventral visual stream. It's documented
 in both places — the occipital subsystem describes its role in the
 visual pipeline, and this subsystem describes its anatomical location.
@@ -362,7 +439,7 @@ Top-level modules referenced by this subsystem (multi-subsystem):
         WorkingMemory — Baddeley working memory model
         (frontal subsystem — referenced by control)
         ProceduralMemory — skills and habits
-        (basal ganglia — referenced by action_selection)
+        (basal ganglia — claimed by basal_ganglia)
         SemanticMemory — semantic knowledge store
         (neocortical, temporal-parietal)
         SpacedRepetitionScheduler — spaced repetition
@@ -441,6 +518,70 @@ Top-level modules referenced by this subsystem (multi-subsystem):
         Owned here: the medial temporal lobe is the ventral
         "what" stream's endpoint. ``occipital_lobe`` imports it
         across the boundary rather than duplicating it.
+
+Top-level modules newly claimed by this subsystem:
+
+    (cognition/) concept_learner.py, topic_resolver.py, memory_store.py
+        ConceptLearner — word labeling and activation spreading into
+        the network (semantic learning). TopicResolver — topic
+        extraction and concept variant matching (lexical-semantic
+        lookup). MemoryStore — conversation and cognitive event
+        persistence (episodic recording).
+
+    (sleep package) dream_synthesis.py, compression.py
+        DreamSynthesisEngine — REM-time proposal of novel typed edges
+        between structurally similar far-apart concepts, validated on
+        waking. SleepCompressor — the bounded-memory compaction pass
+        (VQ retraining, holographic edge migration, episode
+        summarization). Both are hippocampal-replay processes riding
+        on the sleep state the brainstem sets.
+
+    (concepts/) consolidation.py, dynamics.py, extraction.py,
+                archival.py, edge_log.py, types.py
+        The semantic hub's machinery: ConsolidationMixin (sleep
+        processing and review bridges), DynamicsMixin (spreading
+        activation and cortical ticks), ExtractionMixin (concept
+        extraction from text), ArchivalMixin (the archival tier),
+        EdgeLog (the append-only edge journal with web provenance),
+        and the CorticalLayer/Provenance types.
+
+    (perception/) core.py, recognition.py
+        Intent / QuestionType — input-side comprehension
+        classification (what kind of speech act, what kind of
+        question) — Wernicke's-side parsing. FaceRecognizer —
+        YuNet detection + SFace 128-d embeddings; the fusiform face
+        area (occipitotemporal; also re-exported by occipital_lobe).
+
+    (language/) figurative.py, statistical_learner.py, grounding.py,
+                base.py, morphology.py
+        FigurativeLanguageProcessor — metaphor (cross-domain "X is
+        Y") and irony detection. StatisticalLanguageLearner — n-gram
+        patterns and user-style adaptation from heard input.
+        SemanticGrounder — resolves heard names against the network
+        without mutating it. base.py — the Thought /
+        SyntacticStructure / LanguageEngine interface both language
+        halves implement. morphology.py — the shared inflectional
+        engine: comprehension deconjugates ("runs" → "run"),
+        production conjugates ("they run" vs "it runs"); one module
+        so the two systems never disagree about English.
+
+    (learning/) stdp.py, synapses.py
+        STDP over SynapticStore — timing-dependent synaptic efficacy,
+        deliberately separate from the semantic graph and embeddings
+        (see the STDP section above). The timing-based counterpart to
+        HebbianPlasticity's correlation-based embedding adaptation.
+
+    (self/) learning.py
+        SelfDirectedLearner — deriving new network facts from what it
+        already knows (reasoning, inference, conversation) instead of
+        fetching from external sources. Semantic learning, temporal.
+
+    (sleep package) architecture.py — the consolidation machinery
+        SynapticDownscaler (the synaptic homeostasis downscaler —
+        SHY's slow-wave downscaling) and HippocampalReplay
+        (ReplayItem — the replay that drives consolidation and dream
+        content). The ultradian SleepCycleTracker from the same
+        module is claimed by brainstem.
 """
 
 from __future__ import annotations
@@ -533,6 +674,84 @@ _EXPORTS: dict[str, str] = {
     # network
     "Voice": "temporal_lobe.speech",
     "VoiceInput": "temporal_lobe.speech",
+    # Conversational semantic learning and variant matching —
+    # word labeling into the network, topic extraction
+    "ConceptLearner": "cognition.concept_learner",
+    "MemoryStore": "cognition.memory_store",
+    "TopicResolver": "cognition.topic_resolver",
+    # Hippocampal replay content — dream synthesis (structurally
+    # similar far-pair edge proposals, validated on waking) and the
+    # sleep compression pass (VQ retraining, holographic edge
+    # migration, episode summarization)
+    "DreamInsight": "sleep.dream_synthesis",
+    "DreamProposal": "sleep.dream_synthesis",
+    "DreamSynthesisEngine": "sleep.dream_synthesis",
+    "SleepCompressor": "sleep.compression",
+    # The concept network's machinery — consolidation, activation
+    # dynamics, extraction, archival tiers, the edge log, and the
+    # layer/provenance types (all part of the ATL semantic hub)
+    "ArchivalMixin": "concepts.archival",
+    "ConsolidationMixin": "concepts.consolidation",
+    "CorticalLayer": "concepts.types",
+    "DynamicsMixin": "concepts.dynamics",
+    "EdgeLog": "concepts.edge_log",
+    "ExtractionMixin": "concepts.extraction",
+    "open_edge_log": "concepts.edge_log",
+    "Provenance": "concepts.types",
+    # Input-side comprehension classification — intent and question
+    # type detection over heard language (Wernicke's-side parsing)
+    "Intent": "perception.core",
+    "QuestionType": "perception.core",
+    # Fusiform face area — occipitotemporal; the ventral stream's
+    # people endpoint (also re-exported by occipital_lobe)
+    "DetectedFace": "perception.recognition",
+    "FaceRecognizer": "perception.recognition",
+    "KnownFace": "perception.recognition",
+    # Figurative language — metaphor and irony interpretation
+    # (cross-domain semantic structure)
+    "FigurativeLanguageProcessor": "language.figurative",
+    "IronyDetection": "language.figurative",
+    "Metaphor": "language.figurative",
+    # Statistical language learning — n-gram patterns and user-style
+    # adaptation from heard input
+    "NGramModel": "language.statistical_learner",
+    "StatisticalLanguageLearner": "language.statistical_learner",
+    # Semantic grounding — resolving heard names against the network
+    # without mutating it
+    "GroundedProposition": "language.grounding",
+    "SemanticGrounder": "language.grounding",
+    # The language interface — Thought, SyntacticStructure, and the
+    # LanguageEngine base both production and comprehension implement
+    "LanguageEngine": "language.base",
+    "SyntacticStructure": "language.base",
+    "Thought": "language.base",
+    # Lexical morphosyntax — the shared inflectional engine both
+    # comprehension (deconjugation) and production (conjugation) use
+    "conjugate_verb": "language.morphology",
+    "deconjugate_verb": "language.morphology",
+    "is_verb_form": "language.morphology",
+    # The synaptic substrate and its timing-dependent rule —
+    # experience-dependent efficacy kept deliberately separate from
+    # the semantic graph (HebbianPlasticity, above, is the
+    # correlation-based counterpart)
+    "SpikeEvent": "learning.stdp",
+    "STDP": "learning.stdp",
+    "SynapticStore": "learning.synapses",
+    # Self-directed knowledge learning — deriving new network facts
+    # from what it already knows (reasoning, inference, conversation)
+    "InferenceResult": "self.learning",
+    "LearningEvent": "self.learning",
+    "SelfDirectedLearner": "self.learning",
+    # Sleep architecture's consolidation machinery — the synaptic
+    # homeostasis downscaler (SHY) and hippocampal replay (the
+    # ultradian tracker is claimed by brainstem)
+    "HippocampalReplay": "sleep.architecture",
+    "ReplayItem": "sleep.architecture",
+    "SynapticDownscaler": "sleep.architecture",
+    # Concept-network utilities — word-sense stripping and the
+    # world-concept test used by the learners
+    "is_world_concept": "concepts",
+    "strip_sense_suffix": "concepts",
 }
 
 # The five eager names stay in a literal list so static checkers

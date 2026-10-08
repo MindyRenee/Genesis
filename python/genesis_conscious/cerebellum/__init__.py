@@ -4,7 +4,7 @@
 ANATOMY AND FUNCTION
 ════════════════════════════════════════════════════════════════════════
 
-The motor_learning ("little brain") sits behind the cerebral cortex and
+The cerebellum ("little brain") sits behind the cerebral cortex and
 contains more than half of the brain's neurons. Despite its small
 size, it is critical for smooth, coordinated, well-timed movement
 and for predictive control of action.
@@ -18,7 +18,7 @@ Key functions:
     - Cognitive timing (not just motor — also involved in
       language, attention, and working memory timing)
 
-The motor_learning is NOT involved in initiating movement or deciding
+The cerebellum is NOT involved in initiating movement or deciding
 what to do — that's the basal ganglia and frontal subsystem. Instead,
 it takes a motor command and produces a refined, error-corrected
 version, predicting the sensory feedback that will result.
@@ -57,7 +57,7 @@ MATHEMATICAL FOUNDATION
 Adaptive Filter Model (Fujita, 1987; Dean et al.)
 ---------------------------------------------------
 
-The motor_learning is modeled as an adaptive filter. Mossy fiber input
+The cerebellum is modeled as an adaptive filter. Mossy fiber input
 is expanded by granule cells into a high-dimensional representation,
 then filtered by Purkinje cell weights to produce output.
 
@@ -76,7 +76,7 @@ separation possible (the kernel trick, biologically implemented).
 In Genesis: not yet implemented as a dedicated module. The
 predictive coding system in vision (V1->V4->VTC->MTL)
 implements a similar principle — each level predicts the level
-below, and prediction errors drive learning. The motor_learning would
+below, and prediction errors drive learning. The cerebellum would
 extend this to the motor domain when motor control is added.
 
 
@@ -135,7 +135,7 @@ mathematical framework but with sensory prediction errors.
 Forward Model Prediction
 --------------------------
 
-The motor_learning predicts the sensory consequences of motor commands.
+The cerebellum predicts the sensory consequences of motor commands.
 This prediction is compared to actual feedback, and the mismatch
 drives motor corrections.
 
@@ -156,7 +156,7 @@ The forward model allows the system to:
        (predict and cancel self-generated feedback)
 
 In Genesis: not yet implemented. The predictive coding system in
-vision implements visual prediction; the motor_learning would
+vision implements visual prediction; the cerebellum would
 extend this to motor prediction when motor control is added.
 
 
@@ -164,7 +164,7 @@ extend this to motor prediction when motor control is added.
 BRAIN WAVES
 ════════════════════════════════════════════════════════════════════════
 
-The motor_learning has its own local circuitry and doesn't produce the
+The cerebellum has its own local circuitry and doesn't produce the
 same large-scale oscillations as the cerebral cortex. However, it
 interacts with cortical rhythms through the relay.
 
@@ -172,11 +172,11 @@ Gamma (30-100 Hz) — Cerebellar-cortical coordination
 -------------------------------------------------------
 
 Cerebellar activity is coordinated with cortical gamma during
-precise motor timing. The motor_learning provides the timing signal
+precise motor timing. The cerebellum provides the timing signal
 that coordinates cortical gamma bursts during movement (Brembs et
 al., 2010).
 
-In Genesis: the motor_learning would contribute to gamma timing
+In Genesis: the cerebellum would contribute to gamma timing
 when motor control is implemented. Currently not tracked
 separately.
 
@@ -184,7 +184,7 @@ Beta (13-30 Hz) — Motor preparation
 --------------------------------------
 
 Cerebellar beta is coordinated with cortical beta during motor
-preparation and execution. The motor_learning provides the predictive
+preparation and execution. The cerebellum provides the predictive
 timing that stabilizes cortical beta during sustained motor
 control.
 
@@ -196,19 +196,19 @@ motor control is implemented.
 ANATOMICAL BOUNDARIES
 ════════════════════════════════════════════════════════════════════════
 
-The motor_learning is not part of the cerebral cortex — it's a
+The cerebellum is not part of the cerebral cortex — it's a
 separate structure connected to the cortex via the relay. It
 receives motor commands from the frontal subsystem (motor cortex) and
 sends refined predictions back via the relay.
 
-The motor_learning interacts with:
+The cerebellum interacts with:
     - Frontal subsystem (motor cortex): receives motor commands,
       sends refined predictions
     - Parietal subsystem: receives sensory state for prediction
     - Temporal subsystem: timing for auditory-motor coordination
     - Brainstem: inferior olive provides error signals
 
-The motor_learning's function — error-driven prediction and forward
+The cerebellum's function — error-driven prediction and forward
 modeling — is implemented by the predictive coding module, which
 stays at the top level (it is multi-subsystem: predictive coding runs in
 cortex too). This subsystem re-exports it (the association pattern):
@@ -228,14 +228,14 @@ Re-exported modules:
 
     (top-level) learning/td.py
         TDLearner — eligibility traces and prediction error
-        learning. The motor_learning uses the same mathematical
+        learning. The cerebellum uses the same mathematical
         framework (eligibility traces + error-driven plasticity)
         but for sensory prediction rather than reward prediction.
-        Re-exported by action_selection (its anatomical home).
+        Re-exported by basal_ganglia (its anatomical home).
 
     (vision) visual_cortex.py
         Predictive coding system — each level predicts the level
-        below. The motor_learning would extend this principle to the
+        below. The cerebellum would extend this principle to the
         motor domain.
 """
 
@@ -243,7 +243,7 @@ from __future__ import annotations
 
 from .._views import view_getattr
 
-# The motor_learning's function is implemented by predictive_coding.py,
+# The cerebellum's function is implemented by learning/predictive.py,
 # which stays at the top level — it is a whole-brain predictive
 # stack (parietal + cerebellar + limbic + prefrontal layers). This
 # subsystem lazily re-exports it so the anatomy is a real connection

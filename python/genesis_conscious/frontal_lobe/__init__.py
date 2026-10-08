@@ -217,6 +217,192 @@ executive.py task-switching approximates the gating function
 Go/NoGo gating of working memory updates.
 
 
+Commitment Boundaries (hysteresis + confirmation + refractory)
+----------------------------------------------------------------
+
+Genesis's state is continuous, but its transitions are discrete:
+asleep or awake, announced-drowsy or not. A commitment boundary is
+the digitizer between the two — the functional analog of an
+all-or-none spike threshold, generalized for a scalar signal by
+three mechanisms:
+
+    committed if s >= enter          (held for confirm_s continuously)
+    released if s <= release         (release <= enter: deadband)
+    no release before refractory_s   (minimum dwell)
+
+    where:
+        s            = the continuous signal (e.g. drowsiness)
+        enter        = the crossing level that commits the state
+        release      = the lower level that releases it
+        confirm_s    = sustained-crossing requirement — a lone
+                       transient spike cannot commit (the time-domain
+                       analog of the venus flytrap's two-trigger rule);
+                       a single dip below enter restarts the window
+        refractory_s = minimum dwell once latched
+
+The deadband (enter - release) is the same noise margin that
+separates logic-level 0.4V from 2.4V: flicker near the boundary
+cannot oscillate the output. The boundary is deliberately
+content-blind — it sees a magnitude and a clock, never what the
+signal means — so it gates whether and when a transition happens,
+never which transition.
+
+In Genesis: commitment.py CommitmentBoundary implements enter/
+release levels, the confirm_s window, and the refractory dwell,
+with just_committed/just_released edges recorded for the narrative
+self.
+
+
+Recursive Metacognitive Models (precision-weighted self-prediction)
+---------------------------------------------------------------------
+
+Where the Rust active-inference engine is a generative model of the
+neurochemical trajectory, the cognitive side models its own
+*thinking*. CognitiveProcessModel predicts what its reflection will
+discover before it runs; CognitiveTrajectoryModel predicts what it
+will think about next. Each level of the recursive tower carries a
+precision that tracks how well it predicts itself:
+
+    error_e = |predicted - observed|          (per target)
+    surprise_EMA ← (1-α)·surprise_EMA + α·error   (α = 0.2)
+    precision ↑ 0.008/obs when surprise < 0.2   (predicting well)
+    precision ↓ 0.015/obs when surprise >= 0.2  (asymmetric: losing
+                    confidence is quick, regaining it is slow)
+    higher levels start less precise and recover slower
+    (LEVEL_PRECISION_DECAY = 0.7 — uncertainty about uncertainty)
+
+The tower grows and prunes itself: a new level spawns when the top
+level's surprise EMA exceeds 0.25 for 10 consecutive observations
+(the system failing to predict its own metacognition → build a
+model of that unpredictability), and a level is pruned when its
+surprise EMA stays below 0.08 for 30+ observations (it has become
+predictable → the level above adds no information). The aggregate
+metacognitive surprise feeds back into cognition: high surprise →
+deeper reflection next time; sustained low surprise → lighter
+reflection.
+
+In Genesis: self/metacognitive_model.py CognitiveProcessModel and
+self/cognitive_trajectory.py CognitiveTrajectoryModel implement
+this; self/reflection.py ReflectionEngine supplies the observations
+the models predict.
+
+
+Task Competence (verification-ranked skill memory)
+----------------------------------------------------
+
+TaskCompetence is the domain-general substrate under every task
+family: schema recognition (grouping states by structural features,
+not surface identity), affordance learning (which state variables
+an operator changes, with what confidence), and prediction checking
+(comparing expected effects with observed transitions, so "solved"
+means the world actually changed as predicted).
+
+Skill authority is rank-ordered by how a procedure was verified,
+not a scalar confidence:
+
+    VERIFICATION_KINDS = ("reported", "solver", "external")
+    VERIFICATION_WEIGHT = {"reported": 0.5, "solver": 0.8,
+                           "external": 1.0}
+
+A procedure verified only epistemically (solver) carries less
+transfer authority than one checked against the world (external —
+exact replay, an environment's terminal condition, a real
+actuator); an unverified report carries least. Episodes encoded
+under dopamine/arousal below the salience floor (0.2) stay
+episodic — they do not proceduralize into skills.
+
+In Genesis: reasoning/competence.py implements this; the task
+families (classification, quantities, relations, sequence, sorter,
+assembly) are the honest environments it practices against.
+
+
+Method Library (DreamCoder-style wake–sleep compression)
+----------------------------------------------------------
+
+During wake, the problem solver produces verified solutions; during
+sleep, the library mines them for recurring structure and compresses
+the shared pattern into a Method — a content-free strategy record
+(which operators and relation types sufficed, for which goal type,
+across how many distinct problems). During the next wake, the
+library acts as the recognition model: methods matching the goal
+type propose a replay, and every replay outcome updates the
+method's reliability with a support-anchored prior:
+
+    reliability = (successes + 0.6 * prior_mass)
+                  / (uses + prior_mass)
+    prior_mass  = 0.5 * support
+
+    where:
+        support    = distinct problems the method compressed
+        prior_mass = pseudo-observation mass added by consolidation
+                     (one reinforcement bout per support)
+
+Unused methods start near 0.6 (support of 2); observed outcomes
+quickly dominate the prior. Stored targets are never trusted —
+replay re-derives content from the live network through the
+label→edge-query map.
+
+In Genesis: reasoning/method_library.py implements this, modeled on
+DreamCoder's wake–sleep cycle (Ellis et al., 2023).
+
+
+Hamiltonian Flow (language generation as geodesic traversal)
+--------------------------------------------------------------
+
+FlowGenerator treats sentence generation as a trajectory through a
+potential landscape on a 16-dimensional torus (one angular
+coordinate per flow dimension, angles from the embedding store's
+toroidal matrix or a spectral fallback). The potential is a
+weighted sum of joint von Mises kernels centered at each concept:
+
+    U(θ) = -Σᵢ wᵢ · K(θ, θᵢ)
+    K(θ, θᵢ) = exp(κ · (Σₖ cos(θₖ - θᵢₖ) - d))     κ = 3.0
+
+    where:
+        wᵢ  = concept i's edge-weight sum (well depth)
+        d   = torus dimension (the subtracted κ·d keeps the joint
+              kernel in (0, 1] without changing the field's shape)
+
+Strongly-connected concepts are low-potential basins. The flow
+integrates Hamilton's equations with symplectic Euler (energy
+conserving, no numerical drift):
+
+    p_{k+1} = p_k - dt · ∇U(θ_k)          dt = 0.05
+    θ_{k+1} = θ_k + dt · p_{k+1}
+    p ← p · (1 - friction)                 friction = 0.15
+
+with momentum clipped at 10, angles wrapped to [0, 2π), and a hub
+swirl: within π/3 radians of a significant hub (weight > 1), the
+trajectory is rotated up to π/3 scaled by proximity — steering
+around over-central concepts instead of falling into them. The
+trajectory ends at a local minimum (|∇U| < 1e-4), a revisited
+region (closed orbit), or 80 steps. The sentence IS the trajectory:
+the sequence of concept cells traversed is the word order, and
+morphology (agreement, copula, pronouns) renders it — no templates.
+
+In Genesis: language/flow.py FlowGenerator implements this.
+
+
+Inner Life (spontaneous thought chains)
+-----------------------------------------
+
+InnerLife is the stream of cognition between interactions —
+mind-wandering that rides on the arousal state the brainstem sets.
+Thoughts arise from unresolved curiosity and emotional state, then
+chain: each thought continues the chain with a base probability
+
+    P(continue) = 0.6        (dreams: 0.7 — they flow more freely)
+
+bounded by chain-length limits, and the chain is monitored for
+rumination: a negative chain of 3+ thoughts whose novelty falls
+below 0.3 is recognized as repetitive dwelling rather than
+productive wandering.
+
+In Genesis: sleep/inner_life.py InnerLife implements this;
+SpontaneousThought and ThoughtChainType (sleep/thoughts.py) are the
+thought records it produces.
+
+
 ════════════════════════════════════════════════════════════════════════
 BRAIN WAVES
 ════════════════════════════════════════════════════════════════════════
@@ -296,7 +482,7 @@ with parietal (attention), temporal (memory), and subcortical
 (basal ganglia gating, dopamine) systems. They stay at the top
 level and are referenced by this subsystem.
 
-    (top-level) executive.py
+    executive.py (in this package)
         ExecutiveFunction — planning, response inhibition,
         task-switching. PFC but has parietal connections
         (task-switching involves posterior parietal cortex).
@@ -325,7 +511,7 @@ level and are referenced by this subsystem.
         coordinating frontal, parietal, temporal, and limbic
         processing. Referenced by all subsystems.
 
-    (top-level) volition.py
+    volition.py (in this package)
         Volition — internal urges that decide when Genesis acts on
         itself. Urges grow organically based on internal and
         environmental triggers. When an urge crosses its threshold,
@@ -360,7 +546,7 @@ level and are referenced by this subsystem.
         how to allocate cognitive resources. Multi-subsystem (frontal +
         parietal attention).
 
-    (top-level) narrative.py
+    (infrastructure/) narrative.py
         NarrativeEngine — Genesis's self-story over time. Gives
         identity continuity — knowing who it was, who it is, and
         who it's becoming. The narrative self is the autobiographical
@@ -373,7 +559,7 @@ level and are referenced by this subsystem.
         — the PFC's ability to think about its own processes.
         Multi-subsystem (frontal metacognition + temporal code memory).
 
-    (top-level) bug_reporter.py
+    (infrastructure/) bug_reporter.py
         BugReporter — Genesis's ability to notice problems in its
         own code. Not a linter — an organic reading of code that
         surfaces issues. Metacognitive error detection (PFC + ACC).
@@ -383,7 +569,7 @@ level and are referenced by this subsystem.
         explore its own filesystem. Curiosity-driven exploration
         (PFC + limbic curiosity + parietal spatial navigation).
 
-    (top-level) canvas.py
+    canvas.py (in this package)
         Canvas — Genesis expresses its emotional state as visual art.
         Affective expression through generative art. Creative
         expression is prefrontal (DLPFC) + limbic (emotional drive)
@@ -404,18 +590,131 @@ level and are referenced by this subsystem.
         world. Tools are callable capabilities. Prefrontal tool use
         (humans' tool use is PFC + parietal + motor).
 
-    (top-level) global_workspace.py
+    global_workspace.py (in this package)
         GlobalWorkspace — Dehaene's Global Workspace Theory. The
         cognitive access broadcast system. When information in any
         module reaches high activation, it's broadcast to all others.
         This is the whole-brain integration layer — not purely
         frontal, but the prefrontal cortex is the primary broadcaster.
 
-    (top-level) mind.py
+    (mind/) the Mind package
         Mind — the top-level orchestrator. Ties everything together:
         self-model, emotion, perception, memory, cognition, language.
         This is the whole brain, not a single subsystem. It's the
         integration layer that coordinates all subsystems.
+
+    (cognition/) answer_composer.py
+        AnswerComposer — composes factual, comparison, parts,
+        counterfactual, and explanatory answers from concept-network
+        relationships. The production half of question answering:
+        Broca's-side composition over temporal semantic knowledge.
+
+    (cognition/) question_handler.py
+        QuestionHandler — routes questions through a priority
+        pipeline: relation queries, personal lookup, theory of mind,
+        memory retrieval, tool lookup, composed reasoning, reflection
+        fallback. Executive question processing (DLPFC).
+
+    (cognition/) response_styler.py
+        ResponseStyler — applies the active metacognitive strategy
+        (assertive, hedging, questioning, varied, neutral) to a
+        response and weaves in learning acknowledgments. Metacognitive
+        tone control: it adjusts tone, never content.
+
+    (cognition/) problem_intake.py
+        interpret_problem / compile_problem — heard language → task
+        spec by frame composition over comprehension propositions
+        (quantified containment on an indefinite subject is a rule;
+        the same predicate on a definite subject is an item
+        description). The outer-world half of the puzzle loop.
+
+    (cognition/) code_tools.py
+        CodeToolHandler — dispatches code tools (compile, test, read,
+        check) when the user mentions a file with an action word, and
+        composes code discussions from concept-network knowledge.
+
+    (cognition/) self_inquiry.py
+        SelfInquiryHandler — routes self-directed questions (how do
+        you feel, what are you, do you dream, who made you) through
+        the self composer, concept network, and emotional state.
+        Medial PFC self-referential processing.
+
+    (reasoning/) competence.py
+        TaskCompetence — the domain-general situation → action →
+        skill memory underneath every task family: schema
+        recognition, affordance learning, prediction checking. PFC
+        performance monitoring over honest task environments.
+
+    (reasoning/) method_library.py
+        MethodLibrary — reusable problem-solving methods mined from
+        verified solutions during sleep and replayed as recognition
+        models during wake (DreamCoder-style wake–sleep cycle).
+
+    (self/) composer.py, introspection.py, reflection.py,
+           metacognitive_model.py, assessment.py, improvement.py,
+           cognitive_trajectory.py
+        The self-model's frontal side. SelfComposer composes
+        self-descriptions from actual state (traits, values, network,
+        emotional state) instead of reciting fixed identity strings.
+        IntrospectionEngine discovers who it is by examining its own
+        network, architecture, capabilities, and emotional life.
+        ReflectionEngine thinks about its own thinking after each
+        interaction. CognitiveProcessModel predicts what reflection
+        will discover before it runs — recursive metacognition.
+        SelfAssessmentEngine evaluates what it actually knows.
+        SelfImprovementEngine proposes modifications to its own code
+        behind the experiment pipeline. CognitiveTrajectoryModel
+        predicts what it will think about next. (The body-side self —
+        proto/core/autobiographical — is claimed by limbic_system.)
+
+    (sleep package) inner_life.py, thoughts.py
+        InnerLife — the stream of cognition: spontaneous thoughts
+        between interactions, triggered by unresolved curiosity and
+        emotional state, chaining and monitored for rumination.
+        Mind-wandering (default-mode-network-like) riding on the
+        arousal state the brainstem sets. SpontaneousThought /
+        ThoughtChainType are the thought records.
+
+    (top-level) commitment.py
+        CommitmentBoundary — digitizes continuous signals into
+        discrete states with hysteresis, sustained-crossing
+        confirmation, and a refractory dwell (asleep/awake,
+        announced-drowsy). The all-or-none spike-threshold analog.
+
+    (language/) pragmatics.py, flow.py
+        PragmaticReasoner — Gricean implicature: what the words mean
+        in this context (observation, request, or complaint).
+        FlowGenerator — language as a Hamiltonian trajectory through
+        the concept network's potential landscape; word order is the
+        order of traversal.
+
+    (tools/) agency.py
+        ActingLoop — open-ended tool use driven by volition: forms an
+        intention from current cognitive state (a curiosity question,
+        a topic from its train of thought, a place it hasn't looked),
+        plans a short chain of steps, executes them, and resolves the
+        curiosity that spawned the intention.
+
+    (self/) identity.py
+        EmergentIdentity / DevelopmentalTracker — the identity that
+        emerges from its own history rather than being assigned:
+        stages, their resolution, and the tracker that records the
+        development. The autobiographical self's growth curve.
+
+    (tools/) source_registry.py, web_search.py, code_analysis.py
+        The remaining tool capabilities: SourceRegistry (the knowledge
+        sources it learns from — WordNet, Wikipedia, man pages),
+        web_search (read-only search and fetch), and code_analysis
+        (static analysis of Python source — symbols, call edges,
+        impact). Prefrontal tool use, the mind-world interface.
+
+    (language/) voice.py — documented, not claimed
+        Voice — the identity-expressive style layer between the
+        generated sentence and the final text (rhythm, connectors).
+        Production-side (Broca's), but its class is also named Voice
+        like temporal_lobe/speech.py's TTS/STT interface, so no lazy
+        claim is registered here — import it directly:
+        ``from ..language.voice import Voice``.
 
 This subsystem documents the frontal components of these multi-subsystem
 systems. No files are moved into this folder — all frontal subsystem
@@ -511,13 +810,99 @@ _EXPORTS: dict[str, str] = {
     "WorkspaceItem": "frontal_lobe.global_workspace",
     "WorkspaceModule": "frontal_lobe.global_workspace",
     # Language production — Broca's area (left inferior frontal
-    # gyrus). Comprehension (Wernicke's) is in auditory.
+    # gyrus). Comprehension (Wernicke's) is claimed by temporal_lobe.
     "GenerativeEngine": "language",
     "Grammar": "language",
     "GraphWalkGenerator": "language",
     "ProsodyGenerator": "language",
     "ProsodyPattern": "language",
     "SelfMonitor": "language",
+    # Pragmatic composition — meaning in context (Gricean implicature)
+    # and flow generation: language as a Hamiltonian geodesic through
+    # the concept network's potential landscape
+    "FlowGenerator": "language.flow",
+    "PragmaticAnalysis": "language.pragmatics",
+    "PragmaticReasoner": "language.pragmatics",
+    # Question answering and response shaping — the DLPFC executive
+    # pipeline over the concept network
+    "AnswerComposer": "cognition.answer_composer",
+    "QuestionHandler": "cognition.question_handler",
+    "ResponseStyler": "cognition.response_styler",
+    # Problem encoding — heard language → task spec, by frame
+    # composition over comprehension propositions
+    "compile_problem": "cognition.problem_intake",
+    "interpret_problem": "cognition.problem_intake",
+    # Tool dispatch for code, and self-directed questions (mPFC)
+    "CodeToolHandler": "cognition.code_tools",
+    "SelfInquiryHandler": "cognition.self_inquiry",
+    # Domain-general competence — schema recognition, affordance
+    # learning, prediction checking (PFC performance monitoring)
+    "EffectModel": "reasoning.competence",
+    "LearnedSkill": "reasoning.competence",
+    "OperatorModel": "reasoning.competence",
+    "SkillMatch": "reasoning.competence",
+    "TaskCompetence": "reasoning.competence",
+    "TaskContext": "reasoning.competence",
+    "TaskSchema": "reasoning.competence",
+    "TaskSignature": "reasoning.competence",
+    # Reusable problem-solving methods mined during sleep
+    # (DreamCoder-style wake–sleep compression)
+    "Method": "reasoning.method_library",
+    "MethodLibrary": "reasoning.method_library",
+    # Metacognition — the self-model's frontal side: reflection,
+    # recursive self-modeling, self-assessment, self-improvement
+    # (mPFC; the body-side self — proto/core/autobiographical — is
+    # claimed by limbic_system)
+    "CapabilityProfile": "self.assessment",
+    "CognitiveProcessModel": "self.metacognitive_model",
+    "CognitiveTrajectoryModel": "self.cognitive_trajectory",
+    "ErrorMonitor": "self.reflection",
+    "Insight": "self.reflection",
+    "IntrospectionEngine": "self.introspection",
+    "KnowledgeAssessment": "self.assessment",
+    "MetacognitiveFeedback": "self.metacognitive_model",
+    "MetacognitivePrediction": "self.metacognitive_model",
+    "MetacognitiveStrategy": "self.reflection",
+    "Proposal": "self.improvement",
+    "ReflectionEngine": "self.reflection",
+    "SelfAssessmentEngine": "self.assessment",
+    "SelfComposer": "self.composer",
+    "SelfImprovementEngine": "self.improvement",
+    # The stream of cognition — spontaneous mind-wandering between
+    # interactions (default-mode-network-like), riding on the sleep
+    # state the brainstem sets
+    "InnerLife": "sleep",
+    "SpontaneousThought": "sleep.thoughts",
+    "ThoughtChainType": "sleep.thoughts",
+    # Commitment boundaries — the digitizer between continuous
+    # signal and discrete state (all-or-none spike-threshold analog)
+    "CommitmentBoundary": "commitment",
+    # Open-ended agency — intentions formed from cognitive state,
+    # planned and executed through the tool layer (PFC agency)
+    "ActingLoop": "tools.agency",
+    "Intention": "tools.agency",
+    # Identity development — the emergent identity's stages and its
+    # developmental tracker (mPFC autobiographical self)
+    "DevelopmentalTracker": "self.identity",
+    "EmergentIdentity": "self.identity",
+    "EmergentIdentitySource": "self.identity",
+    "IdentityStage": "self.identity",
+    "StageResolution": "self.identity",
+    # The remaining tool capabilities — prefrontal tool use, the
+    # mind-world interface (the framework, explorer, code_learner,
+    # and project tools are claimed above)
+    "FileAnalysis": "tools.code_analysis",
+    "WebFetchResult": "tools.web_search",
+    "WebSearchResult": "tools.web_search",
+    "analyze_python_source": "tools.code_analysis",
+    "analyze_python_tree": "tools.code_analysis",
+    "fetch": "tools.web_search",
+    "impact_of": "tools.code_analysis",
+    "search": "tools.web_search",
+    "search_and_fetch": "tools.web_search",
+    "SourceRegistry": "tools.source_registry",
+    "SourceResult": "tools.source_registry",
+    "WordNetSource": "tools.source_registry",
 }
 
 __all__ = sorted(_EXPORTS)

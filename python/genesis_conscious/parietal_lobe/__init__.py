@@ -26,9 +26,10 @@ Pipeline:
     V1 output (from occipital subsystem)
         |
         v
-    [MT/V5] Motion processing (not yet implemented)
-        |   Direction and speed selectivity
-        |   Produces: motion field
+    [MT/V5] Motion processing (motion.py)
+        |   Direction and speed selectivity — per-cell normal flow
+        |   from consecutive frames (constant-brightness least squares)
+        |   Produces: MotionField + grouped MotionRegions
         v
     [LIP] Lateral intraparietal area
         |   Saliency map + winner-take-all selection
@@ -70,11 +71,13 @@ Normalization typically involves:
     2. Normalize: N(F) = (F - min(F)) / (max(F) - min(F))
     3. Suppress local maxima except the global maximum (iterative)
 
-In Genesis: the current implementation computes a scene-level
-salience score (max of V1 salience, color salience, object salience)
-in vision.py's _compute_salience(). A proper topographic saliency
-map is not yet implemented — it would require V1 to output a
-spatially-organized salience map rather than a scalar.
+In Genesis: saliency.py SaliencyMap implements the topographic
+map — bottom-up feature maps (intensity centre-surround, color
+double-opponency, ...) combined into one spatial priority map, with
+SaliencyMap.select() choosing the next attended location by
+winner-take-all and inhibition-of-return returning an
+AttendedLocation. This replaces the scalar scene-salience the
+vision pipeline used before.
 
 
 Winner-Take-All Selection (integrate-and-fire with global inhibition)
@@ -172,6 +175,33 @@ In Genesis: not yet implemented. Genesis doesn't have eye movements
 in the biological sense, but the camera (retina) has a field of
 view. Coordinate transformation would map retinal positions to
 body/world coordinates when spatial reasoning is needed.
+
+
+Motion (MT/V5 — constant-brightness flow)
+-------------------------------------------
+
+motion.py takes two consecutive luminance frames and produces a
+motion field: per-cell direction and speed, plus the moving regions
+those cells group into. The estimator is the constant-brightness
+approximation of optical flow:
+
+    Ix * u + Iy * v + It = 0
+
+    where:
+        Ix, Iy = spatial luminance gradients
+        It     = temporal luminance gradient
+        (u, v) = the cell's flow velocity
+
+Solved per coarse cell by least squares over its pixels (a single
+equation per pixel cannot determine both components; aggregating
+over a cell's pixel set makes the system over-determined and
+solvable). This is *normal flow* — the component of motion visible
+under the aperture constraint — which is exactly the input LIP's
+saliency map and the sensorimotor areas need: where things move and
+how fast, not what they are.
+
+In Genesis: parietal_lobe/motion.py MotionProcessor implements this,
+producing MotionField (per-cell flow) and grouped MotionRegions.
 
 
 ════════════════════════════════════════════════════════════════════════
@@ -305,12 +335,45 @@ imports and re-exports it; the frontal subsystem does the same.
         Referenced by every subsystem.
 
     (Future modules to be added here as they are implemented:)
-    saliency.py    Koch-Ullman saliency map with feature map
-                   combination and winner-take-all selection.
     spatial_wm.py  Bump attractor for spatial working memory.
     coords.py      Retinotopic-to-allocentric coordinate
                    transformation.
-    motion.py      MT/V5 motion processing (dorsal stream).
+
+    Implemented here (see the saliency and motion sections above):
+    saliency.py    LIP topographic saliency map — feature-map
+                   combination, winner-take-all selection,
+                   inhibition-of-return.
+    motion.py      MT/V5 motion processing — per-cell normal flow
+                   via the constant-brightness approximation,
+                   moving-region grouping.
+
+Top-level modules newly claimed by this subsystem:
+
+    (reasoning/) math_reasoning.py
+        MathReasoningEngine — numerical magnitude and symbolic
+        manipulation. The intraparietal sulcus (IPS) handles
+        magnitude; the PFC handles symbolic manipulation
+        (frontoparietal — also re-exported by frontal_lobe).
+
+    (cognition/) situation_model.py
+        SituationModel — the episodic state of the world the current
+        discourse describes ("Mary is in the bathroom", "Sandra is
+        carrying the milk"), updated every turn by comprehension
+        propositions and consulted before semantic memory or external
+        lookup. Event comprehension is parietal-temporal; the model
+        of where things are right now is parietal (the world_model's
+        discourse sibling).
+
+    (spatial/) agent.py, practice.py, solver.py, transforms.py,
+               delta.py, grounding.py
+        The spatial reasoner's full apparatus: SpatialAgent (the
+        practicing agent and its episode results), SpatialPractice
+        (attempt records over offered puzzles), SpatialReasoner's
+        hypothesis/failure records, Transform (the transformation
+        operators — gravity direction, recolor maps, shifts, fills),
+        PairDelta/TaskDelta (perceive_pair/perceive_task — the
+        before/after structure deltas), and the scene-facts
+        grounding of perceived scenes into checkable relations.
 """
 
 from __future__ import annotations
@@ -327,6 +390,16 @@ _EXPORTS: dict[str, str] = {
     "AttentionFocus": "parietal_lobe.attention",
     "AttentionSystem": "parietal_lobe.attention",
     "AttentionType": "parietal_lobe.attention",
+    # LIP — the topographic saliency map and winner-take-all
+    # selection with inhibition-of-return
+    "AttendedLocation": "parietal_lobe.saliency",
+    "SaliencyMap": "parietal_lobe.saliency",
+    "SaliencyResult": "parietal_lobe.saliency",
+    # MT/V5 — per-cell normal flow and the moving regions it groups
+    "MotionCell": "parietal_lobe.motion",
+    "MotionField": "parietal_lobe.motion",
+    "MotionProcessor": "parietal_lobe.motion",
+    "MotionRegion": "parietal_lobe.motion",
     # Multisensory integration — the superior parietal lobule binds
     # the modalities into a unified percept
     "IntegratedPerception": "perception",
@@ -348,6 +421,33 @@ _EXPORTS: dict[str, str] = {
     "SpatialSolution": "spatial",
     "perceive": "spatial",
     "ground_scene": "spatial",
+    # The spatial reasoner's full apparatus — the practicing agent,
+    # its transformation operators, pair/task deltas, and the
+    # grounding of scenes into facts and relations
+    "FailureInfo": "spatial.solver",
+    "PairDelta": "spatial.delta",
+    "perceive_pair": "spatial.delta",
+    "perceive_task": "spatial.delta",
+    "PracticeAttempt": "spatial.practice",
+    "scene_facts": "spatial.grounding",
+    "scene_relations_for": "spatial.grounding",
+    "SpatialAgent": "spatial.agent",
+    "SpatialHypothesis": "spatial.solver",
+    "SpatialPractice": "spatial.practice",
+    "TaskDelta": "spatial.delta",
+    "Transform": "spatial.transforms",
+    # Numerical cognition — the intraparietal sulcus handles
+    # magnitude; the PFC handles symbolic manipulation. Co-claimed
+    # with frontal_lobe (frontoparietal).
+    "MathResult": "reasoning.math_reasoning",
+    "try_math": "reasoning.math_reasoning",
+    # The discourse situation model — the episodic state of the world
+    # the current conversation describes (event comprehension;
+    # distinct from the semantic network)
+    "DialogueAct": "cognition.situation_model",
+    "EntityState": "cognition.situation_model",
+    "SituationEvent": "cognition.situation_model",
+    "SituationModel": "cognition.situation_model",
 }
 
 __all__ = sorted(_EXPORTS)
