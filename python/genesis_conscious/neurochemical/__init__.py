@@ -10,7 +10,7 @@ information is processed — they change the gain, plasticity, and
 mode of every brain region simultaneously.
 
 In the biological brain, neuromodulators are produced by small
-nuclei in the autonomics and hyporelay and projected widely across
+nuclei in the brainstem and hyporelay and projected widely across
 the cortex. Each neurotransmitter system is a separate pathway with
 its own origin, projections, receptor types, and computational role.
 
@@ -26,8 +26,8 @@ The 18 chemicals:
     Index  Chemical          Origin (biological)                Baseline
     -----  --------          ------------------                  -------
     0      Dopamine          VTA, SNc (midbrain)                 0.35
-    1      Serotonin         Dorsal/median raphe (autonomics)     0.40
-    2      Norepinephrine    Locus coeruleus (autonomics)         0.30
+    1      Serotonin         Dorsal/median raphe (brainstem)     0.40
+    2      Norepinephrine    Locus coeruleus (brainstem)         0.30
     3      Acetylcholine     Basal forebrain (nucleus of Meynert) 0.35
     4      GABA              Inhibitory interneurons (ubiquitous) 0.50
     5      Glutamate         Excitatory neurons (ubiquitous)     0.60

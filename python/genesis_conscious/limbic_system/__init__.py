@@ -404,6 +404,27 @@ _EXPORTS: dict[str, str] = {
     "UserAffectEstimate": "learning",
     # Amygdala evaluation of language — sentiment tagging
     "analyze_sentiment": "language.sentiment",
+    # The learned sentiment lexicon — valence acquired from experience
+    "clear_learned_sentiment": "language.sentiment",
+    "has_learned_sentiment": "language.sentiment",
+    "learn_sentiment": "language.sentiment",
+    "lookup_sentiment": "language.sentiment",
+    # Affective self-report — composing how it feels and what it is
+    # concerned about, from the emotional state (insula → expression)
+    "FeelingReporter": "cognition.feeling_reporter",
+    # The self-model's structural components — traits, the machine
+    # body-substrate, the minimal self, agency detection, values,
+    # self-esteem (SelfModel itself is claimed above)
+    "AgencyDetector": "self.model",
+    "ComputationalSubstrate": "self.model",
+    "MinimalSelf": "self.model",
+    "PersonalityTraits": "self.model",
+    "SelfEsteem": "self.model",
+    "Value": "self.model",
+    # Interoceptive congruence — how well the felt body matches the
+    # expressed body (somatic_marker congruence)
+    "SomaticSnapshot": "self.somatic",
+    "somatic_congruence": "self.somatic",
     # Reward/motivation tracking — the dopamine sense of progress
     "GrowthLedger": "infrastructure.growth_ledger",
     "GrowthMilestone": "infrastructure.growth_ledger",
