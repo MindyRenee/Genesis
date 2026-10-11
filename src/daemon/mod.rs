@@ -56,6 +56,9 @@ pub mod interoception;
 pub mod ipc;
 /// RTC wake alarm — scheduling its own return from suspension.
 pub mod rtc_wake;
+/// Named multidimensional tensor slab — shared numeric state between
+/// the daemon and the cognitive mind.
+pub mod tensor_slab;
 pub mod tick;
 
 pub use active_inference::{ActiveInferenceEngine, InferenceResult, apply_inference_feedback};

@@ -6,7 +6,7 @@ domain socket and provides a clean, Pythonic API for all IPC commands.
 
 The protocol is request-response only. Subcognitive→cognitive
 notifications (phase changes, dream insights) are handled separately
-by ``genesis_conscious.infrastructure.notifications``, a pull-based queue that
+by ``infrastructure.notifications``, a pull-based queue that
 detects state changes during the polling cycle — not by this client.
 
 # Usage
@@ -83,6 +83,7 @@ from .protocol import (
     CHEM_OXYTOCIN,
     CONSOLIDATE,
     DREAM,
+    DROP_TENSOR,
     DT_MAX,
     DT_MIN,
     DT_NOMINAL_STEP,
@@ -93,6 +94,7 @@ from .protocol import (
     GET_INFERENCE_SUMMARY,
     GET_ION_SUMMARY,
     GET_MEMORY_STATS,
+    GET_MOTOR_TARGET,
     GET_NEURO_SUMMARY,
     GET_PHASE,
     GET_PLASTICITY_PROFILE,
@@ -102,8 +104,10 @@ from .protocol import (
     # Command IDs
     GET_STATE,
     GET_SUBSYSTEM_TELEMETRY,
+    GET_TENSOR,
     GET_ZONE_TRANSITIONS,
     HANDSHAKE,
+    LIST_TENSORS,
     # Module IDs (for validation and store_observation)
     MODULE_GUARDRAILS,
     MODULE_SENSORY,
@@ -115,6 +119,7 @@ from .protocol import (
     NEURO_IMPULSE,
     PING,
     PROTOCOL_VERSION,
+    PUT_TENSOR,
     READ_SENSORS,
     RETRIEVE_EPISODE,
     SAVE_INFERENCE,
@@ -138,6 +143,14 @@ from .protocol import (
     write_message,
 )
 from .swallow import note_swallowed
+from .tensor import (
+    MotorTarget,
+    Tensor,
+    TensorMeta,
+    pack_name,
+    unpack_list,
+    unpack_motor_target,
+)
 from .types import (
     BodyControlState,
     BodyState,
@@ -326,12 +339,16 @@ class GenesisClient:
         STORE_EVENT, NEURO_IMPULSE, NEURO_ADJUST_BASELINE, SET_ZONE, SYNC,
         SHUTDOWN, UPDATE_MODULE_STATUS, UPDATE_USER_AFFECT, ARCHIVE_EPISODE,
         STORE_EPISODE,
-        ADVANCE_NEURO, CONSOLIDATE, ASSOCIATE, DREAM, READ_SENSORS,
-        APPLY_BODY_CONTROL, SAVE_INFERENCE,
+        ADVANCE_NEURO, ADVANCE_PHYSICS, CONSOLIDATE, ASSOCIATE, DREAM, READ_SENSORS,
+        APPLY_BODY_CONTROL, SAVE_INFERENCE, SET_POLICY_AUTHORITY, SET_WAKE_ALARM,
     })
 
+    # All tensor commands are idempotent (last-write-wins put,
+    # read-only gets/list, idempotent remove), so every one may be
+    # retried after a reconnect.
     _RETRYABLE_CMDS = _CACHEABLE_CMDS | frozenset({
         PING, RETRIEVE_EPISODE, FIND_SIMILAR, GET_RECENT_EPISODES, SEARCH_EPISODES,
+        PUT_TENSOR, GET_TENSOR, LIST_TENSORS, DROP_TENSOR, GET_MOTOR_TARGET,
     })
 
     # Commands whose response first byte is an ack/status byte (1 =
@@ -343,8 +360,12 @@ class GenesisClient:
         PING, STORE_EVENT, STORE_EPISODE, SET_ZONE, NEURO_IMPULSE, SYNC,
         SHUTDOWN, UPDATE_MODULE_STATUS, UPDATE_USER_AFFECT,
         ARCHIVE_EPISODE,
-        NEURO_ADJUST_BASELINE, ADVANCE_NEURO, CONSOLIDATE, ASSOCIATE,
+        NEURO_ADJUST_BASELINE, ADVANCE_NEURO, ADVANCE_PHYSICS, CONSOLIDATE, ASSOCIATE,
         DREAM, READ_SENSORS, APPLY_BODY_CONTROL, SAVE_INFERENCE,
+        SET_POLICY_AUTHORITY, SET_WAKE_ALARM,
+        # PUT/DROP ack with a single byte. GET_TENSOR's leading
+        # found-byte is 0 or 1, so it can never alias an error code.
+        PUT_TENSOR, DROP_TENSOR,
     })
 
     def _request(
@@ -484,6 +505,65 @@ class GenesisClient:
         """
         resp = self._request(GET_ION_SUMMARY, timeout=timeout)
         return IonSummary.unpack(resp)
+
+    # ─── Tensor slab ──────────────────────────────────────────
+    # Named multidimensional tensors shared with the daemon — world
+    # frames, salience fields, embeddings, motor fields. Wire layouts
+    # live in `genesis_client.tensor` and mirror
+    # `src/daemon/tensor_slab.rs`. The slab is process-local daemon
+    # state: nothing here survives a daemon restart.
+
+    def put_tensor(
+        self,
+        name: str,
+        tensor: Tensor,
+        *,
+        timeout: float | None = None,
+    ) -> bool:
+        """Store a named tensor on the daemon's slab (last write wins).
+
+        Args:
+            name: 1–128 byte UTF-8 name (e.g. ``"world.frame"``).
+            tensor: The :class:`Tensor` to store.
+
+        Returns:
+            True when the daemon acknowledged the store.
+        """
+        resp = self._request(
+            PUT_TENSOR, pack_name(name) + tensor.pack(), timeout=timeout
+        )
+        return bool(resp) and resp[0] == 1
+
+    def get_tensor(
+        self, name: str, *, timeout: float | None = None
+    ) -> Tensor | None:
+        """Fetch a named tensor, or ``None`` when absent."""
+        resp = self._request(GET_TENSOR, pack_name(name), timeout=timeout)
+        if not resp or resp[0] == 0:
+            return None
+        return Tensor.unpack(resp[1:])
+
+    def list_tensors(self, *, timeout: float | None = None) -> list[TensorMeta]:
+        """Names, dtypes, and shapes of every live slab tensor."""
+        resp = self._request(LIST_TENSORS, timeout=timeout)
+        return unpack_list(resp)
+
+    def drop_tensor(self, name: str, *, timeout: float | None = None) -> bool:
+        """Remove a named tensor. Idempotent — absent names ack too."""
+        resp = self._request(DROP_TENSOR, pack_name(name), timeout=timeout)
+        return bool(resp) and resp[0] == 1
+
+    def get_motor_target(self, *, timeout: float | None = None) -> MotorTarget:
+        """What the published motor fields currently point at.
+
+        The daemon decodes ``motor.spatial`` (argmax cell projected
+        onto its canonical 64×64 coordinate grid) and ``motor.actions``
+        (argmax disposition, mapped through ``motor.action_ids``) into
+        a single fixed-width answer — the decision read back from the
+        distributed field, not the symbol that wrote it.
+        """
+        resp = self._request(GET_MOTOR_TARGET, timeout=timeout)
+        return unpack_motor_target(resp)
 
     def get_neuro_summary(self, *, timeout: float | None = None) -> NeuroSummary:
         """Get the compact neurochemical summary (32 bytes).
@@ -933,9 +1013,21 @@ class GenesisClient:
             raise ValueError(f"limit must be 0-4294967295, got {limit}")
         if not (0 <= offset <= 0xFFFFFFFF):
             raise ValueError(f"offset must be 0-4294967295, got {offset}")
-        payload = _U32.pack(limit) + _U32.pack(offset)
-        resp = self._request(SEARCH_EPISODES, payload, timeout=timeout)
-        return unpack_recent_episodes(resp)
+        limit = min(limit, 1000)
+        episodes: list[RecentEpisode] = []
+        while len(episodes) < limit:
+            page_offset = offset + len(episodes)
+            if page_offset > 0xFFFFFFFF:
+                break
+            payload = _U32.pack(limit - len(episodes)) + _U32.pack(page_offset)
+            resp = self._request(SEARCH_EPISODES, payload, timeout=timeout)
+            page = unpack_recent_episodes(resp)
+            if not page:
+                break
+            if episodes and page[0].episode_id <= episodes[-1].episode_id:
+                raise ProtocolError("episode search returned overlapping pages")
+            episodes.extend(page)
+        return episodes
 
     def set_zone(self, zone: int, *, timeout: float | None = None) -> bool:
         """Set the cognitive task zone (what Genesis is doing).

@@ -18,15 +18,12 @@ import logging
 
 import pytest
 
-from genesis_conscious import (
-    ConceptNetwork,
-    CuriosityEngine,
-    ReasoningEngine,
-    ReflectionEngine,
-    RelationType,
-)
-from genesis_conscious.sleep import InnerLife
-from genesis_conscious.sleep.thoughts import SpontaneousThought
+from concepts import ConceptNetwork, RelationType
+from frontal_lobe.reasoning import Reasoner
+from limbic_system.curiosity import Curiosity
+from self import Reflection
+from sleep import InnerLife
+from sleep.thoughts import SpontaneousThought
 
 
 def _inner_life() -> InnerLife:
@@ -35,11 +32,11 @@ def _inner_life() -> InnerLife:
         net.add_concept(name, confidence=0.5)
     net.add_edge("alpha", "beta", RelationType.RELATED_TO, 0.8)
     net.add_edge("beta", "gamma", RelationType.RELATED_TO, 0.5)
-    reasoning = ReasoningEngine(net)
+    reasoning = Reasoner(net)
     return InnerLife(
         net,
-        CuriosityEngine(net, reasoning),
-        ReflectionEngine(net),
+        Curiosity(net, reasoning),
+        Reflection(net),
         seed=7,
     )
 
@@ -62,7 +59,7 @@ def _nrem_summary():
 
 def _emotion():
     """A neutral EmotionalState, built the way the real one is."""
-    from genesis_conscious.limbic_system.emotion import (
+    from limbic_system.emotion import (
         EmotionalState,
         EmotionCategory,
     )
@@ -101,8 +98,8 @@ def test_dream_derived_insight_reaches_the_dream_stream() -> None:
     attributes, because `_LiveEvent` had no `is_dream` to read. Only a live
     run caught that. Asserting on the sender asserts the wrong side.
     """
-    from genesis_conscious.mind.conversation import stream_kind
-    from genesis_conscious.sleep.inner_life import _LiveEvent
+    from frontal_lobe.conversation import stream_kind
+    from sleep.inner_life import _LiveEvent
 
     il = _inner_life()
     recorder = _Recorder()
@@ -125,8 +122,8 @@ def test_dream_derived_insight_reaches_the_dream_stream() -> None:
 
 def test_waking_derived_insight_stays_a_thought() -> None:
     """The other direction: waking insights must not be demoted."""
-    from genesis_conscious.mind.conversation import stream_kind
-    from genesis_conscious.sleep.inner_life import _LiveEvent
+    from frontal_lobe.conversation import stream_kind
+    from sleep.inner_life import _LiveEvent
 
     il = _inner_life()
     recorder = _Recorder()
@@ -148,7 +145,7 @@ def test_live_event_carries_the_dream_flag() -> None:
     Its `__slots__` omitted `is_dream`, so every dream-derived event was
     indistinguishable from a waking one no matter what the sender said.
     """
-    from genesis_conscious.sleep.inner_life import _LiveEvent
+    from sleep.inner_life import _LiveEvent
 
     assert "is_dream" in _LiveEvent.__slots__, (
         "the receiver reads is_dream off this object"
@@ -245,7 +242,7 @@ def test_chain_stops_when_sleep_onsets_mid_chain() -> None:
         lambda emotion, thought: 1.0
     )
 
-    import genesis_conscious.sleep.inner_life as il_mod
+    import sleep.inner_life as il_mod
 
     original_delay = il_mod.CHAIN_THOUGHT_DELAY
     il_mod.CHAIN_THOUGHT_DELAY = 0.0
@@ -329,7 +326,7 @@ def test_dream_generators_are_only_flagged_by_their_callers() -> None:
 def test_parasomnia_log_is_not_a_thought(caplog) -> None:
     """Parasomnia events are logged, never surfaced as thoughts."""
     il = _inner_life()
-    caplog.set_level(logging.WARNING, logger="genesis_conscious.sleep.inner_life")
+    caplog.set_level(logging.WARNING, logger="sleep.inner_life")
 
     recorder = _Recorder()
     il._emit = recorder  # type: ignore[method-assign,assignment]
@@ -441,7 +438,7 @@ def test_broadcast_carries_the_explicit_learning_flag() -> None:
         class language:
             current_brain_waves = None
 
-    il._cognition = _Cog()
+    il._frontal = _Cog()
 
     dream = _thought("dream", is_dream=True)
     il._broadcast_thought(dream, ["alpha"])

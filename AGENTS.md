@@ -4,7 +4,8 @@
 Genesis is a machine-native cognitive architecture. The Rust crate
 (`genesis`) defines the core state schema — the memory-mapped hub of
 system state that every module reads from and writes to. The Python
-layer (`python/genesis_conscious/`) is the cognitive mind: perception,
+layer (`python/`, one top-level package per brain region) is
+the cognitive mind: perception,
 reasoning, language, introspection, and self-modeling.
 
 ## CRITICAL RULE: Never hardcode Genesis's responses
@@ -68,7 +69,9 @@ not — those must be generated, not recited.
   `ZIG_ROOT=` / `LIBCLANG_ROOT=` if yours differ. The include set must
   match `$ZIG cc -E -v -x c /dev/null` exactly — print it and copy the
   `<...>` search list. A partial set fails on `__STD_TYPE` inside
-  `stddef.h`. With this the Rust suite is 524 tests and takes ~2 min.
+  `stddef.h`. With this the Rust suite is ~600 tests (596 as of
+  October 2026) and takes ~2 min of test time once the release
+  build is warm (a cold release build is ~15 min more).
   Note that `. ./scripts/cargo-env.sh` must run in the *current*
   shell: piping the source (`. ./scripts/cargo-env.sh | tail`) runs it
   in a subshell, so the exported `PATH` is discarded and the build
@@ -77,7 +80,7 @@ not — those must be generated, not recited.
 - Python 3.12+ (CI tests 3.12 and 3.14), dependencies pinned in
   `python/requirements.txt` (runtime) and `python/requirements-dev.txt` (lint + test). Install with: `pip install -r python/requirements-dev.txt`
 - Lint: `ruff check` and `pyflakes` (both must pass)
-- Type check: `mypy python/genesis_conscious/ python/genesis_client/ python/genesis_cli.py python/tests/ --ignore-missing-imports` (0 errors)
+- Type check: `mypy python/ --ignore-missing-imports` (0 errors)
 - Optional native capabilities (not in requirements.txt, because the
   wheels bind to system libraries that may be absent): microphone
   (`vosk`, `sounddevice`, `speechrecognition`), voice (`piper-tts` +
@@ -88,6 +91,29 @@ not — those must be generated, not recited.
   libportaudio, so a wheel-only install silently turns "no microphone"
   into a crash in the audio thread. Genesis degrades to text-only when a
   capability is missing — that is expected, not an error.
+
+## Packaged install
+- `python/` is a real package (`genesis-cognitive`): `pip install
+  ./python` provides the `genesis` console script — the installed
+  equivalent of run.sh (it sets `GENESIS_RUN` itself). Additions:
+  `--headless` (resident mode, no prompt; for systemd/background),
+  `--stop` (the run.sh --stop teardown, pidfiles + /proc scan), and
+  `~/.config/genesis/agent.env` loading (`GENESIS_ENV_FILE` overrides).
+- `scripts/install.sh` installs locally: `~/.local/lib/genesis/venv`
+  (editable — the running code stays this checkout), binaries copied
+  beside the interpreter, `~/.local/bin/genesis`, and an enabled
+  `genesis.service` systemd user unit. `--uninstall` removes the
+  install, never the data dir.
+- Path resolution for installed layouts lives in
+  `infrastructure/paths.py`: `package_root()` (the dir holding the
+  top-level packages) and `code_root()` (the source tree: GENESIS_ROOT
+  → repo-marker walk → package container). Use these instead of new
+  `parents[N]`/`dirname(...)` depth-counting — a packaged install has
+  no checkout above site-packages.
+- Binaries resolve `GENESIS_BIN_DIR` → `target/release` → beside the
+  interpreter (`venv/bin`). The privileged helpers prefer the
+  root-owned `/usr/local/libexec/genesis` copies; the Python
+  `CpuSpeed` probe (`sudo -n <helper> test`) mirrors the daemon's.
 
 ## Time ownership
 The daemon is the sole authority on time and on physics. It is the
@@ -141,7 +167,7 @@ Two layout traps worth knowing before touching either struct:
   `read_consistent()`, or ask the daemon.
 
 `GET_ION_SUMMARY` (opcode 40, additive, 108-byte reply) exposes the
-layer to the mind; `genesis_conscious/neurochemical/electrochemistry.py`
+layer to the mind; `neurochemical/electrochemistry.py`
 turns it into bounded cognitive modulation (attention / integration /
 memory-consolidation gains, neutral ≈ 1.0). Note genesis2 uses opcode
 **36** for this; that id is already spent here on `GET_SENSOR_PRESENCE`,
@@ -295,12 +321,12 @@ Other things worth knowing before experimenting:
 - **Disk grows slowly by design.** The episodic store is append-only
   (<1 KB per episode, linear). Expect months-to-years scale; watch
   small volumes. Everything that grows in memory is bounded and
-  explicitly so — episodic eviction (`memory/engine.py`), attractor
+  explicitly so — episodic eviction (`memory/memory.py`), attractor
   trimming to 60% of Hopfield capacity (`memory/systems.py`),
   executive suppression with release deadlines and 50 retained
   conversation threads / 200 topic-history entries
   (`memory/working.py`), 500 retained learning results and a
-  200-entry FIFO curiosity queue (`learning/autonomous.py`), 5,000
+  200-entry FIFO curiosity queue (`frontal_lobe/autonomous.py`), 5,000
   review records with `stability` capped at 7 days
   (`memory/spaced_repetition.py`), and a 4,096-entry LRU vector cache
   (`concepts/embeddings.py`).
@@ -426,7 +452,7 @@ written at save time; the log's fold overwrites it at restore.
   site cannot go stale between thresholds. 10,000 failures produce 14
   records, the last carrying the true count. The tally lives in
   `genesis_client` (the lower layer) with the journal injected as a
-  sink at Mind startup, because `genesis_conscious` depends on
+  sink at Mind startup, because the region tree depends on
   `genesis_client` and not the reverse. Query with `swallow_report()`,
   surfaced in status as `swallowed_errors`. Site names are
   `module.function`, derived from the real enclosing scope.

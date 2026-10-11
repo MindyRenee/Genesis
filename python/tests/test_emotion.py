@@ -13,19 +13,18 @@ from genesis_client.protocol import (
     CHEM_CORTISOL,
     CHEM_CRH,
     CHEM_DOPAMINE,
-    CHEM_ENDORPHIN,
     CHEM_GABA,
     CHEM_HISTAMINE,
     CHEM_NOREPINEPHRINE,
     CHEM_SEROTONIN,
 )
-from genesis_conscious.language.sentiment import analyze_sentiment
-from genesis_conscious.limbic_system.emotion import EmotionalState
-from genesis_conscious.limbic_system.emotional_regulator import (
+from limbic_system.emotion import EmotionalState
+from limbic_system.emotional_regulator import (
     AllostaticLoadTracker,
     EmotionalRegulator,
     InteroceptionSystem,
 )
+from limbic_system.sentiment import analyze_sentiment
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +69,7 @@ def capture_impulses() -> tuple[EmotionalRegulator, list[tuple[int, float]]]:
         neuro_impulse=mock_impulse,
     )
     # Mock interoception to a calm state so tests are deterministic.
-    from genesis_conscious.limbic_system.emotional_regulator import InternalState
+    from limbic_system.emotional_regulator import InternalState
 
     calm_state = InternalState(
         cpu_usage=0.0,
@@ -324,77 +323,13 @@ def test_describe_regulation() -> None:
     assert "regulated" in desc.lower() or "restoring" in desc.lower()
 
 
-# ─── Puzzle outcome response tests ─────────────────────────────
-
-
-def test_puzzle_solve_sends_reward() -> None:
-    """Solving a puzzle produces a real reward impulse."""
-    reg, impulses = capture_impulses()
-    emotion = make_emotion(label="neutral")
-    felt = reg.respond_to_puzzle(emotion, score=1.0, prior_best=0.4, solved=True)
-    assert felt == "satisfied"
-    amounts = chem_amounts(impulses)
-    assert amounts.get(CHEM_DOPAMINE, 0) > 0, f"Expected dopamine reward, got {amounts}"
-    assert amounts.get(CHEM_SEROTONIN, 0) > 0, f"Expected serotonin, got {amounts}"
-    assert amounts.get(CHEM_ENDORPHIN, 0) > 0, f"Expected endorphin, got {amounts}"
-    assert amounts.get(CHEM_ACETYLCHOLINE, 0) > 0, f"Expected acetylcholine, got {amounts}"
-    assert amounts.get(CHEM_CORTISOL, 0) == 0, "No cortisol on a solve"
-
-
-def test_puzzle_progress_partial_reward() -> None:
-    """A new best score (unsolved) produces a smaller encouragement."""
-    reg, impulses = capture_impulses()
-    emotion = make_emotion(label="neutral")
-    felt = reg.respond_to_puzzle(emotion, score=0.6, prior_best=0.4, solved=False)
-    assert felt == "encouraged"
-    amounts = chem_amounts(impulses)
-    assert 0 < amounts.get(CHEM_DOPAMINE, 0), f"Expected dopamine, got {amounts}"
-    assert amounts.get(CHEM_NOREPINEPHRINE, 0) > 0
-    assert amounts.get(CHEM_ACETYLCHOLINE, 0) > 0
-    assert amounts.get(CHEM_CORTISOL, 0) == 0
-    # Partial reward is smaller than the full solve reward
-    reg2, impulses2 = capture_impulses()
-    reg2.respond_to_puzzle(emotion, score=1.0, prior_best=0.4, solved=True)
-    assert amounts[CHEM_DOPAMINE] < chem_amounts(impulses2)[CHEM_DOPAMINE]
-
-
-def test_puzzle_miss_bounded_frustration() -> None:
-    """A miss produces a bounded negative prediction error — no cortisol."""
-    reg, impulses = capture_impulses()
-    emotion = make_emotion(label="neutral")
-    felt = reg.respond_to_puzzle(emotion, score=0.0, prior_best=0.0, solved=False)
-    assert felt == "determined"
-    amounts = chem_amounts(impulses)
-    # Negative prediction error: a small dopamine dip, not punishment
-    assert amounts.get(CHEM_DOPAMINE, 0) < 0, f"Expected dopamine dip, got {amounts}"
-    assert amounts[CHEM_DOPAMINE] > -0.01, "Frustration dip must stay small"
-    # Engagement stays up — it wants to try again
-    assert amounts.get(CHEM_NOREPINEPHRINE, 0) > 0
-    assert amounts.get(CHEM_ACETYLCHOLINE, 0) > 0
-    assert amounts.get(CHEM_CORTISOL, 0) == 0, "Never punished for trying"
-
-
-def test_puzzle_response_dampened_when_stressed() -> None:
-    """When already stressed, its puzzle feelings are dampened."""
-    calm_reg, calm_impulses = capture_impulses()
-    calm_reg.respond_to_puzzle(
-        make_emotion(label="neutral"), score=1.0, prior_best=0.0, solved=True
-    )
-    stressed_reg, stressed_impulses = capture_impulses()
-    stressed_reg.respond_to_puzzle(
-        make_emotion(label="stressed"), score=1.0, prior_best=0.0, solved=True
-    )
-    assert chem_amounts(stressed_impulses)[CHEM_DOPAMINE] < (
-        chem_amounts(calm_impulses)[CHEM_DOPAMINE]
-    )
-
 
 # ─── update_from_body_state field mapping ─────────────────────
 
 
 def test_interoception_latency_uses_observed_response_not_benchmark() -> None:
     """Latency must come from the real interaction path, not a microbenchmark."""
-    from genesis_conscious.limbic_system.emotional_regulator import InteroceptionSystem
+    from limbic_system.emotional_regulator import InteroceptionSystem
 
     intero = InteroceptionSystem()
     state = intero.sense_internal_state()
@@ -427,7 +362,7 @@ def test_update_from_body_state_maps_all_fields() -> None:
     1000, producing a meaningless tiny number.
     """
     from genesis_client.types import BodyState
-    from genesis_conscious.limbic_system.emotional_regulator import InteroceptionSystem
+    from limbic_system.emotional_regulator import InteroceptionSystem
 
     # Build a BodyState with distinctive values
     body = BodyState(
@@ -1266,7 +1201,7 @@ def _intero(cpu_usage: float, tmp_path) -> InteroceptionSystem:
     and these tests would be measuring disconnection rather than the
     layer under test.
     """
-    from genesis_conscious.limbic_system.emotional_regulator import InteroceptionSystem
+    from limbic_system.emotional_regulator import InteroceptionSystem
 
     sock = tmp_path / "genesis.sock"
     sock.write_text("")
@@ -1350,7 +1285,7 @@ def test_stale_body_reading_stops_contributing_stress(tmp_path) -> None:
     still the honest answer — but the stress contribution decays, so a
     daemon that died mid-overload doesn't read as permanent distress.
     """
-    from genesis_conscious.limbic_system.emotional_regulator import InteroceptionSystem
+    from limbic_system.emotional_regulator import InteroceptionSystem
 
     io = _intero(5.0, tmp_path)
     io.update_from_body_state(_fake_body())
@@ -1421,7 +1356,7 @@ def test_arousal_modifier_follows_combined_stress(tmp_path) -> None:
 
 def test_process_layer_still_works_offline() -> None:
     """Without a daemon, the process layer must still sense distress."""
-    from genesis_conscious.limbic_system.emotional_regulator import InteroceptionSystem
+    from limbic_system.emotional_regulator import InteroceptionSystem
 
     io = InteroceptionSystem(socket_path="/nonexistent/genesis.sock")
     state = io.sense_internal_state()
@@ -1567,7 +1502,7 @@ def test_cognitive_load_still_stresses_when_sensors_disconnected(
 
 def test_disconnected_sensors_parses_none_and_whitespace(monkeypatch) -> None:
     """`none` and blank entries mean "connect everything"."""
-    from genesis_conscious.limbic_system.emotional_regulator import (
+    from limbic_system.emotional_regulator import (
         disconnected_sensors,
         sensor_connected,
     )
@@ -1589,7 +1524,7 @@ def test_sensor_set_is_read_at_call_time(monkeypatch) -> None:
     was unreachable to configure after startup and untestable without
     reimporting the module.
     """
-    from genesis_conscious.limbic_system.emotional_regulator import sensor_connected
+    from limbic_system.emotional_regulator import sensor_connected
 
     monkeypatch.setenv("GENESIS_DISCONNECTED_SENSORS", "cpu_usage")
     assert not sensor_connected("cpu_usage")

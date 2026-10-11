@@ -8,8 +8,8 @@ import time
 
 import pytest
 
-from genesis_conscious.concepts import RelationType
-from genesis_conscious.mind import Mind
+from concepts import RelationType
+from mind import Mind
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def test_mind_lifecycle_learner_persistence():
         mind1 = Mind(socket_path)
         # Don't call start() — it needs the daemon. We test
         # _save_state/_load_saved_state directly.
-        learner = mind1.cognition.self_learner
+        learner = mind1.brain.frontal.self_learner
         learner.learn_from_input("A dog is a mammal.")
         learner.learn_from_input("Cryptobiosis is defined as a state of suspended animation.")
         learner.learn_from_input("A spider has eight legs.")
@@ -51,14 +51,14 @@ def test_mind_lifecycle_learner_persistence():
         mind2 = Mind(socket_path)
         mind2._load_saved_state()
 
-        learner2 = mind2.cognition.self_learner
+        learner2 = mind2.brain.frontal.self_learner
         stats2 = learner2.get_stats()
 
         # Learner stats should match
         assert stats2 == stats1, f"Stats mismatch: {stats2} vs {stats1}"
 
         # Concept network should have the learned concepts
-        net = mind2.cognition.network
+        net = mind2.brain.frontal.network
         assert net.get_concept("dog") is not None
         assert net.get_concept("cryptobiosis") is not None
         assert net.get_concept("spider") is not None
@@ -86,7 +86,7 @@ def test_failed_late_restore_does_not_commit_network(tmp_path):
     import gzip
     import json
 
-    from genesis_conscious.infrastructure.persistence import load_state
+    from infrastructure.persistence import load_state
 
     source_dir = tmp_path / "source"
     target_dir = tmp_path / "target"
@@ -94,11 +94,11 @@ def test_failed_late_restore_does_not_commit_network(tmp_path):
     target_dir.mkdir()
 
     source = Mind(str(source_dir / "genesis.sock"))
-    source.cognition.network.add_concept("restored_marker", "concept")
+    source.brain.frontal.network.add_concept("restored_marker", "concept")
     source._save_state()
 
     target = Mind(str(target_dir / "genesis.sock"))
-    target.cognition.network.add_concept("preexisting_marker", "concept")
+    target.brain.frontal.network.add_concept("preexisting_marker", "concept")
 
     data = load_state(str(source_dir))
     assert data is not None
@@ -109,8 +109,8 @@ def test_failed_late_restore_does_not_commit_network(tmp_path):
 
     with pytest.raises(OSError, match="Cannot restore cognitive_state"):
         target._load_saved_state()
-    assert target.cognition.network.get_concept("preexisting_marker") is not None
-    assert target.cognition.network.get_concept("restored_marker") is None
+    assert target.brain.frontal.network.get_concept("preexisting_marker") is not None
+    assert target.brain.frontal.network.get_concept("restored_marker") is None
 
 
 def test_mind_lifecycle_backward_compat():
@@ -142,7 +142,7 @@ def test_mind_lifecycle_backward_compat():
         mind._load_saved_state()
 
         # Learner should have default stats
-        stats = mind.cognition.self_learner.get_stats()
+        stats = mind.brain.frontal.self_learner.get_stats()
         assert stats["total_inferences"] == 0
         assert stats["conversation_facts"] == 0
 
@@ -153,7 +153,7 @@ def test_mind_lifecycle_learner_log_persistence():
         socket_path = os.path.join(data_dir, "genesis.sock")
 
         mind1 = Mind(socket_path)
-        learner = mind1.cognition.self_learner
+        learner = mind1.brain.frontal.self_learner
         learner.learn_from_input("A dog is a mammal.")
         learner.learn_from_input("A cat is a mammal.")
         learner.learn_from_input("Entropy means a measure of disorder.")
@@ -166,7 +166,7 @@ def test_mind_lifecycle_learner_log_persistence():
         mind2 = Mind(socket_path)
         mind2._load_saved_state()
 
-        learner2 = mind2.cognition.self_learner
+        learner2 = mind2.brain.frontal.self_learner
         log_after = list(learner2._learning_log)
 
         assert len(log_after) == len(log_before)
@@ -245,8 +245,8 @@ def test_enter_teaching_mode_sets_flag():
 
         assert mind.is_teaching
         assert mind.teaching_topic == "neuroscience"
-        assert mind.cognition.teaching_mode
-        assert mind.cognition.teaching_topic == "neuroscience"
+        assert mind.brain.frontal.teaching_mode
+        assert mind.brain.frontal.teaching_topic == "neuroscience"
 
 
 def test_enter_teaching_mode_without_topic():
@@ -256,7 +256,7 @@ def test_enter_teaching_mode_without_topic():
         mind.enter_teaching_mode()
         assert mind.is_teaching
         assert mind.teaching_topic == ""
-        assert mind.cognition.teaching_mode
+        assert mind.brain.frontal.teaching_mode
 
 
 def test_exit_teaching_mode_clears_flag():
@@ -270,8 +270,8 @@ def test_exit_teaching_mode_clears_flag():
 
         assert not mind.is_teaching
         assert mind.teaching_topic == ""
-        assert not mind.cognition.teaching_mode
-        assert mind.cognition.teaching_topic == ""
+        assert not mind.brain.frontal.teaching_mode
+        assert mind.brain.frontal.teaching_topic == ""
 
 
 def test_exit_teaching_mode_when_not_teaching_is_noop():
@@ -365,7 +365,7 @@ def test_teaching_mode_updates_topic_when_already_teaching():
 
         mind.enter_teaching_mode("calculus")
         assert mind.teaching_topic == "calculus"
-        assert mind.cognition.teaching_topic == "calculus"
+        assert mind.brain.frontal.teaching_topic == "calculus"
         assert mind.is_teaching
 
 
@@ -373,23 +373,23 @@ def test_curiosity_filtering_in_teaching_mode():
     """In teaching mode, only lesson-related curiosity questions should be asked."""
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_mind(data_dir)
-        cognition = mind.cognition
+        frontal = mind.brain.frontal
 
         # Add some concepts to the network
-        net = cognition.network
+        net = frontal.network
         net.add_concept("neuron", origin="dictionary")
         net.add_concept("synapse", origin="dictionary")
         net.add_concept("pizza", origin="dictionary")
         # Add an edge so neuron and synapse are neighbors
-        from genesis_conscious.concepts import RelationType
+        from concepts import RelationType
         net.add_edge("neuron", "synapse", relation=RelationType.RELATED_TO)
 
         # Simulate teaching mode
-        cognition.teaching_mode = True
-        cognition.teaching_topic = "neuroscience"
+        frontal.teaching_mode = True
+        frontal.teaching_topic = "neuroscience"
 
         # Test the lesson topic helper
-        from genesis_conscious.perception import Intent, Perception, QuestionType
+        from perception import Intent, Perception, QuestionType
         perception = Perception(
             raw_text="Tell me about neurons",
             intent=Intent.STATEMENT,
@@ -408,14 +408,14 @@ def test_curiosity_filtering_in_teaching_mode():
             word_count=4,
             confidence=0.8,
         )
-        lesson_topics = cognition._teaching_lesson_topics(perception)
+        lesson_topics = frontal._teaching_lesson_topics(perception)
         assert "neuron" in lesson_topics
         assert "neuroscience" in lesson_topics
 
         # Test concept-relates-to-lesson helper
-        assert cognition._concept_relates_to_lesson("neuron", "neuron")
-        assert cognition._concept_relates_to_lesson("synapse", "neuron")
-        assert not cognition._concept_relates_to_lesson("pizza", "neuroscience")
+        assert frontal._concept_relates_to_lesson("neuron", "neuron")
+        assert frontal._concept_relates_to_lesson("synapse", "neuron")
+        assert not frontal._concept_relates_to_lesson("pizza", "neuroscience")
 
 
 def test_pick_creation_topic_skips_internal_namespaces():
@@ -431,13 +431,13 @@ def test_pick_creation_topic_skips_internal_namespaces():
     """
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_mind(data_dir)
-        net = mind.cognition.network
+        net = mind.brain.frontal.network
 
         # Internal namespaces present in the live concept network.
         for internal in (
             "_cat:cause:guarded_cortisol",
             "_utt:hello",
-            "python:genesis_conscious.concepts",
+            "python:concepts",
             "rust:daemon::tick",
             "skill:sorter",
             "goal:explore",
@@ -673,7 +673,7 @@ def test_restore_sleep_state_engages_sleep_mechanism():
         assert mind2.learner._paused, (
             "learner should be paused after _start_engage_restored_sleep()"
         )
-        assert mind2.cognition.self_learner._paused, (
+        assert mind2.brain.frontal.self_learner._paused, (
             "self-directed learner should be paused after restore engagement"
         )
         assert not mind2.inner_life._paused, (
@@ -709,7 +709,7 @@ def test_inner_life_gets_a_shutdown_budget_matching_its_longest_phase() -> None:
     """
     import inspect
 
-    from genesis_conscious.mind.lifecycle import LifecycleMixin
+    from brainstem.lifecycle import LifecycleMixin
 
     src = inspect.getsource(LifecycleMixin.stop)
     assert "_SUBSYSTEM_STOP_TIMEOUTS" in src, (
@@ -732,7 +732,7 @@ def test_shutdown_warning_reports_how_long_it_waited() -> None:
     """
     import inspect
 
-    from genesis_conscious.mind.lifecycle import LifecycleMixin
+    from brainstem.lifecycle import LifecycleMixin
 
     src = inspect.getsource(LifecycleMixin._join_shutdown_thread)
     assert "did not exit within" in src, (

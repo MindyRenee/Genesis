@@ -11,8 +11,8 @@ Covers:
 - Sleep-state persistence/serialization across restarts
 
 All imports come from the sleep bundle's public API
-(``genesis_conscious.sleep``) or the package ``__init__``
-(``genesis_conscious``).
+(``sleep``) or the package ``__init__``
+(``sleep``).
 """
 
 from __future__ import annotations
@@ -25,22 +25,18 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
-from genesis_conscious import (
-    ConceptNetwork,
-    CuriosityEngine,
-    NarrativeEngine,
-    ReasoningEngine,
-    ReflectionEngine,
-    RelationType,
-    SelfModel,
-)
-from genesis_conscious.infrastructure.persistence import (
+from concepts import ConceptNetwork, RelationType
+from frontal_lobe.reasoning import Reasoner
+from infrastructure.narrative import Narrator
+from infrastructure.persistence import (
     load_state,
     restore_sleep_cycle,
     save_state,
     serialize_sleep_state,
 )
-from genesis_conscious.sleep import (
+from limbic_system.curiosity import Curiosity
+from self import Reflection, SelfModel
+from sleep import (
     HippocampalReplay,
     HypnagogicState,
     InnerLife,
@@ -461,9 +457,9 @@ class TestInnerLifeSleepArchitecture:
     def _make_inner_life(self) -> InnerLife:
         """Build an InnerLife with a small network and no callbacks."""
         net = _make_network()
-        reasoning = ReasoningEngine(net)
-        curiosity = CuriosityEngine(net, reasoning)
-        reflection = ReflectionEngine(net)
+        reasoning = Reasoner(net)
+        curiosity = Curiosity(net, reasoning)
+        reflection = Reflection(net)
         return InnerLife(
             net,
             curiosity,
@@ -647,8 +643,8 @@ def test_sleep_state_roundtrip_through_save_load():
         save_state(
             data_dir,
             net,
-            ReflectionEngine(net),
-            NarrativeEngine(sm, net),
+            Reflection(net),
+            Narrator(sm, net),
             sm,
             sleep_state=sleep_data,
         )
@@ -679,8 +675,8 @@ def test_sleep_state_not_present_in_old_saves():
         save_state(
             data_dir,
             net,
-            ReflectionEngine(net),
-            NarrativeEngine(sm, net),
+            Reflection(net),
+            Narrator(sm, net),
             sm,
         )
 

@@ -1,7 +1,7 @@
 """Pytest configuration for Genesis tests.
 
 Adds the parent directory (``python/``) to ``sys.path`` so that
-``genesis_conscious`` and ``genesis_client`` are importable without
+the region packages and ``genesis_client`` are importable without
 each test file having to manipulate ``sys.path`` itself. This keeps
 test imports at the top of the file (no E402 violations) while
 preserving the same import behavior.
@@ -13,7 +13,7 @@ import sys
 import pytest
 
 # Insert the python/ directory (parent of tests/) so that both
-# genesis_conscious and genesis_client are importable. This replaces
+# the region packages and genesis_client are importable. This replaces
 # the per-file ``sys.path.insert(0, ...)`` calls that were scattered
 # across the test suite and triggered E402 (module-level import not
 # at top of file) lint violations.
@@ -102,7 +102,7 @@ def learned_sentiment():
     additional words of its own. The learned lexicon is module-global,
     so it is cleared on teardown to keep tests independent.
     """
-    from genesis_conscious.language.sentiment import (
+    from limbic_system.sentiment import (
         LEARNED_LEXICON,
         learn_sentiment,
     )
@@ -148,7 +148,7 @@ _TEST_VERBS = (
 @pytest.fixture
 def learned_verbs():
     """Teach a test vocabulary of verb base forms, then clean up."""
-    from genesis_conscious.language.morphology import (
+    from temporal_lobe.morphology import (
         _LEARNED_VERBS,
         register_learned_verb,
     )

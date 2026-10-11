@@ -39,9 +39,9 @@ logger = logging.getLogger(__name__)
 
 # The durable sink, set by the higher layer. This module lives in
 # `genesis_client` because both layers need it and `genesis_client` is
-# the lower of the two — `genesis_conscious` depends on the client, not
+# the lower of the two — `mind` depends on the client, not
 # the other way round, so importing the journal here would invert the
-# dependency. `genesis_conscious` registers the journal at startup; with
+# dependency. `mind` registers the journal at startup; with
 # no sink the tally still works and only the durable record is absent.
 # The sink receives the exception, not just the tally. A record of
 # "site X failed 79 times" with no exception attached is not diagnosable:

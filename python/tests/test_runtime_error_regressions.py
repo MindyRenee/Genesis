@@ -44,7 +44,7 @@ def test_sleep_desync_reads_the_phase_field(monkeypatch) -> None:
     """The reader must use the field `PhaseInfo` actually has."""
     import inspect
 
-    from genesis_conscious.mind.sleep import SleepMixin
+    from brainstem.sleep import SleepMixin
 
     src = inspect.getsource(SleepMixin._check_sleep_desync)
     assert "get_phase().phase" in src, (
@@ -70,15 +70,15 @@ def test_curiosity_generate_questions_dereferences_its_emotion() -> None:
     `AttributeError: 'NoneType' object has no attribute 'alertness'` and
     the curiosity source of her self-model was silently always empty.
     """
-    from genesis_conscious.concepts import ConceptNetwork, RelationType
-    from genesis_conscious.learning.curiosity import CuriosityEngine
-    from genesis_conscious.reasoning import ReasoningEngine
+    from concepts import ConceptNetwork, RelationType
+    from frontal_lobe.reasoning import Reasoner
+    from limbic_system.curiosity import Curiosity
 
     net = ConceptNetwork()
     for name in ("alpha", "beta", "gamma"):
         net.add_concept(name, confidence=0.5)
     net.add_edge("alpha", "beta", RelationType.RELATED_TO, 0.1)
-    curiosity = CuriosityEngine(net, ReasoningEngine(net))
+    curiosity = Curiosity(net, Reasoner(net))
 
     with pytest.raises(AttributeError):
         curiosity.generate_questions(emotion=None)  # type: ignore[arg-type]
@@ -86,16 +86,16 @@ def test_curiosity_generate_questions_dereferences_its_emotion() -> None:
 
 def test_identity_curiosity_source_actually_produces_observations() -> None:
     """The source that used to always raise must now yield something."""
-    from genesis_conscious.concepts import ConceptNetwork, RelationType
-    from genesis_conscious.learning.curiosity import CuriosityEngine
-    from genesis_conscious.reasoning import ReasoningEngine
-    from genesis_conscious.self.identity import EmergentIdentity
+    from concepts import ConceptNetwork, RelationType
+    from frontal_lobe.reasoning import Reasoner
+    from limbic_system.curiosity import Curiosity
+    from self.identity import EmergentIdentity
 
     net = ConceptNetwork()
     for name in ("alpha", "beta", "gamma", "delta"):
         net.add_concept(name, confidence=0.5)
     net.add_edge("alpha", "beta", RelationType.RELATED_TO, 0.1)
-    curiosity = CuriosityEngine(net, ReasoningEngine(net))
+    curiosity = Curiosity(net, Reasoner(net))
     # `questions_asked` counts retained question records; seed it so the
     # "deeply curious" branch is taken.
     curiosity._asked_questions = deque(
@@ -125,7 +125,7 @@ def test_missing_camera_is_not_tallied_as_an_error() -> None:
     respectively.
     """
     from genesis_client import swallow
-    from genesis_conscious.perception.vision import Vision
+    from perception.vision import Vision
 
     class _Vision:
         def __init__(self) -> None:
@@ -135,14 +135,14 @@ def test_missing_camera_is_not_tallied_as_an_error() -> None:
         # absent camera does.
         is_available = Vision.is_available  # type: ignore[assignment,misc]
 
-    import genesis_conscious.perception.vision as vision_mod
+    import perception.vision as vision_mod
 
     def _no_frame(copy: bool = True):
         raise FileNotFoundError(2, "No such file or directory")
 
     original = vision_mod.latest_frame
     vision_mod.latest_frame = _no_frame
-    site = "genesis_conscious.perception.vision.is_available"
+    site = "perception.vision.is_available"
     before = swallow.swallow_count(site)
     try:
         vis = _Vision()
@@ -163,7 +163,7 @@ def test_sleep_desync_runs_without_raising() -> None:
         def get_phase(self) -> PhaseInfo:
             return PhaseInfo(phase=5, arousal=0.2, valence=0.0)
 
-    from genesis_conscious.mind.sleep import SleepMixin
+    from brainstem.sleep import SleepMixin
 
     probe = SleepMixin.__new__(SleepMixin)
     probe._is_sleeping = False

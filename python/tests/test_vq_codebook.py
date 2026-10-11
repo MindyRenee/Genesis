@@ -5,7 +5,7 @@ import os
 import numpy as np
 import pytest
 
-from genesis_conscious.infrastructure.vq_codebook import VQCodebook
+from infrastructure.vq_codebook import VQCodebook
 
 
 @pytest.fixture

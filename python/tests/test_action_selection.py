@@ -6,14 +6,14 @@ import math
 
 import pytest
 
-from genesis_conscious.basal_ganglia import (
+from basal_ganglia import (
     ActionBid,
-    BasalGangliaSelector,
+    BasalGanglia,
 )
 
 
 def test_selector_gates_strongest_action_by_disinhibition() -> None:
-    selector = BasalGangliaSelector(hyperdirect_gain=0.3)
+    selector = BasalGanglia(hyperdirect_gain=0.3)
     result = selector.select(
         [ActionBid("answer", 0.9), ActionBid("ask", 0.2)],
     )
@@ -24,7 +24,7 @@ def test_selector_gates_strongest_action_by_disinhibition() -> None:
 
 
 def test_selector_raises_threshold_under_high_conflict() -> None:
-    selector = BasalGangliaSelector(hyperdirect_gain=0.3)
+    selector = BasalGanglia(hyperdirect_gain=0.3)
     result = selector.select(
         [ActionBid("answer", 0.9), ActionBid("ask", 0.85)],
     )
@@ -52,7 +52,7 @@ def test_selector_raises_threshold_under_high_conflict() -> None:
 def test_selector_vetoes_when_brake_exceeds_the_winner() -> None:
     """A strong hyperdirect brake blocks release entirely.
 
-    The veto path -- ``selected is None`` -- is what DecisionEngine
+    The veto path -- ``selected is None`` -- is what DecisionMaker
     treats as "hold back this turn". It needs a brake large enough to
     push the threshold above the best action's disinhibition, which for
     these bids means ``hyperdirect_gain`` well above the 0.8 default.
@@ -60,7 +60,7 @@ def test_selector_vetoes_when_brake_exceeds_the_winner() -> None:
     ``test_selector_raises_threshold_under_high_conflict``) and the
     winner is still released.
     """
-    selector = BasalGangliaSelector(hyperdirect_gain=2.0)
+    selector = BasalGanglia(hyperdirect_gain=2.0)
     result = selector.select(
         [ActionBid("answer", 0.9), ActionBid("ask", 0.85)],
     )
@@ -70,7 +70,7 @@ def test_selector_vetoes_when_brake_exceeds_the_winner() -> None:
 
 
 def test_positive_rpe_favors_direct_drive_without_changing_salience() -> None:
-    selector = BasalGangliaSelector(hyperdirect_gain=0.0)
+    selector = BasalGanglia(hyperdirect_gain=0.0)
     neutral = selector.select(
         [ActionBid("answer", 0.8), ActionBid("ask", 0.4)],
         dopamine_rpe=0.0,
@@ -87,7 +87,7 @@ def test_positive_rpe_favors_direct_drive_without_changing_salience() -> None:
 
 
 def test_negative_rpe_opposes_direct_drive() -> None:
-    selector = BasalGangliaSelector(hyperdirect_gain=0.0)
+    selector = BasalGanglia(hyperdirect_gain=0.0)
     neutral = selector.select(
         [ActionBid("answer", 0.8), ActionBid("ask", 0.4)],
         dopamine_rpe=0.0,
@@ -110,11 +110,11 @@ def test_negative_rpe_opposes_direct_drive() -> None:
 )
 def test_selector_rejects_non_finite_salience(bids: list[ActionBid]) -> None:
     with pytest.raises(ValueError):
-        BasalGangliaSelector().select(bids)
+        BasalGanglia().select(bids)
 
 
 def test_selector_rejects_duplicate_actions() -> None:
     with pytest.raises(ValueError):
-        BasalGangliaSelector().select(
+        BasalGanglia().select(
             [ActionBid("answer", 0.5), ActionBid("answer", 0.4)]
         )

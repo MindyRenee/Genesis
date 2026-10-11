@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from genesis_conscious.tools.code_analysis import (
+from tools.code_analysis import (
     analyze_python_source,
     impact_of,
     summarize,

@@ -13,11 +13,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import logging
 
-from genesis_conscious.cognition.thought_composer import ThoughtComposer
-from genesis_conscious.concepts import ConceptNetwork, RelationType
-from genesis_conscious.limbic_system.emotion import EmotionalState
-from genesis_conscious.memory import Turn, WorkingMemory
-from genesis_conscious.reasoning import ReasoningEngine
+from concepts import ConceptNetwork, RelationType
+from frontal_lobe.reasoning import Reasoner
+from frontal_lobe.thought_composer import ThoughtComposer
+from limbic_system.emotion import EmotionalState
+from memory import Turn, WorkingMemory
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ def _make_network_with_knowledge() -> ConceptNetwork:
 def test_compose_about_known_concept() -> None:
     """Composer can compose a thought about a concept it knows."""
     net = _make_network_with_knowledge()
-    reasoner = ReasoningEngine(net)
+    reasoner = Reasoner(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
     emotion = _make_emotion()
 
@@ -81,7 +81,7 @@ def test_compose_about_known_concept() -> None:
 def test_compose_about_unknown_concept() -> None:
     """Composer returns None for unknown concepts."""
     net = ConceptNetwork()
-    reasoner = ReasoningEngine(net)
+    reasoner = Reasoner(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
     emotion = _make_emotion()
 
@@ -98,7 +98,7 @@ def test_compose_about_isolated_concept() -> None:
     """
     net = ConceptNetwork()
     net.add_concept("mystery", confidence=0.2)
-    reasoner = ReasoningEngine(net)
+    reasoner = Reasoner(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
     emotion = _make_emotion()
 
@@ -109,7 +109,7 @@ def test_compose_about_isolated_concept() -> None:
 def test_compose_answer_from_reasoning() -> None:
     """Composer answers using reasoning, not hardcoded strings."""
     net = _make_network_with_knowledge()
-    reasoner = ReasoningEngine(net)
+    reasoner = Reasoner(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
     emotion = _make_emotion()
 
@@ -124,7 +124,7 @@ def test_compose_answer_from_reasoning() -> None:
 def test_compose_answer_causal() -> None:
     """Composer can answer causal questions."""
     net = _make_network_with_knowledge()
-    reasoner = ReasoningEngine(net)
+    reasoner = Reasoner(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
     emotion = _make_emotion()
 
@@ -138,7 +138,7 @@ def test_compose_answer_causal() -> None:
 def test_compose_reflection() -> None:
     """Composer can reflect on a topic."""
     net = _make_network_with_knowledge()
-    reasoner = ReasoningEngine(net)
+    reasoner = Reasoner(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
     emotion = _make_emotion(creativity=0.7)
 
@@ -155,7 +155,7 @@ def test_compose_reflection_unknown_topic() -> None:
     templates for unknown topics. It stays silent (returns None).
     """
     net = ConceptNetwork()
-    reasoner = ReasoningEngine(net)
+    reasoner = Reasoner(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
     emotion = _make_emotion()
 
@@ -173,7 +173,7 @@ def test_compose_novel_connection() -> None:
     animal = net.get_concept("animal")
     assert animal is not None
     animal.activation = 0.7
-    reasoner = ReasoningEngine(net)
+    reasoner = Reasoner(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
     emotion = _make_emotion(creativity=0.7)
 
@@ -187,7 +187,7 @@ def test_compose_novel_connection() -> None:
 def test_compose_answer_no_topics() -> None:
     """Composer returns None when no topics are provided."""
     net = _make_network_with_knowledge()
-    reasoner = ReasoningEngine(net)
+    reasoner = Reasoner(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
     emotion = _make_emotion()
 
@@ -198,7 +198,7 @@ def test_compose_answer_no_topics() -> None:
 def test_compose_about_tracks_said() -> None:
     """Composer tracks what it's said about concepts."""
     net = _make_network_with_knowledge()
-    reasoner = ReasoningEngine(net)
+    reasoner = Reasoner(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
     emotion = _make_emotion()
 
@@ -221,7 +221,7 @@ def test_dedup_reasoning_ignores_sentence_punctuation() -> None:
     net.add_concept("small mammal", confidence=0.5)
     net.add_edge("ferret", "small mammal", RelationType.IS_A, 0.6,
                  origin="stated")
-    reasoner = ReasoningEngine(net)
+    reasoner = Reasoner(net)
     results = reasoner.reason_about("ferret")
     assert results, "expected a deductive conclusion for an is_a edge"
 
@@ -244,7 +244,7 @@ def test_compose_about_does_not_repeat_fact_as_inference() -> None:
     net.add_concept("small mammal", confidence=0.5)
     net.add_edge("ferret", "small mammal", RelationType.IS_A, 0.6,
                  origin="stated")
-    reasoner = ReasoningEngine(net)
+    reasoner = Reasoner(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
     emotion = _make_emotion()
 
@@ -257,7 +257,7 @@ def test_compose_about_does_not_repeat_fact_as_inference() -> None:
 def test_compose_about_varies() -> None:
     """Composer produces varied output for the same concept."""
     net = _make_network_with_knowledge()
-    reasoner = ReasoningEngine(net)
+    reasoner = Reasoner(net)
     composer = ThoughtComposer(net, reasoner, seed=None)
     emotion = _make_emotion(creativity=0.8, openness_to_engage=0.8)
 
@@ -284,7 +284,7 @@ def test_compose_confidence_reflects_knowledge() -> None:
 
     net.add_concept("uncertain", confidence=0.2)
 
-    reasoner = ReasoningEngine(net)
+    reasoner = Reasoner(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
     emotion = _make_emotion()
 
@@ -436,7 +436,7 @@ def test_integration_learning_changes_responses() -> None:
     """
     net = ConceptNetwork()
     net.add_concept("cognition", confidence=0.6)
-    reasoner = ReasoningEngine(net)
+    reasoner = Reasoner(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
     emotion = _make_emotion()
 
@@ -457,7 +457,7 @@ def test_integration_learning_changes_responses() -> None:
 def test_integration_reasoning_drives_answer() -> None:
     """Reasoning results drive composed answers."""
     net = _make_network_with_knowledge()
-    reasoner = ReasoningEngine(net)
+    reasoner = Reasoner(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
     emotion = _make_emotion()
 
@@ -472,7 +472,7 @@ def test_integration_reasoning_drives_answer() -> None:
 def test_integration_working_memory_with_composer() -> None:
     """Working memory and composer work together."""
     net = _make_network_with_knowledge()
-    reasoner = ReasoningEngine(net)
+    reasoner = Reasoner(net)
     composer = ThoughtComposer(net, reasoner, seed=42)
     wm = WorkingMemory()
     emotion = _make_emotion()
@@ -515,7 +515,7 @@ def test_gather_knowledge_excludes_hub_attachment_edges() -> None:
     net.add_edge(
         "makes", "emotion", RelationType.RELATED_TO, 0.10, origin="hub_attachment"
     )
-    composer = ThoughtComposer(net, ReasoningEngine(net), seed=42)
+    composer = ThoughtComposer(net, Reasoner(net), seed=42)
 
     assert composer._gather_knowledge("makes", depth=2) == []
 
@@ -526,7 +526,7 @@ def test_gather_knowledge_excludes_low_weight_edges() -> None:
     net.add_concept("a", confidence=0.8)
     net.add_concept("b", confidence=0.8)
     net.add_edge("a", "b", RelationType.RELATED_TO, 0.1, origin="co_occurrence")
-    composer = ThoughtComposer(net, ReasoningEngine(net), seed=42)
+    composer = ThoughtComposer(net, Reasoner(net), seed=42)
 
     assert composer._gather_knowledge("a", depth=2) == []
 
@@ -534,7 +534,7 @@ def test_gather_knowledge_excludes_low_weight_edges() -> None:
 def test_gather_knowledge_keeps_reliable_edges() -> None:
     """Reliable, sufficiently-weighted edges are still spoken."""
     net = _make_network_with_knowledge()
-    composer = ThoughtComposer(net, ReasoningEngine(net), seed=42)
+    composer = ThoughtComposer(net, Reasoner(net), seed=42)
 
     knowledge = composer._gather_knowledge("dog", depth=2)
     assert any(rel == "is a" and tgt == "mammal" for rel, tgt, _ in knowledge)
@@ -556,7 +556,7 @@ def test_compose_about_definition_only_concept() -> None:
         confidence=1.0,
         properties={"definition": "enjoying or showing or marked by joy or pleasure"},
     )
-    composer = ThoughtComposer(net, ReasoningEngine(net), seed=42)
+    composer = ThoughtComposer(net, Reasoner(net), seed=42)
 
     thought = composer.compose_about("happy", _make_emotion(), focused=True)
     assert thought is not None
@@ -578,7 +578,7 @@ def test_compose_natural_fact_uses_seeded_verb() -> None:
     net.add_concept("makes", confidence=0.9)
     net.add_concept("emotion", confidence=1.0)
     net.seed_relation_verbs()
-    composer = ThoughtComposer(net, ReasoningEngine(net), seed=42)
+    composer = ThoughtComposer(net, Reasoner(net), seed=42)
 
     fact = composer._compose_natural_fact("makes", "related_to", "emotion")
     # Any of the seeded verbs is fine; the raw triple is not.

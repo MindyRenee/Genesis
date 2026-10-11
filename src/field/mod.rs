@@ -13,6 +13,8 @@ pub mod engine;
 pub use engine::SystemEngine;
 pub mod runtime;
 pub use runtime::{FieldIntegration, FieldRuntime, LATENT_DIMENSION};
+pub mod motor;
+pub use motor::MotorTarget;
 
 const EPS: f64 = 1.0e-12;
 pub type Vector = Vec<f64>;
@@ -632,8 +634,8 @@ impl GlobalField {
         max_paths: usize,
     ) -> Result<Vec<TransportPath>, FieldError> {
         /// Mutable state threaded through the depth-first search. Bundled so
-/// the recursion takes one accumulator instead of four separate
-/// out-parameters (which tripped `clippy::too_many_arguments`).
+        /// the recursion takes one accumulator instead of four separate
+        /// out-parameters (which tripped `clippy::too_many_arguments`).
         struct Walk<'a> {
             to: &'a str,
             max_paths: usize,

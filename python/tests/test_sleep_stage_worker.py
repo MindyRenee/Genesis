@@ -21,8 +21,8 @@ from __future__ import annotations
 import threading
 import time
 
-from genesis_conscious.mind.sleep import SleepStageWorker
-from genesis_conscious.sleep.architecture import SleepStage
+from brainstem.sleep import SleepStageWorker
+from sleep.architecture import SleepStage
 
 
 class _Recorder:

@@ -1,5 +1,32 @@
 //! Genesis — the core state schema and subcognitive foundation.
+//!
+//! ## Layout
+//!
+//! `python/` opens to brain regions because the mind is organized
+//! anatomically; `src/` presents the body's anatomy the same way.
+//! The implementation lives in `daemon`, `state`, `store`,
+//! `cognition`, and `field`; the region modules (`brainstem`,
+//! `thalamus`, `neurochemical`, `memory`, `limbic_system`,
+//! `basal_ganglia`, `self_`, `sleep`, `tools`, `infrastructure`)
+//! re-export those modules under the structure they implement, so
+//! the crate reads the same way the mind does: click `src/` and the
+//! subcortical regions are what you see.
 
+// ─── The body, by region ─────────────────────────────────────────
+// Anatomical view of the implementation below — re-exports only,
+// no code moves. See each region's mod.rs for what lives there.
+pub mod basal_ganglia;
+pub mod brainstem;
+pub mod infrastructure;
+pub mod limbic_system;
+pub mod memory;
+pub mod neurochemical;
+pub mod self_;
+pub mod sleep;
+pub mod thalamus;
+pub mod tools;
+
+// ─── Implementation ──────────────────────────────────────────────
 pub mod cognition;
 pub mod daemon;
 pub mod data_dir;

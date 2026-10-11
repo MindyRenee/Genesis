@@ -116,7 +116,7 @@ def resolve_config_py(env: dict[str, str]) -> str:
         [
             "python3", "-c",
             "import sys; sys.path.insert(0, 'python');"
-            "from genesis_conscious.infrastructure.config import default_data_dir;"
+            "from infrastructure.config import default_data_dir;"
             "print(default_data_dir())",
         ],
         env,
@@ -319,6 +319,7 @@ def test_every_resolver_in_the_repo_is_covered() -> None:
         "test_data_dir_conformance.py",
         "data_dir.rs",
         "__init__.py",  # genesis_client usage example in the module docstring
+        "install.sh",  # names the default in user-facing output, never resolves it
     }
 
     suspicious: list[str] = []

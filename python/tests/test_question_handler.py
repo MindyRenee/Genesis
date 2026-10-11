@@ -8,17 +8,17 @@ traversal, direction, and resolution logic is genuinely exercised.
 
 from unittest.mock import MagicMock
 
-from genesis_conscious.cognition.question_handler import (
+from concepts import ConceptNetwork, RelationType
+from frontal_lobe.question_handler import (
     _PAST_MARKER_RE,
     QuestionHandler,
 )
-from genesis_conscious.concepts import ConceptNetwork, RelationType
-from genesis_conscious.language import Thought
-from genesis_conscious.limbic_system.emotion import EmotionalState
-from genesis_conscious.memory.engine import MemoryContext
-from genesis_conscious.perception import Intent, Perception, QuestionType
-from genesis_conscious.self import SelfComposer, SelfModel
-from genesis_conscious.tools.framework import ToolRegistry
+from limbic_system.emotion import EmotionalState
+from memory.memory import MemoryContext
+from perception import Intent, Perception, QuestionType
+from self import SelfComposer, SelfModel
+from temporal_lobe.base import Thought
+from tools.framework import ToolRegistry
 
 _VERB_MAP = {
     RelationType.CREATES: "creates",

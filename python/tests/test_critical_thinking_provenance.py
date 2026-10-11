@@ -1,8 +1,8 @@
 """Regression tests for critical-thinking evidence provenance."""
 
-from genesis_conscious.concepts import ConceptNetwork, RelationType
-from genesis_conscious.reasoning import (
-    CriticalThinkingEngine,
+from concepts import ConceptNetwork, RelationType
+from frontal_lobe.reasoning import (
+    CriticalThinker,
     ReasoningResult,
     ReasoningType,
 )
@@ -25,7 +25,7 @@ def test_knowledge_payload_without_provenance_is_not_evidence() -> None:
         knowledge=[("causes", "smoke", 0.9)],
     )
 
-    assessment = CriticalThinkingEngine(network).evaluate(result)
+    assessment = CriticalThinker(network).evaluate(result)
 
     assert assessment.supporting_evidence == []
     assert "unsupported_assertion" in assessment.fallacies

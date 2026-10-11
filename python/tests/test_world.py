@@ -6,15 +6,13 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from concepts import ConceptNetwork
+from frontal_lobe.reasoning import Reasoner
 from genesis_client.protocol import CHEM_OXYTOCIN
-from genesis_conscious import (
-    ConceptNetwork,
-    CuriosityEngine,
-    ReasoningEngine,
-    ReflectionEngine,
-)
-from genesis_conscious.sleep import InnerLife
-from genesis_conscious.world import (
+from limbic_system.curiosity import Curiosity
+from self import Reflection
+from sleep import InnerLife
+from world import (
     Beta,
     EventKind,
     EventStream,
@@ -24,9 +22,9 @@ from genesis_conscious.world import (
     PresenceBelief,
     PresenceKind,
 )
-from genesis_conscious.world.belief import BID_WINDOW
-from genesis_conscious.world.events import ground_topics
-from genesis_conscious.world.presence import (
+from world.belief import BID_WINDOW
+from world.events import ground_topics
+from world.presence import (
     AMBIENT_PRESENCE_TIMEOUT,
     USER_PRESENCE_TIMEOUT,
 )
@@ -41,9 +39,9 @@ def _make_inner_life() -> InnerLife:
     """Build a minimal InnerLife for social-drive tests."""
     net = ConceptNetwork()
     net.add_concept("alpha", confidence=0.5)
-    reasoning = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoning)
-    reflection = ReflectionEngine(net)
+    reasoning = Reasoner(net)
+    curiosity = Curiosity(net, reasoning)
+    reflection = Reflection(net)
     return InnerLife(net, curiosity, reflection, seed=42)
 
 
@@ -758,3 +756,76 @@ def test_summarize_includes_beliefs():
     world.hear_user("yes")
     text = world.summarize()
     assert "replies" in text
+
+
+# ─── Structured percepts ────────────────────────────────────
+
+
+def test_perceive_carries_structured_percept():
+    """A percept may carry the data itself, not only a description."""
+    world = _make_world()
+    grid = [[0, 0, 1], [0, 1, 0], [1, 0, 0]]
+    event = world.perceive(
+        "a structured field", salience=0.7, source="console:test",
+        percept={"grid": grid},
+    )
+    assert event is not None
+    assert event.percept == {"grid": grid}
+    # The textual record is still there — the structure rides along.
+    assert "structured field" in event.describe()
+
+
+def test_percept_not_persisted():
+    """The percept payload is live data; the record stores its text."""
+    world = _make_world()
+    world.perceive(
+        "a field", salience=0.7, source="console:test",
+        percept=[[1, 0], [0, 1]],
+    )
+    data = world.to_dict()
+    for edata in data["events"]:
+        assert "percept" not in edata
+
+
+def test_world_percept_grounds_into_concepts(tmp_path):
+    """A grid percept is scene-parsed and grounded in the network."""
+    from mind import Mind
+
+    mind = Mind(str(tmp_path / "genesis.sock"))
+    grid = [[0, 0, 0], [0, 5, 0], [0, 0, 0]]
+    mind.world.perceive(
+        "a dot in a field", salience=0.7, source="console:test",
+        percept=grid,
+    )
+    net = mind.brain.frontal.network
+    assert net.get_concept("world:console:test:obj:0") is not None
+
+
+def test_world_percept_dedups_identical_scene(tmp_path):
+    """Grounding the same frame twice adds nothing new."""
+    from mind import Mind
+
+    mind = Mind(str(tmp_path / "genesis.sock"))
+    grid = [[0, 0], [0, 7]]
+    mind.world.perceive("a field", salience=0.7, source="s", percept=grid)
+    net = mind.brain.frontal.network
+    assert net.get_concept("world:s:obj:0") is not None
+    # The identical frame is recorded as already-grounded...
+    assert mind._world_percept_scenes["s"] is not None
+    count = len(getattr(net, "_concepts", {})) or len(getattr(net, "concepts", {}))
+    mind.world.perceive("a field", salience=0.7, source="s", percept=grid)
+    # ...and does not re-ground.
+    after = len(getattr(net, "_concepts", {})) or len(getattr(net, "concepts", {}))
+    assert after == count
+
+
+def test_world_percept_ignores_non_grid(tmp_path):
+    """A non-spatial percept is carried but not scene-parsed."""
+    from mind import Mind
+
+    mind = Mind(str(tmp_path / "genesis.sock"))
+    event = mind.world.perceive(
+        "a hum", salience=0.3, source="ambient", percept="not a grid",
+    )
+    assert event is not None
+    assert mind.brain.frontal.network.get_concept("world:ambient:obj:0") is None

@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 import genesis_cli
-from genesis_conscious.mind.lifecycle import LifecycleMixin
+from brainstem.lifecycle import LifecycleMixin
 
 
 def test_shutdown_waits_for_slow_daemon_within_grace_window(tmp_path):
@@ -236,7 +236,7 @@ _stop_all
 
 @pytest.mark.parametrize("raw", [b"{", b'{"version":2,"reflection":null}'])
 def test_failed_mind_start_preserves_saved_state(tmp_path, raw):
-    from genesis_conscious.mind import Mind
+    from mind import Mind
 
     path = tmp_path / "cognitive_state.json"
     path.write_bytes(raw)
@@ -275,7 +275,8 @@ def test_interactive_failure_still_shuts_down(tmp_path):
         patch.multiple(
             genesis_cli,
             _parse_cli_args=Mock(return_value=Mock(
-                data_dir=str(tmp_path), tail=False, daemon_socket=None, offline=True,
+                data_dir=str(tmp_path), tail=False, daemon_socket=None,
+                offline=True, headless=False, stop=False,
             )),
             _acquire_cli_lock=Mock(return_value=1),
             _start_daemon_process=Mock(),
@@ -322,7 +323,7 @@ def test_startup_failure_still_shuts_down(tmp_path, failing_step):
             genesis_cli,
             _parse_cli_args=Mock(return_value=Mock(
                 data_dir=str(tmp_path), tail=False, daemon_socket=None,
-                offline=True,
+                offline=True, headless=False, stop=False,
             )),
             _acquire_cli_lock=Mock(return_value=1),
             _start_daemon_process=Mock(),
@@ -339,7 +340,7 @@ def test_startup_failure_still_shuts_down(tmp_path, failing_step):
 
 
 def test_shutdown_reports_failed_final_save(tmp_path):
-    from genesis_conscious.mind import Mind
+    from mind import Mind
 
     mind = Mind(str(tmp_path / "genesis.sock"), offline=True)
     mind._running = True
@@ -351,7 +352,7 @@ def test_shutdown_reports_failed_final_save(tmp_path):
 
 
 def test_shutdown_waits_for_autosave_before_saving(tmp_path):
-    from genesis_conscious.mind import Mind
+    from mind import Mind
 
     mind = Mind(str(tmp_path / "genesis.sock"), offline=True)
     mind._running = True

@@ -2,36 +2,35 @@
 //!
 //! ## Variational implementation
 //!
-//! This module implements active inference under a **mean-field
-//! (diagonal) Gaussian variational posterior** over the hidden
-//! neurochemical state. The generative model is a linear state-space
-//! predictor with a learned transition matrix. The posterior is
-//! updated via a diagonal Kalman filter, which is the exact
-//! variational update for a linear-Gaussian model. The free energy
-//! is the proper variational free energy: the KL divergence between
-//! the posterior and the prior, plus the negative log-likelihood of
-//! the observation under the posterior. Policy selection evaluates
-//! expected free energy with both pragmatic value (distance from
-//! homeostatic targets) and epistemic value (expected information
-//! gain from novel observations).
+//! This module uses a **diagonal Gaussian state estimate** over the
+//! hidden neurochemical state. The generative predictor is a learned
+//! linear state-space model. Covariance propagation retains the diagonal
+//! of A P A^T + Q; off-diagonal posterior covariance is discarded.
+//! This is a diagonal-projected filter for coupled dynamics. For the
+//! represented Gaussian prior, `variational_free_energy_nats` computes
+//! full KL[q||p] plus expected negative log-likelihood, including
+//! posterior variance and Gaussian normalization. `free_energy` maps
+//! its excess above a matched observation into bounded control output.
+//! Policy selection uses expected negative log Gaussian preferences
+//! minus next-observation information gain. Additive controls make
+//! the information gain policy-independent.
 //!
 //! ### What is and isn't variational
 //!
 //! **Is variational:**
-//! - The posterior q(s) = N(belief_mean, diag(belief_var)) is a
-//!   proper variational posterior, updated via Kalman filter with
-//!   the predict step (prior_var = belief_var + Q) and the update
-//!   step (gain, mean, variance). The posterior variance is
-//!   propagated forward each tick, making the Kalman gain adaptive.
-//! - The free energy F = KL[q(s)||p(s)] + NLL(o|s) is the standard
-//!   variational free energy of the free energy principle. The
-//!   expected-uncertainty term incorporates the posterior variance
-//!   (belief_var), so the free energy reflects the actual estimation
-//!   uncertainty of the variational posterior, not just a precision
-//!   heuristic.
-//! - Precision is the inverse variance of the likelihood, which
-//!   weights prediction errors in the NLL term.
-//! - Policy selection minimizes a pragmatic expected-free-energy proxy
+//! - The estimate q(s) = N(belief_mean, diag(belief_var)) is Gaussian.
+//!   It uses a diagonal-projected Kalman filter, with prior variance
+//!   diag(A diag(belief_var) A^T) + Q and scalar observation updates
+//!   of gain, mean, and variance. Uncertainty is propagated each
+//!   tick, making the gain adaptive rather than fixed.
+//! - VFE is KL[q(s)||p(s)] - E_q[log p(o|s)], evaluated explicitly
+//!   for the represented diagonal Gaussian prior and posterior.
+//!   The likelihood expectation includes squared residuals and
+//!   posterior variance. Bounded control telemetry is a separate
+//!   monotonic transformation of excess VFE; raw VFE is in nats.
+//! - `precision` is normalized confidence mapped to observation variance;
+//!   actual likelihood precision is 1 / obs_var, not this [0, 1] score.
+//! - Policy selection minimizes Gaussian expected free energy
 //!   over the action-conditioned generative model. Exploration is kept
 //!   as a separate temperature-controlled sampling mechanism because
 //!   this model class has additive controls.
@@ -39,14 +38,12 @@
 //! **Is simplified (not full Friston):**
 //! - The posterior is diagonal (mean-field), not full-covariance.
 //!   This is a common approximation in variational Bayes.
-//! - The generative model is linear (not nonlinear), which means
-//!   the Kalman update is exact (no Laplace approximation needed).
-//! - The KL complexity term uses only the mean-shift component,
-//!   not the full KL divergence. The variance-ratio term is a
-//!   surprise-independent constant (the intrinsic information content
-//!   of an observation) that would pin complexity at a positive
-//!   floor; the posterior variance instead enters through the
-//!   expected-uncertainty term, where it varies with surprise.
+//! - The predictor is linear before bounds are applied; discarding
+//!   covariance and clipping the means make its filter approximate.
+//! - KL uses both mean and variance terms, with diagonal covariance.
+//!   The covariance projection loses cross-dimensional correlations;
+//!   full-covariance filtering would retain those correlations.
+//!   Observation noise is adapted rather than inferred hierarchically.
 //! - The policy repertoire is discrete and fixed (9 policies), not
 //!   a continuous action space.
 //! - Epistemic value is the expected information gain computed
@@ -86,8 +83,8 @@
 //!
 //! These simplifications make the implementation tractable at 10 Hz
 //! on a single machine while preserving the core mathematical
-//! structure of active inference: a variational posterior, proper
-//! free energy, and epistemic-pragmatic policy selection.
+//! motifs of active inference: approximate state estimation, bounded
+//! regulatory demand, and homeostatic policy selection.
 //!
 //! This is the "strange loop": a generative model that predicts
 //! Genesis's **own** neurochemical trajectory, computes prediction
@@ -152,21 +149,21 @@
 //!
 //! # Free energy
 //!
-//! The variational free energy is:
+//! The formal variational free energy, NOT the bounded telemetry proxy, is:
 //!
 //! ```text
-//! F = KL[q(s) || p(s)] + NLL(o | q(s))
+//! F = KL[q(s) || p(s)] - E_q[log p(o | s)]
 //! ```
 //!
 //! where q(s) = N(belief_mean, diag(belief_var)) is the posterior,
 //! p(s) = N(predicted, diag(prior_var)) is the prior (generative
-//! model's prediction), and NLL is the negative log-likelihood of
-//! the observation under the posterior.
+//! model's prediction), and the accuracy term is the expectation
+//! of negative log-likelihood p(o|s), taken over q(s).
 //!
 //! **KL divergence (complexity term):** measures how far the
-//! posterior has moved from the prior. When the observation matches
-//! the prediction, the posterior equals the prior and KL = 0. When
-//! the observation is surprising, the posterior diverges and KL > 0.
+//! posterior differs from the prior in mean AND variance. Even if
+//! an observation matches the predicted mean, it generally reduces
+//! variance, so posterior and prior differ and the full KL is nonzero.
 //!
 //! **NLL (accuracy term):** the precision-weighted prediction error.
 //! When precision is high (the model trusts its predictions), the
@@ -366,10 +363,6 @@ const PRECISION_VAR_EMA_RATE: f32 = 0.005;
 /// (decay above 0.15) could never trigger anywhere near the resting
 /// regime and left the exploration branch dead in practice.
 const PRECISION_REFERENCE_VAR: f32 = 0.0004;
-
-/// The weight of model uncertainty in the free energy computation.
-/// `(1 - precision) * this` is added to surprise to get free energy.
-const UNCERTAINTY_WEIGHT: f32 = 0.3;
 
 /// The EMA decay rate for surprise. Lower = longer memory of past
 /// surprise; higher = more reactive to recent surprise.
@@ -654,10 +647,10 @@ const MATURITY_ERROR_INIT: f32 = 0.5;
 // ─── Variational posterior (Kalman filter) ───────────────────────
 //
 // The variational posterior is a diagonal Gaussian q(s) = N(mu, diag(sigma^2)).
-// It is updated via a diagonal Kalman filter, which is the exact
-// variational update for a linear-Gaussian generative model.
+// It is updated via a diagonal-projected Kalman approximation; exact
+// coupled-model inference would retain the full covariance matrix.
 //
-// The process noise (prior_var) represents the inherent unpredictability
+// Process noise Q (not the full prior_var) represents inherent unpredictability
 // of the neurochemical dynamics — how much the state can change between
 // ticks that the transition matrix can't predict.
 //
@@ -683,7 +676,7 @@ const MAX_OBS_NOISE: f32 = 0.1;
 /// model the fact that no observation is perfectly reliable.
 const MIN_OBS_NOISE: f32 = 0.001;
 
-/// The theoretical maximum steady-state posterior variance, used to
+/// An identity-model reference steady-state posterior variance, used to
 /// normalize `belief_var` into [0, 1] for the free-energy uncertainty
 /// and epistemic-value computations. This is the steady-state
 /// `belief_var` at minimum precision (0.1) and maximum observation
@@ -698,21 +691,21 @@ const MIN_OBS_NOISE: f32 = 0.001;
 /// 0.03 so the normalized value stays strictly in [0, 1] during
 /// transients (where belief_var may briefly exceed steady state).
 ///
-/// With the learned-transition predict step (`prior_var = A[i][i]^2 *
-/// belief_var + Q`), the steady-state belief_var depends on A[i][i].
-/// Self-amplifying dimensions (A[i][i] > 1) have a higher steady-state
-/// belief_var; at the clamp limit (A[i][i] = 2.0, A^2 = 4.0) the
-/// steady state is ≈ 0.076. For those dimensions the normalized value
-/// saturates at 1.0 ("maximally uncertain"), which is the correct
-/// behavior — an amplifying dimension IS maximally uncertain. The
-/// normalization remains accurate for the common case (A[i][i] ≈ 1.0),
-/// and the saturation only affects extreme learned dynamics.
+/// Learned prediction uses `sum_j A[i][j]^2 * belief_var[j] + Q`,
+/// so cross-channel coupling also affects steady-state uncertainty.
+/// For a scalar A=2 transition at obs_var=0.1, posterior variance
+/// approaches ≈0.076 rather than the identity-model reference.
+/// Such values saturate this telemetry normalization at 1.0;
+/// that means the calibration reference is exceeded, not that the
+/// state is mathematically maximally uncertain. This constant is
+/// a reference scale rather than a covariance upper bound, and
+/// neither Gaussian inference nor policy selection requires it.
 const MAX_BELIEF_VAR: f32 = 0.03;
 
-/// Scale factor for normalizing the KL divergence (complexity) term
-/// of the variational free energy to [0, 1]. Typical KL per dimension
-/// is 0–1.5 under moderate surprise. Dividing by 1.0 maps this
-/// directly, preserving sensitivity to belief updates.
+/// Scale in nats for the exponential map of per-dimension excess VFE.
+/// Raw Gaussian VFE is retained separately and is not range-clamped.
+/// One nat per dimension gives an excess control level of 1-exp(-1).
+/// This scale changes control amplitude, not the variational objective.
 const KL_SCALE: f32 = 1.0;
 
 // ─── Policy selection (active inference) ─────────────────────────
@@ -957,9 +950,10 @@ pub struct InferenceResult {
     /// precision adaptation and allostatic load need a sustained signal,
     /// not a noisy per-tick spike.
     pub surprise: f32,
-    /// The computed free energy, [0, 1].
+    /// Monotonic normalized excess Gaussian VFE, [0, 1].
     pub free_energy: f32,
-    /// The expected future free energy, [0, 1].
+    pub variational_free_energy_nats: f32,
+    /// EMA of recent regulatory demand, not a future VFE forecast, [0, 1].
     pub expected_free_energy: f32,
     /// The updated allostatic load, [0, 1].
     pub allostasis_load: f32,
@@ -992,7 +986,7 @@ pub struct InferenceResult {
     pub model_maturity: f32,
     /// The selected policy name (for observability).
     pub selected_policy: &'static str,
-    /// The expected free energy of the selected policy.
+    /// Gaussian expected free energy per dimension of the selected policy.
     pub selected_policy_efe: f32,
 }
 
@@ -1011,9 +1005,9 @@ pub struct InferenceResult {
 /// 6. **Update posterior**: Kalman filter update of the variational
 ///    posterior (belief_mean, belief_var) using the prediction as
 ///    prior and the observation to compute the posterior.
-/// 7. **Compute free energy**: variational free energy = KL divergence
-///    between posterior and prior + negative log-likelihood of
-///    the observation.
+/// 7. **Compute demand proxy**: smoothed RMS error, heuristic uncertainty,
+///    and mean-shift distance between posterior and prior. This is
+///    bounded telemetry, not the full variational free energy.
 /// 8. **Update expected free energy**: EMA of recent free energy trend.
 /// 9. **Update allostatic load**: accumulate or recover based on
 ///    expected free energy.
@@ -1127,10 +1121,10 @@ pub struct ActiveInferenceEngine {
     /// belief_var = (1 - K) * prior_var, where K is the Kalman gain.
     /// Lower variance = higher confidence.
     belief_var: [f32; DIM],
-    /// Prior variance (process noise): how much the state is expected
-    /// to change unpredictably between ticks. Constant per dimension.
+    /// Predicted marginal variance: propagated posterior uncertainty
+    /// plus process noise. It changes with the model and belief variance.
     prior_var: [f32; DIM],
-    /// The last computed variational free energy [0, 1]. Stored so
+    /// The last bounded regulatory demand proxy [0, 1]. Stored so
     /// that signals() can report it without recomputing.
     last_free_energy: f32,
     /// What she prefers to be, as prior belief over outcomes.
@@ -1450,7 +1444,9 @@ impl ActiveInferenceEngine {
         // the model would attribute the action's effect to the
         // endogenous dynamics (A), corrupting A and causing the
         // closed-loop system to oscillate as the policy changes.
+        let prediction_transition = self.transition_matrix;
         let predicted = self.predict_with_action(&pre, &self.last_action);
+        let predicted_belief = self.predict_with_action(&self.belief_mean, &self.last_action);
 
         let mut result = InferenceResult {
             predicted,
@@ -1458,6 +1454,7 @@ impl ActiveInferenceEngine {
             errors: [0.0; DIM],
             surprise: 0.0,
             free_energy: 0.0,
+            variational_free_energy_nats: 0.0,
             expected_free_energy: 0.0,
             allostasis_load: self.allostasis_load,
             precision: self.precision,
@@ -1477,6 +1474,10 @@ impl ActiveInferenceEngine {
             // prior prediction). Just record the observation and
             // mark as initialized.
             self.initialized = true;
+            self.belief_mean = post;
+            let observation_variance =
+                MIN_OBS_NOISE + (1.0 - self.precision) * (MAX_OBS_NOISE - MIN_OBS_NOISE);
+            self.belief_var = [observation_variance; DIM];
             self.tick_count = 1;
             self._update_maturity();
             result.model_maturity = self.model_maturity;
@@ -1748,30 +1749,22 @@ impl ActiveInferenceEngine {
         );
 
         // Step 6: Update the variational posterior (Kalman filter) and
-        // compute the variational free energy.
+        // compute full Gaussian VFE and its bounded excess control signal.
         //
         // The posterior q(s) = N(belief_mean, diag(belief_var)) is
         // updated via a diagonal Kalman filter:
         //   K[i] = prior_var[i] / (prior_var[i] + obs_var)
-        //   belief_mean[i] = predicted[i] + K[i] * (obs[i] - predicted[i])
+        //   belief_mean[i] = prior_mean[i] + K[i] * (obs[i] - prior_mean[i])
         //   belief_var[i] = (1 - K[i]) * prior_var[i]
         //
-        // The variational free energy is:
-        //   F = accuracy (NLL) + complexity (KL divergence)
+        // Full VFE computed below is:
+        //   F = E_q[-log p(o|s)] + KL[q(s)||p(s)]
         //
         // where:
-        //   accuracy = surprise_ema (the EMA of the normalized L2 norm
-        //     of prediction errors — proportional to the NLL since
-        //     NLL ∝ ||error||² / obs_var)
-        //   complexity = KL[q(s) || p(s)] (how far the posterior has
-        //     moved from the prior — the information content of the
-        //     belief update)
-        //
-        // The accuracy term uses the surprise EMA (same as before) for
-        // compatibility with the allostatic load calibration. The key
-        // upgrade is the complexity term: the old heuristic
-        // (1-precision) * uncertainty_weight is replaced with the
-        // proper KL divergence between the posterior and the prior.
+        //   accuracy = expected Gaussian NLL, using the posterior's
+        //     mean residual, variance, and the observation noise.
+        //   complexity = full Gaussian KL, including covariance ratios.
+        // The raw value is separate from its normalized control output.
 
         // Observation noise: precision-weighted. High precision →
         // low obs_var → trust observations. Low precision → high
@@ -1793,13 +1786,13 @@ impl ActiveInferenceEngine {
         //
         //   P_{k|k-1}[i] = sum_j A[i][j]^2 * P_{k-1|k-1}[j] + Q[i]
         //
-        // We use the diagonal-only form:
+        // We retain every transition coefficient in this diagonal projection:
         //
-        //   P_{k|k-1}[i] = A[i][i]^2 * P_{k-1|k-1}[i] + Q[i]
+        //   P_{k|k-1}[i] = sum_j A[i][j]^2 * P_{k-1|k-1}[j] + Q[i]
         //
-        // This accounts for the learned self-dynamics of each
-        // dimension while neglecting cross-dimensional covariance
-        // coupling. A[i][i] is the self-persistence of dimension i —
+        // Cross-dimensional transition weights propagate uncertainty even
+        // when the represented posterior covariance is diagonal. Covariances
+        // between different output dimensions remain omitted. A[i][i] is
         // how much its current value predicts its next value. The
         // square (A[i][i]^2) is always non-negative, correctly
         // handling oscillating dimensions (A[i][i] < 0): variance
@@ -1846,115 +1839,64 @@ impl ActiveInferenceEngine {
         //
         // This is the uncertainty tracking that makes the variational
         // posterior a real posterior, not a static-gain filter.
-        for i in 0..DIM {
-            let a_diag_sq = self.transition_matrix[i][i] * self.transition_matrix[i][i];
-            self.prior_var[i] = crate::state::sanitize::finite_clamp(
-                a_diag_sq * self.belief_var[i] + PROCESS_NOISE,
-                1e-8,
-                1.0,
-            );
+        for (i, transition_row) in prediction_transition.iter().enumerate() {
+            let propagated_var = transition_row
+                .iter()
+                .zip(self.belief_var.iter())
+                .map(|(weight, variance)| weight * weight * variance)
+                .sum::<f32>();
+            self.prior_var[i] =
+                crate::state::sanitize::finite_clamp(propagated_var + PROCESS_NOISE, 1e-8, 1.0);
         }
 
         // Kalman update (per dimension, diagonal)
         for i in 0..DIM {
             let prior_v = self.prior_var[i];
             let gain = prior_v / (prior_v + obs_var);
-            let innovation = post[i] - predicted[i];
-            self.belief_mean[i] =
-                crate::state::sanitize::finite_clamp(predicted[i] + gain * innovation, 0.0, 2.0);
+            let innovation = post[i] - predicted_belief[i];
+            self.belief_mean[i] = crate::state::sanitize::finite_clamp(
+                predicted_belief[i] + gain * innovation,
+                0.0,
+                2.0,
+            );
             self.belief_var[i] =
                 crate::state::sanitize::finite_clamp((1.0 - gain) * prior_v, 1e-8, 1.0);
         }
 
-        // Complexity term of the variational free energy: the squared
-        // Mahalanobis distance of the posterior mean from the prior mean,
-        // normalized by prior variance. This is the information gain —
-        // how far the belief was updated by the observation.
-        //
-        // Only the mean-shift component is used, NOT the full KL
-        // divergence. The full KL between two Gaussians includes a
-        // variance-ratio term:
-        //   0.5 * log(prior_var/belief_var) + 0.5 * belief_var/prior_var - 0.5
-        //
-        // This term is strictly positive whenever the Kalman gain is
-        // nonzero (the posterior variance always shrinks below the
-        // prior: belief_var = (1-gain) * prior_var, gain > 0). It
-        // represents the intrinsic information content of an observation
-        // — the entropy reduction from prior to posterior — which is
-        // nonzero even when the observation matches the prediction
-        // perfectly, because any observation reduces uncertainty.
-        //
-        // Crucially, this term is surprise-independent: it depends only
-        // on prior_var and belief_var (both determined before the
-        // observation), not on the observation value itself. With the
-        // predict step, it now varies slowly across ticks (as belief_var
-        // evolves), but within a tick it is the same regardless of
-        // whether the observation was surprising or not. Including it
-        // would add a surprise-independent offset to the complexity,
-        // distorting the allostatic load dynamics (which depend on the
-        // free energy crossing thresholds in response to surprise).
-        //
-        // The mean-shift term alone correctly captures the surprise-
-        // dependent complexity: it is zero when the observation matches
-        // the prediction (no belief update needed) and grows with the
-        // magnitude of the update. The posterior variance enters the
-        // free energy through the expected-uncertainty term (below),
-        // where it varies with both the estimation history and the
-        // current precision — the appropriate place for estimation
-        // uncertainty in the free energy decomposition.
+        // Full Gaussian KL includes mean displacement and covariance change.
+        // Expected negative log-likelihood includes the posterior variance,
+        // not just the residual at the posterior mean. Their sum is VFE
+        // in nats, including Gaussian density normalization.
         let mut kl = 0.0f32;
+        let mut expected_nll = 0.0f32;
+        let mut predicted_nll_floor = 0.0f32;
         #[allow(clippy::needless_range_loop, reason = "i indexes multiple arrays")]
         for i in 0..DIM {
-            let sq_diff = (self.belief_mean[i] - predicted[i]).powi(2);
-            kl += 0.5 * sq_diff / self.prior_var[i].max(1e-10);
+            let prior_variance = self.prior_var[i].max(1e-10);
+            let posterior_variance = self.belief_var[i].max(1e-10);
+            let sq_diff = (self.belief_mean[i] - predicted_belief[i]).powi(2);
+            kl += 0.5
+                * ((prior_variance / posterior_variance).ln()
+                    + (posterior_variance + sq_diff) / prior_variance
+                    - 1.0);
+            let residual = post[i] - self.belief_mean[i];
+            expected_nll += 0.5
+                * ((2.0 * std::f32::consts::PI * obs_var).ln()
+                    + (residual * residual + posterior_variance) / obs_var);
+            predicted_nll_floor +=
+                0.5 * (2.0 * std::f32::consts::PI * (prior_variance + obs_var)).ln();
         }
-        let kl_per_dim = kl / DIM as f32;
-        let complexity = crate::state::sanitize::finite_clamp(kl_per_dim / KL_SCALE, 0.0, 1.0);
+        let variational_free_energy_nats = kl + expected_nll;
+        result.variational_free_energy_nats = variational_free_energy_nats;
 
-        // Variational free energy = accuracy + expected uncertainty + complexity.
-        //
-        // The accuracy term (surprise_ema) is the current prediction error.
-        // The expected uncertainty combines two uncertainty signals:
-        //   - (1 - precision): the model's prediction confidence. Low
-        //     precision → expects future prediction errors.
-        //   - normalized posterior variance: the actual estimation
-        //     uncertainty from the variational posterior (belief_var).
-        //     High belief_var → the model is uncertain about the true
-        //     state even if its predictions have been accurate.
-        //
-        // These are related but distinct: precision is about prediction
-        // confidence (will my next prediction be right?), while
-        // belief_var is about estimation confidence (do I know where I
-        // am?). A model can be precise but uncertain (e.g., after a
-        // large observation that moved the posterior far from the prior
-        // — the prediction was wrong, precision drops, but the
-        // posterior is now well-localized by the observation, so
-        // belief_var is low). Conversely, a model can be imprecise but
-        // confident in its estimate (sustained predictability with
-        // accumulating process noise). Averaging both signals and
-        // scaling by UNCERTAINTY_WEIGHT preserves the [0, W]
-        // calibration range while making the posterior variance — the
-        // defining quantity of a variational posterior — functional in
-        // the free energy computation.
-        //
-        // This captures the positive feedback in Friston's framework:
-        // sustained surprise erodes precision and inflates the posterior
-        // variance, both of which raise expected uncertainty, which
-        // raises free energy, which drives allostatic load.
-        //
-        // The complexity term (KL divergence) is the information cost of
-        // the belief update — how far the posterior moved from the prior.
-        let mut belief_var_sum = 0.0f32;
-        for i in 0..DIM {
-            belief_var_sum += self.belief_var[i];
-        }
-        let mean_belief_var = belief_var_sum / DIM as f32;
-        let normalized_belief_var =
-            crate::state::sanitize::finite_clamp(mean_belief_var / MAX_BELIEF_VAR, 0.0, 1.0);
-        let expected_uncertainty =
-            ((1.0 - self.precision) + normalized_belief_var) * 0.5 * UNCERTAINTY_WEIGHT;
+        // Preserve raw VFE separately from bounded physiological control.
+        // Subtract the matched-observation predictive-density reference;
+        // excess VFE is nonnegative although continuous-density VFE need not be.
+        // A monotonic exponential maps per-dimension excess into [0, 1].
+        let excess_free_energy =
+            ((variational_free_energy_nats - predicted_nll_floor) / DIM as f32).max(0.0);
         let free_energy = crate::state::sanitize::finite_clamp(
-            self.surprise_ema + expected_uncertainty + complexity,
+            1.0 - (-excess_free_energy / KL_SCALE).exp(),
             0.0,
             1.0,
         );
@@ -2258,7 +2200,8 @@ impl ActiveInferenceEngine {
         // "noop" policy wins (doing nothing is optimal). When the
         // system is stressed, a corrective policy wins. This is
         // continuous active inference, not just emergency intervention.
-        let selected = self._select_policy(pre_tick, target, result);
+        let inferred_state = self.belief_mean;
+        let selected = self._select_policy(&inferred_state, target, result);
         result.selected_policy = selected.policy.name;
         result.selected_policy_efe = selected.efe;
 
@@ -2392,11 +2335,22 @@ impl ActiveInferenceEngine {
         self.last_action = action;
     }
 
+    fn predicted_variances(&self) -> [f32; DIM] {
+        std::array::from_fn(|i| {
+            let propagated = self.transition_matrix[i]
+                .iter()
+                .zip(self.belief_var.iter())
+                .map(|(weight, variance)| weight * weight * variance)
+                .sum::<f32>();
+            crate::state::sanitize::finite_clamp(propagated + PROCESS_NOISE, 1e-8, 1.0)
+        })
+    }
+
     /// Expected information gain of the next observation, in nats.
     ///
     /// For the diagonal Gaussian posterior this is the entropy
-    /// reduction `0.5 * mean(ln(prior_var[i] / belief_var[i]))`:
-    /// how much uncertainty the Kalman update is expected to remove.
+    /// reduction `0.5 * mean(ln(1 + next_prior_var[i] / obs_var))`:
+    /// how much uncertainty the next Kalman update is expected to remove.
     /// Crucially, with additive controls the posterior *covariance*
     /// update does not depend on the observation value (the Kalman
     /// gain is fixed before the observation arrives), so this
@@ -2405,12 +2359,14 @@ impl ActiveInferenceEngine {
     /// between policies. See the scoring loop for why the previous
     /// novelty-based substitute was removed.
     fn expected_information_gain(&self) -> f32 {
-        let mut ig_sum = 0.0f32;
-        for i in 0..DIM {
-            let ratio = self.prior_var[i] / self.belief_var[i].max(1e-8);
-            ig_sum += 0.5 * ratio.ln().max(0.0);
-        }
-        crate::state::sanitize::finite_clamp(ig_sum / DIM as f32, 0.0, 10.0)
+        let observation_variance =
+            MIN_OBS_NOISE + (1.0 - self.precision) * (MAX_OBS_NOISE - MIN_OBS_NOISE);
+        let gain = self
+            .predicted_variances()
+            .iter()
+            .map(|variance| 0.5 * (variance / observation_variance).ln_1p())
+            .sum::<f32>();
+        gain / DIM as f32
     }
 
     /// Evaluate all candidate policies and select the one with lowest
@@ -2479,35 +2435,28 @@ impl ActiveInferenceEngine {
             // was trained.
             let predicted_after = self.predict_with_action(current, &policy_action);
 
-            // Expected-free-energy proxy for this controller:
+            // Gaussian expected free energy:
             //
-            // EFE_proxy = pragmatic_cost + model_uncertainty
+            // G = E[-ln p_preferred(o)] - I(s;o).
             //
-            // This is intentionally not labeled formal epistemic value.
+            // Expected preference cost includes predictive variance.
             // For additive controls in a linear-Gaussian model, the
             // expected information-gain term is policy-invariant
             // (Koudahl et al., 2021). Exploration is therefore handled
             // separately by the policy sampler.
-            let mut dist_sq = 0.0f32;
+            let preference_precision = self.preference_precision.max(1e-3);
+            let observation_variance =
+                MIN_OBS_NOISE + (1.0 - self.precision) * (MAX_OBS_NOISE - MIN_OBS_NOISE);
+            let future_variances = self.predicted_variances();
+            let mut preference_cost = 0.0f32;
             for i in 0..DIM {
                 let diff = predicted_after[i] - target[i];
-                dist_sq += diff * diff;
+                preference_cost += 0.5
+                    * ((2.0 * std::f32::consts::PI / preference_precision).ln()
+                        + preference_precision
+                            * (diff * diff + future_variances[i] + observation_variance));
             }
-            let expected_surprise = dist_sq / DIM as f32;
-            // NOTE: `uncertainty` depends only on `self.precision` and a
-            // constant — it is identical for every policy. That makes
-            // it invariant under the argmin, and the max-subtraction in
-            // the softmax below removes exactly such a common shift. So
-            // this term has **no effect on which policy is selected**;
-            // its only observable consequence is on the
-            // `selected_policy_efe` value that gets published. It is
-            // retained because a policy-independent term is legitimate
-            // in an expected-free-energy decomposition, but it must not
-            // be read as doing arbitration work — the exploration /
-            // exploitation balance is carried by the precision-gated
-            // softmax sampler below.
-            let uncertainty = (1.0 - self.precision) * UNCERTAINTY_WEIGHT;
-
+            let expected_surprise = preference_cost / DIM as f32;
             // Epistemic value: expected information gain, computed
             // properly as the entropy reduction of the variational
             // posterior (see `expected_information_gain`). For this
@@ -2539,7 +2488,7 @@ impl ActiveInferenceEngine {
             // high precision exploits.
             let epistemic_value = self.expected_information_gain();
 
-            // EFE = pragmatic + uncertainty - epistemic.
+            // EFE = expected negative log preference - expected information gain.
             // Lower EFE is better; epistemic value is subtracted
             // because information gain reduces EFE.
             //
@@ -2560,7 +2509,7 @@ impl ActiveInferenceEngine {
             // regime it exists to run in. A wide symmetric bound
             // rejects non-finite values while preserving order.
             let efe = crate::state::sanitize::finite_clamp(
-                expected_surprise + uncertainty - epistemic_value,
+                expected_surprise - epistemic_value,
                 -EFE_SCORE_LIMIT,
                 EFE_SCORE_LIMIT,
             );
@@ -3355,12 +3304,13 @@ impl ActiveInferenceEngine {
     #[cfg(test)]
     pub(crate) fn test_recompute_prior_var(&mut self) {
         for i in 0..DIM {
-            let a_diag_sq = self.transition_matrix[i][i] * self.transition_matrix[i][i];
-            self.prior_var[i] = crate::state::sanitize::finite_clamp(
-                a_diag_sq * self.belief_var[i] + PROCESS_NOISE,
-                1e-8,
-                1.0,
-            );
+            let propagated_var = self.transition_matrix[i]
+                .iter()
+                .zip(self.belief_var.iter())
+                .map(|(weight, variance)| weight * weight * variance)
+                .sum::<f32>();
+            self.prior_var[i] =
+                crate::state::sanitize::finite_clamp(propagated_var + PROCESS_NOISE, 1e-8, 1.0);
         }
     }
 
@@ -4185,8 +4135,8 @@ mod tests {
         // The expected information gain feeds the published EFE
         // decomposition but must be identical for every policy (it is
         // computed once per cycle, not per policy). Fresh engine:
-        // prior_var == belief_var, so no uncertainty has been
-        // resolved and the gain is ~0.
+        // uncertainty has not yet been resolved, but a future observation
+        // is informative: its gain includes next-step process noise.
         let engine = ActiveInferenceEngine::new();
         let ig = engine.expected_information_gain();
         assert!(
@@ -4194,7 +4144,15 @@ mod tests {
             "IG must be finite nonnegative: {}",
             ig
         );
-        assert!(ig.abs() < 1e-6, "fresh engine IG should be ~0: {}", ig);
+        let observation_variance =
+            MIN_OBS_NOISE + (1.0 - engine.precision) * (MAX_OBS_NOISE - MIN_OBS_NOISE);
+        let expected = 0.5 * (2.0 * PROCESS_NOISE / observation_variance).ln_1p();
+        assert!(
+            (ig - expected).abs() < 1e-6,
+            "next-observation IG: {} vs {}",
+            ig,
+            expected
+        );
     }
 
     // ─── Persistence v4 ─────────────────────────────────────────

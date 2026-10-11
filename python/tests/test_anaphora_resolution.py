@@ -19,10 +19,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from genesis_conscious.cognition.response_styler import ResponseStyler
-from genesis_conscious.concepts import ConceptNetwork, RelationType
-from genesis_conscious.concepts.types import ConceptCategory
-from genesis_conscious.memory import WorkingMemory
+from concepts import ConceptNetwork, RelationType
+from concepts.types import ConceptCategory
+from frontal_lobe.response_styler import ResponseStyler
+from memory import WorkingMemory
 
 
 def _make_styler(

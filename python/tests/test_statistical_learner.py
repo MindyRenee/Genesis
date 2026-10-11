@@ -8,13 +8,13 @@ slot selection and generator realization scoring.
 
 import pytest
 
-from genesis_conscious.language.statistical_learner import (
+from limbic_system.emotion import EmotionalState
+from self import PersonalityTraits, SelfModel
+from temporal_lobe.statistical_learner import (
     NGramModel,
     StatisticalLanguageLearner,
 )
-from genesis_conscious.language.vocabulary import Vocabulary
-from genesis_conscious.limbic_system.emotion import EmotionalState
-from genesis_conscious.self import PersonalityTraits, SelfModel
+from temporal_lobe.vocabulary import Vocabulary
 
 # ─── NGramModel ───────────────────────────────────────────────────
 
@@ -373,17 +373,17 @@ def test_vocabulary_no_fluency_model_works():
 
 def test_prediction_alignment_neutral_without_data():
     """Without learned data, prediction alignment is neutral (0.5)."""
-    from genesis_conscious.language.generator import GenerativeEngine
+    from frontal_lobe.generator import GenerativeLanguage
 
-    engine = GenerativeEngine(SelfModel(born_at=0), seed=42)
+    engine = GenerativeLanguage(SelfModel(born_at=0), seed=42)
     assert engine._prediction_alignment("anything goes here") == 0.5
 
 
 def test_prediction_alignment_higher_for_predicted_text():
     """Text following the learner's predictions scores higher."""
-    from genesis_conscious.language.generator import GenerativeEngine
+    from frontal_lobe.generator import GenerativeLanguage
 
-    engine = GenerativeEngine(SelfModel(born_at=0), seed=42)
+    engine = GenerativeLanguage(SelfModel(born_at=0), seed=42)
     # Teach a strong pattern: "the cat sat" repeated many times
     for _ in range(20):
         engine.acquire_from_input("the cat sat")
@@ -396,8 +396,8 @@ def test_prediction_alignment_higher_for_predicted_text():
 
 def test_prediction_alignment_neutral_for_short_text():
     """Very short text gets neutral alignment."""
-    from genesis_conscious.language.generator import GenerativeEngine
+    from frontal_lobe.generator import GenerativeLanguage
 
-    engine = GenerativeEngine(SelfModel(born_at=0), seed=42)
+    engine = GenerativeLanguage(SelfModel(born_at=0), seed=42)
     engine.acquire_from_input("the cat sat on the mat")
     assert engine._prediction_alignment("x") == 0.5

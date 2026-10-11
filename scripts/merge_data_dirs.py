@@ -53,8 +53,8 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "python"))
 
-from genesis_conscious.concepts.edge_log import EdgeLog, open_edge_log
-from genesis_conscious.concepts.types import Edge
+from concepts.edge_log import EdgeLog, open_edge_log
+from concepts.types import Edge
 
 
 def _load_state(path: Path) -> dict[str, Any]:

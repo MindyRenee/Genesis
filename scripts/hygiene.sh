@@ -132,10 +132,7 @@ ARTIFACT_DIRS=(
 # Source directories — never touched by --clean
 SOURCE_DIRS=(
     "src"
-    "python/genesis_conscious"
-    "python/genesis_client"
-    "python/genesis_cli.py"
-    "python/tests"
+    "python"
     "tests"
     "examples"
     "scripts"
@@ -474,7 +471,7 @@ do_check() {
     local py_issues=""
     if command -v ruff >/dev/null 2>&1; then
         local ruff_out
-        ruff_out=$(ruff check python/genesis_conscious/ python/genesis_client/ python/genesis_cli.py python/tests/ scripts/ 2>&1 || true)
+        ruff_out=$(ruff check python/ scripts/ 2>&1 || true)
         # Report the whole ruff output when ruff found anything, not just
         # the F401/F811/F841 lines. Filtering to those rules meant any
         # other violation — an unsorted import block, say — left
@@ -488,7 +485,7 @@ do_check() {
     fi
     if command -v pyflakes >/dev/null 2>&1; then
         local pf_out
-        pf_out=$(pyflakes python/genesis_conscious/ python/genesis_client/ python/genesis_cli.py python/tests/ scripts/*.py 2>&1 || true)
+        pf_out=$(pyflakes python/ scripts/*.py 2>&1 || true)
         if [ -n "$pf_out" ]; then
             py_issues="${py_issues}${pf_out}"$'\n'
         fi
@@ -505,11 +502,11 @@ do_check() {
     # unused *imports*, so this is the only check here that can see an
     # unreferenced function at all. There is a known backlog, and
     # vulture has no way to know which names are reached dynamically
-    # (canvas dispatch tables, ast.NodeVisitor, HTMLParser, per-puzzle
-    # protocols), so its output needs review rather than a hard gate.
+    # (canvas dispatch tables, ast.NodeVisitor, HTMLParser), so its
+    # output needs review rather than a hard gate.
     if command -v vulture >/dev/null 2>&1; then
         local vulture_out
-        vulture_out=$(vulture python/genesis_conscious/ python/genesis_client/ python/genesis_cli.py \
+        vulture_out=$(vulture python/ \
             --min-confidence 80 2>&1 | head -20 || true)
         if [ -n "$vulture_out" ]; then
             local v_count

@@ -5,6 +5,7 @@ mind end-to-end with a running daemon.
 """
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -19,13 +20,13 @@ import pytest
 
 from genesis_client import NeuroSummary
 from genesis_client.protocol import PHASE_FLOW, PHASE_SLEEPING, PHASE_STRESS
-from genesis_conscious.limbic_system.emotion import (
+from limbic_system.emotion import (
     EmotionalState,
     EmotionCategory,
     assess_emotion,
 )
-from genesis_conscious.perception import Intent, QuestionType, perceive
-from genesis_conscious.self import SelfModel
+from perception import Intent, QuestionType, perceive
+from self import SelfModel
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +159,7 @@ def test_emotion_structural_state():
         phase=0,
     )
     emo = assess_emotion(summary)
-    from genesis_conscious.limbic_system.emotion import CognitiveMode, EmotionCategory
+    from limbic_system.emotion import CognitiveMode, EmotionCategory
     assert emo.category == EmotionCategory.NEUTRAL
     assert emo.cognitive_mode == CognitiveMode.STEADY
 
@@ -170,8 +171,8 @@ def test_learn_emotion_word_from_labeling():
     """Emotion word learning associates words with categories."""
     from unittest.mock import MagicMock
 
-    from genesis_conscious.cognition import CognitionEngine
-    from genesis_conscious.concepts import ConceptNetwork
+    from concepts import ConceptNetwork
+    from frontal_lobe import FrontalLobe
 
     # Create a minimal mock for the client
     client = MagicMock()
@@ -182,10 +183,10 @@ def test_learn_emotion_word_from_labeling():
     )
 
     # Create a cognition engine with a fresh network
-    cog = CognitionEngine.__new__(CognitionEngine)
+    cog = FrontalLobe.__new__(FrontalLobe)
     cog.network = ConceptNetwork()
     cog._rng = __import__("random").Random(42)
-    from genesis_conscious.cognition.concept_learner import ConceptLearner
+    from temporal_lobe.concept_learner import ConceptLearner
     cog._concept_learner = ConceptLearner(network=cog.network)
 
     # Test labeling
@@ -211,7 +212,7 @@ def test_learn_emotion_word_from_labeling():
 
     # Verify relationships were created between words
     # for the same category (SIMILAR_TO edges)
-    from genesis_conscious.concepts import RelationType
+    from concepts import RelationType
     neighbors = cog.network.get_neighbors("positive", RelationType.SIMILAR_TO)
     neighbor_ids = [n[0] for n in neighbors]
     assert "content" in neighbor_ids
@@ -228,13 +229,13 @@ def test_learn_emotion_word_from_labeling():
 
 def test_learn_emotion_word_skips_non_emotion_words():
     """Emotion word learning skips common non-emotion words."""
-    from genesis_conscious.cognition import CognitionEngine
-    from genesis_conscious.concepts import ConceptNetwork
+    from concepts import ConceptNetwork
+    from frontal_lobe import FrontalLobe
 
-    cog = CognitionEngine.__new__(CognitionEngine)
+    cog = FrontalLobe.__new__(FrontalLobe)
     cog.network = ConceptNetwork()
     cog._rng = __import__("random").Random(42)
-    from genesis_conscious.cognition.concept_learner import ConceptLearner
+    from temporal_lobe.concept_learner import ConceptLearner
     cog._concept_learner = ConceptLearner(network=cog.network)
 
     emotion = EmotionalState(
@@ -248,13 +249,13 @@ def test_learn_emotion_word_skips_non_emotion_words():
 
 def test_learn_emotion_word_different_patterns():
     """Emotion word learning recognizes different labeling patterns."""
-    from genesis_conscious.cognition import CognitionEngine
-    from genesis_conscious.concepts import ConceptNetwork
+    from concepts import ConceptNetwork
+    from frontal_lobe import FrontalLobe
 
-    cog = CognitionEngine.__new__(CognitionEngine)
+    cog = FrontalLobe.__new__(FrontalLobe)
     cog.network = ConceptNetwork()
     cog._rng = __import__("random").Random(42)
-    from genesis_conscious.cognition.concept_learner import ConceptLearner
+    from temporal_lobe.concept_learner import ConceptLearner
     cog._concept_learner = ConceptLearner(network=cog.network)
 
     emotion = EmotionalState(
@@ -447,8 +448,12 @@ def _run_mind_tests(mind) -> None:
     # new words for how she feels.
     lower_resp = response.lower()
     gap_response = "unable to respond" in lower_resp
-    self_referential = any(
-        w in lower_resp for w in (" i ", "i'm", "i am", " me", " my", "myself")
+    # Word-boundary match so a sentence-initial "I" counts — "I feel
+    # optimistic" is first-person even though " i " never appears.
+    self_referential = bool(
+        re.search(r"\bi\b", lower_resp)
+        or "i'm" in lower_resp
+        or re.search(r"\bme\b|\bmy\b|\bmyself\b", lower_resp)
     )
     assert len(response.strip()) > 0, "self-inquiry response empty"
     assert gap_response or self_referential, (
@@ -542,7 +547,7 @@ def test_integration_mind():
 
         time.sleep(0.5)
 
-        from genesis_conscious import Mind
+        from mind import Mind
 
         mind = Mind(socket_path, offline=True)
         try:

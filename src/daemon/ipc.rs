@@ -56,7 +56,7 @@ use std::path::{Path, PathBuf};
 
 use crate::cognition::SelfModel;
 use crate::state::{CognitiveZone, GenesisCoreState, ModuleId, NeurochemicalId};
-use crate::store::{EventType, LtmStore, MmapState, RingBuffer};
+use crate::store::{Episode, EventType, LtmStore, MmapState, RingBuffer};
 
 // ─────────────────────────────────────────────────────────────────
 //  Protocol constants
@@ -338,7 +338,7 @@ pub mod cmd {
     /// owns time and measures its own elapsed interval, because a
     /// caller-chosen step is what let the mind dictate the body's
     /// integration rate. Offline experiments still need one — the
-    /// causal assay in `python/genesis_conscious/eval/assay.py` advances
+    /// causal assay in `python/eval/assay.py` advances
     /// a fixed number of ticks and reads the per-tick response, so `dt`
     /// is its independent variable and cannot be the daemon's wall clock.
     ///
@@ -359,6 +359,38 @@ pub mod cmd {
     /// reusing genesis2's 36, which this tree already spent on
     /// GET_SENSOR_PRESENCE.
     pub const GET_ION_SUMMARY: u8 = 40;
+
+    // ─── Tensor slab ──────────────────────────────────────────
+    // Named multidimensional tensors shared between the daemon and
+    // the cognitive mind — world frames, salience fields, embeddings,
+    // motor fields. The slab is process-local (see
+    // `daemon::tensor_slab`); nothing here touches CoreState layout,
+    // so all five commands are additive and PROTOCOL_VERSION is
+    // unaffected.
+
+    /// Store a named tensor. Request: `[u8 name_len][name utf8]
+    /// [u8 dtype][u8 ndim][ndim × u32 dims][payload]`. Response:
+    /// `[u8 ack]` (1) or an error byte (`INVALID_VALUE` for a bad
+    /// dtype/rank/name/length mismatch or a full slab).
+    pub const PUT_TENSOR: u8 = 41;
+    /// Fetch a named tensor. Request: `[u8 name_len][name utf8]`.
+    /// Response: `[u8 found]` (0 = absent), then the tensor encoding
+    /// when found.
+    pub const GET_TENSOR: u8 = 42;
+    /// List live tensors — names, dtypes, shapes, never payload.
+    /// Request: empty. Response: `[u16 count][entries]`.
+    pub const LIST_TENSORS: u8 = 43;
+    /// Drop a named tensor (idempotent). Request: `[u8 name_len]
+    /// [name utf8]`. Response: `[u8 ack]` (1).
+    pub const DROP_TENSOR: u8 = 44;
+    /// Decode the published motor fields into a concrete target: the
+    /// strongest cell of `motor.spatial` projected onto the canonical
+    /// 64×64 coordinate grid, plus the strongest disposition of
+    /// `motor.actions`. Request: empty. Response: 14 bytes —
+    /// `[u8 flags][u8 action_id][f32 a_strength][u16 x][u16 y]
+    /// [f32 cell_strength]`; flags bit0 = action present, bit1 = cell
+    /// present.
+    pub const GET_MOTOR_TARGET: u8 = 45;
 }
 
 /// Notification opcodes for daemon→cognitive push messages.
@@ -366,7 +398,7 @@ pub mod cmd {
 /// **Reserved / unwired.** The IPC channel is strictly request-response:
 /// the daemon never writes an unsolicited message to a client, so none
 /// of these are ever sent today. The cognitive mind instead detects
-/// these events by polling (`python/genesis_conscious/infrastructure/
+/// these events by polling (`python/infrastructure/
 /// notifications.py`,
 /// a pull-based queue), which is the active mechanism. These constants
 /// reserve the 100+ opcode range for a future push implementation and
@@ -1047,6 +1079,27 @@ fn serialize_subsystem_telemetry(
     resp
 }
 
+fn serialize_episode_page(episodes: &[Episode]) -> Vec<u8> {
+    let mut resp = vec![0u8; 4];
+    let mut count = 0u32;
+    for ep in episodes {
+        let text_bytes = ep.text.as_bytes();
+        if 1 + resp.len() + 26 + text_bytes.len() > MAX_MESSAGE_LEN {
+            break;
+        }
+        resp.extend_from_slice(&ep.episode_id.to_le_bytes());
+        resp.extend_from_slice(&ep.timestamp.to_le_bytes());
+        resp.extend_from_slice(&ep.salience.to_le_bytes());
+        resp.push(ep.event_type);
+        resp.push(ep.source_module);
+        resp.extend_from_slice(&(text_bytes.len() as u32).to_le_bytes());
+        resp.extend_from_slice(text_bytes);
+        count += 1;
+    }
+    resp[..4].copy_from_slice(&count.to_le_bytes());
+    resp
+}
+
 // ─────────────────────────────────────────────────────────────────
 //  Message framing
 // ─────────────────────────────────────────────────────────────────
@@ -1505,10 +1558,7 @@ impl Drop for IpcServer {
         // startup attempt may have returned because another listener was
         // already live at this path; removing it here would undo the
         // live-socket protection above.
-        if self
-            .owns_socket
-            .load(std::sync::atomic::Ordering::Acquire)
-        {
+        if self.owns_socket.load(std::sync::atomic::Ordering::Acquire) {
             let _ = std::fs::remove_file(&self.socket_path);
         }
     }
@@ -2996,19 +3046,7 @@ pub fn default_handler(
 
             let episodes = ltm.recent_episodes(limit, filter);
 
-            let mut resp = Vec::with_capacity(4 + episodes.len() * 64);
-            resp.extend_from_slice(&(episodes.len() as u32).to_le_bytes());
-            for ep in &episodes {
-                let text_bytes = ep.text.as_bytes();
-                resp.extend_from_slice(&ep.episode_id.to_le_bytes());
-                resp.extend_from_slice(&ep.timestamp.to_le_bytes());
-                resp.extend_from_slice(&ep.salience.to_le_bytes());
-                resp.push(ep.event_type);
-                resp.push(ep.source_module);
-                resp.extend_from_slice(&(text_bytes.len() as u32).to_le_bytes());
-                resp.extend_from_slice(text_bytes);
-            }
-            resp
+            serialize_episode_page(&episodes)
         }
 
         cmd::GET_PLASTICITY_PROFILE => {
@@ -3395,19 +3433,7 @@ pub fn default_handler(
 
             let episodes = ltm.search_episodes(limit, offset);
 
-            let mut resp = Vec::with_capacity(4 + episodes.len() * 64);
-            resp.extend_from_slice(&(episodes.len() as u32).to_le_bytes());
-            for ep in &episodes {
-                let text_bytes = ep.text.as_bytes();
-                resp.extend_from_slice(&ep.episode_id.to_le_bytes());
-                resp.extend_from_slice(&ep.timestamp.to_le_bytes());
-                resp.extend_from_slice(&ep.salience.to_le_bytes());
-                resp.push(ep.event_type);
-                resp.push(ep.source_module);
-                resp.extend_from_slice(&(text_bytes.len() as u32).to_le_bytes());
-                resp.extend_from_slice(text_bytes);
-            }
-            resp
+            serialize_episode_page(&episodes)
         }
 
         cmd::SET_POLICY_AUTHORITY => {
@@ -3476,6 +3502,77 @@ pub fn default_handler(
                 }
             }
         }
+
+        // ─── Tensor slab ─────────────────────────────────────
+        // Named tensors are daemon-process state — no mmap, no
+        // TickLoop. See `daemon::tensor_slab` for the wire codec and
+        // `field::motor` for the field decode.
+        cmd::PUT_TENSOR => {
+            use super::tensor_slab::{self, Tensor, TensorError};
+            let resp = (|| -> Result<(), TensorError> {
+                let (name, off) = tensor_slab::decode_name(payload)?;
+                let (tensor, used) = Tensor::decode(&payload[off..])?;
+                if used != payload.len() - off {
+                    return Err(TensorError::InvalidValue);
+                }
+                tensor_slab::slab()
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .put(name, tensor)
+            })();
+            match resp {
+                Ok(()) => vec![1],
+                Err(TensorError::PayloadTooShort) => vec![error::PAYLOAD_TOO_SHORT],
+                Err(TensorError::InvalidValue | TensorError::SlabFull) => {
+                    vec![error::INVALID_VALUE]
+                }
+            }
+        }
+
+        cmd::GET_TENSOR => {
+            use super::tensor_slab::{self, TensorError};
+            match tensor_slab::decode_name(payload) {
+                Err(TensorError::PayloadTooShort) => vec![error::PAYLOAD_TOO_SHORT],
+                Err(_) => vec![error::INVALID_VALUE],
+                Ok((name, _)) => {
+                    let slab = tensor_slab::slab()
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner());
+                    match slab.get(&name) {
+                        Some(t) => {
+                            let mut resp = Vec::with_capacity(3 + t.shape.len() * 4 + t.data.len());
+                            resp.push(1);
+                            resp.extend_from_slice(&t.encode());
+                            resp
+                        }
+                        None => vec![0],
+                    }
+                }
+            }
+        }
+
+        cmd::LIST_TENSORS => {
+            let slab = super::tensor_slab::slab()
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            super::tensor_slab::encode_list(&slab.list())
+        }
+
+        cmd::DROP_TENSOR => match super::tensor_slab::decode_name(payload) {
+            Err(super::tensor_slab::TensorError::PayloadTooShort) => {
+                vec![error::PAYLOAD_TOO_SHORT]
+            }
+            Err(_) => vec![error::INVALID_VALUE],
+            Ok((name, _)) => {
+                super::tensor_slab::slab()
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .remove(&name);
+                vec![1]
+            }
+        },
+
+        cmd::GET_MOTOR_TARGET => crate::field::motor::current_motor_target().encode(),
 
         // ─── Reactive commands (mind-driven) ───────────────────
         // These are handled by the reactive_handler which has access

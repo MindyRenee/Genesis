@@ -26,14 +26,14 @@ import pytest
 
 import genesis_cli
 from genesis_client.ltm_index import scan_ltm_index
-from genesis_conscious.infrastructure.journal import (
+from infrastructure.journal import (
     JOURNAL_FILENAME,
     CognitiveJournal,
     record_error,
     record_event,
     set_active,
 )
-from genesis_conscious.mind import Mind
+from mind import Mind
 
 
 def _read_events(path: Path) -> list[dict]:
@@ -111,6 +111,58 @@ def test_journal_record_error(tmp_path):
     assert event["kind"] == "error"
     assert event["site"] == "volition.bug_scan"
     assert "boom" in event["text"]
+
+
+def test_journal_tail_returns_last_n_events(tmp_path):
+    """tail() reads the journal back — /thoughts uses it to surface
+    the live stream, not just inner_life's own deque."""
+    journal = CognitiveJournal(tmp_path)
+    for i in range(8):
+        journal.record("learning", f"event {i}")
+    journal.close()
+
+    events = journal.tail(3)
+    assert [e["text"] for e in events] == ["event 5", "event 6", "event 7"]
+    assert all(e["kind"] == "learning" for e in events)
+
+
+def test_journal_tail_handles_missing_and_empty(tmp_path):
+    journal = CognitiveJournal(tmp_path)
+    assert journal.tail(5) == []
+    journal.close()
+    # A journal that never opened (unwritable dir) tails to empty.
+    dead = CognitiveJournal("/nonexistent-dir-for-journal/nope")
+    assert dead.tail(5) == []
+
+
+def test_journal_tail_skips_malformed_lines(tmp_path):
+    path = tmp_path / JOURNAL_FILENAME
+    path.write_text(
+        '{"kind": "learning", "text": "good"}\n'
+        "not json at all\n"
+        '{"kind": "thought", "text": "also good"}\n'
+    )
+    journal = CognitiveJournal(tmp_path)
+    events = journal.tail(10)
+    journal.close()
+    assert [e["text"] for e in events] == ["good", "also good"]
+
+
+def test_journal_tail_reads_across_a_midline_slice(tmp_path):
+    """A tail read that starts mid-line drops the fragment, not the
+    rest of the window."""
+    path = tmp_path / JOURNAL_FILENAME
+    # Two events where the tail window lands inside the first line.
+    lines = [
+        json.dumps({"kind": "learning", "text": "early"}) + "\n",
+        json.dumps({"kind": "learning", "text": "late"}) + "\n",
+    ]
+    path.write_text("".join(lines))
+    journal = CognitiveJournal(tmp_path)
+    journal._TAIL_READ_BYTES = len(lines[1]) + 5  # slice inside line 1
+    events = journal.tail(10)
+    journal.close()
+    assert [e["text"] for e in events] == ["late"]
 
 
 def test_module_record_error_noop_without_active(tmp_path):

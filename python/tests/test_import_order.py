@@ -1,76 +1,77 @@
-"""Guard the load-bearing import order in cognition/engine.py.
+"""Guard the laziness that keeps the ``self`` import cycle harmless.
 
-``cognition/engine.py`` participates in a three-way import cycle::
+Several modules do ``from self import X`` at module level::
 
-    self -> perception -> language -> self
+    frontal_lobe/generator.py     -> from self import SelfModel
+    temporal_lobe/vocabulary.py   -> from self import PersonalityTraits
+    temporal_lobe/memory_store.py -> from self import SelfModel
+    infrastructure/narrative.py   -> from self import PersonalityTraits, SelfModel
 
-Each package's ``__init__`` eagerly imports its submodules, so whichever one
-is entered first leaves the other two partially initialised. Concretely,
-``language/generator.py`` does ``from ..self import SelfModel``; if
-``genesis_conscious.self`` is still executing its own ``__init__`` when that
-line runs, ``SelfModel`` is not yet bound and the import raises.
+Meanwhile ``self`` itself imports the rest of the tree
+(``self.composer`` reaches ``frontal_lobe.graph_walk``,
+``self.metacognitive_model``/``self.reflection`` reach ``frontal_lobe``).
 
-The cycle is entered from ``infrastructure/narrative.py``, which
-``cognition/engine.py`` imports. Placing that import *after* ``..self``,
-``..perception`` and ``..language`` means those three are already bound
-before the cycle is walked. Moving it earlier breaks the entire package:
-every ``import genesis_conscious`` fails.
+If ``self/__init__.py`` ever *eagerly* imported its submodules, that
+chain could run ``from self import SelfModel`` inside one of those
+modules while ``self`` is only partially initialised — an ImportError
+on ``import mind``. The package resolves attributes lazily (PEP 562,
+``view_getattr``), so ``from self import X`` binds only the submodule
+that defines X — and ``self.model``'s own imports (concepts,
+genesis_client, infrastructure.config) never reach the language
+modules, so the edge can never fire mid-import.
 
-Sorting tools (``ruff --fix``) will happily undo it, so this test pins the
-order. ``ruff``'s I001 is ignored for this one file in pyproject.toml with a
-pointer here.
+This test pins two things:
+
+1. ``self/__init__.py`` stays lazy — it must not ``from .x import``
+   a submodule at module level;
+2. a fresh interpreter can ``import mind`` — the end-to-end check
+   that the whole graph actually loads.
 """
 
 from __future__ import annotations
 
 import ast
 import pathlib
+import subprocess
+import sys
 
 _ROOT = pathlib.Path(__file__).resolve().parents[1]
-ENGINE = _ROOT / "genesis_conscious" / "cognition" / "engine.py"
-
-# Only `language` must precede it. `language/generator.py` is the module that
-# reads `SelfModel` out of the partially-initialised `self` package, so
-# `language` is the edge that must already be bound. `perception` and `self`
-# may follow `narrative`: by then `self` is mid-`__init__` either way, and the
-# order that matters is the one `language` fixes.
-MUST_PRECEDE_NARRATIVE = ("language",)
+SELF_INIT = _ROOT / "self" / "__init__.py"
 
 
-def _relative_import_order() -> dict[str, int]:
-    """Map each ``..<pkg>`` import to the line it appears on."""
-    tree = ast.parse(ENGINE.read_text(encoding="utf-8"))
-    order: dict[str, int] = {}
-    for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.level == 2 and node.module:
-            order.setdefault(node.module.split(".")[0], node.lineno)
-    return order
+def test_self_package_stays_lazy() -> None:
+    """``self/__init__`` must not eagerly import its submodules.
 
-
-def test_narrative_imports_after_the_cycle() -> None:
-    order = _relative_import_order()
-    assert "infrastructure" in order, "expected a ..infrastructure import"
-    narrative_line = order["infrastructure"]
-    for package in MUST_PRECEDE_NARRATIVE:
-        assert package in order, f"expected a ..{package} import"
-        assert order[package] < narrative_line, (
-            f"..{package} is imported on line {order[package]}, after "
-            f"..infrastructure on line {narrative_line}. The cycle "
-            f"(self -> perception -> language -> self) will be entered with "
-            f"genesis_conscious.self only partially initialised, and "
-            f"language/generator.py's `from ..self import SelfModel` fails."
-        )
+    The ``from self import X`` edges inside generator.py, vocabulary.py,
+    memory_store.py and narrative.py are only safe while ``self`` binds
+    submodules on demand. An eager ``from .model import SelfModel`` at
+    the top of the package re-opens the self -> perception -> language
+    -> self partial-initialisation cycle.
+    """
+    tree = ast.parse(SELF_INIT.read_text(encoding="utf-8"))
+    eager = []
+    for node in tree.body:  # top-level statements only
+        if (
+            isinstance(node, ast.ImportFrom)
+            and node.level == 1
+            and node.module is not None
+        ):
+            eager.append(node.module)
+        if isinstance(node, ast.ImportFrom) and node.module == "_views":
+            continue
+    assert not eager, (
+        f"self/__init__.py eagerly imports submodules: {eager}. "
+        "That re-opens the partial-initialisation cycle — keep the "
+        "package lazy via view_getattr."
+    )
 
 
 def test_package_imports_cleanly() -> None:
-    """The whole point: a fresh interpreter must import the package."""
-    import subprocess
-    import sys
-
+    """The whole point: a fresh interpreter must import the mind."""
     result = subprocess.run(
-        [sys.executable, "-c", "import genesis_conscious"],
+        [sys.executable, "-c", "import mind"],
         capture_output=True,
         text=True,
-        cwd=str(ENGINE.parents[2]),
+        cwd=str(_ROOT),
     )
-    assert result.returncode == 0, f"import genesis_conscious failed:\n{result.stderr}"
+    assert result.returncode == 0, f"import mind failed:\n{result.stderr}"

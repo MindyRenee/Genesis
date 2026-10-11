@@ -46,10 +46,10 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "python"))
 
-from genesis_conscious.concepts import ConceptNetwork, open_archive
-from genesis_conscious.concepts.edge_log import open_edge_log
-from genesis_conscious.infrastructure.config import default_data_dir
-from genesis_conscious.infrastructure.persistence import restore_network
+from concepts import ConceptNetwork, open_archive
+from concepts.edge_log import open_edge_log
+from infrastructure.config import default_data_dir
+from infrastructure.persistence import restore_network
 
 
 def _load_state(path: Path) -> dict[str, Any]:

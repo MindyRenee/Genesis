@@ -53,7 +53,7 @@ from genesis_client.types import (
     SubsystemTelemetry,
     ZoneTransitions,
 )
-from genesis_conscious.self.model import SelfModel
+from self.model import SelfModel
 
 TRACKED_STATES = 8  # must match zones::TRACKED_STATES
 SUBSYSTEM_REC = 21

@@ -37,7 +37,7 @@
 //! - Na⁺/K⁺-ATPase exports 3 Na⁺ and imports 2 K⁺ per cycle, gated by
 //!   intracellular Na⁺, extracellular K⁺, and ATP availability.
 //! - A signed K⁺/Cl⁻ cotransport term models net KCC2 extrusion (positive
-//!   flux) and NKCC1-like import (negative flux).
+//!   flux) and reversed KCC2 import (negative flux).
 //! - A Ca²⁺ extrusion term models PMCA/NCX clearance; its Na⁺-coupled
 //!   component can weaken or reverse under intracellular Na⁺ load.
 //!
@@ -141,7 +141,7 @@ const NERNST_FACTOR_MV: f32 = 26.713;
 const RESTING_MEMBRANE_MV: f32 = -75.0;
 /// Membrane integration time constant in seconds.
 const MEMBRANE_TAU_S: f32 = 0.025;
-/// Fraction of extracellular volume affected by a unit intracellular flux.
+/// Effective intracellular-to-reservoir volume ratio, not tissue volume fraction.
 const EXTRACELLULAR_VOLUME_RATIO: f32 = 0.20;
 /// Extracellular reservoir/glial homeostasis time constant in seconds.
 const EXTRACELLULAR_TAU_S: f32 = 20.0;
@@ -151,24 +151,26 @@ const INTRACELLULAR_TAU_S: f32 = 600.0;
 /// Relative conductance activation time constants in seconds.
 const CONDUCTANCE_TAU_S: [f32; ION_COUNT] = [0.020, 0.050, 0.080, 0.015];
 /// Conversion from normalized `g·mV` current to intracellular mM/s.
-const CURRENT_TO_MM_PER_S: [f32; ION_COUNT] = [0.00015, 0.008, 0.0024, 0.0035];
+const CURRENT_TO_MM_PER_S: [f32; ION_COUNT] = [0.00175, 0.0035, 0.0035, 0.0035];
+const CALCIUM_FREE_FRACTION: f32 = 0.00015 / CURRENT_TO_MM_PER_S[IonId::Calcium as usize];
 
 /// Maximum Na⁺/K⁺-ATPase cycle flux in mM/s. Each cycle exports 3 Na⁺
 /// and imports 2 K⁺, so the Na⁺ rate is `3 × nak_pump_rate`.
 const NAK_MAX_RATE_MM_PER_S: f32 = 0.042;
 /// Normalized electrogenic pump contribution in the chord equation.
-const PUMP_CURRENT_EQUIV_MV: f32 = 1.5;
+const PUMP_CURRENT_EQUIV_MV: f32 =
+    NAK_MAX_RATE_MM_PER_S / CURRENT_TO_MM_PER_S[IonId::Sodium as usize];
 /// Half-saturation constants for Na⁺i and K⁺o pump activation.
 const NAK_KM_NA_I_MM: f32 = 10.0;
 const NAK_KM_K_O_MM: f32 = 1.5;
 
 /// Baseline outward Cl⁻ transport at the resting intracellular level.
 const CL_TRANSPORT_BASE_MM_PER_S: f32 = 0.010;
-/// Sensitivity of net KCC2/NKCC1 transport to intracellular Cl⁻ error.
+/// Phenomenological increase of KCC2 transport capacity with Cl⁻ load.
 const CL_TRANSPORT_GAIN_PER_S: f32 = 0.020;
-/// K⁺ carried with the net chloride transport flux (KCC2/NKCC1 are
-/// cation-chloride cotransporters).
-const CL_TRANSPORT_K_STOICH: f32 = 0.5;
+/// K⁺ carried per Cl⁻ by electroneutral KCC2 in either direction;
+/// NKCC1's distinct Na⁺:K⁺:Cl⁻ = 1:1:2 transport is not modeled.
+const CL_TRANSPORT_K_STOICH: f32 = 1.0;
 
 /// Baseline Ca²⁺ extrusion balancing resting Ca²⁺ leak/current.
 const CA_EXTRUSION_BASE_MM_PER_S: f32 = 0.00016;
@@ -223,7 +225,7 @@ pub struct IonState {
     /// Na⁺/K⁺-ATPase cycle rate in mM/s.
     pub nak_pump_rate: f32,
     /// Net K⁺/Cl⁻ cotransport in mM/s. Positive = outward Cl⁻/K⁺ flux
-    /// (KCC2-like); negative = inward flux (NKCC1-like).
+    /// (KCC2-like); negative = reversed KCC2 inward flux.
     pub kcl_cotransporter_flux: f32,
     /// Na⁺/Ca²⁺ exchange rate in mM/s of Ca²⁺. Positive = Ca²⁺ extrusion
     /// coupled to Na⁺ entry; negative = exchange reversal.
@@ -302,7 +304,16 @@ impl IonState {
     /// explicit Euler steps, while concentration changes are bounded and
     /// followed by physiological range clamps.
     pub fn tick(&mut self, neuro: &NeurochemicalVector, dt: f32) {
+        let dt = finite_clamp(finite_or(dt, super::neurochemical::DT), 0.001, 1.0);
+        let steps = (dt / 0.01).ceil() as usize;
+        for _ in 0..steps {
+            self.tick_step(neuro, dt / steps as f32);
+        }
+    }
+
+    fn tick_step(&mut self, neuro: &NeurochemicalVector, dt: f32) {
         self.sanitize();
+        self.recompute_derived();
         let dt = finite_clamp(finite_or(dt, super::neurochemical::DT), 0.001, 1.0);
 
         let glutamate = finite_clamp(neuro.effective(NeurochemicalId::Glutamate), 0.0, 2.0);
@@ -314,6 +325,20 @@ impl IonState {
         let voltage = self.membrane_potential_mv;
         let sodium_gate = sigmoid((voltage + 35.0) / 6.0);
         let calcium_gate = sigmoid((voltage + 45.0) / 6.0);
+        let na_i = IonId::Sodium as usize;
+        let k_i = IonId::Potassium as usize;
+        let cation_reversal = NERNST_FACTOR_MV
+            * ((self.extracellular_mm[na_i] + self.extracellular_mm[k_i])
+                / (self.intracellular_mm[na_i] + self.intracellular_mm[k_i]))
+                .ln();
+        let sodium_fraction = finite_clamp(
+            (cation_reversal - self.reversal_potential_mv[k_i])
+                / (self.reversal_potential_mv[na_i] - self.reversal_potential_mv[k_i]),
+            0.0,
+            1.0,
+        );
+        let synaptic_cation_conductance =
+            (0.25 * glutamate + 0.05 * acetylcholine) * (1.0 - 0.25 * adenosine);
 
         let target = [
             // Voltage-gated Ca²⁺: glutamate opens NMDA/L-type-like influx,
@@ -323,10 +348,13 @@ impl IonState {
             0.20 + 0.55 * gaba,
             // K⁺ leak plus voltage-gated delayed-rectifier-like activation;
             // adenosine/GABA modestly increase outward stabilizing current.
-            0.90 + 0.40 * sigmoid((voltage + 35.0) / 10.0) + 0.08 * adenosine + 0.04 * gaba,
+            0.90 + 0.40 * sigmoid((voltage + 35.0) / 10.0)
+                + 0.08 * adenosine
+                + 0.04 * gaba
+                + synaptic_cation_conductance * (1.0 - sodium_fraction),
             // AMPA-like glutamate drive plus voltage-gated Na⁺ recruitment.
-            (0.035 + 0.15 * glutamate + 0.20 * glutamate * sodium_gate + 0.03 * acetylcholine)
-                * (1.0 - 0.25 * adenosine),
+            (0.035 + 0.20 * sodium_gate) * (1.0 - 0.25 * adenosine)
+                + synaptic_cation_conductance * sodium_fraction,
         ];
         for i in 0..ION_COUNT {
             let alpha = 1.0 - (-dt / CONDUCTANCE_TAU_S[i]).exp();
@@ -348,7 +376,20 @@ impl IonState {
 
         // Chord-conductance voltage target. The Na⁺/K⁺ pump contributes a
         // small net outward (hyperpolarizing) current due to its 3:2 ratio.
-        let pump_current = PUMP_CURRENT_EQUIV_MV * (self.nak_pump_rate / NAK_MAX_RATE_MM_PER_S);
+        let ca_i = IonId::Calcium as usize;
+        let ncx_reversal =
+            3.0 * self.reversal_potential_mv[na_i] - 2.0 * self.reversal_potential_mv[ca_i];
+        let ncx = (NCX_REVERSE_GAIN_MM_PER_S / CALCIUM_FREE_FRACTION)
+            * ((ncx_reversal - voltage) / (2.0 * NERNST_FACTOR_MV)).tanh();
+        self.ncx_flux = ncx;
+        let pmca_max = 2.0 * CA_EXTRUSION_BASE_MM_PER_S;
+        let pmca_affinity = pmca_max / CA_EXTRUSION_GAIN_PER_S;
+        let pmca = (pmca_max / CALCIUM_FREE_FRACTION)
+            * self.atp_availability
+            * self.intracellular_mm[ca_i]
+            / (self.intracellular_mm[ca_i] + pmca_affinity);
+        let pump_current = PUMP_CURRENT_EQUIV_MV * (self.nak_pump_rate / NAK_MAX_RATE_MM_PER_S)
+            - ncx / CURRENT_TO_MM_PER_S[na_i];
         let mut conductance_sum = 0.0;
         let mut voltage_sum = 0.0;
         for i in 0..ION_COUNT {
@@ -360,7 +401,10 @@ impl IonState {
         } else {
             RESTING_MEMBRANE_MV
         };
-        let voltage_alpha = 1.0 - (-dt / MEMBRANE_TAU_S).exp();
+        let voltage_decay = dt * conductance_sum / MEMBRANE_TAU_S;
+        let voltage_alpha = -(-voltage_decay).exp_m1();
+        let mean_voltage = voltage_target
+            + (voltage - voltage_target) * voltage_alpha / voltage_decay.max(f32::MIN_POSITIVE);
         self.membrane_potential_mv += (voltage_target - self.membrane_potential_mv) * voltage_alpha;
         self.membrane_potential_mv = finite_clamp(self.membrane_potential_mv, -120.0, 80.0);
 
@@ -369,91 +413,89 @@ impl IonState {
         // intracellular ion; for Cl⁻, outward conventional current is an
         // inward anion flux.
         let mut channel_flux = [0.0f32; ION_COUNT];
-        let mut channel_load = 0.0;
         for (i, ion) in IonId::all().into_iter().enumerate() {
             self.current_density[i] =
-                self.conductance[i] * (self.membrane_potential_mv - self.reversal_potential_mv[i]);
+                self.conductance[i] * (mean_voltage - self.reversal_potential_mv[i]);
             let inward_flux = if ion == IonId::Chloride {
                 self.current_density[i]
             } else {
                 -self.current_density[i]
             } * CURRENT_TO_MM_PER_S[i];
             channel_flux[i] = inward_flux;
-            channel_load += inward_flux.abs();
-            self.intracellular_mm[i] += inward_flux * dt;
-            self.extracellular_mm[i] -= inward_flux * EXTRACELLULAR_VOLUME_RATIO * dt;
         }
 
         // Na⁺/K⁺ pump stoichiometry.
         let nak = self.nak_pump_rate;
-        let na_i = IonId::Sodium as usize;
-        let k_i = IonId::Potassium as usize;
-        self.intracellular_mm[na_i] -= 3.0 * nak * dt;
-        self.extracellular_mm[na_i] += 3.0 * nak * EXTRACELLULAR_VOLUME_RATIO * dt;
-        self.intracellular_mm[k_i] += 2.0 * nak * dt;
-        self.extracellular_mm[k_i] -= 2.0 * nak * EXTRACELLULAR_VOLUME_RATIO * dt;
 
-        // Net cation-chloride transport. Positive flux is KCC2-like outward
-        // transport; negative flux is NKCC1-like inward transport.
+        // Net KCC2 transport follows ln(Ki*Cli / Ko*Clo); positive is outward.
+        // Reversed KCC2 imports K⁺ and Cl⁻, still with electroneutral 1:1 flux.
         let cl_i = IonId::Chloride as usize;
-        let cl_transport = finite_clamp(
-            CL_TRANSPORT_BASE_MM_PER_S
-                + CL_TRANSPORT_GAIN_PER_S
-                    * (self.intracellular_mm[cl_i] - REST_INTRACELLULAR_MM[cl_i]),
-            -0.08,
-            0.12,
-        );
+        let cl_drive = ((self.intracellular_mm[k_i] * self.intracellular_mm[cl_i])
+            / (self.extracellular_mm[k_i] * self.extracellular_mm[cl_i]))
+            .ln();
+        let rest_cl_drive = ((REST_INTRACELLULAR_MM[k_i] * REST_INTRACELLULAR_MM[cl_i])
+            / (REST_EXTRACELLULAR_MM[k_i] * REST_EXTRACELLULAR_MM[cl_i]))
+            .ln();
+        let cl_capacity = CL_TRANSPORT_BASE_MM_PER_S
+            + CL_TRANSPORT_GAIN_PER_S
+                * (self.intracellular_mm[cl_i] - REST_INTRACELLULAR_MM[cl_i]).max(0.0);
+        let cl_transport = finite_clamp(cl_capacity * cl_drive / rest_cl_drive, -0.08, 0.12);
         self.kcl_cotransporter_flux = cl_transport;
-        self.intracellular_mm[cl_i] -= cl_transport * dt;
-        self.extracellular_mm[cl_i] += cl_transport * EXTRACELLULAR_VOLUME_RATIO * dt;
-        self.intracellular_mm[k_i] -= CL_TRANSPORT_K_STOICH * cl_transport * dt;
-        self.extracellular_mm[k_i] +=
-            CL_TRANSPORT_K_STOICH * cl_transport * EXTRACELLULAR_VOLUME_RATIO * dt;
 
         // PMCA/NCX Ca²⁺ extrusion. Positive ncx_flux extrudes one Ca²⁺ and
         // imports approximately three Na⁺. High intracellular Na⁺ weakens
         // the forward exchange and can reverse it under sustained load.
-        let ca_i = IonId::Calcium as usize;
-        let na_overload = ((self.intracellular_mm[na_i] - 20.0) / 20.0).max(0.0);
-        let ncx = finite_clamp(
-            CA_EXTRUSION_BASE_MM_PER_S
-                + CA_EXTRUSION_GAIN_PER_S
-                    * (self.intracellular_mm[ca_i] - REST_INTRACELLULAR_MM[ca_i])
-                - NCX_REVERSE_GAIN_MM_PER_S * na_overload,
-            -0.002,
-            0.02,
-        );
-        self.ncx_flux = ncx;
-        self.intracellular_mm[ca_i] -= ncx * dt;
-        self.extracellular_mm[ca_i] += ncx * EXTRACELLULAR_VOLUME_RATIO * dt;
-        self.intracellular_mm[na_i] += 3.0 * ncx * dt;
-        self.extracellular_mm[na_i] -= 3.0 * ncx * EXTRACELLULAR_VOLUME_RATIO * dt;
+        let calcium_outflow = ncx + pmca;
+        let transporter_flux = [
+            -calcium_outflow,
+            -cl_transport,
+            2.0 * nak - CL_TRANSPORT_K_STOICH * cl_transport,
+            3.0 * ncx - 3.0 * nak,
+        ];
 
         // Extracellular reservoirs and glial buffering pull concentrations
         // back toward their physiological bath values. Slow intracellular
         // restoration bounds residual Na⁺/K⁺ drift without hiding the
         // explicit pump fluxes above.
-        let extracellular_alpha = 1.0 - (-dt / EXTRACELLULAR_TAU_S).exp();
-        for (i, &rest) in REST_EXTRACELLULAR_MM.iter().enumerate() {
-            self.extracellular_mm[i] += (rest - self.extracellular_mm[i]) * extracellular_alpha;
-        }
-        let intracellular_alpha = 1.0 - (-dt / INTRACELLULAR_TAU_S).exp();
-        for i in [na_i, k_i] {
-            self.intracellular_mm[i] +=
-                (REST_INTRACELLULAR_MM[i] - self.intracellular_mm[i]) * intracellular_alpha;
+        let dt64 = f64::from(dt);
+        let extracellular_alpha = -(-dt64 / f64::from(EXTRACELLULAR_TAU_S)).exp_m1();
+        let intracellular_alpha = -(-dt64 / f64::from(INTRACELLULAR_TAU_S)).exp_m1();
+        for (i, ion) in IonId::all().into_iter().enumerate() {
+            let flux = f64::from(channel_flux[i]) + f64::from(transporter_flux[i]);
+            let inside = f64::from(self.intracellular_mm[i]);
+            let outside = f64::from(self.extracellular_mm[i]);
+            let inside_delta = if ion == IonId::Sodium || ion == IonId::Potassium {
+                (f64::from(REST_INTRACELLULAR_MM[i]) - inside
+                    + flux * f64::from(INTRACELLULAR_TAU_S))
+                    * intracellular_alpha
+            } else {
+                flux * dt64
+                    * if ion == IonId::Calcium {
+                        f64::from(CALCIUM_FREE_FRACTION)
+                    } else {
+                        1.0
+                    }
+            };
+            let outside_delta = (f64::from(REST_EXTRACELLULAR_MM[i])
+                - outside
+                - flux * f64::from(EXTRACELLULAR_VOLUME_RATIO) * f64::from(EXTRACELLULAR_TAU_S))
+                * extracellular_alpha;
+            self.intracellular_mm[i] = (inside + inside_delta) as f32;
+            self.extracellular_mm[i] = (outside + outside_delta) as f32;
         }
 
-        // Metabolic load follows absolute channel and transporter throughput.
-        // ATP availability is the bridge back to the ion pumps: adenosine is
+        // ATP consumption counts Na⁺/K⁺-ATPase and PMCA cycles, not passive
+        // channels, NCX, or KCC2. ATP availability gates these pumps: adenosine is
         // treated as an ATP-depletion signal, cortisol adds a smaller stress
         // cost, and sustained ionic workload consumes capacity.
-        let transporter_load = nak / 0.05 + cl_transport.abs() / 0.05 + ncx.abs() / 0.001;
-        let load_target = finite_clamp((channel_load / 0.20 + transporter_load) / 2.5, 0.0, 1.0);
+        let atp_consumption = nak + pmca;
+        let pump_capacity = NAK_MAX_RATE_MM_PER_S + pmca_max / CALCIUM_FREE_FRACTION;
+        let load_target = finite_clamp(atp_consumption / pump_capacity, 0.0, 1.0);
         let load_alpha = 1.0 - (-dt / 5.0).exp();
         self.energy_load += (load_target - self.energy_load) * load_alpha;
         let atp_target = finite_clamp(
             1.0 - 0.35 * adenosine - 0.35 * self.energy_load - 0.10 * cortisol,
-            0.25,
+            0.0,
             1.0,
         );
         let atp_alpha = 1.0 - (-dt / 2.0).exp();
@@ -467,7 +509,8 @@ impl IonState {
     fn recompute_derived(&mut self) {
         let mut conductance_sum = 0.0;
         let mut gradient_sum = 0.0;
-        let mut net_current = PUMP_CURRENT_EQUIV_MV * (self.nak_pump_rate / NAK_MAX_RATE_MM_PER_S);
+        let mut net_current = PUMP_CURRENT_EQUIV_MV * (self.nak_pump_rate / NAK_MAX_RATE_MM_PER_S)
+            - self.ncx_flux / CURRENT_TO_MM_PER_S[IonId::Sodium as usize];
         for (i, ion) in IonId::all().into_iter().enumerate() {
             let inside = finite_clamp(
                 finite_or(self.intracellular_mm[i], REST_INTRACELLULAR_MM[i]),
@@ -546,8 +589,12 @@ impl IonState {
         );
         self.nak_pump_rate = finite_clamp(self.nak_pump_rate, 0.0, NAK_MAX_RATE_MM_PER_S);
         self.kcl_cotransporter_flux = finite_clamp(self.kcl_cotransporter_flux, -0.08, 0.12);
-        self.ncx_flux = finite_clamp(self.ncx_flux, -0.002, 0.02);
-        self.atp_availability = finite_clamp(self.atp_availability, 0.25, 1.0);
+        self.ncx_flux = finite_clamp(
+            self.ncx_flux,
+            -NCX_REVERSE_GAIN_MM_PER_S / CALCIUM_FREE_FRACTION,
+            NCX_REVERSE_GAIN_MM_PER_S / CALCIUM_FREE_FRACTION,
+        );
+        self.atp_availability = finite_clamp(self.atp_availability, 0.0, 1.0);
         self.calcium_signal = finite_clamp(self.calcium_signal, 0.0, 1.0);
         self.chloride_efficacy = finite_clamp(self.chloride_efficacy, 0.0, 1.0);
         self.excitability = finite_clamp(self.excitability, 0.0, 1.0);

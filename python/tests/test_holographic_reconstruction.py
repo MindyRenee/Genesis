@@ -1,6 +1,6 @@
 """Regression tests for holographic associative reconstruction."""
 
-from genesis_conscious.concepts.holographic import HolographicGraph
+from concepts.holographic import HolographicGraph
 
 
 def test_holographic_fidelity_measures_association_retrieval() -> None:

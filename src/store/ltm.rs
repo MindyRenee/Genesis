@@ -709,7 +709,10 @@ impl LtmStore {
             if entry.episode_id == 0 || id_to_idx.contains_key(&entry.episode_id) {
                 return Err(LtmError::Io(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
-                    format!("LTM metadata contains invalid or duplicate episode ID {}", entry.episode_id),
+                    format!(
+                        "LTM metadata contains invalid or duplicate episode ID {}",
+                        entry.episode_id
+                    ),
                 )));
             }
 
@@ -717,12 +720,13 @@ impl LtmStore {
             // ordering. Reject non-finite floats at the trust boundary
             // rather than allowing a valid-looking metadata file to inject
             // NaN into retrieval or salience sorting.
-            if !entry.salience.is_finite()
-                || entry.emotional_tag.iter().any(|v| !v.is_finite())
-            {
+            if !entry.salience.is_finite() || entry.emotional_tag.iter().any(|v| !v.is_finite()) {
                 return Err(LtmError::Io(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
-                    format!("LTM metadata entry {} contains non-finite values", entry.episode_id),
+                    format!(
+                        "LTM metadata entry {} contains non-finite values",
+                        entry.episode_id
+                    ),
                 )));
             }
 
@@ -783,14 +787,19 @@ impl LtmStore {
                 continue;
             }
             if entry.data_offset < 16
-                || entry.data_offset.checked_add(4 + entry.compressed_len as u64)
+                || entry
+                    .data_offset
+                    .checked_add(4 + entry.compressed_len as u64)
                     .is_none_or(|end| end > data_file_len)
                 || entry.compressed_len as usize > MAX_COMPRESSED_SIZE
                 || entry.uncompressed_len as usize > MAX_PAYLOAD_SIZE
             {
                 return Err(LtmError::Io(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
-                    format!("LTM episode {} points to an invalid payload", entry.episode_id),
+                    format!(
+                        "LTM episode {} points to an invalid payload",
+                        entry.episode_id
+                    ),
                 )));
             }
         }
@@ -1746,8 +1755,14 @@ impl LtmStore {
             .map_err(LtmError::Io)?;
         // Decrement episode_count and write the header (which fsyncs
         // the metadata file, covering the flags write above).
-        self.meta_header.episode_count = self.meta_header.episode_count.saturating_sub(1);
-        self.write_meta_header()?;
+        let previous_count = self.meta_header.episode_count;
+        if !self.entries[idx].is_archived() {
+            self.meta_header.episode_count = previous_count.saturating_sub(1);
+        }
+        if let Err(error) = self.write_meta_header() {
+            self.meta_header.episode_count = previous_count;
+            return Err(error);
+        }
 
         // Only update in-memory indices after the durable write
         // succeeds. If `write_meta_header` failed above, the entry is
@@ -1785,7 +1800,7 @@ impl LtmStore {
             return Ok(());
         }
 
-        self.entries[idx].mark_archived();
+        let flags = self.entries[idx].flags | IndexEntry::ARCHIVED_FLAG;
 
         // Only the flags byte changed — write just that byte instead
         // of rewriting the full 64-byte entry. The flags field is at
@@ -1794,12 +1809,15 @@ impl LtmStore {
         self.meta_file
             .seek(SeekFrom::Start(flags_offset))
             .map_err(LtmError::Io)?;
-        self.meta_file
-            .write_all(&[self.entries[idx].flags])
-            .map_err(LtmError::Io)?;
+        self.meta_file.write_all(&[flags]).map_err(LtmError::Io)?;
         // Decrement episode_count (active count) and fsync via header.
-        self.meta_header.episode_count = self.meta_header.episode_count.saturating_sub(1);
-        self.write_meta_header()?;
+        let previous_count = self.meta_header.episode_count;
+        self.meta_header.episode_count = previous_count.saturating_sub(1);
+        if let Err(error) = self.write_meta_header() {
+            self.meta_header.episode_count = previous_count;
+            return Err(error);
+        }
+        self.entries[idx].mark_archived();
 
         // Remove from active_ids but keep in id_to_idx.
         self.active_ids.retain(|id| *id != episode_id);
@@ -1970,7 +1988,7 @@ impl LtmStore {
     pub fn search_episodes(&mut self, limit: usize, offset: usize) -> Vec<Episode> {
         let ids = self.active_episode_ids();
         let start = offset.min(ids.len());
-        let end = (start + limit).min(ids.len());
+        let end = start.saturating_add(limit).min(ids.len());
         // Collect IDs first to avoid borrowing self during the loop
         // (retrieve needs &mut self).
         let page: Vec<u64> = ids[start..end].to_vec();

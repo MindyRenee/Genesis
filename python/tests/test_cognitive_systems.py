@@ -10,8 +10,8 @@ import tempfile
 
 import pytest
 
-from genesis_conscious.concepts import ConceptNetwork, RelationType
-from genesis_conscious.frontal_lobe.executive import (
+from concepts import ConceptNetwork, RelationType
+from frontal_lobe.executive import (
     ActionPlan,
     ExecutiveFunction,
     InhibitionResult,
@@ -19,11 +19,11 @@ from genesis_conscious.frontal_lobe.executive import (
     Task,
     TaskState,
 )
-from genesis_conscious.frontal_lobe.global_workspace import (
+from frontal_lobe.global_workspace import (
     GlobalWorkspace,
     WorkspaceItem,
 )
-from genesis_conscious.memory import (
+from memory import (
     HABIT_THRESHOLD,
     CentralExecutive,
     ConversationThread,
@@ -36,7 +36,7 @@ from genesis_conscious.memory import (
     VisuoSpatialSketchpad,
     WorkingMemory,
 )
-from genesis_conscious.parietal_lobe.attention import (
+from parietal_lobe.attention import (
     AttentionFocus,
     AttentionSystem,
     AttentionType,
@@ -977,7 +977,7 @@ def test_gw_recurrent_ignition_tagged() -> None:
 
 def test_damasio_recurrent_trigger_salience() -> None:
     """Recurrent ignitions register as more salient to the core self."""
-    from genesis_conscious.self.damasio import DamasioSelfHierarchy
+    from self.damasio import DamasioSelfHierarchy
 
     recurrent = WorkspaceItem(
         content="emerged",
@@ -1066,7 +1066,7 @@ def test_gw_on_ignition_not_subliminal() -> None:
 
 def test_safeguard_urge_registered() -> None:
     """The safeguard urge ships in the default urge set."""
-    from genesis_conscious.infrastructure.config import MindConfig
+    from infrastructure.config import MindConfig
 
     urges = {u.name: u for u in MindConfig().volition.urges}
     assert "safeguard" in urges
@@ -1082,8 +1082,8 @@ def test_safeguard_urge_registered() -> None:
 
 def test_safeguard_urge_dynamics() -> None:
     """Safeguard fires under sustained threat, not on a transient."""
-    from genesis_conscious.frontal_lobe.volition import Urge
-    from genesis_conscious.infrastructure.config import MindConfig
+    from frontal_lobe.volition import Urge
+    from infrastructure.config import MindConfig
 
     cfg = next(u for u in MindConfig().volition.urges if u.name == "safeguard")
     urge = Urge(
@@ -1123,7 +1123,7 @@ def test_safeguard_urge_dynamics() -> None:
 
 def test_bug_scan_urge_driven_by_recency_not_bug_count() -> None:
     """bug_scan's stimulus is audit recency; improve keeps the open count."""
-    from genesis_conscious.infrastructure.config import MindConfig
+    from infrastructure.config import MindConfig
 
     urges = {u.name: u for u in MindConfig().volition.urges}
     assert "scan_recency" in urges["bug_scan"].stimuli
@@ -1134,8 +1134,8 @@ def test_bug_scan_urge_driven_by_recency_not_bug_count() -> None:
 
 def test_bug_scan_urge_ignores_bug_count() -> None:
     """A pile of open bugs must not, by itself, fire the scan urge."""
-    from genesis_conscious.frontal_lobe.volition import Urge
-    from genesis_conscious.infrastructure.config import MindConfig
+    from frontal_lobe.volition import Urge
+    from infrastructure.config import MindConfig
 
     cfg = next(u for u in MindConfig().volition.urges if u.name == "bug_scan")
     urge = Urge(
@@ -1156,8 +1156,8 @@ def test_bug_scan_urge_ignores_bug_count() -> None:
 
 def test_bug_scan_urge_discharged_by_scan() -> None:
     """A completed scan discharges the appetite; it regrows and re-fires."""
-    from genesis_conscious.frontal_lobe.volition import Urge
-    from genesis_conscious.infrastructure.config import MindConfig
+    from frontal_lobe.volition import Urge
+    from infrastructure.config import MindConfig
 
     cfg = next(u for u in MindConfig().volition.urges if u.name == "bug_scan")
     urge = Urge(
@@ -1198,12 +1198,10 @@ def test_open_bug_count_excludes_resolved() -> None:
     """open_bug_count counts open issues only — no resolved padding."""
     import json as _json
 
-    from genesis_conscious.infrastructure.bug_reporter import BugReporter
+    from infrastructure.bug_reporter import BugReporter
 
     root = tempfile.mkdtemp()
-    log_dir = os.path.join(root, "genesis_data")
-    os.makedirs(log_dir)
-    log_path = os.path.join(log_dir, "bug_reports.jsonl")
+    log_path = os.path.join(root, "bug_reports.jsonl")
     entries = [
         {"file": "a.py", "line": 1, "severity": "warning",
          "category": "style", "description": "open one"},
@@ -1216,12 +1214,16 @@ def test_open_bug_count_excludes_resolved() -> None:
     with open(log_path, "w", encoding="utf-8") as f:
         for entry in entries:
             f.write(_json.dumps(entry) + "\n")
-    reporter = BugReporter(project_root=root)
+    reporter = BugReporter(project_root=root, log_path=log_path)
     assert reporter.open_bug_count() == 2
     # recent_bugs pads from history; the drive signal must not.
     assert len(reporter.recent_bugs(10)) >= 2
     # No log at all — zero open work, not an error.
-    assert BugReporter(project_root=tempfile.mkdtemp()).open_bug_count() == 0
+    empty = tempfile.mkdtemp()
+    assert BugReporter(
+        project_root=empty,
+        log_path=os.path.join(empty, "bug_reports.jsonl"),
+    ).open_bug_count() == 0
 
 
 def test_gw_registered_modules_property() -> None:
@@ -1316,7 +1318,7 @@ def test_gw_integration_no_topics_neutral() -> None:
 
 def test_damasio_annotate_self_model_unified() -> None:
     """High integration adds field-unified tag."""
-    from genesis_conscious.self.damasio import DamasioSelfHierarchy
+    from self.damasio import DamasioSelfHierarchy
 
     damasio = DamasioSelfHierarchy()
     damasio.annotate_self_model("self-coherent", False, integration=0.8)
@@ -1326,7 +1328,7 @@ def test_damasio_annotate_self_model_unified() -> None:
 
 def test_damasio_annotate_self_model_fragmented() -> None:
     """Low integration adds field-fragmented tag."""
-    from genesis_conscious.self.damasio import DamasioSelfHierarchy
+    from self.damasio import DamasioSelfHierarchy
 
     damasio = DamasioSelfHierarchy()
     damasio.annotate_self_model("self-surprised", True, integration=0.1)
@@ -1335,7 +1337,7 @@ def test_damasio_annotate_self_model_fragmented() -> None:
 
 def test_damasio_annotate_self_model_neutral() -> None:
     """Mid-range integration adds no field tag."""
-    from genesis_conscious.self.damasio import DamasioSelfHierarchy
+    from self.damasio import DamasioSelfHierarchy
 
     damasio = DamasioSelfHierarchy()
     damasio.annotate_self_model("self-coherent", False, integration=0.4)
@@ -1351,7 +1353,7 @@ def test_damasio_annotate_self_model_neutral() -> None:
 
 def test_cognitive_state_has_coherence_field() -> None:
     """CognitiveState has a self_model_coherence field."""
-    from genesis_conscious.cognition.engine import CognitiveState
+    from frontal_lobe.prefrontal import CognitiveState
 
     state = CognitiveState.__dataclass_fields__
     assert "self_model_coherence" in state
@@ -1359,7 +1361,7 @@ def test_cognitive_state_has_coherence_field() -> None:
 
 def test_cognitive_state_describe_includes_coherence() -> None:
     """describe() includes coherence when set."""
-    from genesis_conscious.cognition.engine import CognitiveState
+    from frontal_lobe.prefrontal import CognitiveState
 
     # Verify the field exists and defaults to None
     fields = CognitiveState.__dataclass_fields__
@@ -1564,7 +1566,7 @@ def test_plan_stores_only_grounded_plans() -> None:
     A plan built without an outcome model still carries ``steps`` — the
     caller's action list — but zero confidence and no predicted
     outcomes. Storing it as the current plan would make consumers
-    (``cognition/engine.py``) both act on it and report it as the
+    (``frontal_lobe/prefrontal.py``) both act on it and report it as the
     executive's plan, which is exactly the fabricated confidence the
     grounded-planning change removed. So the ungrounded path returns
     without claiming the slot.
@@ -2870,7 +2872,7 @@ class TestPersistence:
     def test_old_format_backward_compat(self) -> None:
         """Old save files with 'response' (string) instead of 'strategy'
         (dict) should load with a default strategy, not crash."""
-        from genesis_conscious.infrastructure.persistence import restore_procedural_memory
+        from infrastructure.persistence import restore_procedural_memory
 
         old_data = {
             "skills": [
@@ -2901,7 +2903,7 @@ class TestPersistence:
 
     def test_new_format_round_trip(self) -> None:
         """New format with strategy dict should serialize and restore."""
-        from genesis_conscious.infrastructure.persistence import (
+        from infrastructure.persistence import (
             _serialize_procedural_memory,
             restore_procedural_memory,
         )

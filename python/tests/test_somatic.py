@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from genesis_conscious.memory.engine import MemoryEngine, MemoryRecord
-from genesis_conscious.self.somatic import SomaticSnapshot, somatic_congruence
+from memory.memory import MemoryRecord, MemorySystem
+from self.somatic import SomaticSnapshot, somatic_congruence
 
 
 def test_congruence_identical_is_one():
@@ -50,7 +50,7 @@ def test_somatic_rerank_prefers_congruent_body():
         def store_episode(self, **kwargs):
             raise AssertionError("not used")
 
-    engine = MemoryEngine(client=_Client())  # type: ignore[arg-type]
+    engine = MemorySystem(client=_Client())  # type: ignore[arg-type]
     engine._records[1] = MemoryRecord(
         episode_id=1,
         somatic=SomaticSnapshot(arousal=0.9, valence=0.8).to_dict(),
@@ -69,7 +69,7 @@ def test_somatic_rerank_prefers_congruent_body():
     )
     assert [r.episode_id for r in ranked] == [1, 2]
     # And without a provider the order is untouched.
-    engine2 = MemoryEngine(client=_Client())  # type: ignore[arg-type]
+    engine2 = MemorySystem(client=_Client())  # type: ignore[arg-type]
     untouched = engine2._rank_by_somatic_congruence(
         [
             SimilarEpisode(episode_id=1, hamming_distance=10, timestamp=0, salience=0.5),
@@ -86,19 +86,19 @@ def test_somatic_survives_serialization_roundtrip():
         def store_episode(self, **kwargs):
             raise AssertionError("not used")
 
-    engine = MemoryEngine(client=_Client())  # type: ignore[arg-type]
+    engine = MemorySystem(client=_Client())  # type: ignore[arg-type]
     engine._records[7] = MemoryRecord(
         episode_id=7,
         somatic=SomaticSnapshot(arousal=0.3, valence=0.4).to_dict(),
     )
     payload = engine.serialize_records()
-    engine2 = MemoryEngine(client=_Client())  # type: ignore[arg-type]
+    engine2 = MemorySystem(client=_Client())  # type: ignore[arg-type]
     engine2.restore_records(payload)
     rec = engine2._records[7]
     assert rec.somatic is not None
     assert abs(rec.somatic["arousal"] - 0.3) < 1e-9
     # Records written with a legacy developmental_stage key still load.
     payload["records"][0]["developmental_stage"] = "TRUST_VS_MISTRUST"
-    engine3 = MemoryEngine(client=_Client())  # type: ignore[arg-type]
+    engine3 = MemorySystem(client=_Client())  # type: ignore[arg-type]
     engine3.restore_records(payload)
     assert engine3._records[7].somatic is not None

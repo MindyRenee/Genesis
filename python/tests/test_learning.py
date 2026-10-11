@@ -10,6 +10,10 @@ import time
 import numpy as np
 import pytest
 
+from basal_ganglia.td import TDLearner, TDTransition
+from concepts import ConceptNetwork, EmbeddingStore, NetworkTopology, RelationType
+from frontal_lobe.autonomous import AutonomousLearner
+from frontal_lobe.reasoning import Reasoner
 from genesis_client.types import (
     LEARNING_POSTURE_NEUTRAL,
     LEARNING_POSTURE_PROTECTIVE,
@@ -17,25 +21,15 @@ from genesis_client.types import (
     LEARNING_POSTURE_RECOVERING,
     PlasticityProfile,
 )
-from genesis_conscious.cognition.concept_learner import ConceptLearner
-from genesis_conscious.concepts import ConceptNetwork, EmbeddingStore, NetworkTopology, RelationType
-from genesis_conscious.learning import (
-    STDP,
-    AutonomousLearner,
-    CuriosityEngine,
-    DualSystemLearner,
-    HebbianPlasticity,
-    HippocampalEpisode,
-    NeocorticalMemory,
-    SpikeEvent,
-    SynapticStore,
-    TDLearner,
-    TDTransition,
-)
-from genesis_conscious.limbic_system.emotion import EmotionalState
-from genesis_conscious.memory import SemanticMemory
-from genesis_conscious.reasoning import ReasoningEngine
-from genesis_conscious.tools.source_registry import SourceResult
+from limbic_system.curiosity import Curiosity
+from limbic_system.emotion import EmotionalState
+from memory import SemanticMemory
+from temporal_lobe.concept_learner import ConceptLearner
+from temporal_lobe.dual import DualSystemLearner, HippocampalEpisode, NeocorticalMemory
+from temporal_lobe.plasticity import HebbianPlasticity
+from temporal_lobe.stdp import STDP, SpikeEvent
+from temporal_lobe.synapses import SynapticStore
+from tools.source_registry import SourceResult
 
 logger = logging.getLogger(__name__)
 
@@ -155,8 +149,8 @@ def _make_learner(
 ) -> AutonomousLearner:
     """Create a learner with minimal dependencies."""
     net = ConceptNetwork()
-    reasoning = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoning)
+    reasoning = Reasoner(net)
+    curiosity = Curiosity(net, reasoning)
     return AutonomousLearner(
         network=net,
         curiosity=curiosity,
@@ -168,8 +162,8 @@ def _make_learner(
 def test_autonomous_learner_reuses_canonical_semantic_memory() -> None:
     """The autonomous learner must use the cognition engine's semantic store."""
     net = ConceptNetwork()
-    reasoning = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoning)
+    reasoning = Reasoner(net)
+    curiosity = Curiosity(net, reasoning)
     semantic_memory = SemanticMemory(network=net)
 
     learner = AutonomousLearner(
@@ -1002,12 +996,12 @@ def test_trace_not_set_for_inactive_concept(network_td_learning) -> None:
 def test_trace_decays_between_updates(network_td_learning) -> None:
     """Eligibility trace decays by γλ per step."""
     td = TDLearner(network_td_learning, learning_rate=0.1, discount=0.9, lam=0.8)
-    # Step 1: activate "tree" → trace = 1.0 (replacing, single concept)
+    # Step 1: activate "tree" → trace = 0.9 (confidence/count gradient)
     td.update(["tree"], reward=0.0, next_state=["dog"])
-    assert abs(td.get_trace("tree") - 1.0) < 1e-9
+    assert abs(td.get_trace("tree") - 0.9) < 1e-9
     # Step 2: activate "dog" → "tree" trace decays by γλ = 0.72
     td.update(["dog"], reward=0.0, next_state=[])
-    assert abs(td.get_trace("tree") - 0.72) < 1e-9
+    assert abs(td.get_trace("tree") - 0.9 * 0.72) < 1e-9
 
 
 def test_replacing_trace_caps_at_gradient(network_td_learning) -> None:
@@ -1017,9 +1011,9 @@ def test_replacing_trace_caps_at_gradient(network_td_learning) -> None:
     trace_1 = td.get_trace("tree")
     td.update(["tree"], reward=0.0, next_state=[])
     trace_2 = td.get_trace("tree")
-    # Replacing trace: trace is set to gradient (1/count = 1.0), not
-    # accumulated to 1.0 + 0.72 = 1.72.
-    assert abs(trace_2 - 1.0) < 1e-9
+    # Replacing trace: trace is set to gradient (confidence/count = 0.9), not
+    # accumulated to 0.9 + 0.9 * 0.72 = 1.548.
+    assert abs(trace_2 - 0.9) < 1e-9
     assert trace_2 <= trace_1 + 1e-9
 
 
@@ -1057,12 +1051,12 @@ def test_lambda_propagates_credit_backward(network_td_learning) -> None:
     )
 
 
-def test_lambda_zero_equivalent_to_old_td0(network_td_learning) -> None:
-    """λ=0 produces exactly the same weight as the old TD(0) rule.
+def test_lambda_zero_uses_value_gradient(network_td_learning) -> None:
+    """λ=0 gives the semi-gradient TD(0) update for the actual value function.
 
-    The old TD(0) update was: w[i] += α * rpe / count for active i.
-    With λ=0, the trace for active i is 1/count, and the update is
-    w[i] += α * rpe * (1/count) — identical.
+    V(s) is the mean of confidence-weighted active concept weights.
+    Its weight gradient is confidence/count, so the update is
+    w[i] += α * rpe * confidence/count.
     """
     td = TDLearner(network_td_learning, lam=0.0, learning_rate=0.1, discount=0.9)
     v_before = td.predict_value(["tree"])
@@ -1072,9 +1066,9 @@ def test_lambda_zero_equivalent_to_old_td0(network_td_learning) -> None:
     # Manually compute the expected weight change.
     # V(s) = w * conf / 1 = w * 0.9 (single concept, conf=0.9)
     # rpe = 1.0 + 0.9 * 0 - 0.9 = 0.1
-    # w_new = 1.0 + 0.1 * 0.1 * 1.0 = 1.01
-    # V_new = 1.01 * 0.9 = 0.909
-    expected_w = 1.0 + 0.1 * rpe * 1.0
+    # w_new = 1.0 + 0.1 * 0.1 * 0.9 = 1.009
+    # V_new = 1.009 * 0.9 = 0.9081
+    expected_w = 1.0 + 0.1 * rpe * 0.9
     expected_v = expected_w * 0.9
     assert abs(v_after - expected_v) < 1e-9
     assert v_after > v_before  # positive RPE increases value
@@ -1104,7 +1098,7 @@ def test_statistics_include_trace_info(network_td_learning) -> None:
 
 def test_action_value_persistence_roundtrip(network_td_learning) -> None:
     """Action-conditioned values and traces survive persistence."""
-    from genesis_conscious.infrastructure.persistence import (
+    from infrastructure.persistence import (
         _serialize_td_learner,
         restore_td_learner,
     )
@@ -1127,7 +1121,7 @@ def test_action_value_persistence_roundtrip(network_td_learning) -> None:
 
 def test_trace_persistence_roundtrip(network_td_learning) -> None:
     """Eligibility traces and λ survive serialize/restore."""
-    from genesis_conscious.infrastructure.persistence import (
+    from infrastructure.persistence import (
         _serialize_td_learner,
         restore_td_learner,
     )
@@ -1148,7 +1142,7 @@ def test_trace_persistence_roundtrip(network_td_learning) -> None:
 
 def test_restore_old_save_without_traces(network_td_learning) -> None:
     """Restoring a pre-TD(λ) save (no traces/lam keys) doesn't crash."""
-    from genesis_conscious.infrastructure.persistence import restore_td_learner
+    from infrastructure.persistence import restore_td_learner
 
     td = TDLearner(network_td_learning, lam=0.8)
     old_data = {
@@ -1804,8 +1798,8 @@ def _make_curiosity_emotion(
 def test_curiosity_assess() -> None:
     """Curiosity level is modulated by emotional state."""
     net = ConceptNetwork()
-    reasoner = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoner)
+    reasoner = Reasoner(net)
+    curiosity = Curiosity(net, reasoner)
 
     high = curiosity.assess_curiosity(
         _make_curiosity_emotion(plasticity=0.8, valence=0.5, alertness=0.5, creativity=0.7)
@@ -1824,8 +1818,8 @@ def test_curiosity_generate_questions() -> None:
     net = ConceptNetwork()
     net.add_concept("mystery", confidence=0.2)
 
-    reasoner = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoner)
+    reasoner = Reasoner(net)
+    curiosity = Curiosity(net, reasoner)
 
     emo = _make_curiosity_emotion(plasticity=0.7, valence=0.3, creativity=0.6)
     questions = curiosity.generate_questions(emo, active_concepts=["mystery"])
@@ -1839,8 +1833,8 @@ def test_curiosity_low_curiosity_no_questions() -> None:
     net = ConceptNetwork()
     net.add_concept("mystery", confidence=0.2)
 
-    reasoner = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoner)
+    reasoner = Reasoner(net)
+    curiosity = Curiosity(net, reasoner)
 
     emo = _make_curiosity_emotion(plasticity=0.05, valence=-0.3, alertness=0.1, creativity=0.05)
     questions = curiosity.generate_questions(emo, active_concepts=["mystery"])
@@ -1852,8 +1846,8 @@ def test_curiosity_novelty_check() -> None:
     net = ConceptNetwork()
     net.add_concept("mystery", confidence=0.2)
 
-    reasoner = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoner)
+    reasoner = Reasoner(net)
+    curiosity = Curiosity(net, reasoner)
 
     emo = _make_curiosity_emotion(plasticity=0.7, valence=0.3, creativity=0.6)
 
@@ -1871,8 +1865,8 @@ def test_curiosity_contemplate() -> None:
     net = ConceptNetwork()
     net.add_concept("mystery", confidence=0.2)
 
-    reasoner = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoner)
+    reasoner = Reasoner(net)
+    curiosity = Curiosity(net, reasoner)
 
     emo = _make_curiosity_emotion(plasticity=0.6, valence=0.2, creativity=0.5)
     emo.openness_to_engage = 0.3
@@ -1931,7 +1925,7 @@ def test_local_study_keeps_learned_origin() -> None:
 
 def test_web_study_records_concept_sources_capped() -> None:
     """Concepts remember where they were read, bounded in size."""
-    from genesis_conscious.concepts.edge_log import WEB_SOURCES_CAP
+    from concepts.edge_log import WEB_SOURCES_CAP
 
     learner = _make_learner()
     created = learner._extract_and_add_concepts(

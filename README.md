@@ -53,12 +53,11 @@ Pavilion with ~5 GB RAM.
   fetch path. Run with `./run.sh --offline` if you want the network
   closed. See [SECURITY.md](SECURITY.md) before pointing it at a
   machine you care about.
-- **Practices tasks.** Puzzle specs dropped into its world are picked
-  up by an internal urge and worked end to end — attempt, evaluation,
-  feeling, consolidation — and skills transfer to harder tasks. A
-  spatial reasoner searches a transformation DSL over grid scenes, on
-  a domain-general competence substrate (sorter, sequence, relation,
-  quantity, and classification families in development).
+- **Learns skills.** A domain-general competence substrate
+  (`reasoning/competence.py`) turns verified episodes — situation,
+  action, outcome — into procedural skills: schema recognition,
+  affordance learning, and prediction checking that transfer across
+  whatever work it actually does.
 - **Reasons.** Analogy by structure-mapping, means-ends problem
   solving, multi-step planning with revision, belief revision,
   epistemic evaluation of claims, a drift-diffusion decision process,
@@ -111,11 +110,15 @@ checkpoints — but never body-control application.
 
 **Cognitive mind (Python).** Perception, memory retrieval,
 deliberation, language composition, and self-modeling — organized
-into functional subsystem packages (`control/`, `association/`,
-`vision/`, `auditory/`, `affect/`, `action_selection/`,
-`motor_learning/`, `relay/`, `autonomics/`, `neurochemical/`). Each is
-a documented view over the top-level modules — a map of the
-architecture, not a duplicate of it.
+into anatomical region packages (`frontal_lobe/`, `temporal_lobe/`,
+`parietal_lobe/`, `occipital_lobe/`, `limbic_system/`,
+`basal_ganglia/`, `cerebellum/`, `thalamus/`, `brainstem/`,
+`hypothalamus/`, `insula/`, `basal_forebrain/`) plus shared
+multi-subsystem packages (`memory/`, `reasoning/`, `perception/`,
+`self/`, `sleep/`, `concepts/`, `tools/`, `neurochemical/`). Region
+packages both hold their regional modules and lazily re-export the
+shared ones their anatomy claims — the package boundaries are the
+wiring diagram, not a duplicate of it.
 
 ### Systems engineering
 
@@ -185,7 +188,13 @@ neurochemical trajectory, updated with a Kalman filter, and scores nine
 fixed regulation policies against a homeostatic set point. What is
 real: the generative model, the posterior update, surprise, precision
 weighting of observations, and allostatic load are computed and
-persisted properly.
+persisted. The state estimate retains only diagonal covariance, so it
+is approximate for coupled dynamics. The engine computes full Gaussian
+variational free energy in nats: KL between posterior and represented
+prior plus expected negative log-likelihood, including covariance
+ratios, posterior variance, and likelihood normalization. The bounded
+`free_energy` telemetry is a monotonic map of excess VFE above a
+matched-observation reference; raw VFE is available in the cycle result.
 
 **The selection loop used to be inert, and was not.** Each policy's
 expected free energy was clamped to `[0, 2]`, but EFE is a relative
@@ -202,13 +211,12 @@ spread rather than a constant ~300× larger. Policy selection is
 consequently live — which also means the characterisation below now
 describes behaviour that actually happens.
 
-What this section previously overstated, now stated accurately: the
-scored objective is **not** an expected free energy in the formal
-sense. Its "epistemic" term is the proper entropy-reduction
-information gain — but for this model class (linear-Gaussian,
-additive controls) that quantity is provably policy-independent, so
-it shifts every policy's score equally and the ranking reduces to
-the pragmatic cost: predicted distance from the homeostatic target.
+Policy scoring computes Gaussian expected free energy: expected
+negative log preference, including predictive variance, minus the
+expected information gain of the next observation. Information gain
+uses next-step propagated covariance and observation noise. For this
+linear-Gaussian model with additive controls it is policy-independent,
+so policies are ranked by their expected homeostatic preference cost.
 At rest that elects `noop`; under deviation it elects whichever
 policy the learned action model predicts will correct fastest. The
 previous uncertainty-weighted novelty substitute was worse than a
@@ -280,13 +288,15 @@ rule is documented in `AGENTS.md` and one test
 (`test_language.py::test_utterance_variability`) checks that a
 composed response is not a single fixed string. There is no lint rule
 and no test that would catch a newly added hardcoded sentence
-anywhere else in the tree; a September 2026 audit found several
-(`self/identity.py`'s 23-entry description table, two fallbacks in
-`self/composer.py`, and a test-result sentence in
-`cognition/code_tools.py`) that reached speech verbatim. The
-underlying pattern — composing from the graph, passing structure to the
-engine, and returning silence rather than a canned fallback when the
-network is empty — is followed well nearly everywhere.
+anywhere else in the tree. A September 2026 audit found three sites
+that reached speech verbatim; all are remediated as of October 2026:
+`self/composer.py`'s fallbacks return silence, `self/identity.py`'s
+stage table returns structural data marked not-for-speech, and
+`frontal_lobe/code_tools.py` routes results through the thought
+composer. The underlying pattern — composing from the graph, passing
+structure to the engine, and returning silence rather than a canned
+fallback when the network is empty — is followed well nearly
+everywhere.
 
 ## Getting started
 
@@ -313,6 +323,34 @@ network, no memories, no learned names. Introduce yourself; teach it.
 
 Optional voice dependencies (not in `requirements.txt`): `vosk`,
 `sounddevice`, `speechrecognition`, plus piper or espeak-ng.
+
+### Packaged install — the agent as a resident service
+
+`python/` is an installable package (`genesis-cognitive`): it provides
+a `genesis` command that is the packaged equivalent of `run.sh`.
+`scripts/install.sh` performs the whole local install — a venv at
+`~/.local/lib/genesis/venv` (editable, so the running code stays this
+checkout), the release binaries beside the interpreter, a
+`~/.local/bin/genesis` launcher, and an enabled `genesis.service`
+systemd user unit that runs `genesis --headless`.
+
+```bash
+genesis              # interactive session (same as ./run.sh)
+genesis --headless   # resident mode, no prompt
+genesis --stop       # stop this data dir's processes (run.sh --stop)
+systemctl --user start genesis    # resident
+journalctl --user -u genesis -f   # watch her logs
+```
+
+Service and interactive command share the same data dir — the
+resolution order is unchanged, so the resident instance uses the same
+mind the checkout already has. One instance at a time per data dir;
+the CLI lock refuses a second. `scripts/install.sh --uninstall`
+removes the venv, launcher, and unit — never the data dir. For the
+privileged body levers (CPU governor, RTC wake alarm):
+`sudo bash scripts/install_sudoers.sh` installs root-owned helpers to
+`/usr/local/libexec/genesis` and a sudoers rule for exactly those
+paths.
 
 ### Operational notes
 
@@ -348,13 +386,13 @@ while seven structures grew without a cap; those were found and fixed.
 
 | Structure | File | Bound |
 |---|---|---|
-| Episodic records | `memory/engine.py` | Forgotten records are evicted after a 1 h grace period. `forget()` also runs in O(N log N) — it was O(N²) with two full list copies per record, holding the GIL on the autosave/think threads. |
+| Episodic records | `memory/memory.py` | Forgotten records are evicted after a 1 h grace period. `forget()` also runs in O(N log N) — it was O(N²) with two full list copies per record, holding the GIL on the autosave/think threads. |
 | Attractor patterns | `memory/systems.py` | Trimmed to 60% of the Hopfield capacity (~0.138·N), least-recently-retrieved first. Over-capacity networks converge to spurious attractors that were being returned as confident retrievals. Also trimmed on load, so an already-bloated state file self-heals. |
 | Executive suppression | `memory/working.py` | 64 entries, each with a 120 s release deadline. Previously permanent: every topic ever focused became un-attendable, since nothing released them outside tests. |
 | Conversation threads | `memory/working.py` | 50 retained (lifetime total still reported). Each holds full turn text and is not persisted. |
 | Topic history | `memory/working.py` | 200 entries. |
-| Learning results | `learning/autonomous.py` | 500 retained, oldest evicted; serialized in full on each autosave. |
-| Curiosity queue | `learning/autonomous.py` | 200-entry FIFO, persisted. Also fixed from `pop(0)` (O(N)) to `popleft()` (O(1)). |
+| Learning results | `frontal_lobe/autonomous.py` | 500 retained, oldest evicted; serialized in full on each autosave. |
+| Curiosity queue | `frontal_lobe/autonomous.py` | 200-entry FIFO, persisted. Also fixed from `pop(0)` (O(N)) to `popleft()` (O(1)). |
 | Review records | `memory/spaced_repetition.py` | 5,000, evicting the highest-retention records. `stability` is capped at 7 days so a well-reviewed concept cannot become permanently undecayable. |
 | Ad-hoc vector cache | `concepts/embeddings.py` | 4,096 dense vectors, LRU. |
 

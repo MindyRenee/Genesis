@@ -453,9 +453,8 @@ mod tests {
             + tag[3] * 0.15
             + NeurochemicalId::Orexin.default_baseline() * 0.20
             + NeurochemicalId::Epinephrine.default_baseline() * 0.10;
-        let sleep_promoters = tag[4] * 0.25
-            + tag[10] * 0.65
-            + NeurochemicalId::Melatonin.default_baseline() * 0.35;
+        let sleep_promoters =
+            tag[4] * 0.25 + tag[10] * 0.65 + NeurochemicalId::Melatonin.default_baseline() * 0.35;
         let net_drive = arousal_promoters - sleep_promoters;
         let with_arousal_gain =
             1.0 / (1.0 + (-net_drive * crate::state::neurochemical::AROUSAL_GAIN).exp());

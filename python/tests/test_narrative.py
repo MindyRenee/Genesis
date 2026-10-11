@@ -12,20 +12,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import logging
 
-from genesis_conscious.concepts import ConceptNetwork
-from genesis_conscious.infrastructure.narrative import (
+from concepts import ConceptNetwork
+from infrastructure.narrative import (
     AutobiographicalLevel,
     HierarchyNode,
     LifeChapter,
     LifeEvent,
     LifeScript,
     Milestone,
-    NarrativeEngine,
+    Narrator,
     TemporalLink,
     TemporalLinkType,
 )
-from genesis_conscious.limbic_system.emotion import EmotionalState
-from genesis_conscious.self import SelfModel
+from limbic_system.emotion import EmotionalState
+from self import SelfModel
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +35,11 @@ logger = logging.getLogger(__name__)
 # ═══════════════════════════════════════════════════════════════════
 
 
-def _make_engine() -> NarrativeEngine:
-    """Create a NarrativeEngine with a fresh SelfModel and network."""
+def _make_engine() -> Narrator:
+    """Create a Narrator with a fresh SelfModel and network."""
     self_model = SelfModel()
     network = ConceptNetwork()
-    return NarrativeEngine(self_model, network)
+    return Narrator(self_model, network)
 
 
 def _make_emotion(label: str = "neutral") -> EmotionalState:
@@ -150,12 +150,12 @@ def test_life_chapter_describe() -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# NarrativeEngine — initialization
+# Narrator — initialization
 # ═══════════════════════════════════════════════════════════════════
 
 
 def test_narrative_engine_initialization() -> None:
-    """NarrativeEngine initializes with a first chapter."""
+    """Narrator initializes with a first chapter."""
     engine = _make_engine()
     assert engine.event_count == 0
     assert engine.chapter_count == 1  # "Awakening" chapter
@@ -163,7 +163,7 @@ def test_narrative_engine_initialization() -> None:
 
 
 def test_narrative_engine_has_life_script() -> None:
-    """NarrativeEngine has a default life script."""
+    """Narrator has a default life script."""
     engine = _make_engine()
     assert engine.life_script is not None
     assert len(engine.life_script.milestones) > 0
@@ -478,7 +478,7 @@ def test_personality_drift() -> None:
     """Can track personality drift over time."""
     model = SelfModel(born_at=int(time.time() * 1000))
     net = ConceptNetwork()
-    narrative = NarrativeEngine(model, net)
+    narrative = Narrator(model, net)
 
     model.personality.openness = 0.95  # was 0.85
     narrative.snapshot_personality()

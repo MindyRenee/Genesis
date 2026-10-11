@@ -1,7 +1,7 @@
-"""Tests for genesis_conscious.brainstem.module_sampler — the mind's EEG.
+"""Tests for brainstem.module_sampler — the mind's EEG.
 
 Verifies path→module attribution (package layout mirrors its brain
-anatomy), frame-level attribution rules (leaf in genesis_conscious,
+anatomy), frame-level attribution rules (leaf in the region tree,
 IPC calls attributed to the initiating module), and that the sampler
 credits observed execution into the shared accumulator.
 """
@@ -11,6 +11,12 @@ import sys
 import threading
 import time
 
+from brainstem import module_sampler
+from brainstem.module_sampler import (
+    ModuleSampler,
+    _module_for_frame,
+    _module_of_filename,
+)
 from genesis_client.protocol import (
     MODULE_ATTENTION,
     MODULE_DREAMING,
@@ -22,12 +28,6 @@ from genesis_client.protocol import (
     MODULE_MOTOR,
     MODULE_REASONING,
     MODULE_SENSORY,
-)
-from genesis_conscious.brainstem import module_sampler
-from genesis_conscious.brainstem.module_sampler import (
-    ModuleSampler,
-    _module_for_frame,
-    _module_of_filename,
 )
 
 PKG = module_sampler._package_root()
@@ -42,11 +42,11 @@ def _p(*parts: str) -> str:
 
 def test_directory_attribution():
     """Each subsystem directory resolves to its manifest module."""
-    assert _module_of_filename(_p("memory", "engine.py")) == MODULE_MEMORY
+    assert _module_of_filename(_p("memory", "memory.py")) == MODULE_MEMORY
     assert _module_of_filename(_p("concepts", "network.py")) == MODULE_MEMORY
-    assert _module_of_filename(_p("cognition", "engine.py")) == MODULE_REASONING
+    assert _module_of_filename(_p("frontal_lobe", "prefrontal.py")) == MODULE_INTENTION
     assert _module_of_filename(_p("reasoning", "x.py")) == MODULE_REASONING
-    assert _module_of_filename(_p("language", "engine.py")) == MODULE_LANGUAGE
+    assert _module_of_filename(_p("temporal_lobe", "morphology.py")) == MODULE_LANGUAGE
     assert _module_of_filename(_p("perception", "vision.py")) == MODULE_SENSORY
     assert _module_of_filename(_p("occipital_lobe", "v1.py")) == MODULE_SENSORY
     assert _module_of_filename(_p("temporal_lobe", "vtc.py")) == MODULE_SENSORY
@@ -58,16 +58,42 @@ def test_directory_attribution():
     assert _module_of_filename(_p("basal_ganglia", "x.py")) == MODULE_INTENTION
     assert _module_of_filename(_p("cerebellum", "x.py")) == MODULE_MOTOR
     assert _module_of_filename(_p("sleep", "inner_life.py")) == MODULE_DREAMING
-    assert _module_of_filename(_p("learning", "x.py")) == MODULE_INTENTION
+    # The learning modules live in their regions — attribution follows
+    # the region, not a bundle: striatal TD → intention, the autonomous
+    # learner → intention, curiosity → emotion, the predictive stack →
+    # motor. The synaptic substrate overrides the sensory default —
+    # hippocampal plasticity is memory machinery.
+    assert _module_of_filename(_p("basal_ganglia", "td.py")) == MODULE_INTENTION
+    assert _module_of_filename(_p("frontal_lobe", "autonomous.py")) == MODULE_INTENTION
+    assert _module_of_filename(_p("limbic_system", "curiosity.py")) == MODULE_EMOTION
+    assert _module_of_filename(_p("cerebellum", "predictive.py")) == MODULE_MOTOR
+    assert _module_of_filename(_p("temporal_lobe", "stdp.py")) == MODULE_MEMORY
+    assert _module_of_filename(_p("temporal_lobe", "plasticity.py")) == MODULE_MEMORY
+    assert _module_of_filename(_p("temporal_lobe", "dual.py")) == MODULE_MEMORY
+    assert _module_of_filename(_p("temporal_lobe", "synapses.py")) == MODULE_MEMORY
     assert _module_of_filename(_p("self", "model.py")) == MODULE_METACOGNITION
+    # Packages without a region-shaped name still attribute: the world
+    # model reasons, the eval harness measures herself.
+    assert _module_of_filename(_p("world", "belief.py")) == MODULE_REASONING
+    assert _module_of_filename(_p("eval", "harness.py")) == MODULE_METACOGNITION
+    # Language production inside the executive region keeps its
+    # language attribution; self-status reporting is metacognition.
+    assert _module_of_filename(_p("frontal_lobe", "answer_composer.py")) == (
+        MODULE_LANGUAGE
+    )
+    assert _module_of_filename(_p("frontal_lobe", "status.py")) == (
+        MODULE_METACOGNITION
+    )
 
 
-def test_mind_disambiguation():
-    """mind/ defaults to metacognition; volition/sleep override."""
-    assert _module_of_filename(_p("mind", "heartbeat.py")) == MODULE_METACOGNITION
-    assert _module_of_filename(_p("mind", "core.py")) == MODULE_METACOGNITION
-    assert _module_of_filename(_p("mind", "volition.py")) == MODULE_INTENTION
-    assert _module_of_filename(_p("mind", "sleep.py")) == MODULE_DREAMING
+def test_mind_file_attribution():
+    """mind.py attributes to metacognition; region-filed files keep pins."""
+    assert _module_of_filename(_p("mind.py")) == MODULE_METACOGNITION
+    assert _module_of_filename(_p("brainstem", "sleep.py")) == MODULE_DREAMING
+    assert _module_of_filename(_p("basal_ganglia", "volition.py")) == (
+        MODULE_INTENTION
+    )
+    assert _module_of_filename(_p("brainstem", "heartbeat.py")) == MODULE_EMOTION
 
 
 def test_top_level_files():
@@ -84,7 +110,7 @@ def test_top_level_files():
 
 
 def test_foreign_files_unattributed():
-    """Files outside genesis_conscious resolve to None."""
+    """Files outside the region tree resolve to None."""
     assert _module_of_filename("/usr/lib/python3.12/socket.py") is None
     assert _module_of_filename(f"{sys.executable}") is None
     client = os.path.join(os.path.dirname(PKG), "genesis_client", "client.py")
@@ -97,7 +123,7 @@ def test_foreign_files_unattributed():
 def _leaf_in_package():
     """Call from inside this test file — but the leaf is in tests/.
 
-    tests/ is outside genesis_conscious, so frame attribution must
+    tests/ is outside the region tree, so frame attribution must
     return None rather than the caller's module.
     """
     return _module_for_frame(sys._getframe())

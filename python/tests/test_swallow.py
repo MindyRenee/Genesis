@@ -26,7 +26,7 @@ from genesis_client.swallow import (
     swallow_report,
     total_swallowed,
 )
-from genesis_conscious.infrastructure.journal import CognitiveJournal
+from infrastructure.journal import CognitiveJournal
 
 
 @pytest.fixture(autouse=True)
@@ -214,7 +214,7 @@ def test_sink_receives_the_exception() -> None:
 
 def test_journal_error_record_carries_the_exception(tmp_path) -> None:
     """End to end through the real journal sink shape."""
-    from genesis_conscious.infrastructure.journal import CognitiveJournal
+    from infrastructure.journal import CognitiveJournal
 
     j = CognitiveJournal(tmp_path)  # takes the data *directory*
     j.record(

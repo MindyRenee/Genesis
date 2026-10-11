@@ -20,7 +20,7 @@ import os
 import tempfile
 import textwrap
 
-from genesis_conscious.infrastructure.bug_reporter import BugReporter
+from infrastructure.bug_reporter import BugReporter
 
 
 def _scan(source: str) -> list:
@@ -29,7 +29,10 @@ def _scan(source: str) -> list:
     path = os.path.join(root, "sample.py")
     with open(path, "w", encoding="utf-8") as f:
         f.write(textwrap.dedent(source))
-    return BugReporter(project_root=root).scan(max_files=5).bugs
+    return BugReporter(
+        project_root=root,
+        log_path=os.path.join(root, "bug_reports.jsonl"),
+    ).scan(max_files=5).bugs
 
 
 def _categories(source: str) -> set[str]:
@@ -94,8 +97,26 @@ def test_is_true_not_flagged() -> None:
 
 
 def test_type_equality_detected() -> None:
-    """'type(x) == int' is flagged — use isinstance."""
+    """'type(x) == CustomCls' is flagged — use isinstance."""
     assert "type_equality_check" in _categories(
+        """
+        class Node:
+            pass
+
+        def f(x):
+            return type(x) == Node
+        """
+    )
+
+
+def test_type_equality_int_not_flagged() -> None:
+    """'type(x) == int' is NOT flagged — exact-type is deliberate.
+
+    bool subclasses int, so the suggested isinstance rewrite would
+    silently widen the check to accept True — the flag would invite
+    a semantic-changing "fix" nobody should apply.
+    """
+    assert "type_equality_check" not in _categories(
         """
         def f(x):
             return type(x) == int
@@ -392,3 +413,120 @@ def test_clean_code_has_no_new_categories() -> None:
         """
     )
     assert not (found & new_categories), found & new_categories
+
+
+# ─── foreground yield ─────────────────────────────────────────────
+
+
+def test_scan_parks_while_foreground_turn_active() -> None:
+    """A foreground think() turn parks the scan between files.
+
+    ``should_pause`` is the cooperative half of foreground
+    arbitration: the scan is the CPU-bound piece that used to starve
+    think() of the GIL for whole seconds at a time. It must consult
+    the hook per file, keep working when it clears, and still
+    produce a complete result.
+    """
+    import itertools
+    import time
+
+    root = tempfile.mkdtemp()
+    for i in range(4):
+        with open(os.path.join(root, f"f{i}.py"), "w", encoding="utf-8") as f:
+            f.write("x = 1\n")
+
+    reporter = BugReporter(
+        project_root=root,
+        log_path=os.path.join(root, "bug_reports.jsonl"),
+    )
+
+    # Busy for a bounded window, then clear — mimics a think() turn.
+    checks = itertools.count()
+    reporter.should_pause = lambda: next(checks) < 4
+
+    started = time.monotonic()
+    result = reporter.scan(max_files=10)
+    elapsed = time.monotonic() - started
+
+    assert result.total_files == 4
+    # Each park is a 50 ms sleep; four files each saw a busy hook.
+    assert elapsed >= 0.15
+
+
+def test_scan_without_hook_never_parks() -> None:
+    """Default should_pause is None — zero overhead when unwired."""
+    root = tempfile.mkdtemp()
+    with open(os.path.join(root, "a.py"), "w", encoding="utf-8") as f:
+        f.write("x = 1\n")
+    reporter = BugReporter(
+        project_root=root,
+        log_path=os.path.join(root, "bug_reports.jsonl"),
+    )
+    assert reporter.should_pause is None
+    assert reporter.scan(max_files=5).total_files == 1
+
+
+# ─── core-package boundary ────────────────────────────────────────
+
+
+def _scan_tree(files: dict[str, str]) -> list:
+    """Write ``files`` under a temp root and return the bugs found."""
+    root = tempfile.mkdtemp()
+    for rel, content in files.items():
+        path = os.path.join(root, rel)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(content)
+    return BugReporter(
+        project_root=root,
+        log_path=os.path.join(root, "bug_reports.jsonl"),
+    ).scan(max_files=10).bugs
+
+
+def test_print_flagged_inside_core_package() -> None:
+    """print() in a package module is a smell — logging exists there."""
+    bugs = _scan_tree(
+        {
+            "python/mypkg/__init__.py": "",
+            "python/mypkg/mod.py": 'def f():\n    print("hi")\n',
+        }
+    )
+    assert any(
+        b.category == "print_in_code" and b.file == "python/mypkg/mod.py"
+        for b in bugs
+    )
+
+
+def test_print_not_flagged_in_toplevel_script() -> None:
+    """print() in a top-level module is the CLI's output — not a smell."""
+    bugs = _scan_tree(
+        {
+            "python/genesis_cli.py": 'def f():\n    print("hi")\n',
+        }
+    )
+    assert not any(b.category == "print_in_code" for b in bugs)
+
+
+def test_print_not_flagged_in_non_package_dir() -> None:
+    """A dir without __init__.py (voices, egg-info) is not core code."""
+    bugs = _scan_tree(
+        {
+            "python/voices/helper.py": 'def f():\n    print("hi")\n',
+        }
+    )
+    assert not any(b.category == "print_in_code" for b in bugs)
+
+
+def test_function_length_threshold_scripts_vs_core() -> None:
+    """Core files use the 110-line limit; scripts get the 150 slack."""
+    body = "\n".join(f"    x = {i}" for i in range(120))
+    func = "def f():\n" + body + "\n    return x\n"
+    core_bugs = _scan_tree(
+        {
+            "python/mypkg/__init__.py": "",
+            "python/mypkg/mod.py": func,
+        }
+    )
+    script_bugs = _scan_tree({"python/genesis_cli.py": func})
+    assert any(b.category == "long_function" for b in core_bugs)
+    assert not any(b.category == "long_function" for b in script_bugs)

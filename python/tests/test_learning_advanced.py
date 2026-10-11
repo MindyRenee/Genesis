@@ -13,29 +13,31 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from genesis_client.protocol import GET_INFERENCE_SUMMARY, UPDATE_USER_AFFECT
-from genesis_client.types import InferenceSummary
-from genesis_conscious.concepts import ConceptNetwork, RelationType
-from genesis_conscious.learning import (
-    ActiveInferenceReader,
-    AutonomousLearner,
-    CuriosityEngine,
-    DyadicState,
+from cerebellum.predictive import (
     Prediction,
     PredictionContext,
     PredictionError,
     PredictiveCodingLayer,
+)
+from concepts import ConceptNetwork, RelationType
+from frontal_lobe.autonomous import (
+    RATE_LIMIT_DELAY,
+    THROTTLED_DELAY_MULTIPLIER,
+    AutonomousLearner,
+)
+from frontal_lobe.reasoning import Reasoner
+from genesis_client.protocol import GET_INFERENCE_SUMMARY, UPDATE_USER_AFFECT
+from genesis_client.types import InferenceSummary
+from limbic_system.active_inference import (
+    ActiveInferenceReader,
+    DyadicState,
     SelfModelState,
     UserAffectEstimate,
 )
-from genesis_conscious.learning.autonomous import (
-    RATE_LIMIT_DELAY,
-    THROTTLED_DELAY_MULTIPLIER,
-)
-from genesis_conscious.limbic_system.emotional_regulator import EmotionalRegulator
-from genesis_conscious.mind import Mind
-from genesis_conscious.perception import Intent, Perception, QuestionType
-from genesis_conscious.reasoning import ReasoningEngine
+from limbic_system.curiosity import Curiosity
+from limbic_system.emotional_regulator import EmotionalRegulator
+from mind import Mind
+from perception import Intent, Perception, QuestionType
 
 logger = logging.getLogger(__name__)
 
@@ -1336,7 +1338,7 @@ def _check_fact_learned(mind, concept_name, expected_substrings,
                         expected_rel_type, expected_rel_target):
     """Check if a fact was learned: concept exists, definition contains
     expected substrings, and optionally the expected relation exists."""
-    net = mind.cognition.network
+    net = mind.brain.frontal.network
     concept = net.get_concept(concept_name)
     if concept is None:
         return False, f"concept '{concept_name}' not found"
@@ -1378,8 +1380,8 @@ def test_learning_fidelity_immediate_recall():
 
         # Teach all facts
         for teach_input, _, _, _, _ in _TEACH_FACTS:
-            mind.cognition.self_learner.learn_from_input(teach_input)
-        mind.cognition.self_learner.run_inference_cycle(force=True)
+            mind.brain.frontal.self_learner.learn_from_input(teach_input)
+        mind.brain.frontal.self_learner.run_inference_cycle(force=True)
 
         # Check immediate recall
         correct = 0
@@ -1413,8 +1415,8 @@ def test_learning_fidelity_delayed_recall_after_interference():
 
         # Phase A: Teach all facts
         for teach_input, _, _, _, _ in _TEACH_FACTS:
-            mind.cognition.self_learner.learn_from_input(teach_input)
-        mind.cognition.self_learner.run_inference_cycle(force=True)
+            mind.brain.frontal.self_learner.learn_from_input(teach_input)
+        mind.brain.frontal.self_learner.run_inference_cycle(force=True)
 
         # Phase B: Immediate recall
         immediate_correct = 0
@@ -1427,8 +1429,8 @@ def test_learning_fidelity_delayed_recall_after_interference():
 
         # Phase C: Filler interactions (interference)
         for filler in _FILLER_FACTS:
-            mind.cognition.self_learner.learn_from_input(filler)
-        mind.cognition.self_learner.run_inference_cycle(force=True)
+            mind.brain.frontal.self_learner.learn_from_input(filler)
+        mind.brain.frontal.self_learner.run_inference_cycle(force=True)
 
         # Phase D: Delayed recall
         delayed_correct = 0
@@ -1470,8 +1472,8 @@ def test_learning_fidelity_persistence_across_save_load():
         # Session 1: Learn facts, save
         mind1 = Mind(socket_path)
         for teach_input, _, _, _, _ in _TEACH_FACTS:
-            mind1.cognition.self_learner.learn_from_input(teach_input)
-        mind1.cognition.self_learner.run_inference_cycle(force=True)
+            mind1.brain.frontal.self_learner.learn_from_input(teach_input)
+        mind1.brain.frontal.self_learner.run_inference_cycle(force=True)
         mind1._save_state()
 
         # Session 2: Load, verify facts survived
@@ -1505,8 +1507,8 @@ def test_learning_fidelity_results_persisted():
 
         # Teach facts
         for teach_input, _, _, _, _ in _TEACH_FACTS:
-            mind.cognition.self_learner.learn_from_input(teach_input)
-        mind.cognition.self_learner.run_inference_cycle(force=True)
+            mind.brain.frontal.self_learner.learn_from_input(teach_input)
+        mind.brain.frontal.self_learner.run_inference_cycle(force=True)
 
         # Score
         correct = 0
@@ -1549,8 +1551,8 @@ def test_learning_fidelity_results_persisted():
 def _make_learner() -> AutonomousLearner:
     """Create a learner with minimal dependencies for testing."""
     net = ConceptNetwork()
-    reasoning = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoning)
+    reasoning = Reasoner(net)
+    curiosity = Curiosity(net, reasoning)
     return AutonomousLearner(network=net, curiosity=curiosity)
 
 

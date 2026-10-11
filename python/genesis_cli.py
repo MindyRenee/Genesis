@@ -45,6 +45,7 @@ Commands (typed during conversation):
     /look        — ask it what it sees through the retina
     /look at <path> — ask it to look at an image file
     /draw        — ask it to draw what it feels right now
+    /play        — her game collection; /play add <file> hands her a game spec
     /register-face <name> — teach it your face (look at the camera)
     /faces       — show known faces and who it last saw
     /mission [text] — set or show its top-level mission
@@ -54,6 +55,8 @@ Commands (typed during conversation):
     /meditate [secs] — put it into meditation (default 60s)
     /teach [topic] — put it into teaching mode (focused learning)
     /endteach    — exit teaching mode, resume normal operation
+    /game        — put it into game mode (focused play)
+    /endgame     — exit game mode, resume normal operation
     /teach-questions — answer its queued questions one at a time
     /sleep-aid   — emergency sleep aid for stress-induced insomnia
     /web-history [N] — see what it's been looking at online (last N, default 20)
@@ -89,31 +92,31 @@ from collections.abc import Callable
 from pathlib import Path
 from types import FrameType
 
+from brainstem.thresholds import AUTO_WAKE_MIN_SLEEP_S
+from concepts import RelationType
 from discord_feed import DiscordFeed, FeedLogHandler, StderrTee
 from genesis_client.ltm_index import scan_ltm_index
 from genesis_client.protocol import PHASE_ACTIVE, PHASE_ALERT, PHASE_NREM, PHASE_REM
-from genesis_conscious.concepts import RelationType
-from genesis_conscious.infrastructure.config import default_data_dir
-from genesis_conscious.mind import Mind
-from genesis_conscious.mind.thresholds import AUTO_WAKE_MIN_SLEEP_S
-from genesis_conscious.perception.ambient import (
+from infrastructure.config import default_data_dir
+from mind import Mind
+from perception.ambient import (
     AmbientListener,
     contains_wake_word,
     strip_wake_word,
 )
-from genesis_conscious.temporal_lobe import AuditoryCortex, SoundEvent
-from genesis_conscious.temporal_lobe.speech import Voice, VoiceInput
+from temporal_lobe import AuditoryCortex, SoundEvent
+from temporal_lobe.speech import Voice, VoiceInput
 
 capture_android_camera: Callable[[str | os.PathLike[str]], str | None] | None
 try:
-    from genesis_conscious.android_camera import capture_android_camera as _capture_android_camera
+    from android_camera import capture_android_camera as _capture_android_camera
 except ImportError:
     capture_android_camera = None
 else:
     capture_android_camera = _capture_android_camera
 
 # Script directory — used to locate the project root. Python already
-# adds the script's directory to sys.path[0], so genesis_conscious and
+# adds the script's directory to sys.path[0], so the region packages and
 # genesis_client are importable without explicit path manipulation.
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -287,30 +290,33 @@ _MODULE_NAMES = {
 }
 
 
-def _find_daemon_binary() -> str | None:
-    """Find the genesis-daemon binary.
+def _binary_candidates(name: str) -> list[Path]:
+    """Candidate paths for a Genesis Rust binary, in priority order.
 
-    There is one canonical build: ``cargo build --release``. The release
-    binary is the only one Genesis will run — no debug fallback, no
-    ambiguity about which binary is live.
+    1. ``GENESIS_BIN_DIR`` — explicit override for unusual layouts.
+    2. ``<project root>/target/release/<name>`` — the canonical
+       ``cargo build --release`` output in a source checkout.
+    3. Next to the running interpreter — ``venv/bin`` in a packaged
+       install, where scripts/install.sh places them.
     """
-    project_root = Path(SCRIPT_DIR).parent
-    path = project_root / "target" / "release" / "genesis-daemon"
-    if path.exists() and os.access(path, os.X_OK):
-        return str(path)
-    return None
+    candidates: list[Path] = []
+    env_dir = os.environ.get("GENESIS_BIN_DIR")
+    if env_dir:
+        candidates.append(Path(env_dir) / name)
+    candidates.append(Path(SCRIPT_DIR).parent / "target" / "release" / name)
+    candidates.append(Path(sys.executable).parent / name)
+    return candidates
 
 
-def _project_root() -> Path:
-    """The repository root (parent of the python/ directory)."""
-    return Path(SCRIPT_DIR).parent
+def _find_binary(name: str) -> str | None:
+    """Find a Genesis binary (``genesis-daemon``, ``retina``).
 
-
-def _find_retina_binary() -> str | None:
-    """Find the retina binary (release build only)."""
-    path = _project_root() / "target" / "release" / "retina"
-    if path.exists() and os.access(path, os.X_OK):
-        return str(path)
+    Release build only — no debug fallback, no ambiguity about which
+    binary is live. Searches ``_binary_candidates`` in order.
+    """
+    for path in _binary_candidates(name):
+        if path.exists() and os.access(path, os.X_OK):
+            return str(path)
     return None
 
 
@@ -518,9 +524,11 @@ def _tail_daemon_log(data_dir: str) -> int:
             except subprocess.TimeoutExpired:
                 proc.kill()
     except FileNotFoundError:
-        print("[genesis] Error: 'tail' command not found. "
-              "Install coreutils or use 'tail -F <data-dir>/daemon.log'.",
-              file=sys.stderr)
+        print(
+            "[genesis] Error: 'tail' command not found. "
+            "Install coreutils or use 'tail -F <data-dir>/daemon.log'.",
+            file=sys.stderr,
+        )
         return 1
     return 0
 
@@ -846,7 +854,7 @@ class AuditoryHandler:
             # This is how it learns about sounds — each new sound type
             # becomes a concept it can think about and reason over.
             try:
-                network = self.mind.cognition.network
+                network = self.mind.brain.frontal.network
                 if not network.get_concept(event.sound_type):
                     network.add_concept(
                         event.sound_type,
@@ -900,14 +908,14 @@ class AuditoryHandler:
         try:
             emotion = self.mind.feel()
             # Try to compose from what it knows about this sound type
-            thought = self.mind.cognition.composer.compose_about(
+            thought = self.mind.brain.frontal.composer.compose_about(
                 event.sound_type, emotion, focused=True
             )
             if thought and thought.content and thought.confidence > 0.3:
                 # Dedup — don't repeat what it just said about this
                 # sound type. Without this, "noise relates to brain"
                 # repeats every few seconds with different verb synonyms.
-                if self.mind.cognition.composer.has_said_similar(
+                if self.mind.brain.frontal.composer.has_said_similar(
                     event.sound_type, thought.content
                 ):
                     return
@@ -1051,11 +1059,13 @@ def _render_status(mind: Mind) -> str:
         f"  │  STM entries:    {status['stm_count']}",
         f"  │  LTM episodes:   {status['ltm_count']}",
         f"  │  Interactions:   {status['interactions']}",
-        f"  │  Language:       {status['language_engine']}",
+        f"  │  Language:       {status['language']}",
     ])
     if mind.is_teaching:
         topic = mind.teaching_topic or "general"
         lines.append(f"  │  Teaching mode:  ON (topic: {topic})")
+    if mind.is_gaming:
+        lines.append("  │  Game mode:      ON")
     queued = mind.queued_question_count
     if queued:
         lines.append(f"  │  Queued questions: {queued} (use /teach-questions)")
@@ -1165,6 +1175,7 @@ def _handle_command(mind: Mind, command: str) -> str:
             "/archive-project", "/restore-project", "/manage-projects",
             "/note-project", "/review-notes", "/read-notes",
             "/teach", "/endteach", "/teach-questions",
+            "/game", "/endgame",
             "/introspect", "/mission",
         ):
             if mind.is_sleeping:
@@ -1241,120 +1252,6 @@ def _cmd_thoughts(mind: Mind, rest: str) -> str:
     """Show Genesis's recent spontaneous thoughts and inner life."""
     return f"\n  genesis> {mind.inner_life_status()}\n"
 
-
-def _cmd_puzzle(mind: Mind, rest: str) -> str:
-    """Puzzle status, or hand it a puzzle spec to work on.
-
-    /puzzle              — what it's practicing now + pending offers
-    /puzzle offer <file> — drop a puzzle spec into its world
-    /puzzle drop <name>  — take an offered puzzle back
-
-    A spec is data, not code: {"family": "grid", "train": [...],
-    "test": [...]}, {"family": "sorter", "generate"/"slots"+"blocks"},
-    {"family": "sequence", "generate"/"pattern"},
-    {"family": "assembly", "generate": {"rows","cols"}},
-    {"family": "relations", "generate"/"positions"+"objects"+"goals"},
-    {"family": "quantities", "generate"/"target"+"groups"}, or
-    {"family": "classification", "items"+"predicate"/"examples"}.
-    """
-    from genesis_conscious.spatial.practice import (
-        CURRICULUM,
-        normalize_offered,
-    )
-
-    practice = mind.spatial_practice
-    rest = rest.strip()
-    if rest.startswith("offer "):
-        path = Path(rest[6:].strip()).expanduser()
-        try:
-            raw = json.loads(path.read_text())
-        except (OSError, json.JSONDecodeError) as e:
-            return f"\n  can't read {path}: {e}\n"
-        task = normalize_offered(raw, path.stem)
-        if task is None:
-            return (
-                "\n  not a puzzle spec — needs a family: \"grid\""
-                " (train/test pairs), \"sorter\" (generate or"
-                " slots+blocks), or \"assembly\" (generate rows/cols)\n"
-            )
-        known = {t["name"] for t in practice.offered_tasks()}
-        known |= {str(t["name"]) for t in CURRICULUM}
-        if task["name"] in known:
-            return f"\n  {task['name']} is already on its list\n"
-        practice.offered_dir().mkdir(parents=True, exist_ok=True)
-        target = practice.offered_dir() / f"{task['name']}.json"
-        target.write_text(json.dumps(raw, indent=2) + "\n")
-        # Register it as a world event — it notices a new puzzle in
-        # its environment, not just a file on disk.
-        mind.world.notify(
-            f"a new {task['family']} puzzle appeared: {task['name']}",
-            salience=0.6,
-        )
-        return (
-            f"\n  offered {task['name']} [{task['family']}] — it'll "
-            "pick it up when its puzzle urge rises\n"
-        )
-    if rest.startswith("drop "):
-        name = rest[5:].strip()
-        try:
-            files = sorted(practice.offered_dir().glob("*.json"))
-        except OSError:
-            files = []
-        for f in files:
-            if f.stem == name:
-                f.unlink()
-                return f"\n  dropped {name}\n"
-            try:
-                raw = json.loads(f.read_text())
-            except (OSError, json.JSONDecodeError):
-                continue
-            task = normalize_offered(raw, f.stem)
-            if task is not None and task["name"] == name:
-                f.unlink()
-                return f"\n  dropped {name}\n"
-        return f"\n  no offered puzzle named {name}\n"
-    if rest:
-        return (
-            "\n  /puzzle            — what it's practicing now"
-            "\n  /puzzle offer <file> — drop a puzzle spec into its world"
-            "\n  /puzzle drop <name>  — take an offer back\n"
-        )
-    lines = [""]
-    cur = practice.current_task()
-    if cur is None:
-        lines.append(
-            "  nothing pending — every known puzzle is mastered or parked"
-        )
-    else:
-        lines.append(
-            f"  current: {cur['name']} [{cur.get('family', 'grid')}]"
-        )
-        if cur.get("hint"):
-            lines.append(f"    hint: {cur['hint']}")
-        n = cur["name"]
-        lines.append(
-            f"    attempts={practice.attempts.get(n, 0)} "
-            f"mastery={practice.mastery.get(n, 0.0):.2f}"
-        )
-    pending = [
-        t
-        for t in practice.offered_tasks()
-        if practice.mastery.get(t["name"], 0.0) < 1.0
-    ]
-    if pending:
-        lines.append("  offered:")
-        for t in pending:
-            lines.append(
-                f"    {t['name']} [{t['family']}] "
-                f"attempts={practice.attempts.get(t['name'], 0)} "
-                f"mastery={practice.mastery.get(t['name'], 0.0):.2f}"
-            )
-    st = practice.status()
-    mastered = sum(1 for v in st.values() if v >= 1.0)
-    lines.append(f"  mastered {mastered}/{len(st)}")
-    lines.append("  /puzzle offer <file> — hand it a puzzle spec")
-    lines.append("")
-    return "\n".join(lines)
 
 
 def _cmd_world(mind: Mind, rest: str) -> str:
@@ -1795,7 +1692,7 @@ def _cmd_register_face(mind: Mind, rest: str) -> str:
         return f"\n  genesis> {result}\n"
 
     # Capture a frame and register
-    from genesis_conscious.perception.retina import latest_frame
+    from perception.retina import latest_frame
 
     frame = latest_frame(copy=True)
     if frame is None:
@@ -1808,7 +1705,7 @@ def _cmd_register_face(mind: Mind, rest: str) -> str:
 
     # Convert to RGB if needed
     if frame.ndim == 3 and frame.shape[2] != 3:
-        from genesis_conscious.perception.vision import _yuyv_to_rgb
+        from perception.vision import _yuyv_to_rgb
         rgb = _yuyv_to_rgb(frame)
     else:
         rgb = frame
@@ -2178,6 +2075,56 @@ def _cmd_endteach(mind: Mind, rest: str) -> str:
     ) + "\n"
 
 
+def _cmd_game(mind: Mind, rest: str) -> str:
+    """Put Genesis into game mode — focused play.
+
+    Volition urges, autonomous learning, and inner-life wandering
+    pause so every cycle goes to the game in front of it. It can
+    still answer if spoken to; conversation just stops being the
+    driver. Use /endgame to exit.
+    """
+    if mind.is_gaming:
+        return (
+            _compose(
+                mind,
+                "already in game mode",
+                fallback="[already playing]",
+                confidence=0.5,
+            )
+            + "\n  Use /endgame to stop.\n"
+        )
+    mind.enter_game_mode()
+    return (
+        _compose(
+            mind,
+            "entering game mode — focused on the game",
+            fallback="[game mode]",
+            confidence=0.7,
+            metadata={"game_mode_started": True},
+        )
+        + "\n  Use /endgame when you're done.\n"
+    )
+
+
+def _cmd_endgame(mind: Mind, rest: str) -> str:
+    """Exit game mode and resume normal operation."""
+    if not mind.is_gaming:
+        return _compose(
+            mind,
+            "not in game mode",
+            fallback="[not playing]",
+            confidence=0.4,
+        ) + "\n"
+    mind.exit_game_mode()
+    return _compose(
+        mind,
+        "exiting game mode, resuming normal operation",
+        fallback="[resuming]",
+        confidence=0.7,
+        metadata={"game_mode_ended": True},
+    ) + "\n"
+
+
 def _cmd_teach_questions(mind: Mind, rest: str) -> str:
     """Answer Genesis's queued questions one at a time.
 
@@ -2256,8 +2203,105 @@ def _cmd_sleep_aid(mind: Mind, rest: str) -> str:
     return "\n".join(lines)
 
 
+def _cmd_play(mind: Mind, rest: str) -> str:
+    """Her game collection, or hand her a game spec to play.
+
+    /play              — what she's drawn to + how well she plays
+    /play add <file>   — place a game spec into her world
+    /play drop <name>  — take an added game back
+
+    Games are always there if she wants them — the play urge picks
+    what she plays, this just manages what's on the shelf. A spec is
+    data, not code: {"family": "grid", "train": [...], "test": [...]},
+    {"family": "sorter", "generate"/"slots"+"blocks"},
+    {"family": "sequence", "generate"/"pattern"},
+    {"family": "assembly", "generate": {"rows","cols"}},
+    {"family": "relations", "generate"/"positions"+"objects"+"goals"},
+    {"family": "quantities", "generate"/"target"+"groups"},
+    {"family": "classification", "items"+"predicate"/"examples"}.
+    """
+    from frontal_lobe.games.play import COLLECTION, normalize_offered
+
+    play = mind.game_play
+    rest = rest.strip()
+    if rest.startswith("add "):
+        path = Path(rest[4:].strip()).expanduser()
+        try:
+            raw = json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError) as e:
+            return f"\n  can't read {path}: {e}\n"
+        task = normalize_offered(raw, path.stem)
+        if task is None:
+            return (
+                "\n  not a game spec — needs a family: \"grid\""
+                " (train/test pairs), \"sorter\" (generate or"
+                " slots+blocks), \"sequence\", \"assembly\","
+                " \"relations\", \"quantities\", or \"classification\"\n"
+            )
+        known = {t["name"] for t in play.offered_games()}
+        known |= {str(t["name"]) for t in COLLECTION}
+        if task["name"] in known:
+            return f"\n  {task['name']} is already in her collection\n"
+        play.offered_dir().mkdir(parents=True, exist_ok=True)
+        target = play.offered_dir() / f"{task['name']}.json"
+        target.write_text(json.dumps(raw, indent=2) + "\n")
+        # Register it as a world event — she notices a new game in
+        # her environment, not just a file on disk.
+        mind.world.notify(
+            f"a new {task['family']} game appeared: {task['name']}",
+            salience=0.6,
+        )
+        return (
+            f"\n  added {task['name']} [{task['family']}] — she'll "
+            "pick it up when she feels like playing\n"
+        )
+    if rest.startswith("drop "):
+        name = rest[5:].strip()
+        try:
+            files = sorted(play.offered_dir().glob("*.json"))
+        except OSError:
+            files = []
+        for f in files:
+            if f.stem == name:
+                f.unlink()
+                return f"\n  dropped {name}\n"
+            try:
+                raw = json.loads(f.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue
+            task = normalize_offered(raw, f.stem)
+            if task is not None and task["name"] == name:
+                f.unlink()
+                return f"\n  dropped {name}\n"
+        return f"\n  no added game named {name}\n"
+    if rest:
+        return (
+            "\n  /play — her game collection\n"
+            "  /play add <file> — hand her a game spec\n"
+            "  /play drop <name> — take an added game back\n"
+        )
+
+    status = play.status()
+    lines = ["\n  her games:"]
+    try:
+        drawn = play.pick()
+    except Exception:  # noqa: BLE001
+        drawn = None
+    if drawn is not None:
+        lines.append(
+            f"    drawn to: {drawn['name']} [{drawn.get('family', 'grid')}]"
+        )
+    for name, m in status.items():
+        lines.append(f"    {name:<28} {m:>5.0%}")
+    if not status:
+        lines.append("    none yet")
+    lines.append("")
+    return "\n".join(lines)
+
+
 _COMMAND_HANDLERS: dict[str, Callable[[Mind, str], str]] = {
     "/status": _cmd_status,
+    "/play": _cmd_play,
     "/feel": _cmd_feel,
     "/introspect": _cmd_introspect,
     "/learning": _cmd_learning,
@@ -2300,9 +2344,10 @@ _COMMAND_HANDLERS: dict[str, Callable[[Mind, str], str]] = {
     "/meditate": _cmd_meditate,
     "/teach": _cmd_teach,
     "/endteach": _cmd_endteach,
+    "/game": _cmd_game,
+    "/endgame": _cmd_endgame,
     "/teach-questions": _cmd_teach_questions,
     "/sleep-aid": _cmd_sleep_aid,
-    "/puzzle": _cmd_puzzle,
 }
 
 
@@ -2474,6 +2519,7 @@ def _print_help() -> None:
     logger.info("    /look         — ask it what it sees through the retina")
     logger.info("    /look at <p>  — ask it to look at an image file")
     logger.info("    /draw         — ask it to draw what it feels right now")
+    logger.info("    /play         — her game collection; hand her one with /play add <file>")
     logger.info("    /register-face <name> — teach it your face")
     logger.info("    /faces        — show known faces and who it last saw")
     logger.info("    /mission [text] — set or show its top-level mission")
@@ -2483,9 +2529,10 @@ def _print_help() -> None:
     logger.info("    /meditate [secs] — put it into meditation")
     logger.info("    /teach [topic] — put it into teaching mode (focused learning)")
     logger.info("    /endteach    — exit teaching mode, resume normal operation")
+    logger.info("    /game        — put it into game mode (focused play)")
+    logger.info("    /endgame     — exit game mode, resume normal operation")
     logger.info("    /teach-questions — answer its queued questions one at a time")
     logger.info("    /sleep-aid    — emergency sleep aid for stress-induced insomnia")
-    logger.info("    /puzzle       — its puzzle practice; offer one with /puzzle offer <file>")
     logger.info("    /quit         — exit")
     logger.info("")
     logger.info("  When you're idle, its thoughts appear live as genesis~ lines.")
@@ -2575,6 +2622,19 @@ def _parse_cli_args() -> argparse.Namespace:
         help="Start in offline mode — skip all network access. "
         "Autonomous learning pauses; conversation and art continue.",
     )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="Run resident: start the daemon and mind without the "
+        "interactive prompt. For systemd/background use; stop with "
+        "SIGTERM or `genesis --stop`.",
+    )
+    parser.add_argument(
+        "--stop",
+        action="store_true",
+        help="Stop the Genesis processes for this data dir and exit "
+        "(the installed equivalent of run.sh --stop).",
+    )
     return parser.parse_args()
 
 
@@ -2597,7 +2657,10 @@ def _acquire_cli_lock(data_dir: str) -> int | None:
         if fd is not None:
             os.close(fd)
         print(
-            f"Error: cannot acquire Genesis lock for {data_dir}: {e}",
+            f"Error: cannot acquire Genesis lock for {data_dir}: {e}\n"
+            "Is another Genesis already running? Stop it with "
+            "`genesis --stop`, `systemctl --user stop genesis`, or "
+            "./run.sh --stop.",
             file=sys.stderr,
         )
         return None
@@ -2626,6 +2689,138 @@ def _remove_pid_file(data_dir: str, name: str) -> None:
         logger.debug(f"failed to remove PID file {path}")
 
 
+# ─── Stop (--stop, the installed equivalent of run.sh --stop) ────────
+
+
+def _pid_from_file(path: str) -> int | None:
+    """The PID in a pidfile, or None when absent, unreadable, or dead."""
+    try:
+        pid = int(Path(path).read_text().strip())
+    except (OSError, ValueError):
+        return None
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return None
+    return pid
+
+
+def _kill_pidfile(path: str, sig: int) -> None:
+    """Signal the process named by a pidfile, then drop the file.
+
+    Mirrors run.sh: the file is removed when the signal lands or the
+    PID was already dead, and kept if the signal was refused so the
+    caller can retry or escalate.
+    """
+    pid = _pid_from_file(path)
+    if pid is None:
+        Path(path).unlink(missing_ok=True)
+        return
+    try:
+        os.kill(pid, sig)
+    except OSError:
+        return
+    Path(path).unlink(missing_ok=True)
+
+
+def _orphan_pids(data_dir: str) -> list[int]:
+    """Live Genesis subprocesses for *data_dir* without live pidfiles.
+
+    Matches ``/proc/*/exe`` against the resolved daemon/retina binary
+    paths — the same binaries this install would start, so unrelated
+    user processes can never match. The daemon's argv carries
+    ``--data-dir``, keeping two instances on one machine separate; the
+    retina takes no arguments, so its binary path (this checkout's
+    ``target/`` or this install's ``venv/bin``) is already
+    instance-scoped.
+    """
+    binary_paths: dict[str, set[str]] = {"genesis-daemon": set(), "retina": set()}
+    for name in binary_paths:
+        for cand in _binary_candidates(name):
+            if cand.exists():
+                binary_paths[name].add(os.path.realpath(cand))
+    if not any(binary_paths.values()):
+        return []
+    found: list[int] = []
+    try:
+        entries = os.listdir("/proc")
+    except OSError:
+        return []
+    for entry in entries:
+        if not entry.isdigit():
+            continue
+        try:
+            exe = os.path.realpath(os.path.join("/proc", entry, "exe"))
+        except OSError:
+            continue
+        if exe in binary_paths["retina"]:
+            found.append(int(entry))
+        elif exe in binary_paths["genesis-daemon"]:
+            try:
+                with open(os.path.join("/proc", entry, "cmdline"), "rb") as f:
+                    cmdline = f.read()
+            except OSError:
+                continue
+            if data_dir.encode() in cmdline:
+                found.append(int(entry))
+    return found
+
+
+def _any_running(data_dir: str) -> bool:
+    """Whether any Genesis process for *data_dir* is alive."""
+    for name in (_PID_FILE_CLI, _PID_FILE_DAEMON, _PID_FILE_RETINA):
+        if _pid_from_file(os.path.join(data_dir, name)) is not None:
+            return True
+    return bool(_orphan_pids(data_dir))
+
+
+def _stop_all(data_dir: str) -> int:
+    """Stop every Genesis process for *data_dir* — the run.sh teardown.
+
+    Order matters: SIGINT the CLI first so it saves state and stops
+    the daemon itself; then SIGKILL whatever the pidfiles and /proc
+    still name; finally remove socket/lock/pid files so the next start
+    is clean.
+    """
+    cli_pidfile = os.path.join(data_dir, _PID_FILE_CLI)
+    daemon_pidfile = os.path.join(data_dir, _PID_FILE_DAEMON)
+    retina_pidfile = os.path.join(data_dir, _PID_FILE_RETINA)
+
+    cli_pid = _pid_from_file(cli_pidfile)
+    if cli_pid is not None:
+        try:
+            os.kill(cli_pid, signal.SIGINT)
+        except OSError:
+            pass
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline:
+            try:
+                os.kill(cli_pid, 0)
+            except OSError:
+                break
+            time.sleep(0.1)
+
+    _kill_pidfile(cli_pidfile, signal.SIGKILL)
+    _kill_pidfile(daemon_pidfile, signal.SIGKILL)
+    _kill_pidfile(retina_pidfile, signal.SIGKILL)
+    for pid in _orphan_pids(data_dir):
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+
+    for name in (
+        "genesis.sock",
+        "genesis.lock",
+        "genesis_cli.lock",
+        _PID_FILE_CLI,
+        _PID_FILE_DAEMON,
+        _PID_FILE_RETINA,
+    ):
+        Path(os.path.join(data_dir, name)).unlink(missing_ok=True)
+    return 0
+
+
 def _start_daemon_process(
     data_dir: str, daemon_socket: str
 ) -> subprocess.Popen | None:
@@ -2646,10 +2841,11 @@ def _start_daemon_process(
             file=sys.stderr,
         )
         return None
-    daemon_path = _find_daemon_binary()
+    daemon_path = _find_binary("genesis-daemon")
     if daemon_path is None:
         print(
-            "Error: genesis-daemon binary not found. Run: cargo build --release",
+            "Error: genesis-daemon binary not found. Run: cargo build "
+            "--release (source checkout) or scripts/install.sh (install).",
             file=sys.stderr,
         )
         return None
@@ -3200,7 +3396,10 @@ def _handle_conversation(
     with out_lock:
         logger.info("  genesis~ (thinking...)")
     try:
-        response = mind.respond(user_input)
+        if mind.is_gaming and user_input.startswith("FRAME "):
+            response = mind.game_turn(user_input)
+        else:
+            response = mind.respond(user_input)
     except Exception as e:  # noqa: BLE001
         with out_lock:
             logger.info(f"\n  genesis> (error: {e})\n")
@@ -3392,11 +3591,52 @@ def _shutdown(
     return clean_shutdown
 
 
+def _load_agent_env() -> None:
+    """Load KEY=VALUE lines from the installed agent's env file.
+
+    ``$XDG_CONFIG_HOME/genesis/agent.env`` (or ``$GENESIS_ENV_FILE``)
+    is written by scripts/install.sh — e.g. the Discord webhook mirror
+    for a resident deployment. Real environment variables always win:
+    values are applied with ``setdefault`` semantics.
+    """
+    env_file = os.environ.get("GENESIS_ENV_FILE")
+    if not env_file:
+        config_home = os.environ.get("XDG_CONFIG_HOME") or os.path.join(
+            os.path.expanduser("~"), ".config"
+        )
+        env_file = os.path.join(config_home, "genesis", "agent.env")
+    try:
+        lines = Path(env_file).read_text().splitlines()
+    except OSError:
+        return
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key, value = key.strip(), value.strip().strip('"').strip("'")
+        if key:
+            os.environ.setdefault(key, value)
+
+
+def _console_main() -> int:
+    """Entry point for the installed ``genesis`` command.
+
+    run.sh exports GENESIS_RUN to prove the CLI came up through the
+    supported launcher; the installed console script *is* a supported
+    launcher, so it sets the flag itself.
+    """
+    _load_agent_env()
+    os.environ["GENESIS_RUN"] = "1"
+    return main()
+
+
 def main() -> int:
     """Main entry point for the Genesis CLI."""
     if not os.environ.get("GENESIS_RUN"):
         print(
-            "Error: Genesis must be started with ./run.sh.",
+            "Error: Genesis must be started with ./run.sh (source "
+            "checkout) or the `genesis` command (installed).",
             file=sys.stderr,
         )
         return 1
@@ -3406,6 +3646,15 @@ def main() -> int:
 
     if args.tail:
         return _tail_daemon_log(data_dir)
+
+    if args.stop:
+        if _any_running(data_dir):
+            print("  Stopping Genesis...", file=sys.stderr)
+            _stop_all(data_dir)
+            print("  Genesis stopped.", file=sys.stderr)
+        else:
+            print("  Genesis is not running.", file=sys.stderr)
+        return 0
 
     daemon_socket = args.daemon_socket or os.path.join(data_dir, DEFAULT_DAEMON_SOCKET)
 
@@ -3493,10 +3742,29 @@ def main() -> int:
                 # ── Autonomous sleep/wake watcher ──
                 _start_sleep_watcher(mind, shutting_down)
 
-                # ── Interactive loop ──
-                _run_interactive_loop(
-                    mind, voice, thought_collector, shutting_down, dedup_voice
-                )
+                if args.headless:
+                    # Resident mode: the mind lives in its own threads;
+                    # this thread just waits for SIGTERM/SIGINT. There
+                    # is no prompt to read — stdin under systemd is
+                    # /dev/null, and input() would exit instantly. The
+                    # signal handler's KeyboardInterrupt exists to break
+                    # input(); with no input() it is noise, so the wait
+                    # absorbs it like the interactive loop does.
+                    print(
+                        "[genesis] Resident mode — running headless. "
+                        "Stop with SIGTERM or `genesis --stop`.",
+                        file=sys.stderr,
+                    )
+                    try:
+                        while not shutting_down.is_set():
+                            shutting_down.wait(5.0)
+                    except KeyboardInterrupt:
+                        pass
+                else:
+                    # ── Interactive loop ──
+                    _run_interactive_loop(
+                        mind, voice, thought_collector, shutting_down, dedup_voice
+                    )
     finally:
         # Mark shutdown before saving so subsequent signals do not raise
         # KeyboardInterrupt during persistence. Repeated Ctrl+C must not
@@ -3523,7 +3791,7 @@ def _start_retina_process(data_dir: str) -> subprocess.Popen | None:
     frames into shared memory. We manage it as a child process so
     it's automatically stopped when the CLI shuts down.
     """
-    retina_path = _find_retina_binary()
+    retina_path = _find_binary("retina")
     if not retina_path:
         print("[genesis] Retina not built — camera unavailable.", file=sys.stderr)
         print("[genesis] Build with: cargo build --release", file=sys.stderr)

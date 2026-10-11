@@ -24,7 +24,7 @@ import zipfile
 
 import numpy as np
 
-from genesis_conscious.infrastructure.config import default_data_dir
+from infrastructure.config import default_data_dir
 
 # ─── Config ──────────────────────────────────────────────────────
 
@@ -58,8 +58,8 @@ def _load_concept_vocab(data_dir: str) -> tuple[object, set[str]] | None:
     Returns (network, vocab) or None if no saved state is found.
     """
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-    from genesis_conscious.concepts import ConceptNetwork
-    from genesis_conscious.infrastructure.persistence import load_state, restore_network
+    from concepts import ConceptNetwork
+    from infrastructure.persistence import load_state, restore_network
 
     print(f"Loading concept network from {data_dir}...")
     data = load_state(data_dir)

@@ -30,11 +30,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "python"))
 
-from genesis_conscious.concepts.edge_log import (
+from concepts.edge_log import (
     EdgeLog,
     is_derivable_edge,
 )
-from genesis_conscious.concepts.types import RelationType
+from concepts.types import RelationType
 
 
 def _load_cognitive_state(path: Path) -> dict:
@@ -161,7 +161,7 @@ def migrate(data_dir: Path, write: bool, force: bool) -> int:
         log = EdgeLog(tmp)
         # Fold the classified set through the same event semantics the
         # runtime uses: snapshot is the migration's birth record.
-        from genesis_conscious.concepts.types import Edge
+        from concepts.types import Edge
 
         log.snapshot([
             Edge(

@@ -5,6 +5,68 @@ evidence behind them, not just the claims. Entries are dated, newest
 first. Code references are commit SHAs; runtime artifacts live in the
 instance's data dir (`~/.local/share/genesis*`).
 
+## 2026-10-11 — Regional wiring audit: every function in its region
+
+Full audit of all 34 `__init__.py` files against current
+neuroscience, closing the claims the earlier view-package work left
+unowned. The conformance suite grew from 53 to 67 pins and now
+covers the `world` package outright (moved off the allowlist — every
+world module is region-claimed):
+
+- **Sleep pressure is basal-forebrain again.** `Adenosine` was
+  claimed by no region; process S's best-characterized site of
+  action is the basal forebrain's wake-active neurons (A1
+  inhibition — Porkka-Heiskanen 1997, Strecker 2000, Basheer 2004),
+  documented with the honest caveat that the signal is now known to
+  be distributed across cortex and BF and largely astrocytic
+  (Blanco-Centurion 2006, Bjorness 2009). `SleepInertia` co-claimed
+  by hypothalamus — the lag rides orexin's timescale.
+- **The world model is anatomical now.** `OuterWorld` →
+  temporal_lobe (hippocampal–entorhinal cognitive map + STS social
+  stream; successor-representation predictive maps), `PresenceBelief`
+  → parietal + frontal (rTPJ belief attribution + mPFC), and
+  `WorldBridge` → thalamus (world content reaching cortex rides the
+  relay).
+- **Self is distributed the way the biology is.** `MinimalSelf` and
+  `AgencyDetector` → parietal TPJ (self-location, ownership
+  comparator — Blanke, Decety); `ProtoSelf` gains its brainstem root
+  (NTS/parabrachial/PAG body maps — Damasio's primordial self is
+  below cortex); `AutobiographicalSelf` → temporal (hippocampal
+  memory); `SomaticSnapshot` → insula (the interoceptive comparison);
+  `InnerLife` → parietal as well as frontal (the DMN's posterior hub
+  is PCC/precuneus).
+- **Consolidation co-claims.** `EmotionalMemorySystem` → limbic
+  (amygdala-modulated hippocampal consolidation, McGaugh);
+  `PGOWave` → occipital (the "O" is where dream imagery lands);
+  `REPLAY_COMPRESSION` → temporal.
+- **Region-owned chemicals claimed.** `BDNF` → temporal (hippocampal
+  plasticity), `Endorphin` → hypothalamus (arcuate/pituitary).
+- **Stale references repaired.** Docstrings still named pre-rename
+  packages: hippocampus "documented in auditory", VLPO "documented
+  under limbic_system/" (it's `hypothalamus/`), "re-exported by
+  control", a phantom top-level `reasoning/`, a `vision.py` saliency
+  that now lives in `parietal_lobe/saliency.py`, and the old
+  "association pattern" name for the view-package mechanism. Root
+  package doc now lists all twelve regions plus neurochemical.
+- **README currency.** The September 2026 no-hardcoding audit
+  findings are marked remediated: composer fallbacks return silence,
+  the identity stage table returns structural data marked
+  not-for-speech, code_tools composes through the language engine.
+
+- **One entry point.** The root `python/__init__.py` stopped being a
+  200-symbol catalog of individual models and functions. It now
+  advertises exactly one entry — `Mind`, the assembled organ — with
+  regions reached through the connectome (`mind.brain.<region>`) and
+  the region packages serving as the anatomical map rather than a
+  second surface. Legacy flat names (`from python import
+  ConceptNetwork`) still resolve through a lazy `__getattr__` that
+  consults the claiming region — nothing external breaks, and
+  `dir(python)` now shows just `Mind`.
+
+Nothing was deleted and no module moved — the view-package design
+keeps implementation where it is coherent and claims it where it is
+anatomically placed. `test_regional_wiring.py`: 70/70.
+
 ## 2026-09-28 — Active inference loop, three honesty fixes
 
 The arbitration loop documented its own flaws (README: novelty term

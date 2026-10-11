@@ -36,7 +36,7 @@ fi
 
 
 # Where the vosk model lives. Must match
-# genesis_conscious.infrastructure.config.vosk_model_dir(), which is the
+# infrastructure.config.vosk_model_dir(), which is the
 # single source of truth; this shell resolves the same order run.sh does
 # so the installer and the loader never disagree. An explicit
 # GENESIS_VOSK_DIR wins outright.
@@ -85,6 +85,14 @@ if [ "$VERIFY_ONLY" -eq 0 ]; then
     if "$PY" -m pip install --only-binary=:all: \
         vosk sounddevice SpeechRecognition piper-tts; then
         ok "wheels installed"
+    elif "$PY" -m pip install --user --only-binary=:all: \
+        --break-system-packages \
+        vosk sounddevice SpeechRecognition piper-tts; then
+        # PEP 668 externally-managed hosts (Ubuntu 24.04+): --user is
+        # also refused without --break-system-packages. User-site is
+        # the documented escape and matches how this host's other
+        # third-party packages are installed.
+        ok "wheels installed (user site)"
     else
         bad "wheel install failed (see above)"
     fi
@@ -210,7 +218,7 @@ def check(name, fn):
         rows.append(("FAIL", name, f"{type(e).__name__}: {e}"))
 
 def tts():
-    from genesis_conscious.temporal_lobe.speech import _PIPER_BIN, _PIPER_MODEL
+    from temporal_lobe.speech import _PIPER_BIN, _PIPER_MODEL
     import os
     if not (_PIPER_BIN.exists() and os.access(_PIPER_BIN, os.X_OK)):
         raise RuntimeError("piper binary missing/unexecutable")
@@ -231,7 +239,7 @@ def tts():
     return f"synthesised {secs:.2f}s @ {w.getframerate()}Hz"
 
 def stt():
-    from genesis_conscious.temporal_lobe.speech import (
+    from temporal_lobe.speech import (
         VOSK_MODEL_DIR, VOSK_MODEL_NAME,
     )
     p = VOSK_MODEL_DIR / VOSK_MODEL_NAME
@@ -255,7 +263,7 @@ def drawing():
 
 def ions():
     from genesis_client.protocol import GET_ION_SUMMARY
-    from genesis_conscious.neurochemical.electrochemistry import interpret_ions
+    from neurochemical.electrochemistry import interpret_ions
     interpret_ions(None)
     return f"opcode {GET_ION_SUMMARY}, neutral ctx ok"
 

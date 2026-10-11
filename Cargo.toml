@@ -8,6 +8,13 @@ description = "A machine-native cognitive architecture with coupled neurochemica
 license-file = "LICENSE"
 repository = "https://github.com/MindyRenee/Genesis"
 
+# binutils ≥2.44 warns "ignoring deprecated linker optimization setting '1'"
+# about the -O1 rustc passes to the linker — a known upstream false
+# positive (rust-lang/rust#158192). Allow the forwarding lint; linker
+# errors still fail the build regardless.
+[lints.rust]
+linker_messages = "allow"
+
 [dependencies]
 flate2 = "1.1.9"
 libc = "0.2.189"

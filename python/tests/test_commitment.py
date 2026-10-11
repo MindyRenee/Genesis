@@ -8,9 +8,9 @@ the per-tick re-digitization of the concept network's analog state.
 
 import pytest
 
-from genesis_conscious.commitment import CommitmentBoundary
-from genesis_conscious.concepts import ConceptNetwork, RelationType
-from genesis_conscious.concepts.dynamics import (
+from commitment import CommitmentBoundary
+from concepts import ConceptNetwork, RelationType
+from concepts.dynamics import (
     SPARK_MIN,
     SWEEP_INTERVAL_TICKS,
 )

@@ -2,8 +2,8 @@
 
 import pytest
 
-from genesis_conscious.concepts import ConceptNetwork
-from genesis_conscious.learning.td import TDLearner
+from basal_ganglia.td import TDLearner
+from concepts import ConceptNetwork
 
 
 def _network() -> ConceptNetwork:

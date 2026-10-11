@@ -13,16 +13,16 @@ import math
 
 import pytest
 
-from genesis_client.protocol import CHEM_NAMES, PHASE_NAMES
-from genesis_conscious.eval import (
+from eval import (
     check_snapshot_vs_defaults,
     compare_snapshots,
     isolated_daemon,
     run_chemical_assay,
 )
-from genesis_conscious.eval.assay import ASSAY_DT
-from genesis_conscious.eval.baseline import Snapshot, capture_snapshot
-from genesis_conscious.eval.harness import find_daemon_binary, settle
+from eval.assay import ASSAY_DT
+from eval.baseline import Snapshot, capture_snapshot
+from eval.harness import find_daemon_binary, settle
+from genesis_client.protocol import CHEM_NAMES, PHASE_NAMES
 
 pytestmark = pytest.mark.slow
 

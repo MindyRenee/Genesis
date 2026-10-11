@@ -1,12 +1,12 @@
 """Regression tests for goal-directed decision candidate generation."""
 
-from genesis_conscious.concepts import ConceptNetwork
-from genesis_conscious.reasoning import ActionType, DecisionEngine, ResourceState
+from concepts import ConceptNetwork
+from frontal_lobe.reasoning import ActionType, DecisionMaker, ResourceState
 
 
 def test_active_goals_make_investigation_selectable() -> None:
     """An active goal must expose investigation as a real decision option."""
-    engine = DecisionEngine(ConceptNetwork())
+    engine = DecisionMaker(ConceptNetwork())
     outcome = engine.decide(
         default_action=ActionType.ANSWER,
         reasoning_results=[],
@@ -24,7 +24,7 @@ def test_active_goals_make_investigation_selectable() -> None:
 
 def test_no_active_goals_do_not_add_investigation() -> None:
     """Investigation should not be injected when there is no active goal."""
-    engine = DecisionEngine(ConceptNetwork())
+    engine = DecisionMaker(ConceptNetwork())
     outcome = engine.decide(
         default_action=ActionType.ANSWER,
         reasoning_results=[],
@@ -39,9 +39,35 @@ def test_no_active_goals_do_not_add_investigation() -> None:
         for candidate in outcome.candidates
     )
 
+
+def test_decision_outcome_carries_bg_conflict() -> None:
+    """The basal-ganglia conflict scalar reaches the DecisionOutcome.
+
+    The ACC monitors this signal for response conflict (Botvinick
+    et al., 2001) — it must be exposed at the outcome level, not
+    buried per-candidate.
+    """
+    engine = DecisionMaker(ConceptNetwork())
+    outcome = engine.decide(
+        default_action=ActionType.ANSWER,
+        reasoning_results=[],
+        confidence=0.4,
+        uncertainty=0.5,
+        goals=[],
+        topics=[],
+        perception_intent="question",
+    )
+    assert 0.0 <= outcome.conflict <= 1.0
+    selectable = [
+        c for c in outcome.candidates
+        if c.action_type != ActionType.WITHHOLD and not c.inhibited
+    ]
+    assert selectable
+    assert all(c.bg_conflict == outcome.conflict for c in selectable)
+
 def test_hardware_distress_blocks_exploration_but_preserves_conversation() -> None:
     """Daemon-owned distress must constrain optional exploration."""
-    engine = DecisionEngine(
+    engine = DecisionMaker(
         ConceptNetwork(),
         resource_state=ResourceState(
             available=True,
@@ -70,7 +96,7 @@ def test_hardware_distress_blocks_exploration_but_preserves_conversation() -> No
 
 def test_resource_constraint_is_inert_without_hardware_verdict() -> None:
     """Low reserve alone must not become an invented shutdown threshold."""
-    engine = DecisionEngine(
+    engine = DecisionMaker(
         ConceptNetwork(),
         resource_state=ResourceState(
             available=True,

@@ -24,16 +24,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
 
-from genesis_conscious import (
-    ConceptNetwork,
-    CuriosityEngine,
-    ReasoningEngine,
-    ReflectionEngine,
-    RelationType,
-)
-from genesis_conscious.limbic_system.emotion import EmotionalState
-from genesis_conscious.reasoning.engine import ReasoningType
-from genesis_conscious.sleep import InnerLife
+from concepts import ConceptNetwork, RelationType
+from frontal_lobe.reasoning import Reasoner
+from frontal_lobe.reasoning.reasoner import ReasoningType
+from limbic_system.curiosity import Curiosity
+from limbic_system.emotion import EmotionalState
+from self import Reflection
+from sleep import InnerLife
 
 
 def _make_network() -> ConceptNetwork:
@@ -50,9 +47,9 @@ def _make_network() -> ConceptNetwork:
 def _make_inner_life(network: ConceptNetwork | None = None, seed: int = 42) -> InnerLife:
     """Build an InnerLife with a small network and no callbacks."""
     net = network or _make_network()
-    reasoning = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoning)
-    reflection = ReflectionEngine(net)
+    reasoning = Reasoner(net)
+    curiosity = Curiosity(net, reasoning)
+    reflection = Reflection(net)
     return InnerLife(
         net,
         curiosity,
@@ -499,7 +496,7 @@ class TestRecentTopicTracking:
 
     def test_record_thought_appends_topic(self):
         """_record_thought should append the topic to recent_thought_topics."""
-        from genesis_conscious.sleep.inner_life import SpontaneousThought
+        from sleep.inner_life import SpontaneousThought
         il = _make_inner_life()
         emotion = _neutral_emotion()
         thought = SpontaneousThought(
@@ -513,7 +510,7 @@ class TestRecentTopicTracking:
 
     def test_record_thought_uses_trigger_when_no_topic(self):
         """When metadata has no topic, the trigger should be used."""
-        from genesis_conscious.sleep.inner_life import SpontaneousThought
+        from sleep.inner_life import SpontaneousThought
         il = _make_inner_life()
         emotion = _neutral_emotion()
         thought = SpontaneousThought(
@@ -552,8 +549,8 @@ _ABDUCTIVE_CONCLUSION = (
 
 def _weave_one(reasoning_type):
     """Run one result of `reasoning_type` through the composer's dispatch."""
-    from genesis_conscious.cognition.thought_composer import ThoughtComposer
-    from genesis_conscious.reasoning.engine import ReasoningResult
+    from frontal_lobe.reasoning.reasoner import ReasoningResult
+    from frontal_lobe.thought_composer import ThoughtComposer
 
     composer = ThoughtComposer.__new__(ThoughtComposer)
     composer._rng = random.Random(0)
@@ -587,7 +584,7 @@ def test_abductive_inference_is_spoken_and_hedged() -> None:
     is a ranked guess. Presenting it flatly would overclaim, which is
     why the conclusion's own hedge must survive into the prose.
     """
-    from genesis_conscious.reasoning.engine import ReasoningType
+    from frontal_lobe.reasoning.reasoner import ReasoningType
 
     spoken = _weave_one(ReasoningType.ABDUCTIVE)
     assert "fire" in spoken

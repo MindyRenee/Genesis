@@ -3,8 +3,8 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from genesis_conscious.concepts import ConceptNetwork
-from genesis_conscious.frontal_lobe.executive import ExecutiveFunction
+from concepts import ConceptNetwork
+from frontal_lobe.executive import ExecutiveFunction
 
 
 def test_executive_intention_survives_failed_episode() -> None:
@@ -47,8 +47,8 @@ def test_executive_completes_grounded_success() -> None:
 
 
 def test_acting_loop_registers_with_existing_executive() -> None:
-    from genesis_conscious.tools.agency import ActingLoop
-    from genesis_conscious.tools.framework import ToolRegistry
+    from tools.agency import ActingLoop
+    from tools.framework import ToolRegistry
 
     class CountingExecutive(ExecutiveFunction):
         def __init__(self) -> None:
@@ -109,7 +109,7 @@ def test_executive_round_trips_persistent_intentions() -> None:
 
 def test_acting_loop_arbitrates_existing_objective(tmp_path) -> None:
     """A stronger unfinished objective is selected over a fresh probe."""
-    from genesis_conscious.tools.agency import ActingLoop, Intention
+    from tools.agency import ActingLoop, Intention
 
     executive = ExecutiveFunction()
     prior = executive.form_intention(
@@ -167,7 +167,7 @@ def test_world_and_improvement_signals_map_to_real_actuators() -> None:
             "source": "world_event",
         },
         {
-            "topic": "python/genesis_conscious/executive.py",
+            "topic": "python/frontal_lobe/executive.py",
             "mode": "improvement",
             "kind": "inspect",
             "salience": 0.7,
@@ -176,7 +176,7 @@ def test_world_and_improvement_signals_map_to_real_actuators() -> None:
     ])
     assert {i.objective for i in items} == {
         "learn:photosynthesis",
-        "inspect:python/genesis_conscious/executive.py",
+        "inspect:python/frontal_lobe/executive.py",
     }
     assert all(i.actionable for i in items)
 

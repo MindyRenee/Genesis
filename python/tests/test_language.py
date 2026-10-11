@@ -14,21 +14,16 @@ import warnings
 import numpy as np
 import pytest
 
-from genesis_conscious.concepts import ConceptNetwork, RelationType
-from genesis_conscious.language import (
-    GenerativeEngine,
-    Grammar,
-    GraphWalkGenerator,
-    LanguageEngine,
-    SentenceStructure,
-    Thought,
-    Vocabulary,
-    Voice,
-)
-from genesis_conscious.language.flow import FlowGenerator
-from genesis_conscious.language.grammar import INTENT_STRUCTURES
-from genesis_conscious.limbic_system.emotion import EmotionalState
-from genesis_conscious.self import PersonalityTraits, SelfModel
+from concepts import ConceptNetwork, RelationType
+from frontal_lobe.flow import FlowGenerator
+from frontal_lobe.generator import GenerativeLanguage
+from frontal_lobe.grammar import INTENT_STRUCTURES, Grammar, SentenceStructure
+from frontal_lobe.graph_walk import GraphWalkGenerator
+from frontal_lobe.voice import Voice
+from limbic_system.emotion import EmotionalState
+from self import PersonalityTraits, SelfModel
+from temporal_lobe.base import Language, Thought
+from temporal_lobe.vocabulary import Vocabulary
 
 logger = logging.getLogger(__name__)
 
@@ -357,27 +352,27 @@ def test_voice_add_idiom() -> None:
     assert idiom == "circling back to something"
 
 
-# ─── GenerativeEngine tests ────────────────────────────────────
+# ─── GenerativeLanguage tests ────────────────────────────────────
 
 
-def test_generative_engine_is_language_engine() -> None:
-    """GenerativeEngine implements the LanguageEngine interface."""
+def test_generative_language_is_language() -> None:
+    """GenerativeLanguage implements the Language interface."""
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=42)
-    assert isinstance(engine, LanguageEngine)
+    lang = GenerativeLanguage(model, seed=42)
+    assert isinstance(lang, Language)
 
 
-def test_generative_engine_name() -> None:
+def test_generative_language_name() -> None:
     """Engine has a name."""
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=42)
-    assert engine.name == "GenerativeEngine"
+    engine = GenerativeLanguage(model, seed=42)
+    assert engine.name == "GenerativeLanguage"
 
 
 def test_generative_engine_render() -> None:
     """Engine can render a thought."""
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=42)
+    engine = GenerativeLanguage(model, seed=42)
     emotion = _make_emotion()
 
     thought = Thought(
@@ -397,7 +392,7 @@ def test_generative_engine_greet() -> None:
     Without a graph, the greeting may be minimal — no hardcoded fallback.
     """
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=42)
+    engine = GenerativeLanguage(model, seed=42)
     emotion = _make_emotion()
 
     text = engine.greet(emotion, first=True)
@@ -408,7 +403,7 @@ def test_generative_engine_greet() -> None:
 def test_generative_engine_farewell() -> None:
     """Engine can generate a farewell."""
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=42)
+    engine = GenerativeLanguage(model, seed=42)
     emotion = _make_emotion(valence=0.3)
 
     text = engine.farewell(emotion)
@@ -418,7 +413,7 @@ def test_generative_engine_farewell() -> None:
 def test_generative_engine_acknowledge() -> None:
     """Engine can generate an acknowledgment."""
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=42)
+    engine = GenerativeLanguage(model, seed=42)
     emotion = _make_emotion()
 
     text = engine.acknowledge(emotion, topic="cognition")
@@ -428,7 +423,7 @@ def test_generative_engine_acknowledge() -> None:
 def test_generative_engine_self_report() -> None:
     """Engine can generate a self-report."""
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=42)
+    engine = GenerativeLanguage(model, seed=42)
     emotion = _make_emotion()
 
     text = engine.self_report(emotion)
@@ -443,7 +438,7 @@ def test_self_report_composes_from_fragments() -> None:
     grammatical output — never a recited string.
     """
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=42)
+    engine = GenerativeLanguage(model, seed=42)
     emotion = _make_emotion()
 
     fragments = [
@@ -453,7 +448,7 @@ def test_self_report_composes_from_fragments() -> None:
     ]
     outputs = set()
     for seed in range(12):
-        engine = GenerativeEngine(model, seed=seed)
+        engine = GenerativeLanguage(model, seed=seed)
         thought = Thought(
             content="Genesis",
             intent="self_report",
@@ -482,7 +477,7 @@ def test_self_report_pred_fragments_never_collide_with_copula() -> None:
     emotion = _make_emotion()
     fragments = [("pred", "care about honesty"), ("pred", "depend on memory")]
     for seed in range(20):
-        engine = GenerativeEngine(model, seed=seed)
+        engine = GenerativeLanguage(model, seed=seed)
         thought = Thought(
             content="x",
             intent="self_report",
@@ -499,7 +494,7 @@ def test_self_report_pred_fragments_never_collide_with_copula() -> None:
 def test_generative_engine_philosophize() -> None:
     """Engine can generate a philosophical reflection."""
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=42)
+    engine = GenerativeLanguage(model, seed=42)
     emotion = _make_emotion(creativity=0.7)
 
     text = engine.philosophize(emotion, topic="cognition")
@@ -509,7 +504,7 @@ def test_generative_engine_philosophize() -> None:
 def test_generative_engine_express_emotion() -> None:
     """Engine can express an emotional state."""
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=42)
+    engine = GenerativeLanguage(model, seed=42)
     emotion = _make_emotion(label="positive", valence=0.4)
 
     text = engine.express_emotion(emotion)
@@ -520,8 +515,8 @@ def test_generative_engine_deterministic() -> None:
     """Same seed → same output."""
     model1 = _make_self_model()
     model2 = _make_self_model()
-    engine1 = GenerativeEngine(model1, seed=42)
-    engine2 = GenerativeEngine(model2, seed=42)
+    engine1 = GenerativeLanguage(model1, seed=42)
+    engine2 = GenerativeLanguage(model2, seed=42)
     emotion = _make_emotion()
 
     thought = Thought(
@@ -538,7 +533,7 @@ def test_generative_engine_deterministic() -> None:
 def test_generative_engine_emotion_affects_output() -> None:
     """Different emotions → potentially different output."""
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=42)
+    engine = GenerativeLanguage(model, seed=42)
 
     thought = Thought(
         content="I'm thinking about cognition.",
@@ -566,7 +561,7 @@ def test_generative_engine_emotion_affects_output() -> None:
 def test_generative_engine_raw_content() -> None:
     """Engine handles pre-composed content (raw thoughts)."""
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=42)
+    engine = GenerativeLanguage(model, seed=42)
     emotion = _make_emotion()
 
     thought = Thought(
@@ -588,7 +583,7 @@ def test_generative_engine_raw_content() -> None:
 def test_generative_engine_short_content() -> None:
     """Engine composes from short content."""
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=42)
+    engine = GenerativeLanguage(model, seed=42)
     emotion = _make_emotion()
 
     thought = Thought(
@@ -606,7 +601,7 @@ def test_generative_engine_short_content() -> None:
 def test_generative_engine_vary() -> None:
     """Engine can apply variation to existing text."""
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=42)
+    engine = GenerativeLanguage(model, seed=42)
     emotion = _make_emotion()
 
     text = engine.vary("This is a test sentence. It has two parts.", emotion)
@@ -617,7 +612,7 @@ def test_generative_engine_vary() -> None:
 def test_generative_engine_all_intents() -> None:
     """Engine can generate for all known intents."""
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=42)
+    engine = GenerativeLanguage(model, seed=42)
     emotion = _make_emotion()
 
     intents = [
@@ -651,7 +646,7 @@ def test_generative_engine_all_intents() -> None:
 def test_generative_engine_no_empty_output() -> None:
     """Engine never produces empty output."""
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=42)
+    engine = GenerativeLanguage(model, seed=42)
     emotion = _make_emotion()
 
     for _ in range(50):
@@ -678,7 +673,7 @@ def test_integration_greeting_varies() -> None:
     is empty and output collapses to the invariant fallback.
     """
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=None, network=ConceptNetwork())  # random seed
+    engine = GenerativeLanguage(model, seed=None, network=ConceptNetwork())  # random seed
     emotion = _make_emotion()
 
     greetings = set()
@@ -698,7 +693,7 @@ def test_integration_emotion_changes_greeting() -> None:
     doesn't crash with different emotions.
     """
     model = _make_self_model()
-    engine = GenerativeEngine(model, seed=42)
+    engine = GenerativeLanguage(model, seed=42)
 
     emotion_positive = _make_emotion(valence=0.4, label="positive")
     emotion_negative = _make_emotion(valence=-0.3, label="melancholic")
@@ -859,13 +854,13 @@ def test_graph_walk_returns_none_for_unknown_concept() -> None:
 def test_graph_walk_returns_none_when_no_network() -> None:
     """The generator returns None when no concept network is provided."""
     # GraphWalkGenerator requires a network — this test verifies
-    # the GenerativeEngine falls back correctly when graph_walk is None
+    # the GenerativeLanguage falls back correctly when graph_walk is None
 
-    from genesis_conscious.language import GenerativeEngine
-    from genesis_conscious.self import SelfModel
+    from frontal_lobe.generator import GenerativeLanguage
+    from self import SelfModel
 
     sm = SelfModel(born_at=int(time.time() * 1000), personality=_make_personality_gw())
-    engine = GenerativeEngine(sm, seed=42, network=None)
+    engine = GenerativeLanguage(sm, seed=42, network=None)
     assert engine._graph_walk is None, "Graph walk should be None without network"
 
 
@@ -988,18 +983,18 @@ def test_graph_walk_uses_relation_verbs() -> None:
         f"No relation verb found in output: {text!r}"
 
 
-# ─── Integration with GenerativeEngine ─────────────────────────
+# ─── Integration with GenerativeLanguage ─────────────────────────
 
 
 def test_generative_engine_uses_graph_walk_when_available() -> None:
-    """GenerativeEngine uses the graph-walk generator when a network is provided."""
+    """GenerativeLanguage uses the graph-walk generator when a network is provided."""
 
-    from genesis_conscious.language import GenerativeEngine
-    from genesis_conscious.self import SelfModel
+    from frontal_lobe.generator import GenerativeLanguage
+    from self import SelfModel
 
     net = _make_network_with_concepts()
     sm = SelfModel(born_at=int(time.time() * 1000), personality=_make_personality_gw())
-    engine = GenerativeEngine(sm, seed=42, network=net)
+    engine = GenerativeLanguage(sm, seed=42, network=net)
 
     assert engine._graph_walk is not None, "Graph walk should be initialized with network"
 
@@ -1015,13 +1010,13 @@ def test_generative_engine_uses_graph_walk_when_available() -> None:
 
 
 def test_generative_engine_falls_back_without_network() -> None:
-    """GenerativeEngine falls back to grammar when no network is available."""
+    """GenerativeLanguage falls back to grammar when no network is available."""
 
-    from genesis_conscious.language import GenerativeEngine
-    from genesis_conscious.self import SelfModel
+    from frontal_lobe.generator import GenerativeLanguage
+    from self import SelfModel
 
     sm = SelfModel(born_at=int(time.time() * 1000), personality=_make_personality_gw())
-    engine = GenerativeEngine(sm, seed=42, network=None)
+    engine = GenerativeLanguage(sm, seed=42, network=None)
 
     assert engine._graph_walk is None
 
@@ -1311,7 +1306,7 @@ def test_flow_gradient_matches_analytic_von_mises() -> None:
     kernel is K = exp(κ(cos δ − 1)) and the only nonzero gradient
     component is −κ·w·K·sin δ.
     """
-    from genesis_conscious.language.flow import _FLOW_DIM, _KAPPA
+    from frontal_lobe.flow import _FLOW_DIM, _KAPPA
 
     delta = 0.4
     theta = np.zeros(_FLOW_DIM, dtype=np.float32)
@@ -1336,7 +1331,7 @@ def test_flow_gradient_no_overflow_with_clustered_concepts() -> None:
     ``np.linalg.norm``, yielding ``grad_mag = inf`` and collapsing the
     flow onto the momentum clip. The log-space kernel keeps it bounded.
     """
-    from genesis_conscious.language.flow import _FLOW_DIM
+    from frontal_lobe.flow import _FLOW_DIM
 
     rng = np.random.default_rng(0)
     theta = rng.uniform(0, 2 * np.pi, _FLOW_DIM).astype(np.float32)
@@ -1354,7 +1349,7 @@ def test_flow_gradient_no_overflow_with_clustered_concepts() -> None:
 
 def test_flow_potential_is_finite_and_bounded() -> None:
     """_potential stays finite for clustered concepts (bounded kernel)."""
-    from genesis_conscious.language.flow import _FLOW_DIM
+    from frontal_lobe.flow import _FLOW_DIM
 
     rng = np.random.default_rng(1)
     theta = rng.uniform(0, 2 * np.pi, _FLOW_DIM).astype(np.float32)
@@ -1369,12 +1364,29 @@ def test_flow_potential_is_finite_and_bounded() -> None:
 # Morphology — verb agreement and deconjugation
 # ======================================================================
 
-from genesis_conscious.language.morphology import (  # noqa: E402
+from temporal_lobe.morphology import (  # noqa: E402
     agree_verb_phrase,
     copula,
+    hedge_verb_phrase,
     is_plural_np,
     is_verb_form,
 )
+
+
+def test_hedge_verb_phrase_does_not_stack_copula() -> None:
+    """A modal replaces a finite copula; it does not precede one.
+
+    Live speech produced "might is a kind of" and "might causes"
+    because producers concatenated "might" onto a third-person seed.
+    """
+    assert hedge_verb_phrase("is a kind of") == "might be a kind of"
+    assert hedge_verb_phrase("is part of") == "might be part of"
+    assert hedge_verb_phrase("is similar to") == "might be similar to"
+    assert hedge_verb_phrase("causes") == "might cause"
+    assert hedge_verb_phrase("relates to") == "might relate to"
+    assert hedge_verb_phrase("might be a kind of") == "might be a kind of"
+    assert "might is" not in hedge_verb_phrase("is a type of")
+    assert "might causes" not in hedge_verb_phrase("causes")
 
 
 def test_is_verb_form_returns_base_for_irregulars() -> None:
@@ -1497,18 +1509,18 @@ def test_knowledge_content_drops_tautological_facts() -> None:
 
 def test_inner_life_emotional_fallback_skips_self_topic() -> None:
     """When the seed concept IS the emotion word, no thought is emitted."""
-    from genesis_conscious.concepts.network import ConceptNetwork
-    from genesis_conscious.learning.curiosity import CuriosityEngine
-    from genesis_conscious.reasoning.engine import ReasoningEngine
-    from genesis_conscious.self.reflection import ReflectionEngine
-    from genesis_conscious.sleep.inner_life import InnerLife
+    from concepts.network import ConceptNetwork
+    from frontal_lobe.reasoning.reasoner import Reasoner
+    from limbic_system.curiosity import Curiosity
+    from self.reflection import Reflection
+    from sleep.inner_life import InnerLife
 
     net = ConceptNetwork()
     net.add_concept("excited", confidence=0.8)
     inner = InnerLife(
         net,
-        CuriosityEngine(net, ReasoningEngine(net)),
-        ReflectionEngine(net),
+        Curiosity(net, Reasoner(net)),
+        Reflection(net),
         seed=42,
     )
     emotion = _make_emotion(label="excited")
@@ -1528,11 +1540,11 @@ def test_inner_life_emotional_fallback_skips_self_topic() -> None:
 
 
 def _props(text: str):
-    from genesis_conscious.language.comprehension import (
-        ComprehensionEngine,
+    from temporal_lobe.comprehension import (
+        Comprehension,
     )
 
-    return ComprehensionEngine().comprehend(text)
+    return Comprehension().comprehend(text)
 
 
 def test_imperative_base_verbs_parse_as_predicates() -> None:
@@ -1598,63 +1610,6 @@ def test_shared_subject_coordination_unchanged() -> None:
     assert "came" in preds and "saw" in preds
 
 
-# ── Problem-result composition ──────────────────────────────────
-# A worked sorter reports the actual placements, and modifiers land
-# in English order (size < color < shape).
-
-
-def test_sorter_result_composes_placement_report() -> None:
-    """The utterance reports which block went in which hole — the
-    world's verdict, not telemetry like 'matched100%→cost0.00'."""
-    vocab = Vocabulary(seed=42)
-    emotion = _make_emotion()
-    result = {
-        "family": "sorter",
-        "solved": True,
-        "score": 1.0,
-        "placements": [
-            {
-                "slot": {"round": "yes"},
-                "block": {"red": "yes", "round": "yes"},
-            },
-            {
-                "slot": {"square": "yes"},
-                "block": {"blue": "yes", "square": "yes"},
-            },
-        ],
-    }
-    out = vocab._compose_problem_result_content(result, emotion)
-    assert out is not None
-    assert "red round" in out and "round hole" in out
-    assert "blue square" in out and "square hole" in out
-    assert "matched" not in out and "cost" not in out
-
-
-def test_sorter_attr_name_orders_modifiers() -> None:
-    """Heard attrs are unordered — English says 'the small yellow
-    round block', not 'the round yellow small block'."""
-    out = Vocabulary._attr_name(
-        {"round": "yes", "yellow": "yes", "small": "yes"}, "block"
-    )
-    assert out == "the small yellow round block"
-    # Key/value attrs anchor the shape value as the noun.
-    out = Vocabulary._attr_name(
-        {"shape": "star", "color": "red", "size": "small"}, "block"
-    )
-    assert out == "the small red star"
-
-
-def test_sorter_result_without_placements_still_speaks() -> None:
-    """A solved sorter with no placement detail falls back to the
-    generic solved frame rather than silence."""
-    vocab = Vocabulary(seed=42)
-    out = vocab._compose_problem_result_content(
-        {"family": "sorter", "solved": True, "score": 1.0},
-        _make_emotion(),
-    )
-    assert out is not None and out.strip()
-
-
 # ======================================================================
 # Composed-knowledge rendering — utterance integrity
 # ======================================================================
@@ -1672,7 +1627,7 @@ def test_sorter_result_without_placements_still_speaks() -> None:
 # fragment concept names surfaced in latent discovery.
 
 
-def _knowledge_engine() -> GenerativeEngine:
+def _knowledge_engine() -> GenerativeLanguage:
     """Engine over a network mirroring the live failure's edges."""
     model = _make_self_model()
     net = ConceptNetwork()
@@ -1688,7 +1643,7 @@ def _knowledge_engine() -> GenerativeEngine:
     crisp = net.get_concept("crisp")
     assert crisp is not None
     crisp.properties["definition"] = "a brittle texture"
-    return GenerativeEngine(model, seed=42, network=net)
+    return GenerativeLanguage(model, seed=42, network=net)
 
 
 def test_knowledge_content_dedupes_hyphenated_definition() -> None:
@@ -1796,8 +1751,8 @@ def test_knowledge_metadata_composes_rather_than_passes_content_through() -> Non
     assembler's string. If this test starts failing because the two
     converge, the pass-through has won.
     """
-    from genesis_conscious.cognition.thought_composer import ThoughtComposer
-    from genesis_conscious.reasoning.engine import ReasoningEngine
+    from frontal_lobe.reasoning.reasoner import Reasoner
+    from frontal_lobe.thought_composer import ThoughtComposer
 
     network = ConceptNetwork()
     network.add_concept("dog", confidence=0.9)
@@ -1805,7 +1760,7 @@ def test_knowledge_metadata_composes_rather_than_passes_content_through() -> Non
     network.add_edge("dog", "animal", relation=RelationType.IS_A, weight=0.9)
 
     composer = ThoughtComposer(
-        network=network, reasoner=ReasoningEngine(network=network), seed=1
+        network=network, reasoner=Reasoner(network=network), seed=1
     )
     thought = composer.compose_about("dog", _make_emotion())
     assert thought is not None
@@ -1813,7 +1768,7 @@ def test_knowledge_metadata_composes_rather_than_passes_content_through() -> Non
     # The composer supplied structured knowledge...
     assert thought.metadata.get("knowledge"), "composer must emit knowledge tuples"
 
-    engine = GenerativeEngine(_make_self_model(), seed=7, network=network)
+    engine = GenerativeLanguage(_make_self_model(), seed=7, network=network)
     spoken = engine.render(thought, _make_emotion())
 
     assert spoken, "engine produced nothing"
@@ -1835,8 +1790,8 @@ def test_verbatim_fallback_is_last_resort_and_not_used_by_composer_paths() -> No
     say *something*) but it must not be the path a composition route
     takes. Asserted directly so the branch cannot grow unnoticed.
     """
-    from genesis_conscious.cognition.thought_composer import ThoughtComposer
-    from genesis_conscious.reasoning.engine import ReasoningEngine
+    from frontal_lobe.reasoning.reasoner import Reasoner
+    from frontal_lobe.thought_composer import ThoughtComposer
 
     network = ConceptNetwork()
     network.add_concept("dog", confidence=0.9)
@@ -1850,7 +1805,7 @@ def test_verbatim_fallback_is_last_resort_and_not_used_by_composer_paths() -> No
     # from the conjunction of knowledge, definition and reasoning, and a
     # thinner dict legitimately falls through.
     composer = ThoughtComposer(
-        network=network, reasoner=ReasoningEngine(network=network), seed=1
+        network=network, reasoner=Reasoner(network=network), seed=1
     )
     thought = composer.compose_about("dog", emotion)
     assert thought is not None

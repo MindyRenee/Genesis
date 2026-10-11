@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from genesis_conscious.concepts import ConceptNetwork, open_archive
+from concepts import ConceptNetwork, open_archive
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -167,7 +167,7 @@ def test_recovered_concepts_are_recallable(recover, tmp_path: Path) -> None:
     net = ConceptNetwork()
     net.attach_archive(open_archive(target))
     state = json.loads(gzip.decompress((target / "cognitive_state.json").read_bytes()))
-    from genesis_conscious.infrastructure.persistence import restore_network
+    from infrastructure.persistence import restore_network
 
     restore_network(net, state["concept_network"])
 

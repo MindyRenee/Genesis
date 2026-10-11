@@ -18,8 +18,9 @@ from unittest.mock import patch
 
 import pytest
 
-from genesis_conscious.concepts import ConceptNetwork, RelationType
-from genesis_conscious.self import (
+from concepts import ConceptNetwork, RelationType
+from infrastructure.bug_reporter import BugReport
+from self import (
     ExperimentRecord,
     FeedbackRecord,
     HeuristicExperiment,
@@ -28,9 +29,9 @@ from genesis_conscious.self import (
     ProposalCategory,
     ProposalStatus,
     SelfDirectedLearner,
-    SelfImprovementEngine,
+    SelfImprovement,
 )
-from genesis_conscious.self.learning import (
+from self.learning import (
     _CAUSES_RE,
     _DEFINITION_RE,
     _DEPENDS_RE,
@@ -42,7 +43,7 @@ from genesis_conscious.self.learning import (
     _SIMILAR_RE,
     _normalize_concept,
 )
-from genesis_conscious.tools.framework import ToolResult
+from tools.framework import ToolResult
 
 logger = logging.getLogger(__name__)
 
@@ -154,12 +155,12 @@ class TestProposalDataclass:
         assert restored.confidence == 0.5
 
 
-class TestSelfImprovementEngine:
+class TestSelfImprovementSuite:
     """Tests for the self-improvement engine."""
 
     def test_engine_creation(self):
         """Test engine creation."""
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         assert len(engine.get_pending_proposals()) == 0
         assert len(engine.get_all_proposals()) == 0
 
@@ -173,13 +174,13 @@ def bar(y):
     return y * 2
 """
         root, _ = _make_test_file(content)
-        engine = SelfImprovementEngine(project_root=root)
+        engine = SelfImprovement(project_root=root)
 
         # Bypass cooldown for testing
         engine._last_generation_time = 0.0
 
         # We need to point the engine at the right directory
-        # The engine scans python/genesis_conscious by default,
+        # The engine scans python/ by default,
         # so let's test with a custom path
         proposals = engine.generate_proposals(max_proposals=5)
         # May find proposals from the project's actual code
@@ -187,7 +188,7 @@ def bar(y):
 
     def test_accept_proposal(self):
         """Test accept proposal."""
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         # Manually add a proposal
         p = Proposal(
             id=1,
@@ -211,7 +212,7 @@ def bar(y):
 
     def test_reject_proposal(self):
         """Test reject proposal."""
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         p = Proposal(
             id=1,
             title="Test",
@@ -233,13 +234,13 @@ def bar(y):
 
     def test_accept_nonexistent_proposal(self):
         """Test accept nonexistent proposal."""
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         assert not engine.accept_proposal(999)
         assert not engine.reject_proposal(999)
 
     def test_double_accept_fails(self):
         """Test double accept fails."""
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         p = Proposal(
             id=1,
             title="Test",
@@ -260,7 +261,7 @@ def bar(y):
 
     def test_withdraw_proposal(self):
         """Test withdraw proposal."""
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         p = Proposal(
             id=1,
             title="Test",
@@ -281,7 +282,7 @@ def bar(y):
 
     def test_mark_applied(self):
         """Test mark applied."""
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         p = Proposal(
             id=1,
             title="Test",
@@ -302,7 +303,7 @@ def bar(y):
 
     def test_feedback_updates_category_stats(self):
         """Test feedback updates category stats."""
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
 
         for i in range(3):
             p = Proposal(
@@ -333,7 +334,7 @@ def bar(y):
 
     def test_category_confidence_adjusts_with_feedback(self):
         """Test category confidence adjusts with feedback."""
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
 
         # Before feedback, confidence multiplier should be 1.0
         conf = engine._category_confidence(ProposalCategory.BUGFIX)
@@ -362,7 +363,7 @@ def bar(y):
 
     def test_category_confidence_decreases_with_rejections(self):
         """Test category confidence decreases with rejections."""
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
 
         # Add 5 rejected proposals
         for i in range(5):
@@ -388,7 +389,7 @@ def bar(y):
 
     def test_proposals_summary(self):
         """Test proposals summary."""
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         p = Proposal(
             id=1,
             title="Test",
@@ -409,11 +410,14 @@ def bar(y):
 
     def test_persistence_roundtrip(self):
         """Test persistence roundtrip."""
-        # Use a file path that exists relative to project_root so the
-        # pending proposal survives restore (restore drops pending
-        # proposals whose target file no longer exists).
-        existing_file = os.path.relpath(__file__, ".")
-        engine = SelfImprovementEngine(project_root=".")
+        # Point the pending proposal at a real file whose contents
+        # match its snippet — restore drops pending proposals that
+        # can't apply (missing file, missing or ambiguous snippet).
+        tmpdir = tempfile.mkdtemp()
+        target = os.path.join(tmpdir, "target.py")
+        with open(target, "w", encoding="utf-8") as f:
+            f.write("old code here\n")
+        engine = SelfImprovement(project_root=tmpdir)
 
         # Add some proposals and feedback
         for i in range(3):
@@ -421,11 +425,11 @@ def bar(y):
                 id=i + 1,
                 title=f"Test {i}",
                 category=ProposalCategory.BUGFIX,
-                file_path=existing_file,
+                file_path="target.py",
                 description="d",
                 rationale="r",
                 expected_benefit="b",
-                original_code="old",
+                original_code="old code here",
                 proposed_code="new",
                 confidence=0.5,
             )
@@ -438,7 +442,7 @@ def bar(y):
         data = engine.to_dict()
 
         # Restore into a new engine
-        engine2 = SelfImprovementEngine(project_root=".")
+        engine2 = SelfImprovement(project_root=tmpdir)
         engine2.restore_from_dict(data)
 
         assert len(engine2.get_all_proposals()) == 3
@@ -453,18 +457,22 @@ def bar(y):
         assert stats["bugfix"]["total"] == 2
 
     def test_restore_drops_stale_pending_proposals(self):
-        """Pending proposals whose target file no longer exists are
-        dropped on restore; non-pending ones are kept for the audit
-        trail."""
-        engine = SelfImprovementEngine(project_root=".")
-        existing_file = os.path.relpath(__file__, ".")
+        """Pending proposals that can no longer apply (missing file,
+        missing or ambiguous snippet) are dropped on restore;
+        non-pending ones are kept for the audit trail."""
+        tmpdir = tempfile.mkdtemp()
+        target = os.path.join(tmpdir, "target.py")
+        with open(target, "w", encoding="utf-8") as f:
+            f.write("old code here\n")
+        engine = SelfImprovement(project_root=tmpdir)
 
-        # Pending proposal targeting a real file — should survive.
+        # Pending proposal targeting a real file with a matching
+        # snippet — should survive.
         live = Proposal(
             id=1, title="live", category=ProposalCategory.BUGFIX,
-            file_path=existing_file, description="d", rationale="r",
-            expected_benefit="b", original_code="old", proposed_code="new",
-            confidence=0.5,
+            file_path="target.py", description="d", rationale="r",
+            expected_benefit="b", original_code="old code here",
+            proposed_code="new", confidence=0.5,
         )
         # Pending proposal targeting a deleted file — should be dropped.
         stale = Proposal(
@@ -483,7 +491,7 @@ def bar(y):
         )
         engine._proposals.extend([live, stale, accepted_gone])
 
-        engine2 = SelfImprovementEngine(project_root=".")
+        engine2 = SelfImprovement(project_root=tmpdir)
         engine2.restore_from_dict(engine.to_dict())
 
         ids = {p.id for p in engine2.get_all_proposals()}
@@ -491,8 +499,8 @@ def bar(y):
         assert engine2.get_proposal(2) is None
 
     def test_persistence_backward_compat(self):
-        """Engine should handle empty/minimal data gracefully."""
-        engine = SelfImprovementEngine(project_root=".")
+        """Should handle empty/minimal data gracefully."""
+        engine = SelfImprovement(project_root=".")
         engine.restore_from_dict({})
         assert len(engine.get_all_proposals()) == 0
         assert engine._next_id == 1
@@ -509,7 +517,7 @@ except:
     pass
 """
         root, _rel = _make_test_file(content)
-        engine = SelfImprovementEngine(project_root=root)
+        engine = SelfImprovement(project_root=root)
         engine._last_generation_time = 0.0
 
         # Manually test the fix generator
@@ -530,7 +538,7 @@ except:
     return items
 """
         root, _rel = _make_test_file(content)
-        engine = SelfImprovementEngine(project_root=root)
+        engine = SelfImprovement(project_root=root)
         engine._last_generation_time = 0.0
 
         with open(os.path.join(root, "test_module.py")) as f:
@@ -551,7 +559,7 @@ except:
     return 1
 """
         root, _rel = _make_test_file(content)
-        engine = SelfImprovementEngine(project_root=root)
+        engine = SelfImprovement(project_root=root)
 
         with open(os.path.join(root, "test_module.py")) as f:
             source = f.read()
@@ -563,28 +571,38 @@ except:
         assert "print(" in original
         assert "logger.info(" in proposed
 
-    def test_fix_print_in_code_strips_file_kwarg(self):
-        """print(..., file=sys.stderr) must strip file= before
-        converting to logger.info(), since logger.info() doesn't
-        accept file=. Without this, the rewrite produces TypeError
-        at runtime and the fix gets reverted, creating an infinite
-        scan→fix→fail→revert loop."""
+    def test_fix_print_in_code_skips_stream_print(self):
+        """print(..., file=sys.stderr) is deliberate stream-directed
+        output, not a stray debug leftover — converting it to
+        logger.info() would drop the stream choice and silence it
+        (info() filters below WARNING by default). Skip instead."""
         content = '''def foo():
     print("[genesis] error", file=sys.stderr)
     return 1
 '''
         root, _rel = _make_test_file(content)
-        engine = SelfImprovementEngine(project_root=root)
+        engine = SelfImprovement(project_root=root)
 
         with open(os.path.join(root, "test_module.py")) as f:
             source = f.read()
         lines = source.splitlines(keepends=True)
 
-        result = engine._fix_print_in_code(lines, 2)
-        assert result is not None
-        _original, proposed, _desc, _benefit = result
-        assert "logger.info(" in proposed
-        assert "file=" not in proposed
+        assert engine._fix_print_in_code(lines, 2) is None
+
+    def test_fix_print_in_code_skips_format_kwargs(self):
+        """sep=/end=/flush= are deliberate output shaping too."""
+        for call in (
+            'print("a", "b", sep="-")',
+            'print("x", end="")',
+            'print("y", flush=True)',
+        ):
+            content = f"def foo():\n    {call}\n    return 1\n"
+            root, _rel = _make_test_file(content)
+            engine = SelfImprovement(project_root=root)
+            with open(os.path.join(root, "test_module.py")) as f:
+                source = f.read()
+            lines = source.splitlines(keepends=True)
+            assert engine._fix_print_in_code(lines, 2) is None, call
 
     def test_fix_silent_except(self):
         """Test fix silent except."""
@@ -594,7 +612,7 @@ except:
     pass
 """
         root, _rel = _make_test_file(content)
-        engine = SelfImprovementEngine(project_root=root)
+        engine = SelfImprovement(project_root=root)
 
         with open(os.path.join(root, "test_module.py")) as f:
             source = f.read()
@@ -610,7 +628,7 @@ except:
     def test_fix_is_literal_comparison(self):
         """'x is 5' is rewritten to 'x == 5'."""
         source = "def f(x):\n    return x is 5\n"
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         result = engine._fix_is_literal_comparison(source, 2)
         assert result is not None
         _original, proposed, _desc, _benefit = result
@@ -620,7 +638,7 @@ except:
     def test_fix_is_not_literal_comparison(self):
         """'x is not 5' is rewritten to 'x != 5'."""
         source = "def f(x):\n    return x is not 5\n"
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         result = engine._fix_is_literal_comparison(source, 2)
         assert result is not None
         _original, proposed, _desc, _benefit = result
@@ -629,7 +647,7 @@ except:
     def test_fix_is_literal_preserves_is_none(self):
         """Only the literal comparison changes; a valid 'is None' stays."""
         source = "def f(x, y):\n    return x is None and y is 5\n"
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         result = engine._fix_is_literal_comparison(source, 2)
         assert result is not None
         _original, proposed, _desc, _benefit = result
@@ -637,42 +655,48 @@ except:
         assert "y == 5" in proposed
 
     def test_fix_type_equality_check(self):
-        """'type(x) == int' becomes 'isinstance(x, int)'."""
-        source = "def f(x):\n    return type(x) == int\n"
-        engine = SelfImprovementEngine(project_root=".")
+        """'type(x) == dict' becomes 'isinstance(x, dict)'."""
+        source = "def f(x):\n    return type(x) == dict\n"
+        engine = SelfImprovement(project_root=".")
         result = engine._fix_type_equality_check(source, 2)
         assert result is not None
         _original, proposed, _desc, _benefit = result
-        assert "isinstance(x, int)" in proposed
+        assert "isinstance(x, dict)" in proposed
 
     def test_fix_type_equality_negated(self):
         """'type(x) is not str' becomes 'not isinstance(x, str)'."""
         source = "def f(x):\n    return type(x) is not str\n"
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         result = engine._fix_type_equality_check(source, 2)
         assert result is not None
         _original, proposed, _desc, _benefit = result
         assert "not isinstance(x, str)" in proposed
 
     def test_fix_type_equality_reversed(self):
-        """'int == type(x)' becomes 'isinstance(x, int)'."""
-        source = "def f(x):\n    return int == type(x)\n"
-        engine = SelfImprovementEngine(project_root=".")
+        """'dict == type(x)' becomes 'isinstance(x, dict)'."""
+        source = "def f(x):\n    return dict == type(x)\n"
+        engine = SelfImprovement(project_root=".")
         result = engine._fix_type_equality_check(source, 2)
         assert result is not None
         _original, proposed, _desc, _benefit = result
-        assert "isinstance(x, int)" in proposed
+        assert "isinstance(x, dict)" in proposed
+
+    def test_fix_type_equality_int_declined(self):
+        """'type(x) is not int' is not rewritten — bool is a subclass of int."""
+        source = "def f(x):\n    return type(x) is not int\n"
+        engine = SelfImprovement(project_root=".")
+        assert engine._fix_type_equality_check(source, 2) is None
 
     def test_fix_type_vs_type_returns_none(self):
         """'type(a) == type(b)' is legitimate — no fix generated."""
         source = "def f(a, b):\n    return type(a) == type(b)\n"
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         assert engine._fix_type_equality_check(source, 2) is None
 
     def test_fix_boolean_equality_true(self):
         """'x == True' becomes 'x'."""
         source = "def f(x):\n    return x == True\n"
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         result = engine._fix_boolean_equality(source, 2)
         assert result is not None
         assert result[1].strip() == "return x"
@@ -680,7 +704,7 @@ except:
     def test_fix_boolean_equality_false(self):
         """'x == False' becomes 'not x'."""
         source = "def f(x):\n    return x == False\n"
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         result = engine._fix_boolean_equality(source, 2)
         assert result is not None
         assert result[1].strip() == "return not x"
@@ -688,7 +712,7 @@ except:
     def test_fix_boolean_equality_not_true(self):
         """'x != True' becomes 'not x'."""
         source = "def f(x):\n    return x != True\n"
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         result = engine._fix_boolean_equality(source, 2)
         assert result is not None
         assert result[1].strip() == "return not x"
@@ -696,7 +720,7 @@ except:
     def test_fix_boolean_equality_compound_negation_parenthesised(self):
         """A compound operand is parenthesised under 'not'."""
         source = "def f(a, b):\n    return (a and b) == False\n"
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         result = engine._fix_boolean_equality(source, 2)
         assert result is not None
         assert result[1].strip() == "return not (a and b)"
@@ -704,7 +728,7 @@ except:
     def test_fix_assert_tuple(self):
         """'assert (cond, msg)' becomes 'assert cond, msg'."""
         source = 'def f(x):\n    assert (x > 0, "positive")\n'
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         result = engine._fix_assert_tuple(source, 2)
         assert result is not None
         assert result[1].strip() == 'assert x > 0, "positive"'
@@ -712,7 +736,7 @@ except:
     def test_fix_base_exception_catch(self):
         """'except BaseException:' becomes 'except Exception:'."""
         source = "try:\n    pass\nexcept BaseException:\n    pass\n"
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         result = engine._fix_base_exception_catch(source.splitlines(keepends=True), 3)
         assert result is not None
         assert result[1].strip() == "except Exception:"
@@ -720,7 +744,7 @@ except:
     def test_fix_fstring_no_placeholder(self):
         """The redundant 'f' prefix is removed."""
         source = 'def f():\n    return f"hello world"\n'
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         result = engine._fix_fstring_no_placeholder(source, 2)
         assert result is not None
         assert result[1].strip() == 'return "hello world"'
@@ -728,16 +752,16 @@ except:
     def test_fix_fstring_with_placeholder_returns_none(self):
         """A real f-string is left alone."""
         source = 'def f(name):\n    return f"hi {name}"\n'
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         assert engine._fix_fstring_no_placeholder(source, 2) is None
 
     def test_missing_docstring_detection(self):
         """Test missing docstring detection."""
-        content = """def foo(x):
-    return x
+        content = """def foo(path):
+    return path
 """
         root, _rel = _make_test_file(content)
-        engine = SelfImprovementEngine(project_root=root)
+        engine = SelfImprovement(project_root=root)
         engine._last_generation_time = 0.0
 
         # Analyze the file directly
@@ -758,7 +782,7 @@ except:
     return x
 '''
         root, _rel = _make_test_file(content)
-        engine = SelfImprovementEngine(project_root=root)
+        engine = SelfImprovement(project_root=root)
 
         proposals = engine._analyze_python_file(
             os.path.join(root, "test_module.py"),
@@ -778,7 +802,7 @@ def bar(y):
     return y
 """
         root, _rel = _make_test_file(content)
-        engine = SelfImprovementEngine(project_root=root)
+        engine = SelfImprovement(project_root=root)
 
         # First generation
         engine._last_generation_time = 0.0
@@ -794,7 +818,7 @@ def bar(y):
 
     def test_cooldown_prevents_rapid_generation(self):
         """Test cooldown prevents rapid generation."""
-        engine = SelfImprovementEngine(project_root=".")
+        engine = SelfImprovement(project_root=".")
         engine._last_generation_time = time.time() - 0.5  # recent (within 1s cooldown)
 
         proposals = engine.generate_proposals(max_proposals=5)
@@ -832,13 +856,13 @@ class TestFeedbackRecord:
 
 
 def _make_importable_pkg(tmpdir: str) -> str:
-    """Create a temp ``python/genesis_conscious/`` package skeleton.
+    """Create a temp ``python/`` package skeleton.
 
     Returns the tmpdir (to be used as project_root). The package
     __init__ is empty so importing submodules does not pull in the
     real cognitive-mind dependency graph.
     """
-    pkg = os.path.join(tmpdir, "python", "genesis_conscious")
+    pkg = os.path.join(tmpdir, "python", "brokenpkg")
     os.makedirs(pkg)
     with open(os.path.join(pkg, "__init__.py"), "w"):
         pass
@@ -857,49 +881,49 @@ class TestAutonomousAllowlist:
 
     def test_cognitive_submodule_allowed(self):
         """Test cognitive submodule allowed."""
-        assert SelfImprovementEngine._is_autonomous_allowed(
-            "python/genesis_conscious/perception.py"
+        assert SelfImprovement._is_autonomous_allowed(
+            "python/perception/core.py"
         )
 
     def test_client_submodule_allowed(self):
         """Test client submodule allowed."""
-        assert SelfImprovementEngine._is_autonomous_allowed(
+        assert SelfImprovement._is_autonomous_allowed(
             "python/genesis_client/client.py"
         )
 
     def test_cli_allowed(self):
         """Test cli allowed."""
-        assert SelfImprovementEngine._is_autonomous_allowed(
+        assert SelfImprovement._is_autonomous_allowed(
             "python/genesis_cli.py"
         )
 
     def test_script_rejected(self):
         """Test script rejected."""
-        assert not SelfImprovementEngine._is_autonomous_allowed(
+        assert not SelfImprovement._is_autonomous_allowed(
             "scripts/verify_change.sh"
         )
 
     def test_rust_substrate_rejected(self):
         """Test rust substrate rejected."""
-        assert not SelfImprovementEngine._is_autonomous_allowed(
+        assert not SelfImprovement._is_autonomous_allowed(
             "src/store/mmap_state.rs"
         )
 
     def test_test_file_rejected(self):
         """Test test file rejected."""
-        assert not SelfImprovementEngine._is_autonomous_allowed(
+        assert not SelfImprovement._is_autonomous_allowed(
             "python/tests/test_perception.py"
         )
 
     def test_arbitrary_project_file_rejected(self):
         """Test arbitrary project file rejected."""
-        assert not SelfImprovementEngine._is_autonomous_allowed(
+        assert not SelfImprovement._is_autonomous_allowed(
             "tools/some_script.py"
         )
 
     def test_root_level_file_rejected(self):
         """Test root level file rejected."""
-        assert not SelfImprovementEngine._is_autonomous_allowed(
+        assert not SelfImprovement._is_autonomous_allowed(
             "setup.py"
         )
 
@@ -916,83 +940,83 @@ class TestProtectedCore:
 
     def test_cognition_engine_protected(self):
         """Cognition engine is protected from autonomous fixes."""
-        assert not SelfImprovementEngine._is_autonomous_allowed(
-            "python/genesis_conscious/cognition/engine.py"
+        assert not SelfImprovement._is_autonomous_allowed(
+            "python/frontal_lobe/prefrontal.py"
         )
 
     def test_language_generator_protected(self):
         """Language generator is protected from autonomous fixes."""
-        assert not SelfImprovementEngine._is_autonomous_allowed(
-            "python/genesis_conscious/language/generator.py"
+        assert not SelfImprovement._is_autonomous_allowed(
+            "python/frontal_lobe/generator.py"
         )
 
     def test_language_graph_walk_protected(self):
         """Language graph_walk is protected from autonomous fixes."""
-        assert not SelfImprovementEngine._is_autonomous_allowed(
-            "python/genesis_conscious/language/graph_walk.py"
+        assert not SelfImprovement._is_autonomous_allowed(
+            "python/frontal_lobe/graph_walk.py"
         )
 
     def test_language_vocabulary_protected(self):
         """Language vocabulary is protected from autonomous fixes."""
-        assert not SelfImprovementEngine._is_autonomous_allowed(
-            "python/genesis_conscious/language/vocabulary.py"
+        assert not SelfImprovement._is_autonomous_allowed(
+            "python/temporal_lobe/vocabulary.py"
         )
 
     def test_mind_protected(self):
         """Mind is protected from autonomous fixes."""
-        assert not SelfImprovementEngine._is_autonomous_allowed(
-            "python/genesis_conscious/mind.py"
+        assert not SelfImprovement._is_autonomous_allowed(
+            "python/mind.py"
         )
 
     def test_cognition_engine_still_own_source(self):
         """Protected core files are still own-source (can have proposals)."""
-        assert SelfImprovementEngine._is_own_source(
-            "python/genesis_conscious/cognition/engine.py"
+        assert SelfImprovement._is_own_source(
+            "python/frontal_lobe/prefrontal.py"
         )
 
     def test_language_still_own_source(self):
         """Language files are still own-source (can have proposals)."""
-        assert SelfImprovementEngine._is_own_source(
-            "python/genesis_conscious/language/generator.py"
+        assert SelfImprovement._is_own_source(
+            "python/frontal_lobe/generator.py"
         )
 
     def test_non_core_cognitive_still_allowed(self):
         """Non-core cognitive files are still autonomously fixable."""
-        assert SelfImprovementEngine._is_autonomous_allowed(
-            "python/genesis_conscious/perception.py"
+        assert SelfImprovement._is_autonomous_allowed(
+            "python/perception/core.py"
         )
 
     def test_protected_core_experiment_blocked(self):
         """Experiments cannot touch protected core files."""
-        from genesis_conscious.self.improvement import HeuristicExperiment
+        from self.improvement import HeuristicExperiment
         assert not HeuristicExperiment._is_allowlisted(
-            "python/genesis_conscious/cognition/engine.py"
+            "python/frontal_lobe/prefrontal.py"
         )
 
     def test_protected_core_still_experimentable(self):
         """Protected core files are still experimentable (proposals OK)."""
-        from genesis_conscious.self.improvement import HeuristicExperiment
+        from self.improvement import HeuristicExperiment
         assert HeuristicExperiment._is_experimentable(
-            "python/genesis_conscious/cognition/engine.py"
+            "python/frontal_lobe/prefrontal.py"
         )
 
 
 class TestModuleNameFor:
-    """Tests for SelfImprovementEngine._module_name_for."""
+    """Tests for SelfImprovement._module_name_for."""
 
     def test_cognitive_submodule(self):
         """Test cognitive submodule."""
         assert (
-            SelfImprovementEngine._module_name_for(
-                "python/genesis_conscious/perception.py"
+            SelfImprovement._module_name_for(
+                "python/perception/core.py"
             )
-            == "genesis_conscious.perception"
+            == "perception.core"
         )
 
     def test_client_submodule(self):
         """Test client submodule."""
         assert (
-            SelfImprovementEngine._module_name_for(
+            SelfImprovement._module_name_for(
                 "python/genesis_client/client.py"
             )
             == "genesis_client.client"
@@ -1001,7 +1025,7 @@ class TestModuleNameFor:
     def test_top_level_script(self):
         """Test top level script."""
         assert (
-            SelfImprovementEngine._module_name_for("python/genesis_cli.py")
+            SelfImprovement._module_name_for("python/genesis_cli.py")
             == "genesis_cli"
         )
 
@@ -1010,7 +1034,7 @@ class TestModuleNameFor:
         # import gate must be skipped for them.
         """Test test file returns none."""
         assert (
-            SelfImprovementEngine._module_name_for(
+            SelfImprovement._module_name_for(
                 "python/tests/test_perception.py"
             )
             is None
@@ -1019,15 +1043,15 @@ class TestModuleNameFor:
     def test_non_python_returns_none(self):
         """Test non python returns none."""
         assert (
-            SelfImprovementEngine._module_name_for("scripts/verify_change.sh")
+            SelfImprovement._module_name_for("scripts/verify_change.sh")
             is None
         )
 
     def test_pycache_returns_none(self):
         """Test pycache returns none."""
         assert (
-            SelfImprovementEngine._module_name_for(
-                "python/genesis_conscious/__pycache__/foo.cpython-312.pyc"
+            SelfImprovement._module_name_for(
+                "python/__pycache__/foo.cpython-312.pyc"
             )
             is None
         )
@@ -1037,7 +1061,7 @@ class TestModuleNameFor:
         # importable as a module — skip the gate.
         """Test non package submodule returns none."""
         assert (
-            SelfImprovementEngine._module_name_for("python/random_dir/foo.py")
+            SelfImprovement._module_name_for("python/random_dir/foo.py")
             is None
         )
 
@@ -1048,7 +1072,7 @@ class TestImportGate:
     These prove that a source change which passes py_compile but
     raises at import time (e.g. a broken module-level re.compile) is
     rejected and reverted — the exact defect that broke
-    genesis_conscious.perception and left it in the repository.
+    perception.core and left it in the repository.
     """
 
     def test_broken_import_is_reverted(self):
@@ -1056,7 +1080,7 @@ class TestImportGate:
         tmpdir = tempfile.mkdtemp()
         _make_importable_pkg(tmpdir)
         mod_path = os.path.join(
-            tmpdir, "python", "genesis_conscious", "broken_mod.py"
+            tmpdir, "python", "brokenpkg", "broken_mod.py"
         )
         original = '"""Valid module."""\nx = 1\n'
         # Valid Python syntax (py_compile passes) but re.compile
@@ -1065,12 +1089,12 @@ class TestImportGate:
         with open(mod_path, "w") as f:
             f.write(original)
 
-        engine = SelfImprovementEngine(project_root=tmpdir)
+        engine = SelfImprovement(project_root=tmpdir)
         result = engine._validate_and_write_fix(
             file_path=Path(mod_path),
             original_source=original,
             fixed_source=broken,
-            rel_path="python/genesis_conscious/broken_mod.py",
+            rel_path="python/brokenpkg/broken_mod.py",
         )
 
         assert result is False, "broken-import change must be rejected"
@@ -1082,27 +1106,27 @@ class TestImportGate:
         tmpdir = tempfile.mkdtemp()
         _make_importable_pkg(tmpdir)
         mod_path = os.path.join(
-            tmpdir, "python", "genesis_conscious", "good_mod.py"
+            tmpdir, "python", "brokenpkg", "good_mod.py"
         )
         original = '"""Old."""\nx = 1\n'
         fixed = '"""New."""\nx = 2\n'
         with open(mod_path, "w") as f:
             f.write(original)
 
-        engine = SelfImprovementEngine(project_root=tmpdir)
+        engine = SelfImprovement(project_root=tmpdir)
         # Mock the test gate so we don't run the real ~5-minute suite.
         mock_tools = type("MockTools", (), {"run": staticmethod(
             lambda name, **kw: ToolResult(success=True, output="mocked")
         )})()
         with patch(
-            "genesis_conscious.self.improvement.get_tools",
+            "self.improvement.get_tools",
             return_value=mock_tools,
         ):
             result = engine._validate_and_write_fix(
                 file_path=Path(mod_path),
                 original_source=original,
                 fixed_source=fixed,
-                rel_path="python/genesis_conscious/good_mod.py",
+                rel_path="python/brokenpkg/good_mod.py",
             )
 
         assert result is True, "valid change must be accepted"
@@ -1114,26 +1138,26 @@ class TestImportGate:
         tmpdir = tempfile.mkdtemp()
         _make_importable_pkg(tmpdir)
         mod_path = os.path.join(
-            tmpdir, "python", "genesis_conscious", "good_mod.py"
+            tmpdir, "python", "brokenpkg", "good_mod.py"
         )
         original = '"""Old."""\nx = 1\n'
         fixed = '"""New."""\nx = 2\n'
         with open(mod_path, "w") as f:
             f.write(original)
 
-        engine = SelfImprovementEngine(project_root=tmpdir)
+        engine = SelfImprovement(project_root=tmpdir)
         mock_tools = type("MockTools", (), {"run": staticmethod(
             lambda name, **kw: ToolResult(success=False, error="tests failed")
         )})()
         with patch(
-            "genesis_conscious.self.improvement.get_tools",
+            "self.improvement.get_tools",
             return_value=mock_tools,
         ):
             result = engine._validate_and_write_fix(
                 file_path=Path(mod_path),
                 original_source=original,
                 fixed_source=fixed,
-                rel_path="python/genesis_conscious/good_mod.py",
+                rel_path="python/brokenpkg/good_mod.py",
             )
 
         assert result is False, "test failure must reject the change"
@@ -1632,7 +1656,7 @@ def test_would_create_cycle_non_hierarchical() -> None:
 def temp_project(tmp_path: Path) -> Path:
     """Create a temporary project with an allowlisted file and verify script."""
     # Create the allowlisted file
-    src_dir = tmp_path / "python" / "genesis_conscious" / "learning"
+    src_dir = tmp_path / "python" / "frontal_lobe"
     src_dir.mkdir(parents=True)
     heuristic_file = src_dir / "autonomous.py"
     heuristic_file.write_text(
@@ -1659,13 +1683,13 @@ def temp_project(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def engine(temp_project: Path) -> SelfImprovementEngine:
-    """Create a SelfImprovementEngine with the temp project."""
-    return SelfImprovementEngine(project_root=str(temp_project))
+def engine(temp_project: Path) -> SelfImprovement:
+    """Create a SelfImprovement with the temp project."""
+    return SelfImprovement(project_root=str(temp_project))
 
 
 @pytest.fixture
-def experiment(engine: SelfImprovementEngine, temp_project: Path) -> HeuristicExperiment:
+def experiment(engine: SelfImprovement, temp_project: Path) -> HeuristicExperiment:
     """Create a HeuristicExperiment with the temp project."""
     return HeuristicExperiment(engine, project_root=str(temp_project))
 
@@ -1706,7 +1730,7 @@ class TestHeuristicExperimentGuardrails:
         """Files not on the allowlist should be skipped.
 
         The allowlist now covers all experimentable files (Genesis's own
-        Python source under genesis_conscious/ or genesis_client/).
+        Python source under python/).
         Non-experimentable files — tests, config, Rust, scripts — are
         still rejected. We verify with a test file.
         """
@@ -1744,7 +1768,7 @@ class TestHeuristicExperimentGuardrails:
             )
 
         record = experiment.run_experiment(
-            file_path="python/genesis_conscious/learning/autonomous.py",
+            file_path="python/frontal_lobe/autonomous.py",
             original_code='_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")',
             proposed_code='_CONCEPT_RE = re.compile(r"\\b([a-z_]+)\\b")',
             description="allow underscores in concepts",
@@ -1756,7 +1780,7 @@ class TestHeuristicExperimentGuardrails:
     def test_original_code_not_found_is_reverted(self, experiment):
         """If the original code snippet doesn't exist, should revert."""
         record = experiment.run_experiment(
-            file_path="python/genesis_conscious/learning/autonomous.py",
+            file_path="python/frontal_lobe/autonomous.py",
             original_code="THIS_DOES_NOT_EXIST",
             proposed_code="replacement",
             description="test",
@@ -1771,12 +1795,12 @@ class TestHeuristicExperimentExecution:
 
     def test_successful_experiment_applies_change(self, experiment, temp_project):
         """A valid change that passes verification should be applied."""
-        file_path = temp_project / "python" / "genesis_conscious" / "learning" / "autonomous.py"
+        file_path = temp_project / "python" / "frontal_lobe" / "autonomous.py"
         original = '_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")'
         proposed = '_CONCEPT_RE = re.compile(r"\\b([a-z_]+)\\b")'
 
         record = experiment.run_experiment(
-            file_path="python/genesis_conscious/learning/autonomous.py",
+            file_path="python/frontal_lobe/autonomous.py",
             original_code=original,
             proposed_code=proposed,
             description="allow underscores in concepts",
@@ -1791,13 +1815,13 @@ class TestHeuristicExperimentExecution:
 
     def test_py_compile_failure_reverts(self, experiment, temp_project):
         """A change that breaks py_compile should be reverted."""
-        file_path = temp_project / "python" / "genesis_conscious" / "learning" / "autonomous.py"
+        file_path = temp_project / "python" / "frontal_lobe" / "autonomous.py"
         original = '_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")'
         # Intentionally broken Python
         proposed = '_CONCEPT_RE = re.compile(r"\\b([a-z'  # unclosed
 
         record = experiment.run_experiment(
-            file_path="python/genesis_conscious/learning/autonomous.py",
+            file_path="python/frontal_lobe/autonomous.py",
             original_code=original,
             proposed_code=proposed,
             description="broken change",
@@ -1820,12 +1844,12 @@ class TestHeuristicExperimentExecution:
         verify_script.chmod(0o755)
 
         experiment = HeuristicExperiment(engine, project_root=str(temp_project))
-        file_path = temp_project / "python" / "genesis_conscious" / "learning" / "autonomous.py"
+        file_path = temp_project / "python" / "frontal_lobe" / "autonomous.py"
         original = '_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")'
         proposed = '_CONCEPT_RE = re.compile(r"\\b([a-z_]+)\\b")'
 
         record = experiment.run_experiment(
-            file_path="python/genesis_conscious/learning/autonomous.py",
+            file_path="python/frontal_lobe/autonomous.py",
             original_code=original,
             proposed_code=proposed,
             description="test with failing verify",
@@ -1840,7 +1864,7 @@ class TestHeuristicExperimentExecution:
     def test_no_change_produces_revert(self, experiment):
         """If the replacement is identical to original, should revert."""
         record = experiment.run_experiment(
-            file_path="python/genesis_conscious/learning/autonomous.py",
+            file_path="python/frontal_lobe/autonomous.py",
             original_code='_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")',
             proposed_code='_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")',
             description="no-op change",
@@ -1856,7 +1880,7 @@ class TestHeuristicExperimentAuditLog:
     def test_applied_experiments_are_logged(self, experiment):
         """Successfully applied experiments should be in the audit log."""
         experiment.run_experiment(
-            file_path="python/genesis_conscious/learning/autonomous.py",
+            file_path="python/frontal_lobe/autonomous.py",
             original_code='_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")',
             proposed_code='_CONCEPT_RE = re.compile(r"\\b([a-z_]+)\\b")',
             description="allow underscores",
@@ -1877,7 +1901,7 @@ class TestHeuristicExperimentAuditLog:
 
         # This will pass py_compile but fail verify → reverted + logged
         experiment.run_experiment(
-            file_path="python/genesis_conscious/learning/autonomous.py",
+            file_path="python/frontal_lobe/autonomous.py",
             original_code='_CONCEPT_RE = re.compile(r"\\b([a-z]+)\\b")',
             proposed_code='_CONCEPT_RE = re.compile(r"\\b([a-z_]+)\\b")',
             description="test revert",
@@ -2353,7 +2377,7 @@ def test_is_meaningful_rejects_internal_namespaces():
     for word in (
         "_cat:cause:guarded_cortisol",
         "_utt:hello",
-        "python:genesis_conscious.concepts",
+        "python:concepts",
         "rust:daemon::tick",
         "skill:sorter",
         "goal:explore",
@@ -2698,6 +2722,400 @@ def test_depends_on_transitive_inference():
     assert "hydrogen" in depends_targets, (
         f"life should be inferred as depending on hydrogen: {depends_targets}"
     )
+
+
+# ─── Proposal correctness regressions ────────────────────────────
+
+
+class TestProposalFixCorrectness:
+    """Regression tests for the defects found in persisted proposals.
+
+    Every pending proposal in the live queue was broken: print→logger
+    rewrites in CLI files, logger calls into logger-less modules,
+    multi-line print rewrites that orphaned their kwargs, except
+    rewrites that deleted noqa/explanatory comments, and docstring
+    filler for private helpers. These pin the corrected behaviour.
+    """
+
+    def test_fix_print_in_code_multiline_returns_none(self):
+        """A print() call spanning lines can't be rewritten safely —
+        the continuation keeps print-only kwargs logger.info() rejects."""
+        content = (
+            "def f():\n"
+            "    print(\n"
+            '        "hello",\n'
+            "        file=sys.stderr,\n"
+            "    )\n"
+        )
+        engine = SelfImprovement(project_root=".")
+        lines = content.splitlines(keepends=True)
+        assert engine._fix_print_in_code(lines, 2) is None
+
+    def test_fix_print_in_code_single_line_still_fixes(self):
+        """Single-line print() calls are still converted."""
+        content = 'def f():\n    print("hi")\n'
+        engine = SelfImprovement(project_root=".")
+        lines = content.splitlines(keepends=True)
+        result = engine._fix_print_in_code(lines, 2)
+        assert result is not None
+        assert "logger.info(" in result[1]
+
+    def test_generate_fix_silent_except_requires_logger(self):
+        """A silent_except proposal needs a module logger — the snippet
+        can't inject the import, so without one the fix is a NameError."""
+        source = (
+            "try:\n"
+            "    x = 1\n"
+            "except Exception:\n"
+            "    pass\n"
+        )
+        bug = BugReport(
+            file="m.py", line=3, severity="warning",
+            category="silent_except", description="d",
+        )
+        engine = SelfImprovement(project_root=".")
+        assert engine._generate_fix(bug, source) is None
+
+        logged = "import logging\nlogger = logging.getLogger(__name__)\n" + source
+        bug_logged = BugReport(
+            file="m.py", line=5, severity="warning",
+            category="silent_except", description="d",
+        )
+        assert engine._generate_fix(bug_logged, logged) is not None
+
+    def test_generate_fix_print_requires_logger(self):
+        """Same rule for print_in_code proposals."""
+        source = 'def f():\n    print("hi")\n'
+        bug = BugReport(
+            file="m.py", line=2, severity="style",
+            category="print_in_code", description="d",
+        )
+        engine = SelfImprovement(project_root=".")
+        assert engine._generate_fix(bug, source) is None
+
+    def test_add_as_e_preserves_noqa_comment(self):
+        """except Exception:  # noqa: BLE001 keeps its suppression —
+        the new line still needs it."""
+        fixed = SelfImprovement._add_as_e_to_except(
+            "        except Exception:  # noqa: BLE001"
+        )
+        assert fixed == "        except Exception as e:  # noqa: BLE001"
+
+    def test_add_as_e_bare_except_with_comment(self):
+        fixed = SelfImprovement._add_as_e_to_except("    except:  # careful")
+        assert fixed == "    except Exception as e:  # careful"
+
+    def test_fix_silent_except_documented_swallow_skipped(self):
+        """An except: pass carrying an explanatory comment is deliberate —
+        the fix would delete the rationale, so none is generated."""
+        content = (
+            "def f():\n"
+            "    try:\n"
+            "        x = 1\n"
+            "    except Exception:  # noqa: BLE001 — a listener must\n"
+            "        pass              # never kill her game\n"
+        )
+        engine = SelfImprovement(project_root=".")
+        lines = content.splitlines(keepends=True)
+        assert engine._fix_silent_except(lines, 4) is None
+
+    def test_fix_silent_except_bare_noqa_still_fixes(self):
+        """A bare noqa marker is lint bookkeeping, not an explanation —
+        the swallow is still fixed and the noqa is preserved."""
+        content = (
+            "def f():\n"
+            "    try:\n"
+            "        x = 1\n"
+            "    except Exception:  # noqa: BLE001\n"
+            "        pass\n"
+        )
+        engine = SelfImprovement(project_root=".")
+        lines = content.splitlines(keepends=True)
+        result = engine._fix_silent_except(lines, 4)
+        assert result is not None
+        _original, proposed, _desc, _benefit = result
+        assert "as e:" in proposed
+        assert "# noqa: BLE001" in proposed
+        assert "logger.debug(" in proposed
+
+    def test_ensure_module_logger_inserts_import(self):
+        """A module with no logger gets import + binding at the top,
+        and the target index shifts past the insertion."""
+        lines = ["x = 1", "def f():", "    pass"]
+        idx = SelfImprovement._ensure_module_logger(lines, 2, "x = 1\ndef f():\n    pass\n")
+        assert lines[0] == "import logging"
+        assert lines[1] == "logger = logging.getLogger(__name__)"
+        assert idx == 4
+
+    def test_ensure_module_logger_existing_untouched(self):
+        """A module that already binds a logger is left alone."""
+        source = "import logging\nlogger = logging.getLogger(__name__)\nx = 1\n"
+        lines = source.split("\n")
+        idx = SelfImprovement._ensure_module_logger(lines, 2, source)
+        assert idx == 2
+        assert "import logging" in lines[0] and len(lines) == 4
+
+    def test_ensure_module_logger_uses_existing_import(self):
+        """With `import logging` present, only the binding is added —
+        right after the import line."""
+        source = "import logging\nimport sys\nx = 1\n"
+        lines = source.split("\n")
+        idx = SelfImprovement._ensure_module_logger(lines, 2, source)
+        assert lines[1] == "logger = logging.getLogger(__name__)"
+        assert idx == 3
+
+    def test_resolve_occurrence_picks_hinted_site(self):
+        """The hint selects which occurrence of a duplicate snippet
+        the experiment edits."""
+        source = "x\nMARKER\ny\nMARKER\nz\n"
+        occurrences = [
+            i for i in range(len(source)) if source.startswith("MARKER", i)
+        ]
+        assert len(occurrences) == 2
+        resolved = HeuristicExperiment._resolve_occurrence(
+            source, occurrences, "MARKER", 4
+        )
+        assert resolved == occurrences[1]
+        resolved = HeuristicExperiment._resolve_occurrence(
+            source, occurrences, "MARKER", 2
+        )
+        assert resolved == occurrences[0]
+
+    def test_resolve_occurrence_no_hint_returns_none(self):
+        source = "MARKER\nMARKER\n"
+        occurrences = [0, 7]
+        assert (
+            HeuristicExperiment._resolve_occurrence(
+                source, occurrences, "MARKER", None
+            )
+            is None
+        )
+
+    def test_resolve_occurrence_unmatched_hint_returns_none(self):
+        source = "MARKER\nMARKER\n"
+        occurrences = [0, 7]
+        assert (
+            HeuristicExperiment._resolve_occurrence(
+                source, occurrences, "MARKER", 99
+            )
+            is None
+        )
+
+    def test_ambiguous_snippet_reverted(self, experiment, temp_project):
+        """An original_code matching several sites with no line_hint
+        is refused rather than editing the first match."""
+        dup_file = temp_project / "python" / "frontal_lobe" / "dup.py"
+        dup_file.write_text("dup = 1\nx = 0\ndup = 1\n")
+        record = experiment.run_experiment(
+            file_path="python/frontal_lobe/dup.py",
+            original_code="dup = 1",
+            proposed_code="dup = 2",
+            description="ambiguous",
+        )
+        assert record.status == "reverted"
+        assert "ambiguous" in record.reason
+        assert dup_file.read_text() == "dup = 1\nx = 0\ndup = 1\n"
+
+    def test_ambiguous_snippet_resolved_by_hint(self, experiment, temp_project):
+        """With line_hint, the occurrence at the reported line is edited."""
+        dup_file = temp_project / "python" / "frontal_lobe" / "dup.py"
+        dup_file.write_text("dup = 1\nx = 0\ndup = 1\n")
+        record = experiment.run_experiment(
+            file_path="python/frontal_lobe/dup.py",
+            original_code="dup = 1",
+            proposed_code="dup = 2",
+            description="hinted",
+            line_hint=3,
+        )
+        assert record.status == "applied"
+        assert dup_file.read_text() == "dup = 1\nx = 0\ndup = 2\n"
+
+    def test_docstring_proposal_skips_private_function(self):
+        """Private helpers don't get docstring proposals — a generated
+        docstring can only restate the name."""
+        content = "def _helper():\n    return 1\n"
+        root, _rel = _make_test_file(content)
+        engine = SelfImprovement(project_root=root)
+        proposals = engine._analyze_python_file(
+            os.path.join(root, "test_module.py"),
+            "test_module.py",
+            max_proposals=5,
+            existing_sources=set(),
+        )
+        assert not any("docstring" in p.title.lower() for p in proposals)
+
+    def test_docstring_proposal_skips_trivial_public(self):
+        """A public no-arg one-liner has nothing to document."""
+        content = "def ready():\n    return True\n"
+        root, _rel = _make_test_file(content)
+        engine = SelfImprovement(project_root=root)
+        proposals = engine._analyze_python_file(
+            os.path.join(root, "test_module.py"),
+            "test_module.py",
+            max_proposals=5,
+            existing_sources=set(),
+        )
+        assert not any("docstring" in p.title.lower() for p in proposals)
+
+    def test_docstring_proposal_nontrivial_public(self):
+        """A public function whose docstring adds real info (an arg
+        with a meaningful inferred description) is still documented."""
+        content = (
+            "def compute(path):\n"
+            "    data = open(path).read()\n"
+            "    return data.upper()\n"
+        )
+        root, _rel = _make_test_file(content)
+        engine = SelfImprovement(project_root=root)
+        proposals = engine._analyze_python_file(
+            os.path.join(root, "test_module.py"),
+            "test_module.py",
+            max_proposals=5,
+            existing_sources=set(),
+        )
+        assert any("docstring" in p.title.lower() for p in proposals)
+
+    def test_docstring_proposal_skips_echo_only(self):
+        """Interface-style methods (emit/write) get name-echo
+        docstrings — 'Emit.' + 'record: The record.' is filler, so
+        no proposal."""
+        content = (
+            "class Sink:\n"
+            "    def emit(self, record):\n"
+            "        pass\n"
+            "    def write(self, s):\n"
+            "        pass\n"
+        )
+        root, _rel = _make_test_file(content)
+        engine = SelfImprovement(project_root=root)
+        proposals = engine._analyze_python_file(
+            os.path.join(root, "test_module.py"),
+            "test_module.py",
+            max_proposals=5,
+            existing_sources=set(),
+        )
+        assert not any("docstring" in p.title.lower() for p in proposals)
+
+    def test_restore_drops_ambiguous_proposal_without_hint(self):
+        """A pending proposal whose snippet matches several sites and
+        carries no line_hint can never apply deterministically."""
+        tmpdir = tempfile.mkdtemp()
+        target = os.path.join(tmpdir, "target.py")
+        with open(target, "w", encoding="utf-8") as f:
+            f.write("dup = 1\nx = 0\ndup = 1\n")
+        engine = SelfImprovement(project_root=tmpdir)
+        p = Proposal(
+            id=1, title="ambig", category=ProposalCategory.BUGFIX,
+            file_path="target.py", description="d", rationale="r",
+            expected_benefit="b", original_code="dup = 1",
+            proposed_code="dup = 2", confidence=0.5,
+        )
+        engine._proposals.append(p)
+        engine2 = SelfImprovement(project_root=tmpdir)
+        engine2.restore_from_dict(engine.to_dict())
+        assert engine2.get_all_proposals() == []
+
+    def test_restore_keeps_ambiguous_proposal_with_hint(self):
+        """The same ambiguous snippet survives when line_hint disambiguates."""
+        tmpdir = tempfile.mkdtemp()
+        target = os.path.join(tmpdir, "target.py")
+        with open(target, "w", encoding="utf-8") as f:
+            f.write("dup = 1\nx = 0\ndup = 1\n")
+        engine = SelfImprovement(project_root=tmpdir)
+        p = Proposal(
+            id=1, title="hinted", category=ProposalCategory.BUGFIX,
+            file_path="target.py", description="d", rationale="r",
+            expected_benefit="b", original_code="dup = 1",
+            proposed_code="dup = 2", confidence=0.5, line_hint=3,
+        )
+        engine._proposals.append(p)
+        engine2 = SelfImprovement(project_root=tmpdir)
+        engine2.restore_from_dict(engine.to_dict())
+        assert len(engine2.get_all_proposals()) == 1
+
+    def test_restore_drops_proposal_that_deletes_comment(self):
+        """A pending proposal whose rewrite drops a trailing comment is
+        a stale generation artifact — it deletes intent or a lint
+        suppression the verify gate cannot see."""
+        tmpdir = tempfile.mkdtemp()
+        target = os.path.join(tmpdir, "target.py")
+        with open(target, "w", encoding="utf-8") as f:
+            f.write("try:\n    x = 1\nexcept Exception:  # noqa: BLE001\n    pass\n")
+        engine = SelfImprovement(project_root=tmpdir)
+        p = Proposal(
+            id=1, title="strip-comment", category=ProposalCategory.BUGFIX,
+            file_path="target.py", description="d", rationale="r",
+            expected_benefit="b",
+            original_code="except Exception:  # noqa: BLE001\n    pass",
+            proposed_code="except Exception as e:\n    log(e)",
+            confidence=0.5,
+        )
+        engine._proposals.append(p)
+        engine2 = SelfImprovement(project_root=tmpdir)
+        engine2.restore_from_dict(engine.to_dict())
+        assert engine2.get_all_proposals() == []
+
+    def test_restore_keeps_proposal_that_preserves_comment(self):
+        tmpdir = tempfile.mkdtemp()
+        target = os.path.join(tmpdir, "target.py")
+        with open(target, "w", encoding="utf-8") as f:
+            f.write("try:\n    x = 1\nexcept Exception:  # noqa: BLE001\n    pass\n")
+        engine = SelfImprovement(project_root=tmpdir)
+        p = Proposal(
+            id=1, title="keep-comment", category=ProposalCategory.BUGFIX,
+            file_path="target.py", description="d", rationale="r",
+            expected_benefit="b",
+            original_code="except Exception:  # noqa: BLE001\n    pass",
+            proposed_code="except Exception as e:  # noqa: BLE001\n    log(e)",
+            confidence=0.5,
+        )
+        engine._proposals.append(p)
+        engine2 = SelfImprovement(project_root=tmpdir)
+        engine2.restore_from_dict(engine.to_dict())
+        assert len(engine2.get_all_proposals()) == 1
+
+    def test_restore_drops_logger_reference_without_binding(self):
+        """A pending proposal that calls ``logger.`` in a module with no
+        module-level logger binding would NameError if ever executed."""
+        tmpdir = tempfile.mkdtemp()
+        target = os.path.join(tmpdir, "target.py")
+        with open(target, "w", encoding="utf-8") as f:
+            f.write("try:\n    x = 1\nexcept Exception:\n    pass\n")
+        engine = SelfImprovement(project_root=tmpdir)
+        p = Proposal(
+            id=1, title="no-logger", category=ProposalCategory.BUGFIX,
+            file_path="target.py", description="d", rationale="r",
+            expected_benefit="b",
+            original_code="except Exception:\n    pass",
+            proposed_code="except Exception as e:\n    logger.debug(e)",
+            confidence=0.5,
+        )
+        engine._proposals.append(p)
+        engine2 = SelfImprovement(project_root=tmpdir)
+        engine2.restore_from_dict(engine.to_dict())
+        assert engine2.get_all_proposals() == []
+
+    def test_restore_keeps_logger_reference_with_binding(self):
+        tmpdir = tempfile.mkdtemp()
+        target = os.path.join(tmpdir, "target.py")
+        with open(target, "w", encoding="utf-8") as f:
+            f.write(
+                "import logging\nlogger = logging.getLogger(__name__)\n"
+                "try:\n    x = 1\nexcept Exception:\n    pass\n"
+            )
+        engine = SelfImprovement(project_root=tmpdir)
+        p = Proposal(
+            id=1, title="has-logger", category=ProposalCategory.BUGFIX,
+            file_path="target.py", description="d", rationale="r",
+            expected_benefit="b",
+            original_code="except Exception:\n    pass",
+            proposed_code="except Exception as e:\n    logger.debug(e)",
+            confidence=0.5,
+        )
+        engine._proposals.append(p)
+        engine2 = SelfImprovement(project_root=tmpdir)
+        engine2.restore_from_dict(engine.to_dict())
+        assert len(engine2.get_all_proposals()) == 1
 
 
 # ─── Test runner ──────────────────────────────────────────────

@@ -4,15 +4,15 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from genesis_conscious.concepts import ConceptNetwork
-from genesis_conscious.learning.curiosity import Question
-from genesis_conscious.tools.agency import (
+from concepts import ConceptNetwork
+from limbic_system.curiosity import Question
+from tools.agency import (
     _TOOL_SCOPES,
     ActingLoop,
     ActingResult,
     Intention,
 )
-from genesis_conscious.tools.framework import ToolRegistry
+from tools.framework import ToolRegistry
 
 
 def _make_loop(
@@ -90,8 +90,8 @@ def test_curiosity_code_concept_produces_inspect() -> None:
     """A curiosity question about a code concept becomes an inspection."""
     with tempfile.TemporaryDirectory() as tmp:
         repo = Path(tmp) / "repo"
-        (repo / "genesis_conscious").mkdir(parents=True)
-        (repo / "genesis_conscious" / "thing.py").write_text(
+        (repo / "region_pkg").mkdir(parents=True)
+        (repo / "region_pkg" / "thing.py").write_text(
             "def f():\n    return 1\n"
         )
         q = Question(
@@ -209,17 +209,54 @@ def test_observe_reads_own_state() -> None:
         assert any("growth_ledger" in d for d in result.discoveries)
 
 
+def test_observe_body_senses_cpu() -> None:
+    """The 'cpu' observe target senses the machine body via sense_cpu."""
+    with tempfile.TemporaryDirectory() as tmp:
+        loop = _make_loop(tmp)
+        result = ActingResult(
+            intention=Intention("observe", "cpu", "wander")
+        )
+        loop._execute_observe(result.intention, result)
+        assert result.success
+        assert any("body:" in d for d in result.discoveries)
+        assert any(s.tool == "sense_cpu" and s.ok for s in result.steps)
+
+
+def test_observe_body_restores_restricted_affinity() -> None:
+    """A pinned affinity mask triggers the fast-effort restore."""
+    import os
+
+    with tempfile.TemporaryDirectory() as tmp:
+        loop = _make_loop(tmp)
+        original = os.sched_getaffinity(0)
+        one_core = {sorted(original)[0]}
+        try:
+            os.sched_setaffinity(0, one_core)
+            result = ActingResult(
+                intention=Intention("observe", "cpu", "wander")
+            )
+            loop._execute_observe(result.intention, result)
+            assert result.success
+            assert any(
+                "restricted affinity" in d for d in result.discoveries
+            )
+            assert any(s.tool == "set_cpu_effort" for s in result.steps)
+            assert os.sched_getaffinity(0) == original
+        finally:
+            os.sched_setaffinity(0, original)
+
+
 def test_measure_counts_files() -> None:
     """Measure runs whitelisted find/wc/du commands and records numbers."""
     with tempfile.TemporaryDirectory() as tmp:
         repo = Path(tmp) / "repo"
-        target = repo / "genesis_conscious"
+        target = repo / "region_pkg"
         target.mkdir(parents=True)
         (target / "a.py").write_text("x = 1\n")
         (target / "b.py").write_text("y = 2\n")
         loop = _make_loop(tmp)
         result = ActingResult(
-            intention=Intention("measure", "genesis_conscious", "wander")
+            intention=Intention("measure", "region_pkg", "wander")
         )
         loop._execute_measure(result.intention, result)
         assert result.success
@@ -230,7 +267,7 @@ def test_inspect_analyzes_python() -> None:
     """Inspect resolves a code concept to a file and analyzes it."""
     with tempfile.TemporaryDirectory() as tmp:
         repo = Path(tmp) / "repo"
-        pkg = repo / "genesis_conscious"
+        pkg = repo / "region_pkg"
         pkg.mkdir(parents=True)
         (pkg / "widget.py").write_text(
             "class Widget:\n    def spin(self):\n        return 1\n"

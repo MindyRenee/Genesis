@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from genesis_conscious.tools.source_registry import (
+from tools.source_registry import (
     SourceCache,
     SourceRegistry,
     SourceResult,
@@ -228,13 +228,14 @@ def test_registry_force_offline_property() -> None:
 
 def test_learner_with_data_dir_gets_cache(tmp_path) -> None:
     """An AutonomousLearner with a data_dir has a source cache."""
-    from genesis_conscious.concepts import ConceptNetwork
-    from genesis_conscious.learning import AutonomousLearner, CuriosityEngine
-    from genesis_conscious.reasoning import ReasoningEngine
+    from concepts import ConceptNetwork
+    from frontal_lobe.autonomous import AutonomousLearner
+    from frontal_lobe.reasoning import Reasoner
+    from limbic_system.curiosity import Curiosity
 
     net = ConceptNetwork()
-    reasoning = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoning)
+    reasoning = Reasoner(net)
+    curiosity = Curiosity(net, reasoning)
     learner = AutonomousLearner(
         network=net,
         curiosity=curiosity,
@@ -246,13 +247,14 @@ def test_learner_with_data_dir_gets_cache(tmp_path) -> None:
 
 def test_learner_without_data_dir_has_no_cache() -> None:
     """An AutonomousLearner without a data_dir has no cache (backward compat)."""
-    from genesis_conscious.concepts import ConceptNetwork
-    from genesis_conscious.learning import AutonomousLearner, CuriosityEngine
-    from genesis_conscious.reasoning import ReasoningEngine
+    from concepts import ConceptNetwork
+    from frontal_lobe.autonomous import AutonomousLearner
+    from frontal_lobe.reasoning import Reasoner
+    from limbic_system.curiosity import Curiosity
 
     net = ConceptNetwork()
-    reasoning = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoning)
+    reasoning = Reasoner(net)
+    curiosity = Curiosity(net, reasoning)
     learner = AutonomousLearner(
         network=net,
         curiosity=curiosity,
@@ -354,13 +356,14 @@ def test_registry_force_offline_toggle_clears_sticky() -> None:
 
 def test_learner_force_offline_makes_sources_offline() -> None:
     """An AutonomousLearner with force_offline=True has an offline registry."""
-    from genesis_conscious.concepts import ConceptNetwork
-    from genesis_conscious.learning import AutonomousLearner, CuriosityEngine
-    from genesis_conscious.reasoning import ReasoningEngine
+    from concepts import ConceptNetwork
+    from frontal_lobe.autonomous import AutonomousLearner
+    from frontal_lobe.reasoning import Reasoner
+    from limbic_system.curiosity import Curiosity
 
     net = ConceptNetwork()
-    reasoning = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoning)
+    reasoning = Reasoner(net)
+    curiosity = Curiosity(net, reasoning)
     learner = AutonomousLearner(
         network=net,
         curiosity=curiosity,
@@ -372,13 +375,14 @@ def test_learner_force_offline_makes_sources_offline() -> None:
 
 def test_learner_is_offline_property() -> None:
     """The learner's is_offline property reflects the source registry state."""
-    from genesis_conscious.concepts import ConceptNetwork
-    from genesis_conscious.learning import AutonomousLearner, CuriosityEngine
-    from genesis_conscious.reasoning import ReasoningEngine
+    from concepts import ConceptNetwork
+    from frontal_lobe.autonomous import AutonomousLearner
+    from frontal_lobe.reasoning import Reasoner
+    from limbic_system.curiosity import Curiosity
 
     net = ConceptNetwork()
-    reasoning = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoning)
+    reasoning = Reasoner(net)
+    curiosity = Curiosity(net, reasoning)
     learner = AutonomousLearner(
         network=net,
         curiosity=curiosity,

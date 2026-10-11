@@ -201,7 +201,9 @@ pub struct BodyControlState {
 // thermal/power scheduler remains Android's responsibility; Genesis still
 // observes whatever portable body signals are available.
 #[cfg(target_os = "android")]
-fn helper_path() -> Option<&'static str> { None }
+fn helper_path() -> Option<&'static str> {
+    None
+}
 
 #[cfg(not(target_os = "android"))]
 fn helper_path() -> Option<&'static str> {

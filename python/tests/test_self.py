@@ -9,13 +9,12 @@ import logging
 
 import pytest
 
-from genesis_conscious.cognition import CognitiveState
-from genesis_conscious.concepts import ConceptNetwork, RelationType
-from genesis_conscious.language.base import Thought
-from genesis_conscious.limbic_system.emotion import EmotionalState
-from genesis_conscious.memory import MemoryContext
-from genesis_conscious.perception import Intent, Perception, QuestionType
-from genesis_conscious.self import (
+from concepts import ConceptNetwork, RelationType
+from frontal_lobe import CognitiveState
+from limbic_system.emotion import EmotionalState
+from memory import MemoryContext
+from perception import Intent, Perception, QuestionType
+from self import (
     AnswerAssessment,
     AutobiographicalSelf,
     CapabilityProfile,
@@ -30,12 +29,13 @@ from genesis_conscious.self import (
     PredictionError,
     ProtoSelf,
     ProtoSelfState,
-    ReflectionEngine,
-    SelfAssessmentEngine,
+    Reflection,
+    SelfAssessment,
     SelfComposer,
     SelfModel,
 )
-from genesis_conscious.thalamus.brain_waves import BrainWave, BrainWaveState
+from temporal_lobe.base import Thought
+from thalamus.brain_waves import BrainWave, BrainWaveState
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +151,7 @@ def test_prediction_error_is_error_false() -> None:
 def test_reflect_appropriateness_mismatch() -> None:
     """reflect detects intent mismatches."""
     network = ConceptNetwork()
-    engine = ReflectionEngine(network)
+    engine = Reflection(network)
     # Question intent but thought intent is "greet" (not in allowed list)
     state = _make_state(intent=Intent.QUESTION, thought_intent="greet")
     insights = engine.reflect(state, "hello")
@@ -163,7 +163,7 @@ def test_reflect_appropriateness_mismatch() -> None:
 def test_reflect_appropriateness_match() -> None:
     """reflect produces no appropriateness insight when matched."""
     network = ConceptNetwork()
-    engine = ReflectionEngine(network)
+    engine = Reflection(network)
     state = _make_state(intent=Intent.QUESTION, thought_intent="inform")
     insights = engine.reflect(state, "here is the answer")
     corrections = [i for i in insights if i.type == "self_correction"]
@@ -174,7 +174,7 @@ def test_reflect_appropriateness_match() -> None:
 def test_reflect_stores_insights() -> None:
     """reflect stores insights in the engine."""
     network = ConceptNetwork()
-    engine = ReflectionEngine(network)
+    engine = Reflection(network)
     state = _make_state(intent=Intent.QUESTION, thought_intent="greet")
     engine.reflect(state, "hello")
     assert len(engine.insights) >= 1
@@ -188,7 +188,7 @@ def test_reflect_stores_insights() -> None:
 def test_get_recent_insights() -> None:
     """get_recent_insights returns the N most recent insights."""
     network = ConceptNetwork()
-    engine = ReflectionEngine(network)
+    engine = Reflection(network)
     # Generate some insights
     for i in range(5):
         state = _make_state(intent=Intent.QUESTION, thought_intent="greet")
@@ -200,7 +200,7 @@ def test_get_recent_insights() -> None:
 def test_get_insights_by_type() -> None:
     """get_insights_by_type filters insights by type."""
     network = ConceptNetwork()
-    engine = ReflectionEngine(network)
+    engine = Reflection(network)
     state = _make_state(intent=Intent.QUESTION, thought_intent="greet")
     engine.reflect(state, "hello")
     corrections = engine.get_insights_by_type("self_correction")
@@ -214,49 +214,49 @@ def test_get_insights_by_type() -> None:
 
 def test_select_strategy_conflict() -> None:
     """Conflict → ACKNOWLEDGE_UNCERTAINTY."""
-    engine = ReflectionEngine(ConceptNetwork())
+    engine = Reflection(ConceptNetwork())
     strategy = engine.select_strategy({"conflict_detected": True})
     assert strategy == MetacognitiveStrategy.ACKNOWLEDGE_UNCERTAINTY
 
 
 def test_select_strategy_gap() -> None:
     """Gap → GENERATE_QUESTION."""
-    engine = ReflectionEngine(ConceptNetwork())
+    engine = Reflection(ConceptNetwork())
     strategy = engine.select_strategy({"gap_detected": True})
     assert strategy == MetacognitiveStrategy.GENERATE_QUESTION
 
 
 def test_select_strategy_repetition() -> None:
     """Repetition → SWITCH_STYLE."""
-    engine = ReflectionEngine(ConceptNetwork())
+    engine = Reflection(ConceptNetwork())
     strategy = engine.select_strategy({"repetition_detected": True})
     assert strategy == MetacognitiveStrategy.SWITCH_STYLE
 
 
 def test_select_strategy_low_confidence() -> None:
     """Low confidence → SEEK_CLARIFICATION."""
-    engine = ReflectionEngine(ConceptNetwork())
+    engine = Reflection(ConceptNetwork())
     strategy = engine.select_strategy({"confidence": 0.2})
     assert strategy == MetacognitiveStrategy.SEEK_CLARIFICATION
 
 
 def test_select_strategy_high_confidence() -> None:
     """High confidence → BE_ASSERTIVE."""
-    engine = ReflectionEngine(ConceptNetwork())
+    engine = Reflection(ConceptNetwork())
     strategy = engine.select_strategy({"confidence": 0.9})
     assert strategy == MetacognitiveStrategy.BE_ASSERTIVE
 
 
 def test_select_strategy_maintain_course() -> None:
     """Default → MAINTAIN_COURSE."""
-    engine = ReflectionEngine(ConceptNetwork())
+    engine = Reflection(ConceptNetwork())
     strategy = engine.select_strategy({"confidence": 0.5})
     assert strategy == MetacognitiveStrategy.MAINTAIN_COURSE
 
 
 def test_select_strategy_priority_conflict_over_gap() -> None:
     """Conflict has priority over gap."""
-    engine = ReflectionEngine(ConceptNetwork())
+    engine = Reflection(ConceptNetwork())
     strategy = engine.select_strategy(
         {"conflict_detected": True, "gap_detected": True}
     )
@@ -270,14 +270,14 @@ def test_select_strategy_priority_conflict_over_gap() -> None:
 
 def test_summarize_reflection_empty() -> None:
     """summarize_reflection returns default when no insights."""
-    engine = ReflectionEngine(ConceptNetwork())
+    engine = Reflection(ConceptNetwork())
     summary = engine.summarize_reflection()
     assert "hasn't reflected" in summary
 
 
 def test_summarize_reflection_with_insights() -> None:
     """summarize_reflection includes insight counts."""
-    engine = ReflectionEngine(ConceptNetwork())
+    engine = Reflection(ConceptNetwork())
     state = _make_state(intent=Intent.QUESTION, thought_intent="greet")
     engine.reflect(state, "hello")
     summary = engine.summarize_reflection()
@@ -479,6 +479,191 @@ def test_compute_mismatch_case_insensitive() -> None:
     assert monitor._compute_mismatch("The Cat", "the cat") == 0.0
 
 
+# ═══════════════════════════════════════════════════════════════════
+# Conflict monitoring (Botvinick et al., 2001)
+# ═══════════════════════════════════════════════════════════════════
+
+
+def test_record_conflict_raises_caution() -> None:
+    """Strong response conflict raises caution prospectively."""
+    monitor = ErrorMonitor()
+    error = monitor.record_conflict(0.8, context="action selection")
+    assert error.signal == "conflict"
+    assert error.channel == "inhibition"
+    assert error.is_error
+    assert monitor.get_caution_level() > 0.0
+
+
+def test_record_conflict_below_threshold() -> None:
+    """Mild runner-up competition does not recruit caution."""
+    monitor = ErrorMonitor(conflict_threshold=0.6)
+    error = monitor.record_conflict(0.4)
+    assert not error.is_error
+    assert monitor.get_caution_level() == 0.0
+
+
+def test_conflict_below_threshold_not_counted_as_error() -> None:
+    """Sub-threshold conflict is demand, not error — stats exclude it.
+
+    Conflict and error are distinct monitoring signals (N2 vs ERN):
+    normal runner-up competition must not inflate the error count,
+    error rate, or cumulative error signal.
+    """
+    monitor = ErrorMonitor()
+    monitor.record_conflict(0.4)  # demand only
+    monitor.record_prediction("same", "same")  # clean
+    assert monitor.error_count == 0
+    assert monitor.error_rate == 0.0
+    assert monitor.cumulative_error_signal == 0.0
+    # ...but the demand still reached the inhibition channel
+    assert monitor.expected_value_of_control()["inhibition"] > 0.0
+
+
+def test_record_conflict_attributes_inhibition_demand() -> None:
+    """Conflict demand lands on the inhibition channel."""
+    monitor = ErrorMonitor()
+    monitor.record_conflict(0.5)
+    evc = monitor.expected_value_of_control()
+    assert evc["inhibition"] > evc["decision"]
+    assert evc["inhibition"] > 0.0
+
+
+def test_record_conflict_clipped() -> None:
+    """Out-of-range conflict is clipped to [0, 1]."""
+    monitor = ErrorMonitor()
+    error = monitor.record_conflict(1.7)
+    assert error.error_magnitude == 1.0
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Reward prediction error — FRN (Holroyd & Coles, 2002)
+# ═══════════════════════════════════════════════════════════════════
+
+
+def test_record_rpe_negative_is_error() -> None:
+    """Negative δ (worse than expected) is an FRN error."""
+    monitor = ErrorMonitor()
+    error = monitor.record_reward_prediction_error(-0.6)
+    assert error.signal == "frn"
+    assert error.channel == "decision"
+    assert error.error_magnitude == 0.6
+    assert error.is_error
+    assert monitor.get_caution_level() > 0.0
+
+
+def test_record_rpe_positive_no_caution() -> None:
+    """Positive δ (better than expected) produces no error signal."""
+    monitor = ErrorMonitor()
+    error = monitor.record_reward_prediction_error(0.8)
+    assert error.error_magnitude == 0.0
+    assert not error.is_error
+    assert monitor.get_caution_level() == 0.0
+
+
+def test_record_rpe_attributes_decision_demand() -> None:
+    """Reward misses attribute demand to the decision channel."""
+    monitor = ErrorMonitor()
+    monitor.record_reward_prediction_error(-0.5)
+    evc = monitor.expected_value_of_control()
+    assert evc["decision"] > evc["inhibition"]
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Expected value of control (Shenhav et al., 2013)
+# ═══════════════════════════════════════════════════════════════════
+
+
+def test_evc_channel_selectivity() -> None:
+    """EVC is positive only on the channel with attributed demand."""
+    monitor = ErrorMonitor()
+    monitor.record_prediction("a", "b")  # decision channel by default
+    evc = monitor.expected_value_of_control()
+    assert evc["decision"] > 0.0
+    assert evc["inhibition"] < 0.0
+
+
+def test_control_adjustments_empty_without_caution() -> None:
+    """No control deployed when caution is too low to act on."""
+    monitor = ErrorMonitor()
+    monitor.record_prediction("a", "b")
+    # Single small error → EVC positive but caution below the floor.
+    assert monitor.get_caution_level() <= 0.3
+    assert monitor.control_adjustments() == {}
+
+
+def test_control_adjustments_selects_decision_channel() -> None:
+    """Decision errors recruit only the DDM threshold."""
+    monitor = ErrorMonitor()
+    for _ in range(3):
+        monitor.record_prediction("expected something", "got nothing alike")
+    assert monitor.get_caution_level() > 0.3
+    adjustments = monitor.control_adjustments()
+    assert "decision" in adjustments
+    assert "inhibition" not in adjustments
+    assert adjustments["decision"] == monitor.get_caution_level() * 0.5
+
+
+def test_control_adjustments_selects_inhibition_channel() -> None:
+    """Conflict recruits only the inhibition threshold."""
+    monitor = ErrorMonitor()
+    for _ in range(3):
+        monitor.record_conflict(0.9)
+    assert monitor.get_caution_level() > 0.3
+    adjustments = monitor.control_adjustments()
+    assert "inhibition" in adjustments
+    assert "decision" not in adjustments
+    assert adjustments["inhibition"] == monitor.get_caution_level() * 0.3
+
+
+def test_raise_caution_attributes_channel_demand() -> None:
+    """A manual caution raise feeds the named channel's EVC demand."""
+    monitor = ErrorMonitor()
+    monitor.raise_caution(0.4, channel="inhibition")
+    evc = monitor.expected_value_of_control()
+    assert evc["inhibition"] > 0.0
+
+
+def test_tick_decays_channel_demand() -> None:
+    """Channel demand decays alongside caution."""
+    monitor = ErrorMonitor(caution_decay_rate=0.1)
+    monitor.record_prediction("a", "b")
+    before = monitor.expected_value_of_control()["decision"]
+    monitor.tick()
+    assert monitor.expected_value_of_control()["decision"] < before
+
+
+def test_reset_clears_channel_demand() -> None:
+    """reset zeroes the EVC demand terms."""
+    monitor = ErrorMonitor()
+    monitor.record_prediction("a", "b")
+    monitor.reset()
+    evc = monitor.expected_value_of_control()
+    assert evc["decision"] < 0.0
+    assert evc["inhibition"] < 0.0
+
+
+def test_error_monitor_persistence_roundtrip() -> None:
+    """Serialize/restore preserves channel demand and error tags."""
+    from infrastructure.persistence import (
+        _serialize_error_monitor,
+        restore_error_monitor,
+    )
+
+    monitor = ErrorMonitor()
+    monitor.record_prediction("a", "b")
+    monitor.record_conflict(0.7)
+    data = _serialize_error_monitor(monitor)
+
+    restored = ErrorMonitor()
+    restore_error_monitor(restored, data)
+    assert restored._channel_demand == monitor._channel_demand
+    signals = {e.signal for e in restored.recent_errors}
+    assert signals == {"ern", "conflict"}
+    assert restored.conflict_threshold == monitor.conflict_threshold
+    # is_error is recomputed per signal on restore
+    assert all(e.is_error for e in restored.recent_errors)
+
+
 # ======================================================================
 # From tests/test_self_assessment.py
 # ======================================================================
@@ -548,7 +733,7 @@ def test_capability_profile_defaults() -> None:
 def test_assess_knowledge_unknown_concept() -> None:
     """assess_knowledge returns low confidence for unknown concepts."""
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     ka = engine.assess_knowledge("unknown_topic")
     assert ka.concept_exists is False
     assert ka.confidence == 0.0
@@ -558,7 +743,7 @@ def test_assess_knowledge_unknown_concept() -> None:
 def test_assess_knowledge_with_definition() -> None:
     """assess_knowledge detects definitions."""
     network = _make_network_with_concept()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     ka = engine.assess_knowledge("dogs")
     assert ka.concept_exists is True
     assert ka.has_definition is True
@@ -568,7 +753,7 @@ def test_assess_knowledge_with_definition() -> None:
 def test_assess_knowledge_with_relationships() -> None:
     """assess_knowledge detects relationships."""
     network = _make_rich_network()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     ka = engine.assess_knowledge("dogs")
     assert ka.has_relationships is True
     assert ka.connection_count >= 2
@@ -579,7 +764,7 @@ def test_assess_knowledge_no_definition() -> None:
     """assess_knowledge detects missing definitions."""
     network = ConceptNetwork()
     network.add_concept("dogs")  # no definition
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     ka = engine.assess_knowledge("dogs")
     assert ka.concept_exists is True
     assert ka.has_definition is False
@@ -589,7 +774,7 @@ def test_assess_knowledge_no_definition() -> None:
 def test_assess_knowledge_no_relationships() -> None:
     """assess_knowledge detects missing relationships."""
     network = _make_network_with_concept()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     ka = engine.assess_knowledge("dogs")
     assert ka.has_relationships is False
     assert any("relationship" in gap for gap in ka.gaps)
@@ -598,7 +783,7 @@ def test_assess_knowledge_no_relationships() -> None:
 def test_assess_knowledge_case_insensitive() -> None:
     """assess_knowledge is case-insensitive."""
     network = _make_network_with_concept("dogs")
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     ka = engine.assess_knowledge("DOGS")
     assert ka.concept_exists is True
 
@@ -606,7 +791,7 @@ def test_assess_knowledge_case_insensitive() -> None:
 def test_assess_knowledge_tracks_gaps() -> None:
     """assess_knowledge adds unknown topics to known_gaps."""
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     engine.assess_knowledge("unknown")
     assert "unknown" in engine.profile.known_gaps
 
@@ -622,7 +807,7 @@ def test_assess_knowledge_confident_topic() -> None:
         "thousands of years for various purposes including hunting herding "
         "and companionship"
     )
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     ka = engine.assess_knowledge("dogs")
     if ka.confidence > 0.6:
         assert "dogs" in engine.profile.confident_topics
@@ -636,7 +821,7 @@ def test_assess_knowledge_confident_topic() -> None:
 def test_assess_answer_returns_assessment() -> None:
     """assess_answer returns an AnswerAssessment."""
     network = _make_rich_network()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     assessment = engine.assess_answer("dogs are mammals", ["dogs"])
     assert isinstance(assessment, AnswerAssessment)
     assert assessment.answer == "dogs are mammals"
@@ -645,7 +830,7 @@ def test_assess_answer_returns_assessment() -> None:
 def test_assess_answer_unknown_topic() -> None:
     """assess_answer flags unknown topics as missing."""
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     assessment = engine.assess_answer("something about unknown", ["unknown"])
     assert not assessment.knows_all_topics
     assert "unknown" in assessment.missing_topics
@@ -654,7 +839,7 @@ def test_assess_answer_unknown_topic() -> None:
 def test_assess_answer_known_topic() -> None:
     """assess_answer with known topics has higher confidence."""
     network = _make_rich_network()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     assessment = engine.assess_answer("dogs are mammals", ["dogs"])
     assert assessment.confidence > 0.0
 
@@ -662,7 +847,7 @@ def test_assess_answer_known_topic() -> None:
 def test_assess_answer_hedging_detected() -> None:
     """assess_answer detects hedging language."""
     network = _make_rich_network()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     assessment = engine.assess_answer("maybe dogs are mammals, I think", ["dogs"])
     # Hedging should be noted in issues
     assert any("hedg" in issue.lower() for issue in assessment.issues)
@@ -671,7 +856,7 @@ def test_assess_answer_hedging_detected() -> None:
 def test_assess_answer_ignorance_detected() -> None:
     """assess_answer detects 'I don't know' language."""
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     assessment = engine.assess_answer("I don't know about that topic", ["unknown"])
     assert any(
         "ignorance" in issue.lower() or "lack of knowledge" in issue.lower()
@@ -682,7 +867,7 @@ def test_assess_answer_ignorance_detected() -> None:
 def test_assess_answer_increases_total_assessments() -> None:
     """assess_answer increments total_assessments."""
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     assert engine.profile.total_assessments == 0
     engine.assess_answer("test", ["test"])
     assert engine.profile.total_assessments == 1
@@ -696,7 +881,7 @@ def test_assess_answer_increases_total_assessments() -> None:
 def test_detect_gaps_unknown_concept() -> None:
     """detect_gaps returns gaps for unknown concepts."""
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     gaps = engine.detect_gaps(["unknown"])
     assert len(gaps) > 0
     assert any("unknown" in gap for gap in gaps)
@@ -705,7 +890,7 @@ def test_detect_gaps_unknown_concept() -> None:
 def test_detect_gaps_known_concept() -> None:
     """detect_gaps returns no gaps for well-known concepts."""
     network = _make_rich_network()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     gaps = engine.detect_gaps(["dogs"])
     # dogs has definition and relationships → no gaps (or minimal)
     # Actually with the rich network, dogs should be well-known
@@ -716,7 +901,7 @@ def test_detect_gaps_no_definition() -> None:
     """detect_gaps returns gaps for concepts without definitions."""
     network = ConceptNetwork()
     network.add_concept("dogs")  # no definition
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     gaps = engine.detect_gaps(["dogs"])
     assert any("definition" in gap for gap in gaps)
 
@@ -724,7 +909,7 @@ def test_detect_gaps_no_definition() -> None:
 def test_detect_gaps_empty_topics() -> None:
     """detect_gaps returns empty list for no topics."""
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     assert engine.detect_gaps([]) == []
 
 
@@ -736,7 +921,7 @@ def test_detect_gaps_empty_topics() -> None:
 def test_score_answer_quality_returns_float() -> None:
     """score_answer_quality returns a float in [0, 1]."""
     network = _make_rich_network()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     score = engine.score_answer_quality("dogs are mammals", "what are dogs", ["dogs"])
     assert isinstance(score, float)
     assert 0.0 <= score <= 1.0
@@ -745,7 +930,7 @@ def test_score_answer_quality_returns_float() -> None:
 def test_score_answer_quality_relevant() -> None:
     """Relevant answers get higher scores."""
     network = _make_rich_network()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     good_score = engine.score_answer_quality(
         "dogs are mammals and animals", "what are dogs", ["dogs"]
     )
@@ -758,7 +943,7 @@ def test_score_answer_quality_relevant() -> None:
 def test_score_answer_quality_ignorance_honest() -> None:
     """Honest ignorance gets some credit."""
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     score = engine.score_answer_quality("I don't know about that", "what is unknown", ["unknown"])
     assert score > 0.0  # gets some credit for honesty
 
@@ -771,7 +956,7 @@ def test_score_answer_quality_ignorance_honest() -> None:
 def test_record_question_outcome_success() -> None:
     """record_question_outcome tracks successes."""
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     engine.record_question_outcome("what", success=True, topic="dogs")
     stats = engine.profile.question_type_stats["what"]
     assert stats["success"] == 1
@@ -781,7 +966,7 @@ def test_record_question_outcome_success() -> None:
 def test_record_question_outcome_failure() -> None:
     """record_question_outcome tracks failures."""
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     engine.record_question_outcome("what", success=False, topic="unknown")
     stats = engine.profile.question_type_stats["what"]
     assert stats["failure"] == 1
@@ -802,7 +987,7 @@ def test_get_capability_summary_empty() -> None:
     that sentence. Silence is the honest output.
     """
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     summary = engine.get_capability_summary()
     assert summary == []
 
@@ -814,7 +999,7 @@ def test_get_capability_summary_with_data() -> None:
     the language engine — not this module — realizes the surface form.
     """
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     engine.record_question_outcome("what", success=True, topic="dogs")
     engine.record_question_outcome("why", success=False, topic="unknown")
     summary = engine.get_capability_summary()
@@ -835,7 +1020,7 @@ def test_get_capability_summary_with_data() -> None:
 def test_get_confidence_for_topic_cached() -> None:
     """get_confidence_for_topic returns cached confidence."""
     network = _make_rich_network()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     # First call assesses and caches
     conf1 = engine.get_confidence_for_topic("dogs")
     # Second call returns cached value
@@ -846,7 +1031,7 @@ def test_get_confidence_for_topic_cached() -> None:
 def test_get_confidence_for_topic_unknown() -> None:
     """get_confidence_for_topic returns 0 for unknown topics."""
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     assert engine.get_confidence_for_topic("unknown") == 0.0
 
 
@@ -858,7 +1043,7 @@ def test_get_confidence_for_topic_unknown() -> None:
 def test_should_hedge_low_confidence() -> None:
     """should_hedge returns True for low-confidence topics."""
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     assert engine.should_hedge(["unknown"]) is True
 
 
@@ -873,7 +1058,7 @@ def test_should_hedge_high_confidence() -> None:
         "thousands of years for various purposes including hunting herding "
         "and companionship and have evolved alongside humans"
     )
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     engine.assess_knowledge("dogs")  # cache the confidence
     if engine.get_confidence_for_topic("dogs") >= 0.3:
         assert engine.should_hedge(["dogs"]) is False
@@ -882,7 +1067,7 @@ def test_should_hedge_high_confidence() -> None:
 def test_should_hedge_empty_topics() -> None:
     """should_hedge returns False for no topics."""
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     assert engine.should_hedge([]) is False
 
 
@@ -894,7 +1079,7 @@ def test_should_hedge_empty_topics() -> None:
 def test_get_learning_priorities_empty() -> None:
     """get_learning_priorities returns empty list initially."""
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     priorities = engine.get_learning_priorities()
     assert isinstance(priorities, list)
 
@@ -902,7 +1087,7 @@ def test_get_learning_priorities_empty() -> None:
 def test_get_learning_priorities_with_gaps() -> None:
     """get_learning_priorities includes known gaps first."""
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     engine.record_question_outcome("what", success=False, topic="unknown")
     priorities = engine.get_learning_priorities()
     assert "unknown" in priorities
@@ -916,7 +1101,7 @@ def test_get_learning_priorities_with_gaps() -> None:
 def test_find_weak_concepts_empty() -> None:
     """find_weak_concepts returns empty list for empty network."""
     network = ConceptNetwork()
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     weak = engine.find_weak_concepts()
     assert weak == []
 
@@ -925,7 +1110,7 @@ def test_find_weak_concepts_returns_weak() -> None:
     """find_weak_concepts returns concepts with low confidence."""
     network = ConceptNetwork()
     network.add_concept("weak", properties={"definition": "a weak concept"})
-    engine = SelfAssessmentEngine(network)
+    engine = SelfAssessment(network)
     weak = engine.find_weak_concepts()
     # "weak" has a definition but no relationships → low confidence
     assert any(name == "weak" for name, _ in weak)
@@ -988,7 +1173,7 @@ def _make_emotion(
 
 def _make_network_with_emotion_words() -> ConceptNetwork:
     """A concept network with learned emotion-word associations."""
-    from genesis_conscious.concepts import RelationType
+    from concepts import RelationType
 
     net = _make_network()
     # Add emotion words with category properties AND EXPRESSES edges
@@ -1271,7 +1456,7 @@ def test_self_reflection_fragments() -> None:
     composer = SelfComposer(seed=42)
     sm = _make_self_model()
     net = _make_network()
-    refl = ReflectionEngine(net)
+    refl = Reflection(net)
     emotion = _make_emotion()
 
     fragments = composer.self_reflection_fragments(sm, net, refl, emotion)
@@ -1285,7 +1470,7 @@ def test_self_reflection_fragments_includes_insights() -> None:
     composer = SelfComposer(seed=42)
     sm = _make_self_model()
     net = _make_network()
-    refl = ReflectionEngine(net)
+    refl = Reflection(net)
     refl.insights.append(
         Insight(type="growth", content="I learned about cognition", confidence=0.8)
     )
@@ -1300,7 +1485,7 @@ def test_insight_predicates_silent_without_insights() -> None:
     """With no reflective insights, no predicates — no canned recital."""
     composer = SelfComposer(seed=42)
     net = _make_network()
-    refl = ReflectionEngine(net)
+    refl = Reflection(net)
 
     assert composer.insight_predicates(refl) == []
 
@@ -1309,7 +1494,7 @@ def test_insight_predicates_from_gap() -> None:
     """A gap insight yields predicate fragments about its understanding."""
     composer = SelfComposer(seed=42)
     net = _make_network()
-    refl = ReflectionEngine(net)
+    refl = Reflection(net)
     refl.insights.append(
         Insight(type="gap", content="knowledge gap: memory", confidence=0.7)
     )
@@ -1328,7 +1513,7 @@ def test_insight_predicates_from_missing_concept() -> None:
     """A 'missing concept' gap yields distinct predicates."""
     composer = SelfComposer(seed=42)
     net = _make_network()
-    refl = ReflectionEngine(net)
+    refl = Reflection(net)
     refl.insights.append(
         Insight(type="gap", content="missing concept: qualia", confidence=0.6)
     )
@@ -1343,7 +1528,7 @@ def test_insight_predicates_from_self_correction() -> None:
     """A bare-phrase self-correction yields notice predicates."""
     composer = SelfComposer(seed=42)
     net = _make_network()
-    refl = ReflectionEngine(net)
+    refl = Reflection(net)
     refl.insights.append(
         Insight(
             type="self_correction",
@@ -1362,7 +1547,7 @@ def test_insight_predicates_skips_user_phrased_correction() -> None:
     """A correction phrased about the user yields no predicates."""
     composer = SelfComposer(seed=42)
     net = _make_network()
-    refl = ReflectionEngine(net)
+    refl = Reflection(net)
     refl.insights.append(
         Insight(
             type="self_correction",
@@ -1378,7 +1563,7 @@ def test_insight_predicates_falls_back_to_frameable() -> None:
     """If the latest insight is unframeable, an earlier one is used."""
     composer = SelfComposer(seed=42)
     net = _make_network()
-    refl = ReflectionEngine(net)
+    refl = Reflection(net)
     refl.insights.append(
         Insight(type="gap", content="knowledge gap: memory", confidence=0.7)
     )
@@ -1399,7 +1584,7 @@ def test_insight_predicates_ignores_patterns() -> None:
     """Pattern insights (intent labels) are not used."""
     composer = SelfComposer(seed=42)
     net = _make_network()
-    refl = ReflectionEngine(net)
+    refl = Reflection(net)
     refl.insights.append(
         Insight(
             type="pattern",
@@ -1420,7 +1605,7 @@ def test_insight_predicates_display_name() -> None:
     """
     composer = SelfComposer(seed=42)
     net = _make_network()
-    refl = ReflectionEngine(net)
+    refl = Reflection(net)
     refl.insights.append(
         Insight(
             type="gap",
@@ -1962,7 +2147,7 @@ def test_hierarchy_autobiographical_event_count() -> None:
 def test_reflection_learning() -> None:
     """Detects when new concepts are encountered."""
     net = ConceptNetwork()
-    reflector = ReflectionEngine(net)
+    reflector = Reflection(net)
 
     state = _make_state(
         intent=Intent.QUESTION,
@@ -1975,7 +2160,7 @@ def test_reflection_learning() -> None:
 def test_reflection_gap_detection() -> None:
     """Detects knowledge gaps."""
     net = ConceptNetwork()
-    reflector = ReflectionEngine(net)
+    reflector = Reflection(net)
 
     state = _make_state(
         intent=Intent.QUESTION,
@@ -1988,7 +2173,7 @@ def test_reflection_gap_detection() -> None:
 def test_reflection_honesty_check() -> None:
     """Detects when confidence doesn't match claimed certainty."""
     net = ConceptNetwork()
-    reflector = ReflectionEngine(net)
+    reflector = Reflection(net)
 
     state = _make_state(
         intent=Intent.QUESTION,
@@ -2001,7 +2186,7 @@ def test_reflection_honesty_check() -> None:
 def test_reflection_mood_tracking() -> None:
     """Tracks mood over time."""
     net = ConceptNetwork()
-    reflector = ReflectionEngine(net)
+    reflector = Reflection(net)
 
     for i in range(25):
         valence = 0.4 if i < 15 else -0.3
@@ -2064,7 +2249,7 @@ def test_self_model_sees_her_own_hardware_body() -> None:
     or any of the other hardware signals. She could not know she was
     hot, or out of power, or being stalled.
     """
-    from genesis_conscious.self.model import SelfModel as SM
+    from self.model import SelfModel as SM
 
     body = SM().update_hardware_body(_FullBody())
 
@@ -2088,7 +2273,7 @@ def test_absent_sensor_is_distinguishable_from_measured_zero() -> None:
     reading, and a need derived from the body could be inferred from
     silence. `hardware_sensors_present` counts what actually reported.
     """
-    from genesis_conscious.self.model import SelfModel as SM
+    from self.model import SelfModel as SM
 
     class _PartialBody:
         cpu_temp_c = 60.0
@@ -2113,7 +2298,7 @@ def test_stale_hardware_reading_is_not_actionable() -> None:
     """A need computed from a stale body reading is a hallucinated need."""
     import time as _time
 
-    from genesis_conscious.self.model import SelfModel as SM
+    from self.model import SelfModel as SM
 
     model = SM()
     body = model.update_hardware_body(_FullBody())
@@ -2130,7 +2315,7 @@ def test_stale_hardware_reading_is_not_actionable() -> None:
 
 def test_non_finite_sensor_reading_is_not_a_measurement() -> None:
     """A NaN or inf from a sensor must not enter the self-model."""
-    from genesis_conscious.self.model import SelfModel as SM
+    from self.model import SelfModel as SM
 
     class _BrokenBody:
         cpu_temp_c = float("nan")
@@ -2152,7 +2337,7 @@ def test_hardware_staleness_constant_is_not_a_serialized_field() -> None:
     """
     import dataclasses
 
-    from genesis_conscious.self.model import ComputationalSubstrate
+    from self.model import ComputationalSubstrate
 
     field_names = {f.name for f in dataclasses.fields(ComputationalSubstrate)}
     assert "HARDWARE_STALE_SECONDS" not in field_names

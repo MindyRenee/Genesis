@@ -2,13 +2,13 @@
 
 import pytest
 
-from genesis_conscious.concepts.network import ConceptNetwork
-from genesis_conscious.language.comprehension import (
-    ComprehensionEngine,
+from concepts.network import ConceptNetwork
+from temporal_lobe.comprehension import (
+    Comprehension,
     Proposition,
     SemanticRole,
 )
-from genesis_conscious.language.grounding import SemanticGrounder
+from temporal_lobe.semantic_grounding import SemanticGrounder
 
 
 def test_grounder_binds_existing_concepts_without_mutating_network() -> None:
@@ -74,7 +74,7 @@ def test_comprehension_output_can_be_grounded_without_reparsing() -> None:
     network.add_concept("dog", confidence=0.9)
     network.add_concept("water", confidence=0.8)
 
-    result = ComprehensionEngine().comprehend("The dog drank water.")
+    result = Comprehension().comprehend("The dog drank water.")
     grounded = SemanticGrounder(network).ground_all(result.propositions)
 
     assert grounded

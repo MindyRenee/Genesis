@@ -1,6 +1,6 @@
 """Memory bundle tests — storage, retrieval, consolidation, and spaced repetition.
 
-Tests MemoryEngine (retrieval, context, reconsolidation), EmotionalMemorySystem,
+Tests MemorySystem (retrieval, context, reconsolidation), EmotionalMemorySystem,
 AttractorNetwork, PrimingSystem, SpreadingActivation, and SpacedRepetitionScheduler.
 """
 
@@ -17,25 +17,25 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from concepts import ConceptNetwork, RelationType
 from genesis_client.types import Episode, MemoryStats, SimilarEpisode
-from genesis_conscious.concepts import ConceptNetwork, RelationType
-from genesis_conscious.memory import (
+from memory import (
     AttractorNetwork,
     MemoryContext,
-    MemoryEngine,
     MemoryRecord,
+    MemorySystem,
     ReconsolidationModification,
     ReviewRecord,
     SourceTag,
     SpacedRepetitionScheduler,
 )
-from genesis_conscious.memory.systems import (
+from memory.systems import (
     EmotionalMemorySystem,
     PrimingSystem,
     SpreadingActivation,
     _emotional_similarity,
 )
-from genesis_conscious.sleep import SleepStage
+from sleep import SleepStage
 
 logger = logging.getLogger(__name__)
 
@@ -67,9 +67,9 @@ def _make_mock_client(ltm_count: int = 0) -> MagicMock:
     return client
 
 
-def _make_engine(ltm_count: int = 0) -> MemoryEngine:
-    """Create a MemoryEngine with a mock client."""
-    return MemoryEngine(client=_make_mock_client(ltm_count))
+def _make_engine(ltm_count: int = 0) -> MemorySystem:
+    """Create a MemorySystem with a mock client."""
+    return MemorySystem(client=_make_mock_client(ltm_count))
 
 
 def _make_record(
@@ -234,7 +234,7 @@ def test_store_memory_uses_real_ltm_id() -> None:
 
     This is the critical regression test for the ID-sync bug: previously
     store_memory used store_event (STM path) which doesn't return an ID,
-    so MemoryEngine fabricated a fake ID from ltm_count. Now it uses
+    so MemorySystem fabricated a fake ID from ltm_count. Now it uses
     store_episode which returns the real LTM ID synchronously. The
     MemoryRecord, attractor key, and synaptic consolidation must all
     use this real ID.
@@ -266,7 +266,7 @@ def test_store_memory_real_id_not_ltm_count() -> None:
     client = _make_mock_client(ltm_count=50)
     client.store_episode.side_effect = None
     client.store_episode.return_value = 200
-    engine = MemoryEngine(client=client)
+    engine = MemorySystem(client=client)
     ok = engine.store_memory("post-archive memory", salience=0.5)
     assert ok is True
     # Must use 200 (real ID), not 51 (ltm_count + 1)
@@ -1142,10 +1142,10 @@ def _make_engine_with_record(
     salience: float = 0.5,
     retention: float = 0.8,
     synaptic_strength: float = 0.5,
-) -> tuple[MemoryEngine, MemoryRecord]:
-    """Create a MemoryEngine with a pre-registered memory record."""
+) -> tuple[MemorySystem, MemoryRecord]:
+    """Create a MemorySystem with a pre-registered memory record."""
     client = _make_mock_client_recons()
-    engine = MemoryEngine(client=client)
+    engine = MemorySystem(client=client)
     rec = MemoryRecord(
         episode_id=episode_id,
         salience=salience,
@@ -1323,8 +1323,8 @@ def _make_engine_with_source(
     source: str = "conversation",
     confidence: float = 0.8,
     access_count: int = 0,
-) -> tuple[MemoryEngine, MemoryRecord]:
-    """Create a MemoryEngine with a record that has a source tag."""
+) -> tuple[MemorySystem, MemoryRecord]:
+    """Create a MemorySystem with a record that has a source tag."""
     engine, rec = _make_engine_with_record(episode_id=episode_id)
     rec.source_tag = SourceTag(source=source, modality="text", confidence=confidence)
     rec.access_count = access_count
@@ -1334,7 +1334,7 @@ def _make_engine_with_source(
 def test_store_memory_creates_source_tag():
     """store_memory with source= should create a SourceTag on the record."""
     client = _make_mock_client_recons(ltm_count=1)
-    engine = MemoryEngine(client=client)
+    engine = MemorySystem(client=client)
 
     engine.store_memory(text="test memory", salience=0.5, source="conversation")
 
@@ -1351,7 +1351,7 @@ def test_store_memory_creates_source_tag():
 def test_store_memory_invalid_source_defaults_to_unknown():
     """store_memory with an invalid source string should default to 'unknown'."""
     client = _make_mock_client_recons(ltm_count=1)
-    engine = MemoryEngine(client=client)
+    engine = MemorySystem(client=client)
 
     engine.store_memory(text="test", source="bogus_source")
 
@@ -1661,7 +1661,7 @@ def test_replay_does_not_touch_forgotten_memories():
 def test_replay_respects_sample_size_limit():
     """Replay should not exceed the sample size limit."""
     client = _make_mock_client_recons(ltm_count=1)
-    engine = MemoryEngine(client=client)
+    engine = MemorySystem(client=client)
     # Create 20 old memories
     old_time = int(time.time() * 1000) - 999_999_999
     for i in range(1, 21):
@@ -1680,7 +1680,7 @@ def test_replay_respects_sample_size_limit():
 def test_replay_empty_store_does_nothing():
     """Replay with no memories should return 0."""
     client = _make_mock_client_recons(ltm_count=0)
-    engine = MemoryEngine(client=client)
+    engine = MemorySystem(client=client)
 
     replayed = engine._replay_old_memories(recent_cutoff=int(time.time() * 1000))
 
@@ -1690,10 +1690,10 @@ def test_replay_empty_store_does_nothing():
 
 def test_replay_integrated_with_n3_consolidation():
     """N3 consolidation should include experience replay."""
-    from genesis_conscious.sleep import SleepStage
+    from sleep import SleepStage
 
     client = _make_mock_client_recons(ltm_count=1)
-    engine = MemoryEngine(client=client)
+    engine = MemorySystem(client=client)
     # Create an old memory
     old_time = int(time.time() * 1000) - 999_999_999
     rec = MemoryRecord(episode_id=1, retention=0.5, encoded_at=old_time)

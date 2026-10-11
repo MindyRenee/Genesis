@@ -1566,30 +1566,20 @@ fn test_engine_load_v1_file_still_works() {
 
 #[test]
 fn test_kalman_predict_step_propagates_variance() {
-    // The Kalman predict step (prior_var = belief_var + Q) makes the
-    // posterior variance functional: it is propagated forward and
-    // consumed by the free-energy computation. The observable
-    // signature is that the free energy remains strictly positive
-    // under sustained predictability even when precision has saturated
-    // at 1.0 — because the posterior variance (belief_var), while
-    // small, is nonzero and contributes to the expected-uncertainty
-    // term.
-    //
-    // Before the fix, belief_var was dead state: the expected
-    // uncertainty was (1 - precision) * W, which is exactly 0 at
-    // precision 1.0. With the functional posterior, the expected
-    // uncertainty is ((1 - precision) + normalized_belief_var) * 0.5
-    // * W, which is nonzero even at precision 1.0 because belief_var
-    // > 0 (the steady-state posterior variance under process noise).
-    // This test would fail with the old dead belief_var (FE = 0) and
-    // passes with the functional posterior (FE > 0).
+    // Propagated variance enters the full Gaussian variational objective.
+    // For continuous observations, negative log density can be negative;
+    // this is not a non-negative error norm. The bounded control signal
+    // instead measures excess energy above a matched-observation reference.
     let mut engine = ActiveInferenceEngine::new();
     let state = [0.5f32; NEUROCHEMICAL_COUNT];
 
     // Run enough ticks for precision to saturate at 1.0 (recovers at
     // 0.002/tick from 0.5 → 250 ticks to reach 1.0).
+    let mut variational_energy = 0.0;
     for _ in 0..300 {
-        engine.cycle(&state, &state, 0.1, &state);
+        variational_energy = engine
+            .cycle(&state, &state, 0.1, &state)
+            .variational_free_energy_nats;
     }
 
     // Precision should be at or near 1.0.
@@ -1599,22 +1589,17 @@ fn test_kalman_predict_step_propagates_variance() {
         engine.precision()
     );
 
-    // The free energy should be strictly positive, reflecting the
-    // posterior variance contribution. With the old dead belief_var,
-    // FE would be exactly 0 here (surprise=0, (1-precision)*W=0,
-    // complexity=0). With the functional posterior, FE > 0 because
-    // belief_var > 0 at steady state (process noise prevents it from
-    // reaching zero).
+    // Full VFE retains likelihood normalization and uncertainty at rest.
+    // The normalized excess control signal vanishes for matched observations.
+    assert!(
+        variational_energy.is_finite() && variational_energy < 0.0,
+        "Gaussian VFE should reflect the concentrated predictive density: F={}",
+        variational_energy
+    );
     let fe = engine.signals().free_energy;
     assert!(
-        fe > 0.0,
-        "free energy should be positive at max precision, reflecting \
-         the functional posterior variance: fe={}",
-        fe
-    );
-    assert!(
-        fe < 0.05,
-        "free energy should be small under sustained predictability: fe={}",
+        (0.0..0.05).contains(&fe),
+        "excess free energy should be small under sustained predictability: fe={}",
         fe
     );
 }

@@ -24,7 +24,7 @@ from prune_dead_concepts import (
     prune_state,
 )
 
-from genesis_conscious.concepts import (
+from concepts import (
     QUALITY_THRESHOLD,
     Concept,
     ConceptCategory,
@@ -37,9 +37,9 @@ from genesis_conscious.concepts import (
     is_world_concept,
     open_archive,
 )
-from genesis_conscious.concepts.edge_log import open_edge_log
-from genesis_conscious.memory import SemanticMemory
-from genesis_conscious.memory.semantic import _relation_to_edge
+from concepts.edge_log import open_edge_log
+from memory import SemanticMemory
+from memory.semantic import _relation_to_edge
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ def _c(net: ConceptNetwork, name: str) -> Concept:
 
 def test_network_quality_properties() -> None:
     """Mean edge weight, concept confidence, and density are exposed."""
-    from genesis_conscious.concepts import (
+    from concepts import (
         ConceptNetwork,
         RelationType,
     )
@@ -1104,7 +1104,7 @@ def test_cortical_tick_stability() -> None:
 def test_utterance_words_provenance() -> None:
     """Utterance word retrieval exposes seed vs learned provenance."""
     net = ConceptNetwork()
-    from genesis_conscious.language import Vocabulary
+    from temporal_lobe.vocabulary import Vocabulary
     Vocabulary(seed=42, network=net)  # seeds utterance words into net
 
     items = net.find_utterance_words_with_provenance("greeting_word")
@@ -1673,7 +1673,7 @@ def test_spill_reports_when_it_trims_nothing(caplog) -> None:
     """
     import logging
 
-    caplog.set_level(logging.DEBUG, logger="genesis_conscious.concepts.archival")
+    caplog.set_level(logging.DEBUG, logger="concepts.archival")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         net = _make_network_with_archive(tmpdir)
@@ -1713,7 +1713,7 @@ def test_spill_warns_if_working_memory_did_not_shrink(caplog) -> None:
     """
     import logging
 
-    caplog.set_level(logging.ERROR, logger="genesis_conscious.concepts.archival")
+    caplog.set_level(logging.ERROR, logger="concepts.archival")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         net = _make_network_with_archive(tmpdir)
@@ -2053,7 +2053,7 @@ def test_is_world_concept_accepts_genuine_concepts(concept_id: str) -> None:
         # Code symbols
         "python:mind.deny_site",
         "rust:state.neurochemical",
-        "python:genesis_conscious.concepts.conceptnetwork",
+        "python:concepts.network",
         "python:brain_waves.compute_gamma_synchrony",
         # Structural hubs
         "_cat:emotion:joy",
@@ -2175,9 +2175,9 @@ def test_world_concept_ids_empty_network() -> None:
 def test_curiosity_engine_skips_non_world_concepts() -> None:
     """The curiosity engine should not generate questions about
     code symbols or function words."""
-    from genesis_conscious.learning import CuriosityEngine
-    from genesis_conscious.limbic_system.emotion import EmotionalState
-    from genesis_conscious.reasoning import ReasoningEngine
+    from frontal_lobe.reasoning import Reasoner
+    from limbic_system.curiosity import Curiosity
+    from limbic_system.emotion import EmotionalState
 
     net = ConceptNetwork()
     # Add a code symbol with high activation
@@ -2196,8 +2196,8 @@ def test_curiosity_engine_skips_non_world_concepts() -> None:
     if c:
         c.activation = 1.0
 
-    reasoning = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoning)
+    reasoning = Reasoner(net)
+    curiosity = Curiosity(net, reasoning)
 
     emotion = EmotionalState(
         label="neutral",
@@ -2222,12 +2222,13 @@ def test_curiosity_engine_skips_non_world_concepts() -> None:
 
 def test_autonomous_learner_add_topic_rejects_garbage() -> None:
     """add_topic should reject code symbols and function words."""
-    from genesis_conscious.learning import AutonomousLearner, CuriosityEngine
-    from genesis_conscious.reasoning import ReasoningEngine
+    from frontal_lobe.autonomous import AutonomousLearner
+    from frontal_lobe.reasoning import Reasoner
+    from limbic_system.curiosity import Curiosity
 
     net = ConceptNetwork()
-    reasoning = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoning)
+    reasoning = Reasoner(net)
+    curiosity = Curiosity(net, reasoning)
     learner = AutonomousLearner(
         network=net,
         curiosity=curiosity,
@@ -2483,13 +2484,13 @@ def test_dream_concept_ids_falls_back_to_world() -> None:
 def test_curiosity_engine_prefers_quality_concepts() -> None:
     """When selecting from activation (idle curiosity), the curiosity
     engine should prefer high-quality concepts over low-quality ones."""
-    from genesis_conscious.learning import CuriosityEngine
-    from genesis_conscious.limbic_system.emotion import EmotionalState
-    from genesis_conscious.reasoning import ReasoningEngine
+    from frontal_lobe.reasoning import Reasoner
+    from limbic_system.curiosity import Curiosity
+    from limbic_system.emotion import EmotionalState
 
     net = ConceptNetwork()
-    reasoning = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoning)
+    reasoning = Reasoner(net)
+    curiosity = Curiosity(net, reasoning)
 
     # Add low-quality concepts with high activation
     for name in ["zzz_low_1", "zzz_low_2", "zzz_low_3", "zzz_low_4", "zzz_low_5"]:
@@ -3638,7 +3639,7 @@ def test_clean_noise_keeps_concepts_when_the_archive_write_fails(caplog) -> None
     import sqlite3
 
     net = _noise_network(6)
-    caplog.set_level(logging.ERROR, logger="genesis_conscious.concepts.network")
+    caplog.set_level(logging.ERROR, logger="concepts.network")
 
     def boom(items):
         raise sqlite3.OperationalError("disk I/O error")
@@ -3658,7 +3659,7 @@ def test_clean_noise_reports_what_it_did(caplog) -> None:
     import logging
 
     net = _noise_network(4)
-    caplog.set_level(logging.INFO, logger="genesis_conscious.concepts.network")
+    caplog.set_level(logging.INFO, logger="concepts.network")
 
     net.clean_noise(min_confidence=0.4, min_edges=1)
 

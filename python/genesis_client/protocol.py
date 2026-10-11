@@ -48,6 +48,7 @@ __all__ = [
     "CHEM_VASOPRESSIN",
     "CONSOLIDATE",
     "DREAM",
+    "DROP_TENSOR",
     "ERROR_INTERNAL_ERROR",
     "ERROR_INVALID_VALUE",
     "ERROR_OK",
@@ -62,6 +63,7 @@ __all__ = [
     "GET_INFERENCE_SUMMARY",
     "GET_ION_SUMMARY",
     "GET_MEMORY_STATS",
+    "GET_MOTOR_TARGET",
     "GET_NEURO_SUMMARY",
     "GET_PHASE",
     "GET_PLASTICITY_PROFILE",
@@ -70,8 +72,10 @@ __all__ = [
     "GET_SENSOR_PRESENCE",
     "GET_STATE",
     "GET_SUBSYSTEM_TELEMETRY",
+    "GET_TENSOR",
     "GET_ZONE_TRANSITIONS",
     "HANDSHAKE",
+    "LIST_TENSORS",
     "MAX_MESSAGE_LEN",
     "MODULE_ATTENTION",
     "MODULE_DREAMING",
@@ -109,6 +113,7 @@ __all__ = [
     "PHASE_STRESS",
     "PING",
     "PROTOCOL_VERSION",
+    "PUT_TENSOR",
     "READ_SENSORS",
     "RETRIEVE_EPISODE",
     "SAVE_INFERENCE",
@@ -282,6 +287,24 @@ GET_ZONE_TRANSITIONS = 37
 # Additive: no BodyState layout changed.
 GET_PROCESS_HEALTH = 38
 
+# ─── Tensor slab ──────────────────────────────────────────────
+# Named multidimensional tensors shared between the daemon and the
+# mind — world frames, salience fields, embeddings, motor fields.
+# Wire layouts live in `genesis_client/tensor.py` and mirror
+# `src/daemon/tensor_slab.rs`; the slab is process-local daemon state.
+# All five commands are additive — no BodyState/CoreState layout
+# changes — so PROTOCOL_VERSION stays 3.
+
+PUT_TENSOR = 41
+GET_TENSOR = 42
+LIST_TENSORS = 43
+DROP_TENSOR = 44
+# Decode the published motor fields (`motor.spatial` +
+# `motor.actions`) into a concrete action/grid target on the daemon's
+# canonical 64×64 coordinate grid (`src/field/motor.rs`). Response is
+# a fixed 12 bytes — see `tensor.unpack_motor_target`.
+GET_MOTOR_TARGET = 45
+
 SUBSYSTEM_DAEMON = 0
 SUBSYSTEM_COGNITIVE = 1
 SUBSYSTEM_RETINA = 2
@@ -415,7 +438,7 @@ DT_NOMINAL_STEP = 0.2
 # Reserved / unwired: the IPC channel is strictly request-response,
 # so the daemon never sends these today. The cognitive mind detects
 # phase changes and dream insights by polling instead — see
-# ``genesis_conscious/infrastructure/notifications.py`` (a pull-based
+# ``infrastructure/notifications.py`` (a pull-based
 # queue). These
 # IDs reserve the 100+ opcode range for a future push mechanism and
 # mirror the Rust ``notify`` module in ``src/daemon/ipc.rs``.

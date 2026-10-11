@@ -10,20 +10,20 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-from genesis_conscious.cognition import CognitiveState
-from genesis_conscious.concepts import ConceptNetwork
-from genesis_conscious.language.base import Thought
-from genesis_conscious.limbic_system.emotion import EmotionalState
-from genesis_conscious.memory import MemoryContext
-from genesis_conscious.perception import Intent, Perception, QuestionType
-from genesis_conscious.self import (
+from concepts import ConceptNetwork
+from frontal_lobe import CognitiveState
+from limbic_system.emotion import EmotionalState
+from memory import MemoryContext
+from perception import Intent, Perception, QuestionType
+from self import (
     CognitiveProcessModel,
     Insight,
     MetacognitiveFeedback,
     MetacognitivePrediction,
-    ReflectionEngine,
+    Reflection,
 )
-from genesis_conscious.thalamus.brain_waves import BrainWave, BrainWaveState
+from temporal_lobe.base import Thought
+from thalamus.brain_waves import BrainWave, BrainWaveState
 
 
 def _make_state(
@@ -211,7 +211,7 @@ def test_spawn_level_on_sustained_surprise() -> None:
     predict this, so its surprise stays high, and after enough cycles
     a new level should spawn.
     """
-    from genesis_conscious.self.metacognitive_model import (
+    from self.metacognitive_model import (
         SPAWN_PERSISTENCE,
     )
 
@@ -242,7 +242,7 @@ def test_prune_level_on_sustained_predictability() -> None:
     outcomes very consistent. The spawned level should eventually
     be pruned because it's no longer adding information.
     """
-    from genesis_conscious.self.metacognitive_model import (
+    from self.metacognitive_model import (
         PRUNE_MIN_AGE,
     )
 
@@ -276,7 +276,7 @@ def test_prune_level_on_sustained_predictability() -> None:
 
 def test_depth_never_exceeds_max() -> None:
     """The model never exceeds MAX_LEVELS."""
-    from genesis_conscious.self.metacognitive_model import MAX_LEVELS
+    from self.metacognitive_model import MAX_LEVELS
 
     model = CognitiveProcessModel()
     state = _make_state()
@@ -380,19 +380,19 @@ def test_persistence_backward_compatible() -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Integration with ReflectionEngine
+# Integration with Reflection
 # ═══════════════════════════════════════════════════════════════════
 
 
 def test_reflection_engine_has_metacognitive_model() -> None:
-    """ReflectionEngine creates a CognitiveProcessModel."""
-    engine = ReflectionEngine(ConceptNetwork())
+    """Reflection creates a CognitiveProcessModel."""
+    engine = Reflection(ConceptNetwork())
     assert isinstance(engine.metacognitive_model, CognitiveProcessModel)
 
 
 def test_reflection_updates_metacognitive_model() -> None:
     """reflect() updates the metacognitive model's feedback."""
-    engine = ReflectionEngine(ConceptNetwork())
+    engine = Reflection(ConceptNetwork())
     state = _make_state()
     engine.reflect(state, "test response")
     assert engine.metacognitive_model.feedback is not None
@@ -401,7 +401,7 @@ def test_reflection_updates_metacognitive_model() -> None:
 
 def test_reflection_predicts_before_reflecting() -> None:
     """reflect() stores the prediction before running checks."""
-    engine = ReflectionEngine(ConceptNetwork())
+    engine = Reflection(ConceptNetwork())
     state = _make_state()
     engine.reflect(state, "test response")
     assert engine.metacognitive_model.last_prediction is not None
@@ -410,7 +410,7 @@ def test_reflection_predicts_before_reflecting() -> None:
 
 def test_multiple_reflections_accumulate_cycles() -> None:
     """Multiple reflect() calls increment the cycle count."""
-    engine = ReflectionEngine(ConceptNetwork())
+    engine = Reflection(ConceptNetwork())
     state = _make_state()
     for _ in range(5):
         engine.reflect(state, "test response")
@@ -449,7 +449,7 @@ def test_self_surprise_returns_float() -> None:
 
 def test_delta_skips_deep_reflection_by_default() -> None:
     """Delta brain wave skips deep reflection when surprise is low."""
-    engine = ReflectionEngine(ConceptNetwork())
+    engine = Reflection(ConceptNetwork())
     # First cycle with non-delta to establish low-surprise feedback.
     state_normal = _make_state(brain_wave=BrainWave.ALPHA)
     engine.reflect(state_normal, "test response")
@@ -475,7 +475,7 @@ def test_high_metacognitive_surprise_overrides_delta_skip() -> None:
     import random
 
     rng = random.Random(42)  # deterministic for reproducibility
-    engine = ReflectionEngine(ConceptNetwork())
+    engine = Reflection(ConceptNetwork())
     state = _make_state(brain_wave=BrainWave.ALPHA)
 
     # Phase 1: train with random outcomes to drive up surprise.
@@ -539,7 +539,7 @@ def test_last_prediction_available_before_reflection() -> None:
     cycle) to pre-hedge the current response. This test verifies
     the prediction is stored and accessible.
     """
-    engine = ReflectionEngine(ConceptNetwork())
+    engine = Reflection(ConceptNetwork())
     state = _make_state()
     # Before any reflection, last_prediction is None.
     assert engine.metacognitive_model.last_prediction is None

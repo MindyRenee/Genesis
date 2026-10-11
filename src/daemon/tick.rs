@@ -46,11 +46,11 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::cognition::{IntentionManager, SelfModel};
+use crate::field::{FieldIntegration, FieldRuntime};
 use crate::state::neurochemical::{NeuroTickParams, NeurochemicalId};
 use crate::state::{CognitiveZone, MentalPhase, ModuleId, ModuleStatus, subcognitive_flag};
 use crate::store::ring_buffer::EventType;
 use crate::store::{LtmStore, MmapState, RingBuffer};
-use crate::field::{FieldIntegration, FieldRuntime};
 
 use super::active_inference::{
     ActiveInferenceEngine, DyadicSignals, apply_inference_feedback, impulse_offset_to_rate,

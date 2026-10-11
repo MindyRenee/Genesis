@@ -7,15 +7,15 @@ from dataclasses import dataclass
 
 import pytest
 
+from concepts import ConceptNetwork, RelationType
+from frontal_lobe.reasoning import Reasoner, ReasoningType
 from genesis_client.types import NeuroSummary, RecentEpisode
-from genesis_conscious.concepts import ConceptNetwork, RelationType
-from genesis_conscious.limbic_system.emotion import EmotionalState
-from genesis_conscious.mind import Mind
-from genesis_conscious.reasoning import ReasoningEngine, ReasoningType
-from genesis_conscious.sleep import (
+from limbic_system.emotion import EmotionalState
+from mind import Mind
+from sleep import (
     DreamInsight,
     DreamProposal,
-    DreamSynthesisEngine,
+    DreamSynthesis,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,14 +67,14 @@ def contradiction_network() -> ConceptNetwork:
 
 
 class TestDreamSynthesis:
-    """Tests for the DreamSynthesisEngine.synthesize method."""
+    """Tests for the DreamSynthesis.synthesize method."""
 
     def test_finds_structurally_similar_unconnected_pairs(self, network) -> None:
         """Synthesis should find unconnected pairs with similar structure."""
         # Before synthesis, dog-cat should have no direct edge
         assert not _has_direct_edge(network, "dog", "cat", RelationType.SIMILAR_TO)
 
-        engine = DreamSynthesisEngine(network)
+        engine = DreamSynthesis(network)
         proposals = engine.synthesize(max_proposals=10)
 
         # Should find at least some proposals (dog-cat, car-truck)
@@ -88,7 +88,7 @@ class TestDreamSynthesis:
 
     def test_proposes_similar_to_for_is_a_leaves(self, network):
         """IS_A leaves should get SIMILAR_TO proposals."""
-        engine = DreamSynthesisEngine(network)
+        engine = DreamSynthesis(network)
         proposals = engine.synthesize(max_proposals=10)
 
         # At least one proposal should be SIMILAR_TO
@@ -97,7 +97,7 @@ class TestDreamSynthesis:
 
     def test_stores_hypothetical_edges_in_network(self, network):
         """Synthesis should add hypothetical edges to the network."""
-        engine = DreamSynthesisEngine(network)
+        engine = DreamSynthesis(network)
         proposals = engine.synthesize(max_proposals=10)
 
         # The network should now have dream-synthesis edges
@@ -114,7 +114,7 @@ class TestDreamSynthesis:
     def test_empty_network_returns_no_proposals(self):
         """An empty network should produce no proposals."""
         net = ConceptNetwork()
-        engine = DreamSynthesisEngine(net)
+        engine = DreamSynthesis(net)
         proposals = engine.synthesize()
         assert proposals == []
 
@@ -122,7 +122,7 @@ class TestDreamSynthesis:
         """A network with one concept should produce no proposals."""
         net = ConceptNetwork()
         net.add_edge("dog", "animal", RelationType.IS_A, weight=0.9)
-        engine = DreamSynthesisEngine(net)
+        engine = DreamSynthesis(net)
         proposals = engine.synthesize()
         assert proposals == []
 
@@ -130,7 +130,7 @@ class TestDreamSynthesis:
         """Pairs that already have an edge should not be proposed."""
         # Connect dog and cat with a non-dream edge
         network.add_edge("dog", "cat", RelationType.SIMILAR_TO, weight=0.8, origin="stated")
-        engine = DreamSynthesisEngine(network)
+        engine = DreamSynthesis(network)
         proposals = engine.synthesize(max_proposals=10)
 
         # No proposal should be between dog and cat (already connected)
@@ -145,7 +145,7 @@ class TestDreamSynthesis:
         net.add_edge("dog", "animal", RelationType.IS_A, weight=0.9)
         # fire causes smoke (outgoing CAUSES only) — completely different signature
         net.add_edge("fire", "smoke", RelationType.CAUSES, weight=0.9)
-        engine = DreamSynthesisEngine(net)
+        engine = DreamSynthesis(net)
         proposals = engine.synthesize(max_proposals=10)
         # dog and fire have no shared structural signature → no proposal
         for p in proposals:
@@ -154,13 +154,13 @@ class TestDreamSynthesis:
 
     def test_max_proposals_limit(self, network):
         """Synthesis should respect the max_proposals limit."""
-        engine = DreamSynthesisEngine(network)
+        engine = DreamSynthesis(network)
         proposals = engine.synthesize(max_proposals=2)
         assert len(proposals) <= 2
 
 
 class TestDreamValidation:
-    """Tests for the DreamSynthesisEngine.validate method."""
+    """Tests for the DreamSynthesis.validate method."""
 
     def test_promotes_edge_with_sufficient_corroborations(self, network):
         """An edge with >= 2 corroborating paths should be promoted."""
@@ -172,7 +172,7 @@ class TestDreamValidation:
         network.add_edge("dog", "pet", RelationType.SIMILAR_TO, weight=0.6)
         network.add_edge("cat", "pet", RelationType.SIMILAR_TO, weight=0.6)
 
-        engine = DreamSynthesisEngine(network)
+        engine = DreamSynthesis(network)
         proposal = DreamProposal(
             source="dog",
             target="cat",
@@ -188,7 +188,7 @@ class TestDreamValidation:
 
     def test_drops_contradicted_edge(self, contradiction_network):
         """An edge contradicted by OPPOSITE_OF should be dropped."""
-        engine = DreamSynthesisEngine(contradiction_network)
+        engine = DreamSynthesis(contradiction_network)
         proposal = DreamProposal(
             source="hot",
             target="cold",
@@ -204,7 +204,7 @@ class TestDreamValidation:
 
     def test_insufficient_evidence_remains_hypothetical(self, network):
         """An edge with < 2 corroborations should remain hypothetical."""
-        engine = DreamSynthesisEngine(network)
+        engine = DreamSynthesis(network)
         proposal = DreamProposal(
             source="dog",
             target="cat",
@@ -221,7 +221,7 @@ class TestDreamValidation:
 
     def test_transitive_chain_provides_corroboration(self, causal_network):
         """A transitive CAUSES chain should count as corroboration."""
-        engine = DreamSynthesisEngine(causal_network)
+        engine = DreamSynthesis(causal_network)
         # Propose fire CAUSES burn (supported by fire→heat→burn chain)
         proposal = DreamProposal(
             source="fire",
@@ -244,7 +244,7 @@ class TestDreamValidation:
         network.add_edge("dog", "pet", RelationType.SIMILAR_TO, weight=0.6)
         network.add_edge("cat", "pet", RelationType.SIMILAR_TO, weight=0.6)
 
-        engine = DreamSynthesisEngine(network)
+        engine = DreamSynthesis(network)
         # First synthesize to create the hypothetical edge
         engine.synthesize(max_proposals=10)
         # Then validate
@@ -269,7 +269,7 @@ class TestDreamValidation:
         network.add_edge("dog", "pet", RelationType.SIMILAR_TO, weight=0.6)
         network.add_edge("cat", "pet", RelationType.SIMILAR_TO, weight=0.6)
 
-        engine = DreamSynthesisEngine(network)
+        engine = DreamSynthesis(network)
         proposal = DreamProposal(
             source="dog",
             target="cat",
@@ -289,7 +289,7 @@ class TestDreamReview:
 
     def test_review_finds_pending_edges(self, network):
         """Review should find and validate all dream-synthesis edges."""
-        engine = DreamSynthesisEngine(network)
+        engine = DreamSynthesis(network)
         engine.synthesize(max_proposals=10)
 
         results = engine.review_pending_proposals()
@@ -298,7 +298,7 @@ class TestDreamReview:
 
     def test_review_no_pending_returns_empty(self, network):
         """Review with no pending edges should return empty list."""
-        engine = DreamSynthesisEngine(network)
+        engine = DreamSynthesis(network)
         results = engine.review_pending_proposals()
         assert results == []
 
@@ -308,7 +308,7 @@ class TestDreamPersistence:
 
     def test_to_dict_and_restore(self, network):
         """State should survive a to_dict/restore_from_dict round-trip."""
-        engine = DreamSynthesisEngine(network)
+        engine = DreamSynthesis(network)
         # Add a fake insight
         engine._validated_insights.append(DreamInsight(
             source="dog",
@@ -321,7 +321,7 @@ class TestDreamPersistence:
         engine._rejected_count = 2
 
         data = engine.to_dict()
-        engine2 = DreamSynthesisEngine(network)
+        engine2 = DreamSynthesis(network)
         engine2.restore_from_dict(data)
 
         assert engine2.insight_count == 1
@@ -333,7 +333,7 @@ class TestDreamPersistence:
 
     def test_restore_empty_data(self, network):
         """Restoring from empty data should not crash."""
-        engine = DreamSynthesisEngine(network)
+        engine = DreamSynthesis(network)
         engine.restore_from_dict({})
         assert engine.insight_count == 0
         assert engine.proposed_count == 0
@@ -350,7 +350,7 @@ class TestDreamIntegration:
         network.add_edge("dog", "pet", RelationType.SIMILAR_TO, weight=0.6)
         network.add_edge("cat", "pet", RelationType.SIMILAR_TO, weight=0.6)
 
-        engine = DreamSynthesisEngine(network)
+        engine = DreamSynthesis(network)
         # Synthesize
         proposals = engine.synthesize(max_proposals=10)
         assert len(proposals) > 0
@@ -368,7 +368,7 @@ class TestDreamIntegration:
 
     def test_stats_tracking(self, network):
         """Stats should track proposed, validated, and rejected counts."""
-        engine = DreamSynthesisEngine(network)
+        engine = DreamSynthesis(network)
         engine.synthesize(max_proposals=10)
         initial_proposed = engine.proposed_count
         assert initial_proposed > 0
@@ -460,7 +460,7 @@ def _add_corroborating_evidence(net: ConceptNetwork) -> None:
     net.add_edge("fire", "sun", RelationType.SIMILAR_TO, weight=0.6)
 
 
-def _has_analogical_heat_insight(engine: ReasoningEngine) -> bool:
+def _has_analogical_heat_insight(engine: Reasoner) -> bool:
     """Check if the reasoning engine can infer 'star might cause heat'.
 
     This requires analogical transfer: star similar_to X, X causes heat.
@@ -482,7 +482,7 @@ class TestDreamSynthesisImprovesReasoning:
         """Before dream synthesis, the reasoning engine cannot infer
         that star might cause heat (no SIMILAR_TO edge to transfer through)."""
         net = _build_base_network()
-        engine = ReasoningEngine(net)
+        engine = Reasoner(net)
 
         assert not _has_analogical_heat_insight(engine), (
             "Reasoning engine should NOT be able to infer 'star causes heat' "
@@ -493,7 +493,7 @@ class TestDreamSynthesisImprovesReasoning:
         """Dream synthesis should find that star and fire are structurally
         similar (same signature: IS_A + CAUSES) and propose a SIMILAR_TO edge."""
         net = _build_base_network()
-        dream = DreamSynthesisEngine(net)
+        dream = DreamSynthesis(net)
 
         proposals = dream.synthesize(max_proposals=10)
 
@@ -514,7 +514,7 @@ class TestDreamSynthesisImprovesReasoning:
         net = _build_base_network()
 
         # Sleep: synthesize proposals
-        dream = DreamSynthesisEngine(net)
+        dream = DreamSynthesis(net)
         dream.synthesize(max_proposals=10)
 
         # Wake: encounter corroborating evidence
@@ -536,14 +536,14 @@ class TestDreamSynthesisImprovesReasoning:
         net = _build_base_network()
 
         # Before dream synthesis: no analogical heat insight
-        engine_before = ReasoningEngine(net)
+        engine_before = Reasoner(net)
         assert not _has_analogical_heat_insight(engine_before), (
             "Before dream synthesis, reasoning should NOT produce "
             "an analogical insight about star and heat"
         )
 
         # Sleep: run dream synthesis
-        dream = DreamSynthesisEngine(net)
+        dream = DreamSynthesis(net)
         dream.synthesize(max_proposals=10)
 
         # Wake: encounter corroborating evidence
@@ -553,7 +553,7 @@ class TestDreamSynthesisImprovesReasoning:
         dream.review_pending_proposals()
 
         # After dream synthesis: the analogical heat insight should exist
-        engine_after = ReasoningEngine(net)
+        engine_after = Reasoner(net)
         assert _has_analogical_heat_insight(engine_after), (
             "After dream synthesis, reasoning SHOULD produce an analogical "
             "insight: 'star might cause heat, by analogy with fire' — "
@@ -579,7 +579,7 @@ class TestDreamSynthesisImprovesReasoning:
         net = _build_base_network()
 
         # ── 2. Confirm reasoning can't bridge the gap ──────────────
-        engine_before = ReasoningEngine(net)
+        engine_before = Reasoner(net)
         results_before = engine_before.reason_about("star")
         analogical_before = [
             r for r in results_before
@@ -591,7 +591,7 @@ class TestDreamSynthesisImprovesReasoning:
         )
 
         # ── 3. Sleep: dream synthesis proposes a novel connection ──
-        dream = DreamSynthesisEngine(net)
+        dream = DreamSynthesis(net)
         proposals = dream.synthesize(max_proposals=10)
         assert len(proposals) > 0, "Dream synthesis should produce proposals"
 
@@ -622,7 +622,7 @@ class TestDreamSynthesisImprovesReasoning:
         )
 
         # ── 6. Confirm reasoning can now bridge the gap ────────────
-        engine_after = ReasoningEngine(net)
+        engine_after = Reasoner(net)
         results_after = engine_after.reason_about("star")
         analogical_after = [
             r for r in results_after
@@ -660,7 +660,7 @@ class TestDreamSynthesisImprovesReasoning:
         net = _build_base_network()
 
         # Before: count analogical results
-        engine_before = ReasoningEngine(net)
+        engine_before = Reasoner(net)
         before_results = engine_before.reason_about("star")
         before_analogical = [
             r for r in before_results
@@ -668,13 +668,13 @@ class TestDreamSynthesisImprovesReasoning:
         ]
 
         # Sleep + wake + validate
-        dream = DreamSynthesisEngine(net)
+        dream = DreamSynthesis(net)
         dream.synthesize(max_proposals=10)
         _add_corroborating_evidence(net)
         dream.review_pending_proposals()
 
         # After: count analogical results
-        engine_after = ReasoningEngine(net)
+        engine_after = Reasoner(net)
         after_results = engine_after.reason_about("star")
         after_analogical = [
             r for r in after_results
@@ -741,7 +741,7 @@ def _make_mind(episodes: dict[int, str], concepts: list[str]) -> Mind:
     socket_path = os.path.join(data_dir, "genesis.sock")
     mind = Mind(socket_path)
     mind.client = _MockDreamClient(episodes)  # type: ignore[assignment]
-    mind.cognition = _MockDreamCognition(concepts)  # type: ignore[assignment]
+    mind.brain.frontal = _MockDreamCognition(concepts)  # type: ignore[assignment]
     return mind
 
 
@@ -1175,8 +1175,8 @@ def test_wake_readiness_returns_ready_when_awake():
 
 def test_wake_readiness_blocks_on_n3():
     """wake_readiness() should return False when in N3 deep sleep."""
-    from genesis_conscious.sleep.architecture import SleepCycleTracker
-    from genesis_conscious.thalamus.brain_waves import SleepStage
+    from sleep.architecture import SleepCycleTracker
+    from thalamus.brain_waves import SleepStage
 
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_wake_readiness_mind(data_dir)
@@ -1234,8 +1234,8 @@ def test_wake_readiness_blocks_on_low_bdnf():
 
 def test_wake_readiness_ready_when_all_signals_pass():
     """wake_readiness() should return True when all signals indicate readiness."""
-    from genesis_conscious.sleep.architecture import SleepCycleTracker
-    from genesis_conscious.thalamus.brain_waves import SleepStage
+    from sleep.architecture import SleepCycleTracker
+    from thalamus.brain_waves import SleepStage
 
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_wake_readiness_mind(
@@ -1305,7 +1305,7 @@ def test_auto_wake_fires_after_min_sleep_window():
     """Auto-wake still fires once the minimum sleep window has elapsed."""
     import time as _time
 
-    from genesis_conscious.mind.thresholds import AUTO_WAKE_MIN_SLEEP_S
+    from brainstem.thresholds import AUTO_WAKE_MIN_SLEEP_S
 
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_wake_readiness_mind(data_dir, adenosine=0.1)
@@ -1340,23 +1340,20 @@ def test_auto_wake_window_does_not_block_user_initiated_sleep():
 
 def _make_inner_life_for_lucid(seed: int = 42):
     """Build an InnerLife with a small network for lucid dream tests."""
-    from genesis_conscious import (
-        ConceptNetwork,
-        CuriosityEngine,
-        ReasoningEngine,
-        ReflectionEngine,
-        RelationType,
-    )
-    from genesis_conscious.sleep import InnerLife
+    from concepts import ConceptNetwork, RelationType
+    from frontal_lobe.reasoning import Reasoner
+    from limbic_system.curiosity import Curiosity
+    from self import Reflection
+    from sleep import InnerLife
 
     net = ConceptNetwork()
     for name in ("alpha", "beta", "gamma", "delta", "epsilon"):
         net.add_concept(name, confidence=0.5)
     net.add_edge("alpha", "beta", RelationType.RELATED_TO, 0.8)
     net.add_edge("beta", "gamma", RelationType.RELATED_TO, 0.5)
-    reasoning = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoning)
-    reflection = ReflectionEngine(net)
+    reasoning = Reasoner(net)
+    curiosity = Curiosity(net, reasoning)
+    reflection = Reflection(net)
     return InnerLife(net, curiosity, reflection, seed=seed)
 
 
@@ -1493,14 +1490,11 @@ def _make_emotion() -> EmotionalState:
 
 def _make_inner_life_for_dream_composition():
     """InnerLife over a network holding a speakable/unspeakable pair."""
-    from genesis_conscious import (
-        ConceptNetwork,
-        CuriosityEngine,
-        ReasoningEngine,
-        ReflectionEngine,
-        RelationType,
-    )
-    from genesis_conscious.sleep import InnerLife
+    from concepts import ConceptNetwork, RelationType
+    from frontal_lobe.reasoning import Reasoner
+    from limbic_system.curiosity import Curiosity
+    from self import Reflection
+    from sleep import InnerLife
 
     net = ConceptNetwork()
     net.add_concept(
@@ -1514,9 +1508,9 @@ def _make_inner_life_for_dream_composition():
     )
     net.add_concept("feline", confidence=0.9)
     net.add_edge("cat", "feline", RelationType.IS_A, 0.9, origin="stated")
-    reasoning = ReasoningEngine(net)
-    curiosity = CuriosityEngine(net, reasoning)
-    reflection = ReflectionEngine(net)
+    reasoning = Reasoner(net)
+    curiosity = Curiosity(net, reasoning)
+    reflection = Reflection(net)
     return InnerLife(net, curiosity, reflection, seed=42)
 
 
@@ -1565,7 +1559,7 @@ def test_dream_thought_chain_seeds_survive_anchor_only_content():
     look like it mentions a single concept, and every chain after the
     first link would collapse.
     """
-    from genesis_conscious.sleep.thoughts import SpontaneousThought
+    from sleep.thoughts import SpontaneousThought
 
     il = _make_inner_life_for_dream_composition()
     thought = SpontaneousThought(
@@ -1597,10 +1591,11 @@ def test_dream_thought_speech_never_contains_the_raw_pair():
     """
     import time
 
-    from genesis_conscious import GenerativeEngine, PersonalityTraits, SelfModel
+    from frontal_lobe.generator import GenerativeLanguage
+    from self import PersonalityTraits, SelfModel
 
     il = _make_inner_life_for_dream_composition()
-    engine = GenerativeEngine(
+    engine = GenerativeLanguage(
         SelfModel(
             born_at=int(time.time() * 1000),
             personality=PersonalityTraits(
@@ -1636,14 +1631,15 @@ def test_echoed_placeholder_is_suppressed_despite_grammar_decoration():
     """
     import time
 
-    from genesis_conscious import GenerativeEngine, PersonalityTraits, SelfModel
-    from genesis_conscious.sleep.thoughts import SpontaneousThought
+    from frontal_lobe.generator import GenerativeLanguage
+    from self import PersonalityTraits, SelfModel
+    from sleep.thoughts import SpontaneousThought
 
     # No definition, no edges, noisy target: composition can only echo.
     net = ConceptNetwork()
     net.add_concept("cat", confidence=0.5)
     net.add_concept("compiler for the rust language", confidence=0.5)
-    engine = GenerativeEngine(
+    engine = GenerativeLanguage(
         SelfModel(
             born_at=int(time.time() * 1000),
             personality=PersonalityTraits(

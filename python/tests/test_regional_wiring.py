@@ -1,10 +1,9 @@
 """Regional wiring conformance — every function claimed by its region.
 
-The brain-region packages are documented anatomical view layers over
-the top-level functional modules (see ``genesis_conscious._views``).
-Each region's ``_EXPORTS`` maps public symbols to the modules that
-provide them, resolved lazily (PEP 562) so import order can never
-close a cycle.
+The brain-region packages are the top-level packages of the source
+tree (see ``_views``). Each region's ``_EXPORTS`` maps public symbols
+to the modules that provide them, resolved lazily (PEP 562) so
+import order can never close a cycle.
 
 This suite pins that wiring the way ``test_data_dir_conformance``
 pins data-dir resolution:
@@ -40,10 +39,13 @@ REGIONS = (
     "cerebellum",
     "thalamus",
     "brainstem",
+    "hypothalamus",
+    "insula",
+    "basal_forebrain",
 )
 
 REGION_MODULES = {
-    name: importlib.import_module(f"genesis_conscious.{name}") for name in REGIONS
+    name: importlib.import_module(name) for name in REGIONS
 }
 
 
@@ -76,35 +78,36 @@ def test_every_claim_resolves(region: str) -> None:
 # prefrontal-driven/thalamic-relayed workspace broadcast).
 
 _OWNERSHIP_PINS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
-    # Working memory is DLPFC, not hippocampal.
-    ("WorkingMemory", ("frontal_lobe",), ("temporal_lobe", "basal_ganglia")),
+    # Working memory includes frontal control and parietal storage.
+    ("WorkingMemory", ("frontal_lobe", "parietal_lobe"), ("temporal_lobe", "basal_ganglia")),
     # Procedural memory and TD learning are striatal.
     ("ProceduralMemory", ("basal_ganglia",), ("temporal_lobe", "frontal_lobe")),
     ("TDLearner", ("basal_ganglia",), ("frontal_lobe",)),
-    ("ActionFeedbackEngine", ("basal_ganglia",), ("frontal_lobe",)),
+    ("ActionFeedback", ("basal_ganglia",), ("frontal_lobe",)),
     # The concept network is the anterior temporal semantic hub.
     ("ConceptNetwork", ("temporal_lobe",), ("frontal_lobe", "parietal_lobe")),
     ("EmbeddingStore", ("temporal_lobe",), ()),
     # Wernicke and Broca.
-    ("ComprehensionEngine", ("temporal_lobe",), ("frontal_lobe",)),
-    ("GenerativeEngine", ("frontal_lobe",), ("temporal_lobe",)),
+    ("Comprehension", ("temporal_lobe",), ("frontal_lobe",)),
+    ("GenerativeLanguage", ("frontal_lobe",), ("temporal_lobe",)),
     # Attention is parietal (IPS substrate).
     ("AttentionSystem", ("parietal_lobe",), ("temporal_lobe",)),
     # Emotion is limbic.
     ("EmotionalState", ("limbic_system",), ("frontal_lobe",)),
     ("FeelingReporter", ("limbic_system",), ("temporal_lobe",)),
-    # Rhythms are thalamic; staging is brainstem.
+    # Rhythm summaries are shared; staging spans brainstem and hypothalamus.
     ("BrainWave", ("thalamus",), ("frontal_lobe",)),
-    ("SleepCycleTracker", ("brainstem",), ("temporal_lobe",)),
+    ("SleepCycleTracker", ("brainstem", "hypothalamus"), ("temporal_lobe",)),
     # Vision is occipital.
     ("V1Model", ("occipital_lobe",), ("temporal_lobe",)),
     # Cerebellar prediction.
     ("PredictiveCodingLayer", ("cerebellum",), ("frontal_lobe",)),
-    # Frontal metacognition and the mind-wandering stream.
-    ("ReflectionEngine", ("frontal_lobe",), ("limbic_system",)),
-    ("InnerLife", ("frontal_lobe",), ("brainstem",)),
+    # Frontal metacognition and the mind-wandering stream — the DMN
+    # is a frontoparietal midline loop (mPFC + PCC/precuneus).
+    ("Reflection", ("frontal_lobe",), ("limbic_system",)),
+    ("InnerLife", ("frontal_lobe", "parietal_lobe"), ("brainstem",)),
     # Hippocampal replay content and consolidation machinery.
-    ("DreamSynthesisEngine", ("temporal_lobe",), ("brainstem",)),
+    ("DreamSynthesis", ("temporal_lobe",), ("brainstem",)),
     ("SleepCompressor", ("temporal_lobe",), ("brainstem",)),
     ("HippocampalReplay", ("temporal_lobe",), ("brainstem",)),
     # The synaptic substrate's timing rule lives with the semantic
@@ -113,10 +116,65 @@ _OWNERSHIP_PINS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
     # Competence monitoring and the situation model.
     ("TaskCompetence", ("frontal_lobe",), ("temporal_lobe",)),
     ("SituationModel", ("parietal_lobe",), ("frontal_lobe",)),
+    # Rule induction is the mid-DLPFC's hypothesis generator.
+    ("DorsolateralPFC", ("frontal_lobe",), ("temporal_lobe", "basal_ganglia", "parietal_lobe")),
+    # Error/conflict monitoring is the dorsal ACC's — medial frontal,
+    # not limbic cortex and not striatal (it reads striatal signals).
+    ("ErrorMonitor", ("frontal_lobe",), ("limbic_system", "basal_ganglia", "temporal_lobe")),
     # Deliberate multi-claims — shared anatomy.
     ("MathResult", ("frontal_lobe", "parietal_lobe"), ()),
     ("GlobalWorkspace", ("frontal_lobe", "thalamus"), ()),
     ("FaceRecognizer", ("temporal_lobe", "occipital_lobe"), ()),
+    # Stress axis and neuroendocrine outputs are hypothalamic.
+    ("HPAAxis", ("hypothalamus", "limbic_system"), ()),
+    ("Orexin", ("hypothalamus",), ()),
+    ("Melatonin", ("hypothalamus",), ()),
+    # Source nuclei of the ascending neuromodulators are brainstem.
+    ("Norepinephrine", ("brainstem",), ()),
+    ("Serotonin", ("brainstem",), ()),
+    # Aggregate ACh includes basal-forebrain and pontine projections.
+    ("Acetylcholine", ("basal_forebrain", "brainstem"), ()),
+    # Interoception is insular; the heartbeat that samples the body is
+    # brainstem; both are claimed by each.
+    ("InteroceptionSystem", ("insula", "limbic_system"), ()),
+    ("HeartbeatMixin", ("insula", "brainstem"), ()),
+    # The urge accumulator is gated by the striatum and held by frontal.
+    ("Urge", ("basal_ganglia", "frontal_lobe"), ()),
+    # Social perception is superior temporal.
+    ("Presence", ("temporal_lobe",), ()),
+    # The event stream's direction classification rides with it.
+    ("INBOUND_KINDS", ("temporal_lobe",), ()),
+    ("OUTBOUND_KINDS", ("temporal_lobe",), ()),
+    # Process S: the adenosine signal accumulates and acts in the
+    # basal forebrain (A1 inhibition of wake-active neurons).
+    ("Adenosine", ("basal_forebrain",), ()),
+    # Orexin-timescale grogginess — hypothalamic peptide, brainstem switch.
+    ("SleepInertia", ("brainstem", "hypothalamus"), ()),
+    # PGO: generated pontine, projected occipital.
+    ("PGOWave", ("brainstem", "occipital_lobe"), ()),
+    # The K-complex downstate is cortical (frontal recruitment,
+    # Mak-McClure 2015) riding the thalamocortical loop — claimed by
+    # both ends of the circuit.
+    ("KComplex", ("frontal_lobe", "thalamus"), ()),
+    # The external-world model is the hippocampal-entorhinal map plus
+    # the STS social stream — the relay is how it reaches cortex.
+    ("OuterWorld", ("temporal_lobe",), ()),
+    ("WorldBridge", ("thalamus",), ()),
+    # Mentalizing posteriors over presences — rTPJ + mPFC.
+    ("PresenceBelief", ("parietal_lobe", "frontal_lobe"), ()),
+    # The minimal self and agency comparator are TPJ work; the
+    # Damasio hierarchy is limbic with a brainstem proto-self root.
+    ("MinimalSelf", ("parietal_lobe", "limbic_system"), ()),
+    ("AgencyDetector", ("parietal_lobe", "limbic_system"), ()),
+    ("ProtoSelf", ("insula", "limbic_system", "brainstem"), ()),
+    ("AutobiographicalSelf", ("limbic_system", "temporal_lobe"), ()),
+    # Amygdala-modulated consolidation is limbic AND hippocampal.
+    ("EmotionalMemorySystem", ("temporal_lobe", "limbic_system"), ()),
+    # Interoceptive somatic-marker congruence is read in the insula.
+    ("SomaticSnapshot", ("limbic_system", "insula"), ()),
+    # Region-owned chemicals the table assigns but nothing claimed.
+    ("BDNF", ("temporal_lobe",), ()),
+    ("Endorphin", ("hypothalamus",), ()),
 )
 
 
@@ -141,56 +199,55 @@ def test_ownership_pins(
 # support layers, the environment interface, the orchestrator, the
 # task environments, and the two platform adapters.
 _ALLOWLIST: dict[str, str] = {
-    "genesis_conscious.mind": "the orchestrator — the whole brain, not a region",
-    "genesis_conscious.infrastructure": "support layer (persistence, config, journal)",
-    "genesis_conscious.eval": "baseline/drift/assay harness",
-    "genesis_conscious.world": "the external world — environment interface",
-    "genesis_conscious.neurochemical": "body chemistry (documented in brainstem)",
-    "genesis_conscious.android_camera": "platform adapter",
-    "genesis_conscious.android_tools": "platform adapter",
-    "genesis_conscious._views": "the view machinery itself",
-    "genesis_conscious.language.voice": (
-        "documented in frontal_lobe's organization; no lazy claim — its "
-        "Voice class would collide with temporal_lobe.speech's Voice"
+    "mind": "the assembled mind — a top-level module, not a region",
+    "infrastructure": "support layer (persistence, config, journal)",
+    "eval": "baseline/drift/assay harness",
+    "neurochemical": (
+        "body chemistry — sources shared by brainstem, hypothalamus, basal forebrain"
     ),
+    "android_camera": "platform adapter",
+    "android_tools": "platform adapter",
+    "_views": "the view machinery itself",
+    # Constant tables — no class/function to carry __module__, but the
+    # file is brainstem's autonomic setpoints
+    "brainstem.thresholds": "autonomic setpoints — constants owned by brainstem",
+    "parietal_lobe.motion": "compatibility projection of occipitotemporal MT/V5",
 }
 
-# The honest task environments wired through TaskCompetence (frontal):
-# practice grounds, not brain tissue.
-_TASK_FAMILIES = (
-    "classification",
-    "quantities",
-    "relations",
-    "sequence",
-    "sorter",
-    "assembly",
-)
-
 _FUNCTIONAL_PACKAGES = (
-    "cognition",
+    # The regions themselves — they are the engines now, and their
+    # own modules must be claimed by a region just like any other.
+    "frontal_lobe",
+    "temporal_lobe",
+    "parietal_lobe",
+    "occipital_lobe",
+    "limbic_system",
+    "basal_ganglia",
+    "cerebellum",
+    "thalamus",
+    "brainstem",
+    "hypothalamus",
+    "insula",
+    "basal_forebrain",
     "memory",
-    "reasoning",
-    "spatial",
-    "language",
-    "learning",
     "perception",
     "self",
     "sleep",
     "concepts",
     "tools",
-    *_TASK_FAMILIES,
+    "world",
 )
 
 
 def _all_functional_modules() -> list[str]:
     """Every submodule of the functional packages, as dotted paths."""
-    root = os.path.join(REPO, "python", "genesis_conscious")
+    root = os.path.join(REPO, "python")
     mods: list[str] = []
     for pkg in _FUNCTIONAL_PACKAGES:
         pkg_dir = os.path.join(root, pkg)
         for fname in sorted(os.listdir(pkg_dir)):
             if fname.endswith(".py") and fname != "__init__.py":
-                mods.append(f"genesis_conscious.{pkg}.{fname[:-3]}")
+                mods.append(f"{pkg}.{fname[:-3]}")
     return mods
 
 
@@ -216,11 +273,6 @@ def test_every_functional_module_is_claimed_or_allowlisted() -> None:
             continue
         if module in _ALLOWLIST:
             continue
-        # The task families are the honest practice environments wired
-        # through TaskCompetence (frontal) — documented practice
-        # grounds, not brain tissue.
-        if module.split(".")[1] in _TASK_FAMILIES:
-            continue
         unclaimed.append(module)
     assert not unclaimed, (
         f"{len(unclaimed)} functional module(s) claimed by no region and "
@@ -237,3 +289,40 @@ def test_allowlist_entries_exist() -> None:
         assert os.path.exists(path) or os.path.exists(pkg_path), (
             f"allowlist entry {module} points at nothing"
         )
+
+
+def test_volition_workers_run_below_foreground_priority() -> None:
+    """Urge worker threads renice themselves before acting.
+
+    The kernel-level half of foreground arbitration: a bug scan that
+    started before the user typed keeps losing scheduler/GIL handoffs
+    to think() instead of timing it out at 15 s.
+    """
+    import sys
+    from unittest.mock import MagicMock, patch
+
+    import basal_ganglia.volition as vol
+
+    if not sys.platform.startswith("linux"):
+        pytest.skip("per-thread nice is linux-only")
+
+    with patch.object(vol.os, "setpriority") as sp:
+        vol._lower_thread_priority()
+        sp.assert_called_once()
+        assert sp.call_args[0][2] == vol._VOLITION_NICE
+
+    # Wrapped actions carry the priority — the renice runs inside the
+    # worker thread, not on the dispatcher.
+    seen = {}
+
+    def probe():
+        seen["nice"] = vol.os.getpriority(vol.os.PRIO_PROCESS, 0)
+
+    holder = MagicMock()
+    import threading
+    holder._volition_lock = threading.Lock()
+    holder._volition_active = {"probe"}
+    holder._volition_sem = threading.Semaphore(1)
+    holder._volition_sem.acquire()
+    vol.VolitionMixin._run_volition_action(holder, "probe", probe)
+    assert seen["nice"] >= vol._VOLITION_NICE - 1

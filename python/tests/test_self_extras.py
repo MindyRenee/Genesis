@@ -9,14 +9,14 @@ from pathlib import Path
 
 import pytest
 
-from genesis_conscious.concepts import ConceptNetwork, RelationType
-from genesis_conscious.infrastructure.growth_ledger import GrowthLedger, GrowthMilestone
-from genesis_conscious.tools.code_learner import (
+from concepts import ConceptNetwork, RelationType
+from infrastructure.growth_ledger import GrowthLedger, GrowthMilestone
+from tools.code_learner import (
     CodeLearner,
     CodeLearningResult,
     FileLearningResult,
 )
-from genesis_conscious.tools.explorer import Explorer
+from tools.explorer import Explorer
 
 logger = logging.getLogger(__name__)
 
@@ -541,7 +541,7 @@ def test_max_files_limit(temp_project) -> None:
 # ======================================================================
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-PY_DIR = PROJECT_ROOT / "genesis_conscious"
+PY_DIR = PROJECT_ROOT
 RUST_DIR = PROJECT_ROOT.parent / "src"
 
 
