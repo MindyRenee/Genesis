@@ -3,8 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from concepts import ConceptNetwork
-from tools.framework import (
+from frontal_lobe.tools.framework import (
     ToolRegistry,
     delete_file,
     list_dir,
@@ -13,12 +12,12 @@ from tools.framework import (
     run_shell,
     write_file,
 )
-from tools.project_composer import (
+from frontal_lobe.tools.project_composer import (
     compose_main_module,
     compose_test_module,
     gather_knowledge,
 )
-from tools.project_creator import (
+from frontal_lobe.tools.project_creator import (
     MAX_PROJECT_SIZE_BYTES,
     _sanitize_name,
     archive_project,
@@ -31,6 +30,7 @@ from tools.project_creator import (
     read_project_notes,
     restore_project,
 )
+from temporal_lobe.concepts import ConceptNetwork
 
 # ─── Tool sandboxing ─────────────────────────────────────────────────
 
@@ -157,7 +157,7 @@ def test_sanitize_name_defaults_to_project() -> None:
 
 def _seeded_network() -> ConceptNetwork:
     """Build a small concept network with real typed edges for tests."""
-    from concepts import RelationType
+    from temporal_lobe.concepts import RelationType
     net = ConceptNetwork()
     net.add_concept(
         "memory", confidence=0.9,
@@ -246,7 +246,7 @@ def test_compose_test_module_compiles() -> None:
 
 def test_compose_main_module_adaptive_structure() -> None:
     """Different domains produce different relation functions."""
-    from concepts import RelationType
+    from temporal_lobe.concepts import RelationType
     net = ConceptNetwork()
     net.add_concept("fire", confidence=0.8, properties={"definition": "combustion"})
     net.add_concept("smoke", confidence=0.7, properties={"definition": "visible particles"})

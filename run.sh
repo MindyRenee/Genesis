@@ -299,4 +299,4 @@ export GENESIS_RUN=1
 #
 # OFFLINE_ARG was parsed from the command line above (--offline for
 # no network access).
-python3 python/genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:-}
+PYTHONPATH="$PWD/python:${PYTHONPATH:-}" python3 genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:-}

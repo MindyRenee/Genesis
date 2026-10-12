@@ -50,7 +50,8 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from concepts import ConceptNetwork, Edge, RelationType
+from temporal_lobe.concepts import ConceptNetwork, Edge, RelationType
+
 from genesis_client.swallow import note_swallowed
 
 if TYPE_CHECKING:

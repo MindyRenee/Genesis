@@ -11,12 +11,13 @@ import sys
 import threading
 import time
 
-from brainstem import module_sampler
 from brainstem.module_sampler import (
     ModuleSampler,
     _module_for_frame,
     _module_of_filename,
 )
+
+from brainstem import module_sampler
 from genesis_client.protocol import (
     MODULE_ATTENTION,
     MODULE_DREAMING,

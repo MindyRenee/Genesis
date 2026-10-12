@@ -634,26 +634,26 @@ from .vtc import VTCFeatureSpace as VTCFeatureSpace
 # creates cycles.
 _EXPORTS: dict[str, str] = {
     # Hippocampal system — memory formation, retrieval, consolidation
-    "AttractorNetwork": "memory",
-    "EmotionalMemorySystem": "memory",
-    "Fact": "memory",
-    "MemoryContext": "memory",
-    "MemorySystem": "memory",
-    "MemoryRecord": "memory",
-    "PrimingSystem": "memory",
-    "ReconsolidationModification": "memory",
-    "ReviewRecord": "memory",
-    "Schema": "memory",
-    "SemanticMemory": "memory",
-    "SpacedRepetitionScheduler": "memory",
-    "SpreadingActivation": "memory",
+    "AttractorNetwork": "temporal_lobe.memory.systems",
+    "EmotionalMemorySystem": "temporal_lobe.memory.systems",
+    "Fact": "temporal_lobe.memory.semantic",
+    "MemoryContext": "temporal_lobe.memory.memory",
+    "MemorySystem": "temporal_lobe.memory.memory",
+    "MemoryRecord": "temporal_lobe.memory.memory",
+    "PrimingSystem": "temporal_lobe.memory.systems",
+    "ReconsolidationModification": "temporal_lobe.memory.memory",
+    "ReviewRecord": "temporal_lobe.memory.spaced_repetition",
+    "Schema": "temporal_lobe.memory.semantic",
+    "SemanticMemory": "temporal_lobe.memory.semantic",
+    "SpacedRepetitionScheduler": "temporal_lobe.memory.spaced_repetition",
+    "SpreadingActivation": "temporal_lobe.memory.systems",
     "MotionCell": "occipital_lobe.motion",
     "MotionField": "occipital_lobe.motion",
     "MotionProcessor": "occipital_lobe.motion",
     "MotionRegion": "occipital_lobe.motion",
     "ThetaGammaCoupling": "thalamus.brain_waves",
     "compute_theta_gamma_coupling": "thalamus.brain_waves",
-    "SharpWaveRipple": "sleep.events",
+    "SharpWaveRipple": "thalamus.events",
     # Hippocampus -> neocortex consolidation (complementary learning
     # systems) and hippocampal Hebbian plasticity
     "DualSystemLearner": "temporal_lobe.dual",
@@ -668,33 +668,33 @@ _EXPORTS: dict[str, str] = {
     "Vocabulary": "temporal_lobe.vocabulary",
     # Anterior temporal semantic hub — the concept network binds
     # multimodal features into unified concept representations
-    "Concept": "concepts",
-    "ConceptCategory": "concepts",
-    "ConceptModality": "concepts",
-    "ConceptNetwork": "concepts",
-    "Edge": "concepts",
-    "RelationType": "concepts",
-    "detect_category": "concepts",
-    "detect_modality": "concepts",
+    "Concept": "temporal_lobe.concepts.types",
+    "ConceptCategory": "temporal_lobe.concepts.types",
+    "ConceptModality": "temporal_lobe.concepts.types",
+    "ConceptNetwork": "temporal_lobe.concepts.network",
+    "Edge": "temporal_lobe.concepts.types",
+    "RelationType": "temporal_lobe.concepts.types",
+    "detect_category": "temporal_lobe.concepts.classify",
+    "detect_modality": "temporal_lobe.concepts.classify",
     # The latent semantic space beneath the symbolic network
-    "EmbeddingStore": "concepts",
+    "EmbeddingStore": "temporal_lobe.concepts.embeddings",
     # Lexical-semantic knowledge — the dictionary
     "WordNetEntry": "infrastructure.wordnet_dictionary",
     "lookup_definition": "infrastructure.wordnet_dictionary",
     "lookup_word": "infrastructure.wordnet_dictionary",
     # Semantic compression and associative memory
-    "HolographicGraph": "concepts",
+    "HolographicGraph": "temporal_lobe.concepts.holographic",
     "VQCodebook": "infrastructure.vq_codebook",
     # Long-term concept storage — active (hippocampal) and archived
     # (neocortical) tiers
-    "ConceptArchive": "concepts",
-    "open_archive": "concepts",
+    "ConceptArchive": "temporal_lobe.concepts.archive",
+    "open_archive": "temporal_lobe.concepts.archive",
     # Hippocampal-replay-driven edge discovery during sleep, and
     # graph-theoretic analysis of the knowledge structure
-    "EdgeProposer": "concepts",
-    "NetworkTopology": "concepts",
+    "EdgeProposer": "temporal_lobe.concepts.edge_proposer",
+    "NetworkTopology": "temporal_lobe.concepts.topology",
     # The auditory-temporal pathway: cochlea -> A1 -> Wernicke's area
-    "AmbientListener": "perception.ambient",
+    "AmbientListener": "occipital_lobe.perception.ambient",
     # Speech motor interface — anatomically frontal (Broca's + motor
     # cortex) but functionally part of the temporal-centered language
     # network
@@ -709,30 +709,30 @@ _EXPORTS: dict[str, str] = {
     # similar far-pair edge proposals, validated on waking) and the
     # sleep compression pass (VQ retraining, holographic edge
     # migration, episode summarization)
-    "DreamInsight": "sleep.dream_synthesis",
-    "DreamProposal": "sleep.dream_synthesis",
-    "DreamSynthesis": "sleep.dream_synthesis",
-    "SleepCompressor": "sleep.compression",
+    "DreamInsight": "temporal_lobe.dream_synthesis",
+    "DreamProposal": "temporal_lobe.dream_synthesis",
+    "DreamSynthesis": "temporal_lobe.dream_synthesis",
+    "SleepCompressor": "temporal_lobe.compression",
     # The concept network's machinery — consolidation, activation
     # dynamics, extraction, archival tiers, the edge log, and the
     # layer/provenance types (all part of the ATL semantic hub)
-    "ArchivalMixin": "concepts.archival",
-    "ConsolidationMixin": "concepts.consolidation",
-    "CorticalLayer": "concepts.types",
-    "DynamicsMixin": "concepts.dynamics",
-    "EdgeLog": "concepts.edge_log",
-    "ExtractionMixin": "concepts.extraction",
-    "open_edge_log": "concepts.edge_log",
-    "Provenance": "concepts.types",
+    "ArchivalMixin": "temporal_lobe.concepts.archival",
+    "ConsolidationMixin": "temporal_lobe.concepts.consolidation",
+    "CorticalLayer": "temporal_lobe.concepts.types",
+    "DynamicsMixin": "temporal_lobe.concepts.dynamics",
+    "EdgeLog": "temporal_lobe.concepts.edge_log",
+    "ExtractionMixin": "temporal_lobe.concepts.extraction",
+    "open_edge_log": "temporal_lobe.concepts.edge_log",
+    "Provenance": "temporal_lobe.concepts.types",
     # Input-side comprehension classification — intent and question
     # type detection over heard language (Wernicke's-side parsing)
-    "Intent": "perception.core",
-    "QuestionType": "perception.core",
+    "Intent": "occipital_lobe.perception.core",
+    "QuestionType": "occipital_lobe.perception.core",
     # Fusiform face area — occipitotemporal; the ventral stream's
     # people endpoint (also re-exported by occipital_lobe)
-    "DetectedFace": "perception.recognition",
-    "FaceRecognizer": "perception.recognition",
-    "KnownFace": "perception.recognition",
+    "DetectedFace": "occipital_lobe.perception.recognition",
+    "FaceRecognizer": "occipital_lobe.perception.recognition",
+    "KnownFace": "occipital_lobe.perception.recognition",
     # Figurative language — metaphor and irony interpretation
     # (cross-domain semantic structure)
     "FigurativeLanguageProcessor": "temporal_lobe.figurative",
@@ -765,19 +765,19 @@ _EXPORTS: dict[str, str] = {
     "SynapticStore": "temporal_lobe.synapses",
     # Self-directed knowledge learning — deriving new network facts
     # from what it already knows (reasoning, inference, conversation)
-    "InferenceResult": "self.learning",
-    "LearningEvent": "self.learning",
-    "SelfDirectedLearner": "self.learning",
+    "InferenceResult": "frontal_lobe.self.learning",
+    "LearningEvent": "frontal_lobe.self.learning",
+    "SelfDirectedLearner": "frontal_lobe.self.learning",
     # Sleep architecture's consolidation machinery — the synaptic
     # homeostasis downscaler (SHY) and hippocampal replay (the
     # ultradian tracker is claimed by brainstem)
-    "HippocampalReplay": "sleep.architecture",
-    "ReplayItem": "sleep.architecture",
-    "SynapticDownscaler": "sleep.architecture",
+    "HippocampalReplay": "brainstem.architecture",
+    "ReplayItem": "brainstem.architecture",
+    "SynapticDownscaler": "brainstem.architecture",
     # Concept-network utilities — word-sense stripping and the
     # world-concept test used by the learners
-    "is_world_concept": "concepts",
-    "strip_sense_suffix": "concepts",
+    "is_world_concept": "temporal_lobe.concepts.classify",
+    "strip_sense_suffix": "temporal_lobe.concepts.classify",
     # The hippocampal cognitive map — place cells, grid code,
     # context anchors
     "CognitiveMap": "temporal_lobe.cognitive_map",
@@ -803,13 +803,13 @@ _EXPORTS: dict[str, str] = {
     # The autobiographical self — identity built on hippocampal
     # autobiographical memory (co-claimed with limbic_system, which
     # owns the Damasio hierarchy)
-    "AutobiographicalSelf": "self.damasio",
+    "AutobiographicalSelf": "insula.damasio",
     # The hippocampal neurotrophin — plasticity and consolidation
     # gain (the table's "hippocampus, cortex" chemical)
-    "BDNF": "neurochemical.bdnf",
+    "BDNF": "temporal_lobe.bdnf",
     # The replay-compression constant — replay's transfer rate during
     # consolidation (the rest of architecture.py is claimed above)
-    "REPLAY_COMPRESSION": "sleep.architecture",
+    "REPLAY_COMPRESSION": "brainstem.architecture",
     # The region itself — Wernicke + ATL hub + medial-temporal
     # encoding as one object
     "TemporalLobe": "temporal_lobe.temporal",

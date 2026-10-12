@@ -22,14 +22,15 @@ import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from infrastructure.paths import package_root
 from limbic_system.emotion import EmotionalState
-from perception import Perception
+from occipital_lobe.perception import Perception
 from temporal_lobe.base import Language, Thought
 
+from infrastructure.paths import package_root
+
 if TYPE_CHECKING:
-    from concepts import ConceptNetwork
-    from tools.framework import ToolRegistry
+    from frontal_lobe.tools.framework import ToolRegistry
+    from temporal_lobe.concepts import ConceptNetwork
 
     from .thought_composer import ThoughtComposer
 

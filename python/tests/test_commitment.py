@@ -7,13 +7,10 @@ the per-tick re-digitization of the concept network's analog state.
 """
 
 import pytest
+from temporal_lobe.concepts import ConceptNetwork, RelationType
+from temporal_lobe.concepts.dynamics import SPARK_MIN, SWEEP_INTERVAL_TICKS
 
 from commitment import CommitmentBoundary
-from concepts import ConceptNetwork, RelationType
-from concepts.dynamics import (
-    SPARK_MIN,
-    SWEEP_INTERVAL_TICKS,
-)
 
 # ─── Construction / validation ───────────────────────────────────
 

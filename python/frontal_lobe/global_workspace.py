@@ -84,8 +84,9 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from genesis_client.swallow import note_swallowed
 from thalamus.brain_waves import BrainWave, BrainWaveState
+
+from genesis_client.swallow import note_swallowed
 
 logger = logging.getLogger(__name__)
 

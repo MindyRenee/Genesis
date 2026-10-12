@@ -200,11 +200,14 @@ def test_ownership_pins(
 # task environments, and the two platform adapters.
 _ALLOWLIST: dict[str, str] = {
     "mind": "the assembled mind — a top-level module, not a region",
+    "genesis_cli": "the console entrypoint — a top-level module, not a region",
+    "genesis_client": "the daemon client — support layer beside the regions",
     "infrastructure": "support layer (persistence, config, journal)",
     "eval": "baseline/drift/assay harness",
-    "neurochemical": (
-        "body chemistry — sources shared by brainstem, hypothalamus, basal forebrain"
-    ),
+    "world": "the outer world — adapters, not a region",
+    "commitment": "top-level support module",
+    "discord_feed": "platform adapter",
+    "setup_embeddings": "one-off embedding setup script",
     "android_camera": "platform adapter",
     "android_tools": "platform adapter",
     "_views": "the view machinery itself",
@@ -229,25 +232,34 @@ _FUNCTIONAL_PACKAGES = (
     "hypothalamus",
     "insula",
     "basal_forebrain",
-    "memory",
-    "perception",
-    "self",
-    "sleep",
-    "concepts",
-    "tools",
-    "world",
 )
 
 
 def _all_functional_modules() -> list[str]:
-    """Every submodule of the functional packages, as dotted paths."""
+    """Every .py module under the region tree plus the support packages."""
     root = os.path.join(REPO, "python")
     mods: list[str] = []
     for pkg in _FUNCTIONAL_PACKAGES:
-        pkg_dir = os.path.join(root, pkg)
-        for fname in sorted(os.listdir(pkg_dir)):
-            if fname.endswith(".py") and fname != "__init__.py":
-                mods.append(f"{pkg}.{fname[:-3]}")
+        for dirpath, _dirs, files in os.walk(os.path.join(root, pkg)):
+            for fname in sorted(files):
+                if fname.endswith(".py") and fname != "__init__.py":
+                    rel = os.path.relpath(os.path.join(dirpath, fname), root)
+                    mods.append(rel[:-3].replace(os.sep, "."))
+    # The support packages and loose modules sit beside python/ at the
+    # repository root; they are candidates for the allowlist, never
+    # for a regional claim.
+    for pkg in ("genesis_client", "infrastructure", "world", "eval"):
+        pdir = os.path.join(REPO, pkg)
+        if not os.path.isdir(pdir):
+            continue
+        for dirpath, _dirs, files in os.walk(pdir):
+            for fname in sorted(files):
+                if fname.endswith(".py") and fname != "__init__.py":
+                    rel = os.path.relpath(os.path.join(dirpath, fname), REPO)
+                    mods.append(rel[:-3].replace(os.sep, "."))
+    for fname in sorted(os.listdir(REPO)):
+        if fname.endswith(".py") and fname != "__init__.py":
+            mods.append(fname[:-3])
     return mods
 
 
@@ -271,7 +283,7 @@ def test_every_functional_module_is_claimed_or_allowlisted() -> None:
     for module in _all_functional_modules():
         if module in claimed:
             continue
-        if module in _ALLOWLIST:
+        if any(module == a or module.startswith(a + ".") for a in _ALLOWLIST):
             continue
         unclaimed.append(module)
     assert not unclaimed, (
@@ -282,13 +294,15 @@ def test_every_functional_module_is_claimed_or_allowlisted() -> None:
 
 def test_allowlist_entries_exist() -> None:
     """Allowlist entries must point at real modules (no stale entries)."""
-    root = os.path.join(REPO, "python")
     for module in _ALLOWLIST:
-        path = os.path.join(root, *module.split(".")) + ".py"
-        pkg_path = os.path.join(root, *module.split("."), "__init__.py")
-        assert os.path.exists(path) or os.path.exists(pkg_path), (
-            f"allowlist entry {module} points at nothing"
+        found = any(
+            os.path.exists(os.path.join(root, *module.split(".")) + ".py")
+            or os.path.exists(
+                os.path.join(root, *module.split("."), "__init__.py")
+            )
+            for root in (os.path.join(REPO, "python"), REPO)
         )
+        assert found, f"allowlist entry {module} points at nothing"
 
 
 def test_volition_workers_run_below_foreground_priority() -> None:

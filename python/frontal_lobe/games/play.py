@@ -31,9 +31,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from parietal_lobe.grid import Grid
+
 from genesis_client.swallow import note_swallowed
 from infrastructure.journal import record_error
-from parietal_lobe.grid import Grid
 
 from ..dlpfc import DorsolateralPFC
 from .spatial.solver import SpatialReasoner

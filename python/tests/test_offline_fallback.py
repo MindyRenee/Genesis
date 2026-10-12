@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from tools.source_registry import (
+from frontal_lobe.tools.source_registry import (
     SourceCache,
     SourceRegistry,
     SourceResult,
@@ -228,10 +228,10 @@ def test_registry_force_offline_property() -> None:
 
 def test_learner_with_data_dir_gets_cache(tmp_path) -> None:
     """An AutonomousLearner with a data_dir has a source cache."""
-    from concepts import ConceptNetwork
     from frontal_lobe.autonomous import AutonomousLearner
     from frontal_lobe.reasoning import Reasoner
     from limbic_system.curiosity import Curiosity
+    from temporal_lobe.concepts import ConceptNetwork
 
     net = ConceptNetwork()
     reasoning = Reasoner(net)
@@ -247,10 +247,10 @@ def test_learner_with_data_dir_gets_cache(tmp_path) -> None:
 
 def test_learner_without_data_dir_has_no_cache() -> None:
     """An AutonomousLearner without a data_dir has no cache (backward compat)."""
-    from concepts import ConceptNetwork
     from frontal_lobe.autonomous import AutonomousLearner
     from frontal_lobe.reasoning import Reasoner
     from limbic_system.curiosity import Curiosity
+    from temporal_lobe.concepts import ConceptNetwork
 
     net = ConceptNetwork()
     reasoning = Reasoner(net)
@@ -356,10 +356,10 @@ def test_registry_force_offline_toggle_clears_sticky() -> None:
 
 def test_learner_force_offline_makes_sources_offline() -> None:
     """An AutonomousLearner with force_offline=True has an offline registry."""
-    from concepts import ConceptNetwork
     from frontal_lobe.autonomous import AutonomousLearner
     from frontal_lobe.reasoning import Reasoner
     from limbic_system.curiosity import Curiosity
+    from temporal_lobe.concepts import ConceptNetwork
 
     net = ConceptNetwork()
     reasoning = Reasoner(net)
@@ -375,10 +375,10 @@ def test_learner_force_offline_makes_sources_offline() -> None:
 
 def test_learner_is_offline_property() -> None:
     """The learner's is_offline property reflects the source registry state."""
-    from concepts import ConceptNetwork
     from frontal_lobe.autonomous import AutonomousLearner
     from frontal_lobe.reasoning import Reasoner
     from limbic_system.curiosity import Curiosity
+    from temporal_lobe.concepts import ConceptNetwork
 
     net = ConceptNetwork()
     reasoning = Reasoner(net)

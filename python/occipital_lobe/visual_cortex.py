@@ -12,16 +12,16 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import numpy as np
-
-from genesis_client.swallow import note_swallowed
 from temporal_lobe.mtl_bridge import MemoryBridge
 from temporal_lobe.vtc import VTCFeatureSpace
+
+from genesis_client.swallow import note_swallowed
 
 from .v1 import V1Model, _extract_patches, _to_grayscale, _whiten_patches
 from .v4 import V4Model
 
 if TYPE_CHECKING:
-    from concepts import ConceptNetwork, EmbeddingStore
+    from temporal_lobe.concepts import ConceptNetwork, EmbeddingStore
 
 logger = logging.getLogger(__name__)
 

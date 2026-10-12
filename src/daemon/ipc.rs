@@ -359,6 +359,11 @@ pub mod cmd {
     /// reusing genesis2's 36, which this tree already spent on
     /// GET_SENSOR_PRESENCE.
     pub const GET_ION_SUMMARY: u8 = 40;
+    /// Volitional push onto the sleep-wake network. Request:
+    /// [u8 kind (0 = sleep, 1 = wake)][f32 magnitude]. Response: [u8 ack].
+    /// The push decays on the physics clock; see `TickLoop::set_volition`.
+    /// Additive: PROTOCOL_VERSION is unaffected.
+    pub const SET_VOLITION: u8 = 46;
 
     // ─── Tensor slab ──────────────────────────────────────────
     // Named multidimensional tensors shared between the daemon and
@@ -3690,6 +3695,28 @@ pub fn reactive_handler(
                 resp
             }
 
+            cmd::SET_VOLITION => {
+                // Request: [u8 kind (0 = sleep, 1 = wake)][f32 magnitude]
+                if payload.len() < 5 {
+                    return vec![error::PAYLOAD_TOO_SHORT];
+                }
+                let sleep = match payload[0] {
+                    0 => true,
+                    1 => false,
+                    _ => return vec![error::INVALID_VALUE],
+                };
+                let magnitude = f32::from_le_bytes(payload[1..5].try_into().unwrap_or_default());
+                match tick_loop.lock() {
+                    Ok(mut tl) => {
+                        tl.set_volition(sleep, magnitude);
+                        vec![1u8]
+                    }
+                    Err(e) => {
+                        eprintln!("[ipc] SET_VOLITION: tick_loop poisoned: {e}");
+                        vec![error::INTERNAL_ERROR]
+                    }
+                }
+            }
             cmd::ADVANCE_PHYSICS => {
                 // Evaluation-only sibling of ADVANCE_NEURO. See the
                 // opcode's doc comment: the production command cannot be

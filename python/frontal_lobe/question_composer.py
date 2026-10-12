@@ -16,8 +16,8 @@ from __future__ import annotations
 
 import random
 
-from concepts import ConceptNetwork
 from limbic_system.emotion import EmotionalState
+from temporal_lobe.concepts import ConceptNetwork
 
 
 class QuestionComposer:

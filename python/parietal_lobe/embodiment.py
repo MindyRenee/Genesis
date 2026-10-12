@@ -32,6 +32,16 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from basal_ganglia.world_policy import WorldPolicy
+from parietal_lobe.spatial_imagery import SpatialImagery
+from parietal_lobe.world_model import (
+    OUT_COLLECT,
+    OUT_HAZARD,
+    OUT_WIN,
+    WorldEvent,
+    WorldModel,
+)
+from temporal_lobe.cognitive_map import CognitiveMap
+
 from genesis_client.protocol import (
     CHEM_ACETYLCHOLINE,
     CHEM_DOPAMINE,
@@ -42,15 +52,6 @@ from genesis_client.protocol import (
     EMOTIONAL_TAG_SIZE,
     MODULE_SENSORY,
 )
-from parietal_lobe.spatial_imagery import SpatialImagery
-from parietal_lobe.world_model import (
-    OUT_COLLECT,
-    OUT_HAZARD,
-    OUT_WIN,
-    WorldEvent,
-    WorldModel,
-)
-from temporal_lobe.cognitive_map import CognitiveMap
 
 if TYPE_CHECKING:
     from parietal_lobe.grid import Grid

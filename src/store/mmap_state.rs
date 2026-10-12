@@ -87,6 +87,7 @@ use libc::{
 };
 
 use crate::state::legacy_v3::GenesisCoreStateV3;
+use crate::state::legacy_v4::GenesisCoreStateV4;
 use crate::state::{CoreStateError, GenesisCoreState};
 
 /// The logical file size — one 4K page. The state struct (3416 bytes)
@@ -119,10 +120,17 @@ fn mapped_len() -> usize {
 /// on UTC machines, and in any case anchored to the real day rather
 /// than to file-creation time.
 fn local_phase_of_day(now_ms: u64) -> f32 {
+    (local_seconds_of_day(now_ms) as f32 / 86_400.0).rem_euclid(1.0)
+}
+
+/// Seconds since local midnight at `now_ms`, falling back to UTC when the
+/// local conversion is unavailable. See [`local_phase_of_day`].
+pub(crate) fn local_seconds_of_day(now_ms: u64) -> i64 {
     let secs = now_ms / 1000;
     // UTC fallback: seconds of day modulo 86400.
     let utc_secs_of_day = (secs % 86_400) as i64;
-    let secs_of_day = libc::time_t::try_from(secs)
+
+    libc::time_t::try_from(secs)
         .ok()
         .and_then(|t| {
             let mut tm: libc::tm = unsafe { std::mem::zeroed() };
@@ -140,8 +148,7 @@ fn local_phase_of_day(now_ms: u64) -> f32 {
                 )
             }
         })
-        .unwrap_or(utc_secs_of_day);
-    (secs_of_day as f32 / 86_400.0).rem_euclid(1.0)
+        .unwrap_or(utc_secs_of_day)
 }
 
 /// A memory-mapped Genesis core state file.
@@ -472,6 +479,31 @@ impl MmapState {
                 crate::state::CoreStateError::VersionMismatch { found: 2, .. } => {
                     snapshot =
                         unsafe { Self::migrate_and_snapshot(ptr, fd, |s| s.migrate_state(2))? };
+                }
+                // v4 → v5: the sleep network was inserted ahead of the
+                // checksum, so every field from there on moved. Decode the
+                // file through the byte-exact v4 type, widen it (which
+                // seeds the network at its source initial conditions), and
+                // recompute the checksum.
+                crate::state::CoreStateError::VersionMismatch { found: 4, .. } => {
+                    // SAFETY: as for the v3 arm — exclusive ownership and
+                    // the flock is held, and the 4 KB mapping is larger
+                    // than the 3416-byte v4 struct.
+                    let legacy =
+                        unsafe { core::ptr::read_volatile(ptr as *const GenesisCoreStateV4) };
+                    if legacy.header.state_size as usize
+                        != core::mem::size_of::<GenesisCoreStateV4>()
+                    {
+                        return Err(StateFileError::VerificationFailed(e));
+                    }
+                    let widened = legacy.into_current();
+                    // SAFETY: as above.
+                    snapshot = unsafe {
+                        Self::migrate_and_snapshot(ptr, fd, |s| {
+                            *s = widened;
+                            s.migrate_state(4)
+                        })?
+                    };
                 }
                 // v3 → v4: the layout itself changed — `ions` was
                 // inserted ahead of the checksum — so a v3 file cannot
@@ -1347,6 +1379,60 @@ mod tests {
         }
 
         drop(state);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn open_migrates_a_v4_file_to_v5_with_the_sleep_network_seeded() {
+        use crate::state::core_state::crc32_ieee;
+        use crate::state::legacy_v4::GenesisCoreStateV4;
+        use crate::state::sleep_network::INITIAL;
+
+        let path = temp_state_path();
+        let now_ms = 1_800_000_000_000u64;
+        let current = GenesisCoreState::new(42, now_ms);
+        let mut legacy = GenesisCoreStateV4 {
+            header: current.header,
+            neurochemicals: current.neurochemicals,
+            zones: current.zones,
+            memory: current.memory,
+            manifest: current.manifest,
+            ions: current.ions,
+            checksum: 0,
+            inference_signals: current.inference_signals,
+        };
+        legacy.header.version = 4;
+        legacy.header.state_size = core::mem::size_of::<GenesisCoreStateV4>() as u32;
+        // The v4 checksum covers bytes 0..40 and 48..(its checksum offset).
+        let bytes = unsafe {
+            core::slice::from_raw_parts(
+                &legacy as *const GenesisCoreStateV4 as *const u8,
+                core::mem::size_of::<GenesisCoreStateV4>(),
+            )
+        };
+        let covered: Vec<u8> = bytes[..40]
+            .iter()
+            .chain(&bytes[48..core::mem::offset_of!(GenesisCoreStateV4, checksum)])
+            .copied()
+            .collect();
+        legacy.checksum = crc32_ieee(&covered);
+        let mut file = vec![0u8; 4096];
+        let raw = unsafe {
+            core::slice::from_raw_parts(
+                &legacy as *const GenesisCoreStateV4 as *const u8,
+                core::mem::size_of::<GenesisCoreStateV4>(),
+            )
+        };
+        file[..raw.len()].copy_from_slice(raw);
+        std::fs::write(&path, &file).unwrap();
+
+        let migrated = MmapState::open(&path).unwrap();
+        let s = migrated.read_consistent().expect("migrated state reads");
+        assert_eq!(s.header.version, crate::state::header::SCHEMA_VERSION);
+        assert_eq!(s.header.state_size as usize, GenesisCoreState::SIZE);
+        assert_eq!(s.sleep_network, INITIAL);
+        assert_eq!(s.ions.intracellular_mm, current.ions.intracellular_mm);
+        drop(migrated);
         let _ = std::fs::remove_file(&path);
     }
 

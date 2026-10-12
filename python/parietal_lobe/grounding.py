@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from concepts.types import RelationType
+from temporal_lobe.concepts.types import RelationType
 
 from .scene import ObjectRelation, Scene
 

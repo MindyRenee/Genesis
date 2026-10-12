@@ -17,16 +17,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import logging
 
 import pytest
-
-from genesis_client import NeuroSummary
-from genesis_client.protocol import PHASE_FLOW, PHASE_SLEEPING, PHASE_STRESS
+from frontal_lobe.self import SelfModel
 from limbic_system.emotion import (
     EmotionalState,
     EmotionCategory,
     assess_emotion,
 )
-from perception import Intent, QuestionType, perceive
-from self import SelfModel
+from occipital_lobe.perception import Intent, QuestionType, perceive
+
+from genesis_client import NeuroSummary
+from genesis_client.protocol import PHASE_FLOW, PHASE_SLEEPING, PHASE_STRESS
 
 logger = logging.getLogger(__name__)
 
@@ -171,8 +171,8 @@ def test_learn_emotion_word_from_labeling():
     """Emotion word learning associates words with categories."""
     from unittest.mock import MagicMock
 
-    from concepts import ConceptNetwork
     from frontal_lobe import FrontalLobe
+    from temporal_lobe.concepts import ConceptNetwork
 
     # Create a minimal mock for the client
     client = MagicMock()
@@ -212,7 +212,7 @@ def test_learn_emotion_word_from_labeling():
 
     # Verify relationships were created between words
     # for the same category (SIMILAR_TO edges)
-    from concepts import RelationType
+    from temporal_lobe.concepts import RelationType
     neighbors = cog.network.get_neighbors("positive", RelationType.SIMILAR_TO)
     neighbor_ids = [n[0] for n in neighbors]
     assert "content" in neighbor_ids
@@ -229,8 +229,8 @@ def test_learn_emotion_word_from_labeling():
 
 def test_learn_emotion_word_skips_non_emotion_words():
     """Emotion word learning skips common non-emotion words."""
-    from concepts import ConceptNetwork
     from frontal_lobe import FrontalLobe
+    from temporal_lobe.concepts import ConceptNetwork
 
     cog = FrontalLobe.__new__(FrontalLobe)
     cog.network = ConceptNetwork()
@@ -249,8 +249,8 @@ def test_learn_emotion_word_skips_non_emotion_words():
 
 def test_learn_emotion_word_different_patterns():
     """Emotion word learning recognizes different labeling patterns."""
-    from concepts import ConceptNetwork
     from frontal_lobe import FrontalLobe
+    from temporal_lobe.concepts import ConceptNetwork
 
     cog = FrontalLobe.__new__(FrontalLobe)
     cog.network = ConceptNetwork()

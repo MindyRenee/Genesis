@@ -57,8 +57,8 @@ from basal_ganglia import ActionBid, BasalGanglia
 
 if TYPE_CHECKING:
     from basal_ganglia.td import TDLearner
-    from concepts import ConceptNetwork
     from frontal_lobe.executive import ExecutiveFunction
+    from temporal_lobe.concepts import ConceptNetwork
 
     from .reasoner import ReasoningResult
 

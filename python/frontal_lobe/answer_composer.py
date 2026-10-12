@@ -26,8 +26,8 @@ from limbic_system.emotion import EmotionalState
 from temporal_lobe.base import Language, Thought
 
 if TYPE_CHECKING:
-    from concepts import ConceptNetwork, Edge, RelationType
-    from perception import Perception
+    from occipital_lobe.perception import Perception
+    from temporal_lobe.concepts import ConceptNetwork, Edge, RelationType
 
 __all__ = ["AnswerComposer"]
 
@@ -675,7 +675,7 @@ class AnswerComposer:
         Tracks cumulative sign so a prevention under an increase flips to
         a decrease, an opposite propagates the opposite sign, etc.
         """
-        from concepts import RelationType
+        from temporal_lobe.concepts import RelationType
 
         visited: set[str] = {start_cid}
         queue: deque[tuple[str, int, int]] = deque([(start_cid, direction, 0)])
@@ -911,7 +911,7 @@ class AnswerComposer:
 
     def _relation_verb(self, rel: RelationType) -> str:
         """Convert a relation to a natural verb."""
-        from concepts import RelationType as RT
+        from temporal_lobe.concepts import RelationType as RT
 
         verbs = {
             RT.CAUSES: "causes",
@@ -942,7 +942,7 @@ class AnswerComposer:
         self, start: str, end: str, max_depth: int = 3
     ) -> list[tuple[str, RelationType, str]] | None:
         """Find a causal/is_a path from start to end for explanation."""
-        from concepts import RelationType
+        from temporal_lobe.concepts import RelationType
 
         positive_out = {
             RelationType.CAUSES,
@@ -993,7 +993,7 @@ class AnswerComposer:
         causal path so the language engine composes the actual words
         — no hardcoded template strings.
         """
-        from concepts import RelationType
+        from temporal_lobe.concepts import RelationType
 
         start_display = _display_name(start)
         end_display = _display_name(end)
@@ -1034,7 +1034,7 @@ class AnswerComposer:
 
     def _find_cause(self, target: str) -> tuple[str, RelationType, str] | None:
         """Find the strongest cause of a target (or one of its is_a parents)."""
-        from concepts import RelationType
+        from temporal_lobe.concepts import RelationType
 
         ancestors = self._get_is_a_ancestors(target)
         candidates: list[tuple[str, RelationType, str, float]] = []
@@ -1066,7 +1066,7 @@ class AnswerComposer:
 
     def _get_is_a_ancestors(self, target: str, max_depth: int = 2) -> list[str]:
         """Return target and its is_a ancestors up to a shallow depth."""
-        from concepts import RelationType
+        from temporal_lobe.concepts import RelationType
 
         ancestors: list[str] = [target]
         visited: set[str] = {target}
@@ -1206,7 +1206,7 @@ class AnswerComposer:
         self, target: str, desired_sign: int
     ) -> tuple[str, RelationType, str, int, float] | None:
         """Find the strongest controllable cause for a desired change."""
-        from concepts import RelationType
+        from temporal_lobe.concepts import RelationType
 
         positive = {
             RelationType.CAUSES,

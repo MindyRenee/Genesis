@@ -12,7 +12,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import logging
 
-from concepts import ConceptNetwork
+from frontal_lobe.self import SelfModel
+from limbic_system.emotion import EmotionalState
+from temporal_lobe.concepts import ConceptNetwork
+
 from infrastructure.narrative import (
     AutobiographicalLevel,
     HierarchyNode,
@@ -24,8 +27,6 @@ from infrastructure.narrative import (
     TemporalLink,
     TemporalLinkType,
 )
-from limbic_system.emotion import EmotionalState
-from self import SelfModel
 
 logger = logging.getLogger(__name__)
 

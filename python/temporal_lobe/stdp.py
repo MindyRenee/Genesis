@@ -24,7 +24,7 @@ import numpy as np
 from .synapses import SynapticStore
 
 if TYPE_CHECKING:
-    from concepts import ConceptNetwork
+    from temporal_lobe.concepts import ConceptNetwork
 
 __all__ = ["STDP", "SpikeEvent"]
 

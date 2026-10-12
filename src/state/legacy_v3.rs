@@ -57,6 +57,7 @@ impl GenesisCoreStateV3 {
             memory: self.memory,
             manifest: self.manifest,
             ions: IonState::new(),
+            sleep_network: super::sleep_network::INITIAL,
             checksum: self.checksum,
             inference_signals: self.inference_signals,
         }

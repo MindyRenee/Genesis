@@ -48,6 +48,7 @@ from basal_ganglia.action_feedback import (
     ActionSpec,
     OutcomeState,
 )
+
 from genesis_client.protocol import (
     CHEM_ACETYLCHOLINE,
     CHEM_ADENOSINE,

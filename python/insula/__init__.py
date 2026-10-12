@@ -90,13 +90,13 @@ _EXPORTS: dict[str, str] = {
     # The autonomic sampling loop that reads the body each cycle
     "HeartbeatMixin": "brainstem.heartbeat",
     # The body map the self is built on
-    "ProtoSelf": "self.damasio",
-    "ProtoSelfState": "self.damasio",
+    "ProtoSelf": "insula.damasio",
+    "ProtoSelfState": "insula.damasio",
     # Somatic-marker congruence — how well the felt body matches the
     # expressed body: an interoceptive comparison, read in the
     # insular cortex (co-claimed with limbic_system)
-    "SomaticSnapshot": "self.somatic",
-    "somatic_congruence": "self.somatic",
+    "SomaticSnapshot": "insula.somatic",
+    "somatic_congruence": "insula.somatic",
 }
 
 __all__ = sorted(_EXPORTS)

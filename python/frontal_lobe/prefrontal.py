@@ -85,10 +85,7 @@ from thalamus.relay import KIND_HEARD, KIND_SPOKE, Thalamus
 # ``test_import_order.py``, which pins the laziness that makes it safe
 # plus a fresh-interpreter ``import mind``.
 from parietal_lobe.attention import AttentionSystem
-from neurochemical.electrochemistry import (
-    IonCognitiveContext,
-    interpret_ions,
-)
+from brainstem.electrochemistry import IonCognitiveContext, interpret_ions
 from thalamus.brain_waves import (
     BrainWave,
     BrainWaveState,
@@ -96,7 +93,7 @@ from thalamus.brain_waves import (
     assess_brain_waves,
 )
 from .meta_cognitive_router import MetaCognitiveRouter, Route
-from concepts import ConceptNetwork, RelationType, is_world_concept
+from temporal_lobe.concepts import ConceptNetwork, RelationType, is_world_concept
 from limbic_system.emotion import EmotionalState, assess_emotion
 from frontal_lobe.executive import ExecutiveFunction, TaskState
 from frontal_lobe.global_workspace import GlobalWorkspace, WorkspaceItem
@@ -110,7 +107,7 @@ from cerebellum.predictive import PredictionContext, PredictiveCodingLayer
 from limbic_system.curiosity import Curiosity, Question
 from temporal_lobe.stdp import STDP
 from temporal_lobe.synapses import SynapticStore
-from memory import (
+from temporal_lobe.memory import (
     MemoryContext,
     MemorySystem,
     ProceduralMemory,
@@ -119,7 +116,7 @@ from memory import (
 )
 from infrastructure.narrative import Narrator
 from infrastructure.user_profile import UserProfile
-from perception import Intent, Perception, perceive
+from occipital_lobe.perception import Intent, Perception, perceive
 from frontal_lobe.reasoning import (
     DecisionResult,
     DriftDiffusionModel,
@@ -129,7 +126,7 @@ from frontal_lobe.reasoning import (
     ReasoningType,
     TheoryOfMind,
 )
-from self import (
+from frontal_lobe.self import (
     DamasioSelfHierarchy,
     ErrorMonitor,
     Insight,
@@ -160,7 +157,7 @@ if TYPE_CHECKING:
     from cerebellum.predictive import PredictionError as PCPredictionError
     from frontal_lobe.autonomous import AutonomousLearner
     from frontal_lobe.reasoning import UserModel
-    from self import AnswerAssessment
+    from frontal_lobe.self import AnswerAssessment
     from parietal_lobe.system_monitor import SystemMonitor
 
 logger = logging.getLogger(__name__)
@@ -588,12 +585,12 @@ class FrontalLobe:
         self.question_composer = QuestionComposer(self.network)
 
         # Embedding store — latent space for semantic similarity
-        from concepts import EmbeddingStore
+        from temporal_lobe.concepts import EmbeddingStore
 
         self.embeddings: EmbeddingStore = EmbeddingStore(self.network, data_dir=data_dir or ".")
 
         # Edge proposer — discovers new relationships from embedding proximity
-        from concepts import EdgeProposer
+        from temporal_lobe.concepts import EdgeProposer
 
         self.edge_proposer = EdgeProposer(self.network, self.embeddings)
 
@@ -628,7 +625,7 @@ class FrontalLobe:
         self.plasticity = HebbianPlasticity(self.embeddings, self.network)
 
         # Network topology — graph-theoretic self-awareness
-        from concepts import NetworkTopology
+        from temporal_lobe.concepts import NetworkTopology
 
         self.topology = NetworkTopology(self.network)
 
@@ -636,18 +633,18 @@ class FrontalLobe:
         self.composer.embeddings = self.embeddings
 
         # Self composer — generates self-descriptions from actual state
-        from self import SelfComposer
+        from frontal_lobe.self import SelfComposer
 
         self.self_composer = SelfComposer()
 
         # Working memory — tracks attention across turns
-        from memory import WorkingMemory
+        from temporal_lobe.memory import WorkingMemory
 
         self.working_memory = WorkingMemory()
 
         # Tool registry — concrete capabilities the mind can invoke.
         # Any other subsystem can reach the same singleton via get_tools().
-        from tools.framework import get_tools
+        from frontal_lobe.tools.framework import get_tools
 
         self.tools = get_tools()
 
@@ -844,7 +841,7 @@ class FrontalLobe:
         # and confidence. This is the foundation for self-improvement:
         # it can only learn what it's missing if it knows it's
         # missing it.
-        from self import SelfAssessment
+        from frontal_lobe.self import SelfAssessment
 
         self.self_assessment = SelfAssessment(self.network)
 
@@ -852,7 +849,7 @@ class FrontalLobe:
         # through conversation learning, transitive inference,
         # definition synthesis, and self-study. This is the engine
         # that makes it get smarter over time without external input.
-        from self import SelfDirectedLearner
+        from frontal_lobe.self import SelfDirectedLearner
 
         self.self_learner = SelfDirectedLearner(
             self.network, data_dir=data_dir
@@ -937,7 +934,7 @@ class FrontalLobe:
         # cognitive counterpart to the Rust active inference engine
         # (which predicts neurochemistry). Together they form a
         # three-level strange loop: substrate → content → process.
-        from self import CognitiveTrajectoryModel
+        from frontal_lobe.self import CognitiveTrajectoryModel
 
         self.cognitive_trajectory = CognitiveTrajectoryModel()
 
@@ -3285,7 +3282,7 @@ class FrontalLobe:
                 e,
             )
         try:
-            from memory import Turn
+            from temporal_lobe.memory import Turn
 
             self.working_memory.update(
                 Turn(
@@ -3832,7 +3829,7 @@ class FrontalLobe:
         source and target so the metaphorical connection is traversable
         by the graph-walk generator and reasoning engine.
         """
-        from concepts import RelationType
+        from temporal_lobe.concepts import RelationType
 
         source_name = metaphor.source
         target_name = metaphor.target
@@ -5218,7 +5215,7 @@ class FrontalLobe:
                 )
 
         # Update working memory
-        from memory import Turn
+        from temporal_lobe.memory import Turn
 
         self.working_memory.update(
             Turn(
@@ -5651,7 +5648,7 @@ class FrontalLobe:
     ) -> CognitiveState:
         """Build a minimal CognitiveState for a question-answer turn."""
         # Build a minimal cognitive state
-        from perception import QuestionType as _QT
+        from occipital_lobe.perception import QuestionType as _QT
         return CognitiveState(
             perception=Perception(
                 raw_text=user_input,

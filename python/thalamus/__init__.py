@@ -232,8 +232,8 @@ _EXPORTS: dict[str, str] = {
     "compute_gamma_synchrony": "thalamus.brain_waves",
     "compute_theta_gamma_coupling": "thalamus.brain_waves",
     # Spindles arise in RE<->TC loops; K-complex downstates are cortical.
-    "SleepSpindle": "sleep",
-    "KComplex": "sleep",
+    "SleepSpindle": "thalamus.events",
+    "KComplex": "thalamus.events",
     # The broadcast relay — higher-order thalamic nuclei are the
     # physical fan-out of workspace ignition (also re-exported by
     # frontal_lobe: the PFC is the primary broadcaster)

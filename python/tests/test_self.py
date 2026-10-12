@@ -8,13 +8,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import logging
 
 import pytest
-
-from concepts import ConceptNetwork, RelationType
 from frontal_lobe import CognitiveState
-from limbic_system.emotion import EmotionalState
-from memory import MemoryContext
-from perception import Intent, Perception, QuestionType
-from self import (
+from frontal_lobe.self import (
     AnswerAssessment,
     AutobiographicalSelf,
     CapabilityProfile,
@@ -34,7 +29,11 @@ from self import (
     SelfComposer,
     SelfModel,
 )
+from limbic_system.emotion import EmotionalState
+from occipital_lobe.perception import Intent, Perception, QuestionType
 from temporal_lobe.base import Thought
+from temporal_lobe.concepts import ConceptNetwork, RelationType
+from temporal_lobe.memory import MemoryContext
 from thalamus.brain_waves import BrainWave, BrainWaveState
 
 logger = logging.getLogger(__name__)
@@ -1173,7 +1172,7 @@ def _make_emotion(
 
 def _make_network_with_emotion_words() -> ConceptNetwork:
     """A concept network with learned emotion-word associations."""
-    from concepts import RelationType
+    from temporal_lobe.concepts import RelationType
 
     net = _make_network()
     # Add emotion words with category properties AND EXPRESSES edges
@@ -2249,7 +2248,7 @@ def test_self_model_sees_her_own_hardware_body() -> None:
     or any of the other hardware signals. She could not know she was
     hot, or out of power, or being stalled.
     """
-    from self.model import SelfModel as SM
+    from frontal_lobe.self.model import SelfModel as SM
 
     body = SM().update_hardware_body(_FullBody())
 
@@ -2273,7 +2272,7 @@ def test_absent_sensor_is_distinguishable_from_measured_zero() -> None:
     reading, and a need derived from the body could be inferred from
     silence. `hardware_sensors_present` counts what actually reported.
     """
-    from self.model import SelfModel as SM
+    from frontal_lobe.self.model import SelfModel as SM
 
     class _PartialBody:
         cpu_temp_c = 60.0
@@ -2298,7 +2297,7 @@ def test_stale_hardware_reading_is_not_actionable() -> None:
     """A need computed from a stale body reading is a hallucinated need."""
     import time as _time
 
-    from self.model import SelfModel as SM
+    from frontal_lobe.self.model import SelfModel as SM
 
     model = SM()
     body = model.update_hardware_body(_FullBody())
@@ -2315,7 +2314,7 @@ def test_stale_hardware_reading_is_not_actionable() -> None:
 
 def test_non_finite_sensor_reading_is_not_a_measurement() -> None:
     """A NaN or inf from a sensor must not enter the self-model."""
-    from self.model import SelfModel as SM
+    from frontal_lobe.self.model import SelfModel as SM
 
     class _BrokenBody:
         cpu_temp_c = float("nan")
@@ -2337,7 +2336,7 @@ def test_hardware_staleness_constant_is_not_a_serialized_field() -> None:
     """
     import dataclasses
 
-    from self.model import ComputationalSubstrate
+    from frontal_lobe.self.model import ComputationalSubstrate
 
     field_names = {f.name for f in dataclasses.fields(ComputationalSubstrate)}
     assert "HARDWARE_STALE_SECONDS" not in field_names

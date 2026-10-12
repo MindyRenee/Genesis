@@ -53,11 +53,11 @@ from .basal_ganglia import ActionBid, BasalGanglia, SelectionResult
 _EXPORTS: dict[str, str] = {
     "TDLearner": "basal_ganglia.td",
     "TDTransition": "basal_ganglia.td",
-    "HABIT_THRESHOLD": "memory",
-    "HabitBias": "memory",
-    "ProceduralMemory": "memory",
-    "Skill": "memory",
-    "SkillStrategy": "memory",
+    "HABIT_THRESHOLD": "temporal_lobe.memory.procedural",
+    "HabitBias": "temporal_lobe.memory.procedural",
+    "ProceduralMemory": "temporal_lobe.memory.procedural",
+    "Skill": "temporal_lobe.memory.procedural",
+    "SkillStrategy": "temporal_lobe.memory.procedural",
     # The action→prediction→observation→revision loop — how the
     # striatum learns what an action actually produces
     "ActionFeedback": "basal_ganglia.action_feedback",
@@ -79,9 +79,13 @@ _EXPORTS: dict[str, str] = {
     # which holds the urge primitive)
     "Urge": "frontal_lobe.volition",
     "Volition": "frontal_lobe.volition",
+    # GABA — the striatum's own inhibitory currency: direct/indirect
+    # pathway gating lives here, not in a general pool
+    "GABA": "basal_ganglia.gaba",
 }
 
 __all__ = [
+    "GABA",
     "HABIT_THRESHOLD",
     "ActionBid",
     "ActionFeedback",

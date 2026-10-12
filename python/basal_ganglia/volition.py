@@ -16,11 +16,12 @@ from brainstem.thresholds import (
     WAKE_STABILIZATION_WINDOW,
 )
 from frontal_lobe.canvas import DrawingResult, NeurochemistryInput
+from frontal_lobe.tools.project_creator import create_project, manage_project_lifecycle
 from frontal_lobe.volition import Urge, Volition
+
 from genesis_client.protocol import CHEM_NAMES, MODULE_METACOGNITION
 from genesis_client.swallow import note_swallowed
 from infrastructure.journal import record_error
-from tools.project_creator import create_project, manage_project_lifecycle
 
 logger = logging.getLogger(__name__)
 
@@ -895,6 +896,8 @@ class VolitionMixin:
         }
         _on_step = None
         try:
+            from thalamus.brain_waves import BrainWave, add_brain_wave_drive
+
             from genesis_client.protocol import (
                 CHEM_ACETYLCHOLINE,
                 CHEM_CORTISOL,
@@ -902,7 +905,6 @@ class VolitionMixin:
                 CHEM_ENDORPHIN,
                 CHEM_NOREPINEPHRINE,
             )
-            from thalamus.brain_waves import BrainWave, add_brain_wave_drive
 
             add_brain_wave_drive(BrainWave.BETA2, 0.15)
             self._learner_neuro_impulse(CHEM_ACETYLCHOLINE, 0.004)
@@ -1517,7 +1519,7 @@ class VolitionMixin:
         This is how it learns from its own creations.
         """
         try:
-            from concepts import RelationType
+            from temporal_lobe.concepts import RelationType
             self.brain.frontal.network.add_concept(
                 result.name,
                 confidence=0.7,

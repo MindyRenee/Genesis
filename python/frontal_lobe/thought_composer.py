@@ -84,13 +84,13 @@ import re
 from collections import deque
 from typing import TYPE_CHECKING, Any
 
-from concepts import Concept, ConceptNetwork, RelationType
 from frontal_lobe.reasoning import Reasoner, ReasoningResult, ReasoningType
 from limbic_system.emotion import EmotionalState
 from temporal_lobe.base import Thought
+from temporal_lobe.concepts import Concept, ConceptNetwork, RelationType
 
 if TYPE_CHECKING:
-    from concepts import EmbeddingStore
+    from temporal_lobe.concepts import EmbeddingStore
 
 
 # Origins of auto-generated edges that exist only to keep the graph
@@ -362,7 +362,7 @@ class ThoughtComposer:
         (-ing, -s, -es, base form) and prefers the variant that has
         process edges in the graph.
         """
-        from concepts import RelationType
+        from temporal_lobe.concepts import RelationType
 
         process_rels = (RelationType.CREATES, RelationType.CAUSES, RelationType.LEADS_TO)
 
@@ -423,7 +423,7 @@ class ThoughtComposer:
         identify which concept the user is asking about, based on
         which one has functional relationships in the graph.
         """
-        from concepts import RelationType
+        from temporal_lobe.concepts import RelationType
 
         functional_rels = (
             RelationType.ENABLES,
@@ -477,7 +477,7 @@ class ThoughtComposer:
         Returns the reasoning result if a DEPENDS_ON edge exists
         from source to target, otherwise None.
         """
-        from concepts import RelationType
+        from temporal_lobe.concepts import RelationType
 
         for e in self.network.get_edges(source, "out"):
             if (
@@ -814,7 +814,7 @@ class ThoughtComposer:
         *which* relations exist. Derived entirely from graph edges —
         no hardcoded domain knowledge.
         """
-        from concepts import RelationType
+        from temporal_lobe.concepts import RelationType
 
         obj_id = self.network._resolve(object_) or object_.lower()
         subj_id = self.network._resolve(subject) or subject.lower()
@@ -1900,7 +1900,7 @@ class ThoughtComposer:
 
         # Try graph-based verb lookup first — construct phrasings from
         # relation verbs retrieved via EXPRESSES edges from hubs.
-        from concepts import RelationType as _RT
+        from temporal_lobe.concepts import RelationType as _RT
         rt_match = None
         for rt in _RT:
             if rt.value == relation or rt.value == relation.replace(" ", "_"):

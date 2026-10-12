@@ -70,7 +70,7 @@ from .competence import (
 )
 
 if TYPE_CHECKING:
-    from concepts import ConceptNetwork
+    from temporal_lobe.concepts import ConceptNetwork
 
 __all__ = ["Plan", "PlanStatus", "PlanStep", "PlanStepStatus", "Planner"]
 
@@ -666,7 +666,7 @@ class Planner:
         outgoing DEPENDS_ON targets and incoming ENABLES sources —
         concepts this concept depends on or is enabled by.
         """
-        from concepts import RelationType
+        from temporal_lobe.concepts import RelationType
 
         prereqs: list[str] = []
         cid = self.network._resolve(concept)
@@ -690,7 +690,7 @@ class Planner:
         Looks for incoming CAUSES and LEADS_TO edges — concepts that
         cause or lead to this concept.
         """
-        from concepts import RelationType
+        from temporal_lobe.concepts import RelationType
 
         causes: list[str] = []
         cid = self.network._resolve(concept)

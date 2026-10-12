@@ -1,5 +1,5 @@
 """Regression tests for semantic persistence replacement."""
-from memory.semantic import SemanticMemory
+from temporal_lobe.memory.semantic import SemanticMemory
 
 
 def test_restore_replaces_existing_semantic_state():

@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 from .comprehension import Proposition, SemanticRole
 
 if TYPE_CHECKING:
-    from concepts.network import ConceptNetwork
+    from temporal_lobe.concepts.network import ConceptNetwork
 
 
 # Leading determiners that carry no content and are never part of a

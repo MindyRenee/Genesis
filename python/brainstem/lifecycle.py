@@ -16,10 +16,7 @@ from typing import Any, cast
 from genesis_client.protocol import (
     CHEM_ADENOSINE,
     CHEM_DOPAMINE,
-    CHEM_HISTAMINE,
     CHEM_MELATONIN,
-    CHEM_NOREPINEPHRINE,
-    CHEM_OREXIN,
     MODULE_LANGUAGE,
     MODULE_MEMORY,
     MODULE_METACOGNITION,
@@ -196,7 +193,7 @@ class LifecycleMixin:
         # Introspect — discover who it is by examining itself
         # This writes its identity into the concept network through
         # self-examination, not hardcoded facts
-        from self import Introspection
+        from frontal_lobe.self import Introspection
 
         _intro_t0 = time.perf_counter()
         introspector = Introspection(self.brain.frontal.network)
@@ -245,11 +242,11 @@ class LifecycleMixin:
                 self.client.neuro_adjust_baseline(CHEM_ADENOSINE, baseline_delta)
                 # Also drop the current level to match.
                 self._learner_neuro_impulse(CHEM_ADENOSINE, baseline_delta * 0.8)
-                # Boost wake-promoting chemistry.
-                self._learner_neuro_impulse(CHEM_HISTAMINE, 0.20)
-                self._learner_neuro_impulse(CHEM_OREXIN, 0.15)
+                # Wake her with a volitional push onto the sleep-wake network,
+                # which owns the stage. Histamine, orexin and norepinephrine
+                # are no longer pushed: they gated the flip-flop from outside.
+                self._push_volition(sleep=False)
                 self._learner_neuro_impulse(CHEM_DOPAMINE, 0.05)
-                self._learner_neuro_impulse(CHEM_NOREPINEPHRINE, 0.05)
                 self._learner_neuro_impulse(CHEM_MELATONIN, -0.05)
         except (OSError, ConnectionError, RuntimeError) as e:
             note_swallowed(
@@ -859,7 +856,9 @@ class LifecycleMixin:
 
     def _restore_saved_components(self, data) -> None:
         """Validate and commit each saved component as one transaction."""
-        from concepts import ConceptNetwork
+        from frontal_lobe.self import Reflection, SelfModel
+        from temporal_lobe.concepts import ConceptNetwork
+
         from infrastructure.narrative import Narrator
         from infrastructure.persistence import (
             restore_narrative,
@@ -867,7 +866,6 @@ class LifecycleMixin:
             restore_reflection,
             restore_self_model,
         )
-        from self import Reflection, SelfModel
 
         staged_network = None
         if "concept_network" in data:
@@ -1107,8 +1105,9 @@ class LifecycleMixin:
         subsystems are started — otherwise the learner thread would
         start after the pause and run unpaused.
         """
+        from brainstem.architecture import SleepCycleTracker
+
         from infrastructure.persistence import restore_sleep_cycle
-        from sleep import SleepCycleTracker
 
         # Restore sleep state exactly as saved. The defaults are
         # False (awake) — if the sleep_state fields are missing from

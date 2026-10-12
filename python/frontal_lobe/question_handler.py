@@ -31,17 +31,18 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from limbic_system.emotion import EmotionalState
-from perception import Perception, QuestionType
+from occipital_lobe.perception import Perception, QuestionType
 from temporal_lobe.base import Language, Thought
 
 if TYPE_CHECKING:
-    from concepts import ConceptNetwork, RelationType
     from frontal_lobe.reasoning import ReasoningResult, TheoryOfMind
-    from infrastructure.user_profile import UserProfile
-    from memory import MemoryContext
+    from frontal_lobe.self import SelfComposer, SelfModel
+    from frontal_lobe.tools.framework import ToolRegistry
     from parietal_lobe.situation_model import SituationModel
-    from self import SelfComposer, SelfModel
-    from tools.framework import ToolRegistry
+    from temporal_lobe.concepts import ConceptNetwork, RelationType
+    from temporal_lobe.memory import MemoryContext
+
+    from infrastructure.user_profile import UserProfile
 
     from .thought_composer import ThoughtComposer
 
@@ -121,7 +122,7 @@ class QuestionHandler:
         self._user_profile = user_profile
 
         # Build the verb → relation mapping now that we can import.
-        from concepts import RelationType as RT
+        from temporal_lobe.concepts import RelationType as RT
 
         self._question_verbs: dict[str, list[RT]] = {
             "create": [RT.CREATES], "creates": [RT.CREATES],

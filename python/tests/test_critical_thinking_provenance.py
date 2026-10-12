@@ -1,11 +1,11 @@
 """Regression tests for critical-thinking evidence provenance."""
 
-from concepts import ConceptNetwork, RelationType
 from frontal_lobe.reasoning import (
     CriticalThinker,
     ReasoningResult,
     ReasoningType,
 )
+from temporal_lobe.concepts import ConceptNetwork, RelationType
 
 
 def test_knowledge_payload_without_provenance_is_not_evidence() -> None:

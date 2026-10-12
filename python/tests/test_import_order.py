@@ -36,7 +36,7 @@ import subprocess
 import sys
 
 _ROOT = pathlib.Path(__file__).resolve().parents[1]
-SELF_INIT = _ROOT / "self" / "__init__.py"
+SELF_INIT = _ROOT / "frontal_lobe" / "self" / "__init__.py"
 
 
 def test_self_package_stays_lazy() -> None:
@@ -68,10 +68,18 @@ def test_self_package_stays_lazy() -> None:
 
 def test_package_imports_cleanly() -> None:
     """The whole point: a fresh interpreter must import the mind."""
+    import os
+
+    env = dict(os.environ)
+    env["PYTHONPATH"] = (
+        f"{_ROOT.parent}{os.pathsep}{_ROOT}{os.pathsep}"
+        + env.get("PYTHONPATH", "")
+    )
     result = subprocess.run(
         [sys.executable, "-c", "import mind"],
         capture_output=True,
         text=True,
         cwd=str(_ROOT),
+        env=env,
     )
     assert result.returncode == 0, f"import mind failed:\n{result.stderr}"

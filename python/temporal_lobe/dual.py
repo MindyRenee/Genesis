@@ -67,7 +67,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
-    from concepts import ConceptNetwork, EmbeddingStore
+    from temporal_lobe.concepts import ConceptNetwork, EmbeddingStore
 
 __all__ = ["DualSystemLearner", "HippocampalEpisode", "NeocorticalMemory"]
 

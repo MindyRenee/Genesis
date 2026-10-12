@@ -1,9 +1,9 @@
 """Regression tests for reconstruction fidelity across cognitive transforms."""
 
 import numpy as np
+from temporal_lobe.mtl_bridge import MemoryBridge
 
 from infrastructure.vq_codebook import VQCodebook
-from temporal_lobe.mtl_bridge import MemoryBridge
 
 
 def test_vq_reports_actual_quantized_reconstruction_and_saturation() -> None:

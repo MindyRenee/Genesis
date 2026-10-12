@@ -1754,7 +1754,7 @@ impl NeurochemicalVector {
     ///
     /// This must be called after any change to chemical levels or
     /// receptor sensitivities, and after every dynamics tick.
-    fn recompute_derived_with_dt(&mut self, dt_scale: f32) {
+    fn recompute_derived_with_dt(&mut self, dt_scale: f32, network: Option<NetworkLevels>) {
         // Effective levels — for GABA, apply allosteric modulation.
         // For DA and SRT, add a phasic boost: phasic bursts activate
         // low-affinity receptors (D1 for DA, 5-HT2A for SRT) that
@@ -1912,7 +1912,21 @@ impl NeurochemicalVector {
                 1.0 / (1.0 + (-x).exp())
             }
         };
-        let arousal_target = crate::state::sanitize::finite_clamp(sigmoid(total_input), 0.0, 1.0);
+        // With the sleep-wake network present, cortical arousal is set by its
+        // populations: LC for waking activation, REM-on for the REM activation
+        // that the desynchronized EEG shows. The coefficients put NREM, REM and
+        // waking at about 0.21, 0.44 and 0.65 (the NREM and REM bands the
+        // scripted clamps used to enforce). Those bands were never sourced, so
+        // the REM level is open: it should be checked against an EEG reference.
+        // Without the network, the Wilson-Cowan equation is used, unchanged.
+        let arousal_target = match network {
+            Some(net) => crate::state::sanitize::finite_clamp(
+                0.12 + 0.55 * net.lc + 0.25 * net.rem,
+                0.0,
+                1.0,
+            ),
+            None => crate::state::sanitize::finite_clamp(sigmoid(total_input), 0.0, 1.0),
+        };
         // Exponential approach toward the target for time-invariance.
         // The previous `dt_scale.min(1.0)` factor was not
         // time-invariant: at 5 Hz (dt_scale=2) arousal fully replaced
@@ -1927,64 +1941,10 @@ impl NeurochemicalVector {
         self.arousal += (arousal_target - self.arousal) * arousal_alpha;
         self.arousal = crate::state::sanitize::finite_clamp(self.arousal, 0.0, 1.0);
 
-        // Sleep-state arousal clamping.
-        //
-        // The Wilson-Cowan oscillator computes arousal from
-        // neurochemicals, but during sleep the neurochemical
-        // picture is paradoxical:
-        //
-        // - During NREM, adenosine is being cleared (glymphatic
-        //   clearance), which reduces sleep pressure and lets
-        //   arousal drift back up — even though the mind is asleep.
-        //   In real brains, the VLPO actively inhibits arousal
-        //   systems during NREM. Arousal should be low (0.10-0.25).
-        //
-        // - During REM, ACh is high (cholinergic activation for
-        //   dreaming), and ACh is an arousal promoter (weight 0.15),
-        //   so arousal stays high. In real brains, REM is
-        //   "paradoxical sleep" — the EEG looks awake but the mind
-        //   is asleep with muscle atonia. Arousal should be moderate
-        //   (0.35-0.55), not 0.9.
-        //
-        // Without this clamping, you see alertness=0.9 while asleep,
-        // which is nonsensical. The clamp respects the phase that
-        // the neurochemical dynamics already determined — it doesn't
-        // override the phase, it just keeps arousal in a sane range
-        // for that phase.
-        //
-        // The clamp is a HARD clamp (direct cap), not a soft exponential
-        // nudge. A previous soft clamp (rate 2.0) was too weak to
-        // overcome the Wilson-Cowan arousal drive (rate 10.0), so
-        // arousal settled at 0.5-0.7 during NREM instead of the
-        // intended 0.10-0.25. The hard clamp models the VLPO's active
-        // inhibition of arousal systems — it doesn't just nudge
-        // arousal down, it actively prevents it from rising above
-        // the sleep-appropriate range.
-        //
-        // (Saper, Chou & Scammell, 2005; Hobson & McCarley, 1975)
-        let phase = MentalPhase::from_u8(self.emergent_phase);
-        match phase {
-            MentalPhase::NREM => {
-                // NREM: low arousal (slow-wave sleep)
-                // Hard-clamp to 0.10-0.25 — deep restorative sleep.
-                // The VLPO actively inhibits arousal systems; this is
-                // not a gentle suggestion but a hard cap.
-                // Use finite_clamp for NaN safety: native clamp passes
-                // NaN through. self.arousal was finite_clamped above,
-                // but defense-in-depth protects against future code
-                // reordering.
-                self.arousal = crate::state::sanitize::finite_clamp(self.arousal, 0.10, 0.25);
-            }
-            MentalPhase::REM => {
-                // REM: moderate arousal ("paradoxical sleep")
-                // Hard-clamp to 0.35-0.55 — EEG looks awake but mind
-                // is asleep.
-                self.arousal = crate::state::sanitize::finite_clamp(self.arousal, 0.35, 0.55);
-            }
-            _ => {}
-        }
-        self.arousal = crate::state::sanitize::finite_clamp(self.arousal, 0.0, 1.0);
-
+        // Arousal is not clamped to a sleep-stage range. The sleep-wake
+        // network drives the chemistry that sets arousal (LC and REM-on set
+        // norepinephrine and acetylcholine; VLPO sets GABA), so arousal in
+        // NREM and REM comes out of those levels, not from fixed caps.
         // Valence equation — neuroscientifically grounded.
         //
         // Positive contributors:
@@ -2116,7 +2076,7 @@ impl NeurochemicalVector {
 
     /// Recompute all derived fields using the default tick time scale.
     pub fn recompute_derived(&mut self) {
-        self.recompute_derived_with_dt(1.0);
+        self.recompute_derived_with_dt(1.0, None);
     }
 
     /// Compute the emergent mental phase from the current neurochemical
@@ -2177,312 +2137,6 @@ impl NeurochemicalVector {
         // orexin (wake stabilizer) raises it. This makes sleep a
         // multi-system decision, not adenosine alone.
         //
-        // The cholinergic/aminergic flip-flop determines NREM vs REM:
-        // - REM: high ACh (>0.50) + low NE (<0.30) + low histamine (<0.25)
-        //   (noradrenergic silence with cholinergic activation → dreaming)
-        // - NREM: low ACh + high GABA (slow-wave sleep, glymphatic clearance)
-        //
-        // The flip-flop is the reciprocal interaction model (Hobson &
-        // McCarley, 1975): REM-on cells (cholinergic) are active while
-        // REM-off cells (noradrenergic, serotonergic) are silenced.
-        let is_in_sleep = current == MentalPhase::NREM || current == MentalPhase::REM;
-        // No melatonin term here. Melatonin used to lower the *adenosine*
-        // threshold directly (-0.15 entering, -0.10 staying), which put a
-        // circadian signal on the homeostatic process. The evidence is
-        // that it does not work that way: "because melatonin does not
-        // increase the amount of SWS, which is considered a marker of
-        // the homeostatic sleep pressure, the sleep promoting effects of
-        // melatonin may be mostly ascribed to the circadian component of
-        // sleep regulation" (Arbon et al. 2015, via Zisapel 2018), and
-        // "melatonin acts at the SCN to attenuate the wake-promoting
-        // signal of the circadian clock" (Liu et al. 1997). So it belongs
-        // on the circadian drive to the arousal system, which is where it
-        // now lives — see circadian_baseline_modifier for Histamine.
-        //
-        // Orexin is legitimately a wake signal competing at the gate, so
-        // it stays.
-        let sleep_adn = if is_in_sleep {
-            // Sleep pressure can fall below the entry threshold during
-            // late NREM without immediately waking the system. The
-            // cholinergic rebound is intentionally triggered below 0.65
-            // adenosine, so the NREM stay threshold must sit below that
-            // transition window. Otherwise the sleep gate exits NREM
-            // before the rebound can produce the NREM→REM transition.
-            0.55 - 0.05 * (1.0 - ox)
-        } else {
-            0.75 - 0.05 * (1.0 - ox)
-        };
-        let sleep_hist = if is_in_sleep {
-            // More histamine is tolerable when already asleep. The
-            // stay-asleep threshold (0.38) is above the histamine
-            // baseline (0.30) so that small perturbations from its
-            // own normal activity (inner-life dream generation,
-            // memory consolidation, heartbeat modules) — which raise
-            // norepinephrine slightly and in turn histamine via the
-            // +0.05 NE→HIST coupling — don't break the sleep state.
-            // The previous value (0.30) sat exactly at the baseline,
-            // making sleep a tightrope: any tiny NE bump pushed
-            // histamine back above the threshold and the Wilson-Cowan
-            // bistable flip-flop snapped it awake.
-            //
-            // A deliberate wake cascade (mind.wake) sends histamine
-            // +0.20, pushing it from ~0.28 to ~0.48 — well above 0.38,
-            // so intentional waking still works.
-            //
-            // Orexin is wake-promoting, so high orexin lowers the
-            // ceiling (less histamine tolerated → harder to stay asleep).
-            0.38 - 0.05 * ox
-        } else {
-            // Entering: histamine must be lower, especially with high
-            // orexin (wake-promoting signal resists sleep onset).
-            0.25 - 0.05 * ox
-        };
-
-        // Exhaustion override: when raw adenosine (metabolic sleep
-        // pressure) is extreme (>0.90), force sleep regardless of
-        // histamine or orexin. This is the "passing out from exhaustion"
-        // mechanism — in humans, extreme sleep deprivation eventually
-        // overcomes all arousal systems, including histamine and orexin
-        // (Borbély & Achermann, 1999). This prevents the fatal feedback
-        // trap where receptor burnout suppresses effective adenosine so
-        // much that sleep can never be entered, trapping the system
-        // awake without recovery. The override uses raw adenosine
-        // (not the blended signal) because it represents the absolute
-        // metabolic limit — the system cannot stay awake past this
-        // point regardless of receptor state.
-        //
-        // Hysteresis: the override releases at 0.75, not 0.90.
-        //
-        // It used to re-test `adn_raw > 0.90` on every tick, using raw
-        // to *enter* but handing control straight back to the blended
-        // gate to *stay*. That is unsound, because chronic high
-        // adenosine desensitizes its own receptors: measured over 48
-        // simulated hours, raw sat at 0.90 while effective level had
-        // collapsed to 0.126 (receptor sensitivity 0.51), so the
-        // blended signal the gate reads was 0.513 — under the 0.65
-        // stay threshold. So the override engaged, decayed adenosine
-        // by one tick's worth, dropped it just under 0.90, released,
-        // and the gate immediately declared wake. The system chattered
-        // at the sampling limit: 80,871 sleep bouts in 48 h, mean
-        // duration one tick, 4.5 h "asleep" in total, adenosine
-        // pinned at 0.90 and never clearing. REM was unreachable
-        // because the cholinergic rebound needs adenosine below 0.65,
-        // which a one-tick bout can never deliver.
-        //
-        // Releasing at 0.75 — the model's own sleep-onset threshold —
-        // makes exhaustion sleep a latch. The same argument the
-        // existing comment makes for reading raw rather than blended
-        // applies to release: while the system is pinned at its
-        // metabolic limit, receptor burnout must not be able to eject
-        // it. With a sustained bout, raw adenosine decays toward 0.20
-        // with chi_s = 4.2 h, reaching 0.75 in about an hour and 0.65 in
-        // about 50 minutes from a 0.75 onset — which is what puts the
-        // first REM period inside the first NREM bout, at 60-90 min,
-        // instead of never.
-        // REM conjuncts, defined here so the exhaustion override and the
-        // sleep branch agree on them.
-        //
-        // These compare LEVELS, not effective levels, and the reason is
-        // that the flip-flop describes REM-on/REM-off neuronal firing
-        // rather than receptor occupancy of a bulk concentration. The
-        // receptor machinery models how tissue responds to sustained
-        // concentration; it is not a measure of neuronal activity.
-        // Gating on effective level was self-defeating in practice:
-        // driving acetylcholine high enough to clear 0.50 on effective
-        // level (reaching 1.00, p75 0.93) drove its own desensitization,
-        // holding effective at 0.326 and clearing the threshold on only
-        // 4.4% of NREM ticks.
-        // Acetylcholine gate for REM, placed from measurement.
-        //
-        // The gate was 0.50 against an acetylcholine effective level
-        // that reaches only 0.3497 during sleep (mean 0.2926), so the
-        // conjunct could never be satisfied and REM was unreachable
-        // from any state. The code's own comment records why: a
-        // concentration high enough to clear 0.50 on effective level
-        // drives its own receptor desensitization, holding effective
-        // near 0.33. Chasing the gate with concentration is
-        // self-defeating, so the gate moves to the measured range
-        // instead — REM is identified by ACh being the *highest* part
-        // of its sleep range relative to NREM, which is what
-        // distinguishes it.
-        let rem_ach = if current == MentalPhase::REM {
-            REM_ACETYLCHOLINE_GATE * REM_STAY_FACTOR
-        } else {
-            REM_ACETYLCHOLINE_GATE
-        };
-        // Norepinephrine must fall *further* to hold REM than to enter
-        // it, so the state releases as sleep pressure builds.
-        //
-        // The previous stay-threshold of 0.35 against an enter-
-        // threshold of 0.30 made REM sticky enough to hold through the
-        // whole pre-sleep band: measured over the adenosine interval
-        // 0.50-0.90, REM occupied 6,999 of 7,062 ticks, which left no
-        // room for Drowsy and is not physiologically coherent — REM is
-        // entered from NREM as sleep deepens, not held across the
-        // descent into sleep. Tightening the stay-threshold so it
-        // matches the enter-threshold lets REM release to NREM and then
-        // to Drowsy as adenosine climbs.
-        //
-        // The stay factor is applied in the *loosening* direction for
-        // this conjunct. REM_STAY_FACTOR is 0.94, and multiplying a
-        // "level must be below" threshold by a factor below 1 tightens
-        // it instead of relaxing it, which is backwards for hysteresis
-        // and was a second phase straddle: the stay threshold landed on
-        // 0.30 * 0.94 = 0.282, and sleep drives norepinephrine to a
-        // fixed point of 0.282. `ne_level < 0.282` was therefore false
-        // on the equilibrium, dropping to NREM, after which the
-        // enter-threshold of 0.30 held it back in REM on the next tick
-        // — measured as REM/NREM chatter, thousands of transitions
-        // within a single REM bout. A stay threshold must sit clear of
-        // the value it is compared against, so the factor is inverted
-        // for a below-threshold conjunct.
-        let rem_ne = if current == MentalPhase::REM {
-            REM_NOREPI_GATE / REM_STAY_FACTOR
-        } else {
-            REM_NOREPI_GATE
-        };
-        //
-        // Serotonin is deliberately *not* a conjunct here, though it does
-        // get the REM-off profile below. Monti & Jantos (2008) show
-        // dorsal raphe 5-HT is near-silent in REM, but Sakai & Crochet
-        // (2001) found "DRN serotonergic activity does not play any
-        // crucial role in PS generation" — it regulates waking and
-        // slow-wave sleep rather than driving paradoxical sleep. So
-        // serotonin is a correlate of REM, not a necessary condition for
-        // it, and gating entry on it would over-claim. Making it
-        // required also broke `test_emergent_phase_rem`, which
-        // deliberately sets only ACh and NE.
-        let ach_level = raw(NeurochemicalId::Acetylcholine);
-        let ne_level = raw(NeurochemicalId::Norepinephrine);
-        let rem_conditions_met = ach_level > rem_ach && ne_level < rem_ne;
-
-        const EXHAUSTION_ENTER: f32 = 0.90;
-        const EXHAUSTION_RELEASE: f32 = 0.75;
-        let exhaustion_hold = if current == MentalPhase::NREM || current == MentalPhase::REM {
-            adn_raw > EXHAUSTION_RELEASE
-        } else {
-            adn_raw > EXHAUSTION_ENTER
-        };
-        // Drowsy: the descent into sleep.
-        //
-        // Checked before the exhaustion hold, because Drowsy is the
-        // state *between* waking and sleep and the hold would otherwise
-        // swallow it. The exhaustion hold has hysteresis: once asleep it
-        // persists while adenosine stays above 0.75, while Drowsy's
-        // gate is 0.50. So the entire window where Drowsy belongs
-        // (0.50 < adenosine < 0.75) lay inside the region where the
-        // hold was still true, and Drowsy could never be entered —
-        // measured occupancy over a full sleep cycle was NREM 99.1%,
-        // REM 0.8%, Drowsy 0.0%.
-        //
-        // Both axes have hysteresis, so it is easier to stay drowsy than
-        // to enter it. Without the arousal hysteresis, transient
-        // norepinephrine bumps push arousal above the threshold and flip
-        // her back to Active, producing a limit-cycle oscillation.
-        let drowsy_adn = if current == MentalPhase::Drowsy {
-            DROWSY_ADENOSINE_GATE * DROWSY_STAY_FACTOR
-        } else {
-            DROWSY_ADENOSINE_GATE
-        };
-        let drowsy_arousal = if current == MentalPhase::Drowsy {
-            DROWSY_AROUSAL_STAY
-        } else {
-            DROWSY_AROUSAL_GATE
-        };
-        // Bounded above by the *same* sleep-entry boundary the sleep
-        // branch uses, not by an independent ceiling.
-        //
-        // Drowsy previously carried its own `DROWSY_SLEEP_CEILING` of
-        // 0.75 while the sleep branch entered on `sleep_adn`
-        // (0.75 - 0.05*(1-ox), i.e. 0.715 at baseline orexin). Those two
-        // boundaries overlapped on the same signal, so the band between
-        // 0.715 and 0.75 was claimed by Drowsy on one branch and by
-        // sleep on the other. That is not a latent edge case: raw
-        // adenosine saturates at its 1.0 clamp under sustained wake
-        // drive, which pins the blend at exactly 0.750 — inside the
-        // overlap. The state then chattered between the two branches
-        // every tick, measured at 85,198 transitions over 5.5 simulated
-        // hours, and because the Drowsy branch returns before the sleep
-        // branch runs its glymphatic decay, raw adenosine never fell
-        // below 0.90. The cholinergic rebound that produces REM needs
-        // raw adenosine under 0.80, so REM was unreachable.
-        //
-        // Reading the shared boundary means the branches partition the
-        // axis instead of overlapping it: above `sleep_adn` the state is
-        // sleep, below it but above `drowsy_adn` it is Drowsy. Hysteresis
-        // still applies on both sides — the sleep stay threshold relaxes
-        // to 0.55 while asleep and the Drowsy gate relaxes to 0.40 while
-        // drowsy — so each state is still sticky, but neither can claim
-        // a level the other also claims.
-        //
-        // At high raw adenosine the exhaustion override above already
-        // forces sleep; this bound only has to cover the ordinary
-        // descent, which is exactly `sleep_adn`.
-        if adn > drowsy_adn && adn < sleep_adn && self.arousal < drowsy_arousal {
-            return MentalPhase::Drowsy;
-        }
-
-        if exhaustion_hold {
-            // Exhaustion forces *sleep*, but it does not decide NREM
-            // versus REM: the same conjuncts decide, so REM stays
-            // reachable from NREM. NREM is the default because
-            // exhaustion sleep is slow-wave.
-            if rem_conditions_met {
-                return MentalPhase::REM;
-            }
-            return MentalPhase::NREM;
-            // Exhaustion forces *sleep*, not NREM specifically. It used
-            // to return NREM unconditionally, which short-circuited the
-            // sleep branch below where all the NREM/REM logic lives, and
-            // so made REM unreachable from NREM by construction: the only
-            // way to be REM was to already be REM.
-            //
-            // That was invisible because this override is the *active*
-            // path — raw adenosine stays above the 0.75 release
-            // threshold for essentially all NREM ticks (measured range
-            // 0.750-0.900), so the hold is true throughout sleep and the
-            // REM conjuncts were never even evaluated.
-            //
-            // The override now decides only sleep-versus-wake. The NREM
-            // and REM distinction belongs to the sleep branch, which
-            // the exhaustion state has already committed us to, so this
-            // falls through to it.
-        }
-
-        if adn > sleep_adn && hist < sleep_hist {
-            // We are in sleep — determine NREM vs REM
-            // REM: cholinergic high, aminergic low (noradrenergic silence)
-            // rem_ach / rem_ne / rem_srt are defined above the
-            // exhaustion override so both paths share them.
-            // Serotonin is the third REM-off population. The dorsal
-            // raphe goes near-silent in REM, and it is the aminergic
-            // system with the cleanest state profile (Monti & Jantos
-            // 2008), so it discriminates REM from NREM where NE barely
-            // moves. The threshold sits between the NREM target (0.30)
-            // and the REM target (0.10) set by the REM-off profile.
-            // rem_srt likewise.
-            // Level, not effective level, for all three REM conjuncts.
-            //
-            // The flip-flop is a statement about REM-on and REM-off
-            // *neuronal populations* and their firing, not about receptor
-            // occupancy of a bulk extracellular concentration. The
-            // receptor machinery (sensitivity, desensitization,
-            // internalization) models how tissue responds to sustained
-            // concentration; it is not a measure of cholinergic neuronal
-            // activity. Gating a state defined by neuronal activity on a
-            // receptor-scaled concentration conflates two different
-            // quantities, and it is self-defeating in practice: driving
-            // the acetylcholine level high enough to clear the threshold
-            // on effective level (which reached 1.00, p75 0.93) drove
-            // its own desensitization, holding effective at 0.326 and
-            // clearing 0.50 on only 4.4% of NREM ticks.
-            if rem_conditions_met {
-                return MentalPhase::REM;
-            }
-            // NREM: default sleep state — low ACh, high GABA
-            return MentalPhase::NREM;
-        }
-
         // Overwhelmed: cortisol and NE both at their ceiling.
         //
         // The previous gate also required `global_tone > 0.7`, which
@@ -2620,6 +2274,29 @@ impl NeurochemicalVector {
             return MentalPhase::Alert;
         }
 
+        // Drowsy: awake, with sleep pressure building and arousal falling.
+        //
+        // Sleep itself is no longer decided here. The sleep-wake network
+        // owns the boundary into sleep and the NREM/REM stages (see
+        // `sleep_network::stage`), so this rule has no upper bound on
+        // adenosine. Hysteresis on both axes keeps Drowsy from flickering.
+        let drowsy_adn = if current == MentalPhase::Drowsy {
+            DROWSY_ADENOSINE_GATE * DROWSY_STAY_FACTOR
+        } else {
+            DROWSY_ADENOSINE_GATE
+        };
+        let drowsy_arousal = if current == MentalPhase::Drowsy {
+            DROWSY_AROUSAL_STAY
+        } else {
+            DROWSY_AROUSAL_GATE
+        };
+        if adn > drowsy_adn && self.arousal < drowsy_arousal {
+            return MentalPhase::Drowsy;
+        }
+
+        // Drowsy ranks below every other waking phase: it is what waking looks
+        // like when sleep pressure is high and arousal is low, and any stronger
+        // waking state should be reported instead.
         MentalPhase::Active
     }
 
@@ -2897,7 +2574,7 @@ impl NeurochemicalVector {
         // the coupling matrix — the core of the 18×18 dynamics — would
         // operate on one-tick-stale effective levels every tick, miscomputing
         // coupling forces, eCB synthesis, and the HPA cascade drive.
-        self.recompute_derived_with_dt(dt_scale);
+        self.recompute_derived_with_dt(dt_scale, params.network_levels);
 
         // Snapshot current effective levels for the coupling computation
         // (avoid in-place feedback during the step). Baselines are read
@@ -3055,19 +2732,26 @@ impl NeurochemicalVector {
             // them, serotonin measured identically in wake and NREM
             // (0.3917 vs 0.3918 over 24 h, range 0.358-0.398), so the
             // REM-off population was not represented at all.
-            let is_srt = i == NeurochemicalId::Serotonin as usize;
-            if is_srt && is_sleeping {
+            // When the sleep-wake network drives these chemicals, their level is
+            // set by the network's release target (see the network block after
+            // this loop). They have no fixed setpoint to be restored to, so the
+            // generic update — homeostatic pull, autoreceptor, coupling — is
+            // skipped for them, as it already is for adenosine and the stress
+            // hormones.
+            let network_driven = params.network_levels.is_some()
+                && [
+                    NeurochemicalId::Acetylcholine,
+                    NeurochemicalId::Serotonin,
+                    NeurochemicalId::Norepinephrine,
+                    NeurochemicalId::GABA,
+                    NeurochemicalId::Histamine,
+                    NeurochemicalId::Orexin,
+                ]
+                .iter()
+                .any(|id| i == *id as usize);
+            if network_driven {
                 self.chemicals[i].velocity = 0.0;
                 continue;
-            }
-            let is_ach = i == NeurochemicalId::Acetylcholine as usize;
-            if is_ach && is_sleeping {
-                let adn_level = self.chemicals[NeurochemicalId::Adenosine as usize].level;
-                let in_rebound = current_phase == MentalPhase::REM || adn_level < 0.80;
-                if in_rebound {
-                    self.chemicals[i].velocity = 0.0;
-                    continue;
-                }
             }
             let homeostatic_baseline = circadian_baselines[i];
             let homeostatic_force = if is_melatonin {
@@ -3446,7 +3130,7 @@ impl NeurochemicalVector {
         // transitions. The subsequent recompute_derived() call in
         // sync_neurochemistry_to_state() will be redundant but harmless
         // (it recomputes the same values).
-        self.recompute_derived_with_dt(dt_scale);
+        self.recompute_derived_with_dt(dt_scale, params.network_levels);
         let adn_idx = NeurochemicalId::Adenosine as usize;
         let current_phase = self.compute_phase();
         // The zone is the cognitive layer's authority on sleep state:
@@ -3560,162 +3244,57 @@ impl NeurochemicalVector {
         self.chemicals[adn_idx].level =
             crate::state::sanitize::finite_clamp(self.chemicals[adn_idx].level, 0.0, 1.0);
 
-        // Cholinergic rebound: during sustained NREM, acetylcholine
-        // rebounds from its suppressed NREM level (~0.15-0.25) toward
-        // the REM threshold (0.50+). This is the biological basis of
-        // the NREM→REM transition within the ultradian cycle.
+        // Sleep-wake network drive on the monoaminergic and cholinergic
+        // targets. The network owns the sleep stages, so no latch, threshold,
+        // or phase gate lives here.
         //
-        // During early NREM (adenosine still high, >0.65), ACh stays
-        // low — the brain is in slow-wave sleep with glymphatic
-        // clearance. As adenosine clears below 0.65 (~83 min into
-        // sleep with biological rates), the cholinergic rebound
-        // begins: ACh rises toward 0.65 (just above the 0.50 REM
-        // threshold), enabling the NREM→REM transition.
+        // Acetylcholine is high in waking and in REM and lowest in NREM:
+        // basal forebrain microdialysis gives 0.34 pmol/10 min in NREM,
+        // 0.58 in waking, and 0.77 in REM (Vazquez & Baghdoyan, 2001; cortical
+        // ACh follows the same order, Marrosu et al., 1995). The target is a
+        // linear map of the two network populations that drive it, LC (wake)
+        // and REM-on. The constants are calibrated so NREM, waking, and REM
+        // reach levels 0.20, 0.42, and 0.60, which keep the measured ratios.
         //
-        // During REM, ACh is held high (0.65) to maintain the REM
-        // state — the cholinergic/aminergic flip-flop (Hobson &
-        // McCarley, 1975) is in its cholinergic phase.
-        //
-        // Without this mechanism, ACh's homeostatic force (pulling
-        // toward 0.35) and the coupling forces (GABA, melatonin
-        // suppressing ACh) prevent ACh from ever reaching 0.50 during
-        // sleep. The Rust phase never enters REM, and the Python
-        // lucid dream probability (which uses arousal as a REM
-        // marker) never gets the REM boost — lucid dreaming becomes
-        // nearly impossible.
-        //
-        // The rebound uses a saturating exponential toward the target
-        // (0.65 during rebound/REM, 0.20 during early NREM), with a
-        // time constant of ~10 minutes (biological) — slow enough to
-        // respect the ultradian cycle (~90 min) but fast enough to
-        // reach the threshold within the first REM window.
-        //
-        // The main loop above skips ACh during sleep (when in
-        // rebound or REM) so the homeostatic/coupling forces don't
-        // fight this mechanism — see the `continue` in the main loop.
-        // REM-propensity latch, shared by the serotonin and
-        // acetylcholine profiles below.
-        //
-        // Both were previously driven by an instantaneous test of raw
-        // adenosine against 0.80. Measured over 24 h, raw adenosine
-        // during NREM spans 0.750-0.900 (p50 0.821), so that test was
-        // true on only 36% of NREM ticks. Acetylcholine's exponential
-        // ramp was then chasing a target that switched back to 0.20
-        // every time adenosine ticked above 0.80, so it never converged:
-        // effective ACh cleared the 0.50 REM threshold on 4.4% of NREM
-        // ticks and the three conjuncts never coincided.
-        //
-        // This is a stateful process, not a stateless threshold test.
-        // Benington & Heller (1994) found REM propensity building
-        // across NREM; Ji et al. (2025) identify REM pressure as the
-        // core regulator of the NREM-REM cycle, with a weak ultradian
-        // drive entraining it. Pressure accumulates and then discharges
-        // *during REM* — it does not vanish the instant its trigger
-        // relaxes. A Schmitt trigger on the acetylcholine level
-        // expresses that: once the ramp is under way it runs to
-        // completion, and only discharges in REM.
-        let ach_now = f64::from(self.chemicals[NeurochemicalId::Acetylcholine as usize].level);
-        let adn_now_for_latch =
-            f64::from(self.chemicals[NeurochemicalId::Adenosine as usize].level);
-        let rebound_engaged =
-            adn_now_for_latch < 0.80 || current_phase == MentalPhase::REM || ach_now > 0.50;
-
-        // Serotonergic REM-off profile.
-        //
-        // Dorsal raphe 5-HT neurons show a graded state-dependent
-        // discharge: steady in wake, reduced in NREM, and virtually
-        // silent in REM (Monti & Jantos 2008, Prog Brain Res 172;
-        // Sakai & Crochet 2001, Eur J Neurosci 13:103, which found
-        // DRN serotonergic activity does not drive paradoxical sleep
-        // generation but does regulate waking and slow-wave sleep).
-        // Jouvet's original 5-HT sleep-promotion hypothesis was
-        // contradicted by these recordings — DRN discharge is
-        // positively correlated with arousal and negatively correlated
-        // with both NREM and REM.
-        //
-        // Genesis previously applied no phase dependence to serotonin
-        // at all: measured over 24 h it averaged 0.3917 in wake and
-        // 0.3918 in NREM, range 0.358-0.398 — flat. The REM gate could
-        // therefore not use it, and its two existing conjuncts were
-        // degenerate (ACh > 0.50 never true; NE < 0.30 true ~always
-        // only because NE's baseline is 0.30 and it barely moves).
-        //
-        // Targets are set from the described discharge profile rather
-        // than tuned: 0.30 in NREM (reduced but present — the raphe
-        // fires slowly in NREM, it is not silent) and 0.10 in REM
-        // (near-silence). The approach is exponential on the same
-        // ~minutes timescale as the cholinergic rebound below.
-        let srt_idx = NeurochemicalId::Serotonin as usize;
-        if current_phase == MentalPhase::NREM || current_phase == MentalPhase::REM {
-            // In NREM the target tracks REM propensity: it starts at 0.30
-            // and falls toward REM's near-silence once homeostatic
-            // pressure has relaxed to 0.80, i.e. once the cholinergic
-            // rebound has begun.
-            //
-            // A fixed 0.30 NREM target could never gate REM *entry*,
-            // because the near-silent 0.10 profile only applies once
-            // already in REM -- the same chicken-and-egg the ACh
-            // rebound had. Worse, it is not how the flip-flop works:
-            // REM-on and REM-off populations move *together*, not in
-            // sequence. Benington & Heller (1994) found REM propensity
-            // building across NREM, and Ji et al. (2025) show the
-            // NREM-REM cycle is driven by REM pressure entraining a weak
-            // ultradian rhythm, so the aminergic decline and the
-            // cholinergic rise are two expressions of one accumulating
-            // pressure. Tying both to the same 0.80 crossing makes them
-            // rise and fall together, which is the documented
-            // reciprocal-interaction structure (Lu et al. 2006).
-            let srt_target = if rebound_engaged { 0.10 } else { 0.30 };
-            let srt_rate = 0.001_f64 * f64::from(dt_scale);
-            let cur_srt = f64::from(self.chemicals[srt_idx].level);
-            let new_srt = srt_target - (-srt_rate).exp() * (srt_target - cur_srt);
-            self.chemicals[srt_idx].level =
-                crate::state::sanitize::finite_clamp(new_srt as f32, 0.0, 1.0);
-        }
-
-        let ach_idx = NeurochemicalId::Acetylcholine as usize;
-        if current_phase == MentalPhase::NREM || current_phase == MentalPhase::REM {
-            // Target ACh level depends on sleep stage:
-            // - Early NREM (adenosine > 0.80): ACh stays low (0.20)
-            //   for slow-wave sleep.
-            // - Late NREM (adenosine ≤ 0.80): ACh rebounds toward
-            //   0.65 to trigger the NREM→REM transition.
-            // - REM: ACh is held at 0.65 to maintain the REM state.
-            let ach_target = if rebound_engaged { 0.65 } else { 0.20 };
-            // Saturating exponential toward the target.
-            // Rate: 0.001/tick at 10Hz = 0.01/sec → τ ≈ 100 sec
-            // (biological). With dt_scale=2.0 (200ms tick), this is
-            // 0.002/tick → reaches 50% of target in ~350 ticks
-            // (~70 sec). For compressed tests, the same rate gives
-            // faster convergence in wall-clock time.
-            // Drive the *effective* level, not the raw one.
-            //
-            // The REM gate compares `effective_level()` against 0.50, but
-            // this mechanism was steering the raw level to 0.65. With
-            // acetylcholine's receptor factors depressed — its adaptation
-            // multiplier is 1.2, the highest in the set, on the grounds
-            // that nicotinic receptors desensitize in milliseconds — an
-            // effective value above 0.50 was reached on only 0.9% of NREM
-            // ticks, so REM was unreachable no matter how high the raw
-            // level went.
-            //
-            // "Cholinergic activity is high in REM" is a statement about
-            // signalling, not about concentration, so the target is
-            // converted to the level that yields the intended effective
-            // level, given current receptor health. This is the same
-            // correction as the exhaustion override reading the signal it
-            // gates on: a mechanism that is supposed to produce a state
-            // must act on the quantity the state test measures.
-            let ach_rate = 0.001_f64 * f64::from(dt_scale);
-            let ach_chem = &self.chemicals[ach_idx];
-            let receptor_health = f64::from(ach_chem.receptor_sensitivity)
-                * f64::from(ach_chem.desensitization_factor)
-                * f64::from(ach_chem.internalization_factor).max(1e-3);
-            let level_target = (ach_target / receptor_health).clamp(0.0, 1.0);
-            let current_ach = f64::from(self.chemicals[ach_idx].level);
-            let new_ach = level_target - (-ach_rate).exp() * (level_target - current_ach);
-            self.chemicals[ach_idx].level =
-                crate::state::sanitize::finite_clamp(new_ach as f32, 0.0, 1.0);
+        // Serotonin (dorsal raphe) is steady in waking, reduced in NREM, and
+        // near silent in REM (Monti & Jantos, 2008; Sakai & Crochet, 2001).
+        // Its target tracks LC: 0.10 at rest, 0.40 in full waking.
+        if let Some(net) = params.network_levels {
+            let rate = 0.001_f64 * f64::from(dt_scale);
+            let relax = |chem: &mut Neurochemical, target: f32| {
+                let target = f64::from(target);
+                let cur = f64::from(chem.level);
+                chem.level = crate::state::sanitize::finite_clamp(
+                    (target - (-rate).exp() * (target - cur)) as f32,
+                    0.0,
+                    1.0,
+                );
+            };
+            let (lc, vlpo, rem) = (net.lc, net.vlpo, net.rem);
+            relax(
+                &mut self.chemicals[NeurochemicalId::Acetylcholine as usize],
+                ACH_BASE + ACH_FROM_LC * lc + ACH_FROM_REM * rem,
+            );
+            relax(
+                &mut self.chemicals[NeurochemicalId::Serotonin as usize],
+                (SRT_BASE + SRT_FROM_LC * lc - SRT_FROM_REM * rem).clamp(0.0, 1.0),
+            );
+            relax(
+                &mut self.chemicals[NeurochemicalId::Norepinephrine as usize],
+                (NE_FROM_LC * lc - NE_FROM_REM * rem).clamp(0.0, 1.0),
+            );
+            relax(
+                &mut self.chemicals[NeurochemicalId::GABA as usize],
+                GABA_BASE + GABA_FROM_VLPO * vlpo * (1.0 - rem) - GABA_FROM_REM * rem,
+            );
+            relax(
+                &mut self.chemicals[NeurochemicalId::Histamine as usize],
+                HIST_FROM_LC * lc,
+            );
+            relax(
+                &mut self.chemicals[NeurochemicalId::Orexin as usize],
+                OX_FROM_LC * lc,
+            );
         }
 
         // BDNF recovery after stress: when cortisol has dropped below
@@ -4376,7 +3955,7 @@ impl NeurochemicalVector {
         }
 
         // Recompute all derived fields with the new state
-        self.recompute_derived_with_dt(dt_scale);
+        self.recompute_derived_with_dt(dt_scale, params.network_levels);
     }
 
     /// Advance the neurochemical system by one tick with explicit
@@ -4431,6 +4010,48 @@ impl NeurochemicalVector {
 /// dynamics, allowing different configurations without changing the
 /// core algorithm. The default values are tuned for a 10 Hz tick loop
 /// (DT = 0.1 seconds).
+/// Firing of the sleep-wake network's populations, each normalized to its
+/// saturating maximum: `lc` (wake-promoting locus coeruleus), `vlpo`
+/// (sleep-promoting ventrolateral preoptic area), and `rem` (REM-on). All
+/// lie in `[0, 1]`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct NetworkLevels {
+    pub lc: f32,
+    pub vlpo: f32,
+    pub rem: f32,
+}
+
+/// Release targets as linear functions of the network populations. The
+/// coefficients are fit to the network's measured stage means (wake, NREM,
+/// REM) and to the release data they are meant to reproduce; the fit and its
+/// tolerances are in tests/network_calibration.rs.
+///
+/// Acetylcholine rises with LC (wake) and REM-on: it is high in waking and
+/// REM and lowest in NREM (Vazquez & Baghdoyan 2001).
+pub const ACH_BASE: f32 = 0.2895;
+pub const ACH_FROM_LC: f32 = 0.3017;
+pub const ACH_FROM_REM: f32 = 0.4512;
+/// Serotonin (dorsal raphe) tracks LC, is reduced in NREM, and is near silent
+/// in REM (Monti & Jantos 2008; Sakai & Crochet 2001).
+pub const SRT_BASE: f32 = 0.1904;
+pub const SRT_FROM_LC: f32 = 0.2073;
+pub const SRT_FROM_REM: f32 = 0.1516;
+/// Norepinephrine tracks LC and is silent in REM (Aston-Jones & Bloom 1981).
+pub const NE_FROM_LC: f32 = 0.3121;
+pub const NE_FROM_REM: f32 = 0.0425;
+/// GABA is released by VLPO in NREM and falls in REM even though VLPO is
+/// active then: the GABA-to-ACh ratio drops 68% in REM, always through GABA
+/// (SLEEP 2012). The REM term is the data, not the VLPO population.
+pub const GABA_BASE: f32 = 0.4909;
+pub const GABA_FROM_VLPO: f32 = 0.4341;
+pub const GABA_FROM_REM: f32 = 0.2018;
+/// Histamine (tuberomammillary nucleus) and orexin (lateral hypothalamus) are
+/// wake-active and silent in sleep (Saper et al. 2001; Mileykovskiy et al.
+/// 2005). Both follow LC, anchored to their waking baselines of 0.30 at the
+/// waking LC level of 0.963 (see tests/network_calibration.rs).
+pub const HIST_FROM_LC: f32 = 0.3115;
+pub const OX_FROM_LC: f32 = 0.3115;
+
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct NeuroTickParams {
@@ -4512,6 +4133,11 @@ pub struct NeuroTickParams {
     /// Active) and sleep can persist for ~days instead of draining
     /// what little pressure exists.
     pub zone_sleeping: bool,
+    /// Normalized firing of the sleep-wake network's populations, when the
+    /// network is present. `None` leaves the cholinergic and serotonergic
+    /// targets at their homeostatic setpoints (no network drive), which is
+    /// how the chemistry runs in isolation.
+    pub network_levels: Option<NetworkLevels>,
     /// Endocannabinoid activity-coupled synthesis rate.
     ///
     /// Endocannabinoids are synthesized on demand by postsynaptic neurons
@@ -4658,6 +4284,7 @@ impl NeuroTickParams {
         noise_seed: 0,                      // daemon increments each tick
         receptor_resensitization_rate: 0.0, // set by daemon during sleep
         zone_sleeping: false,               // set by daemon when zone == Sleeping
+        network_levels: None,               // set per sub-step from the sleep-wake network
     };
 
     /// Compressed-time parameters for testing and fast iteration.

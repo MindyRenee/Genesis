@@ -24,8 +24,8 @@ import random
 import re
 from typing import Any
 
+from frontal_lobe.self import PersonalityTraits
 from limbic_system.emotion import EmotionalState
-from self import PersonalityTraits
 from thalamus.brain_waves import BrainWave, BrainWaveState
 
 __all__ = ["Voice"]

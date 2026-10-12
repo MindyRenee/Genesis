@@ -4,11 +4,8 @@
 from dataclasses import dataclass
 
 import pytest
-
-from concepts import (
-    ConceptNetwork,
-)
-from sleep import SleepCompressor
+from temporal_lobe.compression import SleepCompressor
+from temporal_lobe.concepts import ConceptNetwork
 
 
 @dataclass

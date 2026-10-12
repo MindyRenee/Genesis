@@ -43,22 +43,24 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from concepts import EmbeddingStore
-    from genesis_client.types import PlasticityProfile
     from occipital_lobe import VisualCortex
+    from temporal_lobe.concepts import EmbeddingStore
+
+    from genesis_client.types import PlasticityProfile
 
 from basal_ganglia.td import TDLearner
-from concepts import ConceptNetwork, is_world_concept, strip_sense_suffix
-from concepts.edge_log import WEB_SOURCES_CAP, web_origin
-from genesis_client.protocol import CHEM_DOPAMINE
-from genesis_client.swallow import note_swallowed
+from frontal_lobe.tools.source_registry import SourceRegistry, SourceResult
 from limbic_system.curiosity import Curiosity
-from memory import SemanticMemory, SpacedRepetitionScheduler
+from temporal_lobe.concepts import ConceptNetwork, is_world_concept, strip_sense_suffix
+from temporal_lobe.concepts.edge_log import WEB_SOURCES_CAP, web_origin
 from temporal_lobe.dual import DualSystemLearner
+from temporal_lobe.memory import SemanticMemory, SpacedRepetitionScheduler
 from temporal_lobe.stdp import STDP
 from temporal_lobe.synapses import SynapticStore
 from thalamus.brain_waves import BrainWave
-from tools.source_registry import SourceRegistry, SourceResult
+
+from genesis_client.protocol import CHEM_DOPAMINE
+from genesis_client.swallow import note_swallowed
 
 __all__ = [
     "RATE_LIMIT_DELAY",
@@ -2404,7 +2406,7 @@ class AutonomousLearner:
         network (not every noun phrase in the text). Skips self-loops
         and function words.
         """
-        from concepts import RelationType
+        from temporal_lobe.concepts import RelationType
 
         topic_concept = self.network.get_concept(topic)
         if topic_concept is None:
@@ -2602,8 +2604,8 @@ class AutonomousLearner:
         Runs in a background thread so it doesn't slow down text learning.
         """
         try:
+            from frontal_lobe.tools.source_registry import wikipedia_lead_image
             from occipital_lobe import decode_image_bytes, resize_for_vision
-            from tools.source_registry import wikipedia_lead_image
 
             # Fetch the article's lead image
             img_bytes = wikipedia_lead_image(article_title)
@@ -2645,8 +2647,8 @@ class AutonomousLearner:
         source records ``definition_source="web:<domain>"`` alongside
         so a squatting web definition stays attributable.
         """
-        from concepts import _FUNCTION_WORDS
-        from self.learning import _clean_definition_text
+        from frontal_lobe.self.learning import _clean_definition_text
+        from temporal_lobe.concepts import _FUNCTION_WORDS
 
         for concept_name, definition in definitions.items():
             c = self.network.get_concept(concept_name)
@@ -3057,7 +3059,7 @@ class AutonomousLearner:
         safeguard the ``tools/`` fetch path had was dead code on this
         path. One fetch implementation, one boundary.
         """
-        from tools.web_search import fetch as _hardened_fetch
+        from frontal_lobe.tools.web_search import fetch as _hardened_fetch
 
         try:
             result = _hardened_fetch(url)
@@ -3315,7 +3317,7 @@ class AutonomousLearner:
             existing_edges = self.network.get_edges(concept_name, "out")
             if any(e.target == neighbor for e in existing_edges):
                 return
-            from concepts import RelationType
+            from temporal_lobe.concepts import RelationType
             self.network.add_edge(
                 concept_name,
                 neighbor,

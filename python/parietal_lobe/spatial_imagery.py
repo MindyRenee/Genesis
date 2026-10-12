@@ -42,7 +42,7 @@ from parietal_lobe.transforms import (
 )
 
 if TYPE_CHECKING:
-    from concepts import ConceptNetwork
+    from temporal_lobe.concepts import ConceptNetwork
 
 logger = logging.getLogger(__name__)
 

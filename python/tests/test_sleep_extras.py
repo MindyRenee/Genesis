@@ -6,17 +6,13 @@ import tempfile
 from dataclasses import dataclass
 
 import pytest
-
-from concepts import ConceptNetwork, RelationType
 from frontal_lobe.reasoning import Reasoner, ReasoningType
-from genesis_client.types import NeuroSummary, RecentEpisode
 from limbic_system.emotion import EmotionalState
+from temporal_lobe.concepts import ConceptNetwork, RelationType
+from temporal_lobe.dream_synthesis import DreamInsight, DreamProposal, DreamSynthesis
+
+from genesis_client.types import NeuroSummary, RecentEpisode
 from mind import Mind
-from sleep import (
-    DreamInsight,
-    DreamProposal,
-    DreamSynthesis,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -969,6 +965,11 @@ class _MockClient:
         self.impulses.append((chem, magnitude))
         return True
 
+    def set_volition(self, sleep: bool, magnitude: float, **kwargs) -> bool:
+        """Mirror of GenesisClient.set_volition; records the push."""
+        self.__dict__.setdefault("volitions", []).append((sleep, magnitude))
+        return True
+
     def set_zone(self, zone: int, **kwargs) -> bool:
         """Set zone."""
         self.zones.append(zone)
@@ -995,10 +996,10 @@ def test_sleep_aid_enters_sleep_state():
 
 
 def test_sleep_aid_emits_correct_impulses():
-    """sleep_aid() should emit adenosine, cortisol, GABA, histamine,
-    orexin, and serotonin impulses in the correct directions."""
+    """sleep_aid() pushes the sleep-wake network toward sleep and relieves the
+    HPA drive (cortisol). Stage chemistry (GABA, serotonin, histamine,
+    orexin) is the network's to set, so those impulses are no longer sent."""
     from genesis_client.protocol import (
-        CHEM_ADENOSINE,
         CHEM_CORTISOL,
         CHEM_GABA,
         CHEM_HISTAMINE,
@@ -1012,45 +1013,24 @@ def test_sleep_aid_emits_correct_impulses():
         mock = mind.client  # type: ignore[assignment]
         impulses = dict(mock.impulses)
 
-        # Adenosine must be boosted (positive) to push past sleep threshold
-        assert CHEM_ADENOSINE in impulses, "adenosine impulse missing"
-        assert impulses[CHEM_ADENOSINE] > 0.0, "adenosine must be positive"
-
-        # Cortisol must be suppressed (negative) to relieve BDNF inhibition
-        assert CHEM_CORTISOL in impulses, "cortisol impulse missing"
-        assert impulses[CHEM_CORTISOL] < 0.0, "cortisol must be negative"
-
-        # GABA must be boosted (positive) for inhibitory surge
-        assert CHEM_GABA in impulses, "GABA impulse missing"
-        assert impulses[CHEM_GABA] > 0.0, "GABA must be positive"
-
-        # Histamine must be suppressed (negative) to lower arousal
-        assert CHEM_HISTAMINE in impulses, "histamine impulse missing"
-        assert impulses[CHEM_HISTAMINE] < 0.0, "histamine must be negative"
-
-        # Orexin must be suppressed (negative) to destabilize wake
-        assert CHEM_OREXIN in impulses, "orexin impulse missing"
-        assert impulses[CHEM_OREXIN] < 0.0, "orexin must be negative"
-
-        # Serotonin must be boosted (positive) to support BDNF recovery
-        assert CHEM_SEROTONIN in impulses, "serotonin impulse missing"
-        assert impulses[CHEM_SEROTONIN] > 0.0, "serotonin must be positive"
+        assert impulses.get(CHEM_CORTISOL, 0.0) < 0.0, "cortisol must be suppressed"
+        for chem in (CHEM_GABA, CHEM_SEROTONIN, CHEM_HISTAMINE, CHEM_OREXIN):
+            assert chem not in impulses, f"chem {chem} is network-driven, not impulsed"
+        assert mock.volitions and mock.volitions[-1][0] is True, "sleep push missing"
 
 
-def test_sleep_aid_adenosine_is_strong():
-    """The adenosine boost must be strong enough to push past the 0.75
-    sleep threshold from a typical baseline (~0.20). At least +0.30."""
-    from genesis_client.protocol import CHEM_ADENOSINE
+def test_sleep_aid_pushes_strongly_toward_sleep():
+    """The sleep push must be strong enough to carry the network into sleep:
+    the volitional push is at least the mind's sleep magnitude (VOLITION_MAGNITUDE)."""
+    from brainstem.sleep import VOLITION_MAGNITUDE
 
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_mind_sleep_aid(data_dir)
         mind.sleep_aid()
         mock = mind.client  # type: ignore[assignment]
-        adenosine_impulse = dict(mock.impulses)[CHEM_ADENOSINE]
-        assert adenosine_impulse >= 0.30, (
-            f"adenosine impulse too weak: {adenosine_impulse}, "
-            "must be >= 0.30 to push past 0.75 sleep threshold"
-        )
+        sleep, magnitude = mock.volitions[-1]
+        assert sleep is True
+        assert magnitude >= VOLITION_MAGNITUDE, f"sleep push {magnitude} is too weak"
 
 
 def test_sleep_aid_idempotent_when_sleeping():
@@ -1137,6 +1117,7 @@ class _WakeReadinessMockClient(_MockClient):
         class _MockState:
             chemicals: dict[str, float]
             phase_name: str = "active"
+            sleep_pressure: float = 0.0
 
         return _MockState(chemicals={"adenosine": self._adenosine})
 
@@ -1175,7 +1156,7 @@ def test_wake_readiness_returns_ready_when_awake():
 
 def test_wake_readiness_blocks_on_n3():
     """wake_readiness() should return False when in N3 deep sleep."""
-    from sleep.architecture import SleepCycleTracker
+    from brainstem.architecture import SleepCycleTracker
     from thalamus.brain_waves import SleepStage
 
     with tempfile.TemporaryDirectory() as data_dir:
@@ -1234,7 +1215,7 @@ def test_wake_readiness_blocks_on_low_bdnf():
 
 def test_wake_readiness_ready_when_all_signals_pass():
     """wake_readiness() should return True when all signals indicate readiness."""
-    from sleep.architecture import SleepCycleTracker
+    from brainstem.architecture import SleepCycleTracker
     from thalamus.brain_waves import SleepStage
 
     with tempfile.TemporaryDirectory() as data_dir:
@@ -1340,11 +1321,11 @@ def test_auto_wake_window_does_not_block_user_initiated_sleep():
 
 def _make_inner_life_for_lucid(seed: int = 42):
     """Build an InnerLife with a small network for lucid dream tests."""
-    from concepts import ConceptNetwork, RelationType
+    from frontal_lobe.inner_life import InnerLife
     from frontal_lobe.reasoning import Reasoner
+    from frontal_lobe.self import Reflection
     from limbic_system.curiosity import Curiosity
-    from self import Reflection
-    from sleep import InnerLife
+    from temporal_lobe.concepts import ConceptNetwork, RelationType
 
     net = ConceptNetwork()
     for name in ("alpha", "beta", "gamma", "delta", "epsilon"):
@@ -1490,11 +1471,11 @@ def _make_emotion() -> EmotionalState:
 
 def _make_inner_life_for_dream_composition():
     """InnerLife over a network holding a speakable/unspeakable pair."""
-    from concepts import ConceptNetwork, RelationType
+    from frontal_lobe.inner_life import InnerLife
     from frontal_lobe.reasoning import Reasoner
+    from frontal_lobe.self import Reflection
     from limbic_system.curiosity import Curiosity
-    from self import Reflection
-    from sleep import InnerLife
+    from temporal_lobe.concepts import ConceptNetwork, RelationType
 
     net = ConceptNetwork()
     net.add_concept(
@@ -1559,7 +1540,7 @@ def test_dream_thought_chain_seeds_survive_anchor_only_content():
     look like it mentions a single concept, and every chain after the
     first link would collapse.
     """
-    from sleep.thoughts import SpontaneousThought
+    from frontal_lobe.thoughts import SpontaneousThought
 
     il = _make_inner_life_for_dream_composition()
     thought = SpontaneousThought(
@@ -1592,7 +1573,7 @@ def test_dream_thought_speech_never_contains_the_raw_pair():
     import time
 
     from frontal_lobe.generator import GenerativeLanguage
-    from self import PersonalityTraits, SelfModel
+    from frontal_lobe.self import PersonalityTraits, SelfModel
 
     il = _make_inner_life_for_dream_composition()
     engine = GenerativeLanguage(
@@ -1632,8 +1613,8 @@ def test_echoed_placeholder_is_suppressed_despite_grammar_decoration():
     import time
 
     from frontal_lobe.generator import GenerativeLanguage
-    from self import PersonalityTraits, SelfModel
-    from sleep.thoughts import SpontaneousThought
+    from frontal_lobe.self import PersonalityTraits, SelfModel
+    from frontal_lobe.thoughts import SpontaneousThought
 
     # No definition, no edges, noisy target: composition can only echo.
     net = ConceptNetwork()

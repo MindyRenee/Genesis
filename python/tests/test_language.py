@@ -13,16 +13,15 @@ import warnings
 
 import numpy as np
 import pytest
-
-from concepts import ConceptNetwork, RelationType
 from frontal_lobe.flow import FlowGenerator
 from frontal_lobe.generator import GenerativeLanguage
 from frontal_lobe.grammar import INTENT_STRUCTURES, Grammar, SentenceStructure
 from frontal_lobe.graph_walk import GraphWalkGenerator
+from frontal_lobe.self import PersonalityTraits, SelfModel
 from frontal_lobe.voice import Voice
 from limbic_system.emotion import EmotionalState
-from self import PersonalityTraits, SelfModel
 from temporal_lobe.base import Language, Thought
+from temporal_lobe.concepts import ConceptNetwork, RelationType
 from temporal_lobe.vocabulary import Vocabulary
 
 logger = logging.getLogger(__name__)
@@ -857,7 +856,7 @@ def test_graph_walk_returns_none_when_no_network() -> None:
     # the GenerativeLanguage falls back correctly when graph_walk is None
 
     from frontal_lobe.generator import GenerativeLanguage
-    from self import SelfModel
+    from frontal_lobe.self import SelfModel
 
     sm = SelfModel(born_at=int(time.time() * 1000), personality=_make_personality_gw())
     engine = GenerativeLanguage(sm, seed=42, network=None)
@@ -990,7 +989,7 @@ def test_generative_engine_uses_graph_walk_when_available() -> None:
     """GenerativeLanguage uses the graph-walk generator when a network is provided."""
 
     from frontal_lobe.generator import GenerativeLanguage
-    from self import SelfModel
+    from frontal_lobe.self import SelfModel
 
     net = _make_network_with_concepts()
     sm = SelfModel(born_at=int(time.time() * 1000), personality=_make_personality_gw())
@@ -1013,7 +1012,7 @@ def test_generative_engine_falls_back_without_network() -> None:
     """GenerativeLanguage falls back to grammar when no network is available."""
 
     from frontal_lobe.generator import GenerativeLanguage
-    from self import SelfModel
+    from frontal_lobe.self import SelfModel
 
     sm = SelfModel(born_at=int(time.time() * 1000), personality=_make_personality_gw())
     engine = GenerativeLanguage(sm, seed=42, network=None)
@@ -1509,11 +1508,11 @@ def test_knowledge_content_drops_tautological_facts() -> None:
 
 def test_inner_life_emotional_fallback_skips_self_topic() -> None:
     """When the seed concept IS the emotion word, no thought is emitted."""
-    from concepts.network import ConceptNetwork
+    from frontal_lobe.inner_life import InnerLife
     from frontal_lobe.reasoning.reasoner import Reasoner
+    from frontal_lobe.self.reflection import Reflection
     from limbic_system.curiosity import Curiosity
-    from self.reflection import Reflection
-    from sleep.inner_life import InnerLife
+    from temporal_lobe.concepts.network import ConceptNetwork
 
     net = ConceptNetwork()
     net.add_concept("excited", confidence=0.8)

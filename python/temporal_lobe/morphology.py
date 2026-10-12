@@ -680,7 +680,7 @@ def person_pronoun(
             # explicitly person-typed) get "they" — gender-neutral
             # singular. Animals and plants stay "it".
             try:
-                from concepts import ConceptCategory
+                from temporal_lobe.concepts import ConceptCategory
 
                 if concept.category == ConceptCategory.LIVING:
                     is_person = bool(concept.properties.get("proper_noun"))

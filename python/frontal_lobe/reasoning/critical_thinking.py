@@ -63,7 +63,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from concepts import ConceptNetwork, Edge, RelationType
+from temporal_lobe.concepts import ConceptNetwork, Edge, RelationType
 
 from .reasoner import ReasoningResult
 

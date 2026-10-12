@@ -19,10 +19,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from concepts import ConceptNetwork, RelationType
-from concepts.types import ConceptCategory
 from frontal_lobe.response_styler import ResponseStyler
-from memory import WorkingMemory
+from temporal_lobe.concepts import ConceptNetwork, RelationType
+from temporal_lobe.concepts.types import ConceptCategory
+from temporal_lobe.memory import WorkingMemory
 
 
 def _make_styler(

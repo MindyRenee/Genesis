@@ -131,7 +131,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 
-from concepts import ConceptNetwork
+from temporal_lobe.concepts import ConceptNetwork
 
 __all__ = ["TDLearner", "TDTransition"]
 

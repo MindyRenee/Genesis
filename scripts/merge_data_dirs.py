@@ -51,10 +51,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "python"))
+sys.path[:0] = [str(Path(__file__).resolve().parent.parent / "python"),
+               str(Path(__file__).resolve().parent.parent)]
 
-from concepts.edge_log import EdgeLog, open_edge_log
-from concepts.types import Edge
+from temporal_lobe.concepts.edge_log import EdgeLog, open_edge_log  # noqa: E402
+from temporal_lobe.concepts.types import Edge  # noqa: E402
 
 
 def _load_state(path: Path) -> dict[str, Any]:

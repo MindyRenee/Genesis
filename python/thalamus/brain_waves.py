@@ -316,17 +316,30 @@ class SleepStage(Enum):
         return self is not SleepStage.REM
 
 
-def _sleep_stage_from_summary(summary: NeuroSummary) -> SleepStage | None:
+# NREM depth from the sleep-wake network's sleep pressure h, as a fraction of
+# its maximum. The cut points are the network's own NREM terciles over days
+# 8–10 of its trajectory (one-third at 0.15, two-thirds at 0.38): the deepest
+# third of NREM is slow-wave sleep, the middle third N2, the rest N1. Slow-wave
+# activity tracks homeostatic pressure (Borbély's two-process model).
+NREM_N3_PRESSURE = 0.38
+NREM_N2_PRESSURE = 0.15
+
+
+def _sleep_stage_from_summary(
+    summary: NeuroSummary, sleep_pressure: float | None = None
+) -> SleepStage | None:
     """Derive the sleep stage from a neurochemical summary.
 
     Returns None if the summary is not in a sleep phase. Handles both
     the legacy "sleeping" phase name and the split "nrem"/"rem" phase
-    names (the Rust side now distinguishes NREM from REM).
+    names (the Rust side distinguishes NREM from REM).
 
-    For the legacy "sleeping" phase, arousal > 0.50 maps to REM
-    (since the old daemon didn't distinguish NREM from REM). For the
-    explicit "nrem" phase, only N1/N2/N3 are produced — the daemon
-    said NREM, so it's NREM regardless of arousal.
+    For the legacy "sleeping" phase, arousal > 0.50 maps to REM. For the
+    explicit "nrem" phase, the stage is N1/N2/N3 and never REM. When the
+    network's sleep pressure is supplied, the depth comes from it, which is
+    the physiological signal. Without it, the arousal bands are used; those
+    bands no longer separate NREM depths, since the network sets NREM arousal
+    from LC alone.
     """
     phase = summary.phase_name
     if phase == "rem":
@@ -343,7 +356,12 @@ def _sleep_stage_from_summary(summary: NeuroSummary) -> SleepStage | None:
         else:
             return SleepStage.N3
     if phase == "nrem":
-        # Explicit NREM — stage depends on arousal, but never REM.
+        if sleep_pressure is not None:
+            if sleep_pressure >= NREM_N3_PRESSURE:
+                return SleepStage.N3
+            if sleep_pressure >= NREM_N2_PRESSURE:
+                return SleepStage.N2
+            return SleepStage.N1
         arousal = summary.arousal
         if arousal > 0.35:
             return SleepStage.N1
@@ -1834,16 +1852,11 @@ def _sleep_phase_powers(
 ) -> tuple[dict[BrainWave, float], str, str]:
     """Derive brain wave powers for sleep stages (REM/N1/N2/N3).
 
-    ``stage`` is the authoritative stage from the ultradian tracker.
-    When it is None the stage is derived from arousal instead — but
-    that fallback cannot express N1, because the daemon hard-clamps
-    arousal into 0.10-0.25 for the whole of NREM (neurochemical.rs,
-    the NREM sleep-state clamp), while the arousal thresholds put N1
-    above 0.35. Deriving from arousal therefore reports slow-wave N3
-    for the whole of NREM and reaches N2 only when arousal happens to
-    sit in the top of the clamp band. The ultradian cycle is what
-    actually decides N1/N2/N3, so its stage is preferred whenever the
-    caller has it.
+    ``stage`` is the stage the daemon's sleep-wake network reports, with
+    NREM depth from the network's sleep pressure (see
+    ``_sleep_stage_from_summary``). When it is None the stage is derived
+    from the summary instead, using the arousal bands, which cannot express
+    NREM depth now that the network sets NREM arousal from LC alone.
     """
     if stage is None:
         stage = _sleep_stage_from_summary(summary)

@@ -17,10 +17,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
-from concepts import ConceptNetwork, RelationType
-from infrastructure.bug_reporter import BugReport
-from self import (
+from frontal_lobe.self import (
     ExperimentRecord,
     FeedbackRecord,
     HeuristicExperiment,
@@ -31,7 +28,7 @@ from self import (
     SelfDirectedLearner,
     SelfImprovement,
 )
-from self.learning import (
+from frontal_lobe.self.learning import (
     _CAUSES_RE,
     _DEFINITION_RE,
     _DEPENDS_RE,
@@ -43,7 +40,10 @@ from self.learning import (
     _SIMILAR_RE,
     _normalize_concept,
 )
-from tools.framework import ToolResult
+from frontal_lobe.tools.framework import ToolResult
+from temporal_lobe.concepts import ConceptNetwork, RelationType
+
+from infrastructure.bug_reporter import BugReport
 
 logger = logging.getLogger(__name__)
 
@@ -882,19 +882,19 @@ class TestAutonomousAllowlist:
     def test_cognitive_submodule_allowed(self):
         """Test cognitive submodule allowed."""
         assert SelfImprovement._is_autonomous_allowed(
-            "python/perception/core.py"
+            "python/occipital_lobe/perception/core.py"
         )
 
     def test_client_submodule_allowed(self):
         """Test client submodule allowed."""
         assert SelfImprovement._is_autonomous_allowed(
-            "python/genesis_client/client.py"
+            "genesis_client/client.py"
         )
 
     def test_cli_allowed(self):
         """Test cli allowed."""
         assert SelfImprovement._is_autonomous_allowed(
-            "python/genesis_cli.py"
+            "genesis_cli.py"
         )
 
     def test_script_rejected(self):
@@ -965,7 +965,7 @@ class TestProtectedCore:
     def test_mind_protected(self):
         """Mind is protected from autonomous fixes."""
         assert not SelfImprovement._is_autonomous_allowed(
-            "python/mind.py"
+            "mind.py"
         )
 
     def test_cognition_engine_still_own_source(self):
@@ -988,14 +988,14 @@ class TestProtectedCore:
 
     def test_protected_core_experiment_blocked(self):
         """Experiments cannot touch protected core files."""
-        from self.improvement import HeuristicExperiment
+        from frontal_lobe.self.improvement import HeuristicExperiment
         assert not HeuristicExperiment._is_allowlisted(
             "python/frontal_lobe/prefrontal.py"
         )
 
     def test_protected_core_still_experimentable(self):
         """Protected core files are still experimentable (proposals OK)."""
-        from self.improvement import HeuristicExperiment
+        from frontal_lobe.self.improvement import HeuristicExperiment
         assert HeuristicExperiment._is_experimentable(
             "python/frontal_lobe/prefrontal.py"
         )
@@ -1010,7 +1010,7 @@ class TestModuleNameFor:
             SelfImprovement._module_name_for(
                 "python/perception/core.py"
             )
-            == "perception.core"
+            == "occipital_lobe.perception.core"
         )
 
     def test_client_submodule(self):
@@ -1119,7 +1119,7 @@ class TestImportGate:
             lambda name, **kw: ToolResult(success=True, output="mocked")
         )})()
         with patch(
-            "self.improvement.get_tools",
+            "frontal_lobe.self.improvement.get_tools",
             return_value=mock_tools,
         ):
             result = engine._validate_and_write_fix(
@@ -1150,7 +1150,7 @@ class TestImportGate:
             lambda name, **kw: ToolResult(success=False, error="tests failed")
         )})()
         with patch(
-            "self.improvement.get_tools",
+            "frontal_lobe.self.improvement.get_tools",
             return_value=mock_tools,
         ):
             result = engine._validate_and_write_fix(

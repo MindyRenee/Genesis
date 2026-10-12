@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 
-from concepts import _FUNCTION_WORDS, ConceptNetwork
+from temporal_lobe.concepts import _FUNCTION_WORDS, ConceptNetwork
 
 __all__ = ["TopicResolver"]
 

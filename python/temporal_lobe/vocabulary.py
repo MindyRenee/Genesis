@@ -22,10 +22,11 @@ import re
 from collections import deque
 from typing import Any, ClassVar
 
-from concepts import _FUNCTION_WORDS, RelationType
-from genesis_client.swallow import note_swallowed
+from frontal_lobe.self import PersonalityTraits
 from limbic_system.emotion import PLASTICITY_CLOSED, PLASTICITY_LOW, EmotionalState
-from self import PersonalityTraits
+from temporal_lobe.concepts import _FUNCTION_WORDS, RelationType
+
+from genesis_client.swallow import note_swallowed
 
 from .morphology import (
     agree_verb_phrase,

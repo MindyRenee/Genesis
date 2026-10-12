@@ -5,12 +5,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from genesis_client.protocol import CHEM_NAMES
-from genesis_client.swallow import note_swallowed
-from tools.project_creator import (
-    archive_project as _archive_project,
-)
-from tools.project_creator import (
+from frontal_lobe.tools.project_creator import archive_project as _archive_project
+from frontal_lobe.tools.project_creator import (
     clear_project_notes,
     create_project,
     leave_project_note,
@@ -19,9 +15,10 @@ from tools.project_creator import (
     projects_with_notes,
     read_project_notes,
 )
-from tools.project_creator import (
-    restore_project as _restore_project,
-)
+from frontal_lobe.tools.project_creator import restore_project as _restore_project
+
+from genesis_client.protocol import CHEM_NAMES
+from genesis_client.swallow import note_swallowed
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +192,7 @@ class ProjectsMixin:
             # concept already exists (added by _add_project_concept);
             # link the feedback to it.
             try:
-                from concepts import RelationType
+                from temporal_lobe.concepts import RelationType
 
                 feedback_concept = f"feedback_on_{pname}"
                 self.brain.frontal.network.add_concept(

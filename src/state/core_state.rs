@@ -94,6 +94,7 @@ use super::header::{CoreStateHeader, SCHEMA_VERSION};
 use super::inference::InferenceSignals;
 use super::ions::IonState;
 use super::manifest::RuntimeManifest;
+use super::sleep_network::{INITIAL as SLEEP_INITIAL, State as SleepState};
 use super::memory::MemoryPointers;
 use super::neurochemical::{NeuroTickParams, NeurochemicalId, NeurochemicalVector};
 use super::zones::{ActiveZones, CognitiveZone, MentalPhase};
@@ -152,6 +153,16 @@ static CRC32_TABLE: [u32; 256] = {
     table
 };
 
+/// CRC32 (IEEE) of `bytes`, with the same table as the core state
+/// checksum. Shared so sidecar files carry the same integrity check.
+pub fn crc32_ieee(bytes: &[u8]) -> u32 {
+    let mut crc = 0xFFFFFFFFu32;
+    for &byte in bytes {
+        crc = (crc >> 8) ^ CRC32_TABLE[((crc ^ byte as u32) & 0xFF) as usize];
+    }
+    crc ^ 0xFFFFFFFFu32
+}
+
 /// The complete Genesis core state.
 ///
 /// See the [module-level documentation](self) for the full layout.
@@ -168,6 +179,12 @@ pub struct GenesisCoreState {
     pub memory: MemoryPointers,
     /// Runtime module manifest table.
     pub manifest: RuntimeManifest,
+    /// Sleep-wake network state: `[f_lc, f_vlpo, f_r, f_scn, h, c, xc, n]`.
+    /// Authoritative, like the ions: the homeostatic sleep pressure and the
+    /// circadian oscillator are not derivable from anything else. Placed
+    /// after `manifest` so it lands on an 8-byte boundary with no padding
+    /// inside the checksum region. See [`crate::state::sleep_network`].
+    pub sleep_network: SleepState,
     /// Ion electrochemistry — calcium, chloride, potassium, sodium.
     /// Sits ahead of the checksum because concentrations, gradients,
     /// and membrane potential are authoritative persistent state, not
@@ -196,6 +213,7 @@ impl GenesisCoreState {
             memory: MemoryPointers::new(),
             manifest: RuntimeManifest::new(),
             ions: IonState::new(),
+            sleep_network: SLEEP_INITIAL,
             checksum: 0,
             inference_signals: InferenceSignals::new(),
         };
@@ -204,6 +222,26 @@ impl GenesisCoreState {
         state.sync_neurochemistry_to_state();
         state.checksum = state.compute_checksum();
         state
+    }
+
+    /// Take the sleep stage from the sleep-wake network and publish it to the
+    /// neurochemical phase and the zones.
+    ///
+    /// The network decides sleep and its stages. The chemistry still names
+    /// the waking phases. The zone's sleeping override applies here too, so a
+    /// mind that is cognitively asleep is never shown a waking phase.
+    pub fn apply_network_phase(&mut self) {
+        let phase = super::sleep_network::stage(&self.sleep_network, self.neurochemicals.phase());
+        self.neurochemicals.emergent_phase = phase as u8;
+        let zone_phase = if self.zones.zone() == CognitiveZone::Sleeping {
+            match phase {
+                MentalPhase::REM => MentalPhase::REM,
+                _ => MentalPhase::NREM,
+            }
+        } else {
+            phase
+        };
+        self.zones.sync_phase(zone_phase);
     }
 
     /// Propagate the neurochemical system's derived state to the
@@ -424,9 +462,15 @@ impl GenesisCoreState {
                 self.checksum = self.compute_checksum();
                 Ok(())
             }
-            // v4 → v4: no-op (same version)
+            // v4 → v5: the sleep network was inserted ahead of the checksum.
+            // The caller widened the v4 layout (see
+            // `GenesisCoreStateV4::into_current`), which seeds the network at
+            // its source initial conditions. Here we restamp the version and
+            // size and recompute the checksum over the widened state.
             4 => {
-                self.verify()?;
+                self.header.version = SCHEMA_VERSION;
+                self.header.state_size = Self::SIZE as u32;
+                self.checksum = self.compute_checksum();
                 Ok(())
             }
             // Unknown version: cannot migrate
@@ -879,18 +923,20 @@ const _: () = {
     // grew with it. Nothing before the signals block moved: the
     // reserve exists so a new signal field cannot shift the rest of
     // the wire layout. Schema v4 then inserted `ions` ahead of the
-    // checksum, which moved the signals block to 3352 — they now end at
-    // 3352 + 64 = 3416, exactly the struct's size.
+    // checksum, which moved the signals block to 3352. Schema v5 inserted
+    // the 64-byte sleep network ahead of the checksum, so the signals block
+    // now sits at 3416 and ends at 3416 + 64 = 3480, the struct's size.
     assert!(core::mem::size_of::<GenesisCoreState>() <= 4096);
     assert!(offset_of!(GenesisCoreState, header) == 0);
     assert!(offset_of!(GenesisCoreState, neurochemicals) == 56);
     assert!(offset_of!(GenesisCoreState, zones) == 2472);
     assert!(offset_of!(GenesisCoreState, memory) == 2568);
     assert!(offset_of!(GenesisCoreState, manifest) == 2688);
-    assert!(offset_of!(GenesisCoreState, ions) == 3224);
-    assert!(offset_of!(GenesisCoreState, checksum) == 3348);
-    assert!(core::mem::size_of::<GenesisCoreState>() == 3416);
-    assert!(offset_of!(GenesisCoreState, inference_signals) == 3352);
+    assert!(offset_of!(GenesisCoreState, sleep_network) == 3224);
+    assert!(offset_of!(GenesisCoreState, ions) == 3288);
+    assert!(offset_of!(GenesisCoreState, checksum) == 3412);
+    assert!(core::mem::size_of::<GenesisCoreState>() == 3480);
+    assert!(offset_of!(GenesisCoreState, inference_signals) == 3416);
     // `compute_checksum` locates the checksum field with
     // `offset_of!(Self, checksum)` and region 2 as `48..<that offset>`
     // — it no longer derives either from `RESERVED_BYTES`. What

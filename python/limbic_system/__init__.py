@@ -403,13 +403,13 @@ _EXPORTS: dict[str, str] = {
     "InternalState": "limbic_system.emotional_regulator",
     # Insula / proto-self — the Damasio hierarchy: proto-self (body),
     # core self (feeling), autobiographical self (identity; cortical)
-    "AutobiographicalSelf": "self",
-    "CoreSelf": "self",
-    "CoreSelfEpisode": "self",
-    "DamasioSelfHierarchy": "self",
-    "ProtoSelf": "self",
-    "ProtoSelfState": "self",
-    "SelfModel": "self",
+    "AutobiographicalSelf": "insula.damasio",
+    "CoreSelf": "insula.damasio",
+    "CoreSelfEpisode": "insula.damasio",
+    "DamasioSelfHierarchy": "insula.damasio",
+    "ProtoSelf": "insula.damasio",
+    "ProtoSelfState": "insula.damasio",
+    "SelfModel": "frontal_lobe.self.model",
     # Interoceptive self-reading — active inference over its own
     # neurochemical trajectory (insula: felt sense of the body);
     # SEEKING drive (curiosity) and dyadic user-affect modeling
@@ -434,23 +434,23 @@ _EXPORTS: dict[str, str] = {
     # The self-model's structural components — traits, the machine
     # body-substrate, the minimal self, agency detection, values,
     # self-esteem (SelfModel itself is claimed above)
-    "AgencyDetector": "self.model",
-    "ComputationalSubstrate": "self.model",
-    "MinimalSelf": "self.model",
-    "PersonalityTraits": "self.model",
-    "SelfEsteem": "self.model",
-    "Value": "self.model",
+    "AgencyDetector": "frontal_lobe.self.model",
+    "ComputationalSubstrate": "frontal_lobe.self.model",
+    "MinimalSelf": "frontal_lobe.self.model",
+    "PersonalityTraits": "frontal_lobe.self.model",
+    "SelfEsteem": "frontal_lobe.self.model",
+    "Value": "frontal_lobe.self.model",
     # Interoceptive congruence — how well the felt body matches the
     # expressed body (somatic_marker congruence; co-claimed with
     # insula, where the interoceptive comparison is read)
-    "SomaticSnapshot": "self.somatic",
-    "somatic_congruence": "self.somatic",
+    "SomaticSnapshot": "insula.somatic",
+    "somatic_congruence": "insula.somatic",
     # Amygdala-modulated consolidation — emotional salience tags the
     # memory and gates its strength (McGaugh's amygdala-hippocampal
     # interaction; co-claimed with temporal_lobe, which owns the
     # episodic store)
-    "EmotionalMemory": "memory.systems",
-    "EmotionalMemorySystem": "memory.systems",
+    "EmotionalMemory": "temporal_lobe.memory.systems",
+    "EmotionalMemorySystem": "temporal_lobe.memory.systems",
     # Reward/motivation tracking — the dopamine sense of progress
     "GrowthLedger": "infrastructure.growth_ledger",
     "GrowthMilestone": "infrastructure.growth_ledger",

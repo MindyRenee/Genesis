@@ -28,13 +28,11 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "python"))
+sys.path[:0] = [str(Path(__file__).resolve().parent.parent / "python"),
+               str(Path(__file__).resolve().parent.parent)]
 
-from concepts.edge_log import (
-    EdgeLog,
-    is_derivable_edge,
-)
-from concepts.types import RelationType
+from temporal_lobe.concepts.edge_log import EdgeLog, is_derivable_edge  # noqa: E402
+from temporal_lobe.concepts.types import RelationType  # noqa: E402
 
 
 def _load_cognitive_state(path: Path) -> dict:
@@ -161,7 +159,7 @@ def migrate(data_dir: Path, write: bool, force: bool) -> int:
         log = EdgeLog(tmp)
         # Fold the classified set through the same event semantics the
         # runtime uses: snapshot is the migration's birth record.
-        from concepts.types import Edge
+        from temporal_lobe.concepts.types import Edge
 
         log.snapshot([
             Edge(

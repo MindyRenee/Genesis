@@ -16,19 +16,19 @@ import tempfile
 import time
 
 # Add the python/ directory to the path
-sys.path.insert(
-    0,
+sys.path[:0] = [
     os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "python"),
-)
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+]
 
-import logging
+import logging  # noqa: E402
 
-from genesis_client import GenesisClient
-from genesis_client.protocol import (
+from genesis_client import GenesisClient  # noqa: E402
+from genesis_client.protocol import (  # noqa: E402
     CHEM_DOPAMINE,
     ZONE_CODING,
 )
-from genesis_client.types import MemoryStats, NeuroSummary, PhaseInfo
+from genesis_client.types import MemoryStats, NeuroSummary, PhaseInfo  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

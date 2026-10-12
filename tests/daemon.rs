@@ -1306,6 +1306,32 @@ fn test_mind_drives_still_run_the_body_maintenance() {
 }
 
 #[test]
+fn advance_neuro_steps_the_sleep_network() {
+    // The sleep-wake network is part of the body. Mind-driven advances must
+    // move it, and it must stay finite: a poisoned network would silently
+    // stop the sleep drive.
+    let path = std::env::temp_dir().join(format!(
+        "genesis_sleep_net_{}.bin",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let mmap = MmapState::create(&path, 1, 1000).expect("create state");
+    let before = mmap.read_consistent().expect("read").sleep_network;
+    let mut tl = TickLoop::new();
+    for _ in 0..10 {
+        tl.note_mind_drive();
+        tl.advance_neuro(&mmap);
+    }
+    let after = mmap.read_consistent().expect("read").sleep_network;
+    assert!(after.iter().all(|v| v.is_finite()), "network went non-finite: {after:?}");
+    assert_ne!(after, before, "the sleep network did not advance");
+    drop(mmap);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
 fn test_mind_cannot_choose_the_physics_step_size() {
     // The mind must not supply dt. Physics integrates at the rate the
     // constants were tuned for; a caller-chosen step is how the body

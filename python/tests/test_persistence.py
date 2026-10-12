@@ -11,7 +11,10 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from concepts import ConceptNetwork, RelationType
+from frontal_lobe.self import Insight, PersonalityTraits, Reflection, SelfDirectedLearner, SelfModel
+from temporal_lobe.concepts import ConceptNetwork, RelationType
+from temporal_lobe.synapses import SynapticStore
+
 from infrastructure.narrative import Narrator
 from infrastructure.persistence import (
     load_state,
@@ -24,14 +27,6 @@ from infrastructure.persistence import (
     restore_synapses,
     save_state,
 )
-from self import (
-    Insight,
-    PersonalityTraits,
-    Reflection,
-    SelfDirectedLearner,
-    SelfModel,
-)
-from temporal_lobe.synapses import SynapticStore
 
 logger = logging.getLogger(__name__)
 
@@ -518,7 +513,7 @@ def test_semantic_memory_facts_survive_a_round_trip(tmp_path):
     edge log cannot hold these edges, so a fact learned from a
     conversation previously existed only in RAM.
     """
-    from memory.semantic import Fact, SemanticMemory
+    from temporal_lobe.memory.semantic import Fact, SemanticMemory
 
     network = ConceptNetwork()
     network.add_concept("dog", confidence=0.9)
@@ -561,7 +556,7 @@ def test_semantic_memory_facts_survive_a_round_trip(tmp_path):
 
 def test_semantic_memory_restore_tolerates_corrupt_payload():
     """A corrupt payload costs the facts, not the ability to start."""
-    from memory.semantic import SemanticMemory
+    from temporal_lobe.memory.semantic import SemanticMemory
 
     network = ConceptNetwork()
     sem = SemanticMemory(network=network)
@@ -587,7 +582,7 @@ def test_semantic_memory_does_not_restore_stale_priming():
     toward concepts that were salient then, which is not what semantic
     priming models.
     """
-    from memory.semantic import SemanticMemory
+    from temporal_lobe.memory.semantic import SemanticMemory
 
     network = ConceptNetwork()
     sem = SemanticMemory(network=network)
@@ -598,11 +593,12 @@ def test_semantic_memory_does_not_restore_stale_priming():
 
 def test_allostatic_load_round_trip():
     """A real allostatic load survives save/restore."""
+    from limbic_system.emotional_regulator import AllostaticLoadTracker
+
     from infrastructure.persistence import (
         _serialize_allostatic_load,
         restore_allostatic_load,
     )
-    from limbic_system.emotional_regulator import AllostaticLoadTracker
 
     tracker = AllostaticLoadTracker()
     tracker.set_inference_load(0.6)
@@ -635,8 +631,9 @@ def test_allostatic_restore_clamps_corrupt_load():
     hand-edited or corrupted save file would have made the regulator
     louder precisely when it was most worn down.
     """
-    from infrastructure.persistence import restore_allostatic_load
     from limbic_system.emotional_regulator import AllostaticLoadTracker
+
+    from infrastructure.persistence import restore_allostatic_load
 
     for bad in (-3.0, 50.0, float("nan"), float("inf")):
         tracker = AllostaticLoadTracker()
@@ -656,8 +653,9 @@ def test_allostatic_restore_clamps_corrupt_load():
 
 def test_allostatic_restore_tolerates_corrupt_duration():
     """A non-finite elevation counter must not make stress permanently chronic."""
-    from infrastructure.persistence import restore_allostatic_load
     from limbic_system.emotional_regulator import AllostaticLoadTracker
+
+    from infrastructure.persistence import restore_allostatic_load
 
     tracker = AllostaticLoadTracker()
     restore_allostatic_load(
@@ -677,8 +675,9 @@ def test_allostatic_restore_tolerates_corrupt_duration():
 
 def test_allostatic_restore_ignores_removed_fields():
     """Old save files carrying retired fields still restore cleanly."""
-    from infrastructure.persistence import restore_allostatic_load
     from limbic_system.emotional_regulator import AllostaticLoadTracker
+
+    from infrastructure.persistence import restore_allostatic_load
 
     tracker = AllostaticLoadTracker()
     restore_allostatic_load(
@@ -706,8 +705,9 @@ def test_allostatic_serialization_is_compact():
     was appended to every regulation cycle, serialized on every save
     (~3.6 KB), restored, and never read for any decision.
     """
-    from infrastructure.persistence import _serialize_allostatic_load
     from limbic_system.emotional_regulator import AllostaticLoadTracker
+
+    from infrastructure.persistence import _serialize_allostatic_load
 
     tracker = AllostaticLoadTracker()
     tracker.set_inference_load(0.5)

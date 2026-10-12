@@ -30,10 +30,11 @@ from frontal_lobe.reasoning.competence import (
     TaskCompetence,
     TaskContext,
 )
-from genesis_client.swallow import note_swallowed
 from parietal_lobe.grid import Grid
 from parietal_lobe.scene import Scene, perceive
 from parietal_lobe.transforms import Example, Transform, propose
+
+from genesis_client.swallow import note_swallowed
 
 logger = logging.getLogger(__name__)
 

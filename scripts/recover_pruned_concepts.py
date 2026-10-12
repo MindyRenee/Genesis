@@ -44,12 +44,14 @@ import sys
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "python"))
+sys.path[:0] = [str(Path(__file__).resolve().parent.parent / "python"),
+               str(Path(__file__).resolve().parent.parent)]
 
-from concepts import ConceptNetwork, open_archive
-from concepts.edge_log import open_edge_log
-from infrastructure.config import default_data_dir
-from infrastructure.persistence import restore_network
+from temporal_lobe.concepts import ConceptNetwork, open_archive  # noqa: E402
+from temporal_lobe.concepts.edge_log import open_edge_log  # noqa: E402
+
+from infrastructure.config import default_data_dir  # noqa: E402
+from infrastructure.persistence import restore_network  # noqa: E402
 
 
 def _load_state(path: Path) -> dict[str, Any]:

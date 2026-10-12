@@ -74,13 +74,8 @@ from enum import Enum
 from itertools import combinations
 from typing import Any
 
-from concepts import (
-    QUALITY_THRESHOLD,
-    ConceptNetwork,
-    RelationType,
-    is_world_concept,
-)
 from frontal_lobe.reasoning import Reasoner, ReasoningResult, ReasoningType
+from temporal_lobe.concepts import QUALITY_THRESHOLD, ConceptNetwork, RelationType, is_world_concept
 from thalamus.brain_waves import BrainWave, BrainWaveState
 
 from .emotion import EmotionalState

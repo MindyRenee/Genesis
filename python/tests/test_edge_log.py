@@ -8,15 +8,15 @@ derivable-edge rejection, and the ConceptNetwork wiring that makes
 
 import json
 
-from concepts.edge_log import (
+from temporal_lobe.concepts.edge_log import (
     is_derivable_edge,
     is_web_origin,
     open_edge_log,
     web_domain_of,
     web_origin,
 )
-from concepts.network import ConceptNetwork
-from concepts.types import Edge, RelationType
+from temporal_lobe.concepts.network import ConceptNetwork
+from temporal_lobe.concepts.types import Edge, RelationType
 
 
 def _edge(src="a", tgt="b", rel=RelationType.IS_A, w=0.7, origin="stated"):
@@ -519,7 +519,7 @@ class TestCompactionFailureIsReported:
 
         log.compact = boom  # type: ignore[method-assign]
         # Force the threshold so compaction is attempted.
-        import concepts.network as nmod
+        import temporal_lobe.concepts.network as nmod
         original = nmod._COMPACT_THRESHOLD_BYTES
         nmod._COMPACT_THRESHOLD_BYTES = 0
         try:
@@ -546,8 +546,8 @@ class TestCompactionFailureIsReported:
 
 
 def test_network_rejects_nonfinite_edge_weights():
-    from concepts.network import ConceptNetwork
-    from concepts.types import RelationType
+    from temporal_lobe.concepts.network import ConceptNetwork
+    from temporal_lobe.concepts.types import RelationType
 
     network = ConceptNetwork()
     assert network.add_edge("a", "b", RelationType.RELATED_TO, float("nan")) is None
@@ -556,8 +556,8 @@ def test_network_rejects_nonfinite_edge_weights():
 
 
 def test_network_does_not_mutate_weight_when_canonical_write_fails(monkeypatch):
-    from concepts.network import ConceptNetwork
-    from concepts.types import RelationType
+    from temporal_lobe.concepts.network import ConceptNetwork
+    from temporal_lobe.concepts.types import RelationType
 
     network = ConceptNetwork()
     edge = network.add_edge("a", "b", RelationType.IS_A, 0.2)

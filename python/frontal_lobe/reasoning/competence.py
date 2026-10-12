@@ -35,7 +35,7 @@ from typing import TYPE_CHECKING, Any
 from genesis_client.swallow import note_swallowed
 
 if TYPE_CHECKING:
-    from concepts import ConceptNetwork
+    from temporal_lobe.concepts import ConceptNetwork
 
 Scalar = str | int | float | bool | None
 State = Mapping[str, Any]
@@ -1126,7 +1126,7 @@ class TaskCompetence:
         if self.network is None:
             return
         try:
-            from concepts import RelationType
+            from temporal_lobe.concepts import RelationType
 
             name = f"skill:{skill.skill_id}"
             self.network.add_concept(

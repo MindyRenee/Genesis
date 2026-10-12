@@ -1,7 +1,7 @@
 """Regression tests for goal-directed decision candidate generation."""
 
-from concepts import ConceptNetwork
 from frontal_lobe.reasoning import ActionType, DecisionMaker, ResourceState
+from temporal_lobe.concepts import ConceptNetwork
 
 
 def test_active_goals_make_investigation_selectable() -> None:

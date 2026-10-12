@@ -33,8 +33,8 @@ import re
 from collections import deque
 from typing import Any
 
+from frontal_lobe.self import SelfModel
 from limbic_system.emotion import EmotionalState
-from self import SelfModel
 from temporal_lobe.acquisition import LanguageAcquisition
 from temporal_lobe.base import Language, Thought
 from temporal_lobe.statistical_learner import StatisticalLanguageLearner
@@ -1146,7 +1146,7 @@ class GenerativeLanguage(Language):
         if fragments is None:
             # Select identity fragments from the self-model + concept
             # network rather than reciting a hardcoded self-description.
-            from self.composer import SelfComposer
+            from frontal_lobe.self.composer import SelfComposer
 
             composer = SelfComposer()
             fragments = composer.identity_fragments(

@@ -410,20 +410,20 @@ _EXPORTS: dict[str, str] = {
     "MotionProcessor": "occipital_lobe.motion",
     "MotionRegion": "occipital_lobe.motion",
     "MemoryBridge": "temporal_lobe.mtl_bridge",
-    "Retina": "perception.retina",
+    "Retina": "occipital_lobe.perception.retina",
     "TrainingExample": "temporal_lobe.mtl_bridge",
     "VTCFeatureSpace": "temporal_lobe.vtc",
-    "Vision": "perception.vision",
+    "Vision": "occipital_lobe.perception.vision",
     # The "O" in PGO — pontine phasic bursts arriving at occipital
     # cortex during REM are the hypothesized drive of dream visual
     # imagery (co-claimed with brainstem, which generates the "P")
-    "PGOWave": "sleep.events",
+    "PGOWave": "thalamus.events",
     # Fusiform face area — occipitotemporal: YuNet detection, SFace
     # 128-d embeddings. Co-claimed with temporal_lobe (the ventral
     # stream's people endpoint).
-    "DetectedFace": "perception.recognition",
-    "FaceRecognizer": "perception.recognition",
-    "KnownFace": "perception.recognition",
+    "DetectedFace": "occipital_lobe.perception.recognition",
+    "FaceRecognizer": "occipital_lobe.perception.recognition",
+    "KnownFace": "occipital_lobe.perception.recognition",
     # The region itself — the ventral visual stream as one object
     "OccipitalLobe": "occipital_lobe.occipital",
 }

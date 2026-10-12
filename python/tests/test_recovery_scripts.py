@@ -18,8 +18,7 @@ import sys
 from pathlib import Path
 
 import pytest
-
-from concepts import ConceptNetwork, open_archive
+from temporal_lobe.concepts import ConceptNetwork, open_archive
 
 REPO = Path(__file__).resolve().parents[2]
 

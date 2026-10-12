@@ -15,6 +15,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from limbic_system.emotion import EmotionalState, assess_emotion
+from limbic_system.emotional_regulator import EmotionalRegulator
+from occipital_lobe.perception import Intent, perceive
+
 from genesis_client.protocol import (
     CHEM_CORTISOL,
     CHEM_DOPAMINE,
@@ -25,9 +29,6 @@ from genesis_client.protocol import (
     CHEM_SEROTONIN,
 )
 from genesis_client.types import NeuroSummary
-from limbic_system.emotion import EmotionalState, assess_emotion
-from limbic_system.emotional_regulator import EmotionalRegulator
-from perception import Intent, perceive
 
 # ─── Helpers ────────────────────────────────────────────────────────
 
@@ -381,8 +382,9 @@ def test_neutral_emotion_has_no_cause() -> None:
 
 def test_cause_category_enum_access() -> None:
     """Emotional state provides enum access to cause category."""
-    from genesis_client.protocol import PHASE_STRESS
     from limbic_system.emotion import CauseCategory
+
+    from genesis_client.protocol import PHASE_STRESS
     summary = make_summary(arousal=0.8, valence=-0.3, plasticity=0.4, phase=PHASE_STRESS)
     emo = assess_emotion(summary)
     assert emo.cause_category == CauseCategory.STRESS_CORTISOL
@@ -411,8 +413,8 @@ def _make_feeling_reporter():
     """Construct a FeelingReporter with an empty network for tests."""
     import random as _random
 
-    from concepts import ConceptNetwork
     from limbic_system.feeling_reporter import FeelingReporter
+    from temporal_lobe.concepts import ConceptNetwork
 
     return FeelingReporter(
         network=ConceptNetwork(),

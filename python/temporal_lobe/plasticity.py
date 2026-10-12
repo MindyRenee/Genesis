@@ -60,11 +60,10 @@ import threading
 from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
-
-from concepts import RelationType
+from temporal_lobe.concepts import RelationType
 
 if TYPE_CHECKING:
-    from concepts import ConceptNetwork, EmbeddingStore
+    from temporal_lobe.concepts import ConceptNetwork, EmbeddingStore
 
 __all__ = ["HebbianPlasticity"]
 

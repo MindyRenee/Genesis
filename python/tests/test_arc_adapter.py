@@ -20,7 +20,7 @@ import pytest
 
 sys.path.insert(0, str(__file__).rsplit("/tests/", 1)[0])
 
-from frontal_lobe.games.arc import ArcPractice, ArcResult
+from world.arc import ArcPractice, ArcResult
 
 
 class _State(Enum):
@@ -104,7 +104,7 @@ def _practice(monkeypatch, env, *, mind: _StubMind | None = None) -> ArcPractice
     fake_mod = types.SimpleNamespace(Arcade=lambda **kw: _FakeArcade(env))
     monkeypatch.setitem(sys.modules, "arc_agi", fake_mod)
     p = ArcPractice.__new__(ArcPractice)
-    p._mind = mind or _StubMind()
+    p._mind = mind or _StubMind()  # type: ignore[assignment]
     p._arcade = _FakeArcade(env)
     import tempfile
 
@@ -198,3 +198,39 @@ def test_play_requests_recording(monkeypatch):
     p = _practice(monkeypatch, env)
     p.play("fake-6", max_steps=5)
     assert p._arcade.made_with["save_recording"] is True
+
+
+def test_mind_play_arc_wraps_game_mode_and_restores(monkeypatch):
+    import mind as mind_mod
+
+    calls: list[str] = []
+
+    class _Stub:
+        is_gaming = False
+
+        def enter_game_mode(self):
+            if not self.is_gaming:
+                calls.append("enter")
+            self.is_gaming = True
+
+        def exit_game_mode(self):
+            calls.append("exit")
+            self.is_gaming = False
+
+    class _Practice:
+        def __init__(self, mind, instructions=""):
+            assert mind.is_gaming
+
+        def play(self, game, max_steps=0):
+            return ArcResult(game_id=game, state="BUDGET", steps=max_steps)
+
+    monkeypatch.setattr("world.arc.ArcPractice", _Practice)
+    stub = _Stub()
+    out = mind_mod.Mind.play_arc(stub, ["g1", "g2"], max_steps=7)
+    assert [r.game_id for r in out] == ["g1", "g2"] and out[0].steps == 7
+    assert calls == ["enter", "exit"] and not stub.is_gaming
+
+    stub.is_gaming = True
+    calls.clear()
+    mind_mod.Mind.play_arc(stub, ["g3"])
+    assert calls == [] and stub.is_gaming

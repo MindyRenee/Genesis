@@ -55,10 +55,13 @@ pub mod header;
 pub mod inference;
 pub mod ions;
 pub mod legacy_v3;
+pub mod legacy_v4;
 pub mod manifest;
 pub mod memory;
 pub mod neurochemical;
+pub mod phase_partition;
 pub mod sanitize;
+pub mod sleep_network;
 pub mod zones;
 
 // Re-export the primary types.

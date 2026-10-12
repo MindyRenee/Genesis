@@ -16,10 +16,9 @@ from typing import cast
 from unittest.mock import MagicMock
 
 import pytest
-
-from concepts import ConceptNetwork, RelationType
-from genesis_client.types import Episode, MemoryStats, SimilarEpisode
-from memory import (
+from brainstem.architecture import SleepStage
+from temporal_lobe.concepts import ConceptNetwork, RelationType
+from temporal_lobe.memory import (
     AttractorNetwork,
     MemoryContext,
     MemoryRecord,
@@ -29,13 +28,14 @@ from memory import (
     SourceTag,
     SpacedRepetitionScheduler,
 )
-from memory.systems import (
+from temporal_lobe.memory.systems import (
     EmotionalMemorySystem,
     PrimingSystem,
     SpreadingActivation,
     _emotional_similarity,
 )
-from sleep import SleepStage
+
+from genesis_client.types import Episode, MemoryStats, SimilarEpisode
 
 logger = logging.getLogger(__name__)
 
@@ -1690,7 +1690,7 @@ def test_replay_empty_store_does_nothing():
 
 def test_replay_integrated_with_n3_consolidation():
     """N3 consolidation should include experience replay."""
-    from sleep import SleepStage
+    from brainstem.architecture import SleepStage
 
     client = _make_mock_client_recons(ltm_count=1)
     engine = MemorySystem(client=client)

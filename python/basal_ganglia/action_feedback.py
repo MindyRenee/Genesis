@@ -44,7 +44,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, TypeGuard
 
-from concepts import ConceptNetwork, RelationType
+from temporal_lobe.concepts import ConceptNetwork, RelationType
 
 if TYPE_CHECKING:
     from frontal_lobe.reasoning.reasoner import ProbabilisticReasoning

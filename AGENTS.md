@@ -93,8 +93,8 @@ not — those must be generated, not recited.
   capability is missing — that is expected, not an error.
 
 ## Packaged install
-- `python/` is a real package (`genesis-cognitive`): `pip install
-  ./python` provides the `genesis` console script — the installed
+- The repo root is a real package (`genesis-cognitive`): `pip install
+  .` provides the `genesis` console script — the installed
   equivalent of run.sh (it sets `GENESIS_RUN` itself). Additions:
   `--headless` (resident mode, no prompt; for systemd/background),
   `--stop` (the run.sh --stop teardown, pidfiles + /proc scan), and
@@ -107,7 +107,7 @@ not — those must be generated, not recited.
 - Path resolution for installed layouts lives in
   `infrastructure/paths.py`: `package_root()` (the dir holding the
   top-level packages) and `code_root()` (the source tree: GENESIS_ROOT
-  → repo-marker walk → package container). Use these instead of new
+  → package root). Use these instead of new
   `parents[N]`/`dirname(...)` depth-counting — a packaged install has
   no checkout above site-packages.
 - Binaries resolve `GENESIS_BIN_DIR` → `target/release` → beside the
@@ -130,24 +130,35 @@ cognitive mind is alive.
   interoception, CPU/thermal policy. Losing those starved the body for
   as long as the mind held the lease, which was the original defect.
 - The mind is an observer. It reads `CoreState.inference_signals`
-  (the 64-byte `InferenceSignals` block at offset 3352) for surprise,
+  (the 64-byte `InferenceSignals` block at offset 3416) for surprise,
   free energy, precision, and allostatic load rather than provoking a
-  physics advance to obtain them. Note the block moved when v4
-  inserted the ions ahead of the checksum — 3228 was the v3 offset and
-  is stale.
+  physics advance to obtain them. The block has moved twice: 3228 was the
+  v3 offset, 3352 the v4 offset, and 3416 is v5, after the sleep network
+  was inserted ahead of the checksum. Use `offset_of!`, not a literal.
 - `tick_count` is a 5 Hz counter by construction: every
   `_INTERVAL_TICKS` gate assumes it. A caller-chosen step would stretch
   those periods.
 
 ## State schema and the ion layer
-`CoreState` is **schema v4** (3416 bytes) in
-`src/state/core_state.rs`. v4 inserted a 124-byte `IonState`
-(`src/state/ions.rs`) immediately **before** the checksum field, so
-every field after `manifest` moved and a v3 file (3296 bytes) cannot be
-reinterpreted in place. `src/state/legacy_v3.rs` holds the byte-exact
-v3 layout that `MmapState::open` decodes a v3 file through before
-widening it; `GenesisCoreStateV3` is frozen history and its size and
-offsets are pinned by assertions.
+`CoreState` is **schema v5** (3480 bytes) in
+`src/state/core_state.rs`. v5 inserted the 64-byte sleep-wake network
+state (`sleep_network: [f64; 8]`, see "Sleep-wake network" below) between
+`manifest` and `ions`, so the checksum sits at 3412, the ions at 3288, and
+the inference signals at 3416. The network sits there rather than before
+the checksum so that it is 8-byte aligned with no padding inside the
+checksum region.
+
+Every earlier layout is frozen and decoded through its own byte-exact type
+before widening: `src/state/legacy_v3.rs` (3296 bytes) and
+`src/state/legacy_v4.rs` (3416 bytes). `MmapState::open` dispatches on the
+version and the size of the file, and the offsets and sizes of each legacy
+type are pinned by assertions. v4 files migrate in place to v5 with the
+network at its source initial conditions (see the v4 migration test in
+`src/store/mmap_state.rs`).
+
+v4 inserted a 124-byte `IonState` (`src/state/ions.rs`) immediately
+**before** the checksum field, so every field after `manifest` moved and
+a v3 file (3296 bytes) cannot be reinterpreted in place.
 
 The ion block sits *inside* the CRC32 region deliberately: resting
 concentrations, electrochemical gradients and membrane potential are
@@ -167,7 +178,7 @@ Two layout traps worth knowing before touching either struct:
   `read_consistent()`, or ask the daemon.
 
 `GET_ION_SUMMARY` (opcode 40, additive, 108-byte reply) exposes the
-layer to the mind; `neurochemical/electrochemistry.py`
+layer to the mind; `brainstem/electrochemistry.py`
 turns it into bounded cognitive modulation (attention / integration /
 memory-consolidation gains, neutral ≈ 1.0). Note genesis2 uses opcode
 **36** for this; that id is already spent here on `GET_SENSOR_PRESENCE`,
@@ -176,7 +187,7 @@ pins both ids.
 
 ## Wire protocol
 - The daemon↔mind IPC protocol lives in `src/daemon/ipc.rs`
-  (`PROTOCOL_VERSION`) and `python/genesis_client/protocol.py` — the
+  (`PROTOCOL_VERSION`) and `genesis_client/protocol.py` — the
   two constants must always match. Current version: **v3** (BodyState
   carries the timing/involuntary/senescence layer — pulse, throttle,
   PSI, battery cycles, entropy, clocksource, suspend caps — with a
@@ -204,6 +215,10 @@ pins both ids.
   last_death]` for the daemon/cognitive/retina process tree — a
   subsystem that dies used to vanish from the telemetry with no trace,
   so a crashed retina was indistinguishable from one never started.
+  `SET_VOLITION = 46` pushes the sleep-wake network: `[u8 kind (0 sleep,
+  1 wake)][f32 magnitude]`, reply `[u8 ack]`. It decays on the physics
+  clock (see "Sleep-wake network"). Additive, so `PROTOCOL_VERSION` is
+  unchanged.
   `ADVANCE_PHYSICS = 39` is an evaluation-only sibling of
   `ADVANCE_NEURO = 24`, both requesting `[f32 dt]` and both returning the
   same 21-byte reply. `ADVANCE_NEURO`'s dt is **ignored**: the daemon
@@ -219,6 +234,85 @@ pins both ids.
   manifest fields that previously had no producer; the module section
   of `GET_SUBSYSTEM_TELEMETRY` carries them back at 18 bytes/record,
   and parsers accept the older 6-byte record as task 0 / no error.
+
+## Sleep-wake network
+Sleep is decided by a sourced network, not by thresholds on chemistry.
+`src/state/sleep_network.rs` is a transcription of the Booth / Diniz Behn
+network (ModelDB 244485, `DinizBehnBooth_SWnetworkModel.m`, from Gleit,
+Diniz Behn & Booth 2013 as revised by Booth, Xique & Diniz Behn 2017). It
+has wake (LC), NREM (VLPO), REM-on (R), a circadian oscillator, and a
+homeostatic sleep variable `h`. Time is in minutes. Sleep onset is LC below
+4 Hz; REM is R above 3 Hz in sleep. The physics step integrates it by RK4
+in the same sub-steps and seqlock transaction as the chemistry, on the
+local clock (`clock_minutes`), and then publishes the stage to the phase
+and the zones (`CoreState::apply_network_phase`).
+
+Checked against the source's own statements (`sleep_network` tests): about
+7.6 h asleep a day, one sleep period a day, four REM bouts a night, a
+~99-minute REM cycle, a first REM period at 84 minutes, and REM at 15–30%
+of sleep.
+
+**Known discrepancy.** REM bouts in the source shorten across the night
+(25, 33.5, 28.5, 21 min). In adults they lengthen toward morning. The test
+`rem_bouts_lengthen_across_the_night` is ignored and fails when run with
+`--ignored`. It is not tuned to pass: the cause is either a real difference
+from human physiology or an error in the transcription, and we have no EEG
+reference here to tell which.
+
+**Volition.** `/sleep`, `/nap`, `/wake` act on the body through
+`SET_VOLITION` (opcode 46): drive onto VLPO for sleep, onto LC for wake.
+The push decays with `VOLITION_TAU_SECS` (300 s). That constant is an
+assumption, not a measurement. While asleep the mind renews the push from
+the heartbeat. A sustained sleep push brings on sleep onset within an hour
+of waking (tested).
+
+**Chemistry driven by the network.** These four release targets are linear
+functions of the network populations, and each chemical is set directly by
+the network, not restored by the homeostatic or autoreceptor forces (the
+same convention adenosine and the stress hormones use):
+- Acetylcholine: high in waking and REM, lowest in NREM (Vazquez &
+  Baghdoyan 2001). Steady states 0.34 / 0.58 / 0.77 (NREM / wake / REM).
+- Serotonin: dorsal raphe, reduced in NREM, near silent in REM (Monti &
+  Jantos 2008). Steady states 0.22 / 0.39 / 0.07.
+- Norepinephrine: tracks LC, silent in REM. Steady states 0.05 / 0.30 / 0.
+- GABA: highest in NREM; waking 39% lower, REM 63% lower (SLEEP 2012).
+  Anchored to the waking baseline of 0.50: NREM 0.82, REM 0.30.
+`tests/network_calibration.rs` checks the steady states and the ordering.
+The targets were fit to these levels, so the steady states agree by
+construction. The test checks that the dynamics hold them, and it is not an
+independent validation of the levels.
+
+**Retired.** The scripted ACh rebound (latch, 0.65 / 0.20 targets), the
+threshold classifier's NREM and REM branches, the arousal clamps for NREM
+and REM, and the chemical wake and sleep-aid impulses that forced the
+flip-flop (histamine, orexin, norepinephrine). The classifier still names
+the waking phases (Active, Alert, Flow, Stress, Drowsy, Overwhelmed).
+
+**What depends on the sleep stage.** The stage now comes from the network, so
+the things that were gated on it were checked:
+- N3 consolidation (the heavy pass: concept consolidation, edge discovery,
+  downscaling, and compression) runs on each entry into N3. Measured over days
+  7–10 of the network: N3 is entered about twice a night and takes about 25%
+  of sleep, so the heavy pass does not run every cycle.
+- REM dreams and dream synthesis follow REM: about 24% of sleep.
+- Archiving of dormant concepts runs on the autosave timer and does not depend
+  on sleep.
+- Naps are capped to N1–N2 (`nap_capped_stage`); the network has no notion of
+  a nap, so without the cap a nap could run the N3 pass and REM dreams.
+
+**Open items, not done.**
+- `h` is not connected to adenosine. Adenosine is still chemistry-only,
+  and the mind's auto-sleep and auto-wake thresholds still read it.
+- The source's LC drops to 0.15 of its maximum in NREM (about 0.9 Hz).
+  Locus coeruleus firing is reduced in NREM, not nearly silent, so this is
+  a property of the source model that we have not corrected.
+- Network-driven chemicals no longer receive the autoreceptor feedback
+  that the generic release dynamics applied. Presynaptic autoreceptors
+  are real, but in this model they are not the mechanism setting release
+  levels.
+- Impulses to the network-driven chemicals decay toward the network's
+  target. A stress impulse to norepinephrine is therefore transient,
+  because stress does not yet drive LC.
 
 ## Keep the project tidy
 The project is large. Dead code, unused files, and stale leftovers
@@ -259,7 +353,7 @@ without knowing about the pin. That function now implements the full
 order anyway, so tools run outside `run.sh` agree: `config.py`,
 `scripts/hygiene.sh`, `scripts/prune_dead_concepts.py`,
 `scripts/migrate_edges_to_log.py`, `scripts/install_optional_deps.sh`,
-`python/setup_embeddings.py`, `examples/read_state.rs`, and
+`setup_embeddings.py`, `examples/read_state.rs`, and
 `examples/recover.rs`. There is no remaining known deviation — check
 this list before adding a ninth resolver.
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 
 import numpy as np
-
 from temporal_lobe import AuditoryCortex, SoundEvent
 from temporal_lobe.auditory import (
     _classify_sound,

@@ -1,19 +1,20 @@
 """Task competence — schema recognition, affordances, and skill reuse."""
 
-from concepts import ConceptNetwork
 from frontal_lobe.reasoning import (
     GoalCondition,
     ProcedureStep,
     TaskCompetence,
     TaskContext,
 )
+from frontal_lobe.self import Reflection, SelfModel
+from temporal_lobe.concepts import ConceptNetwork
+
 from infrastructure.narrative import Narrator
 from infrastructure.persistence import (
     load_state,
     restore_task_competence,
     save_state,
 )
-from self import Reflection, SelfModel
 
 
 def _context(
@@ -344,7 +345,7 @@ class TestTaskCompetence:
 
 
     def test_verified_skill_is_grounded_in_concept_network(self):
-        from concepts import ConceptNetwork, RelationType
+        from temporal_lobe.concepts import ConceptNetwork, RelationType
 
         net = ConceptNetwork()
         competence = TaskCompetence(network=net)
@@ -385,7 +386,7 @@ class TestTaskCompetence:
 
 def _planning_network() -> ConceptNetwork:
     """fire depends on oxygen and fuel; oxygen causes circulation."""
-    from concepts import RelationType
+    from temporal_lobe.concepts import RelationType
 
     net = ConceptNetwork()
     for c in ("fire", "heat", "oxygen", "fuel", "circulation"):

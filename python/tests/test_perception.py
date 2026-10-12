@@ -7,11 +7,9 @@ import tempfile
 
 import numpy as np
 import pytest
-
-from concepts import ConceptNetwork
+from frontal_lobe.self import PersonalityTraits
 from limbic_system.emotion import EmotionalState
-from occipital_lobe.v1 import _build_summary
-from perception import (
+from occipital_lobe.perception import (
     IntegratedPerception,
     MemoryBridge,
     MultisensoryInput,
@@ -29,7 +27,7 @@ from perception import (
     load_image,
     resize_for_vision,
 )
-from perception.core import (
+from occipital_lobe.perception.core import (
     Intent,
     Perception,
     _classify_intent,
@@ -40,17 +38,14 @@ from perception.core import (
     _extract_topics,
     perceive,
 )
-from perception.vision import (
-    ColorInfo,
-    _build_scene,
-    _learn_objects,
-)
-from self import PersonalityTraits
+from occipital_lobe.perception.vision import ColorInfo, _build_scene, _learn_objects
+from occipital_lobe.v1 import _build_summary
 from temporal_lobe import (
     COCO_CLASSES,
     DetectedObject,
     ObjectRecognizer,
 )
+from temporal_lobe.concepts import ConceptNetwork
 from temporal_lobe.vocabulary import Vocabulary
 
 logger = logging.getLogger(__name__)

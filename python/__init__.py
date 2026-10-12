@@ -59,17 +59,16 @@ same object (``mind.memory``, ``mind.self_model``, ``mind.inner_life``).
 
 # Brain-lobe naming convention
 
-The package is organized into neuroanatomical lobe directories
+The package is organized into neuroanatomical region directories
 (``frontal_lobe/``, ``parietal_lobe/``, ``temporal_lobe/``,
 ``occipital_lobe/``, ``limbic_system/``, ``basal_ganglia/``,
 ``cerebellum/``, ``thalamus/``, ``brainstem/``,
-``hypothalamus/``, ``insula/``, ``basal_forebrain/``,
-``neurochemical/``). Each is a *view package* that
-lazily re-exports the relevant top-level modules — the lobe layer
-is a documented map of the architecture, not a duplicate of it.
-They are how to *find* a function's anatomical home
-(``from temporal_lobe import ConceptNetwork``), not a second entry
-point into the running mind. The conformance suite
+``hypothalamus/``, ``insula/``, ``basal_forebrain/``). Each is a
+*view package* that lazily re-exports the modules it owns — the
+region layer is a documented map of the architecture, not a
+duplicate of it. They are how to *find* a function's anatomical
+home (``from temporal_lobe import ConceptNetwork``), not a second
+entry point into the running mind. The conformance suite
 (``tests/test_regional_wiring.py``) pins the map: every claim must
 resolve, load-bearing ownership decisions are asserted, and no
 functional module may go unclaimed.
@@ -87,8 +86,8 @@ import importlib
 
 __all__ = ["Mind"]
 
-# Packages a flat-catalog name may live in, in claim order — the
-# regions first (anatomy is the map), then the functional packages.
+# Packages a flat-catalog name may live in — the brain regions that
+# carry this tree, in claim order.
 _PACKAGES = (
     "frontal_lobe",
     "temporal_lobe",
@@ -102,15 +101,6 @@ _PACKAGES = (
     "hypothalamus",
     "insula",
     "basal_forebrain",
-    "neurochemical",
-    "memory",
-    "perception",
-    "self",
-    "sleep",
-    "concepts",
-    "tools",
-    "infrastructure",
-    "world",
 )
 
 
@@ -125,7 +115,9 @@ def __getattr__(name: str) -> object:
     working, not as the advertised surface.
     """
     if name == "Mind":
-        return importlib.import_module(".mind", __name__).Mind
+        # Mind sits beside this tree at the repository root — the
+        # assembled organ is a top-level module, not a region.
+        return importlib.import_module("mind").Mind
     for pkg_name in _PACKAGES:
         try:
             pkg = importlib.import_module(f".{pkg_name}", __name__)

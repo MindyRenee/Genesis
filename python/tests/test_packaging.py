@@ -17,9 +17,11 @@ import genesis_cli
 from infrastructure.paths import code_root, package_root
 
 
-def test_package_root_is_the_python_dir() -> None:
-    # This test file lives in python/tests/, so parents[1] is python/.
-    assert package_root() == Path(__file__).resolve().parents[1]
+def test_package_root_is_the_repo_root() -> None:
+    # The package root is the directory holding the top-level packages:
+    # the repo root in a checkout (python/ plus the support packages),
+    # site-packages in an install.
+    assert package_root() == Path(__file__).resolve().parents[2]
 
 
 def test_code_root_is_the_repo_root() -> None:

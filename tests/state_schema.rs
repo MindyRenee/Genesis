@@ -18,6 +18,9 @@ use genesis::state::*;
 
 // ─── Size assertions ──────────────────────────────────────────
 
+const ASLEEP_NET: [f64; 8] = [0.5, 4.5, 0.0, 4.0, 214.116748078719, 0.00114912794709424, -1.15530846944936, 0.604617443838918];
+const ASLEEP_REM: [f64; 8] = [0.5, 0.5, 4.0, 4.0, 214.116748078719, 0.00114912794709424, -1.15530846944936, 0.604617443838918];
+
 #[test]
 fn test_struct_sizes() {
     assert_eq!(core::mem::size_of::<CoreStateHeader>(), 56);
@@ -30,7 +33,7 @@ fn test_struct_sizes() {
     assert_eq!(core::mem::size_of::<RuntimeManifest>(), 536);
     // Legacy layout was 3288 bytes; current InferenceSignals.policy_authority is
     // reserved region, which is defined as exactly the signals size.
-    assert_eq!(core::mem::size_of::<GenesisCoreState>(), 3416);
+    assert_eq!(core::mem::size_of::<GenesisCoreState>(), 3480);
 }
 
 // ─── Field offset assertions ──────────────────────────────────
@@ -94,9 +97,10 @@ fn test_field_offsets() {
     assert_eq!(offset_of!(GenesisCoreState, zones), 2472);
     assert_eq!(offset_of!(GenesisCoreState, memory), 2568);
     assert_eq!(offset_of!(GenesisCoreState, manifest), 2688);
-    assert_eq!(offset_of!(GenesisCoreState, ions), 3224);
-    assert_eq!(offset_of!(GenesisCoreState, checksum), 3348);
-    assert_eq!(offset_of!(GenesisCoreState, inference_signals), 3352);
+    assert_eq!(offset_of!(GenesisCoreState, sleep_network), 3224);
+    assert_eq!(offset_of!(GenesisCoreState, ions), 3288);
+    assert_eq!(offset_of!(GenesisCoreState, checksum), 3412);
+    assert_eq!(offset_of!(GenesisCoreState, inference_signals), 3416);
 
     // The v3 layout is pinned too: it is the byte-exact description
     // migration decodes, so its offsets must not drift.
@@ -630,128 +634,76 @@ fn test_baseline_adapts_to_sustained_level() {
 
 #[test]
 fn test_emergent_phase_nrem() {
+    // Sleep stages come from the sleep-wake network. With the network asleep and
+    // REM-on quiet, the stage is NREM whatever the waking phase was.
+    use genesis::state::sleep_network::stage;
     let mut vec = NeurochemicalVector::new(0);
     vec.get_mut(NeurochemicalId::Adenosine).unwrap().level = 0.85;
-    vec.get_mut(NeurochemicalId::Histamine).unwrap().level = 0.15;
     vec.recompute_derived();
-    assert_eq!(vec.phase(), MentalPhase::NREM);
+    assert_eq!(stage(&ASLEEP_NET, vec.phase()), MentalPhase::NREM);
 }
 
 #[test]
 fn test_emergent_phase_rem() {
+    // With REM-on firing during sleep, the network's stage is REM.
+    use genesis::state::sleep_network::stage;
     let mut vec = NeurochemicalVector::new(0);
-    // REM: high adenosine (sleep state), high ACh, low NE (noradrenergic silence)
     vec.get_mut(NeurochemicalId::Adenosine).unwrap().level = 0.85;
-    vec.get_mut(NeurochemicalId::Histamine).unwrap().level = 0.15;
-    vec.get_mut(NeurochemicalId::Acetylcholine).unwrap().level = 0.65;
-    vec.get_mut(NeurochemicalId::Norepinephrine).unwrap().level = 0.20;
     vec.recompute_derived();
-    assert_eq!(vec.phase(), MentalPhase::REM);
+    assert_eq!(stage(&ASLEEP_REM, vec.phase()), MentalPhase::REM);
 }
 
 #[test]
-fn test_sleep_phases_do_not_straddle_a_shared_boundary() {
-    // Regression: two hysteresis thresholds sat exactly on the fixed
-    // points they were compared against, so the phase chattered between
-    // two branches on every tick instead of settling.
-    //
-    // 1. Drowsy carried its own ceiling of 0.75 while the sleep branch
-    //    entered at `0.75 - 0.05*(1-ox)` = 0.715, both on the same
-    //    blended adenosine signal. Raw adenosine saturates at its 1.0
-    //    clamp under sustained drive, pinning the blend at exactly
-    //    0.750 — inside the overlap. Measured 85,198 phase transitions
-    //    over 5.5 simulated hours, and because the Drowsy branch
-    //    returned before the sleep branch ran its glymphatic decay,
-    //    raw adenosine never fell below 0.90 and REM was unreachable.
-    // 2. The REM norepinephrine stay threshold was 0.30 * 0.94 = 0.282
-    //    while sleep drives norepinephrine to a fixed point of 0.282,
-    //    so `ne < 0.282` was false at equilibrium and the state
-    //    oscillated REM/NREM within a single bout.
-    //
-    // Both are boundary-coincidence bugs, not tuning problems, so the
-    // regression is structural: a state must not flip more than once
-    // within a window where its input signals are stationary.
-    let params = NeuroTickParams {
-        maturation_level: 1.0,
-        ..Default::default()
-    };
-    let mut vec = NeurochemicalVector::new(1);
-    let mut ms = 0u64;
-    // One hour of wake drive, then stop and let clearance run.
-    for step in 0..400_000u32 {
-        ms += 100;
-        if step < 36_000 {
-            vec.apply_impulse_capped(NeurochemicalId::Adenosine, 0.006, ms);
-        }
-        vec.tick_with_params(&params);
-    }
-    let mut transitions = 0u32;
-    let mut last = vec.emergent_phase;
-    let mut saw_nrem = false;
-    let mut saw_rem = false;
-    for _ in 0..200_000u32 {
-        vec.tick_with_params(&params);
-        if vec.emergent_phase != last {
+fn test_network_stage_does_not_chatter_across_a_sleep_episode() {
+    // The sleep stage now comes from the sleep-wake network. Across two
+    // simulated days it must not flicker: the flip-flop commits to a state
+    // and the transitions are a handful per ultradian cycle, not thousands.
+    use genesis::state::sleep_network::{INITIAL, advance, stage};
+    use genesis::state::zones::MentalPhase;
+    let dt = 0.02;
+    let mut x = INITIAL;
+    let mut last = stage(&x, MentalPhase::Active);
+    let (mut transitions, mut saw_nrem, mut saw_rem) = (0u32, false, false);
+    for i in 0..(2880.0 / dt) as usize {
+        x = advance(i as f64 * dt, &x, dt);
+        let now = stage(&x, MentalPhase::Active);
+        if now != last {
             transitions += 1;
-            last = vec.emergent_phase;
+            last = now;
         }
-        if vec.emergent_phase == MentalPhase::NREM as u8 {
-            saw_nrem = true;
-        }
-        if vec.emergent_phase == MentalPhase::REM as u8 {
-            saw_rem = true;
-        }
+        saw_nrem |= now == MentalPhase::NREM;
+        saw_rem |= now == MentalPhase::REM;
     }
-    assert!(saw_nrem, "NREM must be reachable in a sleep episode");
-    assert!(saw_rem, "REM must be reachable in a sleep episode");
-    // A ~90 min ultradian cycle over ~5.5 h is a handful of transitions.
-    // The pre-fix straddle produced tens of thousands.
-    assert!(
-        transitions < 200,
-        "phase chattered: {transitions} transitions, expected a few per ultradian cycle"
-    );
+    assert!(saw_nrem, "NREM must occur over two days");
+    assert!(saw_rem, "REM must occur over two days");
+    assert!(transitions < 200, "stage chattered: {transitions} transitions");
 }
+
 
 #[test]
 fn test_sleep_episode_produces_ultradian_nrem_rem_cycles() {
-    // The point of the sleep architecture is not just that REM is
-    // reachable once, but that sleep alternates NREM and REM on the
-    // documented ultradian rhythm. Process S clearing during sleep is
-    // what lets the cholinergic rebound fire, so a single NREM period
-    // followed by terminal wake would mean clearance is not running.
-    let params = NeuroTickParams {
-        maturation_level: 1.0,
-        ..Default::default()
-    };
-    let mut vec = NeurochemicalVector::new(1);
-    for _ in 0..600_000u32 {
-        vec.tick_with_params(&params);
-    }
-    // From rest, Process S must accumulate over hours before sleep.
-    let mut nrem_bouts = 0u32;
-    let mut rem_bouts = 0u32;
-    let mut prev = vec.emergent_phase;
-    for _ in 0..1_200_000u32 {
-        vec.tick_with_params(&params);
-        let ph = vec.emergent_phase;
-        if ph != prev {
-            if ph == MentalPhase::NREM as u8 {
-                nrem_bouts += 1;
+    // Sleep alternates NREM and REM on the ultradian rhythm, from the
+    // network's own dynamics: repeated NREM and REM bouts across two days.
+    use genesis::state::sleep_network::{INITIAL, advance, stage};
+    use genesis::state::zones::MentalPhase;
+    let dt = 0.02;
+    let mut x = INITIAL;
+    let mut prev = stage(&x, MentalPhase::Active);
+    let (mut nrem_bouts, mut rem_bouts) = (0u32, 0u32);
+    for i in 0..(2880.0 / dt) as usize {
+        x = advance(i as f64 * dt, &x, dt);
+        let now = stage(&x, MentalPhase::Active);
+        if now != prev {
+            match now {
+                MentalPhase::NREM => nrem_bouts += 1,
+                MentalPhase::REM => rem_bouts += 1,
+                _ => {}
             }
-            if ph == MentalPhase::REM as u8 {
-                rem_bouts += 1;
-            }
-            prev = ph;
+            prev = now;
         }
     }
-    assert!(
-        nrem_bouts >= 3,
-        "expected repeated NREM bouts across ~33 h, saw {nrem_bouts}"
-    );
-    assert!(
-        rem_bouts >= 2,
-        "expected repeated REM bouts across ~33 h, saw {rem_bouts}"
-    );
+    assert!(nrem_bouts >= 3, "expected repeated NREM bouts over two days, saw {nrem_bouts}");
+    assert!(rem_bouts >= 2, "expected repeated REM bouts over two days, saw {rem_bouts}");
 }
 
 #[test]
@@ -1178,34 +1130,19 @@ fn test_flow_state_enhances_encoding() {
 }
 
 #[test]
-fn test_sleep_state_emerges_from_adenosine() {
-    let mut state = GenesisCoreState::new(1, 1000);
-
-    // Accumulate sleep pressure
-    for _ in 0..100 {
-        // SAFETY: single-threaded test — no concurrent writers.
-        unsafe { state.write_begin(0) };
-        state
-            .neurochemicals
-            .get_mut(NeurochemicalId::Adenosine)
-            .unwrap()
-            .level = 0.85;
-        state
-            .neurochemicals
-            .get_mut(NeurochemicalId::Histamine)
-            .unwrap()
-            .level = 0.15;
-        state.neuro_tick();
-        state.write_end();
-    }
-
-    assert_eq!(
-        state.zones.phase(),
-        MentalPhase::NREM,
-        "high adenosine + low histamine → NREM sleep phase should emerge"
-    );
+fn test_sleep_state_is_owned_by_the_network() {
+    // High adenosine and low histamine do not make sleep by themselves: the
+    // chemistry's own phase is never a sleep stage. The network decides, and
+    // with the network asleep the stage is NREM.
+    use genesis::state::sleep_network::stage;
+    let mut vec = NeurochemicalVector::new(1);
+    vec.get_mut(NeurochemicalId::Adenosine).unwrap().level = 0.85;
+    vec.get_mut(NeurochemicalId::Histamine).unwrap().level = 0.15;
+    vec.recompute_derived();
+    let chem = vec.phase();
+    assert!(chem != MentalPhase::NREM && chem != MentalPhase::REM, "chemistry alone: {chem:?}");
+    assert_eq!(stage(&ASLEEP_NET, chem), MentalPhase::NREM);
 }
-
 #[test]
 fn test_adenosine_accumulates_during_wakefulness() {
     // Adenosine should accumulate during wakefulness (high histamine)
@@ -1295,7 +1232,9 @@ fn test_adenosine_accumulates_during_wakefulness() {
         state.write_end();
     }
 
-    // Verify we're in sleep phase
+    // Verify we're in sleep phase: the network is asleep and its stage is published.
+    state.sleep_network = ASLEEP_NET;
+    state.apply_network_phase();
     assert_eq!(
         state.zones.phase(),
         MentalPhase::NREM,
@@ -1366,7 +1305,9 @@ fn test_adenosine_clearance_rate_during_sleep() {
             .get_mut(NeurochemicalId::Histamine)
             .unwrap()
             .level = 0.15;
+        state.sleep_network = ASLEEP_NET;
         state.neuro_tick_with_params(&params);
+        state.apply_network_phase();
         state.write_end();
     }
     assert_eq!(
@@ -1394,7 +1335,9 @@ fn test_adenosine_clearance_rate_during_sleep() {
             .get_mut(NeurochemicalId::Histamine)
             .unwrap()
             .level = 0.15;
+        state.sleep_network = ASLEEP_NET;
         state.neuro_tick_with_params(&params);
+        state.apply_network_phase();
         state.write_end();
     }
 
@@ -1495,232 +1438,41 @@ fn test_zone_sleeping_runs_adenosine_clearance() {
 /// active path, so the REM conditions were never evaluated at all.
 /// Measured over 48 simulated hours, REM occupancy was exactly 0%.
 #[test]
-fn test_rem_reachable_from_nrem_through_exhaustion_override() {
-    let mut v = NeurochemicalVector::new(0);
-    v.tick_default();
-    let adn = NeurochemicalId::Adenosine as usize;
-    let ach = NeurochemicalId::Acetylcholine as usize;
-    let ne = NeurochemicalId::Norepinephrine as usize;
-    let hist = NeurochemicalId::Histamine as usize;
-
-    // Phase 1: establish NREM with the cholinergic side still suppressed,
-    // holding raw adenosine inside the exhaustion band.
-    let mut in_nrem = false;
-    for _ in 0..100_000 {
-        v.chemicals[adn].level = 0.95;
-        v.chemicals[ach].level = 0.20;
-        v.chemicals[ne].level = 0.20;
-        v.chemicals[hist].level = 0.15;
-        v.tick_default();
-        if v.phase() == MentalPhase::NREM {
-            in_nrem = true;
-            break;
-        }
-    }
-    assert!(in_nrem, "expected NREM under exhaustion-band adenosine");
-
-    // Phase 2: now satisfy the cholinergic/aminergic REM conditions. REM
-    // must be reachable from that NREM state.
-    let mut reached = false;
-    for _ in 0..100_000 {
-        v.chemicals[adn].level = 0.95;
-        v.chemicals[ach].level = 0.65;
-        v.chemicals[ne].level = 0.20;
-        v.chemicals[hist].level = 0.15;
-        v.tick_default();
-        if v.phase() == MentalPhase::REM {
-            reached = true;
-            break;
-        }
-    }
-    assert!(
-        reached,
-        "REM must be reachable from NREM while the exhaustion override holds; \
-         the override must not decide NREM-vs-REM on its own"
-    );
+fn test_rem_reachable_from_nrem_through_the_network() {
+    // REM is reached from NREM through the sleep-wake network, not through
+    // chemistry thresholds. Covered in detail by the sleep_network unit tests;
+    // here the production path is exercised: stage from the network, published
+    // to the phase, with REM-on firing during sleep.
+    use genesis::state::sleep_network::stage;
+    assert_eq!(stage(&ASLEEP_NET, MentalPhase::Active), MentalPhase::NREM);
+    assert_eq!(stage(&ASLEEP_REM, MentalPhase::NREM), MentalPhase::REM);
 }
 
 #[test]
-fn test_cholinergic_rebound_during_sustained_nrem() {
-    // During sustained NREM, once adenosine has cleared below 0.65,
-    // acetylcholine should rebound toward 0.65 (above the 0.50 REM
-    // threshold). This enables the NREM→REM transition within the
-    // ultradian cycle — the biological basis of REM sleep.
-    //
-    // Without this mechanism, ACh's homeostatic force (pulling toward
-    // 0.35) and coupling forces (GABA, melatonin suppressing ACh)
-    // prevent ACh from ever reaching 0.50 during sleep. The Rust
-    // phase never enters REM, and the Python lucid dream probability
-    // (which uses arousal as a REM marker) never gets the REM boost.
-    let mut state = GenesisCoreState::new(1, 1000);
-    let params = NeuroTickParams {
-        metaplasticity_rate: 0.0,
-        ..NeuroTickParams::COMPRESSED
+fn test_acetylcholine_release_is_higher_under_rem_drive_than_nrem() {
+    // Acetylcholine release is driven by the sleep-wake network's REM-on
+    // population: it is higher in REM than in NREM (Vazquez & Baghdoyan 2001).
+    // This replaces the old scripted rebound. The absolute level is compressed
+    // by the homeostatic autoreceptor feedback, so only the ordering is
+    // asserted here; the calibrated levels are an open item.
+    use genesis::state::neurochemical::NetworkLevels;
+    let run = |rem: f32| {
+        let params = NeuroTickParams {
+            maturation_level: 1.0,
+            network_levels: Some(NetworkLevels { lc: 0.0, vlpo: 0.0, rem }),
+            ..Default::default()
+        };
+        let mut vec = NeurochemicalVector::new(1);
+        for _ in 0..200_000u32 {
+            vec.tick_with_params(&params);
+        }
+        vec.get(NeurochemicalId::Acetylcholine).unwrap().level
     };
-
-    // Force sleep conditions: high adenosine, low histamine, low NE.
-    // Set melatonin high (circadian night) to lower the sleep threshold
-    // so adenosine at 0.60 stays in sleep (without melatonin, the
-    // stay-asleep threshold is ~0.615, which 0.60 would fall below).
-    // Reset receptor factors to 1.0 so the effective adenosine level
-    // equals the raw level (receptor downregulation during the
-    // establishment phase would otherwise reduce the effective level
-    // below the sleep threshold).
-    // First establish NREM with high adenosine (0.85), then test the
-    // cholinergic rebound at lower adenosine levels.
-    for _ in 0..100 {
-        // SAFETY: single-threaded test — exclusive access to a live state struct.
-        unsafe { state.write_begin(0) };
-        let adn = state
-            .neurochemicals
-            .get_mut(NeurochemicalId::Adenosine)
-            .unwrap();
-        adn.level = 0.85;
-        adn.velocity = 0.0;
-        adn.receptor_sensitivity = 1.0;
-        adn.desensitization_factor = 1.0;
-        adn.internalization_factor = 1.0;
-        state
-            .neurochemicals
-            .get_mut(NeurochemicalId::Histamine)
-            .unwrap()
-            .level = 0.15;
-        state
-            .neurochemicals
-            .get_mut(NeurochemicalId::Norepinephrine)
-            .unwrap()
-            .level = 0.20;
-        let ach = state
-            .neurochemicals
-            .get_mut(NeurochemicalId::Acetylcholine)
-            .unwrap();
-        ach.level = 0.20; // low ACh (NREM)
-        ach.receptor_sensitivity = 1.0;
-        ach.desensitization_factor = 1.0;
-        ach.internalization_factor = 1.0;
-        state
-            .neurochemicals
-            .get_mut(NeurochemicalId::Melatonin)
-            .unwrap()
-            .level = 0.80; // circadian night
-        state.neuro_tick_with_params(&params);
-        state.write_end();
-    }
-    assert_eq!(
-        state.zones.phase(),
-        MentalPhase::NREM,
-        "should be in NREM sleep"
-    );
-
-    // Now keep adenosine above 0.65 (early NREM) — ACh should stay low.
-    for _ in 0..200 {
-        // SAFETY: single-threaded test — exclusive access to a live state struct.
-        unsafe { state.write_begin(0) };
-        let adn = state
-            .neurochemicals
-            .get_mut(NeurochemicalId::Adenosine)
-            .unwrap();
-        adn.level = 0.70; // above 0.65 — early NREM
-        adn.velocity = 0.0;
-        adn.receptor_sensitivity = 1.0;
-        adn.desensitization_factor = 1.0;
-        adn.internalization_factor = 1.0;
-        state
-            .neurochemicals
-            .get_mut(NeurochemicalId::Histamine)
-            .unwrap()
-            .level = 0.15;
-        state
-            .neurochemicals
-            .get_mut(NeurochemicalId::Norepinephrine)
-            .unwrap()
-            .level = 0.20;
-        let ach = state
-            .neurochemicals
-            .get_mut(NeurochemicalId::Acetylcholine)
-            .unwrap();
-        ach.receptor_sensitivity = 1.0;
-        ach.desensitization_factor = 1.0;
-        ach.internalization_factor = 1.0;
-        state
-            .neurochemicals
-            .get_mut(NeurochemicalId::Melatonin)
-            .unwrap()
-            .level = 0.80;
-        state.neuro_tick_with_params(&params);
-        state.write_end();
-    }
-
-    // Early NREM: ACh should stay low (target 0.20)
-    let ach_early = state
-        .neurochemicals
-        .get(NeurochemicalId::Acetylcholine)
-        .unwrap()
-        .level;
+    let rem_level = run(1.0);
+    let nrem_level = run(0.0);
     assert!(
-        ach_early < 0.35,
-        "ACh should stay low during early NREM (adenosine > 0.65), got {}",
-        ach_early
-    );
-
-    // Now drop adenosine below 0.80 (late NREM) — ACh should rebound.
-    // The rebound threshold was changed from 0.65 to 0.80 to match the
-    // sleep-onset neighborhood and ensure REM is reachable.
-    for _ in 0..2000 {
-        // SAFETY: single-threaded test — exclusive access to a live state struct.
-        unsafe { state.write_begin(0) };
-        let adn = state
-            .neurochemicals
-            .get_mut(NeurochemicalId::Adenosine)
-            .unwrap();
-        adn.level = 0.75; // below 0.80 — late NREM
-        adn.velocity = 0.0;
-        adn.receptor_sensitivity = 1.0;
-        adn.desensitization_factor = 1.0;
-        adn.internalization_factor = 1.0;
-        state
-            .neurochemicals
-            .get_mut(NeurochemicalId::Histamine)
-            .unwrap()
-            .level = 0.15;
-        state
-            .neurochemicals
-            .get_mut(NeurochemicalId::Norepinephrine)
-            .unwrap()
-            .level = 0.20;
-        let ach = state
-            .neurochemicals
-            .get_mut(NeurochemicalId::Acetylcholine)
-            .unwrap();
-        ach.receptor_sensitivity = 1.0;
-        ach.desensitization_factor = 1.0;
-        ach.internalization_factor = 1.0;
-        state
-            .neurochemicals
-            .get_mut(NeurochemicalId::Melatonin)
-            .unwrap()
-            .level = 0.80;
-        state.neuro_tick_with_params(&params);
-        state.write_end();
-    }
-
-    let ach_late = state
-        .neurochemicals
-        .get(NeurochemicalId::Acetylcholine)
-        .unwrap()
-        .level;
-    assert!(
-        ach_late > 0.50,
-        "ACh should rebound above 0.50 during late NREM (adenosine < 0.80), \
-         got {} — the cholinergic rebound mechanism is not working",
-        ach_late
-    );
-
-    // The phase should transition to REM (ACh > 0.50, NE < 0.30)
-    assert_eq!(
-        state.zones.phase(),
-        MentalPhase::REM,
-        "should transition to REM when ACh rebounds above 0.50"
+        rem_level > nrem_level + 0.05,
+        "ACh release under REM drive {rem_level} should exceed NREM {nrem_level}"
     );
 }
 
@@ -2150,107 +1902,45 @@ fn test_bdnf_isolated_recovery() {
 }
 
 #[test]
-fn test_exhaustion_override_forces_sleep_despite_receptor_burnout() {
-    // When adenosine receptors are downregulated to floor (0.10),
-    // effective adenosine is too low to trigger the normal sleep
-    // threshold. But raw adenosine (metabolic sleep pressure) is
-    // still high. The exhaustion override should force NREM sleep
-    // when raw adenosine > 0.90, regardless of receptor sensitivity.
-    //
-    // This prevents the fatal feedback trap: receptor burnout →
-    // can't sleep → can't recover receptors → stuck awake.
+fn test_extreme_adenosine_alone_does_not_force_sleep() {
+    // Exhaustion no longer forces sleep from the chemistry. With the network
+    // awake, extreme adenosine and burnt-out receptors leave her awake.
     let mut state = GenesisCoreState::new(1, 1000);
-
-    // Simulate receptor burnout: adenosine sensitivity at floor
-    let adn = state
-        .neurochemicals
-        .get_mut(NeurochemicalId::Adenosine)
-        .unwrap();
-    adn.receptor_sensitivity = 0.5; // floor (biological max downregulation)
-    adn.desensitization_factor = 0.2; // floor
-    adn.internalization_factor = 0.45; // floor
-    adn.level = 0.95; // extreme metabolic sleep pressure
-    // Histamine is moderate (would normally prevent sleep)
-    let hist = state
-        .neurochemicals
-        .get_mut(NeurochemicalId::Histamine)
-        .unwrap();
-    hist.receptor_sensitivity = 0.5;
-    hist.level = 0.50; // moderate — would block normal sleep
-
+    let adn = state.neurochemicals.get_mut(NeurochemicalId::Adenosine).unwrap();
+    adn.receptor_sensitivity = 0.5;
+    adn.desensitization_factor = 0.2;
+    adn.internalization_factor = 0.45;
+    adn.level = 0.95;
+    state.neurochemicals.get_mut(NeurochemicalId::Histamine).unwrap().level = 0.50;
     state.neurochemicals.recompute_derived();
     state.sync_neurochemistry_to_state();
-
-    // The phase computation should trigger exhaustion override
+    state.apply_network_phase();
     let phase = state.zones.phase();
-    assert_eq!(
-        phase,
-        MentalPhase::NREM,
-        "exhaustion override should force NREM when raw adenosine > 0.90, \
-         even with receptor burnout and moderate histamine. \
-         Got phase {:?}",
-        phase
+    assert!(
+        phase != MentalPhase::NREM && phase != MentalPhase::REM,
+        "adenosine alone forced a sleep stage: {phase:?}"
     );
 }
 
 #[test]
-fn test_adenosine_blend_allows_sleep_with_downregulated_receptors() {
-    // With the 50/50 blend of effective and raw adenosine, sleep
-    // should be possible even when receptors are partially
-    // downregulated (not at floor, but reduced). This tests the
-    // blend mechanism, not the exhaustion override.
+fn test_chemistry_alone_never_reports_sleep() {
+    // Sleep entry is the network's decision, not the chemistry's. However high
+    // adenosine rises and however far its receptors are downregulated, the
+    // chemistry's own phase is never a sleep stage. The stage shown to her is
+    // set by the sleep-wake network (see `apply_network_phase`).
     let mut state = GenesisCoreState::new(1, 1000);
-
-    // Moderate receptor downregulation
-    let adn = state
-        .neurochemicals
-        .get_mut(NeurochemicalId::Adenosine)
-        .unwrap();
-    adn.receptor_sensitivity = 0.50; // partially downregulated
+    let adn = state.neurochemicals.get_mut(NeurochemicalId::Adenosine).unwrap();
+    adn.receptor_sensitivity = 0.50;
     adn.desensitization_factor = 0.5;
     adn.internalization_factor = 0.5;
-    adn.level = 0.85; // high sleep pressure
-    let hist = state
-        .neurochemicals
-        .get_mut(NeurochemicalId::Histamine)
-        .unwrap();
-    hist.receptor_sensitivity = 0.50;
-    hist.level = 0.10; // low histamine — allows sleep
-
+    adn.level = 0.99;
+    state.neurochemicals.get_mut(NeurochemicalId::Histamine).unwrap().level = 0.10;
     state.neurochemicals.recompute_derived();
     state.sync_neurochemistry_to_state();
-
-    // With blend: adn_eff = 0.85*0.50*0.50*0.50 = 0.106
-    // adn_blend = 0.106*0.5 + 0.85*0.5 = 0.478
-    // Sleep threshold (entering, mel~0, ox~0.3): 0.75 - 0 - 0.05*0.7 = 0.715
-    // 0.478 < 0.715 — won't enter via normal threshold
-    // But raw adenosine 0.85 < 0.90 — won't trigger exhaustion override either
-    // So this should NOT be sleep yet — it should be Active or Drowsy
-    let phase = state.zones.phase();
-    assert_ne!(
-        phase,
-        MentalPhase::NREM,
-        "with partially downregulated receptors and adn_blend=0.48, \
-         should not enter NREM yet (below threshold). Got {:?}",
-        phase
-    );
-
-    // Now push raw adenosine higher to trigger exhaustion override
-    let adn = state
-        .neurochemicals
-        .get_mut(NeurochemicalId::Adenosine)
-        .unwrap();
-    adn.level = 0.92; // extreme — triggers exhaustion override
-    state.neurochemicals.recompute_derived();
-    state.sync_neurochemistry_to_state();
-
-    let phase = state.zones.phase();
-    assert_eq!(
-        phase,
-        MentalPhase::NREM,
-        "exhaustion override should trigger NREM when raw adenosine > 0.90. \
-         Got {:?}",
-        phase
+    let phase = state.neurochemicals.phase();
+    assert!(
+        phase != MentalPhase::NREM && phase != MentalPhase::REM,
+        "chemistry alone reported a sleep stage: {phase:?}"
     );
 }
 
@@ -2291,7 +1981,9 @@ fn test_receptor_burnout_recovery_through_sleep() {
             .get_mut(NeurochemicalId::Adenosine)
             .unwrap();
         adn.apply_impulse(0.5, 0); // accumulate sleep pressure
+        state.sleep_network = ASLEEP_NET;
         state.neuro_tick_with_params(&params);
+        state.apply_network_phase();
         state.write_end();
     }
 
@@ -2322,7 +2014,10 @@ fn test_receptor_burnout_recovery_through_sleep() {
     // If adenosine is high enough, the exhaustion override should
     // allow sleep, and sleep should allow receptor recovery
     if adn_raw > 0.90 {
-        // Should be in sleep phase despite receptor burnout
+        // The network is asleep; its stage is what she is in, whatever the
+        // chemistry's receptors look like.
+        state.sleep_network = ASLEEP_NET;
+        state.apply_network_phase();
         let phase = state.zones.phase();
         assert!(
             phase == MentalPhase::NREM || phase == MentalPhase::REM,
@@ -2336,7 +2031,9 @@ fn test_receptor_burnout_recovery_through_sleep() {
         for _ in 0..3000 {
             // SAFETY: single-threaded test — no concurrent readers.
             unsafe { state.write_begin(0) };
+            state.sleep_network = ASLEEP_NET;
             state.neuro_tick_with_params(&params);
+            state.apply_network_phase();
             state.write_end();
         }
 

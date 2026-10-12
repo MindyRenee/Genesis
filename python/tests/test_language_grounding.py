@@ -1,13 +1,12 @@
 """Tests for the language-to-concept grounding boundary."""
 
 import pytest
-
-from concepts.network import ConceptNetwork
 from temporal_lobe.comprehension import (
     Comprehension,
     Proposition,
     SemanticRole,
 )
+from temporal_lobe.concepts.network import ConceptNetwork
 from temporal_lobe.semantic_grounding import SemanticGrounder
 
 

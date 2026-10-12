@@ -256,6 +256,9 @@ _EXPORTS: dict[str, str] = {
     "PredictiveCodingLayer": "cerebellum.predictive",
     # The region itself — the forward model
     "Cerebellum": "cerebellum.cerebellum",
+    # Endocannabinoid signalling — retrograde modulation at parallel-
+    # fiber synapses; cerebellar LTD depends on it
+    "Endocannabinoid": "cerebellum.endocannabinoid",
 }
 
 __all__ = sorted(_EXPORTS)

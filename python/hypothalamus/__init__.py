@@ -106,7 +106,7 @@ from _views import view_getattr
 
 _EXPORTS: dict[str, str] = {
     "SleepStage": "thalamus.brain_waves",
-    "SleepCycleTracker": "sleep.architecture",
+    "SleepCycleTracker": "brainstem.architecture",
     "SleepMixin": "brainstem.sleep",
     "SleepStageWorker": "brainstem.sleep",
     "AUTO_SLEEP_ADENOSINE": "brainstem.thresholds",
@@ -114,7 +114,7 @@ _EXPORTS: dict[str, str] = {
     # the monoaminergic pole of the flip-flop, so the grogginess after
     # the wake flip decays on orexin's timescale (co-claimed with
     # brainstem, which runs the switch)
-    "SleepInertia": "sleep.events",
+    "SleepInertia": "thalamus.events",
     # The HPA stress cascade — CRH -> ACTH -> cortisol with delays
     "HPAAxis": "limbic_system.emotional_regulator",
     "HPAState": "limbic_system.emotional_regulator",
@@ -122,20 +122,20 @@ _EXPORTS: dict[str, str] = {
     "AllostaticLoadTracker": "limbic_system.emotional_regulator",
     "AllostaticState": "limbic_system.emotional_regulator",
     # PVN neuropeptide — the first stage of the stress axis
-    "CRH": "neurochemical.crh",
+    "CRH": "hypothalamus.crh",
     # Adrenal endpoint of the axis, which the hypothalamus regulates by feedback
-    "Cortisol": "neurochemical.cortisol",
+    "Cortisol": "hypothalamus.cortisol",
     # Magnocellular (SON, PVN) neuropeptides — osmotic balance, bonding
-    "Vasopressin": "neurochemical.vasopressin",
-    "Oxytocin": "neurochemical.oxytocin",
+    "Vasopressin": "hypothalamus.vasopressin",
+    "Oxytocin": "hypothalamus.oxytocin",
     # Arcuate/pituitary opioid peptide — pain relief and reward
-    "Endorphin": "neurochemical.endorphin",
+    "Endorphin": "limbic_system.endorphin",
     # Lateral hypothalamus — orexin/hypocretin wake stabilization
-    "Orexin": "neurochemical.orexin",
+    "Orexin": "hypothalamus.orexin",
     # Tuberomammillary nucleus — histamine cortical arousal
-    "Histamine": "neurochemical.histamine",
+    "Histamine": "hypothalamus.histamine",
     # SCN -> pineal circadian output
-    "Melatonin": "neurochemical.melatonin",
+    "Melatonin": "hypothalamus.melatonin",
 }
 
 __all__ = sorted(_EXPORTS)

@@ -31,21 +31,22 @@ import logging
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
-from genesis_client.swallow import note_swallowed
 from limbic_system.emotion import EmotionalState
-from perception import Perception
+from occipital_lobe.perception import Perception
 from temporal_lobe.base import Language, Thought
+
+from genesis_client.swallow import note_swallowed
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from self_learner import SelfDirectedLearner
-
-    from concepts import ConceptNetwork, NetworkTopology
-    from infrastructure.narrative import Narrator
+    from frontal_lobe.self import Reflection, SelfAssessment, SelfComposer, SelfModel
     from limbic_system.feeling_reporter import FeelingReporter
-    from memory import MemoryContext, MemorySystem
-    from self import Reflection, SelfAssessment, SelfComposer, SelfModel
+    from self_learner import SelfDirectedLearner
+    from temporal_lobe.concepts import ConceptNetwork, NetworkTopology
+    from temporal_lobe.memory import MemoryContext, MemorySystem
+
+    from infrastructure.narrative import Narrator
 
     from .thought_composer import ThoughtComposer
 

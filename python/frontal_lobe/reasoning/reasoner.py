@@ -25,10 +25,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, ClassVar
 
-from concepts import (
-    ConceptNetwork,
-    RelationType,
-)
+from temporal_lobe.concepts import ConceptNetwork, RelationType
 
 __all__ = [
     "BetaDistribution",

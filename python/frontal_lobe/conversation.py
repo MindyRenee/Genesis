@@ -8,6 +8,15 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from frontal_lobe import CognitiveState
+from frontal_lobe.self import EmergentIdentitySource, IdentityStage
+from occipital_lobe import load_image, resize_for_vision
+from parietal_lobe.grid import Grid
+from parietal_lobe.grounding import ground_scene
+from parietal_lobe.scene import Scene
+from parietal_lobe.scene import perceive as _scene_perceive
+from temporal_lobe.base import Thought
+from thalamus.relay import KIND_HEARD
+
 from genesis_client.protocol import (
     CHEM_DOPAMINE,
     CHEM_NOREPINEPHRINE,
@@ -15,14 +24,6 @@ from genesis_client.protocol import (
     MODULE_SENSORY,
 )
 from genesis_client.swallow import note_swallowed
-from occipital_lobe import load_image, resize_for_vision
-from parietal_lobe.grid import Grid
-from parietal_lobe.grounding import ground_scene
-from parietal_lobe.scene import Scene
-from parietal_lobe.scene import perceive as _scene_perceive
-from self import EmergentIdentitySource, IdentityStage
-from temporal_lobe.base import Thought
-from thalamus.relay import KIND_HEARD
 from world import EventKind, PresenceKind
 
 if TYPE_CHECKING:
@@ -373,7 +374,7 @@ class ConversationMixin:
         if not bare:
             return
         if bare and " " not in bare:
-            from concepts.classify import is_world_concept
+            from temporal_lobe.concepts.classify import is_world_concept
             if not is_world_concept(bare):
                 logger.debug(f"suppressed internal-id thought: {bare}")
                 return

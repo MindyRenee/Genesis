@@ -22,10 +22,10 @@ import re
 from typing import TYPE_CHECKING
 
 from limbic_system.emotion import EmotionalState
-from perception import Perception
+from occipital_lobe.perception import Perception
 
 if TYPE_CHECKING:
-    from concepts import ConceptNetwork
+    from temporal_lobe.concepts import ConceptNetwork
 
     from .synapses import SynapticStore
 
@@ -257,8 +257,8 @@ class ConceptLearner:
            persistent graph knowledge with SIMILAR_TO links to other
            words of the same polarity.
         """
-        from concepts import RelationType
         from limbic_system.sentiment import learn_sentiment
+        from temporal_lobe.concepts import RelationType
 
         w = word.lower().strip()
         if not w:
@@ -311,7 +311,7 @@ class ConceptLearner:
         Registers in the morphology overlay (fast path for parsing)
         AND in the concept network so it persists across restarts.
         """
-        from concepts import RelationType
+        from temporal_lobe.concepts import RelationType
         from temporal_lobe.morphology import register_learned_verb
 
         b = base.lower().strip()
@@ -347,7 +347,7 @@ class ConceptLearner:
         the hub, and creates SIMILAR_TO edges to other words for
         the same category.
         """
-        from concepts import RelationType
+        from temporal_lobe.concepts import RelationType
 
         concept = self._network.get_concept(word)
         if concept is None:

@@ -23,8 +23,7 @@ from prune_dead_concepts import (
     _is_dead,
     prune_state,
 )
-
-from concepts import (
+from temporal_lobe.concepts import (
     QUALITY_THRESHOLD,
     Concept,
     ConceptCategory,
@@ -37,9 +36,9 @@ from concepts import (
     is_world_concept,
     open_archive,
 )
-from concepts.edge_log import open_edge_log
-from memory import SemanticMemory
-from memory.semantic import _relation_to_edge
+from temporal_lobe.concepts.edge_log import open_edge_log
+from temporal_lobe.memory import SemanticMemory
+from temporal_lobe.memory.semantic import _relation_to_edge
 
 logger = logging.getLogger(__name__)
 
@@ -63,10 +62,7 @@ def _c(net: ConceptNetwork, name: str) -> Concept:
 
 def test_network_quality_properties() -> None:
     """Mean edge weight, concept confidence, and density are exposed."""
-    from concepts import (
-        ConceptNetwork,
-        RelationType,
-    )
+    from temporal_lobe.concepts import ConceptNetwork, RelationType
 
     network = ConceptNetwork()
     assert network.mean_edge_weight == 0.0
@@ -1673,7 +1669,7 @@ def test_spill_reports_when_it_trims_nothing(caplog) -> None:
     """
     import logging
 
-    caplog.set_level(logging.DEBUG, logger="concepts.archival")
+    caplog.set_level(logging.DEBUG, logger="temporal_lobe.concepts.archival")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         net = _make_network_with_archive(tmpdir)
@@ -1713,7 +1709,7 @@ def test_spill_warns_if_working_memory_did_not_shrink(caplog) -> None:
     """
     import logging
 
-    caplog.set_level(logging.ERROR, logger="concepts.archival")
+    caplog.set_level(logging.ERROR, logger="temporal_lobe.concepts.archival")
 
     with tempfile.TemporaryDirectory() as tmpdir:
         net = _make_network_with_archive(tmpdir)
@@ -3639,7 +3635,7 @@ def test_clean_noise_keeps_concepts_when_the_archive_write_fails(caplog) -> None
     import sqlite3
 
     net = _noise_network(6)
-    caplog.set_level(logging.ERROR, logger="concepts.network")
+    caplog.set_level(logging.ERROR, logger="temporal_lobe.concepts.network")
 
     def boom(items):
         raise sqlite3.OperationalError("disk I/O error")
@@ -3659,7 +3655,7 @@ def test_clean_noise_reports_what_it_did(caplog) -> None:
     import logging
 
     net = _noise_network(4)
-    caplog.set_level(logging.INFO, logger="concepts.network")
+    caplog.set_level(logging.INFO, logger="temporal_lobe.concepts.network")
 
     net.clean_noise(min_confidence=0.4, min_edges=1)
 

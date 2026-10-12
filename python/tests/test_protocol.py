@@ -860,3 +860,12 @@ def test_ion_summary_unpack_matches_wire_layout():
 
     with pytest.raises(ValueError, match="108 bytes"):
         IonSummary.unpack(raw[:107])
+
+
+def test_set_volition_is_opcode_46() -> None:
+    """Volitional push onto the sleep-wake network. Pinned against the Rust
+    daemon's `cmd::SET_VOLITION`, which is also 46."""
+    from genesis_client import protocol
+
+    assert protocol.SET_VOLITION == 46
+    assert "SET_VOLITION" in protocol.__all__

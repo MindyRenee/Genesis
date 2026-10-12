@@ -64,11 +64,12 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from concepts import ConceptNetwork, RelationType
+from temporal_lobe.concepts import ConceptNetwork, RelationType
+
 from genesis_client.swallow import note_swallowed
 
 if TYPE_CHECKING:
-    from concepts import EmbeddingStore
+    from temporal_lobe.concepts import EmbeddingStore
 
 __all__ = ["Analogizer", "AnalogyInsight", "AnalogyPair"]
 

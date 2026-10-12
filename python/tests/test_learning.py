@@ -9,11 +9,20 @@ import time
 
 import numpy as np
 import pytest
-
 from basal_ganglia.td import TDLearner, TDTransition
-from concepts import ConceptNetwork, EmbeddingStore, NetworkTopology, RelationType
 from frontal_lobe.autonomous import AutonomousLearner
 from frontal_lobe.reasoning import Reasoner
+from frontal_lobe.tools.source_registry import SourceResult
+from limbic_system.curiosity import Curiosity
+from limbic_system.emotion import EmotionalState
+from temporal_lobe.concept_learner import ConceptLearner
+from temporal_lobe.concepts import ConceptNetwork, EmbeddingStore, NetworkTopology, RelationType
+from temporal_lobe.dual import DualSystemLearner, HippocampalEpisode, NeocorticalMemory
+from temporal_lobe.memory import SemanticMemory
+from temporal_lobe.plasticity import HebbianPlasticity
+from temporal_lobe.stdp import STDP, SpikeEvent
+from temporal_lobe.synapses import SynapticStore
+
 from genesis_client.types import (
     LEARNING_POSTURE_NEUTRAL,
     LEARNING_POSTURE_PROTECTIVE,
@@ -21,15 +30,6 @@ from genesis_client.types import (
     LEARNING_POSTURE_RECOVERING,
     PlasticityProfile,
 )
-from limbic_system.curiosity import Curiosity
-from limbic_system.emotion import EmotionalState
-from memory import SemanticMemory
-from temporal_lobe.concept_learner import ConceptLearner
-from temporal_lobe.dual import DualSystemLearner, HippocampalEpisode, NeocorticalMemory
-from temporal_lobe.plasticity import HebbianPlasticity
-from temporal_lobe.stdp import STDP, SpikeEvent
-from temporal_lobe.synapses import SynapticStore
-from tools.source_registry import SourceResult
 
 logger = logging.getLogger(__name__)
 
@@ -1925,7 +1925,7 @@ def test_local_study_keeps_learned_origin() -> None:
 
 def test_web_study_records_concept_sources_capped() -> None:
     """Concepts remember where they were read, bounded in size."""
-    from concepts.edge_log import WEB_SOURCES_CAP
+    from temporal_lobe.concepts.edge_log import WEB_SOURCES_CAP
 
     learner = _make_learner()
     created = learner._extract_and_add_concepts(

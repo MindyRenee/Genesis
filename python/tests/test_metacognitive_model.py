@@ -10,19 +10,19 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-from concepts import ConceptNetwork
 from frontal_lobe import CognitiveState
-from limbic_system.emotion import EmotionalState
-from memory import MemoryContext
-from perception import Intent, Perception, QuestionType
-from self import (
+from frontal_lobe.self import (
     CognitiveProcessModel,
     Insight,
     MetacognitiveFeedback,
     MetacognitivePrediction,
     Reflection,
 )
+from limbic_system.emotion import EmotionalState
+from occipital_lobe.perception import Intent, Perception, QuestionType
 from temporal_lobe.base import Thought
+from temporal_lobe.concepts import ConceptNetwork
+from temporal_lobe.memory import MemoryContext
 from thalamus.brain_waves import BrainWave, BrainWaveState
 
 
@@ -211,9 +211,7 @@ def test_spawn_level_on_sustained_surprise() -> None:
     predict this, so its surprise stays high, and after enough cycles
     a new level should spawn.
     """
-    from self.metacognitive_model import (
-        SPAWN_PERSISTENCE,
-    )
+    from frontal_lobe.self.metacognitive_model import SPAWN_PERSISTENCE
 
     model = CognitiveProcessModel()
     state = _make_state()
@@ -242,9 +240,7 @@ def test_prune_level_on_sustained_predictability() -> None:
     outcomes very consistent. The spawned level should eventually
     be pruned because it's no longer adding information.
     """
-    from self.metacognitive_model import (
-        PRUNE_MIN_AGE,
-    )
+    from frontal_lobe.self.metacognitive_model import PRUNE_MIN_AGE
 
     model = CognitiveProcessModel()
     state = _make_state()
@@ -276,7 +272,7 @@ def test_prune_level_on_sustained_predictability() -> None:
 
 def test_depth_never_exceeds_max() -> None:
     """The model never exceeds MAX_LEVELS."""
-    from self.metacognitive_model import MAX_LEVELS
+    from frontal_lobe.self.metacognitive_model import MAX_LEVELS
 
     model = CognitiveProcessModel()
     state = _make_state()

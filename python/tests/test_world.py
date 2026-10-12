@@ -6,12 +6,13 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from concepts import ConceptNetwork
+from frontal_lobe.inner_life import InnerLife
 from frontal_lobe.reasoning import Reasoner
-from genesis_client.protocol import CHEM_OXYTOCIN
+from frontal_lobe.self import Reflection
 from limbic_system.curiosity import Curiosity
-from self import Reflection
-from sleep import InnerLife
+from temporal_lobe.concepts import ConceptNetwork
+
+from genesis_client.protocol import CHEM_OXYTOCIN
 from world import (
     Beta,
     EventKind,

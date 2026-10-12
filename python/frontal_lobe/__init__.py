@@ -818,11 +818,11 @@ _EXPORTS: dict[str, str] = {
     "PresenceBelief": "world.belief",
     "Beta": "world.belief",
     # Working memory — Baddeley model (DLPFC central executive)
-    "CentralExecutive": "memory",
-    "PhonologicalLoop": "memory",
-    "VisuoSpatialSketchpad": "memory",
-    "WorkingMemory": "memory",
-    "KComplex": "sleep.events",
+    "CentralExecutive": "temporal_lobe.memory.working",
+    "PhonologicalLoop": "temporal_lobe.memory.working",
+    "VisuoSpatialSketchpad": "temporal_lobe.memory.working",
+    "WorkingMemory": "temporal_lobe.memory.working",
+    "KComplex": "thalamus.events",
     # Rule induction — posterior over DNF rules from labeled
     # examples, the Rational Rules model (mid-DLPFC hypothesis
     # generation; disengages when the rule is acquired)
@@ -853,8 +853,8 @@ _EXPORTS: dict[str, str] = {
     "BugReport": "infrastructure.bug_reporter",
     "BugReporter": "infrastructure.bug_reporter",
     "BugScanResult": "infrastructure.bug_reporter",
-    "CodeLearner": "tools.code_learner",
-    "CodeLearningResult": "tools.code_learner",
+    "CodeLearner": "frontal_lobe.tools.code_learner",
+    "CodeLearningResult": "frontal_lobe.tools.code_learner",
     "AutonomousLearner": "frontal_lobe.autonomous",
     "LearningResult": "frontal_lobe.autonomous",
     "LearningStrategy": "frontal_lobe.autonomous",
@@ -863,20 +863,20 @@ _EXPORTS: dict[str, str] = {
     "TransferResult": "frontal_lobe.autonomous",
     "is_programming_topic": "frontal_lobe.autonomous",
     # Curiosity-driven filesystem exploration (PFC + parietal)
-    "ExplorationResult": "tools.explorer",
-    "Explorer": "tools.explorer",
+    "ExplorationResult": "frontal_lobe.tools.explorer",
+    "Explorer": "frontal_lobe.tools.explorer",
     # Creative expression — affective art and code generation
     "Canvas": "frontal_lobe.canvas",
     "DrawingResult": "frontal_lobe.canvas",
-    "DomainKnowledge": "tools.project_composer",
-    "compose_main_module": "tools.project_composer",
-    "ProjectResult": "tools.project_creator",
-    "manage_project_lifecycle": "tools.project_creator",
+    "DomainKnowledge": "frontal_lobe.tools.project_composer",
+    "compose_main_module": "frontal_lobe.tools.project_composer",
+    "ProjectResult": "frontal_lobe.tools.project_creator",
+    "manage_project_lifecycle": "frontal_lobe.tools.project_creator",
     # Tool use — the mind-world interface (PFC + parietal + motor)
-    "Tool": "tools.framework",
-    "ToolRegistry": "tools.framework",
-    "ToolResult": "tools.framework",
-    "get_tools": "tools.framework",
+    "Tool": "frontal_lobe.tools.framework",
+    "ToolRegistry": "frontal_lobe.tools.framework",
+    "ToolResult": "frontal_lobe.tools.framework",
+    "get_tools": "frontal_lobe.tools.framework",
     # One cognitive turn — the handoff between regions. Frontal
     # owns the sequence because it owns executive control of it.
     "Turn": "frontal_lobe.turn",
@@ -930,28 +930,28 @@ _EXPORTS: dict[str, str] = {
     # recursive self-modeling, self-assessment, self-improvement
     # (mPFC; the body-side self — proto/core/autobiographical — is
     # claimed by limbic_system)
-    "CapabilityProfile": "self.assessment",
-    "CognitiveProcessModel": "self.metacognitive_model",
-    "CognitiveTrajectoryModel": "self.cognitive_trajectory",
-    "ErrorMonitor": "self.reflection",
-    "PredictionError": "self.reflection",
-    "Insight": "self.reflection",
-    "Introspection": "self.introspection",
-    "KnowledgeAssessment": "self.assessment",
-    "MetacognitiveFeedback": "self.metacognitive_model",
-    "MetacognitivePrediction": "self.metacognitive_model",
-    "MetacognitiveStrategy": "self.reflection",
-    "Proposal": "self.improvement",
-    "Reflection": "self.reflection",
-    "SelfAssessment": "self.assessment",
-    "SelfComposer": "self.composer",
-    "SelfImprovement": "self.improvement",
+    "CapabilityProfile": "frontal_lobe.self.assessment",
+    "CognitiveProcessModel": "frontal_lobe.self.metacognitive_model",
+    "CognitiveTrajectoryModel": "frontal_lobe.self.cognitive_trajectory",
+    "ErrorMonitor": "frontal_lobe.self.reflection",
+    "PredictionError": "frontal_lobe.self.reflection",
+    "Insight": "frontal_lobe.self.reflection",
+    "Introspection": "frontal_lobe.self.introspection",
+    "KnowledgeAssessment": "frontal_lobe.self.assessment",
+    "MetacognitiveFeedback": "frontal_lobe.self.metacognitive_model",
+    "MetacognitivePrediction": "frontal_lobe.self.metacognitive_model",
+    "MetacognitiveStrategy": "frontal_lobe.self.reflection",
+    "Proposal": "frontal_lobe.self.improvement",
+    "Reflection": "frontal_lobe.self.reflection",
+    "SelfAssessment": "frontal_lobe.self.assessment",
+    "SelfComposer": "frontal_lobe.self.composer",
+    "SelfImprovement": "frontal_lobe.self.improvement",
     # The stream of cognition — spontaneous mind-wandering between
     # interactions (default-mode-network-like), riding on the sleep
     # state the brainstem sets
-    "InnerLife": "sleep",
-    "SpontaneousThought": "sleep.thoughts",
-    "ThoughtChainType": "sleep.thoughts",
+    "InnerLife": "frontal_lobe.inner_life",
+    "SpontaneousThought": "frontal_lobe.thoughts",
+    "ThoughtChainType": "frontal_lobe.thoughts",
     # Commitment boundaries — the digitizer between continuous
     # signal and discrete state (all-or-none spike-threshold analog)
     "CommitmentBoundary": "commitment",
@@ -968,36 +968,57 @@ _EXPORTS: dict[str, str] = {
     "PlayResult": "frontal_lobe.games.player",
     "PlayStep": "frontal_lobe.games.player",
     "X11Game": "frontal_lobe.games.windowed",
+    # The play faculties — the external game session and the internal
+    # puzzle domains it shares machinery with.
+    "GameSession": "frontal_lobe.games.session",
+    "SpatialAgent": "frontal_lobe.games.spatial.agent",
+    "ConstraintSession": "frontal_lobe.games.spatial.boards",
+    "SpatialSolution": "frontal_lobe.games.spatial.solver",
+    "RelationsAgent": "frontal_lobe.games.relations.agent",
+    "Arrangement": "frontal_lobe.games.relations.world",
+    "AssemblyAgent": "frontal_lobe.games.assembly.agent",
+    "PiecePuzzle": "frontal_lobe.games.assembly.puzzle",
+    "RuleAgent": "frontal_lobe.games.classification.agent",
+    "GuessTarget": "frontal_lobe.games.classification.world",
+    "PatternAgent": "frontal_lobe.games.sequence.agent",
+    "PatternLine": "frontal_lobe.games.sequence.puzzle",
+    "SorterAgent": "frontal_lobe.games.sorter.agent",
+    "ShapeSorter": "frontal_lobe.games.sorter.puzzle",
+    "QuantitiesAgent": "frontal_lobe.games.quantities.agent",
+    "Basket": "frontal_lobe.games.quantities.world",
+    # Glutamate — the cortex-wide excitatory drive; the cortical
+    # regions share it, and the executive is where it is claimed.
+    "Glutamate": "frontal_lobe.glutamate",
     # Problem intake — a game heard in conversation compiles to a
     # spec (prefrontal comprehension→action handoff)
     "compile_problem": "frontal_lobe.problem_intake",
     "interpret_problem": "frontal_lobe.problem_intake",
     # Open-ended agency — intentions formed from cognitive state,
     # planned and executed through the tool layer (PFC agency)
-    "ActingLoop": "tools.agency",
-    "Intention": "tools.agency",
+    "ActingLoop": "parietal_lobe.agency",
+    "Intention": "parietal_lobe.agency",
     # Identity development — the emergent identity's stages and its
     # developmental tracker (mPFC autobiographical self)
-    "DevelopmentalTracker": "self.identity",
-    "EmergentIdentity": "self.identity",
-    "EmergentIdentitySource": "self.identity",
-    "IdentityStage": "self.identity",
-    "StageResolution": "self.identity",
+    "DevelopmentalTracker": "frontal_lobe.self.identity",
+    "EmergentIdentity": "frontal_lobe.self.identity",
+    "EmergentIdentitySource": "frontal_lobe.self.identity",
+    "IdentityStage": "frontal_lobe.self.identity",
+    "StageResolution": "frontal_lobe.self.identity",
     # The remaining tool capabilities — prefrontal tool use, the
     # mind-world interface (the framework, explorer, code_learner,
     # and project tools are claimed above)
-    "FileAnalysis": "tools.code_analysis",
-    "WebFetchResult": "tools.web_search",
-    "WebSearchResult": "tools.web_search",
-    "analyze_python_source": "tools.code_analysis",
-    "analyze_python_tree": "tools.code_analysis",
-    "fetch": "tools.web_search",
-    "impact_of": "tools.code_analysis",
-    "search": "tools.web_search",
-    "search_and_fetch": "tools.web_search",
-    "SourceRegistry": "tools.source_registry",
-    "SourceResult": "tools.source_registry",
-    "WordNetSource": "tools.source_registry",
+    "FileAnalysis": "frontal_lobe.tools.code_analysis",
+    "WebFetchResult": "frontal_lobe.tools.web_search",
+    "WebSearchResult": "frontal_lobe.tools.web_search",
+    "analyze_python_source": "frontal_lobe.tools.code_analysis",
+    "analyze_python_tree": "frontal_lobe.tools.code_analysis",
+    "fetch": "frontal_lobe.tools.web_search",
+    "impact_of": "frontal_lobe.tools.code_analysis",
+    "search": "frontal_lobe.tools.web_search",
+    "search_and_fetch": "frontal_lobe.tools.web_search",
+    "SourceRegistry": "frontal_lobe.tools.source_registry",
+    "SourceResult": "frontal_lobe.tools.source_registry",
+    "WordNetSource": "frontal_lobe.tools.source_registry",
     # Broca's voice — identity-expressive production style
     "Voice": "frontal_lobe.voice",
     # Route planning over the world model (PFC deliberation)
@@ -1010,7 +1031,7 @@ _EXPORTS: dict[str, str] = {
     "ProjectsMixin": "frontal_lobe.projects",
     # Metacognitive self-improvement proposals (the code lives in
     # self/ but the function is prefrontal metacognition)
-    "ProposalsMixin": "self.proposals",
+    "ProposalsMixin": "frontal_lobe.self.proposals",
 }
 
 __all__ = sorted(_EXPORTS)

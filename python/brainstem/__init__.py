@@ -185,41 +185,176 @@ Re-exported modules:
 
 Referenced but not re-exported (documented in their own subsystems):
 
-    (neurochemical/)
-        The 18-chemical dynamics live in the Rust daemon and Python
-        helper modules. The brainstem *contains* the source nuclei
-        (LC, raphe, VTA/SNc, PPT/LDT) — the chemicals' computational
-        roles are documented in ``neurochemical/``.
-
-    (sleep/) dream_synthesis.py, inner_life.py, compression.py
+    dream_synthesis.py, inner_life.py, compression.py
         Dream CONTENT synthesis (edge proposal/validation) and
         mind-wandering are cortical — default-mode-network and
         hippocampal-replay processes riding on the state the
         brainstem sets. See temporal_lobe (hippocampus) and
         frontal_lobe (mind-wandering / autobiographical content).
+
+
+════════════════════════════════════════════════════════════════════════
+THE NEUROCHEMICAL SYSTEM — the 18-chemical affective engine
+════════════════════════════════════════════════════════════════════════
+
+Neuromodulators are produced by small nuclei in the brainstem and
+hypothalamus and projected widely across the cortex. The brainstem
+*contains* the monoamine source nuclei (LC, raphe, VTA/SNc, PPT/LDT);
+each chemical module documents its own origin, projections, receptor
+types, computational role, and model, and lives in its source's
+region:
+
+    Index  Chemical          Module (region)                  Baseline
+    -----  --------          ----------------                 --------
+    0      Dopamine          basal_ganglia/dopamine           0.35
+    1      Serotonin         brainstem/serotonin              0.40
+    2      Norepinephrine    brainstem/norepinephrine         0.30
+    3      Acetylcholine     basal_forebrain/acetylcholine    0.35
+    4      GABA              basal_ganglia/gaba              0.50
+    5      Glutamate         frontal_lobe/glutamate           0.60
+    6      Cortisol          hypothalamus/cortisol           0.00
+    7      Oxytocin          hypothalamus/oxytocin           0.25
+    8      Endorphin         limbic_system/endorphin         0.25
+    9      Histamine         hypothalamus/histamine          0.30
+    10     Adenosine         basal_forebrain/adenosine       0.20
+    11     BDNF              temporal_lobe/bdnf              0.45
+    12     Endocannabinoid   cerebellum/endocannabinoid      0.25
+    13     Vasopressin       hypothalamus/vasopressin        0.20
+    14     CRH               hypothalamus/crh                0.00
+    15     Orexin            hypothalamus/orexin             0.30
+    16     Epinephrine       brainstem/epinephrine           0.15
+    17     Melatonin         hypothalamus/melatonin          0.10
+
+Cortisol and CRH have zero baseline — they are stress hormones with
+no homeostatic set-point. They rise only via the HPA cascade and
+external impulses, then decay via clearance.
+
+MATHEMATICAL FOUNDATION
+-----------------------
+The full coupled dynamics are in Rust
+(``src/state/neurochemical.rs``); this documents the math. The Python
+side reads levels via ``client.get_neuro_summary()`` and sends
+impulses via ``client.neuro_impulse(CHEM_X, value)``.
+
+Coupled dynamics (18x18 coupling matrix):
+
+    dx_i/dt = f_i(x, u_i) + sum_j  C_ij * g_j(x_j)
+
+    where:
+        x_i       = level of chemical i
+        f_i(x,u)  = intrinsic dynamics (decay, production, feedback)
+        C_ij      = coupling matrix entry (how chemical j affects i)
+        g_j(x_j)  = coupling function (nonlinear, Hill-function gated)
+        u_i       = external input (impulse from Python)
+
+The coupling is nonlinear via three mechanisms:
+
+1. Hill-function threshold gating (n=2 cooperativity):
+
+    g_j(x_j) = x_j^n / (EC50^n + x_j^n)
+
+    where EC50 is the half-maximal effective concentration and n is
+    the Hill coefficient. Below EC50, coupling is subthreshold;
+    above, it activates steeply. This models receptor dose-response
+    curves.
+
+2. State-dependent gain modulation:
+
+    C_ij_effective = C_ij * (1 + alpha * sign(x_i - baseline) *
+                                  sign(x_j - baseline))
+
+    where alpha is up to 0.3 (30% amplification/suppression). When two
+    chemicals co-activate (both above baseline), coupling is
+    amplified (synergy); when they antagonize, coupling is reduced.
+
+3. Dopamine subtype-aware coupling:
+
+    DA_effective = D1_weight * DA + D2_weight * DA
+
+    D1 is excitatory (Go pathway), D2 inhibitory (NoGo). The same
+    concentration produces different coupling by receptor state.
+
+The coupling matrix is mmap'd and plastic — metaplasticity:
+
+    dC_ij/dt = eta_meta * error_signal * eligibility_ij
+
+The system learns how to learn: coupling between chemicals adapts
+based on experience (Rust active inference module).
+
+Receptor adaptation — the effective level is not raw concentration:
+
+    effective_level = level * receptor_sensitivity
+
+    dS/dt      = (S_target - S) / tau_adapt
+    S_target   = 1 / (1 + (level / EC50_adapt)^n)
+
+Sustained high level -> downregulation (tolerance); sustained low
+level -> upregulation (sensitization). The Python side reads
+effective levels via ``NeuroSummary``.
+
+Emotional gating of memory — memory pointers carry weights derived
+from neurochemistry:
+
+    encoding_weight      = f(dopamine, norepinephrine, acetylcholine)
+    consolidation_weight = f(BDNF, serotonin, sleep_stage)
+    retrieval_weight     = f(acetylcholine, serotonin)
+    plasticity_weight    = f(BDNF, cortisol)
+
+High DA + NE + ACh -> strong encoding; high BDNF + low cortisol ->
+strong consolidation; high ACh -> strong retrieval; high cortisol
+suppresses plasticity.
+
+Emergent phases — mental states emerge from the vector, not manual
+switches:
+
+    FLOW:        high dopamine + high ACh + low cortisol + low adenosine
+    STRESS:      high cortisol + high NE + low BDNF
+    DROWSY:      high adenosine + low orexin + low histamine
+    SLEEPING:    high melatonin + high adenosine + low orexin
+    OVERWHELMED: high cortisol + low serotonin + low GABA
+
+Two independent axes: task zone (what it's doing) and mental phase
+(what state it's in). The daemon computes phases; Python reads them
+via ``NeuroSummary``.
+
+Brain waves — neurochemicals and rhythm are deeply coupled:
+
+    Acetylcholine -> gamma (cortical activation, attention)
+    Serotonin -> alpha (mood stability, cortical idling)
+    GABA -> alpha/beta (inhibition, rhythm stabilization)
+    Glutamate -> gamma (excitation, active processing)
+    Dopamine -> theta/gamma (reward, memory encoding)
+    Melatonin -> delta (sleep, slow waves)
+    Adenosine -> delta (sleep pressure, slow waves)
+    Orexin -> beta/gamma (wakefulness, alertness)
+
+``thalamus/brain_waves.py`` reads the neurochemical state to set its
+baseline rhythm. ``limbic_system/emotion.py`` maps neurochemistry to
+EmotionalState; ``limbic_system/emotional_regulator.py`` sends
+corrective impulses — the Python-side homeostatic regulator.
 """
 
 from __future__ import annotations
 
 from _views import view_getattr
 
-# The brainstem's modules are multi-subsystem — they stay at the top
-# level / in the sleep package and are lazily re-exported here so the
-# anatomy is a real connection layer, not just documentation.
+# The brainstem's modules are multi-subsystem — they are lazily
+# re-exported here so the anatomy is a real connection layer, not
+# just documentation.
 _EXPORTS: dict[str, str] = {
     # The five arousal states — the output of the flip-flop switches
     "SleepStage": "thalamus.brain_waves",
     # The N1 -> N2 -> N3 -> N2 -> REM ultradian progression — the
     # implemented analogue of the LCRIM limit cycle
-    "SleepCycleTracker": "sleep",
+    "SleepCycleTracker": "brainstem.architecture",
     # The orexin-stabilization lag after the wake flip
-    "SleepInertia": "sleep",
+    "SleepInertia": "thalamus.events",
     # The N1 transition — the flip-flop mid-flip
-    "HypnagogicState": "sleep",
+    "HypnagogicState": "thalamus.events",
     # Pontine bursts relayed through the LGN to occipital cortex
-    "PGOWave": "sleep",
+    "PGOWave": "thalamus.events",
     # Arousal-system boundary failures — incomplete transitions
-    "ParasomniaEvent": "sleep",
+    "ParasomniaEvent": "thalamus.events",
     # Autonomic monitoring — module EEG (which subsystem is firing)
     "ModuleSampler": "brainstem.module_sampler",
     # The autonomic rhythm itself — the periodic loop that samples
@@ -235,17 +370,22 @@ _EXPORTS: dict[str, str] = {
     "WARN_CORTISOL": "brainstem.thresholds",
     # Neuromodulator source nuclei (table in the module docstring) —
     # the brainstem owns the cells that make these chemicals
-    "Norepinephrine": "neurochemical.norepinephrine",  # locus coeruleus
-    "Serotonin": "neurochemical.serotonin",  # dorsal/median raphe
-    "Dopamine": "neurochemical.dopamine",  # VTA, substantia nigra
-    "Acetylcholine": "neurochemical.acetylcholine",
+    "Norepinephrine": "brainstem.norepinephrine",  # locus coeruleus
+    "Serotonin": "brainstem.serotonin",  # dorsal/median raphe
+    "Dopamine": "basal_ganglia.dopamine",  # VTA, substantia nigra
+    "Acetylcholine": "basal_forebrain.acetylcholine",
+    "Epinephrine": "brainstem.epinephrine",  # adrenal-medullary surge
+    # Ionic state — electrochemical gradients read as bounded
+    # cognitive modulation (attention / integration / consolidation)
+    "IonCognitiveContext": "brainstem.electrochemistry",
+    "interpret_ions": "brainstem.electrochemistry",
     # The proto-self — Damasio's primordial self is rooted in the
     # brainstem's body-mapping nuclei (NTS, parabrachial, PAG,
     # reticular formation): the first map of "how the organism is"
     # is drawn here, below cortex (co-claimed with insula and
     # limbic_system)
-    "ProtoSelf": "self.damasio",
-    "ProtoSelfState": "self.damasio",
+    "ProtoSelf": "insula.damasio",
+    "ProtoSelfState": "insula.damasio",
     # The region itself — the reticular core
     "Brainstem": "brainstem.brainstem",
 }

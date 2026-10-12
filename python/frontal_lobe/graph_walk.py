@@ -57,8 +57,8 @@ import logging
 import random
 from typing import TYPE_CHECKING, Any
 
+from frontal_lobe.self import PersonalityTraits
 from limbic_system.emotion import EmotionalState
-from self import PersonalityTraits
 from temporal_lobe.base import Thought
 from temporal_lobe.morphology import (
     agree_verb_phrase,
@@ -70,7 +70,7 @@ from temporal_lobe.morphology import (
 from .voice import Voice
 
 if TYPE_CHECKING:
-    from concepts import ConceptNetwork, RelationType
+    from temporal_lobe.concepts import ConceptNetwork, RelationType
 
 __all__ = ["GraphWalkGenerator"]
 

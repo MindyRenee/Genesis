@@ -8,17 +8,17 @@ traversal, direction, and resolution logic is genuinely exercised.
 
 from unittest.mock import MagicMock
 
-from concepts import ConceptNetwork, RelationType
 from frontal_lobe.question_handler import (
     _PAST_MARKER_RE,
     QuestionHandler,
 )
+from frontal_lobe.self import SelfComposer, SelfModel
+from frontal_lobe.tools.framework import ToolRegistry
 from limbic_system.emotion import EmotionalState
-from memory.memory import MemoryContext
-from perception import Intent, Perception, QuestionType
-from self import SelfComposer, SelfModel
+from occipital_lobe.perception import Intent, Perception, QuestionType
 from temporal_lobe.base import Thought
-from tools.framework import ToolRegistry
+from temporal_lobe.concepts import ConceptNetwork, RelationType
+from temporal_lobe.memory.memory import MemoryContext
 
 _VERB_MAP = {
     RelationType.CREATES: "creates",

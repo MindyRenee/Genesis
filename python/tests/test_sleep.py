@@ -24,26 +24,25 @@ import tempfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest
-
-from concepts import ConceptNetwork, RelationType
+from brainstem.architecture import (
+    HippocampalReplay,
+    SleepCycleTracker,
+    SleepStage,
+    SynapticDownscaler,
+)
+from frontal_lobe.inner_life import InnerLife
 from frontal_lobe.reasoning import Reasoner
+from frontal_lobe.self import Reflection, SelfModel
+from limbic_system.curiosity import Curiosity
+from temporal_lobe.concepts import ConceptNetwork, RelationType
+from thalamus.events import HypnagogicState, SleepInertia
+
 from infrastructure.narrative import Narrator
 from infrastructure.persistence import (
     load_state,
     restore_sleep_cycle,
     save_state,
     serialize_sleep_state,
-)
-from limbic_system.curiosity import Curiosity
-from self import Reflection, SelfModel
-from sleep import (
-    HippocampalReplay,
-    HypnagogicState,
-    InnerLife,
-    SleepCycleTracker,
-    SleepInertia,
-    SleepStage,
-    SynapticDownscaler,
 )
 
 # ═══════════════════════════════════════════════════════════════════

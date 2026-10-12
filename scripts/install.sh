@@ -81,10 +81,10 @@ if [ ! -x "$VENV/bin/python" ]; then
 fi
 
 say "Installing genesis-cognitive (editable — code stays this checkout)"
-if ! "$VENV/bin/python" -m pip install -e "$REPO/python" 2>/dev/null; then
+if ! "$VENV/bin/python" -m pip install -e "$REPO" 2>/dev/null; then
     # Offline or old toolchain: use the host's setuptools directly.
     say "Isolated build failed; retrying with --no-build-isolation"
-    "$VENV/bin/python" -m pip install -e "$REPO/python" --no-build-isolation
+    "$VENV/bin/python" -m pip install -e "$REPO" --no-build-isolation
 fi
 
 # Ship the binaries next to the interpreter — the CLI's packaged-install

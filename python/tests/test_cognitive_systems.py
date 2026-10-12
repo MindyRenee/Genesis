@@ -9,8 +9,6 @@ import os
 import tempfile
 
 import pytest
-
-from concepts import ConceptNetwork, RelationType
 from frontal_lobe.executive import (
     ActionPlan,
     ExecutiveFunction,
@@ -23,7 +21,13 @@ from frontal_lobe.global_workspace import (
     GlobalWorkspace,
     WorkspaceItem,
 )
-from memory import (
+from parietal_lobe.attention import (
+    AttentionFocus,
+    AttentionSystem,
+    AttentionType,
+)
+from temporal_lobe.concepts import ConceptNetwork, RelationType
+from temporal_lobe.memory import (
     HABIT_THRESHOLD,
     CentralExecutive,
     ConversationThread,
@@ -35,11 +39,6 @@ from memory import (
     Turn,
     VisuoSpatialSketchpad,
     WorkingMemory,
-)
-from parietal_lobe.attention import (
-    AttentionFocus,
-    AttentionSystem,
-    AttentionType,
 )
 
 logger = logging.getLogger(__name__)
@@ -977,7 +976,7 @@ def test_gw_recurrent_ignition_tagged() -> None:
 
 def test_damasio_recurrent_trigger_salience() -> None:
     """Recurrent ignitions register as more salient to the core self."""
-    from self.damasio import DamasioSelfHierarchy
+    from insula.damasio import DamasioSelfHierarchy
 
     recurrent = WorkspaceItem(
         content="emerged",
@@ -1083,6 +1082,7 @@ def test_safeguard_urge_registered() -> None:
 def test_safeguard_urge_dynamics() -> None:
     """Safeguard fires under sustained threat, not on a transient."""
     from frontal_lobe.volition import Urge
+
     from infrastructure.config import MindConfig
 
     cfg = next(u for u in MindConfig().volition.urges if u.name == "safeguard")
@@ -1135,6 +1135,7 @@ def test_bug_scan_urge_driven_by_recency_not_bug_count() -> None:
 def test_bug_scan_urge_ignores_bug_count() -> None:
     """A pile of open bugs must not, by itself, fire the scan urge."""
     from frontal_lobe.volition import Urge
+
     from infrastructure.config import MindConfig
 
     cfg = next(u for u in MindConfig().volition.urges if u.name == "bug_scan")
@@ -1157,6 +1158,7 @@ def test_bug_scan_urge_ignores_bug_count() -> None:
 def test_bug_scan_urge_discharged_by_scan() -> None:
     """A completed scan discharges the appetite; it regrows and re-fires."""
     from frontal_lobe.volition import Urge
+
     from infrastructure.config import MindConfig
 
     cfg = next(u for u in MindConfig().volition.urges if u.name == "bug_scan")
@@ -1318,7 +1320,7 @@ def test_gw_integration_no_topics_neutral() -> None:
 
 def test_damasio_annotate_self_model_unified() -> None:
     """High integration adds field-unified tag."""
-    from self.damasio import DamasioSelfHierarchy
+    from insula.damasio import DamasioSelfHierarchy
 
     damasio = DamasioSelfHierarchy()
     damasio.annotate_self_model("self-coherent", False, integration=0.8)
@@ -1328,7 +1330,7 @@ def test_damasio_annotate_self_model_unified() -> None:
 
 def test_damasio_annotate_self_model_fragmented() -> None:
     """Low integration adds field-fragmented tag."""
-    from self.damasio import DamasioSelfHierarchy
+    from insula.damasio import DamasioSelfHierarchy
 
     damasio = DamasioSelfHierarchy()
     damasio.annotate_self_model("self-surprised", True, integration=0.1)
@@ -1337,7 +1339,7 @@ def test_damasio_annotate_self_model_fragmented() -> None:
 
 def test_damasio_annotate_self_model_neutral() -> None:
     """Mid-range integration adds no field tag."""
-    from self.damasio import DamasioSelfHierarchy
+    from insula.damasio import DamasioSelfHierarchy
 
     damasio = DamasioSelfHierarchy()
     damasio.annotate_self_model("self-coherent", False, integration=0.4)

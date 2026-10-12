@@ -7,9 +7,9 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+from brainstem.lifecycle import LifecycleMixin
 
 import genesis_cli
-from brainstem.lifecycle import LifecycleMixin
 
 
 def test_shutdown_waits_for_slow_daemon_within_grace_window(tmp_path):

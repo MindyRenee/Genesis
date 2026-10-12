@@ -367,9 +367,9 @@ def test_similar_results_valid() -> None:
 
 
 def test_core_state_unpack() -> None:
-    """A 3416-byte buffer unpacks the key fields correctly.
+    """A 3480-byte buffer unpacks the key fields correctly.
 
-    Tests the v4 schema (18 chemicals, 3416 bytes). The offsets are:
+    Tests the v4 schema (18 chemicals, 3480 bytes). The offsets are:
     - Header: 0-55 (56 bytes)
     - NeurochemicalVector: 56-2471 (2416 bytes)
       - chemicals[18]: 56-1063 (1008 bytes, 18 × 56 each)
@@ -389,7 +389,7 @@ def test_core_state_unpack() -> None:
       - consolidation_weight: 2636
       - retrieval_weight: 2640
     """
-    data = bytearray(3416)
+    data = bytearray(3480)
 
     # Header fields
     struct.pack_into("<Q", data, 16, 1000)   # created_at
@@ -438,27 +438,27 @@ def test_core_state_unpack() -> None:
     assert approx_equal(state.retrieval_weight, 0.60)
 
 
-def test_core_state_reads_inference_signals_from_the_v4_offset() -> None:
-    """The inference block is read from 3352, not the v3 offset of 3228.
+def test_core_state_reads_inference_signals_from_the_v5_offset() -> None:
+    """The inference block is read from 3416, not the v4 offset of 3352.
 
-    Schema v4 inserted the 124-byte ion block at 3224, so the v3 offset
-    now lands inside IonState. Reading it there does not fail — it
-    returns ion concentrations wearing the field names of inference
-    signals, which is worse than an error because the regulator
-    consumes `allostasis_load` as real regulatory burden.
+    Schema v5 inserted the 64-byte sleep network at 3224 and moved the
+    ion block to 3288. A v4 offset of 3352 now lands inside IonState, and
+    a read there does not fail: it returns ion concentrations wearing the
+    field names of inference signals, which is worse than an error
+    because the regulator consumes `allostasis_load` as real burden.
     """
-    data = bytearray(3416)
-    # Poison the ion block at the old offset so a v3 read would be
+    data = bytearray(3480)
+    # Poison the region a stale v4 read would hit, so the wrong offset is
     # unambiguously wrong rather than accidentally plausible.
-    for off in range(3228, 3292, 4):
+    for off in range(3352, 3412, 4):
         struct.pack_into("<f", data, off, 9.99)
-    # Field offsets are relative to 3352: 14 f32s in declaration order,
+    # Field offsets are relative to 3416: 14 f32s in declaration order,
     # then inference_tick_count (u32) at +56, then policy_authority.
-    struct.pack_into("<f", data, 3352, 0.1111)   # surprise_ema
-    struct.pack_into("<f", data, 3356, 0.2222)   # free_energy
-    struct.pack_into("<f", data, 3364, 0.7777)   # allostasis_load
-    struct.pack_into("<f", data, 3404, 0.6666)   # model_maturity
-    struct.pack_into("<I", data, 3408, 4242)    # inference_tick_count
+    struct.pack_into("<f", data, 3416, 0.1111)   # surprise_ema
+    struct.pack_into("<f", data, 3420, 0.2222)   # free_energy
+    struct.pack_into("<f", data, 3428, 0.7777)   # allostasis_load
+    struct.pack_into("<f", data, 3468, 0.6666)   # model_maturity
+    struct.pack_into("<I", data, 3472, 4242)     # inference_tick_count
 
     state = CoreState.unpack(bytes(data))
     assert state.inference is not None
@@ -470,7 +470,7 @@ def test_core_state_reads_inference_signals_from_the_v4_offset() -> None:
 
 
 def test_core_state_too_short() -> None:
-    """A buffer shorter than 3416 bytes raises ValueError."""
+    """A buffer shorter than 3480 bytes raises ValueError."""
     try:
         CoreState.unpack(b"\x00" * 3407)
         raise AssertionError()
@@ -934,3 +934,12 @@ def test_body_control_unpack_unknown_boost_byte() -> None:
 if __name__ == "__main__":
     success = run_all()
     sys.exit(0 if success else 1)
+
+
+def test_core_state_reads_the_network_sleep_pressure() -> None:
+    """The network's homeostatic variable h is sleep_network[4] at offset 3256.
+    The mind reads it as a fraction of the source's hmax (323.88)."""
+    data = bytearray(3480)
+    struct.pack_into("<d", data, 3256, 161.94)
+    state = CoreState.unpack(bytes(data))
+    assert approx_equal(state.sleep_pressure, 0.5)

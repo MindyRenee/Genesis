@@ -138,6 +138,15 @@ pub const SLEEP_BDNF_RECOVERY_MULTIPLIER: f32 = 5.0;
 /// sleep reverses receptor downregulation from a day of wakefulness.
 pub const SLEEP_RECEPTOR_RESENSITIZATION_RATE: f32 = 0.001;
 
+/// Time constant (seconds) over which a volitional drive decays. Five
+/// minutes is an assumption, not a measurement: long enough for the
+/// flip-flop to commit to the new state (it switches on a timescale of
+/// minutes), short enough that the push does not outlast the decision.
+pub const VOLITION_TAU_SECS: f32 = 300.0;
+
+/// Largest volitional drive accepted, in the network's input units.
+pub const VOLITION_MAX: f32 = 2.0;
+
 /// The result of a single tick.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct TickResult {
@@ -201,6 +210,11 @@ pub struct TickLoop {
     /// High surprise → faster coupling-matrix learning on the next
     /// tick. Reset to 1.0 after each application.
     metaplasticity_boost: f32,
+    /// Volitional drive onto the sleep-wake network (see
+    /// [`crate::state::sleep_network::Drive`]). Process-local and transient:
+    /// it decays with [`VOLITION_TAU_SECS`] between calls, so a `/sleep` or
+    /// `/wake` is a brief push, not a permanent setting. It is not persisted.
+    volition: crate::state::sleep_network::Drive,
     /// Last-applied CPU frequency policy. The reactive
     /// `apply_body_control` handler (cognitive-mind-driven via IPC)
     /// writes to sysfs (scaling_min/max_freq, governor), but
@@ -277,6 +291,7 @@ impl TickLoop {
             field_runtime: FieldRuntime::new().expect("field topology must be constructible"),
             last_field_integration: None,
             metaplasticity_boost: 1.0,
+            volition: crate::state::sleep_network::Drive::NONE,
             last_freq_policy: super::cpufreq::FreqPolicy::default(),
             last_daemon_nice: 0,
             last_daemon_io_class: super::cpufreq::IoClass::BestEffort(3),
@@ -319,6 +334,7 @@ impl TickLoop {
             field_runtime: FieldRuntime::new().expect("field topology must be constructible"),
             last_field_integration: None,
             metaplasticity_boost: 1.0,
+            volition: crate::state::sleep_network::Drive::NONE,
             last_freq_policy: super::cpufreq::FreqPolicy::default(),
             last_daemon_nice: 0,
             last_daemon_io_class: super::cpufreq::IoClass::BestEffort(3),
@@ -1068,6 +1084,19 @@ impl TickLoop {
         TICK_INTERVAL_MS as f32 / 1000.0
     }
 
+    /// Push the sleep-wake network toward sleep (`sleep = true`, drive onto
+    /// VLPO) or toward wake (`sleep = false`, drive onto LC). The two are
+    /// mutually exclusive, so setting one clears the other. The push decays
+    /// on each physics step (see [`VOLITION_TAU_SECS`]).
+    pub fn set_volition(&mut self, sleep: bool, magnitude: f32) {
+        let m = f64::from(crate::state::sanitize::finite_clamp(magnitude, 0.0, VOLITION_MAX));
+        self.volition = if sleep {
+            crate::state::sleep_network::Drive { vlpo: m, lc: 0.0 }
+        } else {
+            crate::state::sleep_network::Drive { vlpo: 0.0, lc: m }
+        };
+    }
+
     /// Advance neurochemical dynamics by dt, run active inference,
     /// and update the dyadic model. This is the core "physics
     /// integration" step — it advances the coupled differential
@@ -1082,6 +1111,11 @@ impl TickLoop {
         // callers can bypass the wire-level sanitizer; a non-finite or
         // extreme dt must never reach the pharmacodynamic integrator.
         let dt = crate::state::sanitize::finite_clamp(dt, 0.001, 10.0);
+        // A volitional push fades on the physics clock, whatever the caller.
+        let decay = (-dt / VOLITION_TAU_SECS).exp() as f64;
+        self.volition.vlpo *= decay;
+        self.volition.lc *= decay;
+        let drive = self.volition;
         let call_start = std::time::Instant::now();
         let call_interval_s = self
             .subcognitive_last_call
@@ -1167,9 +1201,26 @@ impl TickLoop {
         let sub_steps = self.neuro_substeps(dt);
         let sub_dt = dt / sub_steps as f32;
         neuro_params.dt = sub_dt;
+        // The sleep-wake network runs on the same sub-steps, in the same
+        // transaction, so the sleep drive and the chemistry always describe
+        // the same instant. Its clock is local minutes of day.
+        let clock_start = crate::state::sleep_network::clock_minutes(now_ms);
+        let sub_dt_min = f64::from(sub_dt) / 60.0;
         if let Err(e) = mmap.modify(now_ms, |state| {
-            for _ in 0..sub_steps {
-                state.neuro_tick_with_params(&neuro_params);
+            for i in 0..sub_steps {
+                // The chemistry reads the network's populations as they stand
+                // at the start of this sub-step.
+                let mut p = neuro_params;
+                p.network_levels = Some(crate::state::sleep_network::levels(&state.sleep_network));
+                state.neuro_tick_with_params(&p);
+                let t = clock_start + f64::from(i) * sub_dt_min;
+                state.sleep_network = crate::state::sleep_network::advance_with(
+                    t,
+                    &state.sleep_network,
+                    sub_dt_min,
+                    drive,
+                );
+                state.apply_network_phase();
             }
         }) {
             eprintln!("[tick] advance_neuro neuro tick failed: {e}");

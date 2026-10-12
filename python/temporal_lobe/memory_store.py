@@ -23,16 +23,17 @@ import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from limbic_system.emotion import EmotionalState
+from occipital_lobe.perception import Perception
+
 from genesis_client import GenesisClient
 from genesis_client.swallow import note_swallowed
-from limbic_system.emotion import EmotionalState
-from perception import Perception
 
 if TYPE_CHECKING:
     from basal_ganglia.td import TDLearner
+    from frontal_lobe.self import SelfModel
     from limbic_system.emotional_regulator import EmotionalRegulator
-    from memory import MemorySystem
-    from self import SelfModel
+    from temporal_lobe.memory import MemorySystem
 
 __all__ = ["MemoryStore"]
 
@@ -82,7 +83,7 @@ class MemoryStore:
         But it's in control — the regulator decides how strongly to
         feel each response, based on its current state.
         """
-        from perception import Intent
+        from occipital_lobe.perception import Intent
 
         if self._regulator is None:
             return
@@ -125,7 +126,7 @@ class MemoryStore:
         interaction. Philosophical discussions and emotional exchanges
         are more salient than casual greetings.
         """
-        from perception import Intent
+        from occipital_lobe.perception import Intent
 
         if perception.intent in (Intent.PHILOSOPHY, Intent.SELF_INQUIRY):
             salience = 0.9

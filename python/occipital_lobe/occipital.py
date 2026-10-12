@@ -8,8 +8,8 @@ concept latent space.
 
 from __future__ import annotations
 
+from occipital_lobe.perception.vision import Vision
 from occipital_lobe.visual_cortex import VisualCortex
-from perception.vision import Vision
 
 
 class OccipitalLobe:

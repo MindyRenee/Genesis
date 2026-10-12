@@ -6,6 +6,14 @@ import math
 import sys
 import time
 
+from thalamus.brain_waves import (
+    BrainWave,
+    BrainWaveState,
+    SleepStage,
+    _sleep_stage_from_summary,
+    assess_brain_waves,
+)
+
 from genesis_client.protocol import (
     PHASE_ACTIVE,
     PHASE_ALERT,
@@ -20,13 +28,6 @@ from genesis_client.protocol import (
     ZONE_SLEEPING,
 )
 from genesis_client.types import NeuroSummary
-from thalamus.brain_waves import (
-    BrainWave,
-    BrainWaveState,
-    SleepStage,
-    _sleep_stage_from_summary,
-    assess_brain_waves,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -487,10 +488,10 @@ def _make_wave_state(dominant: BrainWave) -> BrainWaveState:
 
 def test_curiosity_gamma_more_questions():
     """Gamma state produces more curiosity questions than baseline."""
-    from concepts import ConceptNetwork
     from frontal_lobe.reasoning import Reasoner
     from limbic_system.curiosity import Curiosity
     from limbic_system.emotion import EmotionalState
+    from temporal_lobe.concepts import ConceptNetwork
 
     emo = EmotionalState(
         label="curious", nuance="default", cognitive_style="steady",
@@ -513,7 +514,7 @@ def test_curiosity_gamma_more_questions():
 
 def test_working_memory_gamma_expands_capacity():
     """Gamma state expands working memory capacity."""
-    from memory import WorkingMemory
+    from temporal_lobe.memory import WorkingMemory
 
     wm = WorkingMemory()
     summary = _make_summary(arousal=0.5, plasticity=0.5, phase=PHASE_ACTIVE)
@@ -586,10 +587,11 @@ def test_narrative_delta_suppresses_recording():
     """Delta state suppresses narrative event recording."""
     import time
 
-    from concepts import ConceptNetwork
-    from infrastructure.narrative import Narrator
+    from frontal_lobe.self import SelfModel
     from limbic_system.emotion import EmotionalState
-    from self import SelfModel
+    from temporal_lobe.concepts import ConceptNetwork
+
+    from infrastructure.narrative import Narrator
 
     model = SelfModel(born_at=int(time.time() * 1000))
     net = ConceptNetwork()
@@ -615,8 +617,8 @@ def test_narrative_delta_suppresses_recording():
 
 def test_dream_synthesis_theta_more_proposals():
     """Theta (REM) state produces more dream synthesis proposals than delta."""
-    from concepts import ConceptNetwork
-    from sleep import DreamSynthesis
+    from temporal_lobe.concepts import ConceptNetwork
+    from temporal_lobe.dream_synthesis import DreamSynthesis
 
     net = ConceptNetwork()
     # Add some concepts with similar structure
@@ -640,8 +642,8 @@ def test_sleep_compression_consolidation_scales_homeostasis():
     """High consolidation intensity produces more aggressive downscaling."""
     import tempfile
 
-    from concepts import ConceptNetwork, Edge, RelationType
-    from sleep import SleepCompressor
+    from temporal_lobe.compression import SleepCompressor
+    from temporal_lobe.concepts import ConceptNetwork, Edge, RelationType
 
     net = ConceptNetwork()
     net.add_concept("a", origin="learned")
@@ -670,9 +672,9 @@ def test_sleep_compression_consolidation_scales_homeostasis():
 
 def test_voice_brain_waves_modulate_rhythm():
     """Brain wave state modulates voice rhythm."""
+    from frontal_lobe.self import PersonalityTraits
     from frontal_lobe.voice import Voice
     from limbic_system.emotion import EmotionalState
-    from self import PersonalityTraits
 
     personality = PersonalityTraits()
     voice = Voice(personality, seed=42)
@@ -1020,3 +1022,17 @@ def run_all():
 if __name__ == "__main__":
     success = run_all()
     sys.exit(0 if success else 1)
+
+
+def test_nrem_depth_follows_the_network_sleep_pressure() -> None:
+    """With the network's sleep pressure, NREM depth is set by pressure, not by
+    arousal (which the network now sets from LC alone, so it cannot express
+    depth). The cut points are the network's own NREM terciles."""
+    from thalamus.brain_waves import NREM_N2_PRESSURE, NREM_N3_PRESSURE, _sleep_stage_from_summary
+
+    summary = _make_summary(arousal=0.21, phase=PHASE_NREM)
+    assert _sleep_stage_from_summary(summary, NREM_N3_PRESSURE) is SleepStage.N3
+    assert _sleep_stage_from_summary(summary, NREM_N2_PRESSURE) is SleepStage.N2
+    assert _sleep_stage_from_summary(summary, 0.0) is SleepStage.N1
+    # Without pressure the arousal bands apply, unchanged.
+    assert _sleep_stage_from_summary(summary) is SleepStage.N2

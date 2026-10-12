@@ -128,7 +128,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import ClassVar
 
-from concepts import ConceptNetwork, RelationType
+from temporal_lobe.concepts import ConceptNetwork, RelationType
 
 __all__ = [
     "AbstractReasoner",

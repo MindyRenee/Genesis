@@ -77,7 +77,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
 
-from concepts import ConceptNetwork, RelationType
+from temporal_lobe.concepts import ConceptNetwork, RelationType
+
 from genesis_client.swallow import note_swallowed
 
 from .reasoner import ReasoningStrategy

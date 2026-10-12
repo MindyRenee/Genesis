@@ -24,11 +24,11 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from limbic_system.emotion import EmotionalState
-from perception import Perception
+from occipital_lobe.perception import Perception
 from temporal_lobe.base import Language, Thought
 
 if TYPE_CHECKING:
-    from memory import WorkingMemory
+    from temporal_lobe.memory import WorkingMemory
 
     from .thought_composer import ThoughtComposer
 

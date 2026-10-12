@@ -21,6 +21,7 @@ import struct
 from dataclasses import FrozenInstanceError
 
 import pytest
+from frontal_lobe.self.model import SelfModel
 
 from genesis_client.protocol import (
     MODULE_DREAMING,
@@ -53,7 +54,6 @@ from genesis_client.types import (
     SubsystemTelemetry,
     ZoneTransitions,
 )
-from self.model import SelfModel
 
 TRACKED_STATES = 8  # must match zones::TRACKED_STATES
 SUBSYSTEM_REC = 21

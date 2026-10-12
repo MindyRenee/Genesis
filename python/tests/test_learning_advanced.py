@@ -12,22 +12,18 @@ import tempfile
 from unittest.mock import MagicMock
 
 import pytest
-
 from cerebellum.predictive import (
     Prediction,
     PredictionContext,
     PredictionError,
     PredictiveCodingLayer,
 )
-from concepts import ConceptNetwork, RelationType
 from frontal_lobe.autonomous import (
     RATE_LIMIT_DELAY,
     THROTTLED_DELAY_MULTIPLIER,
     AutonomousLearner,
 )
 from frontal_lobe.reasoning import Reasoner
-from genesis_client.protocol import GET_INFERENCE_SUMMARY, UPDATE_USER_AFFECT
-from genesis_client.types import InferenceSummary
 from limbic_system.active_inference import (
     ActiveInferenceReader,
     DyadicState,
@@ -36,8 +32,12 @@ from limbic_system.active_inference import (
 )
 from limbic_system.curiosity import Curiosity
 from limbic_system.emotional_regulator import EmotionalRegulator
+from occipital_lobe.perception import Intent, Perception, QuestionType
+from temporal_lobe.concepts import ConceptNetwork, RelationType
+
+from genesis_client.protocol import GET_INFERENCE_SUMMARY, UPDATE_USER_AFFECT
+from genesis_client.types import InferenceSummary
 from mind import Mind
-from perception import Intent, Perception, QuestionType
 
 logger = logging.getLogger(__name__)
 

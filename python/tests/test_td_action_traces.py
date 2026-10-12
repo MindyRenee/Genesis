@@ -1,9 +1,8 @@
 """Regression tests for action-conditioned TD credit assignment."""
 
 import pytest
-
 from basal_ganglia.td import TDLearner
-from concepts import ConceptNetwork
+from temporal_lobe.concepts import ConceptNetwork
 
 
 def _network() -> ConceptNetwork:

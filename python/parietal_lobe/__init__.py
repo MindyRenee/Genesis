@@ -428,16 +428,16 @@ _EXPORTS: dict[str, str] = {
     "MotionField": "occipital_lobe.motion",
     "MotionProcessor": "occipital_lobe.motion",
     "MotionRegion": "occipital_lobe.motion",
-    "PhonologicalLoop": "memory.working",
-    "VisuoSpatialSketchpad": "memory.working",
-    "WorkingMemory": "memory.working",
+    "PhonologicalLoop": "temporal_lobe.memory.working",
+    "VisuoSpatialSketchpad": "temporal_lobe.memory.working",
+    "WorkingMemory": "temporal_lobe.memory.working",
     "TheoryOfMind": "frontal_lobe.reasoning.theory_of_mind",
     # Multisensory integration — the superior parietal lobule binds
     # the modalities into a unified percept
-    "IntegratedPerception": "perception",
-    "MultisensoryInput": "perception",
-    "MultisensoryIntegrator": "perception",
-    "Perception": "perception",
+    "IntegratedPerception": "occipital_lobe.perception.core",
+    "MultisensoryInput": "occipital_lobe.perception.core",
+    "MultisensoryIntegrator": "occipital_lobe.perception.core",
+    "Perception": "occipital_lobe.perception.core",
     # Interoception of the machine environment — the parietal subsystem's
     # spatial/body awareness extended to the hardware it lives on
     "SystemMonitor": "parietal_lobe.system_monitor",
@@ -465,6 +465,8 @@ _EXPORTS: dict[str, str] = {
     # with frontal_lobe (frontoparietal).
     "MathResult": "frontal_lobe.reasoning.math_reasoning",
     "try_math": "frontal_lobe.reasoning.math_reasoning",
+    "CalcResult": "parietal_lobe.math.arithmetic",
+    "NumberSense": "parietal_lobe.math.number_sense",
     # The discourse situation model — the episodic state of the world
     # the current conversation describes (event comprehension;
     # distinct from the semantic network)
@@ -488,8 +490,8 @@ _EXPORTS: dict[str, str] = {
     # The temporoparietal minimal self — self-location, first-person
     # perspective, and the ownership comparator that marks which
     # events are self-caused (co-claimed with limbic_system)
-    "MinimalSelf": "self.model",
-    "AgencyDetector": "self.model",
+    "MinimalSelf": "frontal_lobe.self.model",
+    "AgencyDetector": "frontal_lobe.self.model",
     # Mentalizing over the social world — Beta posteriors on the
     # external presences' responsiveness and mood (rTPJ belief
     # attribution; co-claimed with frontal_lobe's medial PFC)
@@ -498,7 +500,7 @@ _EXPORTS: dict[str, str] = {
     # The posterior default-mode hub — posterior cingulate/precuneus
     # and the angular gyrus are the parietal half of the mind-
     # wandering loop InnerLife models (co-claimed with frontal_lobe)
-    "InnerLife": "sleep.inner_life",
+    "InnerLife": "frontal_lobe.inner_life",
     # The region itself — dorsal attention + situation model
     "ParietalLobe": "parietal_lobe.parietal",
 }

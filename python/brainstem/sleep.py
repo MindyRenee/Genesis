@@ -9,16 +9,17 @@ from collections import deque
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
+from brainstem.architecture import SleepStage
+from parietal_lobe.situation_model import SituationModel
+
 from commitment import CommitmentBoundary
 from genesis_client.protocol import (
     CHEM_ADENOSINE,
     CHEM_CORTISOL,
     CHEM_DOPAMINE,
     CHEM_GABA,
-    CHEM_HISTAMINE,
     CHEM_MELATONIN,
     CHEM_NOREPINEPHRINE,
-    CHEM_OREXIN,
     CHEM_SEROTONIN,
     PHASE_NAMES,
     PHASE_NREM,
@@ -29,8 +30,6 @@ from genesis_client.protocol import (
 )
 from genesis_client.swallow import note_swallowed
 from infrastructure.journal import record_event
-from parietal_lobe.situation_model import SituationModel
-from sleep import SleepStage
 
 from .thresholds import (
     AUTO_SLEEP_ADENOSINE,
@@ -50,6 +49,11 @@ from .thresholds import (
     WAKE_RESCUE_MELATONIN,
     WAKE_STABILIZATION_WINDOW,
 )
+
+# Strength of a volitional push onto the sleep-wake network. The daemon caps it
+# at 2.0 and decays it on its physics clock; 1.0 brings on sleep within the hour
+# from waking (the network's own sleep onset is verified in the Rust tests).
+VOLITION_MAGNITUDE = 1.0
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +90,7 @@ class SleepMixin:
         keeps compressed associations accessible after migration
         rather than making the holographic graph a write-only graveyard.
         """
-        from sleep import SleepCompressor
+        from temporal_lobe.compression import SleepCompressor
 
         # The worker that runs N3 consolidation off the inner-life
         # thread. Created here so it is owned and stopped alongside the
@@ -479,6 +483,11 @@ class SleepMixin:
 
         adenosine = core_state.chemicals.get("adenosine", 0.0)
         daemon_phase = core_state.phase_name
+        # The network's sleep pressure sets NREM depth in the sleep stages.
+        self.inner_life.observe_sleep_pressure(core_state.sleep_pressure)
+        if self._is_sleeping:
+            # Renewed while the sleep decision holds; the daemon's push decays.
+            self._push_volition(sleep=True)
 
         # ── Auto-sleep onset ──
         if not self._is_sleeping and not self._is_meditating:
@@ -692,6 +701,7 @@ class SleepMixin:
             cycle.cycles_completed if cycle is not None else 0
         )
         self.client.set_zone(ZONE_SLEEPING)
+        self._push_volition(sleep=True)
 
         self._engage_sleep_mechanism()
 
@@ -1099,24 +1109,34 @@ class SleepMixin:
         dream_concepts = self._collect_dream_concepts(dreams)
         self._queue_dream_residues(dream_concepts, dreams)
     def _send_wake_neuro_impulses(self) -> None:
-        """Send the neurochemical wake cascade to push the emergent
-        phase out of NREM/REM.
+        """Wake the body: a volitional push onto the sleep-wake network
+        (LC, wake-promoting), plus the chemistry that is physiological in its
+        own right.
 
-        Mirrors the biological wake cascade:
-        - Adenosine -0.30: glymphatic clearance completes the purge.
-        - Histamine +0.20: activate the wake-promoting tuberomammillary
-          nucleus.
-        - Orexin +0.15: stabilize the wake state (sleep-wake flip-flop).
+        The stage is the network's to decide, so histamine, orexin and
+        norepinephrine are no longer pushed here: they used to gate the
+        flip-flop from outside, and the network now owns that gate.
+        - Adenosine -0.30: glymphatic clearance completes the purge of
+          sleep pressure.
         - Dopamine +0.05: mild arousal to re-engage the reward system.
-        - Norepinephrine +0.05: activate the locus coeruleus.
         - Melatonin -0.10: suppress the sleep hormone if elevated.
         """
+        self._push_volition(sleep=False)
         self._learner_neuro_impulse(CHEM_ADENOSINE, -0.30)
-        self._learner_neuro_impulse(CHEM_HISTAMINE, 0.20)
-        self._learner_neuro_impulse(CHEM_OREXIN, 0.15)
         self._learner_neuro_impulse(CHEM_DOPAMINE, 0.05)
-        self._learner_neuro_impulse(CHEM_NOREPINEPHRINE, 0.05)
         self._learner_neuro_impulse(CHEM_MELATONIN, -0.10)
+
+    def _push_volition(self, *, sleep: bool) -> None:
+        """Push the sleep-wake network toward sleep or wake.
+
+        The push decays on the daemon's physics clock, so it is renewed for
+        as long as the decision holds: while asleep, from the heartbeat; on
+        wake, once, and the network's flip-flop commits from there.
+        """
+        try:
+            self.client.set_volition(sleep, VOLITION_MAGNITUDE)
+        except (OSError, ConnectionError, RuntimeError) as e:
+            note_swallowed("mind.sleep._push_volition", e)
 
     def _check_sleep_desync(self) -> bool:
         """Compare this layer's sleep state against the daemon's.
@@ -1175,22 +1195,16 @@ class SleepMixin:
         return True
 
     def _reinforce_wake(self) -> None:
-        """Re-latch the sleep-wake flip-flop during the stabilization
-        window after waking.
+        """Hold the wake push during the stabilization window after waking.
 
-        Orexin is the wake-state stabilizer: orexinergic neurons fire
-        tonically during wakefulness to keep the mutually inhibitory
-        VLPO/monoaminergic switch latched awake. A single wake-cascade
-        impulse decays within minutes while residual adenosine keeps
-        suppressing orexin, so the daemon's emergent phase can drift
-        back to NREM shortly after waking — brief wake bouts followed
-        by rapid re-sleep. Sustained modest orexin + histamine support
-        during the post-wake window models the tonic orexin tone that
-        normally holds the switch. Bounded by WAKE_REINFORCE_INTERVAL
-        so impulses can't accumulate into an arousal ceiling.
+        The sleep-wake flip-flop is mutually inhibitory: a single push onto
+        the wake population decays on the physics clock, and residual sleep
+        pressure can let the network drift back to sleep shortly after waking.
+        Renewing the wake push through the window keeps the wake population
+        driven until the network's own dynamics hold it awake. The push is
+        bounded by WAKE_REINFORCE_INTERVAL, so it is not sustained forever.
         """
-        self._learner_neuro_impulse(CHEM_OREXIN, 0.08)
-        self._learner_neuro_impulse(CHEM_HISTAMINE, 0.06)
+        self._push_volition(sleep=False)
     def _resume_learners_after_wake(self) -> None:
         """Resume both learners with a delay for sleep inertia.
 
@@ -1272,10 +1286,10 @@ class SleepMixin:
         adenosine hasn't accumulated to the sleep threshold.
 
         When to use this instead of /sleep or /meditate:
-        - /sleep sets the zone to SLEEPING but cannot force the emergent
-          NREM/REM phase, which requires adenosine > 0.75 and histamine
-          < 0.25. If adenosine is at baseline (~0.20) and cortisol is
-          elevated from interoception, sleep cannot emerge.
+        - /sleep sets the zone to SLEEPING and pushes the sleep-wake network
+          toward sleep. A push decays, so it is renewed for as long as the
+          decision holds. If the network's sleep pressure is low and cortisol
+          is elevated, the push may not carry her under.
         - /meditate emits gentle calming impulses (GABA +0.05, cortisol
           -0.02 every 10s) that are too weak to overcome ongoing
           interoception stress from CPU load.
@@ -1327,13 +1341,11 @@ class SleepMixin:
         if self._is_meditating:
             self.wake_from_meditation()
 
-        # Acute sleep-aid impulses — strong, one-shot
-        self._learner_neuro_impulse(CHEM_ADENOSINE, 0.30)
+        # A strong volitional push onto VLPO, and the HPA reduction that
+        # stress-induced insomnia needs. Stage selection is the network's:
+        # GABA, serotonin and the arousal chemistry follow it.
+        self._push_volition(sleep=True)
         self._learner_neuro_impulse(CHEM_CORTISOL, -0.15)
-        self._learner_neuro_impulse(CHEM_GABA, 0.20)
-        self._learner_neuro_impulse(CHEM_HISTAMINE, -0.15)
-        self._learner_neuro_impulse(CHEM_OREXIN, -0.10)
-        self._learner_neuro_impulse(CHEM_SEROTONIN, 0.10)
 
         # Enter sleep — the zone change triggers sleep-tuned neuro
         # params (5x BDNF recovery) and the dreaming/consolidation pass.

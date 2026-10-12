@@ -8,15 +8,11 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
+from frontal_lobe.tools.code_learner import CodeLearner, CodeLearningResult, FileLearningResult
+from frontal_lobe.tools.explorer import Explorer
+from temporal_lobe.concepts import ConceptNetwork, RelationType
 
-from concepts import ConceptNetwork, RelationType
 from infrastructure.growth_ledger import GrowthLedger, GrowthMilestone
-from tools.code_learner import (
-    CodeLearner,
-    CodeLearningResult,
-    FileLearningResult,
-)
-from tools.explorer import Explorer
 
 logger = logging.getLogger(__name__)
 
@@ -557,7 +553,7 @@ def _make_learner(root: str | Path | None = None) -> CodeLearner:
 def test_learn_python_file():
     """Analyzing a Python file adds concepts and relationships."""
     learner = _make_learner()
-    target = PY_DIR / "concepts" / "network.py"
+    target = PY_DIR / "temporal_lobe" / "concepts" / "network.py"
     result = learner.learn_file(str(target))
 
     assert isinstance(result, FileLearningResult)
@@ -670,7 +666,7 @@ def test_learn_codebase():
 def test_deduplication():
     """Analyzing the same file twice does not add duplicate concepts."""
     learner = _make_learner()
-    target = PY_DIR / "concepts" / "network.py"
+    target = PY_DIR / "temporal_lobe" / "concepts" / "network.py"
 
     learner.learn_file(str(target))
     size_after_first = learner.network.size
@@ -687,7 +683,7 @@ def test_deduplication():
 def test_code_summary():
     """get_code_summary returns the expected structure."""
     learner = _make_learner()
-    learner.learn_file(str(PY_DIR / "concepts" / "network.py"))
+    learner.learn_file(str(PY_DIR / "temporal_lobe" / "concepts" / "network.py"))
 
     summary = learner.get_code_summary()
     assert isinstance(summary, dict)
@@ -701,7 +697,7 @@ def test_code_summary():
 def test_relationships_are_typed():
     """Edges added by the learner use the correct RelationTypes."""
     learner = _make_learner()
-    learner.learn_file(str(PY_DIR / "concepts" / "network.py"))
+    learner.learn_file(str(PY_DIR / "temporal_lobe" / "concepts" / "network.py"))
 
     module_concept = "python:network"
     edges = learner.network.get_edges(module_concept, direction="out")

@@ -43,7 +43,7 @@ fi
 # These invocations mirror the toolchain documented in AGENTS.md.
 # A missing tool warns loudly instead of silently passing — a skipped
 # check is a false pass.
-PY_DEPS="python/"
+PY_DEPS="python/ genesis_client/ infrastructure/ world/ eval/"
 
 if command -v ruff >/dev/null 2>&1; then
     if ! ruff_out="$(ruff check 2>&1)"; then

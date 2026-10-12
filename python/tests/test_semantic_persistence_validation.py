@@ -1,5 +1,5 @@
 """Regression tests for semantic persistence validation."""
-from memory.semantic import SemanticMemory
+from temporal_lobe.memory.semantic import SemanticMemory
 
 
 def test_restore_rejects_nonfinite_fact_confidence():

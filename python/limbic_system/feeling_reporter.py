@@ -28,11 +28,12 @@ from limbic_system.emotion import EmotionalState
 from temporal_lobe.base import Language, Thought
 
 if TYPE_CHECKING:
-    from concepts import ConceptNetwork
+    from frontal_lobe.self import DamasioSelfHierarchy, SelfModel
     from frontal_lobe.thought_composer import ThoughtComposer
-    from infrastructure.bug_reporter import BugReporter
     from parietal_lobe.system_monitor import SystemMonitor
-    from self import DamasioSelfHierarchy, SelfModel
+    from temporal_lobe.concepts import ConceptNetwork
+
+    from infrastructure.bug_reporter import BugReporter
 
 __all__ = ["FeelingReporter"]
 

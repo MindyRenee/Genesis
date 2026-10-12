@@ -70,9 +70,9 @@ def test_curiosity_generate_questions_dereferences_its_emotion() -> None:
     `AttributeError: 'NoneType' object has no attribute 'alertness'` and
     the curiosity source of her self-model was silently always empty.
     """
-    from concepts import ConceptNetwork, RelationType
     from frontal_lobe.reasoning import Reasoner
     from limbic_system.curiosity import Curiosity
+    from temporal_lobe.concepts import ConceptNetwork, RelationType
 
     net = ConceptNetwork()
     for name in ("alpha", "beta", "gamma"):
@@ -86,10 +86,10 @@ def test_curiosity_generate_questions_dereferences_its_emotion() -> None:
 
 def test_identity_curiosity_source_actually_produces_observations() -> None:
     """The source that used to always raise must now yield something."""
-    from concepts import ConceptNetwork, RelationType
     from frontal_lobe.reasoning import Reasoner
+    from frontal_lobe.self.identity import EmergentIdentity
     from limbic_system.curiosity import Curiosity
-    from self.identity import EmergentIdentity
+    from temporal_lobe.concepts import ConceptNetwork, RelationType
 
     net = ConceptNetwork()
     for name in ("alpha", "beta", "gamma", "delta"):
@@ -124,8 +124,9 @@ def test_missing_camera_is_not_tallied_as_an_error() -> None:
     degradation beside genuine faults. 9, 8 and 5 occurrences
     respectively.
     """
+    from occipital_lobe.perception.vision import Vision
+
     from genesis_client import swallow
-    from perception.vision import Vision
 
     class _Vision:
         def __init__(self) -> None:
@@ -135,14 +136,14 @@ def test_missing_camera_is_not_tallied_as_an_error() -> None:
         # absent camera does.
         is_available = Vision.is_available  # type: ignore[assignment,misc]
 
-    import perception.vision as vision_mod
+    import occipital_lobe.perception.vision as vision_mod
 
     def _no_frame(copy: bool = True):
         raise FileNotFoundError(2, "No such file or directory")
 
     original = vision_mod.latest_frame
     vision_mod.latest_frame = _no_frame
-    site = "perception.vision.is_available"
+    site = "occipital_lobe.perception.vision.is_available"
     before = swallow.swallow_count(site)
     try:
         vis = _Vision()

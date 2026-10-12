@@ -5,6 +5,13 @@ import time
 from typing import Any
 
 import pytest
+from limbic_system.emotion import EmotionalState
+from limbic_system.emotional_regulator import (
+    AllostaticLoadTracker,
+    EmotionalRegulator,
+    InteroceptionSystem,
+)
+from limbic_system.sentiment import analyze_sentiment
 
 from genesis_client.protocol import (
     CHEM_ACETYLCHOLINE,
@@ -18,13 +25,6 @@ from genesis_client.protocol import (
     CHEM_NOREPINEPHRINE,
     CHEM_SEROTONIN,
 )
-from limbic_system.emotion import EmotionalState
-from limbic_system.emotional_regulator import (
-    AllostaticLoadTracker,
-    EmotionalRegulator,
-    InteroceptionSystem,
-)
-from limbic_system.sentiment import analyze_sentiment
 
 logger = logging.getLogger(__name__)
 
@@ -361,8 +361,9 @@ def test_update_from_body_state_maps_all_fields() -> None:
     readings. It also divided ``arousal_freq`` (a 0-1 fraction) by
     1000, producing a meaningless tiny number.
     """
-    from genesis_client.types import BodyState
     from limbic_system.emotional_regulator import InteroceptionSystem
+
+    from genesis_client.types import BodyState
 
     # Build a BodyState with distinctive values
     body = BodyState(

@@ -3,8 +3,8 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from concepts import ConceptNetwork
 from frontal_lobe.executive import ExecutiveFunction
+from temporal_lobe.concepts import ConceptNetwork
 
 
 def test_executive_intention_survives_failed_episode() -> None:
@@ -47,8 +47,8 @@ def test_executive_completes_grounded_success() -> None:
 
 
 def test_acting_loop_registers_with_existing_executive() -> None:
-    from tools.agency import ActingLoop
-    from tools.framework import ToolRegistry
+    from frontal_lobe.tools.framework import ToolRegistry
+    from parietal_lobe.agency import ActingLoop
 
     class CountingExecutive(ExecutiveFunction):
         def __init__(self) -> None:
@@ -109,7 +109,7 @@ def test_executive_round_trips_persistent_intentions() -> None:
 
 def test_acting_loop_arbitrates_existing_objective(tmp_path) -> None:
     """A stronger unfinished objective is selected over a fresh probe."""
-    from tools.agency import ActingLoop, Intention
+    from parietal_lobe.agency import ActingLoop, Intention
 
     executive = ExecutiveFunction()
     prior = executive.form_intention(

@@ -1,10 +1,11 @@
 """Pytest configuration for Genesis tests.
 
-Adds the parent directory (``python/``) to ``sys.path`` so that
-the region packages and ``genesis_client`` are importable without
-each test file having to manipulate ``sys.path`` itself. This keeps
-test imports at the top of the file (no E402 violations) while
-preserving the same import behavior.
+Adds the brain-region directory (``python/``) and the repository
+root to ``sys.path`` so the region packages and the support packages
+(``genesis_client``, ``infrastructure``, ``world``, ``eval``,
+``mind``) are importable without each test file manipulating
+``sys.path`` itself. This keeps test imports at the top of the file
+(no E402 violations) while preserving the same import behavior.
 """
 
 import os
@@ -12,20 +13,20 @@ import sys
 
 import pytest
 
-# Insert the python/ directory (parent of tests/) so that both
-# the region packages and genesis_client are importable. This replaces
-# the per-file ``sys.path.insert(0, ...)`` calls that were scattered
-# across the test suite and triggered E402 (module-level import not
-# at top of file) lint violations.
+# Insert python/ and the repo root so both halves of the split
+# package tree are importable. This replaces the per-file
+# ``sys.path.insert(0, ...)`` calls that were scattered across the
+# test suite and triggered E402 (module-level import not at top of
+# file) lint violations.
 _PYTHON_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _PYTHON_DIR not in sys.path:
-    sys.path.insert(0, _PYTHON_DIR)
+_PROJECT_ROOT = os.path.dirname(_PYTHON_DIR)
+for _p in (_PYTHON_DIR, _PROJECT_ROOT):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 # Some tests also need the scripts/ directory on the path (e.g.
 # test_concept_network imports from prune_dead_concepts.py). The
-# scripts/ directory lives at the project root (one level above
-# python/), not under python/.
-_PROJECT_ROOT = os.path.dirname(_PYTHON_DIR)
+# scripts/ directory lives at the project root, not under python/.
 _SCRIPTS_DIR = os.path.join(_PROJECT_ROOT, "scripts")
 if os.path.isdir(_SCRIPTS_DIR) and _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)

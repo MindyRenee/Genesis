@@ -115,7 +115,7 @@ def resolve_config_py(env: dict[str, str]) -> str:
     out = _run(
         [
             "python3", "-c",
-            "import sys; sys.path.insert(0, 'python');"
+            "import sys; sys.path[:0] = ['python', '.'];"
             "from infrastructure.config import default_data_dir;"
             "print(default_data_dir())",
         ],
@@ -125,14 +125,14 @@ def resolve_config_py(env: dict[str, str]) -> str:
 
 
 def resolve_setup_embeddings(env: dict[str, str]) -> str:
-    """python/setup_embeddings.py — builds an index over the concept set."""
+    """setup_embeddings.py — builds an index over the concept set."""
     out = _run(
         [
             "python3", "-c",
             "import importlib.util, sys;"
-            "sys.path.insert(0, 'python');"
+            "sys.path[:0] = ['python', '.'];"
             "spec = importlib.util.spec_from_file_location("
-            "    'se', 'python/setup_embeddings.py');"
+            "    'se', 'setup_embeddings.py');"
             "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m);"
             "sys.argv = ['setup_embeddings.py'];"
             "print(m._parse_setup_args()[0])",
@@ -154,7 +154,7 @@ def _python_default(script: Path, env: dict[str, str], attr: str) -> str:
         [
             "python3", "-c",
             f"import importlib.util, sys;"
-            f"sys.path.insert(0, 'python');"
+            f"sys.path[:0] = ['python', '.'];"
             f"spec = importlib.util.spec_from_file_location('m', {str(script)!r});"
             f"m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m);"
             f"print(getattr(m, {attr!r})())",

@@ -21,8 +21,8 @@ from __future__ import annotations
 import threading
 import time
 
+from brainstem.architecture import SleepStage
 from brainstem.sleep import SleepStageWorker
-from sleep.architecture import SleepStage
 
 
 class _Recorder:
@@ -190,3 +190,16 @@ def test_stop_is_idempotent_and_safe_before_start() -> None:
     worker.start()
     assert worker.stop(timeout=5)
     assert worker.stop(timeout=1), "stopping twice is fine"
+
+
+def test_nap_is_capped_to_light_sleep() -> None:
+    """A nap is N1/N2 only. The network's N3 and REM become N2 during a nap,
+    so a rest never runs the heavy consolidation pass or generates REM dreams."""
+    from brainstem.architecture import SleepStage
+    from frontal_lobe.inner_life import nap_capped_stage
+
+    assert nap_capped_stage(SleepStage.N3, nap=True) is SleepStage.N2
+    assert nap_capped_stage(SleepStage.REM, nap=True) is SleepStage.N2
+    assert nap_capped_stage(SleepStage.N1, nap=True) is SleepStage.N1
+    assert nap_capped_stage(SleepStage.N3, nap=False) is SleepStage.N3
+    assert nap_capped_stage(SleepStage.REM, nap=False) is SleepStage.REM

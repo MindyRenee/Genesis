@@ -7,19 +7,20 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from concepts import NetworkTopology
 from frontal_lobe import CognitiveState
-from genesis_client import NeuroSummary
-from genesis_client.protocol import PHASE_NREM, PHASE_REM, ZONE_SLEEPING
-from genesis_client.types import CoreState
+from frontal_lobe.self import EmergentIdentity, IdentityStage
 from limbic_system.emotion import (
     PLASTICITY_CLOSED,
     PLASTICITY_LOW,
     EmotionalState,
     assess_emotion,
 )
-from self import EmergentIdentity, IdentityStage
 from temporal_lobe.base import Thought
+from temporal_lobe.concepts import NetworkTopology
+
+from genesis_client import NeuroSummary
+from genesis_client.protocol import PHASE_NREM, PHASE_REM, ZONE_SLEEPING
+from genesis_client.types import CoreState
 
 if TYPE_CHECKING:
     from limbic_system.curiosity import Question
@@ -31,6 +32,7 @@ from brainstem.thresholds import (
     WARN_CORTISOL,
     WARN_VALENCE,
 )
+
 from genesis_client.swallow import note_swallowed
 
 logger = logging.getLogger(__name__)

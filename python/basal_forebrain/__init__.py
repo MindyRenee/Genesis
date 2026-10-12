@@ -95,11 +95,11 @@ from _views import view_getattr
 
 _EXPORTS: dict[str, str] = {
     # Ch4 and Ch1-2 — cortical and hippocampal cholinergic projections
-    "Acetylcholine": "neurochemical.acetylcholine",
+    "Acetylcholine": "basal_forebrain.acetylcholine",
     # Process S — the adenosine that accumulates here during wake and
     # A1-inhibits this region's wake-active neurons (the somnogenic
     # signal that silences its own arousal output)
-    "Adenosine": "neurochemical.adenosine",
+    "Adenosine": "basal_forebrain.adenosine",
 }
 
 __all__ = sorted(_EXPORTS)

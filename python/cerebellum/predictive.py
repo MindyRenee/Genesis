@@ -104,7 +104,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from perception import Perception
+    from occipital_lobe.perception import Perception
 
 __all__ = [
     "Prediction",
@@ -1094,7 +1094,7 @@ class PredictiveCodingLayer:
         """
         if perceive_fn is None:
             # Import here to avoid a circular import at module load.
-            from perception import perceive as _perceive
+            from occipital_lobe.perception import perceive as _perceive
 
             perceive_fn = _perceive
 

@@ -57,7 +57,6 @@ import math
 from typing import TYPE_CHECKING
 
 import numpy as np
-
 from temporal_lobe.morphology import (
     agree_verb_phrase,
     copula,
@@ -66,9 +65,9 @@ from temporal_lobe.morphology import (
 )
 
 if TYPE_CHECKING:
-    from concepts import ConceptNetwork
     from limbic_system.emotion import EmotionalState
     from temporal_lobe.base import Thought
+    from temporal_lobe.concepts import ConceptNetwork
 
 __all__ = ["FlowGenerator"]
 

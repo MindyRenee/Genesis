@@ -11,7 +11,7 @@ executes the neurochemical dynamics, memory consolidation, and
 generative-model work the cognitive mind requests over a Unix socket.
 A Python *cognitive layer* handles perception, reasoning, language,
 introspection, and self-modeling. The two share a checksummed,
-versioned binary state file (3,296 bytes, schema pinned by layout
+versioned binary state file (3,480 bytes in schema v5, pinned by layout
 asserts) and a Unix socket.
 
 The daemon is lease-driven: while the mind is alive it is a bus
@@ -125,7 +125,7 @@ wiring diagram, not a duplicate of it.
 This is engineered for a 4.7 GB machine, not a datacenter, and the
 low-level design reflects it:
 
-- **One page of core state, zero copies.** The 3,288-byte state
+- **One page of core state, zero copies.** The 3,480-byte state
   struct occupies a single OS page under `MAP_SHARED`; the kernel
   handles paging instead of the process holding heap copies.
 - **Seqlock protocol.** Readers get an owned copy via sequence lock —
@@ -166,20 +166,20 @@ coupling matrix itself adapt under sustained regimes.
 The underlying chemistry is a genuine 18-dimensional dynamical system
 integrated with a semi-implicit (unconditionally stable) scheme, and
 its arousal subsystem is genuinely bistable. The *mental phases*
-(active, flow, stress, drowsy, NREM, REM, overwhelmed) are not however
-emergent in the strong sense: they are read off that dynamics by a
-fixed threshold classifier with per-phase hysteresis
-(`compute_phase_with_hysteresis` in `src/state/neurochemical.rs`).
-No ODE quantity sets any phase boundary. Two of the phases, NREM and
-REM, go further — ACh is held out of the integration during sleep and
-driven to a literal target value, so the sleep-stage ACh rebound is
-scripted rather than simulated. Sleep onset is also gated harder than
-the rest: in a 48-hour simulation with no input, the system spends 3%
-of its time Active, 76% Drowsy, 21% NREM in one-tick bursts, and
-**never** reaches REM without an external `/sleep` command. Treat
-"emerges from the dynamics" as aspirational; the honest description is
-"classified from the coupled dynamics by a fixed threshold rule, with
-a scripted sleep-stage override."
+(active, flow, stress, drowsy, NREM, REM, overwhelmed) are read off the
+coupled chemistry by a threshold classifier with hysteresis
+(`compute_phase_with_hysteresis` in `src/state/neurochemical.rs`), for the
+waking phases. The sleep stages, NREM and REM, come from a sourced
+sleep-wake network (`src/state/sleep_network.rs`): a transcription of the
+Booth / Diniz Behn network, which has wake, NREM, and REM-on populations in
+mutual inhibition, a homeostatic sleep drive, and a circadian oscillator.
+It reproduces the source's own statements about human sleep: about 7.6 h a
+day, one consolidated period, four REM bouts, and a ~99-minute cycle. It
+does not yet reproduce the lengthening of REM bouts toward morning, and that
+gap is recorded as a known discrepancy, not tuned away. The chemistry
+follows the network: acetylcholine, serotonin, norepinephrine, and GABA
+are set by its populations, calibrated to the release data. Open items and
+their sources are in AGENTS.md under "Sleep-wake network".
 
 ### Active inference
 

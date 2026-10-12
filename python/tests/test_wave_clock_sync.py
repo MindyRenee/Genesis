@@ -36,15 +36,15 @@ from __future__ import annotations
 import math
 
 import pytest
-
-from genesis_client import NeuroSummary
-from genesis_client.protocol import DT_MAX
 from thalamus.brain_waves import (
     _TURN_SNAP_EPS,
     BrainWave,
     BrainWaveOscillator,
     _sleep_phase_powers,
 )
+
+from genesis_client import NeuroSummary
+from genesis_client.protocol import DT_MAX
 
 
 def _make_summary(arousal: float = 0.5, phase: int = 0) -> NeuroSummary:

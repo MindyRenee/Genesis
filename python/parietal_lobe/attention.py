@@ -65,7 +65,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from concepts import ConceptNetwork
+    from temporal_lobe.concepts import ConceptNetwork
 
 __all__ = ["AttentionFocus", "AttentionSystem", "AttentionType"]
 

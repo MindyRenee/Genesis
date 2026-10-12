@@ -4,8 +4,6 @@ import logging
 import random
 
 import pytest
-
-from concepts import ConceptNetwork, RelationType
 from frontal_lobe.reasoning import (
     Analogizer,
     AnalogyInsight,
@@ -29,6 +27,7 @@ from frontal_lobe.reasoning import (
     UserBelief,
     UserModel,
 )
+from temporal_lobe.concepts import ConceptNetwork, RelationType
 
 logger = logging.getLogger(__name__)
 

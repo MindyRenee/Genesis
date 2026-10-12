@@ -7,8 +7,8 @@ import tempfile
 import time
 
 import pytest
+from temporal_lobe.concepts import RelationType
 
-from concepts import RelationType
 from mind import Mind
 
 logger = logging.getLogger(__name__)
@@ -221,6 +221,10 @@ class _MockClient:
         """Neuro impulse."""
         return True
 
+    def set_volition(self, sleep: bool, magnitude: float, **kwargs) -> bool:
+        """Mirror of GenesisClient.set_volition: the push is accepted."""
+        return True
+
     def set_zone(self, zone: int, **kwargs) -> bool:
         """Set zone."""
         self.zones.append(zone)
@@ -381,7 +385,7 @@ def test_curiosity_filtering_in_teaching_mode():
         net.add_concept("synapse", origin="dictionary")
         net.add_concept("pizza", origin="dictionary")
         # Add an edge so neuron and synapse are neighbors
-        from concepts import RelationType
+        from temporal_lobe.concepts import RelationType
         net.add_edge("neuron", "synapse", relation=RelationType.RELATED_TO)
 
         # Simulate teaching mode
@@ -389,7 +393,7 @@ def test_curiosity_filtering_in_teaching_mode():
         frontal.teaching_topic = "neuroscience"
 
         # Test the lesson topic helper
-        from perception import Intent, Perception, QuestionType
+        from occipital_lobe.perception import Intent, Perception, QuestionType
         perception = Perception(
             raw_text="Tell me about neurons",
             intent=Intent.STATEMENT,
@@ -515,6 +519,10 @@ class _MockClientMeditation:
     def neuro_impulse(self, chem: int, magnitude: float, **kwargs) -> bool:
         """Neuro impulse."""
         self.impulses.append((chem, magnitude))
+        return True
+
+    def set_volition(self, sleep: bool, magnitude: float, **kwargs) -> bool:
+        """Mirror of GenesisClient.set_volition: the push is accepted."""
         return True
 
     def set_zone(self, zone: int, **kwargs) -> bool:

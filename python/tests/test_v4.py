@@ -1,7 +1,6 @@
 """Tests for V4 sparse coding and reconstruction fidelity."""
 
 import numpy as np
-
 from occipital_lobe.v4 import V4Model
 
 

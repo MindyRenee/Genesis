@@ -4,15 +4,10 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from concepts import ConceptNetwork
+from frontal_lobe.tools.framework import ToolRegistry
 from limbic_system.curiosity import Question
-from tools.agency import (
-    _TOOL_SCOPES,
-    ActingLoop,
-    ActingResult,
-    Intention,
-)
-from tools.framework import ToolRegistry
+from parietal_lobe.agency import _TOOL_SCOPES, ActingLoop, ActingResult, Intention
+from temporal_lobe.concepts import ConceptNetwork
 
 
 def _make_loop(
