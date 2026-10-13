@@ -1270,8 +1270,11 @@ fn test_mind_drives_still_run_the_body_maintenance() {
     //
     // Observable proof, not a flag: `last_body_state` starts as
     // `BodyState::neutral()` (fixed placeholder values) and is replaced
-    // by a real interoceptor read. Reaching INTEROCEPTION_INTERVAL_TICKS
-    // advances must therefore leave it measurably changed.
+    // by a real interoceptor read. Temperature is optional hardware, so
+    // use self-RSS instead: the test process is part of Genesis's own
+    // process tree, so a real read must report nonzero cognitive_load.
+    // Reaching INTEROCEPTION_INTERVAL_TICKS advances must therefore leave
+    // it measurably changed.
     let path = std::env::temp_dir().join(format!(
         "genesis_intero_{}.bin",
         std::time::SystemTime::now()
@@ -1295,9 +1298,8 @@ fn test_mind_drives_still_run_the_body_maintenance() {
         tl.advance_neuro(&mmap);
     }
 
-    assert_ne!(
-        tl.last_body_state.cpu_temp_c,
-        genesis::daemon::interoception::BodyState::neutral().cpu_temp_c,
+    assert!(
+        tl.last_body_state.cognitive_load > 0.0,
         "interoception never ran during mind-driven advances -- the body \
          was not sensing itself"
     );

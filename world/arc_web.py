@@ -45,7 +45,7 @@ import subprocess
 import tempfile
 import threading
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from world.arc import ArcResult
 
@@ -152,7 +152,9 @@ class _Browser:
         await self._connect()
 
     async def _connect(self) -> None:
-        from websockets.client import connect as websocket_connect
+        import websockets
+
+        websocket_connect = cast(Any, websockets).connect
 
         port = self._debug_port()
         deadline = time.time() + 15
