@@ -11,8 +11,8 @@
 # Verified on this host with Zig 0.16.0 under ~/tools. Substitute the two
 # roots below if yours differ; everything else is mechanical. See the
 # Toolchain section of AGENTS.md.
-ZIG_ROOT=${ZIG_ROOT:-/home/mindy/tools/zig-x86_64-linux-0.16.0}
-LIBCLANG_ROOT=${LIBCLANG_ROOT:-/home/mindy/tools/libclang/clang/native}
+ZIG_ROOT=${ZIG_ROOT:-$HOME/tools/zig-x86_64-linux-0.16.0}
+LIBCLANG_ROOT=${LIBCLANG_ROOT:-$HOME/tools/libclang/clang/native}
 ZIG=$ZIG_ROOT/zig
 SHIM=${SHIM_DIR:-/tmp/zigshim}
 
