@@ -147,14 +147,15 @@ of emergence: scripted systems don't surprise their authors.
 ## Verify
 
 ```bash
-# probe suite (sibling repo)
-cd ~/Public/genesis-eval
-PYTHONPATH=~/Public/genesis/python:~/Public/genesis-eval \
+# probe suite — github.com/MindyRenee/genesis-eval, checked out
+# beside this repository so $G contains both
+G=<checkout parent>
+PYTHONPATH=$G/genesis/python:$G/genesis-eval \
     python3 -m validation.run_probes --tier breakthrough
-cd rust-probes && cargo test            # neurochemical dose-response
+cd $G/genesis-eval/validation/rust-probes && cargo test  # dose-response
 
 # the failing-on-purpose test
-cd ~/Public/genesis
+cd $G/genesis
 . ./scripts/cargo-env.sh && cargo test --release -- \
     rem_bouts_lengthen_across_the_night --ignored
 
