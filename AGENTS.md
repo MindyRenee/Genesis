@@ -69,7 +69,7 @@ not — those must be generated, not recited.
   `ZIG_ROOT=` / `LIBCLANG_ROOT=` if yours differ. The include set must
   match `$ZIG cc -E -v -x c /dev/null` exactly — print it and copy the
   `<...>` search list. A partial set fails on `__STD_TYPE` inside
-  `stddef.h`. With this the Rust suite is ~600 tests (596 as of
+  `stddef.h`. With this the Rust suite is ~600 tests (625 as of
   October 2026) and takes ~2 min of test time once the release
   build is warm (a cold release build is ~15 min more).
   Note that `. ./scripts/cargo-env.sh` must run in the *current*
@@ -178,11 +178,11 @@ Two layout traps worth knowing before touching either struct:
   `read_consistent()`, or ask the daemon.
 
 `GET_ION_SUMMARY` (opcode 40, additive, 108-byte reply) exposes the
-layer to the mind; `brainstem/electrochemistry.py`
+layer to the mind; `python/brainstem/electrochemistry.py`
 turns it into bounded cognitive modulation (attention / integration /
 memory-consolidation gains, neutral ≈ 1.0). Note genesis2 uses opcode
 **36** for this; that id is already spent here on `GET_SENSOR_PRESENCE`,
-so a collision is a real risk if ports are merged — `test_protocol.py`
+so a collision is a real risk if ports are merged — `python/tests/test_protocol.py`
 pins both ids.
 
 ## Wire protocol
@@ -350,7 +350,7 @@ divergence, ~8.7k concepts and 8 projects in a fork under
 supported launch path Python's
 `infrastructure/config.py::default_data_dir` resolves correctly even
 without knowing about the pin. That function now implements the full
-order anyway, so tools run outside `run.sh` agree: `config.py`,
+order anyway, so tools run outside `run.sh` agree: `infrastructure/config.py`,
 `scripts/hygiene.sh`, `scripts/prune_dead_concepts.py`,
 `scripts/migrate_edges_to_log.py`, `scripts/install_optional_deps.sh`,
 `setup_embeddings.py`, `examples/read_state.rs`, and
@@ -378,11 +378,12 @@ The Rust side resolves through `genesis::data_dir()` (a pure function
 over its inputs) rather than reimplementing the order, so the examples
 cannot drift from each other.
 
-Assets follow the data dir too. `config.py::vosk_model_dir()` is the
+Assets follow the data dir too. `infrastructure/config.py::vosk_model_dir()` is the
 single source of truth for the speech model: `$GENESIS_VOSK_DIR`, then
 `<data dir>/vosk-models`, then the XDG-relative location, then the
 pre-pin `~/.local/share/genesis/vosk-models` so an existing install
-keeps working. `temporal_lobe/speech.py` and `perception/ambient.py`
+keeps working. `python/temporal_lobe/speech.py` and
+`python/occipital_lobe/perception/ambient.py`
 both call it; the path used to be inlined in both and pointed at
 whatever instance happened to have a model, which for a pinned checkout
 meant reading a *different* instance's directory.
@@ -415,15 +416,19 @@ Other things worth knowing before experimenting:
 - **Disk grows slowly by design.** The episodic store is append-only
   (<1 KB per episode, linear). Expect months-to-years scale; watch
   small volumes. Everything that grows in memory is bounded and
-  explicitly so — episodic eviction (`memory/memory.py`), attractor
-  trimming to 60% of Hopfield capacity (`memory/systems.py`),
+  explicitly so — episodic eviction
+  (`python/temporal_lobe/memory/memory.py`), attractor
+  trimming to 60% of Hopfield capacity
+  (`python/temporal_lobe/memory/systems.py`),
   executive suppression with release deadlines and 50 retained
   conversation threads / 200 topic-history entries
-  (`memory/working.py`), 500 retained learning results and a
-  200-entry FIFO curiosity queue (`frontal_lobe/autonomous.py`), 5,000
-  review records with `stability` capped at 7 days
-  (`memory/spaced_repetition.py`), and a 4,096-entry LRU vector cache
-  (`concepts/embeddings.py`).
+  (`python/temporal_lobe/memory/working.py`), 500 retained learning
+  results and a
+  200-entry FIFO curiosity queue (`python/frontal_lobe/autonomous.py`),
+  5,000 review records with `stability` capped at 7 days
+  (`python/temporal_lobe/memory/spaced_repetition.py`), and a
+  4,096-entry LRU vector cache
+  (`python/temporal_lobe/concepts/embeddings.py`).
 - **It does real background work.** Autonomous urges consume real CPU.
   Interoception dampens heavy work under thermal strain, but keep an
   eye on marginal hardware.
@@ -455,9 +460,9 @@ delete through the archive does.
 and spills dormant ones to `concept_archive.db`. Archiving is a
 **memory-pressure valve, not a dormancy sweep**: `spill_dormant` returns
 early while the network is under the cap, so activation level alone never
-triggers it. Two call sites: `mind/lifecycle.py::_archive_dormant_concepts`
+triggers it. Two call sites: `python/brainstem/lifecycle.py::_archive_dormant_concepts`
 (every 10th autosave cycle, ~50 min) and
-`concepts/consolidation.py::_consolidate_n3_heavy` (N3 slow-wave sleep).
+`python/temporal_lobe/concepts/consolidation.py::_consolidate_n3_heavy` (N3 slow-wave sleep).
 It is not a REM behavior.
 
 Spilled concepts stay recallable — `add_concept` and `_resolve` pull
@@ -516,7 +521,8 @@ look like thinking.
 
 ## Edge storage — the edge log is canonical
 Relationships have ONE source of truth: `edge_log.jsonl` in the data
-dir (append-only assert/retract/snapshot events; `concepts/edge_log.py`).
+dir (append-only assert/retract/snapshot events;
+`python/temporal_lobe/concepts/edge_log.py`).
 `network._edges` is a materialized fold — never persist it as truth.
 The JSON state's `edges` array is a debugging/rollback projection
 written at save time; the log's fold overwrites it at restore.

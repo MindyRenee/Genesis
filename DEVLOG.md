@@ -313,8 +313,8 @@ Evidence: initial public commit `8d656b0`; the paper was in
 
 ## The standing evidence base
 
-- `python3 -m pytest python/tests/ -q -o addopts=''` — 2885 tests
-  passing in the latest logged run.
+- `python3 -m pytest python/tests/ -q -o addopts=''` — 3,597 tests
+  passing as of 2026-10-13.
 - `cargo test` — the Rust subcognitive core.
 - Every claim above points at a commit, a file, or a state artifact
   you can open. If a number here ever stops being true, this file is

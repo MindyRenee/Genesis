@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, please cite the Zenodo record below,
+  which archives the architecture description.
+type: software
+title: "Genesis: A Machine-Native Cognitive Architecture"
+authors:
+  - family-names: Beatty
+    given-names: Mindy
+repository-code: https://github.com/MindyRenee/Genesis
+version: "0.2.0"
+date-released: 2026-09-17
+# `license` is omitted deliberately: LICENSE is AGPL-3.0 with added
+# Ethical Use restrictions (Section 7 terms), which has no SPDX id.
+# Declaring plain AGPL-3.0-only here would understate the rider.
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.22817337
+    description: Zenodo archive record for the architecture preprint
+preferred-citation:
+  type: article
+  title: "Genesis: A Machine-Native Cognitive Architecture"
+  authors:
+    - family-names: Beatty
+      given-names: Mindy
+  doi: 10.5281/zenodo.22817337
+  publisher: Zenodo
+  year: 2026

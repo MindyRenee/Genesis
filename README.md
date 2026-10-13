@@ -104,12 +104,12 @@ have to cross.
   turns into self-improvement experiment proposals. There is no domain
   allow-list: `ALLOW_ALL_DOMAINS` is `True` and both allow-lists are
   empty, so the per-site approval flow is currently dead code. The one
-  real filter is an adult/malware *content* filter on the `tools/`
-  fetch path. Run with `./run.sh --offline` if you want the network
-  closed. See [SECURITY.md](SECURITY.md) before pointing her at a
-  machine you care about.
+  real filter is an adult/malware *content* filter on the
+  `frontal_lobe/tools/` fetch path. Run with `./run.sh --offline`
+  if you want the network closed. See [SECURITY.md](SECURITY.md)
+  before pointing her at a machine you care about.
 - **Learn skills.** A domain-general competence substrate
-  (`reasoning/competence.py`) turns verified episodes — situation,
+  (`frontal_lobe/reasoning/competence.py`) turns verified episodes — situation,
   action, outcome — into procedural skills: schema recognition,
   affordance learning, and prediction checking that transfer across
   whatever work she actually does.
@@ -195,12 +195,16 @@ deliberation, language composition, and self-modeling — organized
 into anatomical region packages (`frontal_lobe/`, `temporal_lobe/`,
 `parietal_lobe/`, `occipital_lobe/`, `limbic_system/`,
 `basal_ganglia/`, `cerebellum/`, `thalamus/`, `brainstem/`,
-`hypothalamus/`, `insula/`, `basal_forebrain/`) plus shared
-multi-subsystem packages (`memory/`, `reasoning/`, `perception/`,
-`self/`, `sleep/`, `concepts/`, `tools/`, `neurochemical/`). Region
-packages both hold their regional modules and lazily re-export the
-shared ones their anatomy claims — the package boundaries are the
-wiring diagram, not a duplicate of it.
+`hypothalamus/`, `insula/`, `basal_forebrain/`). Multi-subsystem
+machinery lives inside the region that claims it anatomically —
+`temporal_lobe/memory/` and `temporal_lobe/concepts/`,
+`frontal_lobe/reasoning/`, `frontal_lobe/self/`,
+`frontal_lobe/tools/`, `occipital_lobe/perception/`,
+`parietal_lobe/math/` — and each region package lazily re-exports
+the public names its anatomy claims through a PEP 562
+`__getattr__`, so `from frontal_lobe import ExecutiveFunction`
+resolves to wherever the implementation actually lives. The package
+boundaries are the wiring diagram, not a duplicate of it.
 
 ### Systems engineering
 
@@ -232,7 +236,7 @@ low-level design reflects it:
 - **Zero-copy perception.** The retina binary feeds camera frames
   through shared memory; the Python layer reads, never copies.
 
-The daemon is ~28k lines of Rust: two binaries (`genesis-daemon`,
+The daemon is ~40k lines of Rust: two binaries (`genesis-daemon`,
 `retina`), one IPC socket, no external services.
 
 ### The neurochemical model
@@ -366,18 +370,21 @@ not. The test is whether a string is a *building block the engine
 composes from* or *the thing it says*.
 
 Enforcement is currently partial and should not be over-trusted. The
-rule is documented in `AGENTS.md` and one test
-(`test_language.py::test_utterance_variability`) checks that a
-composed response is not a single fixed string. There is no lint rule
-and no test that would catch a newly added hardcoded sentence
-anywhere else in the tree. A September 2026 audit found three sites
-that reached speech verbatim; all are remediated as of October 2026:
-`self/composer.py`'s fallbacks return silence, `self/identity.py`'s
-stage table returns structural data marked not-for-speech, and
-`frontal_lobe/code_tools.py` routes results through the thought
-composer. The underlying pattern — composing from the graph, passing
-structure to the engine, and returning silence rather than a canned
-fallback when the network is empty — is followed well nearly
+rule is documented in `AGENTS.md` and several tests check that
+composed output is not a single fixed string
+(`python/tests/test_language.py::test_self_report_composes_from_fragments`,
+`python/tests/test_language.py::test_integration_greeting_varies`,
+`python/tests/test_self.py::test_identity_fragments_varies`). There is
+no lint rule and no test that would catch a newly added hardcoded
+sentence anywhere else in the tree. A September 2026 audit found
+three sites that reached speech verbatim; all are remediated as of
+October 2026: `python/frontal_lobe/self/composer.py`'s fallbacks
+return silence, `python/frontal_lobe/self/identity.py`'s stage table
+returns structural data marked not-for-speech, and
+`python/frontal_lobe/code_tools.py` routes results through the
+thought composer. The underlying pattern — composing from the graph,
+passing structure to the engine, and returning silence rather than a
+canned fallback when the network is empty — is followed well nearly
 everywhere.
 
 ## Getting started
@@ -468,26 +475,26 @@ while seven structures grew without a cap; those were found and fixed.
 
 | Structure | File | Bound |
 |---|---|---|
-| Episodic records | `memory/memory.py` | Forgotten records are evicted after a 1 h grace period. `forget()` also runs in O(N log N) — it was O(N²) with two full list copies per record, holding the GIL on the autosave/think threads. |
-| Attractor patterns | `memory/systems.py` | Trimmed to 60% of the Hopfield capacity (~0.138·N), least-recently-retrieved first. Over-capacity networks converge to spurious attractors that were being returned as confident retrievals. Also trimmed on load, so an already-bloated state file self-heals. |
-| Executive suppression | `memory/working.py` | 64 entries, each with a 120 s release deadline. Previously permanent: every topic ever focused became un-attendable, since nothing released them outside tests. |
-| Conversation threads | `memory/working.py` | 50 retained (lifetime total still reported). Each holds full turn text and is not persisted. |
-| Topic history | `memory/working.py` | 200 entries. |
-| Learning results | `frontal_lobe/autonomous.py` | 500 retained, oldest evicted; serialized in full on each autosave. |
-| Curiosity queue | `frontal_lobe/autonomous.py` | 200-entry FIFO, persisted. Also fixed from `pop(0)` (O(N)) to `popleft()` (O(1)). |
-| Review records | `memory/spaced_repetition.py` | 5,000, evicting the highest-retention records. `stability` is capped at 7 days so a well-reviewed concept cannot become permanently undecayable. |
-| Ad-hoc vector cache | `concepts/embeddings.py` | 4,096 dense vectors, LRU. |
+| Episodic records | `python/temporal_lobe/memory/memory.py` | Forgotten records are evicted after a 1 h grace period. `forget()` also runs in O(N log N) — it was O(N²) with two full list copies per record, holding the GIL on the autosave/think threads. |
+| Attractor patterns | `python/temporal_lobe/memory/systems.py` | Trimmed to 60% of the Hopfield capacity (~0.138·N), least-recently-retrieved first. Over-capacity networks converge to spurious attractors that were being returned as confident retrievals. Also trimmed on load, so an already-bloated state file self-heals. |
+| Executive suppression | `python/temporal_lobe/memory/working.py` | 64 entries, each with a 120 s release deadline. Previously permanent: every topic ever focused became un-attendable, since nothing released them outside tests. |
+| Conversation threads | `python/temporal_lobe/memory/working.py` | 50 retained (lifetime total still reported). Each holds full turn text and is not persisted. |
+| Topic history | `python/temporal_lobe/memory/working.py` | 200 entries. |
+| Learning results | `python/frontal_lobe/autonomous.py` | 500 retained, oldest evicted; serialized in full on each autosave. |
+| Curiosity queue | `python/frontal_lobe/autonomous.py` | 200-entry FIFO, persisted. Also fixed from `pop(0)` (O(N)) to `popleft()` (O(1)). |
+| Review records | `python/temporal_lobe/memory/spaced_repetition.py` | 5,000, evicting the highest-retention records. `stability` is capped at 7 days so a well-reviewed concept cannot become permanently undecayable. |
+| Ad-hoc vector cache | `python/temporal_lobe/concepts/embeddings.py` | 4,096 dense vectors, LRU. |
 
 Two further unbounded-growth findings were investigated and deliberately
 *not* changed, because the fix is a design decision rather than a patch:
 
-- `semantic.py` consolidation labels its edges with `origin="semantic"`,
+- `python/temporal_lobe/memory/semantic.py` consolidation labels its edges with `origin="semantic"`,
   which is in `DERIVABLE_ORIGINS` and therefore rejected — so
   `relates_to`/`similar_to` facts extracted by the semantic layer have no
   durable representation anywhere. Per the edge-log rule this is
   technically correct, but an extracted proposition is earned, not
   recomputable geometry; this wants a non-listed origin.
-- `concepts/embeddings.py` builds a dense 5000² SVD (~100 MB, O(n³))
+- `python/temporal_lobe/concepts/embeddings.py` builds a dense 5000² SVD (~100 MB, O(n³))
   on a 4.7 GB machine. Correct, but the dominant memory spike.
 
 ### Tests and lint
