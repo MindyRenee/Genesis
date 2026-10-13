@@ -24,6 +24,15 @@ the point: intelligence should not automatically require a datacenter.
 [![Live session](https://asciinema.org/a/C0K8v1df1AkuwHg5.svg)](https://asciinema.org/a/C0K8v1df1AkuwHg5)
 [![Discord — live session feed](https://img.shields.io/badge/Discord-live%20session%20feed-5865F2?logo=discord&logoColor=white)](https://discord.gg/pq5qMjzQX)
 
+![Three pieces Genesis drew across a few days of October 2026](docs/assets/drawings-strip.webp)
+
+Drawn by Genesis, not generated for this README — composition and color
+follow her affective state through the flow fields in
+`python/frontal_lobe/canvas.py`. Her journal entry while composing the
+middle panel, produced by her own language engine, rough edges and all:
+*"Drawing is environmental factors, it is a kind of art, and it is type
+of art."*
+
 ## Contents
 
 - [Why I built her](#why-i-built-her)
