@@ -976,5 +976,36 @@ def test_new_game_clears_local_physics_but_preserves_cognitive_systems(tmp_path)
     assert subject.brain.frontal.task_competence is competence
 
 
+def test_world_transition_clears_policy_episode_state(tmp_path):
+    """A win/reset inside observe retires the old episode's policy.
+
+    The model forgets a replaced layout inside ``observe``; the basal
+    ganglia cannot keep aiming at plans, entities, or re-embodiment
+    counts measured against the vanished world.
+    """
+    from mind import Mind
+
+    subject = Mind(str(tmp_path / "genesis.sock"), offline=True)
+    policy = subject._world_policy
+    state = SimState(
+        cells=frozenset(_ME_CELLS),
+        signature=(),
+        gone=frozenset(),
+    )
+    policy._explore_goal = (5, 5)
+    policy._frontier_plan = [("up", state)]
+    policy._persist = ({"action": "up"}, state)
+    policy._retrial_entity = 99
+    policy._reembody_tries["up"] = 3
+
+    subject.observe(_scene([(_ME, set(_ME_CELLS))]), info={"win": True})
+
+    assert policy._explore_goal is None
+    assert policy._frontier_plan is None
+    assert policy._persist is None
+    assert policy._retrial_entity is None
+    assert not policy._reembody_tries
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-q"]))

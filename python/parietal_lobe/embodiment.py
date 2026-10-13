@@ -279,6 +279,13 @@ class EmbodimentMixin:
         # before _resolve_world_action clears it.
         pending = self._pending_world_action
         events = self.world_model.observe(scene, info=info)
+        # A reported win/death or an inferred wholesale turnover reset
+        # the model inside observe(); every policy commitment made
+        # against that vanished episode is stale with it. Cached plans,
+        # retrial entities, perseveration, and re-embodiment counts all
+        # name the old world, not the one now on the retina.
+        if any(event.kind in {"reset", "win"} for event in events):
+            self._world_policy.reset()
         events.extend(self._recognize_scene_change(scene))
         self._map_world(scene)
         self._resolve_world_action()
