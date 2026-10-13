@@ -28,22 +28,27 @@ What runs here is the embodied half of cognition:
 from __future__ import annotations
 
 import logging
+import re
 import time
+from collections import deque
 from typing import TYPE_CHECKING, Any
 
-from basal_ganglia.world_policy import WorldPolicy
+from basal_ganglia.world_policy import _SELECT_THRESHOLD, WorldPolicy
 from parietal_lobe.spatial_imagery import SpatialImagery
 from parietal_lobe.world_model import (
     OUT_COLLECT,
     OUT_HAZARD,
+    OUT_TRANSFORM,
     OUT_WIN,
     WorldEvent,
     WorldModel,
 )
 from temporal_lobe.cognitive_map import CognitiveMap
+from temporal_lobe.concepts import RelationType
 
 from genesis_client.protocol import (
     CHEM_ACETYLCHOLINE,
+    CHEM_CORTISOL,
     CHEM_DOPAMINE,
     CHEM_ENDORPHIN,
     CHEM_NAMES,
@@ -52,6 +57,7 @@ from genesis_client.protocol import (
     EMOTIONAL_TAG_SIZE,
     MODULE_SENSORY,
 )
+from genesis_client.swallow import note_swallowed
 
 if TYPE_CHECKING:
     from parietal_lobe.grid import Grid
@@ -62,6 +68,22 @@ logger = logging.getLogger(__name__)
 # Salience floor for storing a world event in episodic memory —
 # appearances and routine motion are too frequent to record.
 _STORE_SALIENCE = 0.5
+
+# Inner-voice budget per engaged session — salience, not chatter.
+_WORLD_VOICE_CAP = 12
+
+# The wire palette's color space for game grids seen as images:
+# cell values are the 16 colors of the ARC palette (the official
+# arc_agi.rendering.COLOR_MAP, alpha dropped). Kept here rather than
+# imported so the mind layer stays free of the adapter's package.
+_GAME_PALETTE: tuple[tuple[int, int, int], ...] = (
+    (0xFF, 0xFF, 0xFF), (0xCC, 0xCC, 0xCC), (0x99, 0x99, 0x99),
+    (0x66, 0x66, 0x66), (0x33, 0x33, 0x33), (0x00, 0x00, 0x00),
+    (0xE5, 0x3A, 0xA3), (0xFF, 0x7B, 0xCC), (0xF9, 0x3C, 0x31),
+    (0x1E, 0x93, 0xFF), (0x88, 0xD8, 0xF1), (0xFF, 0xDC, 0x00),
+    (0xFF, 0x85, 0x1B), (0x92, 0x12, 0x31), (0x4F, 0xCC, 0x30),
+    (0xA3, 0x56, 0xD6),
+)
 
 # Consecutive unrecognized scene-level transformations before the
 # change grounds as an epistemic gap — a single unexplained frame is
@@ -89,6 +111,44 @@ _EVENT_IMPULSES: dict[str, tuple[tuple[int, float], ...]] = {
     "reshaped": ((CHEM_ACETYLCHOLINE, 0.02),),
 }
 
+# Objective kinds the world actuator can actually serve — a "learn"
+# objective routes to unanswered affordance questions, the rest to
+# coverage. "inspect" is the code actuator's kind and never gets
+# routed into a grid step.
+_WORLD_OBJECTIVE_KINDS = frozenset({"learn", "explore", "observe", "measure"})
+# An objective held this long without a served verdict is revised
+# back to pending so a fresher one can be elected — persistence,
+# not fixation.
+_OBJECTIVE_STALE_S = 120.0
+
+# Visual-cortex sampling cadence in a turn-based world. The grid is
+# still perceived every turn; the expensive occipital hierarchy is an
+# attention sample, not a second decision channel. First frames and
+# level boundaries always get through.
+_WORLD_VISION_PERIOD = 4
+
+# Episodic recall cadence — a pass every this many world ticks, plus
+# immediately on any salient event (the moments a decision is up for
+# grabs). Bounded retrieval keeps the body loop cheap.
+_RECALL_PERIOD = 8
+_RECALL_LIMIT = 6      # candidates scanned per pass
+_RECALL_FETCH = 4      # how many get full text retrieval
+_RECALL_DIST = 20      # SimHash association threshold — the daemon's own
+
+# Her own event vocabulary is the recall key: the outcome words she
+# stored a memory with are the words that decode its valence.
+_RECALL_OUTCOME_VALENCE = {
+    "killed me": -1.0,
+    "is the goal": 1.0,
+    "was touching me": -0.3,
+    "blocked me": -0.25,
+    "changed me": 0.2,
+}
+_RECALL_ENTITY_RE = re.compile(
+    r"the color-(\d+) thing (killed me|is the goal|was touching me"
+    r"|blocked me|changed me)"
+)
+
 
 class EmbodimentMixin:
     """Mixin for :class:`Mind` — the environment-facing loop."""
@@ -112,6 +172,26 @@ class EmbodimentMixin:
         # (action, predicted self-displacement) awaiting its outcome —
         # the intention half of the agency comparator.
         self._pending_world_action: tuple[str, Any] | None = None
+        # The executive objective the chosen bid was serving — it is
+        # fed the comparator's verdict when the outcome arrives, so
+        # objectives learn from consequences the way actions do.
+        self._pending_objective: Any = None
+        # The objective the executive is currently holding, and the
+        # time it was last served a verdict — an objective held long
+        # without an answer is revised so a fresher one is elected.
+        self._held_objective: Any = None
+        self._held_since: float = 0.0
+        # The executive's resting stop threshold — borrowed while a
+        # world holds her so the competition's operating point is
+        # the gate the executive owns; restored on disengage.
+        self._exec_prev_inhibition: float | None = None
+        # Decision journal — each turn's winning channel, its
+        # weight, and where she stood. Her own trace of what she
+        # did and why, kept across the episode so a policy that
+        # circles is visible as circling.
+        self._world_decision_log: deque[dict[str, Any]] = deque(
+            maxlen=400
+        )
         # Parietal imagery workspace — transform skills applied to
         # internal copies of the scene; recognition explains global
         # change that entity tracking cannot express.
@@ -146,6 +226,35 @@ class EmbodimentMixin:
         self._world_task: Any = None
         self._prev_world_state: dict[str, Any] | None = None
         self._world_episode_changes: tuple[str, ...] = ()
+
+        # Engaged world — a world currently holding her attention
+        # (a game in play). Engagement is *state*: volition context
+        # reads it through world_engagement() and the appetitive
+        # urges starve while it holds — the way absorption keeps a
+        # person from wandering off — rather than the urges being
+        # switched off upstream. The loop itself is wholly hers:
+        # perceive, think, act — no delegate plays for her.
+        self._engaged_world: str | None = None
+        self._world_context: str | None = None
+        self._world_seen: set[str] = set()
+        self._world_levels = 0
+        self._world_dry = 0
+        self._world_deaths = 0
+        self._world_voiced = 0
+        self._world_last_voiced: str | None = None
+        self._last_world_step = 0.0
+        # Decision telemetry — the basis behind the last world
+        # action (which drive won, how decisive, the contenders).
+        # Harnesses attach it to each step as recorded reasoning.
+        self.last_world_decision: dict[str, Any] | None = None
+        # The motor field the last act() was arbitrated over — kept
+        # so the step can read how much her own field values the
+        # peak it returned (``_field_opinion``).
+        self._world_motor: Any = None
+        # Episodic recall bookkeeping — when the last pass fired and
+        # what it remembered, for telemetry.
+        self._world_recall_tick = -1
+        self._world_last_recall: dict[int, float] = {}
 
     def observe(
         self,
@@ -222,12 +331,51 @@ class EmbodimentMixin:
         # grid and the offered actions — the fields bias the choice
         # below and are published for the daemon to read back.
         motor = self._compose_motor_fields(ids, recommended)
-        choice = self._world_policy.choose(ids, field=motor)
+        self._world_motor = motor
+        # The executive holds an objective into the competition:
+        # select one when none is held — or when the held one has
+        # gone stale unaddressed — so persistence is prefrontal,
+        # not momentum. Its bid is a channel, never a command.
+        executive = getattr(self.brain.frontal, "executive", None)
+        if executive is not None:
+            try:
+                active = executive.active_intention
+                if active is not self._held_objective:
+                    self._held_objective = active
+                    self._held_since = time.time()
+                if (
+                    active is None
+                    or time.time() - self._held_since > _OBJECTIVE_STALE_S
+                ):
+                    if active is not None:
+                        executive.revise_intention(
+                            active, reason="held too long unanswered"
+                        )
+                    executive.select_intention(
+                        list(executive.actionable_intentions),
+                        allowed_kinds=_WORLD_OBJECTIVE_KINDS,
+                    )
+                    self._held_objective = executive.active_intention
+                    self._held_since = time.time()
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"executive objective select failed: {e}")
+        choice = self._world_policy.choose(
+            ids, field=motor, executive=executive
+        )
+        self._pending_objective = None
         if choice is not None:
             action = str(choice["action"])
             expected = self.world_model.expected_effect(action)
             self._pending_world_action = (action, expected)
-            self.world_model.note_action(action)
+            self._pending_objective = (
+                executive.active_intention
+                if executive is not None
+                and choice.get("source") == "intention"
+                else None
+            )
+            # The cell rides with the action — a distal act is
+            # attributable only if the model knows where it landed.
+            self.world_model.note_action(action, target=choice.get("cell"))
             try:
                 self.self_model.record_intention(
                     action,
@@ -240,7 +388,7 @@ class EmbodimentMixin:
             self._broadcast_world_action(choice, motor)
         return choice
 
-    def note_world_action(self, action: Any) -> None:
+    def note_world_action(self, action: Any, cell: Any = None) -> None:
         """Record an externally-chosen action as her pending intention.
 
         For loops where a specialist (a game agent) picks the move
@@ -254,7 +402,7 @@ class EmbodimentMixin:
         action = str(action)
         expected = self.world_model.expected_effect(action)
         self._pending_world_action = (action, expected)
-        self.world_model.note_action(action)
+        self.world_model.note_action(action, target=cell)
         try:
             self.self_model.record_intention(
                 action,
@@ -291,19 +439,468 @@ class EmbodimentMixin:
     def reset_world(self, keep_learning: bool = True) -> None:
         """Episode boundary — forget the layout, keep the physics."""
         self.world_model.reset(keep_learning=keep_learning)
+        self._world_policy.reset()
         # The allocentric map ends its fix but keeps its structure —
         # hippocampal spatial memory is long-term memory.
         self.cognitive_map.reset_episode()
         self._pending_world_action = None
+        self._pending_objective = None
+        self._held_objective = None
+        self._held_since = 0.0
         self._prev_world_grid = None
         self._prev_world_state = None
         self._world_episode_changes = ()
         self._unexplained_change_streak = 0
+        # The tick counter restarts with the episode — let the new
+        # situation recall freely from its first frame.
+        self._world_recall_tick = -1
 
     def world_summary(self) -> str:
         """What she currently understands about the outer world."""
         base = self.world_model.summary()
         return f"{base} — {self.cognitive_map.summary()} — {self._imagery.summary()}"
+
+    # ─── Engaged world ──────────────────────────────────────────
+
+    def engage_world(self, name: str = "the world") -> None:
+        """Pin engagement: a world is now holding her attention.
+
+        Focus as state, not amputation — while engagement holds,
+        ``world_engagement`` keeps the appetitive urges starved in
+        ``_volition_context`` (she is absorbed, the way a person
+        mid-game doesn't wander off to audit code), and the bodily
+        and defensive drives still get heard.
+        """
+        self._engaged_world = name
+        # While the world is the task, the executive's stop gate
+        # sits at the action competition's operating point — the
+        # basal ganglia run the bidding, the executive owns what
+        # "too weak to act" means here. Restored on disengage.
+        executive = getattr(self.brain.frontal, "executive", None)
+        if executive is not None:
+            try:
+                self._exec_prev_inhibition = executive.inhibition_threshold
+                executive.set_inhibition_threshold(_SELECT_THRESHOLD)
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"executive inhibition borrow failed: {e}")
+
+    def disengage_world(self) -> None:
+        """Release engagement — the world stops holding her.
+
+        The specialist is dropped with the session: what it learned
+        consolidated into ``TaskCompetence`` skills, which persist;
+        the screen's particular layout does not — walking away and
+        coming back, she remembers *how to play*, not that frame.
+        """
+        self._engaged_world = None
+        self._world_seen.clear()
+        self._world_levels = 0
+        self._world_dry = 0
+        self._world_deaths = 0
+        self._world_voiced = 0
+        self._world_last_voiced = None
+        self._world_motor = None
+        self._world_last_recall = {}
+        self._world_recall_tick = -1
+        self._last_world_step = 0.0
+        self._pending_objective = None
+        # The stop threshold returns to the executive's resting
+        # value — the world's competition is over.
+        if self._exec_prev_inhibition is not None:
+            executive = getattr(self.brain.frontal, "executive", None)
+            if executive is not None:
+                try:
+                    executive.set_inhibition_threshold(
+                        self._exec_prev_inhibition
+                    )
+                except Exception as e:  # noqa: BLE001
+                    logger.debug(
+                        f"executive inhibition restore failed: {e}"
+                    )
+            self._exec_prev_inhibition = None
+
+    def world_engagement(self) -> float:
+        """How held her attention is, [0, 1] — the focus signal.
+
+        Two sources: an ignited world broadcast still ringing (a
+        percept just fired — decays with ~10 s half-life) and a
+        pinned engaged world (a live game session). Volition reads
+        this so urges to wander off weigh engagement that already
+        exists rather than treating her as idle.
+        """
+        engagement = 0.0
+        focus = getattr(self, "_world_focus", None)
+        if focus is not None:
+            age_s = max(0.0, time.time() - focus["timestamp"] / 1000.0)
+            engagement = focus["activation"] * pow(0.5, age_s / 10.0)
+        if getattr(self, "_engaged_world", None) is not None:
+            engagement = max(engagement, 0.9)
+        return min(1.0, engagement)
+
+    def world_episode_end(self, outcome: str, game: str = "the game") -> None:
+        """An episode in the engaged world ended (``"win"``/``"over"``).
+
+        Felt, broadcast, learned from — then the layout is forgotten
+        and the physics kept. The specialist's segment closes with
+        the same verdict so its outcome ledger stays honest.
+        """
+        win = outcome == "win"
+        self._world_bridge.broadcast_outcome(
+            outcome,
+            f"episode ended {outcome}",
+            0.9 if win else 0.7,
+            metadata={"game": game, "deaths": self._world_deaths},
+        )
+        if win:
+            self._impulse_world(CHEM_DOPAMINE, 0.02)
+            self._world_say({"kind": "won", "game": game})
+        else:
+            self._world_deaths += 1
+            self._impulse_world(CHEM_DOPAMINE, -0.008)
+            self._impulse_world(CHEM_NOREPINEPHRINE, 0.008)
+            self._impulse_world(CHEM_CORTISOL, 0.001 * self._world_deaths)
+            self._world_say({"kind": "death", "game": game})
+        try:
+            self.world.it_acted(
+                f"played {game}: episode ended {outcome}",
+                detail=f"world episode {outcome}",
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"world act record failed: {e}")
+        self.note_world_end("win" if win else None)
+
+    def _begin_world(self, game: str, level: int) -> None:
+        if self._world_context == game:
+            return
+        self.reset_world(keep_learning=False)
+        self._world_context = game
+        self._world_task = None
+        self._world_levels = level
+        self._world_dry = 0
+        self._world_deaths = 0
+
+    def world_step(
+        self,
+        frame: Any,
+        available_actions: list[Any] | None = None,
+        info: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """One full turn in the engaged world — perceive, think, act.
+
+        The embodied analog of ``think()``: the frame becomes a
+        percept through the whole stack (world model, cognitive map,
+        imagery, episodic memory, the workspace broadcast), her
+        cognition ticks on it (workspace decay/competition, wave
+        refresh, executive candidates), and the basal ganglia emits
+        the action over the composed motor field. The spatial
+        specialist votes as a cortical skill — the choice is hers.
+
+        Returns ``{"action": id, "x": .., "y": ..}`` — id 0 means
+        the world should reset; ``x``/``y`` target coordinate
+        actions. ``None`` when the world offered nothing to do.
+        """
+        info = info or {}
+        game = str(info.get("game", "the game"))
+        level = int(info.get("level", 0) or 0)
+        self._begin_world(game, level)
+        self.mark_user_activity()
+        self._world_last_voiced = None
+        from thalamus.brain_waves import BrainWave
+
+        # Sitting down to a new game — engagement signature plus the
+        # world's spoken instruction broadcast as context, so her
+        # cognition meets the stream already knowing the genre.
+        if game not in self._world_seen:
+            self._world_seen.add(game)
+            self._world_levels = level
+            self._impulse_world(CHEM_ACETYLCHOLINE, 0.004)
+            self._world_wave(BrainWave.BETA2, 0.15)
+            self._world_say(
+                {"kind": "start", "game": game,
+                 "goal": info.get("instructions", "")}
+            )
+            if info.get("instructions"):
+                self._world_bridge.broadcast_observation(
+                    f"{game} instructions: {info['instructions']}",
+                    topics=["game", "instructions", game],
+                    salience=0.9,
+                )
+                self._ground_world_words(str(info["instructions"]))
+
+        # Levels advancing is the goal signal — the episode's own
+        # reward marked before the new observation so the winning
+        # segment closes intact. The ``win`` flag rides the frame
+        # that follows the winning move: the model credits whatever
+        # she was reaching when the world ended, then lets the old
+        # place go while keeping what it taught her.
+        advanced = level > self._world_levels
+        if advanced:
+            self._impulse_world(CHEM_DOPAMINE, 0.01)
+            self._world_say({"kind": "scored", "game": game})
+            self._world_dry = 0
+        self._world_levels = level
+
+        # Perceive — the frame enters through her embodied stack
+        # alone: the world model, the cognitive map, imagery, the
+        # workspace. The change measure that couples to dopamine is
+        # hers to compute, not a delegate's report.
+        prev_grid = self._prev_world_grid
+        events = self.observe(
+            frame,
+            info={**info, "game": game, "level": level,
+                  **({"win": True} if advanced else {})},
+        )
+        change = self._frame_change(prev_grid)
+        vision_novel = (
+            self._see_game_frame(frame)
+            if (
+                self.world_model.tick <= 1
+                or advanced
+                or self.world_model.tick % _WORLD_VISION_PERIOD == 0
+            )
+            else None
+        )
+        self._world_bridge.broadcast_observation(
+            f"game {game}: level {level}/{info.get('win_levels', '?')}, "
+            f"frame changed {change:.0%}",
+            topics=["game", "spatial", game],
+            salience=min(1.0, change * 3.0 + (0.5 if level > 0 else 0.0)),
+            metadata={
+                "game": game,
+                "level": level,
+                **(
+                    {"vision_novel": vision_novel}
+                    if vision_novel is not None
+                    else {}
+                ),
+            },
+        )
+
+        # The step's visible feedback couples to dopamine the same
+        # way internal play couples its TD error — a changed world
+        # is information.
+        impulse = max(-0.006, min(0.006, change * 0.04))
+        if abs(impulse) >= 0.001:
+            self._impulse_world(CHEM_DOPAMINE, impulse)
+            self._world_wave(
+                BrainWave.GAMMA if impulse > 0 else BrainWave.BETA2,
+                min(0.25, abs(impulse) * 40),
+            )
+        if change < 0.005:
+            self._world_dry += 1
+            if self._world_dry == 20:
+                self._world_say({"kind": "stuck", "game": game})
+        else:
+            self._world_dry = 0
+
+        # Think — the cognition slice a turn-based world would
+        # otherwise never give her. And remember: the situation cues
+        # whatever past experience it resembles before she commits.
+        self._world_cognition_tick()
+        self._recall_world(game, events)
+
+        # Act — nothing outside her arbitrates: the motor field is
+        # composed from her own world model and task competence, and
+        # the basal ganglia's drives — goal plan, affordance probe,
+        # frontier exploration, calibration — decide. She is her own
+        # leader; there is no delegate to fall back on.
+        avail = list(available_actions or [])
+        if not avail:
+            return None
+        try:
+            choice = self.act(avail)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.world_step.act", e)
+            choice = None
+        if choice is None:
+            return None
+        action = int(choice["action"])
+        if action == 0:
+            self._world_bridge.broadcast_action(0, metadata={"game": game})
+            self._record_world_decision(
+                "RESET", choice, avail
+            )
+            return {"action": 0}
+        desc: dict[str, Any] = {"action": action}
+        cell = choice.get("cell")
+        if cell is not None:
+            # A distal act carries its target — whichever actions
+            # take coordinates is interface semantics the model
+            # learned from labels, not an id this code knows.
+            desc.update({"x": int(cell[1]), "y": int(cell[0])})
+            self._world_bridge.broadcast_action(
+                action,
+                cell={"x": int(cell[1]), "y": int(cell[0])},
+                metadata={"game": game},
+            )
+        self._record_world_decision(f"ACTION{action}", choice, avail)
+        return desc
+
+    # ─── World-turn internals ───────────────────────────────────
+
+    def _world_cognition_tick(self) -> None:
+        """The between-frames slice of cognition on world content.
+
+        ``think()`` turns on an utterance; this turns on a frame —
+        the wave state the broadcasts quote refreshes, and the
+        workspace advances its dynamics (activation decay + the
+        recurrent competition), so conscious game content settles or
+        ignites by the same machinery as anything she attends. The
+        hypothesis ledger and the executive feed already run inside
+        ``observe`` and the heartbeat's round.
+        """
+        now = time.monotonic()
+        dt = (
+            min(5.0, max(0.0, now - self._last_world_step))
+            if self._last_world_step
+            else 0.2
+        )
+        self._last_world_step = now
+        try:
+            language = getattr(self.brain.frontal, "language", None)
+            if language is not None:
+                language.current_brain_waves = self.brain_waves()
+        except (OSError, ConnectionError) as e:
+            note_swallowed("mind.world_step.brain_waves", e)
+        workspace = getattr(self.brain.frontal, "global_workspace", None)
+        if workspace is not None:
+            try:
+                workspace.tick(dt)
+            except Exception as e:  # noqa: BLE001
+                logger.debug(f"workspace world tick failed: {e}")
+
+    def _see_game_frame(self, frame: Any) -> bool | None:
+        """Run a game grid through the visual cortex as an image.
+
+        The palette-index grid becomes the RGB frame the occipital
+        hierarchy expects, at native resolution. Returns the
+        percept's novelty flag, or None when vision isn't online.
+        """
+        cortex = getattr(self, "visual_cortex", None)
+        if cortex is None:
+            return None
+        try:
+            import numpy as np
+
+            rows = (
+                frame.tolist()
+                if hasattr(frame, "tolist")
+                else getattr(frame, "rows", lambda: frame)()
+            )
+            grid = np.asarray(rows, dtype=np.int64) & 0xF
+            rgb = np.asarray(_GAME_PALETTE, dtype=np.uint8)[grid]
+            percept = cortex.see(rgb, learn=True)
+            return bool(getattr(percept, "is_novel", False))
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.world_step.see_frame", e)
+            return None
+
+    def _world_say(self, moment: dict) -> None:
+        """Her inner voice on a play moment — composed by her own
+        language system from the event, never recited."""
+        if self._world_voiced >= _WORLD_VOICE_CAP:
+            return
+        vocab = getattr(
+            getattr(self.brain.frontal, "language", None), "vocabulary", None
+        )
+        if vocab is None:
+            return
+        try:
+            text = vocab._compose_play_moment(moment, self.feel())
+        except Exception:  # noqa: BLE001
+            return
+        if text:
+            self._world_voiced += 1
+            self._world_last_voiced = text
+            inner = getattr(self, "inner_life", None)
+            if inner is not None:
+                try:
+                    noted = inner.note_thought(
+                        text,
+                        trigger="play",
+                        intent="play",
+                        metadata={
+                            "topic": moment.get("game", ""),
+                            "moment": moment.get("kind", ""),
+                        },
+                    )
+                    if noted is not None:
+                        return
+                except Exception:  # noqa: BLE001
+                    pass
+            self._emit_live_thought("play", text)
+
+    def _impulse_world(self, chem: int, amount: float) -> None:
+        try:
+            self._learner_neuro_impulse(chem, amount)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.world_step._impulse", e)
+
+    def _world_wave(self, wave: Any, amount: float) -> None:
+        try:
+            from thalamus.brain_waves import add_brain_wave_drive
+
+            add_brain_wave_drive(wave, amount)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _record_world_decision(
+        self,
+        token: str,
+        choice: dict[str, Any] | None,
+        avail: list[Any],
+    ) -> None:
+        """Stash the decision basis behind this turn's action —
+        which drive the striatum honored, how decisive her own
+        disposition field was, what else contended. ``note`` carries
+        her inner voice only when a moment was actually voiced."""
+        rec = (
+            dict(self._world_motor.action_scores)
+            if self._world_motor is not None
+            else {}
+        )
+        scored = sorted(
+            (
+                (
+                    rec.get(str(a.get("action") if isinstance(a, dict) else a), 0.0),
+                    a.get("action") if isinstance(a, dict) else a,
+                )
+                for a in avail
+            ),
+            reverse=True,
+        )
+        top = scored[0][0] if scored else 0.0
+        second = scored[1][0] if len(scored) > 1 else 0.0
+        self.last_world_decision = {
+            "action": token,
+            "source": (choice or {}).get("source", "unknown"),
+            "weight": (choice or {}).get("weight"),
+            "confidence": round(min(1.0, max(0.0, top - second) / 2.0), 3),
+            "alternatives": [
+                f"ACTION{a}" for score, a in scored[1:3] if score > 0
+            ],
+            "note": self._world_last_voiced,
+        }
+        # Where she stood when she decided — the position half of
+        # the journal, so a repeated loop shows as a repeated loop.
+        pos: tuple[int, int] | None = None
+        try:
+            me = self.world_model.self_entity
+            if me is not None:
+                pos = (
+                    round(me.centroid[0]),
+                    round(me.centroid[1]),
+                )
+        except Exception:  # noqa: BLE001 — journal is advisory
+            pos = None
+        self._world_decision_log.append(
+            {
+                "action": token,
+                "source": (choice or {}).get("source", "unknown"),
+                "weight": (choice or {}).get("weight"),
+                "pos": pos,
+            }
+        )
 
     # ─── Internals ──────────────────────────────────────────────
 
@@ -427,6 +1024,34 @@ class EmbodimentMixin:
             )
         ]
 
+    def _ground_world_words(self, text: str) -> None:
+        """Words the world speaks to her become concepts.
+
+        An instruction is the world using its own vocabulary; a
+        content word she has no concept for is grounded as a
+        low-confidence node so her language and thought machinery
+        can at least hold it — "arrows" becomes a thing she can
+        wonder about instead of sound that ignites nothing.
+        """
+        try:
+            from temporal_lobe.concepts.classify import _FUNCTION_WORDS
+
+            network = self.brain.frontal.network
+            for raw in text.split():
+                word = raw.strip(".,;:!?()\"'`").lower()
+                if len(word) < 3 or word in _FUNCTION_WORDS:
+                    continue
+                if network._resolve(word) is not None:
+                    continue
+                network.add_concept(
+                    word,
+                    confidence=0.3,
+                    origin="perception",
+                    properties={"kind": "world_word"},
+                )
+        except Exception as e:  # noqa: BLE001 — grounding is advisory
+            logger.debug(f"world-word grounding failed: {e}")
+
     def _ground_unexplained_change(self) -> None:
         """Persistent unexplained global change becomes a concept.
 
@@ -515,6 +1140,34 @@ class EmbodimentMixin:
             )
         except Exception as e:  # noqa: BLE001
             logger.debug(f"agency outcome record failed: {e}")
+        objective = self._pending_objective
+        self._pending_objective = None
+        if objective is None:
+            return
+        try:
+            executive = getattr(self.brain.frontal, "executive", None)
+            if executive is None:
+                return
+            matched = observed == expected
+            executive.observe_intention(
+                objective,
+                actual_outcome=f"move {observed}",
+                success=matched,
+            )
+            if not matched:
+                # A served objective that the world refused is
+                # revised, not abandoned — its confidence drops so
+                # arbitration elects fresher objectives while the
+                # intention itself survives to be retried.
+                executive.revise_intention(
+                    objective,
+                    reason="the world did not answer the attempt",
+                )
+            # The held objective was just served a verdict — the
+            # staleness clock restarts.
+            self._held_since = time.time()
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"executive outcome record failed: {e}")
 
     def _feel_world_event(self, event: WorldEvent) -> None:
         """Felt consequence: world events drive neurochemistry."""
@@ -610,6 +1263,66 @@ class EmbodimentMixin:
             logger.debug(f"world hypothesis update failed: {e}")
         self._prev_world_state = state
 
+    def _recall_world(self, game: str, events: list[WorldEvent]) -> None:
+        """Cue-driven episodic recall — the situation summons its past.
+
+        Hippocampal pattern completion: the live situation (the game
+        plus the world model's own summary) is the retrieval cue;
+        whatever long-term memory associates to it gets re-read for
+        the outcome it once carried. A remembered result lands on
+        the kind it was about — *killed me* / *is the goal* /
+        *blocked me* / *changed me* — weighted by how strongly the
+        memory associates and how salient it was. The residue biases
+        the next motor field: remembered goals pull, remembered
+        killers push away. A voice, never a plan — the basal ganglia
+        still arbitrates, and present-measured evidence outweighs.
+
+        Fires on a cadence and immediately on salient events. The
+        residue is rewritten whole each pass — recall is
+        cue-dependent: a situation that stops cueing a memory stops
+        feeling its pull.
+        """
+        tick = self.world_model.tick
+        salient = any(e.salience >= _STORE_SALIENCE for e in events)
+        if not salient and tick - self._world_recall_tick < _RECALL_PERIOD:
+            return
+        if tick == self._world_recall_tick:
+            return
+        self._world_recall_tick = tick
+        try:
+            cue = f"{game}: {self.world_model.summary()}"
+            hits = self.client.find_similar(cue, limit=_RECALL_LIMIT)
+        except Exception as e:  # noqa: BLE001 — recall is advisory
+            logger.debug(f"world recall query failed: {e}")
+            return
+        valence: dict[int, float] = {}
+        fetched = 0
+        for hit in hits:
+            if hit.hamming_distance > _RECALL_DIST or fetched >= _RECALL_FETCH:
+                continue
+            try:
+                episode = self.client.retrieve_episode(hit.episode_id)
+            except Exception:  # noqa: BLE001 — a lost memory is lost
+                continue
+            fetched += 1
+            assoc = 1.0 - hit.hamming_distance / _RECALL_DIST
+            for match in _RECALL_ENTITY_RE.finditer(episode.text):
+                color = int(match.group(1))
+                sign = _RECALL_OUTCOME_VALENCE[match.group(2)]
+                weight = assoc * max(0.2, hit.salience) * sign
+                valence[color] = max(
+                    -1.0, min(1.0, valence.get(color, 0.0) + weight)
+                )
+        self._world_last_recall = dict(valence)
+        self.world_model.recalled_valence = valence
+        if valence:
+            self._world_bridge.broadcast_observation(
+                self.world_model.summary(),
+                topics=["recall", "embodied", game],
+                salience=min(0.6, 0.3 + 0.3 * max(map(abs, valence.values()))),
+                metadata={"recalled_valence": dict(valence)},
+            )
+
     # ─── Whole-brain world state ────────────────────────────────
 
     def _publish_world_state(self, scene: Scene, events: list[WorldEvent]) -> None:
@@ -664,6 +1377,41 @@ class EmbodimentMixin:
         for event in events:
             if event.salience >= _STORE_SALIENCE:
                 bridge.broadcast_outcome(event.kind, event.text, event.salience)
+        self._ground_world_verdicts(events)
+
+    def _ground_world_verdicts(self, events: list[WorldEvent]) -> None:
+        """Terminal verdicts become thinkable concepts.
+
+        The affordance ledger knows *that* a color is a hazard or a
+        goal; edges make it *sayable* — the concept stream can then
+        hold "the color-9 thing is a hazard" the way her body already
+        holds the aversion. Only outcome kinds with a blamed entity
+        ground an edge: contact verdicts, not suspicions.
+        """
+        _VERDICT_TARGETS = {
+            OUT_HAZARD: "hazard",
+            OUT_WIN: "goal",
+            OUT_COLLECT: "goal",
+            OUT_TRANSFORM: "transform",
+        }
+        try:
+            network = self.brain.frontal.network
+            for event in events:
+                target = _VERDICT_TARGETS.get(event.kind)
+                if target is None or event.other_id < 0:
+                    continue
+                entity = self.world_model.entities.get(event.other_id)
+                if entity is None:
+                    continue
+                network.add_edge(
+                    f"color-{entity.color}",
+                    target,
+                    RelationType.RELATED_TO,
+                    0.6,
+                    origin="perception",
+                )
+        except Exception as e:  # noqa: BLE001 — grounding is advisory
+            logger.debug(f"world-verdict grounding failed: {e}")
 
     def _compose_motor_fields(
         self,
@@ -713,6 +1461,30 @@ class EmbodimentMixin:
         except Exception as e:  # noqa: BLE001 — fields are advisory
             logger.debug(f"motor field composition failed: {e}")
             return None
+
+    def _frame_change(self, prev_grid: Any) -> float:
+        """Fraction of cells the last ``observe`` saw change.
+
+        The felt pulse of a step: what couples to dopamine, what
+        feeds the stuck detector, what sets broadcast salience —
+        measured off her own world-model grid, not reported by a
+        delegate. A first frame is wholly new (1.0).
+        """
+        cur = self._prev_world_grid
+        if cur is None:
+            return 0.0
+        if prev_grid is None:
+            return 1.0
+        h, w = cur.height, cur.width
+        if prev_grid.height != h or prev_grid.width != w:
+            return 1.0
+        diff = sum(
+            1
+            for r in range(h)
+            for c in range(w)
+            if prev_grid.at(r, c) != cur.at(r, c)
+        )
+        return diff / (h * w) if h and w else 0.0
 
     def _broadcast_world_action(self, choice: dict[str, Any], motor: Any) -> None:
         """The chosen action becomes broadcast content — every region

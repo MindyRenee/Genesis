@@ -42,6 +42,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any
 
+from parietal_lobe.boards import ConstraintSession
 from parietal_lobe.scene import Scene
 
 Cell = tuple[int, int]
@@ -68,8 +69,12 @@ _STATIC_AFTER = 6             # observations unmoved → counts as terrain
 _MAX_OBJECT_FRACTION = 0.66   # ≥⅔ of the field is fill, not figure
 _MAX_TRANSLATE = 12           # largest per-step displacement searched
 _RESET_MIN_ENTITIES = 3       # live entities whose total loss means new world
+_CONTACT_FRESH_AFTER = 4      # ticks apart before a touch counts as new
 _RESHAPE_MIN_FRACTION = 0.15  # changed-cells share that counts as reshaping
 _COLLECT_CONFIRM = 3          # ticks a vanished contact must stay gone
+_CLICK_RADIUS = 3             # cells around a distal act counted as its answer
+_MOVE_FAILURE_RETRIES = 2     # observed no-ops before a state-action is refused
+_MOVE_FAILURE_COOLDOWN = 20   # ticks before a changed world earns a retrial
 
 
 def _rigid_translation(
@@ -162,6 +167,7 @@ class WorldEntity:
     velocity: tuple[float, float] = (0.0, 0.0)
     velocity_exact: bool = True  # last move measured rigidly, not guessed
     n_seen: int = 1
+    churn_ticks: int = 0        # observations where its cells changed
     n_moved_free: int = 0       # moved while no action was pending
     action_moves: int = 0       # moved on the step right after her action
     # Moves after her action that matched the action's learned
@@ -182,10 +188,31 @@ class WorldEntity:
     # others — evidence about this entity, not its whole kind.
     blocked_states: set[tuple[PartSig, ...]] = field(default_factory=set)
     open_states: set[tuple[PartSig, ...]] = field(default_factory=set)
+    # Per-sig verdict epoch for blocked_states: the epoch a flashed
+    # (state-conditional) refusal was measured at, ``None`` for a
+    # silent — unconditional — one. Entity evidence lives here so
+    # one gate's conditional verdict cannot be overridden by a
+    # silent wall of the same color.
+    blocked_epochs: dict[tuple[PartSig, ...], int | None] = field(
+        default_factory=dict
+    )
     # When a match rewrote this entity's state this tick — recolor,
     # reshape, rotation — the (from → to) pair, for transform
     # attribution. ``None`` on an unremarkable observation.
     last_transform: tuple[PartSig, PartSig] | None = None
+
+    def is_display(self, bounds: tuple[int, int]) -> bool:
+        """A readout, not a thing: edge-anchored and churning on
+        schedule — a counter, a gauge, a status row. It changes
+        whether or not anything touches it, and it sits where
+        displays sit. ``bounds`` is the field's (height, width)."""
+        if self.n_seen < 6 or self.churn_ticks * 2 < self.n_seen:
+            return False
+        h, w = bounds
+        return any(
+            r < 2 or c < 2 or r >= h - 2 or c >= w - 2
+            for r, c in self.cells
+        )
 
     @property
     def spontaneous(self) -> bool:
@@ -227,12 +254,44 @@ class WorldModel:
         self._next_id = 1
         self.self_id: int | None = None
         self._pending_action: str | None = None
+        # Which entity was her when the pending action was issued.
+        # If self is re-adopted before the world's answer arrives,
+        # the measured delta spans two different bodies — identity
+        # noise, not physics; the trial is discarded, not learned.
+        self._pending_self_id: int | None = None
+        # The cell a coordinate-typed action was aimed at — the
+        # distal analogue of the pending action: without it a click
+        # is unattributable, "ACTION6 happened" with nowhere it
+        # landed.
+        self._pending_target: Cell | None = None
+        # Previous frame's cell→color snapshot — the before-image a
+        # distal action's after-image is measured against.
+        self._last_grid: dict[Cell, int] | None = None
 
         # Learned knowledge — survives episode resets.
         self.action_effects: dict[str, Counter[Cell]] = {}
         self.action_tries: Counter[str] = Counter()
         self.action_noops: Counter[str] = Counter()
+        # Empirical dynamics the entity map failed to explain: a
+        # state-action that repeatedly left the body unmoved is a
+        # measured transition failure, not a route worth replanning.
+        self._move_failures: dict[
+            tuple[str, frozenset[Cell], tuple[PartSig, ...]],
+            tuple[int, int],
+        ] = {}
         self.affordances: dict[int, Counter[str]] = {}
+        # Distal affordances — what acting *at* a kind does, learned
+        # the same way contact affordances are learned: tries count
+        # the experiments, changes sum the cells the world answered
+        # with. ``click_changes[(action, color)] / tries`` is the
+        # kind's responsiveness — a control that answers is worth
+        # pressing again; a dead one stops paying for probes.
+        self.click_tries: Counter[tuple[str, int | None]] = Counter()
+        self.click_changes: Counter[tuple[str, int | None]] = Counter()
+        # The last distal act: (cell, color-that-was-there). When the
+        # world ends without a body to credit, this is the cause to
+        # attribute — the thing she just acted on.
+        self._last_clicked: tuple[Cell, int | None] | None = None
         # What contact does to her body: kind → the part state it
         # rewrote → what it rewrote it to. ``transforms[5][part_a]
         # [part_b] += 1`` means "the color-5 thing changed my part
@@ -251,9 +310,53 @@ class WorldModel:
         # Conditional passability lives on the entities themselves
         # (WorldEntity.blocked_states / open_states): "that gate
         # stopped me" is evidence about that gate, not everything
-        # sharing its color.
+        # sharing its color. The kind level keeps the same
+        # granularity: ``blocked_kinds[color]`` is the set of
+        # self-states this kind has refused — a bump under one
+        # signature extends to unbumped members of the kind under
+        # that signature (walls stay walls), but never crosses
+        # states: the gate that stopped one body may be exactly
+        # the door the next body opens.
+        self.blocked_kinds: dict[int, set[tuple[PartSig, ...]]] = {}
+        # The admitting twin: kinds that let a self-state enter.
+        # When a kind has both refused and admitted one state it is
+        # a mixed kind — members differ — and unobserved members
+        # fall back to per-entity evidence rather than the kind's
+        # refusal.
+        self.open_kinds: dict[int, set[tuple[PartSig, ...]]] = {}
+        # Verdict epoch: a refusal that arrived the same tick part
+        # of her changed is *conditional* — the thing did not stop
+        # her body, it stopped the state her body was in, and said
+        # so. ``None`` marks an unconditional (silent) refusal — a
+        # plain wall. Conditional verdicts bind only in the epoch
+        # they were measured: contact with something unexplained
+        # may have rewritten state her sensors cannot see, and a
+        # verdict from before that touch is stale evidence.
+        self._blocked_epoch: dict[tuple[int, tuple[PartSig, ...]], int | None] = {}
+        self._state_epoch = 0
+        # Tick each kind was last in contact — a touch counts as
+        # fresh only after a real absence. Perception flicker can
+        # drop a contact for a tick and bring it back; that is the
+        # same ongoing touch, not a new one, and it must not open
+        # epochs on a loop.
+        self._contact_kinds: dict[int, int] = {}
+        # Kinds whose unexplained contact coincided with a state
+        # epoch opening — candidate hidden-state changers. Their
+        # rewrite is invisible to her signature, so the epoch is
+        # the only trace it leaves.
+        self._state_changers: set[int] = set()
+        # The cerebellar comparator — efference copy against
+        # reafference. ``None`` is the model standing alone (tests):
+        # a mismatch is then binary surprise, exactly as before.
+        # Wired in by Mind once the brain's regions exist.
+        self.motor_comparator: Any = None
+        # Cell -> entity ids, rebuilt per observation: forward
+        # simulation asks "what is here" thousands of times a step.
+        self._cell_entities: dict[Cell, list[int]] = {}
 
-        # Episodic map — cleared on reset.
+        # Spatial map — learned knowledge of this world's layout:
+        # persists across retries like the physics, wiped only for
+        # a new world (keep_learning=False).
         self.known_free: set[Cell] = set()
         self.known_blocked: set[Cell] = set()
         # Cells whose ownership is unexplained — no entity claimed
@@ -261,6 +364,14 @@ class WorldModel:
         # world is not an object, but it refuses entry all the same.
         # Free-space marking must not resurrect them.
         self.refused_cells: set[Cell] = set()
+        # One refused strip is a suspicion, not a wall: a bump's
+        # leading edge blames every unexplained cell inside it, so
+        # floor beside a real wall reads the same as the wall. A
+        # cell earns refused status only where refused strips keep
+        # overlapping — certainty is a singleton strip (one cell
+        # explains the refusal) or convergence (the same cell
+        # under repeated refusals).
+        self._refusal_suspects: Counter[Cell] = Counter()
         self.visits: Counter[Cell] = Counter()
 
         # Terrain kinds — the medium she moves through, not objects.
@@ -287,12 +398,29 @@ class WorldModel:
         # reappearance says occlusion, staying gone says eaten.
         self._pending_collect: list[_PendingCollect] = []
 
+        # Episodic recall's residue on this world: color → the
+        # valence similar past experiences left behind. Written by
+        # the embodiment layer's recall pass each window it fires;
+        # read by the motor field as associative pull. Survives
+        # episode resets (that is what memory is for) and clears
+        # with the world.
+        self.recalled_valence: dict[int, float] = {}
+
         # Consecutive action-observations the current self failed
         # to answer. Above the limit she is re-judged — a body that
         # stops answering her commands is evidence it was never
         # hers (a display element can inherit the flag through
         # re-segmentation, a dead avatar leaves none).
         self._self_silence = 0
+
+        # Field dimensions, for readout-vs-thing discrimination.
+        self._grid_bounds: tuple[int, int] = (0, 0)
+
+        # Structured scenes — lattice parsing, marker relations,
+        # the colour cycle clicks drive. Learns the same way the
+        # rest of the model does: what the screen shows, induced
+        # from demonstrated states, never assumed.
+        self.boards = ConstraintSession()
 
     def _resolve_collections(self, events: list[WorldEvent]) -> None:
         """Settle vanished-contact records into honest outcomes.
@@ -362,11 +490,19 @@ class WorldModel:
             )
             if term is not None:
                 events.extend(self.attribute_terminal(term))
-                self.reset(keep_learning=True)
+                self.reset(
+                    keep_learning=True,
+                    keep_map=term != OUT_WIN,
+                )
 
         self.tick += 1
+        self._grid_bounds = (scene.grid.height, scene.grid.width)
         pending = self._pending_action
         self._pending_action = None
+        pending_self = self._pending_self_id
+        self._pending_self_id = None
+        pending_target = self._pending_target
+        self._pending_target = None
 
         # Figure/ground: a region occupying more than half the field
         # is the world itself, not a thing in it — floor and fog
@@ -389,7 +525,7 @@ class WorldModel:
             1 for e in self.entities.values() if not e.gone
         )
         if prior_live >= _RESET_MIN_ENTITIES and not matched:
-            events.extend(self.suspect_terminal())
+            events.extend(self.suspect_terminal(pending))
             self.reset(keep_learning=True)
             events.append(WorldEvent(
                 "reset", "the world reset", salience=0.9))
@@ -445,6 +581,9 @@ class WorldModel:
                         salience=0.6,
                         entity_id=entity.id,
                     ))
+            if entity.cells != obj.cells:
+                entity.churn_ticks += 1
+            prev_cells = entity.cells
             entity.cells = obj.cells
             entity.centroid = obj.centroid
             entity.last_seen = self.tick
@@ -456,7 +595,17 @@ class WorldModel:
                     entity_id=entity.id,
                 ))
             if entity.is_self or entity.part_of_self:
-                for cell in obj.cells:
+                # Ground crossed by a stride is covered ground even
+                # though she never stands inside it — otherwise the
+                # cells between footprint and landing stay
+                # "unvisited" forever and the frontier keeps
+                # sending her back to tiles she already passed.
+                crossed = (
+                    self._swept(prev_cells, delta)
+                    if rigid_move
+                    else set()
+                )
+                for cell in obj.cells | crossed:
                     self.known_free.add(cell)
                     self.visits[cell] += 1
 
@@ -466,7 +615,11 @@ class WorldModel:
         # Only a confidently-measured motion can disappoint a
         # prediction — a non-rigid footprint means the observation
         # itself is ambiguous, not surprising.
-        if pending is not None and self.self_id is not None:
+        if (
+            pending is not None
+            and self.self_id is not None
+            and self.self_id == pending_self
+        ):
             self_ent = self.entities.get(self.self_id)
             if (
                 self_ent is not None
@@ -480,11 +633,29 @@ class WorldModel:
                         round(self_ent.velocity[1]),
                     )
                     if observed != expected:
+                        # The cerebellum grades the miss — a bump and
+                        # a mislearned stride are not the same
+                        # surprise — and accumulates it against the
+                        # action's calibration. Without it the event
+                        # carries the flat surprise it always did.
+                        salience = 0.5
+                        if self.motor_comparator is not None:
+                            try:
+                                magnitude = (
+                                    self.motor_comparator.compare(
+                                        pending, expected, observed
+                                    )
+                                )
+                                salience = min(
+                                    0.9, 0.4 + 0.5 * magnitude
+                                )
+                            except Exception:  # noqa: BLE001 — advisory
+                                pass
                         events.append(WorldEvent(
                             "unexpected",
                             f"action {pending} moved me {observed}, "
                             f"expected {expected}",
-                            salience=0.5,
+                            salience=salience,
                             entity_id=self_ent.id,
                         ))
 
@@ -614,12 +785,31 @@ class WorldModel:
         self._resolve_collections(events)
         self._infer_self(events)
         if pending is not None:
-            self._attribute_action(pending, events)
+            self._attribute_action(pending, events, pending_self)
+        if pending is not None and pending_target is not None:
+            self._attribute_click(pending, pending_target, scene, events)
         self._update_parts(events)
-        self._learn_terrain()
+        self._learn_terrain(scene, pending)
         self._update_map(scene)
         self._update_passability()
+        # Structured-scene parsing — boards, markers, and the click
+        # cycle — reparsed per frame like the entities themselves.
+        self.boards.observe(scene.grid)
         events.extend(self._contact_outcomes(pending, events))
+        # The after-image for the next act's before-image: distal
+        # attribution measures the world's answer against this
+        # frame, so the snapshot is taken only after every update
+        # that could mutate tracked state.
+        self._last_grid = {
+            (r, c): v for r, c, v in scene.grid.iter_cells()
+        }
+        # Forward-simulation runs thousands of contact checks a
+        # step; a cell->entity index turns each into swept-size
+        # lookups instead of a scan of everything alive.
+        self._cell_entities = {}
+        for entity in self.entities.values():
+            for cell in entity.cells:
+                self._cell_entities.setdefault(cell, []).append(entity.id)
 
         if info:
             if info.get("reset") or info.get("death"):
@@ -914,11 +1104,20 @@ class WorldModel:
         }
 
     def _attribute_action(
-        self, action: str, events: list[WorldEvent]
+        self,
+        action: str,
+        events: list[WorldEvent],
+        pending_self: int | None = None,
     ) -> None:
         """Record what the pending action did to her body."""
         self.action_tries[action] += 1
         if self.self_id is None:
+            return
+        if pending_self is not None and self.self_id != pending_self:
+            # The body that acted is not the body answering — a self
+            # re-adoption happened inside the trial. The delta this
+            # frame shows belongs to a different entity's tracking,
+            # so it says nothing about what the action does.
             return
         entity = self.entities.get(self.self_id)
         if entity is None:
@@ -934,6 +1133,82 @@ class WorldModel:
         if delta == (0, 0):
             self.action_noops[action] += 1
 
+    def _attribute_click(
+        self,
+        action: str,
+        target: Cell,
+        scene: Scene,
+        events: list[WorldEvent],
+    ) -> None:
+        """Record what a distal act at *target* did to the world.
+
+        The distal analogue of contact attribution: she cannot touch
+        the cell she acts on, so the evidence is what changed around
+        it — a control answers locally. What she clicked *on* is the
+        color that was there in the before-image; what it did is the
+        count of cells the world moved within reach of the act. Both
+        land on the kind (color), not the cell — the physics of
+        "pressing a color-5 tile" transfer to every color-5 tile,
+        which is the only generalization a first episode affords.
+        """
+        prev = self._last_grid
+        if prev is None:
+            return
+        r0, c0 = int(target[0]), int(target[1])
+        clicked_color = prev.get((r0, c0))
+        changed = 0
+        for dr in range(-_CLICK_RADIUS, _CLICK_RADIUS + 1):
+            for dc in range(-_CLICK_RADIUS, _CLICK_RADIUS + 1):
+                cell = (r0 + dr, c0 + dc)
+                if cell in prev and scene.grid.at(*cell) != prev[cell]:
+                    changed += 1
+        key = (action, clicked_color)
+        self.click_tries[key] += 1
+        self.click_changes[key] += changed
+        self._last_clicked = ((r0, c0), clicked_color)
+        if changed:
+            events.append(WorldEvent(
+                "affected",
+                f"acting at ({r0},{c0}) changed {changed} cells",
+                salience=min(0.8, 0.3 + changed * 0.02),
+            ))
+
+    def is_display(self, entity: WorldEntity) -> bool:
+        """Is this entity a readout rather than a thing in the
+        world — a HUD element churning at the field's edge?"""
+        return entity.is_display(self._grid_bounds)
+
+    def click_affordance(self, action: str, color: int | None) -> float:
+        """Mean cells a distal act at this kind has moved — its
+        responsiveness. Zero is honest silence: probed or not, the
+        world has never answered this press."""
+        tries = self.click_tries.get((action, color), 0)
+        if not tries:
+            return 0.0
+        return self.click_changes[(action, color)] / tries
+
+    def board_plan(self) -> Cell | None:
+        """The structured-scene machinery's next click, if it has one.
+
+        When the screen parses as constraint boards and the induced
+        rule says a press would move a violating element toward its
+        asserted state, the answer is the screen cell to aim a
+        coordinate action at. ``None`` when the scene holds no
+        boards, no rule can be induced, or nothing would help — the
+        same silence any unlearned mechanism returns.
+        """
+        return self.boards.plan()
+
+    def click_responsiveness(self, color: int | None) -> float:
+        """The best answer any distal act has gotten from this kind —
+        action-agnostic, so the field can weigh a thing without
+        caring which control she pressed it with."""
+        best = 0.0
+        for (a, c), tries in self.click_tries.items():
+            if c == color and tries:
+                best = max(best, self.click_changes[(a, c)] / tries)
+        return best
+
     def attribute_terminal(self, outcome: str) -> list[WorldEvent]:
         """Credit whatever she was touching when the world ended.
 
@@ -946,9 +1221,27 @@ class WorldModel:
         """
         me = self._effector()
         if me is None:
-            return []
+            # No body to credit — the distal analogue of the contact
+            # rule: whatever she last acted *at* was there when the
+            # world ended. A click that ends an episode marks the
+            # pressed kind, exactly as a fatal touch marks a hazard.
+            if self._last_clicked is None:
+                return []
+            _cell, color = self._last_clicked
+            if color is None:
+                return []
+            self.affordances.setdefault(color, Counter())[outcome] += 1
+            return [WorldEvent(
+                outcome,
+                f"acting on the color-{color} thing ended the world"
+                if outcome == OUT_HAZARD
+                else f"acting on the color-{color} thing is the goal",
+                salience=0.9,
+            )]
         events = []
+        credited: set[int] = set()
         for contact in self._contacts(me):
+            credited.add(contact.color)
             self.affordances.setdefault(
                 contact.color, Counter()
             )[outcome] += 1
@@ -961,9 +1254,46 @@ class WorldModel:
                 entity_id=me.id,
                 other_id=contact.id,
             ))
+        # The world can also end *on* a move — she steps onto the
+        # goal and the level is gone before the contact is ever
+        # observed. The cause then sits where her pending move was
+        # carrying her: the cells she was entering when it ended.
+        # Same rule convicts a hazard met on the way in. Floor and
+        # her own body are not causes; contacts already credited are
+        # not double-counted.
+        pending = self._pending_action
+        if pending is not None:
+            expected = self.effect_of(pending)
+            footprint = self.self_footprint()
+            if expected not in (None, (0, 0)) and footprint:
+                target = self._swept(footprint, expected) - footprint
+                for entity in self.entities.values():
+                    if (
+                        entity.is_self
+                        or entity.part_of_self
+                        or entity.color in self.terrain_kinds
+                        or entity.color in credited
+                        or not entity.cells & target
+                    ):
+                        continue
+                    credited.add(entity.color)
+                    self.affordances.setdefault(
+                        entity.color, Counter()
+                    )[outcome] += 1
+                    events.append(WorldEvent(
+                        outcome,
+                        f"the color-{entity.color} thing killed me"
+                        if outcome == OUT_HAZARD
+                        else f"the color-{entity.color} thing is the goal",
+                        salience=0.9,
+                        entity_id=me.id,
+                        other_id=entity.id,
+                    ))
         return events
 
-    def suspect_terminal(self) -> list[WorldEvent]:
+    def suspect_terminal(
+        self, pending: str | None = None
+    ) -> list[WorldEvent]:
         """Hazard suspicion from an unannounced reset.
 
         The cause is unknown — the world never said what ended it —
@@ -978,12 +1308,14 @@ class WorldModel:
             return []
         my_cells = self.self_footprint()
         events = []
+        suspected: set[int] = set()
         for contact in self._contacts(me):
             if (
                 contact.color in self.terrain_kinds
                 or contact.cells > my_cells
             ):
                 continue
+            suspected.add(contact.color)
             self.death_suspects[contact.color] += 1
             events.append(WorldEvent(
                 "suspect",
@@ -993,6 +1325,35 @@ class WorldModel:
                 entity_id=me.id,
                 other_id=contact.id,
             ))
+        # A long stride can meet its killer inside the swept path
+        # without the old frame ever showing adjacency — the world
+        # ended before the contact frame existed. Credit the kinds
+        # occupying where the pending action was carrying her, just
+        # as a declared ending does.
+        if pending is not None and my_cells:
+            expected = self.effect_of(pending)
+            if expected not in (None, (0, 0)):
+                target = self._swept(my_cells, expected) - my_cells
+                for entity in self.entities.values():
+                    if (
+                        entity.is_self
+                        or entity.part_of_self
+                        or entity.gone
+                        or entity.color in self.terrain_kinds
+                        or entity.color in suspected
+                        or not entity.cells & target
+                    ):
+                        continue
+                    suspected.add(entity.color)
+                    self.death_suspects[entity.color] += 1
+                    events.append(WorldEvent(
+                        "suspect",
+                        f"the color-{entity.color} thing was in my "
+                        f"path when the world ended",
+                        salience=0.5,
+                        entity_id=me.id,
+                        other_id=entity.id,
+                    ))
         return events
 
     def hazard_kind(self, color: int) -> bool:
@@ -1061,17 +1422,23 @@ class WorldModel:
         }
 
         # When a known-effect action produced no motion, the blocker
-        # is whatever sits on the cell she tried to enter — her cells
-        # shifted by the expected displacement.
+        # is whatever sits in the tile she tried to cross — the
+        # whole swept path, not only the destination strip: a wall
+        # inside a stride refuses it and the blame belongs to the
+        # wall's cells, not to empty floor at the far end.
         target_cells: set[Cell] = set()
         if pending is not None and me.velocity == (0.0, 0.0):
             expected = self.effect_of(pending)
             if expected not in (None, (0, 0)):
-                target_cells = {
-                    (r + expected[0], c + expected[1]) for r, c in my_cells
-                }
+                target_cells = self._swept(my_cells, expected)
+                sig = self.self_signature()
+                if sig is not None:
+                    key = (pending, frozenset(my_cells), sig)
+                    tries, _last = self._move_failures.get(key, (0, 0))
+                    self._move_failures[key] = (tries + 1, self.tick)
 
         blocked_hit = False
+        my_sig = self.self_signature()
         for entity in self.entities.values():
             if entity.id in cluster or entity.id in substrates:
                 continue
@@ -1095,14 +1462,38 @@ class WorldModel:
                 and target_cells
                 and entity.cells & target_cells
                 and not entity.cells & my_cells
+                and not (
+                    # Proven-open things in the path aren't the wall
+                    # — a collectible beside the blocker must not
+                    # take the blocker's blame.
+                    (my_sig is not None and my_sig in entity.open_states)
+                    or self.affordance_of(entity.color)[OUT_COLLECT]
+                    or self.affordance_of(entity.color)[OUT_TRANSFORM]
+                    or self.affordance_of(entity.color)[OUT_WIN]
+                    or self.affordance_of(entity.color)[OUT_NOTHING]
+                )
             ):
                 self.affordances.setdefault(entity.color, Counter())
                 aff = self.affordances[entity.color]
                 aff[OUT_BLOCK] += 1
                 blocked_hit = True
-                sig = self.self_signature()
-                if sig is not None:
-                    entity.blocked_states.add(sig)
+                if my_sig is not None:
+                    entity.blocked_states.add(my_sig)
+                    entity.open_states.discard(my_sig)
+                    self.blocked_kinds.setdefault(
+                        entity.color, set()
+                    ).add(my_sig)
+                    # A refusal is a measurement taken under her
+                    # current state — and part of that state may be
+                    # hidden from her own sensors. The verdict binds
+                    # only until something unexplained touches her:
+                    # after that, what refused her may not refuse
+                    # her now. Even a wall must be re-measured to
+                    # keep its certainty.
+                    entity.blocked_epochs[my_sig] = self._state_epoch
+                    self._blocked_epoch[
+                        (entity.color, my_sig)
+                    ] = self._state_epoch
                 self.known_blocked.update(entity.cells)
                 events.append(WorldEvent(
                     "blocked",
@@ -1115,7 +1506,11 @@ class WorldModel:
         # No entity explains the refusal — the space itself did.
         # The destination cells no live thing claims are the edge
         # of her world: mark them refused so the map, the field,
-        # and the planner all stop routing through them.
+        # and the planner all stop routing through them. A strip
+        # with exactly one unexplained cell is certain — that cell
+        # is the wall. A wider strip is only a suspect: the same
+        # cells must keep refusing to earn the mark, or floor
+        # beside walls gets condemned into an unreachable island.
         if target_cells and not blocked_hit:
             occupied = {
                 cell
@@ -1124,10 +1519,17 @@ class WorldModel:
                 for cell in e.cells
             }
             refused = target_cells - occupied - my_cells
-            if refused:
+            if len(refused) == 1:
                 self.refused_cells.update(refused)
                 self.known_blocked.update(refused)
                 self.known_free.difference_update(refused)
+            elif refused:
+                for cell in refused:
+                    self._refusal_suspects[cell] += 1
+                    if self._refusal_suspects[cell] >= 2:
+                        self.refused_cells.add(cell)
+                        self.known_blocked.add(cell)
+                        self.known_free.discard(cell)
 
         # Self-state change under contact: whatever touched her on
         # the tick part of her changed is what changed it. Every
@@ -1161,7 +1563,9 @@ class WorldModel:
                 ))
         return events
 
-    def _learn_terrain(self) -> None:
+    def _learn_terrain(
+        self, scene: Scene, pending: str | None
+    ) -> None:
         """Learn which kinds are the medium she moves through.
 
         Perception never labels ground as ground — the floor is just
@@ -1171,8 +1575,15 @@ class WorldModel:
         larger than she is, is the ground — not a thing she can
         encounter. Small tiles she crosses (pads, pickups) are
         objects: they are not large and they do not absorb space.
+
+        The medium need not be an object at all: a background color
+        that shows through where she stood is learned the same way.
         """
         footprint = self.self_footprint()
+        if not footprint and pending is not None:
+            effector = self._effector()
+            if effector is not None:
+                footprint = effector.cells
         prev = self._prev_footprint
         self._prev_footprint = footprint
         if not footprint or prev is None:
@@ -1180,6 +1591,12 @@ class WorldModel:
         vacated = prev - footprint
         if not vacated:
             return
+        reclaimed = Counter(
+            scene.grid.at(r, c) for r, c in vacated
+        )
+        for color, cells in reclaimed.items():
+            if color == scene.background and cells * 2 >= len(vacated):
+                self.terrain_kinds.add(color)
         for entity in self.entities.values():
             if (
                 entity.gone
@@ -1192,19 +1609,41 @@ class WorldModel:
                 self.terrain_kinds.add(entity.color)
 
     def _update_map(self, scene: Scene) -> None:
-        """Maintain the occupancy map: free floor vs. solid things."""
+        """Maintain the occupancy map: free medium vs. solid things.
+
+        ``known_free`` means "this cell is made of a medium observed
+        to admit her" — not "nothing is drawn here." Unclaimed pixels
+        are unexplored space; crossing them is how a refusal is
+        measured. Treating every blank cell as walkable invents a map
+        through walls and voids before either exists.
+        """
         occupied = {
             cell
             for e in self.entities.values()
             if not e.gone and e.color not in self.terrain_kinds
             for cell in e.cells
         }
-        for r, c, _color in scene.grid.iter_cells():
+        # A refusal is measured truth only while the evidence stands:
+        # a cell she now demonstrably occupies cannot have refused
+        # her — the mark is stale, evict it. (This is how a map kept
+        # across attempts stays honest when the world changes.)
+        stood = self.self_footprint()
+        if stood:
+            self.known_free.update(stood)
+            self.refused_cells.difference_update(stood)
+            for cell in stood:
+                self._refusal_suspects.pop(cell, None)
+        for r, c, color in scene.grid.iter_cells():
             cell = (r, c)
-            if cell in occupied or cell in self.refused_cells:
+            if (
+                color not in self.terrain_kinds
+                or cell in occupied
+                or cell in self.refused_cells
+            ):
                 continue
             self.known_free.add(cell)
             self.known_blocked.discard(cell)
+        sig = self.self_signature()
         for entity in self.entities.values():
             if (
                 entity.gone
@@ -1213,12 +1652,25 @@ class WorldModel:
                 or entity.color in self.terrain_kinds
             ):
                 continue
-            aff = self.affordance_of(entity.color)
-            # Passability is learned, not assumed: a thing is
-            # impassable only once touching it has actually blocked
-            # or killed her. A motionless thing might be a wall —
-            # or a gem sitting still. Static ≠ solid.
-            if aff[OUT_BLOCK] > 0 or self.hazard_kind(entity.color):
+            # Passability is learned, not assumed — and it is
+            # conditional: a kind is map-solid only for the
+            # self-state it has actually refused, never across
+            # states. The gate that stopped one body condemns
+            # nothing for the body a station just gave her; pure
+            # hazards stay condemned for every state.
+            refused_here = (
+                sig is not None
+                and sig in self.blocked_kinds.get(entity.color, ())
+                and sig not in self.open_kinds.get(entity.color, ())
+                and (
+                    # An unmarked or unconditional verdict always
+                    # binds; a conditional one binds only in the
+                    # epoch it was measured.
+                    self._blocked_epoch.get((entity.color, sig))
+                    in (None, self._state_epoch)
+                )
+            )
+            if refused_here or self.hazard_kind(entity.color):
                 self.known_blocked.update(entity.cells)
                 self.known_free.difference_update(entity.cells)
             elif entity.spontaneous:
@@ -1226,6 +1678,11 @@ class WorldModel:
                 # touching them may still be dangerous — affordance
                 # decides, the map just records presence.
                 self.known_free.difference_update(entity.cells)
+            else:
+                # Not refusing her current state: the cells' admission
+                # is the entity's business (passable), not the map's —
+                # evict whatever a former self-state had condemned.
+                self.known_blocked.difference_update(entity.cells)
 
     def _update_passability(self) -> None:
         """Record which self-states can occupy an entity's cells.
@@ -1244,11 +1701,50 @@ class WorldModel:
             if part.part_of_self and not part.gone:
                 my_cells.update(part.cells)
         cluster = self._cluster_ids(me)
+        touched: set[int] = set()
         for entity in self.entities.values():
-            if entity.id in cluster or entity.gone:
+            # Things that vanished under her this very tick were in
+            # contact when they went — the tile she is standing on
+            # reads exactly like one she consumed.
+            if entity.id in cluster or (
+                entity.gone and entity.gone_tick != self.tick
+            ):
                 continue
             if entity.cells & my_cells:
                 entity.open_states.add(sig)
+                # Occupation is the later word: a refusal this
+                # thing once gave her is answered by her being here.
+                entity.blocked_states.discard(sig)
+                entity.blocked_epochs.pop(sig, None)
+                self.open_kinds.setdefault(entity.color, set()).add(sig)
+                touched.add(entity.color)
+        # Touching something unexplained may have changed her in
+        # ways her sensors do not report — hidden state exists in
+        # some worlds. Each *new* unexplained contact opens a fresh
+        # epoch: verdicts measured under the old one stay recorded
+        # but stop binding until re-proven.
+        # A contact is fresh only after an absence longer than the
+        # flicker window — stepping off a station and back on is a
+        # new touch; a thing dropping out of sight for a tick is not.
+        newly = {
+            color for color in touched
+            if self.tick - self._contact_kinds.get(
+                color, -_CONTACT_FRESH_AFTER - 1
+            ) > _CONTACT_FRESH_AFTER
+        }
+        for color in touched:
+            self._contact_kinds[color] = self.tick
+        # "Unexplained" here means no evidence that a real outcome
+        # occurred: a kind seen only to do *nothing visible* may
+        # still have moved hidden state, and a station of that sort
+        # acts on every fresh contact, not only the first.
+        unexplained = {
+            color for color in newly
+            if not (set(self.affordance_of(color)) - {OUT_NOTHING})
+        }
+        if unexplained:
+            self._state_epoch += 1
+            self._state_changers.update(unexplained)
 
     def passable(
         self, entity: WorldEntity, self_sig: tuple[PartSig, ...]
@@ -1266,7 +1762,10 @@ class WorldModel:
         # Observed evidence about THIS entity dominates kind priors.
         if self_sig in entity.open_states:
             return True
-        if self_sig in entity.blocked_states:
+        if self_sig in entity.blocked_states and (
+            entity.blocked_epochs.get(self_sig)
+            in (None, self._state_epoch)
+        ):
             return False
         if self.hazard_kind(entity.color):
             return False
@@ -1276,6 +1775,29 @@ class WorldModel:
             or aff[OUT_WIN] > 0
         ):
             return True
+        if aff[OUT_NOTHING] > 0:
+            # Walked on before without consequence — surface, not
+            # wall. Kind-mixed gates keep their per-entity answer
+            # via the open/blocked states checked above.
+            return True
+        if self_sig in self.blocked_kinds.get(entity.color, ()):
+            # This kind has refused contact *in this self-state* —
+            # the evidence transfers to unbumped members of the
+            # kind under the refused signature (a wall need not
+            # be re-probed piece by piece), but not across states:
+            # an unobserved pair stays optimistically open, the
+            # only way a conditional gate is ever found open. And
+            # a verdict whose refusal announced a state-change binds
+            # only until she next touches the unexplained — hidden
+            # state may have moved since it was measured.
+            if self_sig not in self.open_kinds.get(entity.color, ()) and (
+                self._blocked_epoch.get((entity.color, self_sig))
+                in (None, self._state_epoch)
+            ):
+                return False
+            # The kind is mixed under this very state — members
+            # differ, so this member is judged by what it alone
+            # has shown: nothing yet.
         return True
 
     def _effector(self) -> WorldEntity | None:
@@ -1392,9 +1914,39 @@ class WorldModel:
     def affordance_of(self, color: int) -> Counter[str]:
         return self.affordances.get(color, Counter())
 
+    def recalled_valence_of(self, color: int) -> float:
+        """What episodic memory feels about this kind right now.
+
+        Positive — remembered goals pull; negative — remembered
+        hazards and frustrations repel. Written by the recall pass
+        in the embodiment layer (pattern completion over her own
+        event vocabulary), read by the motor field as one more
+        voice in the field — never a command.
+        """
+        return self.recalled_valence.get(color, 0.0)
+
     def action_understood(self, action: str) -> bool:
-        """Enough trials to know what the action does to her."""
-        return self.action_tries[action] >= _SELF_MIN_CONTINGENT
+        """Enough trials to know what the action does to her —
+        and no evidence the entry has gone stale."""
+        if self.action_tries[action] < _SELF_MIN_CONTINGENT:
+            return False
+        return not self.action_miscalibrated(action)
+
+    def action_miscalibrated(self, action: str) -> bool:
+        """The cerebellum's verdict: this action keeps surprising.
+
+        Nominal experience is not comprehension — a body whose model
+        of a move keeps being wrong has more babbling to do. Without
+        a comparator wired in, stale-ness is undetectable, so the
+        answer is no.
+        """
+        comparator = self.motor_comparator
+        if comparator is None:
+            return False
+        try:
+            return bool(comparator.miscalibrated(action))
+        except Exception:  # noqa: BLE001 — advisory machinery
+            return False
 
     # ─── Forward model ──────────────────────────────────────────
 
@@ -1414,6 +1966,30 @@ class WorldModel:
             ),
         )
 
+    def _swept(
+        self, cells: frozenset[Cell] | set[Cell], effect: Cell
+    ) -> set[Cell]:
+        """Cells a stride crosses, destination included.
+
+        A multi-cell stride is atomic in these worlds: obstruction
+        anywhere along it refuses the whole move — the world does
+        not slide her partway. So refusal evidence, and simulated
+        passability, belong to the path the footprint travels, not
+        only to the strip it lands on.
+        """
+        dr, dc = effect
+        steps = max(abs(dr), abs(dc))
+        out: set[Cell] = set()
+        for k in range(1, steps + 1):
+            for r, c in cells:
+                out.add(
+                    (
+                        r + int(dr * k / steps),
+                        c + int(dc * k / steps),
+                    )
+                )
+        return out
+
     def simulate(self, state: SimState, action: str) -> SimState | None:
         """One forward step through learned physics.
 
@@ -1424,13 +2000,32 @@ class WorldModel:
         consumed, transformers rewrite a part's state. ``None``
         means the action's effect is unknown or the move fails in
         this state — either way there is nothing to plan on.
+
+        A stride fails if *any* cell along its path is impassable —
+        the sweep is checked, not only the destination: a wall
+        inside the jump refuses the jump.
         """
         effect = self.effect_of(action)
         if effect is None or effect == (0, 0):
             return None
+        failure = self._move_failures.get(
+            (action, state.cells, state.signature)
+        )
+        if (
+            failure is not None
+            and failure[0] >= _MOVE_FAILURE_RETRIES
+            and self.tick - failure[1] < _MOVE_FAILURE_COOLDOWN
+        ):
+            return None
         new_cells = frozenset(
             (r + effect[0], c + effect[1]) for r, c in state.cells
         )
+        height, width = self._grid_bounds
+        if height and width and any(
+            not (0 <= r < height and 0 <= c < width) for r, c in new_cells
+        ):
+            return None
+        swept = self._swept(state.cells, effect)
         gone = set(state.gone)
         new_sig = state.signature
         cluster = {
@@ -1438,28 +2033,58 @@ class WorldModel:
             if e.is_self or e.part_of_self
         }
         hits: list[WorldEntity] = []
-        for entity in self.entities.values():
-            if entity.id in state.gone or entity.id in cluster:
-                continue
-            if entity.cells & new_cells:
-                hits.append(entity)
-        # Destination cells no entity claims have no passability
-        # answer from the entity ledger — the map's refusal marks
-        # are the only evidence about them. Entity-covered cells
-        # defer to the entity's own conditional passability.
-        claimed = {
-            cell for e in hits for cell in e.cells & new_cells
-        }
-        if (new_cells - claimed) & self.known_blocked:
+        seen: set[int] = set()
+        index = self._cell_entities
+        if index is not None:
+            for cell in swept:
+                for eid in index.get(cell, ()):
+                    if (
+                        eid in seen
+                        or eid in state.gone
+                        or eid in cluster
+                    ):
+                        continue
+                    seen.add(eid)
+                    entity = self.entities.get(eid)
+                    if entity is not None and entity.cells & swept:
+                        hits.append(entity)
+        else:
+            for entity in self.entities.values():
+                if entity.id in state.gone or entity.id in cluster:
+                    continue
+                if entity.cells & swept:
+                    hits.append(entity)
+        # Swept cells no entity claims have no passability answer
+        # from the entity ledger — the map's refusal marks are the
+        # only evidence about them. Entity-covered cells defer to
+        # the entity's own conditional passability.
+        claimed = {cell for e in hits for cell in e.cells & swept}
+        unclaimed = swept - claimed
+        if (
+            unclaimed & self.known_blocked
+            or unclaimed - self.known_free
+        ):
             return None
         for entity in hits:
+            # Static is not the same as floor: a wall never moves
+            # and is still a wall. Terrain and larger-than-her
+            # entities count as obstacles unless contact evidence
+            # says her state enters them.
             if (
                 entity.color in self.terrain_kinds
                 or entity.cells > new_cells
             ):
+                if not self.passable(entity, new_sig):
+                    return None
                 continue
             if not self.passable(entity, new_sig):
                 return None
+            # Contact outcomes land at the destination — the tile
+            # she finishes on. Something collected only in passing
+            # is not the game's semantics: the stride ends where
+            # it ends.
+            if not entity.cells & new_cells:
+                continue
             aff = self.affordance_of(entity.color)
             if aff[OUT_COLLECT] > 0:
                 gone.add(entity.id)
@@ -1477,37 +2102,94 @@ class WorldModel:
 
     # ─── Episodes ───────────────────────────────────────────────
 
-    def reset(self, keep_learning: bool = True) -> None:
+    def reset(
+        self,
+        keep_learning: bool = True,
+        keep_map: bool = True,
+    ) -> None:
         """Start a new episode.
 
         With ``keep_learning`` the positions are forgotten but the
-        physics are not — action effects, affordances, and tried
-        counts carry across levels, which is what transfer means.
+        physics are not. ``keep_map`` distinguishes a retry from a
+        transition: death in the same maze remembers which cells were
+        wall, floor, or refused; a won level is a new layout, where
+        carrying old cell verdicts would build walls out of memory.
+        ``keep_learning=False`` is a new world entirely: everything
+        learned, map included, is wiped.
         """
         self.tick = 0
         self.entities.clear()
+        self._cell_entities.clear()
         self.self_id = None
         self._pending_action = None
+        self._pending_self_id = None
+        self._pending_target = None
+        self._last_clicked = None
+        self._last_grid = None
         self._prev_footprint = None
-        self.known_free.clear()
-        self.known_blocked.clear()
-        self.refused_cells.clear()
-        self.visits.clear()
         self._pending_collect.clear()
         self._self_silence = 0
+        self._contact_kinds.clear()
+        # A respawn is itself a hidden-state transition: whatever
+        # the world does to her on death, conditional verdicts
+        # measured before it were taken under a different state.
+        self._state_epoch += 1
+        if not keep_map:
+            self.known_free.clear()
+            self.known_blocked.clear()
+            self.refused_cells.clear()
+            self._refusal_suspects.clear()
+            self._move_failures.clear()
+            self.visits.clear()
         if not keep_learning:
+            self.action_labels.clear()
+            self.action_priors.clear()
+            self.coordinate_actions.clear()
             self.action_effects.clear()
             self.action_tries.clear()
             self.action_noops.clear()
+            self._move_failures.clear()
             self.affordances.clear()
+            self.click_tries.clear()
+            self.click_changes.clear()
             self.transforms.clear()
             self.contact_ticks.clear()
             self.death_suspects.clear()
             self.terrain_kinds.clear()
+            self.blocked_kinds.clear()
+            self.open_kinds.clear()
+            self._blocked_epoch.clear()
+            self._state_epoch = 0
+            self._state_changers.clear()
+            self.boards = ConstraintSession()
+            self.known_free.clear()
+            self.known_blocked.clear()
+            self.refused_cells.clear()
+            self._refusal_suspects.clear()
+            self.visits.clear()
+            self.recalled_valence.clear()
+            if self.motor_comparator is not None:
+                try:
+                    self.motor_comparator.reset()
+                except Exception:  # noqa: BLE001 — advisory machinery
+                    pass
 
-    def note_action(self, action: str) -> None:
-        """Record the action just taken; the next observation is its effect."""
+    def note_action(self, action: str, target: Cell | None = None) -> None:
+        """Record the action just taken; the next observation is its effect.
+
+        ``target`` is the cell a coordinate-typed action was aimed
+        at — the distal analogue of contact: the world's answer is
+        attributed to what was *there*, not only to the action id.
+        """
         self._pending_action = action
+        self._pending_self_id = self.self_id
+        self._pending_target = (
+            (int(target[0]), int(target[1])) if target is not None else None
+        )
+        if target is not None:
+            # If the boards machinery planned this press, charge it —
+            # its bookkeeping only counts a click it proposed.
+            self.boards.note_click((int(target[0]), int(target[1])))
 
     def transition_state(self) -> dict[str, Any]:
         """The model flattened to named scalar variables.

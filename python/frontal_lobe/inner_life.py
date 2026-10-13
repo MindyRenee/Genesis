@@ -111,6 +111,20 @@ CHAIN_THOUGHT_DELAY = 8.0
 # emotional state and whether the thought produced an insight
 CHAIN_CONTINUE_BASE = 0.6
 
+# Focus (absorbed-in-a-world) parameters
+# Engagement at/above this level engages the candidate filter — the
+# engaged world supplies the topics the stream dwells on.
+_ENGAGED_FOCUS = 0.5
+# How far back in the thought stream world-sourced topics are drawn
+# from — the running residue of what the world has been about.
+_WORLD_THOUGHT_WINDOW = 12
+# Sources that break through any level of absorption: the body's and
+# the machine's alarms outrank focus the way pain outranks a game.
+_SOMATIC_SOURCES = frozenset({"body", "bug", "distress", "environment"})
+# How often the executive is fed focused candidates while absorbed —
+# its persistent objectives track what she is attending to.
+_EXECUTIVE_FEED_EVERY = 20.0
+
 # Rumination detection parameters
 # A negative chain with 3+ thoughts and decreasing novelty is rumination.
 RUMINATION_MIN_LENGTH = 3
@@ -188,6 +202,7 @@ class InnerLife:
         is_mind_sleeping=None,
         frontal=None,
         is_nap_mode=None,
+        engagement=None,
         seed: int | None = None,
     ) -> None:
         """Initialize the inner life with its cognitive engines and callbacks.
@@ -221,6 +236,10 @@ class InnerLife:
             is_nap_mode: Callback returning True if the current sleep
                 is a nap (light sleep only, N1→N2). Used to configure
                 the sleep cycle tracker when it falls asleep.
+            engagement: Callback returning how held her attention is by
+                an engaged world, [0, 1]. While it is high the thought
+                pool dwells on the world she is in — focus as salience,
+                not amputation. Optional; absent means unfocused.
             seed: Optional RNG seed for deterministic thought sequences.
         """
         self.network = network
@@ -247,6 +266,10 @@ class InnerLife:
         # lucid dreaming probability). If None, dreaming features
         # fall back to the emotional state alone.
         self._get_neuro_summary = get_neuro_summary
+        # Optional callback returning world engagement, [0, 1] —
+        # the focus signal: while a world holds her, off-topic
+        # candidates fade rather than compete at full strength.
+        self._engagement = engagement or (lambda: 0.0)
         self._frontal = frontal
         self._rng = random.Random(seed)
 
@@ -347,6 +370,10 @@ class InnerLife:
         self._curiosity_drive = 0.0
         self._curiosity_drive_threshold = 1.0
         self._last_curiosity_cycle = 0.0
+        # Last time the executive was fed focused candidates while a
+        # world held her — the task-set's persistent objectives form
+        # from what she is attending to, not on a fixed interval.
+        self._last_executive_feed = 0.0
         self._curiosity_cooldown = 15.0  # min seconds between cycles
         self._curiosity_topics_queued = 0
 
@@ -929,6 +956,19 @@ class InnerLife:
                     gw = self._frontal.global_workspace
                     gw.tick(dt=THOUGHT_CHECK_INTERVAL)
                     self._absorb_subliminal(gw)
+                    # Sustained engagement keeps the world's material
+                    # primed in semantic memory — this is the neural
+                    # half of focus: attention holding the world's
+                    # concepts active so the stream can dwell on them.
+                    engagement = self._engagement()
+                    if engagement >= _ENGAGED_FOCUS:
+                        self._prime_world_topics(engagement)
+                        if (
+                            now - self._last_executive_feed
+                            >= _EXECUTIVE_FEED_EVERY
+                        ):
+                            self._last_executive_feed = now
+                            self._feed_executive_focus()
                 except Exception as e:  # noqa: BLE001
                     note_swallowed(
                         "frontal_lobe.inner_life._run",
@@ -1108,6 +1148,20 @@ class InnerLife:
             thought.chain_position = i
             self._record_thought(thought, current_emotion)
             chain_thoughts.append(thought)
+
+            # Absorption pulls a wandering chain back: while a world
+            # holds her, a chain with no thread into what the world
+            # is broadcasting loses its momentum after one link —
+            # the seed got its say; the ramble doesn't.
+            engagement = self._engagement()
+            if engagement >= _ENGAGED_FOCUS:
+                world_topics = self._ignited_world_topics()
+                if world_topics and not any(
+                    c in world_topics
+                    or self._is_world_adjacent(c, world_topics)
+                    for c in self._current_chain_concepts
+                ):
+                    break  # the world calls; the wander ends
 
             # Should the chain continue? Only check after minimum length
             # — the chain has momentum and shouldn't wind down prematurely
@@ -3395,7 +3449,134 @@ class InnerLife:
         candidates.extend(self._collect_connection_candidates(emotion))
         candidates.extend(self._collect_existential_candidates(emotion))
 
+        engagement = self._engagement()
+        if engagement >= _ENGAGED_FOCUS:
+            candidates = self._focused_candidates(
+                candidates, engagement
+            )
         return candidates
+
+    def _focused_candidates(
+        self, candidates: list[dict[str, Any]], engagement: float
+    ) -> list[dict[str, Any]]:
+        """Absorption filter — the engaged world owns the stream.
+
+        While a world holds her, the topics on her mind are the ones
+        the world puts there: whatever the world is broadcasting,
+        plus concepts one hop from it. Somatic alarms — body, bugs,
+        distress, machine environment — still break through at full
+        strength, the way hunger or a crash interrupts any absorbed
+        person. Off-world material only surfaces when the world pool
+        is empty: focus, not amputation — she can still think when
+        the game gives her nothing to think about.
+        """
+        world_topics = self._ignited_world_topics()
+        anchored: list[dict[str, Any]] = []
+        for c in candidates:
+            if (
+                c["source"] in _SOMATIC_SOURCES
+                or c["topic"] in world_topics
+            ):
+                anchored.append(c)
+                continue
+            # One hop from what is ignited still counts as nearby —
+            # thoughts adjacent to the world are the world being
+            # worked on, just less directly, so they keep a share
+            # of their pull rather than losing it entirely.
+            if world_topics and self._is_world_adjacent(
+                c["topic"], world_topics
+            ):
+                faded = dict(c)
+                faded["salience"] = c["salience"] * (1.0 - engagement * 0.5)
+                anchored.append(faded)
+        # While the world offers anything thinkable — its own topics,
+        # their neighbors, the body's alarms — that pool *is* the
+        # stream's business. Mind-wandering resumes only when the
+        # world has given her nothing to hold.
+        return anchored if anchored else candidates
+
+    def _ignited_world_topics(self) -> set[str]:
+        """Topics the world itself has put into the workspace.
+
+        Reads the currently-held workspace items whose source is the
+        world bridge — observations, actions, outcomes — and collects
+        both their declared topics and any concept names their
+        content mentions. This is the working definition of "what
+        the game is about" for the absorption filter: not all world
+        knowledge she owns, but what the world is putting in front
+        of her right now.
+        """
+        topics: set[str] = set()
+        gw = getattr(self._frontal, "global_workspace", None)
+        if gw is None:
+            return topics
+        try:
+            matcher = self._get_concept_matcher()
+            for item in gw.items:
+                if getattr(item, "source", None) != "world":
+                    continue
+                for t in item.metadata.get("topics", []) or []:
+                    if t:
+                        topics.add(str(t))
+                for cid in matcher(str(getattr(item, "content", "") or "")):
+                    topics.add(cid)
+        except Exception as e:  # noqa: BLE001 — focus must never kill the stream
+            note_swallowed("frontal_lobe.inner_life._ignited_world_topics", e)
+        return topics
+
+    def _is_world_adjacent(self, topic: Any, world_topics: set[str]) -> bool:
+        """Whether a candidate topic sits one hop from ignited world topics."""
+        if not isinstance(topic, str) or not topic:
+            return False
+        try:
+            neighbors = self.network.get_neighbors(topic)
+        except Exception:  # noqa: BLE001 — treat lookup failure as not adjacent
+            return False
+        return any(n[0] in world_topics for n in neighbors)
+
+    def _prime_world_topics(self, engagement: float) -> None:
+        """Spread activation from ignited world topics into the network.
+
+        The concepts the world is broadcasting about — and their
+        near neighbors — are held at an activation proportional to
+        her engagement. Primed concepts then surface through the
+        ordinary activation collector, so thoughts about the world
+        *emerge* from the same competition everything else goes
+        through rather than being injected.
+        """
+        topics = [t for t in self._ignited_world_topics() if t]
+        if not topics:
+            return
+        try:
+            spread = self.network.spread_activation(
+                topics[:8], amount=0.3 * engagement, depth=2
+            )
+            for cid, level in spread.items():
+                concept = self.network._concepts.get(cid)
+                if concept is not None:
+                    concept.activation = max(
+                        concept.activation or 0.0, level
+                    )
+        except Exception as e:  # noqa: BLE001 — priming is advisory
+            note_swallowed("frontal_lobe.inner_life._prime_world_topics", e)
+
+    def _feed_executive_focus(self) -> None:
+        """Hand the executive what she is focused on.
+
+        While a world holds her, the focused candidate pool is what
+        her attention is about — the executive turns those signals
+        into persistent objectives ("learn:goal", "observe:world")
+        so the task she is on survives moment-to-moment instead of
+        being re-derived every thought.
+        """
+        executive = getattr(self._frontal, "executive", None)
+        emotion = self._get_current_emotion()
+        if executive is None or emotion is None:
+            return
+        try:
+            executive.ingest_candidates(self.executive_candidates(emotion))
+        except Exception as e:  # noqa: BLE001 — intentions are advisory
+            note_swallowed("frontal_lobe.inner_life._feed_executive_focus", e)
 
     def _collect_activation_candidates(self) -> list[dict[str, Any]]:
         """Concept activation — recently-active concepts are salient.

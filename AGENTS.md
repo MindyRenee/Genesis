@@ -575,3 +575,42 @@ written at save time; the log's fold overwrites it at restore.
   can allow a second process to acquire a different lock for the same state.
 - Existing unreadable cognitive state is a startup error, not first boot.
   Repair or restore it explicitly; do not silently replace it with fresh state.
+
+## ARC-AGI-3 evaluation boundary
+- `/arc <ids> --steps N` is local practice. `/arc --all --steps N`
+  runs all locally discovered environments on one scorecard through
+  `Mind.evaluate_arc()`. The optional ARC SDK is installed in this host's
+  system `python3` (arc-agi 0.9.9 / arcengine 0.9.3), not the checkout's
+  `.venv`; use the interpreter that actually has these packages.
+- `/arc --competition --steps N` explicitly selects the SDK's competition
+  transport: one scorecard, all discovered environments, one `make` each,
+  score obtained only on closure. It requires `ARC_API_KEY` and a Mind
+  started with `--offline` so autonomous cognition does not use the web.
+  This is transport support, NOT a complete Kaggle submission package or
+  certification of prize eligibility. Do not run official submissions
+  without the user's accepted rules and explicit authorization.
+- The SDK lets `OPERATION_MODE=competition` override an OFFLINE constructor.
+  `ArcPractice` rejects that override before constructing the SDK, which
+  otherwise can request anonymous API access during initialization.
+- `ArcResult.steps` counts submitted actions and recovery resets; the initial
+  reset is initialization and excluded. `resets` includes initialization.
+  Use `env.observation_space` after `make` because the SDK already resets
+  in the wrapper constructor. Never retry a step after an arbitrary
+  `TypeError`: the first call may have already changed the environment.
+- Scores are SDK-returned percentages, not completion fractions. A partial
+  offline suite has no suite score because the local SDK may omit unplayed
+  environments from its denominator. Public practice results are not a
+  hidden-set ARC-AGI-3 result. Official scoring and mode documentation:
+  https://docs.arcprize.org/methodology.md and
+  https://docs.arcprize.org/toolkit/competition_mode.md.
+- The adapter gives cognition only observations, available controls, and
+  progress; no game source, internal engine state, baseline action counts,
+  or per-game solution policy. New world contexts discard local physics
+  and cached plans, not the concept network or transferable task competence.
+  Retries within the same world retain learned mechanics.
+- Focused checks: `python3 -m pytest python/tests/test_arc_adapter.py
+  python/tests/test_world_model.py python/tests/test_world_hypotheses.py
+  python/tests/test_spatial_boards.py python/tests/test_spatial_planner.py
+  -q -o addopts=''`. Keep experiments isolated from the live developmental
+  directory and honor the readiness gate; an UNWELL result is a stopped run,
+  not a benchmark success or permission to override physiology.

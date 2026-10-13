@@ -256,6 +256,8 @@ _EXPORTS: dict[str, str] = {
     "PredictiveCodingLayer": "cerebellum.predictive",
     # The region itself — the forward model
     "Cerebellum": "cerebellum.cerebellum",
+    # Sensorimotor prediction error — reafference vs efference copy
+    "SensorimotorLayer": "cerebellum.motor",
     # Endocannabinoid signalling — retrograde modulation at parallel-
     # fiber synapses; cerebellar LTD depends on it
     "Endocannabinoid": "cerebellum.endocannabinoid",

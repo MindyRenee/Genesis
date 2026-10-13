@@ -1395,13 +1395,16 @@ class ConversationMixin:
     def enter_game_mode(self) -> None:
         """Put Genesis into game mode — focused play.
 
-        The whole entity stays whole: volition urges and autonomous
-        learning pause so every cycle goes to the game in front of
-        it, but the inner life stays on — thinking about the game is
-        the point. Conversation is not removed — it can still answer
-        if spoken to — but it stops being the driver. A small
-        norepinephrine impulse marks the shift into alert, attentive
-        posture.
+        The whole entity stays whole: engagement pins her attention
+        on the world, which starves the appetitive urges through
+        volition context — she doesn't wander off because she is
+        *absorbed*, not because her drives were switched off. The
+        learner pauses — the world is the task; topic acquisition can
+        wait for the same reason it waits during conversation. The
+        inner life stays on — thinking about the game is the point.
+        Conversation is not removed — it can still answer if spoken
+        to — but it stops being the driver. A small norepinephrine
+        impulse marks the shift into alert, attentive posture.
         """
         if self._is_gaming:
             return
@@ -1409,6 +1412,16 @@ class ConversationMixin:
         self.brain.frontal.game_mode = True
         self.learner.pause()
         self._learner_neuro_impulse(CHEM_NOREPINEPHRINE, 0.1)
+        self.engage_world("games")
+        # The executive formally takes the task set — engagement is
+        # the strength of her focus; the task-set is its object. Any
+        # region that consults the executive now sees "games" as what
+        # she is doing, not just what she is absorbed in.
+        try:
+            self._prior_task = self.brain.frontal.executive.active_task
+            self.brain.frontal.executive.switch_task("games")
+        except Exception as e:  # noqa: BLE001 — task-set is advisory
+            logger.debug(f"executive task switch failed: {e}")
     def exit_game_mode(self) -> None:
         """Exit game mode and resume normal operation."""
         if not self._is_gaming:
@@ -1416,31 +1429,25 @@ class ConversationMixin:
         self._is_gaming = False
         self.brain.frontal.game_mode = False
         self.learner.resume()
+        self.disengage_world()
         self._resume_inner_life()
+        try:
+            self.brain.frontal.executive.switch_task(
+                getattr(self, "_prior_task", "") or "idle"
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.debug(f"executive task restore failed: {e}")
     def game_turn(self, line: str) -> str:
         """One game-mode turn: world state in, action out.
 
         In game mode a ``FRAME`` line is a scene to act on, not an
-        utterance to answer — it runs through her play faculties
-        (perception, spatial policy, the shared competence substrate)
-        and the reply is the action she chose. Any other input while
-        gaming still reaches conversation — she can still talk.
+        utterance to answer — the session parses the wire format and
+        ``world_step`` runs the turn through her faculties; the reply
+        is the action she chose. Any other input while gaming still
+        reaches conversation — she can still talk.
         """
         if not self._is_gaming or not line.startswith("FRAME "):
             return self.respond(line)
-        # Playing is engagement — mark it so the auto-sleep idle gate
-        # doesn't put her down mid-episode. Rising adenosine is caught
-        # honestly instead by readiness() between attempts.
-        self.mark_user_activity()
-        # A game turn is a cognition turn: refresh the wave state the
-        # way think() does for conversation, else the broadcasts the
-        # session emits all turn carry whatever the last language turn
-        # left — or nothing. One state read per frame is cheap against
-        # the perception and decision work that follows.
-        try:
-            self.brain.frontal.language.current_brain_waves = self.brain_waves()
-        except (OSError, ConnectionError) as e:
-            note_swallowed("mind.game_turn.brain_waves", e)
         if self._game_session is None:
             from frontal_lobe.games.session import GameSession
 
@@ -1452,15 +1459,14 @@ class ConversationMixin:
             return ""
     @property
     def game_decision(self) -> dict[str, Any] | None:
-        """The decision basis behind the session's last chosen action.
+        """The decision basis behind the last world action.
 
         Structured telemetry, not her voice: which drive the basal
         ganglia honored, how decisive the field was, and what else
         was in contention — the ``reasoning`` an ARC harness records
         alongside each step.
         """
-        session = self._game_session
-        return getattr(session, "last_decision", None) if session is not None else None
+        return self.last_world_decision
     def pop_queued_question(self) -> dict[str, str] | None:
         """Pop the next queued question.
 

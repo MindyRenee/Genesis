@@ -1,50 +1,55 @@
-"""ARC-AGI-3 practice — real ``arcengine`` environments through her play loop.
+"""ARC-AGI-3 practice — real ``arcengine`` environments as her world.
 
-This is the adapter ``game_turn`` was written for: the mind's game
-session speaks the harness protocol (``FRAME | ACTIONS | LEVELS |
-GAME | EVENT`` in, ``ACTIONn``/``RESET`` out), and the ``arc-agi``
-package is the world side. This module is the seam that binds them —
-it owns no cognition, only translation and the duty of care:
+This is the adapter ``world_step`` was written for: the mind's
+embodied loop plays, and the ``arc-agi`` package is the world side.
+This module is the seam that binds them — it owns no cognition,
+only translation and the duty of care:
 
-    arcengine FrameDataRaw  ->  FRAME line  ->  mind.game_turn
-    session action token    ->  env.step(GameAction, reasoning=...)
+    arcengine FrameDataRaw  ->  mind.world_step(frame, actions)
+    world action descriptor  ->  env.step(GameAction, reasoning=...)
 
-Frames travel through the ``@file`` form the session accepts: a full
-64×64 board as inline hex exceeds the line the protocol was sized
-for, so each frame is written as one hex row per line to a temp file
-— her "screen" for the turn.
+The mind side never speaks the harness's protocol: a frame is a
+percept (the grid itself, not a text encoding), an action is a
+decision descriptor ``{"action": id, "x": .., "y": ..}``, and the
+episode boundary is told to her directly (``world_episode_end``).
+The adapter is the world's clock — arcengine is turn-based, so the
+world cannot advance without her move — but it never reaches past
+``observe``/``world_step`` into her cognition.
 
 Two contracts keep a run honest:
 
-- **Game mode.** ``play()`` only runs while the mind is in game mode
-  (``enter_game_mode()``): the session's volition/learner suppression
-  and the frame-turn protocol both live behind that flag. A caller
-  that skips it gets refused, because a run that doesn't suppress her
-  other urges isn't measuring the same entity.
+- **Game mode.** ``play()`` only runs while the mind is in game
+  mode (``enter_game_mode()``): engagement is what starves her
+  other urges so the run measures the entity at play, not the
+  collision of play with every urge that happened to fire. A
+  caller that skips it gets refused, because a run that doesn't
+  engage her isn't measuring the same entity.
 - **Readiness.** Her own health gate is checked before the run,
-  at every episode boundary, and periodically mid-episode. When she
-  is asleep, drowsy, stressed, overloaded, or unreachable, the run
-  does not start or stops early — a body that isn't well shouldn't
-  be worked.
+  at every episode boundary, and periodically mid-episode. When
+  she is asleep, drowsy, stressed, overloaded, or unreachable, the
+  run does not start or stops early — a body that isn't well
+  shouldn't be worked.
 
-The ARC side judges honestly and tells her nothing: available action
-ids, the frame, levels completed. Goal inference, mechanics, and
-planning are all on her side of the boundary. What crosses back is
-her decision basis — ``env.step``'s ``reasoning`` field records the
-structured self-report her striatum left behind.
+The ARC side judges honestly and tells her nothing: available
+action ids, the frame, levels completed. Goal inference,
+mechanics, and planning are all on her side of the boundary. What
+crosses back is her decision basis — ``env.step``'s ``reasoning``
+field records the structured self-report her striatum left behind.
 
-This lives in the world, not the frontal lobe: it is the environment
-she plays, and it is never constructed by a caller that builds its own
-mind. ``Mind.play_arc()`` owns the entity side (game mode around each
-run); the genesis CLI is the entrypoint::
+This lives in the world, not the frontal lobe: it is the
+environment she plays, and it is never constructed by a caller
+that builds its own mind. ``Mind.play_arc()`` owns the entity
+side (game mode around each run); the genesis CLI is the
+entrypoint::
 
     /arc ls20-9607627b ft09-0d8bbf25 --steps 400
 """
 
 from __future__ import annotations
 
-import tempfile
+import os
 from dataclasses import dataclass, field
+from inspect import signature
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -63,6 +68,8 @@ class ArcResult:
     levels_completed: int = 0
     win_levels: int = 0
     steps: int = 0
+    resets: int = 0
+    score: float | None = None
     scorecard_id: str | None = None
     reasons: tuple[str, ...] = field(default_factory=tuple)
 
@@ -71,8 +78,18 @@ class ArcResult:
         return self.state == "WIN"
 
 
+@dataclass
+class ArcEvaluation:
+    mode: str
+    games: list[ArcResult]
+    scorecard_id: str | None = None
+    score: float | None = None
+
+
 class ArcPractice:
-    """One ARC game played through her faculties via the session protocol."""
+    """One ARC game played by her through the embodied loop."""
+
+    operation_mode = "offline"
 
     def __init__(
         self,
@@ -83,6 +100,15 @@ class ArcPractice:
         require_live: bool = True,
         record: bool = True,
     ) -> None:
+        if (
+            self.operation_mode == "offline"
+            and os.getenv("OPERATION_MODE", "").strip().lower() == "competition"
+        ):
+            raise RuntimeError("Competition mode requires ArcCompetition.play_all()")
+        if self.operation_mode == "competition" and not os.getenv("ARC_API_KEY", "").strip():
+            raise RuntimeError("Set ARC_API_KEY for an explicitly authorized competition run")
+        if self.operation_mode == "competition" and not getattr(mind, "_offline", False):
+            raise RuntimeError("Competition requires Genesis to start with offline cognition")
         from arc_agi import Arcade, OperationMode
 
         from infrastructure.config import default_data_dir
@@ -96,10 +122,8 @@ class ArcPractice:
         self._arcade = Arcade(
             environments_dir=str(environments_dir or arc_dir / "environment_files"),
             recordings_dir=str(recordings_dir or arc_dir / "recordings"),
-            operation_mode=OperationMode.OFFLINE,
+            operation_mode=OperationMode(self.operation_mode),
         )
-        self._tmp = Path(tempfile.mkdtemp(prefix="arc_frames_"))
-        self._pending_event = ""
         # The player's manual: what a human is told before the first
         # move ("this is a video game — win the levels"). Delivered on
         # the first frame of each game; her cognition gets the genre
@@ -111,42 +135,24 @@ class ArcPractice:
         self._require_live = require_live
         self._record = record
 
-    # ── Frame translation ─────────────────────────────────────
-
-    def _frame_line(self, frame: Any, game_id: str) -> str:
-        """FrameDataRaw -> the session's turn line (``@file`` screen)."""
-        grid = frame.frame[-1]  # newest board of the sequence
-        path = self._tmp / f"{game_id.split('-')[0]}.frame.txt"
-        path.write_text(
-            "\n".join("".join(f"{int(c):x}" for c in row) for row in grid),
-            encoding="utf-8",
-        )
-        avail = ",".join(str(int(a)) for a in (frame.available_actions or []))
-        line = (
-            f"FRAME @{path}"
-            f" | ACTIONS {avail}"
-            f" | LEVELS {frame.levels_completed}/{frame.win_levels}"
-            f" | GAME {game_id}"
-        )
-        if self._instructions and game_id not in self._info_sent:
-            line += f" | INFO {self._instructions}"
-            self._info_sent.add(game_id)
-        if self._pending_event:
-            line += f" | EVENT {self._pending_event}"
-            self._pending_event = ""
-        return line
+    # ── Action translation ────────────────────────────────────
 
     @staticmethod
-    def _to_step(token: str) -> tuple[Any, dict[str, int] | None]:
-        """Session action token -> ``env.step`` arguments."""
-        from arcengine import GameAction
+    def _to_step(desc: dict[str, Any]) -> tuple[Any, dict[str, int] | None]:
+        """Her decision descriptor -> ``env.step`` arguments."""
+        from arcengine import ComplexAction, GameAction
 
-        if token == "RESET":
+        action_id = desc["action"]
+        if type(action_id) is not int:
+            raise ValueError("Action id must be an integer")
+        if action_id == 0:
             return GameAction.RESET, None
-        parts = token.split()
-        action = GameAction.from_id(int(parts[0].removeprefix("ACTION")))
-        if len(parts) == 3:  # ACTION6 x y
-            return action, {"x": int(parts[1]), "y": int(parts[2])}
+        action = GameAction.from_id(action_id)
+        if action.action_type is ComplexAction:
+            x, y = desc.get("x"), desc.get("y")
+            if type(x) is not int or type(y) is not int or not (0 <= x < 64 and 0 <= y < 64):
+                raise ValueError("Coordinate actions require integer x,y in [0, 63]")
+            return action, {"x": x, "y": y}
         return action, None
 
     # ── Health gate ───────────────────────────────────────────
@@ -163,12 +169,13 @@ class ArcPractice:
 
     def play(self, game_id: str, max_steps: int = 200) -> ArcResult:
         """Play one game; stop on WIN, budget, illness, or dead actions."""
-        from arcengine import GameState
-
+        if max_steps <= 0:
+            raise ValueError("max_steps must be positive")
         result = ArcResult(game_id=game_id)
-        # Game mode is the contract: it is what suppresses her other
-        # drives so the run measures the entity at play, not the
-        # collision of play with every urge that happened to fire.
+        # Game mode is the contract: engagement is what starves her
+        # other drives so the run measures the entity at play, not
+        # the collision of play with every urge that happened to
+        # fire.
         if not self._mind.is_gaming:
             raise RuntimeError(
                 "ArcPractice requires game mode — call "
@@ -180,29 +187,85 @@ class ArcPractice:
             return result
 
         scorecard = self._arcade.create_scorecard()
+        result.scorecard_id = scorecard
+        try:
+            return self._play(result, max_steps)
+        finally:
+            try:
+                closed = self._arcade.close_scorecard(scorecard)
+                result.score = getattr(closed, "score", None)
+            except Exception:  # noqa: BLE001
+                result.reasons += ("scorecard closure failed",)
+                result.state = "SCORECARD_ERROR"
+
+    def play_all(self, max_steps: int = 200) -> ArcEvaluation:
+        if max_steps <= 0:
+            raise ValueError("max_steps must be positive")
+        if not self._mind.is_gaming:
+            raise RuntimeError("ARC evaluation requires game mode")
+        if getattr(self, "_suite_started", False):
+            raise RuntimeError("This evaluation has already opened its scorecard")
+        game_ids = [e.game_id for e in self._arcade.get_environments()]
+        if not game_ids or len(set(game_ids)) != len(game_ids):
+            raise ValueError("Evaluation requires a nonempty, unique environment list")
+        evaluation = ArcEvaluation(
+            mode=self.operation_mode,
+            games=[ArcResult(game_id=g, state="NOT_PLAYED") for g in game_ids],
+        )
+        if (reasons := self._check_readiness()) is not None:
+            evaluation.games[0].state = "UNWELL"
+            evaluation.games[0].reasons = reasons
+            return evaluation
+        self._suite_started = True
+        scorecard = self._arcade.create_scorecard()
+        evaluation.scorecard_id = scorecard
+        try:
+            for result in evaluation.games:
+                result.scorecard_id = scorecard
+                if (reasons := self._check_readiness()) is not None:
+                    result.state = "UNWELL"
+                    result.reasons = reasons
+                    break
+                result.state = "NOT_FINISHED"
+                self._play(result, max_steps)
+                if result.state == "UNWELL":
+                    break
+        finally:
+            closed = self._arcade.close_scorecard(scorecard)
+            if self.operation_mode == "competition" or all(r.resets for r in evaluation.games):
+                evaluation.score = getattr(closed, "score", None)
+        return evaluation
+
+    def _play(self, result: ArcResult, max_steps: int) -> ArcResult:
+        from arcengine import ComplexAction, GameAction, GameState
+
+        game_id = result.game_id
         env = self._arcade.make(
             game_id,
-            scorecard_id=scorecard,
+            scorecard_id=result.scorecard_id,
             save_recording=self._record,
         )
-        result.scorecard_id = scorecard
         if env is None:
             result.state = "UNAVAILABLE"
             return result
-        frame = env.reset()
-        while result.steps < max_steps and frame is not None:
+        frame = getattr(env, "observation_space", None)
+        if frame is None:
+            frame = env.reset()
+        result.resets = 1
+        step_signature = signature(env.step)
+        while frame is not None:
             result.levels_completed = frame.levels_completed
             result.win_levels = frame.win_levels
             state = getattr(frame.state, "name", str(frame.state))
             if state == GameState.WIN.name:
                 result.state = state
-                self._mind.game_turn(
-                    self._frame_line(frame, game_id) + " | EVENT win"
-                )
+                self._mind.world_episode_end("win", game_id)
                 break
             if state == GameState.GAME_OVER.name:
-                self._pending_event = "over"
-                frame = env.reset()
+                self._mind.world_episode_end("over", game_id)
+                if result.steps >= max_steps:
+                    result.state = state
+                    break
                 # A death is a checkpoint — if the last episode left
                 # her unwell (stress, mounting sleep pressure), the
                 # next one doesn't start. Recovery beats a score.
@@ -210,36 +273,79 @@ class ArcPractice:
                     result.state = "UNWELL"
                     result.reasons = reasons
                     break
+                result.steps += 1
+                result.resets += 1
+                frame = env.reset()
                 continue
-            if not frame.available_actions:
-                result.state = "NO_ACTIONS"
+            if result.steps >= max_steps:
+                result.state = "BUDGET"
                 break
-            token = self._mind.game_turn(self._frame_line(frame, game_id))
-            result.steps += 1
-            if not token:
-                break
-            action, data = self._to_step(token)
-            # Her decision basis rides the step — the recording keeps
-            # what her striatum actually computed, not a retelling.
-            reasoning = self._mind.game_decision
-            try:
-                frame = env.step(action, data=data, reasoning=reasoning)
-            except TypeError:  # older wrappers without the field
-                frame = env.step(action, data=data)
-            if result.steps % _HEALTH_EVERY_STEPS == 0:
+            if result.steps and result.steps % _HEALTH_EVERY_STEPS == 0:
                 if (reasons := self._check_readiness()) is not None:
                     result.state = "UNWELL"
                     result.reasons = reasons
                     break
-        if result.state == "NOT_FINISHED":
-            if frame is not None:
-                result.state = getattr(getattr(frame, "state", None), "name", result.state)
-            if result.state == "NOT_FINISHED":
-                result.state = "BUDGET"
-        try:
-            self._arcade.close_scorecard(scorecard)
-        except Exception:  # noqa: BLE001
-            pass
+            if not frame.available_actions:
+                result.state = "NO_ACTIONS"
+                break
+            info: dict[str, Any] = {
+                "game": game_id,
+                "level": frame.levels_completed,
+                "win_levels": frame.win_levels,
+            }
+            # The manual is delivered once per game, on the first
+            # frame — her cognition gets the genre framing before
+            # the first move.
+            if self._instructions and game_id not in self._info_sent:
+                info["instructions"] = self._instructions
+                self._info_sent.add(game_id)
+            desc = self._mind.world_step(
+                frame.frame[-1],
+                # The interface's own action semantics ride the
+                # whitelist — a complex action is one that takes a
+                # coordinate, exactly the label convention the
+                # world model consumes. What pointing *does* is
+                # still hers to learn.
+                available_actions=[
+                    {
+                        "action": int(a),
+                        "label": (
+                            "coordinate"
+                            if GameAction.from_id(int(a)).action_type
+                            is ComplexAction
+                            else "simple"
+                        ),
+                    }
+                    for a in frame.available_actions
+                ],
+                info=info,
+            )
+            if desc is None:
+                result.state = "NO_ACTION"
+                break
+            action, data = self._to_step(desc)
+            if action is not GameAction.RESET and action.value not in frame.available_actions:
+                raise ValueError("Chosen action is not available in this observation")
+            result.steps += 1
+            if action is GameAction.RESET:
+                result.resets += 1
+            # Her decision basis rides the step — the recording
+            # keeps what her striatum actually computed, not a
+            # retelling.
+            reasoning = self._mind.game_decision
+            try:
+                step_signature.bind(action, data=data, reasoning=reasoning)
+            except TypeError:  # older wrappers without the field
+                frame = env.step(action, data=data)
+            else:
+                frame = env.step(action, data=data, reasoning=reasoning)
+        if frame is None:
+            result.state = "NO_OBSERVATION"
         return result
 
 
+class ArcCompetition(ArcPractice):
+    operation_mode = "competition"
+
+    def play(self, game_id: str, max_steps: int = 200) -> ArcResult:
+        raise RuntimeError("Competition requires play_all(), not selected games")

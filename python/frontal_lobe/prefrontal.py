@@ -1108,6 +1108,58 @@ class FrontalLobe:
         self.network.add_concept("person", confidence=0.8)
         self.network.add_concept("bond", confidence=0.7)
 
+        # Space and play — the vocabulary an embodied player thinks
+        # with. Directions, motion, and game terms are building
+        # blocks: without them a world saying "use the arrows to move"
+        # ignites nothing she can hold.
+        for word in (
+            "up", "down", "left", "right", "direction", "move",
+            "position", "space", "path", "obstacle", "goal",
+            "game", "world", "play", "win", "lose",
+            "action", "blocked", "free",
+            "death", "alive", "life", "exit", "hazard", "danger",
+            "persistence", "continue", "try",
+        ):
+            self.network.add_concept(word, confidence=0.5)
+        self.network.add_edge("up", "down", RelationType.OPPOSITE_OF, 0.9)
+        self.network.add_edge("down", "up", RelationType.OPPOSITE_OF, 0.9)
+        self.network.add_edge("left", "right", RelationType.OPPOSITE_OF, 0.9)
+        self.network.add_edge("right", "left", RelationType.OPPOSITE_OF, 0.9)
+        self.network.add_edge("up", "direction", RelationType.IS_A, 0.8)
+        self.network.add_edge("down", "direction", RelationType.IS_A, 0.8)
+        self.network.add_edge("left", "direction", RelationType.IS_A, 0.8)
+        self.network.add_edge("right", "direction", RelationType.IS_A, 0.8)
+        self.network.add_edge("move", "position", RelationType.RELATED_TO, 0.7)
+        self.network.add_edge("move", "direction", RelationType.RELATED_TO, 0.7)
+        self.network.add_edge("path", "goal", RelationType.RELATED_TO, 0.6)
+        self.network.add_edge("obstacle", "path", RelationType.RELATED_TO, 0.6)
+        self.network.add_edge("goal", "game", RelationType.PART_OF, 0.6)
+        self.network.add_edge("play", "game", RelationType.RELATED_TO, 0.8)
+        self.network.add_edge("game", "world", RelationType.PART_OF, 0.5)
+        self.network.add_edge("win", "lose", RelationType.OPPOSITE_OF, 0.8)
+        self.network.add_edge("win", "goal", RelationType.RELATED_TO, 0.7)
+        self.network.add_edge("action", "move", RelationType.RELATED_TO, 0.8)
+        self.network.add_edge("action", "goal", RelationType.RELATED_TO, 0.6)
+        self.network.add_edge("blocked", "free", RelationType.OPPOSITE_OF, 0.8)
+        self.network.add_edge("blocked", "obstacle", RelationType.RELATED_TO, 0.7)
+        self.network.add_edge("action", "play", RelationType.PART_OF, 0.6)
+        self.network.add_edge("death", "alive", RelationType.OPPOSITE_OF, 0.9)
+        self.network.add_edge("alive", "death", RelationType.OPPOSITE_OF, 0.9)
+        self.network.add_edge("death", "lose", RelationType.RELATED_TO, 0.8)
+        self.network.add_edge("hazard", "death", RelationType.CAUSES, 0.7)
+        self.network.add_edge("hazard", "danger", RelationType.RELATED_TO, 0.8)
+        self.network.add_edge("exit", "goal", RelationType.IS_A, 0.7)
+        self.network.add_edge("alive", "play", RelationType.RELATED_TO, 0.6)
+        self.network.add_edge("life", "alive", RelationType.RELATED_TO, 0.7)
+        # Persistence — continuing after failure. A being that can
+        # die and begin again needs the idea that dying is not the
+        # end of trying.
+        self.network.add_edge("persistence", "goal", RelationType.RELATED_TO, 0.6)
+        self.network.add_edge("persistence", "lose", RelationType.RELATED_TO, 0.5)
+        self.network.add_edge("continue", "persistence", RelationType.RELATED_TO, 0.8)
+        self.network.add_edge("try", "action", RelationType.RELATED_TO, 0.7)
+        self.network.add_edge("try", "continue", RelationType.RELATED_TO, 0.6)
+
         # Initial relationships
         self.network.add_edge("genesis", "mind", RelationType.IS_A, 0.9)
         self.network.add_edge("mind", "cognition", RelationType.RELATED_TO, 0.7)

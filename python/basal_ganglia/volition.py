@@ -294,42 +294,43 @@ class VolitionMixin:
                 e,
             )
 
-        # Conscious world focus — an ignited world broadcast means an
-        # outer world is already holding her attention (she is *in* a
-        # game, a percept just fired). Volition reads this so urges to
-        # wander off (play, learn) weigh engagement that already
-        # exists rather than treating her as idle.
-        world_engagement = 0.0
-        focus = getattr(self, "_world_focus", None)
-        if focus is not None:
-            age_s = max(0.0, time.time() - focus["timestamp"] / 1000.0)
-            # Half-life ~10 s: a frame observed a moment ago still
-            # engages; one from a minute ago is the past.
-            world_engagement = focus["activation"] * pow(0.5, age_s / 10.0)
+        # Conscious world focus — an ignited world broadcast or a
+        # pinned engaged world means an outer world is holding her
+        # attention (she is *in* a game, a percept just fired). This
+        # is focus expressed as state: engagement attenuates the
+        # appetitive drives — boredom, idle time, off-task curiosity,
+        # audit appetite, social pressure, expression — the way
+        # absorption does, so the urges simply never cross their
+        # thresholds rather than being switched off upstream. The
+        # interoceptive, wave, and threat signals pass untouched:
+        # an absorbed person still has a body, and defensive needs
+        # always out-compete a game.
+        world_engagement = self.world_engagement()
+        free = 1.0 - world_engagement
 
         return {
-            "bug_count": bug_count,
-            "scan_recency": scan_recency,
-            "pending_proposals": pending,
-            "curiosity": curiosity,
-            "boredom": boredom * (1.0 - world_engagement),
-            "games_available": games_available,
+            "bug_count": bug_count * free,
+            "scan_recency": scan_recency * free,
+            "pending_proposals": pending * free,
+            "curiosity": curiosity * free,
+            "boredom": boredom * free,
+            "games_available": games_available * free,
             "idle_seconds": min(
                 1.0,
                 idle / self.config.volition.idle_normalization_seconds,
-            ),
+            ) * free,
             "speech_queue_size": min(
                 1.0,
                 len(self._speech_queue)
                 / self.config.volition.speech_queue_size_normalization,
-            ),
+            ) * free,
             **interoceptive,
-            "emotional_intensity": emotional_intensity,
-            "creativity": creativity,
+            "emotional_intensity": emotional_intensity * free,
+            "creativity": creativity * free,
             **wave_data,
             **threat_data,
-            "concept_growth": concept_growth,
-            "social_isolation": social_isolation,
+            "concept_growth": concept_growth * free,
+            "social_isolation": social_isolation * free,
         }
     def _act_on_volition(self, ready: list[str]) -> list[str]:
         """Run each ready urge action in its own background thread.

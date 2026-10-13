@@ -2091,7 +2091,14 @@ class ThoughtComposer:
             return False
         # Check if the content words appear in any past saying
         content_words = set(content.lower().split())
-        for p in past:
+        for i, p in enumerate(past):
+            # Skip only the entry recorded for this very saying —
+            # compose_about tracks content before returning, so the
+            # newest entry is the content under test; matching it
+            # would report everything as a repeat of itself. Older
+            # identical entries still count as real repeats.
+            if i == len(past) - 1 and p == content[:50]:
+                continue
             past_words = set(p.lower().split())
             if not content_words:
                 continue

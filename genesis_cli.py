@@ -2134,15 +2134,32 @@ def _cmd_arc(mind: Mind, rest: str) -> str:
     Game mode wraps the run; her readiness gate can refuse or stop it.
     """
     parts = rest.split()
+    usage = "  Usage: /arc (<game-id> [more ids] | --all | --competition) [--steps N]\n"
     steps = 200
     if "--steps" in parts:
         i = parts.index("--steps")
-        steps = int(parts[i + 1])
+        try:
+            steps = int(parts[i + 1])
+        except (IndexError, ValueError):
+            return usage
         del parts[i:i + 2]
-    if not parts:
-        return "  Usage: /arc <game-id> [more ids] [--steps N]\n"
+    if not parts or steps <= 0:
+        return usage
+    competition = "--competition" in parts
+    whole_suite = competition or "--all" in parts
+    if any(p.startswith("--") for p in parts) and not (
+        len(parts) == 1 and whole_suite
+    ):
+        return usage
     lines = []
-    for r in mind.play_arc(parts, max_steps=steps):
+    if whole_suite:
+        evaluation = mind.evaluate_arc(max_steps=steps, competition=competition)
+        results = evaluation.games
+        score = "unavailable" if evaluation.score is None else f"{evaluation.score:.2f}%"
+        lines.append(f"  ARC {evaluation.mode}: score {score}")
+    else:
+        results = mind.play_arc(parts, max_steps=steps)
+    for r in results:
         lines.append(
             f"  {r.game_id}: {r.state} levels {r.levels_completed}/{r.win_levels}"
             f" in {r.steps} steps"

@@ -78,7 +78,7 @@ from world import OuterWorld
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from world.arc import ArcResult
+    from world.arc import ArcEvaluation, ArcResult
 from basal_ganglia.volition import VolitionMixin
 from brainstem.heartbeat import HeartbeatMixin
 from brainstem.lifecycle import LifecycleMixin
@@ -196,6 +196,15 @@ class Mind(
         # daemon's tensor slab. Runs last — it reaches into the
         # frontal workspace and the occipital vision system.
         self._init_embodiment(seed=seed)
+        # The cerebellum's sensorimotor comparator takes its seat in
+        # the embodied loop: the world model keeps the physics, the
+        # cerebellum grades each act's predicted reafference against
+        # the frame's answer — error becomes orienting chemistry and
+        # the action's calibration estimate, which is how a stale
+        # move gets re-babbled instead of trusted.
+        self.world_model.motor_comparator = (
+            self.brain.cerebellum.sensorimotor
+        )
 
     @property
     def regulator(self):
@@ -278,7 +287,6 @@ class Mind(
         self.brain.cerebellum = Cerebellum(
             on_neuro_impulse=lambda c, m: self.client.neuro_impulse(c, m)
         )
-
         # Frontal lobe — the executive region: working memory,
         # reasoning, deliberation, language production. Uses the same
         # shared network. It grows its own projection onto the
@@ -370,6 +378,7 @@ class Mind(
             is_mind_sleeping=lambda: self._is_sleeping,
             frontal=self.brain.frontal,
             is_nap_mode=lambda: self._nap_mode,
+            engagement=self.world_engagement,
         )
 
         # Wire the emotional memory callback: when a high-emotion
@@ -736,21 +745,49 @@ class Mind(
         games: list[str],
         max_steps: int = 200,
         instructions: str = "this is a video game",
+        web: bool = False,
     ) -> list[ArcResult]:
         """Play ARC-AGI-3 games as herself, in game mode.
 
-        The environment is ``world.arc``; this is the entity side of the
-        run. Game mode wraps every game, and her readiness gate refuses
-        or stops play, not the caller. Game mode is restored to whatever
-        it was before the call.
+        The environment is ``world.arc`` — or, with ``web=True``, the
+        public human task page through ``world.arc_web`` (real key and
+        mouse events on the live site). Either way this is the entity
+        side of the run. Game mode wraps every game, and her readiness
+        gate refuses or stops play, not the caller. Game mode is
+        restored to whatever it was before the call.
         """
         from world.arc import ArcPractice
 
         was_gaming = self.is_gaming
         self.enter_game_mode()
         try:
+            if web:
+                from world.arc_web import ArcWebPractice
+
+                web_practice = ArcWebPractice(self, instructions=instructions)
+                try:
+                    return [
+                        web_practice.play(game, max_steps=max_steps)
+                        for game in games
+                    ]
+                finally:
+                    web_practice.close()
             practice = ArcPractice(self, instructions=instructions)
             return [practice.play(game, max_steps=max_steps) for game in games]
+        finally:
+            if not was_gaming:
+                self.exit_game_mode()
+
+    def evaluate_arc(
+        self, *, max_steps: int = 200, competition: bool = False,
+    ) -> ArcEvaluation:
+        from world.arc import ArcCompetition, ArcPractice
+
+        was_gaming = self.is_gaming
+        self.enter_game_mode()
+        try:
+            adapter = ArcCompetition(self) if competition else ArcPractice(self)
+            return adapter.play_all(max_steps=max_steps)
         finally:
             if not was_gaming:
                 self.exit_game_mode()

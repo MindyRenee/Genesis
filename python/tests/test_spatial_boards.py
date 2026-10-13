@@ -14,7 +14,7 @@ import sys
 
 sys.path.insert(0, str(__file__).rsplit("/tests/", 1)[0])
 
-from frontal_lobe.games.spatial.boards import (
+from parietal_lobe.boards import (
     ConstraintSession,
     _boards,
     _Element,

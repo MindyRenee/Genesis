@@ -48,10 +48,12 @@ _W_WIN = 1.0        # touching this kind won before
 _W_COLLECT = 0.7    # this kind is consumable value
 _W_HAZARD = 1.0     # this kind killed her
 _W_UNPROBED = 0.25  # an entity whose affordance is still unknown
+_W_RESPONSIVE = 0.5 # a kind whose distal acts the world has answered
 _W_FRONTIER = 0.15  # visited space adjacent to unseen space
 _W_BLOCKED = 0.8    # known-solid cells
 _W_UNTRIED = 0.3    # an action whose effect is unlearned
 _W_RESET = 0.8      # interface-labeled episode-ending actions
+_W_RECALL = 0.6     # episodic recall's associative valence on a kind
 
 
 @dataclass(slots=True)
@@ -96,6 +98,17 @@ def compose_spatial_field(
             + _W_COLLECT * aff.get(OUT_COLLECT, 0)
             - _W_HAZARD * aff.get(OUT_HAZARD, 0)
         )
+        # A kind the world answers when she acts at it keeps its
+        # pull — a control worth pressing again. Normalized so a
+        # press that moves ~8 cells saturates the term.
+        responsive = min(
+            1.0, model.click_responsiveness(entity.color) / 8.0
+        )
+        strength += _W_RESPONSIVE * responsive
+        # Associative recall: a kind her memory remembers as a goal
+        # attracts, as a killer repels — a voice in the field, not a
+        # plan. Present-measured affordances still outweigh it.
+        strength += _W_RECALL * model.recalled_valence_of(entity.color)
         if strength == 0.0 and not aff:
             strength = _W_UNPROBED
         for r, c in entity.cells:

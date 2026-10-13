@@ -416,7 +416,9 @@ class Curiosity:
         # awareness steers wondering (a world event that just ignited
         # is the thing most worth questioning).
         focus = []
-        for name in self._broadcast_concepts:
+        # Snapshot: the workspace appends broadcast concepts from
+        # another thread — iterating a live deque here races.
+        for name in list(self._broadcast_concepts):
             cid = self.network._resolve(name)
             if cid and is_world_concept(cid) and cid not in focus:
                 focus.append(cid)

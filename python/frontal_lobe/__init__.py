@@ -972,7 +972,7 @@ _EXPORTS: dict[str, str] = {
     # puzzle domains it shares machinery with.
     "GameSession": "frontal_lobe.games.session",
     "SpatialAgent": "frontal_lobe.games.spatial.agent",
-    "ConstraintSession": "frontal_lobe.games.spatial.boards",
+    "ConstraintSession": "parietal_lobe.boards",
     "SpatialSolution": "frontal_lobe.games.spatial.solver",
     "RelationsAgent": "frontal_lobe.games.relations.agent",
     "Arrangement": "frontal_lobe.games.relations.world",

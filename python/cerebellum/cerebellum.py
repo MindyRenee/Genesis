@@ -10,6 +10,7 @@ norepinephrine, nor the detailed deep-nuclear/thalamocortical circuit.
 
 from __future__ import annotations
 
+from .motor import SensorimotorLayer
 from .predictive import PredictiveCodingLayer
 
 
@@ -19,9 +20,15 @@ class Cerebellum:
     Attributes:
         predictive_coding: the forward model — predict, compare,
             correct.
+        sensorimotor: the efference-copy comparator — each act's
+            predicted reafference against what the frame carried,
+            error signals leaving as neuro-impulses.
     """
 
     def __init__(self, on_neuro_impulse) -> None:
         self.predictive_coding = PredictiveCodingLayer(
+            on_neuro_impulse=on_neuro_impulse,
+        )
+        self.sensorimotor = SensorimotorLayer(
             on_neuro_impulse=on_neuro_impulse,
         )

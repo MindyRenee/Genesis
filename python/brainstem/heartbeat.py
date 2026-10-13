@@ -462,7 +462,6 @@ class HeartbeatMixin:
             self._is_sleeping
             or self._is_meditating
             or self._is_teaching
-            or self._is_gaming
             or self._suppress_volition
         ):
             return
