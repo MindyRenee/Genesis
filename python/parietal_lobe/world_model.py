@@ -765,6 +765,23 @@ class WorldModel:
                     entity_id=entity.id,
                 ))
 
+        # A partial reset: only her body vanished while the rest of
+        # the world persisted. The wholesale-turnover check above
+        # cannot see this kind of death — the maze kept its
+        # continuity — but the fatal contact/path still exists and is
+        # the only evidence about what ended the attempt.
+        current_self = (
+            self.entities.get(self.self_id)
+            if self.self_id is not None
+            else None
+        )
+        if (
+            current_self is not None
+            and current_self.gone
+            and current_self.gone_tick == self.tick
+        ):
+            events.extend(self.suspect_terminal(pending))
+
         # Whether the current self answered this action feeds the
         # liveness judgment inside _infer_self — evaluated after
         # velocities are measured, like everything else that reads

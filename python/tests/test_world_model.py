@@ -290,6 +290,33 @@ def test_unannounced_reset_suspects_the_pending_path():
     assert any("path" in e.text for e in events if e.kind == "suspect")
 
 
+def test_losing_only_her_body_suspects_the_fatal_path():
+    """A persistent world can still kill the tracked body.
+
+    ARC deaths often respawn the avatar while the maze itself keeps
+    continuity. That is not a wholesale reset, but the kind sitting
+    inside the failed move is still causal evidence — exactly the
+    suspicion a terminal reset would have recorded.
+    """
+    model = _world_with_self()          # learned "up" is (-2, 0)
+    hazard = {(2, 2), (2, 3)}
+    model.observe(_scene([
+        (_ME, set(_ME_CELLS)),
+        (7, hazard),
+        (5, {(0, 0), (0, 1), (1, 0), (1, 1)}),
+        (9, {(12, 10), (12, 11)}),
+    ]))
+    model.note_action("up")
+    events = model.observe(_scene([
+        (7, hazard),                         # she is gone, world stays
+        (5, {(0, 0), (0, 1), (1, 0), (1, 1)}),
+        (9, {(12, 10), (12, 11)}),
+    ]))
+    assert not any(e.kind == "reset" for e in events)
+    assert model.death_suspects[7] == 1
+    assert any("path" in e.text for e in events if e.kind == "suspect")
+
+
 def test_partial_turnover_is_not_a_reset():
     """Ordinary motion — some entities persist — is not a reset."""
     model = _world_with_self()
