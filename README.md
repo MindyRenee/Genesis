@@ -33,6 +33,7 @@ the point: intelligence should not automatically require a datacenter.
 - [Architecture](#architecture)
 - [Getting started](#getting-started)
 - [Tests and lint](#tests-and-lint)
+- [Citing this work](#citing-this-work)
 - [Contributing](#contributing)
 
 ## Why I built her
@@ -146,7 +147,10 @@ have to cross.
   exposes the actual deliberation trace; a narrative self-model and a
   persistent growth ledger keep continuity across her whole life.
 
-The measured record for these claims is in [DEVLOG.md](DEVLOG.md).
+The measured record for these claims is in [DEVLOG.md](DEVLOG.md);
+the evidence catalog — probe results, live-state artifacts, and the
+failure modes that are themselves evidence — is
+[docs/EMERGENCE.md](docs/EMERGENCE.md).
 
 ## ARC-AGI-3
 
@@ -506,6 +510,27 @@ python3 -m pyflakes python/ genesis_client/ infrastructure/ world/ eval/ *.py sc
 python3 -m mypy python/ genesis_client/ infrastructure/ world/ eval/ --ignore-missing-imports
 PYTHONPATH=python:. python3 -m pytest python/tests/ -q -o addopts=''
 ```
+
+## Citing this work
+
+The architecture preprint is archived on Zenodo:
+
+```bibtex
+@misc{beatty2026genesis,
+  author    = {Beatty, Mindy},
+  title     = {Genesis: A Machine-Native Cognitive Architecture},
+  year      = {2026},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.22817337},
+  url       = {https://doi.org/10.5281/zenodo.22817337},
+}
+```
+
+The paper is a 2026-09-17 snapshot. The code has moved since —
+the core state is now schema v5 (3,480 B, not 3,288 B), and sleep is
+staged by the Booth/Diniz Behn network described in `AGENTS.md`,
+not by adenosine thresholds alone. Where the paper and the code
+diverge, the code is current.
 
 ## Contributing
 
