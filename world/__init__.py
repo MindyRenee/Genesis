@@ -13,6 +13,16 @@ upon the world — recorded as a two-way stream of ``ExternalEvent``s.
   rhythm as posteriors with honest uncertainty.
 - ``ExternalEvent`` / ``EventKind`` — things that happen, inbound
   (the world acts on it) or outbound (it acts on the world).
+
+Boundary adapters — worlds that aren't people — live here too but
+stay out of ``__all__``; entry points import them directly:
+
+- ``world.arc`` — ARC-AGI-3 environments via the ``arcengine`` SDK
+  (practice + competition scorecards). See ``docs/ARC-AGI-3.md``.
+- ``world.arc_web`` — the public human task page over Chrome
+  DevTools Protocol.
+- ``world.discord_showcase`` — an observer-only feed mirroring ARC
+  practice runs to a private Discord channel; never touches policy.
 """
 
 from .belief import Beta, PresenceBelief

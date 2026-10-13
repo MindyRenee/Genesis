@@ -94,6 +94,30 @@ def _chunks(text: str) -> Iterator[str]:
         yield text
 
 
+def _multipart(
+    payload: dict, filename: str, data: bytes, field: str = "files[0]"
+) -> tuple[bytes, str]:
+    """Encode a webhook multipart/form-data body (payload_json + one file)."""
+    boundary = f"----genesis{int(time.time() * 1e6):x}"
+    parts: list[bytes] = []
+    parts.append(
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="payload_json"\r\n'
+        f"Content-Type: application/json\r\n\r\n"
+        f"{json.dumps(payload)}\r\n".encode()
+    )
+    parts.append(
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="{field}"; '
+        f'filename="{filename}"\r\n'
+        f"Content-Type: image/png\r\n\r\n".encode()
+        + data
+        + b"\r\n"
+    )
+    parts.append(f"--{boundary}--\r\n".encode())
+    return b"".join(parts), f"multipart/form-data; boundary={boundary}"
+
+
 class DiscordFeed:
     """Background webhook poster. All public methods are thread-safe.
 
@@ -113,10 +137,13 @@ class DiscordFeed:
         self._url = webhook_url
         self._post_interval = post_interval
         self._queue_max = queue_max
-        self._queue: deque[tuple[str | None, str]] = deque()
+        self._queue: deque[tuple] = deque()
         self._cond = threading.Condition()
         self._closing = False
         self._disabled = False
+        # A webhook may edit its own messages; the live-board view is
+        # one message kept current rather than a scroll of frames.
+        self._live_id: str | None = None
         self._thread = threading.Thread(
             target=self._run, name="discord-feed", daemon=True
         )
@@ -143,7 +170,7 @@ class DiscordFeed:
                 return
             while len(self._queue) >= self._queue_max:
                 self._queue.popleft()
-            self._queue.append((author, text))
+            self._queue.append(("text", author, text))
             self._cond.notify()
 
     def post_line(self, line: str) -> None:
@@ -155,6 +182,47 @@ class DiscordFeed:
     def post_user(self, text: str) -> None:
         """Enqueue user input verbatim (typed input never reaches the log)."""
         self.post(text, "you")
+
+    def post_image(
+        self,
+        png: bytes,
+        caption: str = "",
+        author: str | None = None,
+        filename: str = "frame.png",
+    ) -> None:
+        """Enqueue one image attachment."""
+        if not png:
+            return
+        with self._cond:
+            if self._disabled:
+                return
+            while len(self._queue) >= self._queue_max:
+                self._queue.popleft()
+            self._queue.append(("image", author, caption, filename, png))
+            self._cond.notify()
+
+    def update_live(
+        self,
+        png: bytes,
+        caption: str = "",
+        author: str | None = None,
+    ) -> None:
+        """Queue an update to the single live-board message.
+
+        Webhooks can edit their own messages, so the board view is one
+        message kept current rather than a scroll of frames. Pending
+        live updates collapse — only the newest frame is ever sent.
+        """
+        if not png:
+            return
+        with self._cond:
+            if self._disabled:
+                return
+            self._queue = deque(
+                item for item in self._queue if item[0] != "live"
+            )
+            self._queue.append(("live", author, caption, png))
+            self._cond.notify()
 
     # ── Poster thread ────────────────────────────────────────────────
 
@@ -170,13 +238,25 @@ class DiscordFeed:
             batch = self._take_batch()
             if batch is None:
                 return
-            author, content = batch
+            kind = batch[0]
             if backoff:
                 wait = backoff
                 if drain_deadline is not None:
                     wait = min(wait, max(0.0, drain_deadline - time.monotonic()))
                 time.sleep(wait)
-            ok, retry_after, permanent = self._post(content, author)
+            if kind == "text":
+                _, author, content = batch
+                ok, retry_after, permanent = self._post(content, author)
+            elif kind == "image":
+                _, author, caption, filename, png = batch
+                ok, retry_after, permanent = self._post_image_once(
+                    caption, author, filename, png
+                )
+            else:  # "live"
+                _, author, caption, png = batch
+                ok, retry_after, permanent = self._post_live(
+                    caption, author, png
+                )
             if ok:
                 backoff = 0.0
             elif permanent:
@@ -195,17 +275,20 @@ class DiscordFeed:
                 )
                 # Re-queue the failed batch so it isn't lost.
                 with self._cond:
-                    self._queue.appendleft((author, content))
+                    self._queue.appendleft(batch)
             time.sleep(0.0 if self._closing else self._post_interval)
 
-    def _take_batch(self) -> tuple[str | None, str] | None:
-        """Pop one item, coalescing same-author items up to the limit."""
+    def _take_batch(self) -> tuple | None:
+        """Pop one item, coalescing same-author text up to the limit."""
         with self._cond:
             while not self._queue:
                 if self._closing:
                     return None
                 self._cond.wait(timeout=1.0)
-            author, text = self._queue.popleft()
+            item = self._queue.popleft()
+            if item[0] != "text":
+                return item
+            _, author, text = item
             parts = [text]
             total = len(text)
             window_end = time.monotonic() + _COALESCE_WINDOW
@@ -218,13 +301,16 @@ class DiscordFeed:
                         break
                     self._cond.wait(timeout=remaining)
                     continue
-                next_author, next_text = self._queue[0]
+                nxt = self._queue[0]
+                if nxt[0] != "text":
+                    break
+                next_author, next_text = nxt[1], nxt[2]
                 if next_author != author or total + 1 + len(next_text) > _MAX_CONTENT:
                     break
                 self._queue.popleft()
                 parts.append(next_text)
                 total += 1 + len(next_text)
-            return author, "\n".join(parts)
+            return ("text", author, "\n".join(parts))
 
     def _post(
         self, content: str, author: str | None
@@ -270,6 +356,94 @@ class DiscordFeed:
         except (urllib.error.URLError, OSError) as e:
             logger.debug(f"[discord] webhook POST error: {e}")
             return False, None, False
+
+    def _post_image_once(
+        self,
+        caption: str,
+        author: str | None,
+        filename: str,
+        png: bytes,
+    ) -> tuple[bool, float | None, bool]:
+        payload: dict[str, object] = {
+            "content": caption,
+            "allowed_mentions": {"parse": []},
+            "attachments": [
+                {"id": 0, "filename": filename, "description": caption[:1024]}
+            ],
+        }
+        if author:
+            payload["username"] = author
+        body, content_type = _multipart(payload, filename, png)
+        return self._send(self._url, "POST", body, content_type)
+
+    def _post_live(
+        self, caption: str, author: str | None, png: bytes
+    ) -> tuple[bool, float | None, bool]:
+        """PATCH the live message if it exists, else create it (wait=true)."""
+        payload: dict[str, object] = {
+            "content": caption,
+            "allowed_mentions": {"parse": []},
+            "attachments": [{"id": 0, "filename": "board.png"}],
+        }
+        if self._live_id:
+            url = f"{self._url}/messages/{self._live_id}"
+            body, content_type = _multipart(payload, "board.png", png)
+            ok, retry_after, permanent = self._send(url, "PATCH", body, content_type)
+            if ok or retry_after is not None or not permanent:
+                return ok, retry_after, permanent
+            # Permanent failure — the message may have been deleted.
+            # Fall through and create a fresh live message.
+            self._live_id = None
+        if author:
+            payload["username"] = author
+        body, content_type = _multipart(payload, "board.png", png)
+        url = self._url + ("&" if "?" in self._url else "?") + "wait=true"
+        status, retry_after, permanent, resp = self._send(
+            url, "POST", body, content_type, want_body=True
+        )
+        if status and resp:
+            try:
+                self._live_id = json.loads(resp).get("id")
+            except ValueError:
+                pass
+        return status, retry_after, permanent
+
+    def _send(
+        self,
+        url: str,
+        method: str,
+        body: bytes,
+        content_type: str,
+        want_body: bool = False,
+    ) -> tuple:
+        """Raw request. Returns (ok, retry_after, permanent[, body])."""
+        req = urllib.request.Request(
+            url,
+            data=body,
+            headers={
+                "Content-Type": content_type,
+                "User-Agent": "GenesisSessionMirror/1.0",
+            },
+            method=method,
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=15) as r:
+                resp = r.read() if want_body else None
+            return (True, None, False, resp) if want_body else (True, None, False)
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                retry_after = _parse_retry_after(e)
+                logger.debug(f"[discord] rate-limited, retry_after={retry_after}")
+                out = (False, retry_after, False)
+            else:
+                permanent = 400 <= e.code < 500
+                logger.debug(f"[discord] webhook {method} failed: HTTP {e.code}")
+                out = (False, None, permanent)
+            return (*out, None) if want_body else out
+        except (urllib.error.URLError, OSError) as e:
+            logger.debug(f"[discord] webhook {method} error: {e}")
+            out = (False, None, False)
+            return (*out, None) if want_body else out
 
     def close(self) -> None:
         """Flush remaining lines (best-effort) and stop the poster thread."""

@@ -184,3 +184,123 @@ def test_blank_lines_skipped(monkeypatch):
     finally:
         feed.close()
     assert posts == []
+
+
+def _capture_requests(calls: list, monkeypatch, reply: bytes = b"{}"):
+    """Capture raw requests (method, url, content_type, body)."""
+
+    class Resp(_FakeResponse):
+        def read(self):
+            return reply
+
+    def fake_urlopen(req, timeout=0):
+        calls.append(
+            {
+                "method": req.get_method(),
+                "url": req.full_url,
+                "content_type": req.headers.get("Content-type", ""),
+                "body": req.data,
+            }
+        )
+        return Resp()
+
+    monkeypatch.setattr(discord_feed.urllib.request, "urlopen", fake_urlopen)
+
+
+def _multipart_payload(body: bytes) -> dict:
+    """Pull the payload_json part out of a multipart request body."""
+    text = body.decode("utf-8", "replace")
+    marker = 'name="payload_json"'
+    start = text.index(marker) + len(marker)
+    json_start = text.index("{", start)
+    # The JSON part ends at the next boundary line.
+    end = text.index("\r\n----", json_start)
+    return json.loads(text[json_start:end])
+
+
+def test_post_image_sends_multipart(monkeypatch):
+    calls: list = []
+    _capture_requests(calls, monkeypatch)
+    feed = DiscordFeed(URL, post_interval=0.0)
+    try:
+        feed.post_image(b"\x89PNG fake", caption="board", author="Genesis")
+        assert _wait_for(lambda: len(calls) >= 1)
+    finally:
+        feed.close()
+    call = calls[0]
+    assert call["method"] == "POST"
+    assert call["content_type"].startswith("multipart/form-data")
+    payload = _multipart_payload(call["body"])
+    assert payload["content"] == "board"
+    assert payload["username"] == "Genesis"
+    assert payload["attachments"][0]["filename"] == "frame.png"
+    assert b"\x89PNG fake" in call["body"]
+
+
+def test_live_update_creates_then_patches(monkeypatch):
+    calls: list = []
+    # wait=true replies carry the created message id.
+    _capture_requests(calls, monkeypatch, reply=b'{"id": "42"}')
+    feed = DiscordFeed(URL, post_interval=0.0)
+    try:
+        feed.update_live(b"png-one", caption="t1")
+        assert _wait_for(lambda: feed._live_id == "42")
+        feed.update_live(b"png-two", caption="t2")
+        assert _wait_for(lambda: len(calls) >= 2)
+    finally:
+        feed.close()
+    first, second = calls[0], calls[1]
+    assert first["method"] == "POST"
+    assert "wait=true" in first["url"]
+    assert second["method"] == "PATCH"
+    assert second["url"].endswith("/messages/42")
+
+
+def test_live_updates_collapse_pending(monkeypatch):
+    calls: list = []
+    _capture_requests(calls, monkeypatch, reply=b'{"id": "7"}')
+    feed = DiscordFeed(URL, post_interval=0.0)
+    try:
+        # Pause the poster: fill the queue while it sleeps.
+        feed._cond.acquire()
+        try:
+            feed.update_live(b"png-stale", caption="old")
+            feed.update_live(b"png-fresh", caption="new")
+            kinds = [i[0] for i in feed._queue]
+            assert kinds.count("live") == 1
+            assert feed._queue[0][3] == b"png-fresh"
+        finally:
+            feed._cond.release()
+    finally:
+        feed.close()
+
+
+def test_live_patch_failure_recreates(monkeypatch):
+    calls: list = []
+
+    class Resp(_FakeResponse):
+        def read(self):
+            return b'{"id": "9"}'
+
+    def flaky_urlopen(req, timeout=0):
+        calls.append(req)
+        if req.get_method() == "PATCH":
+            raise urllib.error.HTTPError(
+                URL, 404, "gone", {}, io.BytesIO(b"")
+            )
+        return Resp()
+
+    monkeypatch.setattr(
+        discord_feed.urllib.request, "urlopen", flaky_urlopen
+    )
+    feed = DiscordFeed(URL, post_interval=0.0)
+    try:
+        feed.update_live(b"png", caption="t1")
+        assert _wait_for(lambda: feed._live_id == "9")
+        feed.update_live(b"png2", caption="t2")
+        # PATCH 404s permanently → the feed drops the id and re-POSTs.
+        assert _wait_for(
+            lambda: sum(1 for r in calls if r.get_method() == "POST") >= 2
+        )
+    finally:
+        feed.close()
