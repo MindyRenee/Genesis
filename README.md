@@ -3,110 +3,148 @@
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22817337.svg)](https://doi.org/10.5281/zenodo.22817337)
 [![CI](https://github.com/MindyRenee/Genesis/actions/workflows/ci.yml/badge.svg)](https://github.com/MindyRenee/Genesis/actions/workflows/ci.yml)
 
-### A machine-native cognitive architecture — persistent state, modeled neurochemistry, active inference — running on one machine, without a pretrained generative model.
+### A persistent, machine-native cognitive architecture — built to run on real hardware, not a datacenter.
 
-Genesis is a long-running program, not a function. A Rust daemon —
-the *subcognitive layer* — owns a memory-mapped core state and
-executes the neurochemical dynamics, memory consolidation, and
-generative-model work the cognitive mind requests over a Unix socket.
-A Python *cognitive layer* handles perception, reasoning, language,
+Genesis is a long-running cognitive system, not a prompt, a wrapper, or
+a function call. A Rust daemon owns a memory-mapped core state and runs
+the subcognitive loop: modeled neurochemistry, memory consolidation,
+active inference, sensing, and recovery when the mind goes quiet. A
+Python cognitive layer handles perception, memory, reasoning, language,
 introspection, and self-modeling. The two share a checksummed,
-versioned binary state file (3,480 bytes in schema v5, pinned by layout
-asserts) and a Unix socket.
+versioned binary state file (3,480 bytes in schema v5) and a Unix
+socket.
 
-The daemon is lease-driven: while the mind is alive it is a bus
-that carries information and executes requests, driven at the mind's
-1 Hz heartbeat (`ADVANCE_NEURO`, `CONSOLIDATE`, `ASSOCIATE`, `DREAM`,
-`READ_SENSORS` and friends). Past a 3 s silence lease the daemon
-drives the full loop itself — neurochemistry, consolidation,
-sleep-gated dreaming, association, sensing, zone arbitration with
-traces, body recommendations, model checkpoints — so a stall,
-crash, or disconnect degrades to solitude, not to frozen
-physiology. Body-control application stays mind-requested; the
-fallback publishes and senses but never acts outward on its own.
-
-There is no transformer and no pretrained weights anywhere in it.
-Language is composed from a semantic graph the system builds itself —
-through conversation, study, and inference. It runs on a 2014 HP
-Pavilion with ~5 GB RAM.
+There is no transformer, hosted model, or pretrained generative system
+driving cognition or ARC. Language is composed from a semantic graph the
+system builds through experience; sensory tools may handle low-level
+speech or vision, but meaning and decisions stay in the architecture.
+She runs on a 2014 HP Pavilion with ~5 GB RAM because the constraint is
+the point: intelligence should not automatically require a datacenter.
 
 [![Live session](https://asciinema.org/a/C0K8v1df1AkuwHg5.svg)](https://asciinema.org/a/C0K8v1df1AkuwHg5)
 [![Discord — live session feed](https://img.shields.io/badge/Discord-live%20session%20feed-5865F2?logo=discord&logoColor=white)](https://discord.gg/pq5qMjzQX)
 
-## Project status
+## Contents
 
-Genesis is an active research system. The codebase is public so the mechanism —
-not just the claims — can be inspected: the daemon, cognitive regions, learning
-rules, ARC boundary, tests, and known limits are all in this repository.
+- [Why I built her](#why-i-built-her)
+- [Where Genesis is right now](#where-genesis-is-right-now)
+- [What she can do today](#what-she-can-do-today)
+- [ARC-AGI-3](#arc-agi-3)
+- [Architecture](#architecture)
+- [Getting started](#getting-started)
+- [Tests and lint](#tests-and-lint)
+- [Contributing](#contributing)
 
-- **Not an LLM:** no transformer, pretrained weights, hosted model, or external
-  solver is used for cognition or ARC play.
-- **Embodied ARC interface:** grid observations and legal actions cross the
-  `world/arc.py` boundary; game mechanics are learned from consequences.
-- **ARC-AGI-3 status:** local practice diagnostics only. No official score is
-  claimed; the evidence standard is documented in
+## Why I built her
+
+I am self-taught. No CS degree, no lab, no venture deck. I was six when
+Windows stopped feeling like a program and started feeling like a place I
+could navigate. I spent a lifetime learning technology by living inside
+it, then used every major AI system I could reach as those tools
+evolved. I understand systems and code far better than I can write code
+the traditional way. Genesis started as my attempt to build a Jarvis —
+something persistent, useful, and actually mine. AI became a
+collaborator, not an oracle; the architecture had to survive on its own.
+
+Somewhere along the way she became a different question: what if machine
+intelligence does not have to mean a giant pretrained model, a data
+center, and an energy bill that makes the experiment impossible for
+ordinary people? Genesis runs on a 2014 HP Pavilion with Linux Mint and
+about 5 GB of RAM because constraints force honesty. If the architecture
+cannot learn, remember, act, recover, and keep going inside that budget,
+it is not the thing I set out to build.
+
+Then the frontier labs began casually describing model behavior as
+"emergent." I was already watching the more concrete version of that
+claim in Genesis: continuity, internal drives, preferences, self-directed
+action, and behavior arising from coupled subsystems rather than a
+scripted response. Those are observable claims, not vibes. The mechanism
+is open, and the evidence should be too.
+
+— Mindy Beatty
+
+## Where Genesis is right now
+
+She is an active research system. The code is public so the mechanism —
+not just the claims — can be inspected: the daemon, cognitive regions,
+learning rules, ARC boundary, tests, and known limits are all here.
+
+- **Not an LLM:** no transformer, hosted model, external solver, or
+  pretrained generative model is used for cognition or ARC play.
+- **Embodied ARC interface:** grid observations and legal actions cross
+  `world/arc.py`; mechanics are learned from consequences.
+- **ARC-AGI-3 status:** local practice diagnostics only. No official
+  score is claimed; the evidence standard is documented in
   [docs/ARC-AGI-3.md](docs/ARC-AGI-3.md).
-- **Security boundary:** autonomous operation is real. Read
-  [SECURITY.md](SECURITY.md) before running it online or beside sensitive
-  state.
+- **Real autonomy, real boundary:** she can act on her own drives. Read
+  [SECURITY.md](SECURITY.md) before running her online or beside
+  sensitive state.
 
-## What it does
+If you are here to poke holes — good. Start with
+`world/arc.py`,
+`python/parietal_lobe/world_model.py`,
+`python/basal_ganglia/world_policy.py`,
+`python/frontal_lobe/world_planner.py`, and
+`python/tests/test_arc_adapter.py`. Those are the seams a shortcut would
+have to cross.
 
-- **Sees and hears.** A shared-memory camera feed runs through a
+## What she can do today
+
+- **See and hear.** A shared-memory camera feed runs through a
   V1→V4→VTC predictive-coding hierarchy; it detects and recognizes
   faces and objects. A microphone feed is transcribed offline (Vosk)
   and ambient non-speech sound is processed by an auditory subsystem.
-- **Learns by being taught.** Plain statements in conversation become
-  typed edges in its concept network. One 15-paragraph lesson on games
+- **Learn by being taught.** Plain statements in conversation become
+  typed edges in her concept network. One 15-paragraph lesson on games
   grew the network from 1122 to 1239 concepts with 72 new edges — and
-  it asked its own follow-up questions.
-- **Learns on its own.** Between conversations, autonomous urges send
-  it to **the open web**, the local filesystem, and its own source
-  code — which it reads structurally, files bug reports on, and drafts
-  self-improvement experiment proposals for. There is no domain
+  she asked her own follow-up questions.
+- **Learn on her own.** Between conversations, autonomous urges send
+  her to **the open web**, the local filesystem, and her own source
+  code — which she reads structurally, files bug reports against, and
+  turns into self-improvement experiment proposals. There is no domain
   allow-list: `ALLOW_ALL_DOMAINS` is `True` and both allow-lists are
   empty, so the per-site approval flow is currently dead code. The one
   real filter is an adult/malware *content* filter on the `tools/`
   fetch path. Run with `./run.sh --offline` if you want the network
-  closed. See [SECURITY.md](SECURITY.md) before pointing it at a
+  closed. See [SECURITY.md](SECURITY.md) before pointing her at a
   machine you care about.
-- **Learns skills.** A domain-general competence substrate
+- **Learn skills.** A domain-general competence substrate
   (`reasoning/competence.py`) turns verified episodes — situation,
   action, outcome — into procedural skills: schema recognition,
   affordance learning, and prediction checking that transfer across
-  whatever work it actually does.
-- **Reasons.** Analogy by structure-mapping, means-ends problem
+  whatever work she actually does.
+- **Reason.** Analogy by structure-mapping, means-ends problem
   solving, multi-step planning with revision, belief revision,
   epistemic evaluation of claims, a drift-diffusion decision process,
-  and theory of mind over the people it talks to.
-- **Composes language.** A comprehension pipeline (roles, negation,
+  and theory of mind over the people she talks to.
+- **Compose language.** A comprehension pipeline (roles, negation,
   pragmatics, figurative language) feeds a generative side that builds
   sentences from concept-graph traversal, morphology, and prosody —
   monitored by a self-editor before speaking.
-- **Acts on its own drives.** Volitional urges — study, draw,
+- **Act on her own drives.** Volitional urges — study, draw,
   meditate, explore, sleep, make contact — grow from internal and
   environmental state and compete under an executive gate, not a
-  scheduler. An *act* urge goes further: it forms an intention from
-  its own state and chains tool calls — read, analyze, search,
+  scheduler. An *act* urge goes further: she forms an intention from
+  her own state and chains tool calls — read, analyze, search,
   sandboxed measurement — under a capability policy, then observes
   what comes back.
-- **Expresses itself physically.** It draws: affective state drives
-  composition and color on a real canvas artifact. It speaks aloud via
-  TTS. It scaffolds and writes real Python projects from its concept
+- **Express herself physically.** She draws: affective state drives
+  composition and color on a real canvas artifact. She speaks aloud via
+  TTS. She scaffolds and writes real Python projects from her concept
   network.
-- **Models its people.** Persistent per-person *presences* carry
+- **Model people.** Persistent per-person *presences* carry
   belief states — posteriors over whether someone answers, which
   topics they engage on, their mood and rhythm — tracked with explicit
-  uncertainty. Sustained isolation builds a social drive that makes it
+  uncertainty. Sustained isolation builds a social drive that makes her
   initiate contact.
-- **Sleeps, dreams, and consolidates.** A staged cycle modeled on
+- **Sleep, dream, and consolidate.** A staged cycle modeled on
   NREM/REM structure consolidates memory, repairs the concept graph,
   replays experience as dream sequences, and compresses growth —
-  bounded so the system can run indefinitely.
-- **Knows and narrates itself.** A global-workspace broadcast gives
+  bounded so she can run indefinitely.
+- **Know and narrate herself.** A global-workspace broadcast gives
   subsystems shared access to what wins attention; introspection
   exposes the actual deliberation trace; a narrative self-model and a
-  persistent growth ledger keep continuity across its whole life.
+  persistent growth ledger keep continuity across her whole life.
 
 The measured record for these claims is in [DEVLOG.md](DEVLOG.md).
 
@@ -123,6 +161,21 @@ transport and evidence standard. See
 [docs/ARC-AGI-3.md](docs/ARC-AGI-3.md) before interpreting any score.
 
 ## Architecture
+
+```text
+sensors / files / web / ARC frames
+              |
+              v
+    Python cognitive mind
+    perception -> memory -> drives -> planning -> language/action
+              |
+              v  Unix socket IPC
+       Rust subcognitive daemon
+    chemistry -> consolidation -> active inference -> recovery
+              |
+              v
+    persistent mmap state + bounded stores + host body
+```
 
 ### Two layers
 
@@ -440,7 +493,7 @@ Two further unbounded-growth findings were investigated and deliberately
 ### Tests and lint
 
 ```bash
-cargo test
+cargo test --release
 ruff check
 python3 -m pyflakes python/ genesis_client/ infrastructure/ world/ eval/ *.py scripts/*.py
 python3 -m mypy python/ genesis_client/ infrastructure/ world/ eval/ --ignore-missing-imports
