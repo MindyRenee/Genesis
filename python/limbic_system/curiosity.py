@@ -1006,3 +1006,53 @@ class Curiosity:
     def questions_asked(self) -> int:
         """Total questions generated."""
         return len(self._asked_questions)
+
+    def to_dict(self) -> dict[str, Any]:
+        """Serialize curiosity state for restart-safe persistence.
+
+        The asked/resolved sets and habituation counts are what keep a
+        question from being re-asked. Held in memory only, every
+        restart reset the novelty window and the same gaps produced
+        the same questions again.
+        """
+        return {
+            "asked_questions": list(self._asked_questions),
+            "resolved_questions": list(self._resolved_questions),
+            "exposure_counts": dict(self._exposure_counts),
+            "last_exposure_confidence": dict(self._last_exposure_confidence),
+        }
+
+    def restore_from_dict(self, data: dict[str, Any]) -> None:
+        """Restore persisted curiosity state after validating its shape."""
+        if not isinstance(data, dict):
+            raise TypeError("curiosity state must be an object")
+
+        asked = data.get("asked_questions", [])
+        if not isinstance(asked, list):
+            raise TypeError("curiosity.asked_questions must be a list")
+        self._asked_questions = deque(
+            (str(k) for k in asked), maxlen=self._asked_questions_maxlen
+        )
+        self._asked_questions_set = set(self._asked_questions)
+
+        resolved = data.get("resolved_questions", [])
+        if not isinstance(resolved, list):
+            raise TypeError("curiosity.resolved_questions must be a list")
+        self._resolved_questions = deque(
+            (str(k) for k in resolved), maxlen=self._resolved_questions_maxlen
+        )
+        self._resolved_questions_set = set(self._resolved_questions)
+
+        exposure = data.get("exposure_counts", {})
+        if not isinstance(exposure, dict):
+            raise TypeError("curiosity.exposure_counts must be an object")
+        self._exposure_counts = {
+            str(k): int(v) for k, v in exposure.items()
+        }
+
+        last_confidence = data.get("last_exposure_confidence", {})
+        if not isinstance(last_confidence, dict):
+            raise TypeError("curiosity.last_exposure_confidence must be an object")
+        self._last_exposure_confidence = {
+            str(k): float(v) for k, v in last_confidence.items()
+        }

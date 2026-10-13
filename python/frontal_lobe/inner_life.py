@@ -131,6 +131,14 @@ RUMINATION_MIN_LENGTH = 3
 # If novelty drops below this threshold across the chain, it's repetitive
 RUMINATION_NOVELTY_THRESHOLD = 0.3
 
+# Insight write-back weights. A waking insight records the noticed
+# connection just above detect_insight's weak-edge rediscovery
+# threshold (0.2), so the noticing closes its own loop. Dream-derived
+# insights use dream-synthesis's hypothetical weight (0.15) — a single
+# dream pairing stays tentative and only recurrence corroborates it.
+_INSIGHT_EDGE_WEIGHT = 0.25
+_INSIGHT_DREAM_EDGE_WEIGHT = 0.15
+
 
 class _LiveEvent:
     """A minimal thought-like event for the live thought callback.
@@ -5684,17 +5692,21 @@ class InnerLife:
 
                 if connection is None:
                     # No edge exists — this is a novel connection!
-                    return self._make_insight(
+                    insight = self._make_insight(
                         thought, c1, c2, weight=None,
                     )
+                    self._record_insight_edge(network, c1, c2, thought)
+                    return insight
 
                 _relation, weight = connection
                 if weight < 0.2:
                     # Very weak connection — still an insight, but less
                     # surprising than no connection at all.
-                    return self._make_insight(
+                    insight = self._make_insight(
                         thought, c1, c2, weight=weight,
                     )
+                    self._record_insight_edge(network, c1, c2, thought)
+                    return insight
 
         return None
 
@@ -5702,14 +5714,54 @@ class InnerLife:
     def _find_edge(
         network: ConceptNetwork, c1: str, c2: str
     ) -> tuple[RelationType, float] | None:
-        """Find the edge between two concepts, if it exists.
+        """Find the strongest edge between two concepts, if any exists.
 
-        Returns (relation, weight) or None if no edge exists.
+        Returns (relation, weight) of the highest-weight edge, or None
+        if no edge exists. The strongest edge decides novelty — a pair
+        linked weakly through one relation and firmly through another
+        is already known.
         """
+        best: tuple[RelationType, float] | None = None
         for target, relation, weight in network.get_neighbors(c1):
-            if target == c2:
-                return (relation, weight)
-        return None
+            if target == c2 and (best is None or weight > best[1]):
+                best = (relation, weight)
+        return best
+
+    def _record_insight_edge(
+        self,
+        network: ConceptNetwork,
+        c1: str,
+        c2: str,
+        thought: SpontaneousThought,
+    ) -> None:
+        """Write a noticed connection back into the graph.
+
+        Without write-back the same "novel connection" re-fires every
+        time the pair co-activates: the gap is noticed but never
+        recorded, so it stays novel forever. The insight *is* the
+        association forming — co-activation is evidence — so it becomes
+        a tentative ``related_to`` edge carrying its own provenance.
+
+        Waking insights land just above the rediscovery threshold, so
+        the noticing closes its own loop. Dream-derived pairs land at
+        the hypothetical weight dream-synthesis proposals use: a single
+        dream sighting stays tentative, and only recurrence ratchets it
+        past the threshold (each ``add_edge`` on an existing edge
+        strengthens it).
+        """
+        weight = (
+            _INSIGHT_DREAM_EDGE_WEIGHT
+            if getattr(thought, "is_dream", False)
+            else _INSIGHT_EDGE_WEIGHT
+        )
+        try:
+            network.add_edge(
+                c1, c2, RelationType.RELATED_TO, weight, origin="insight"
+            )
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "frontal_lobe.inner_life._record_insight_edge", e
+            )
 
     def _make_insight(
         self,

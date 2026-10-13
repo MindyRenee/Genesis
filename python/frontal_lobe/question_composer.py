@@ -17,7 +17,7 @@ from __future__ import annotations
 import random
 
 from limbic_system.emotion import EmotionalState
-from temporal_lobe.concepts import ConceptNetwork
+from temporal_lobe.concepts import ConceptNetwork, is_world_concept
 
 
 class QuestionComposer:
@@ -52,6 +52,13 @@ class QuestionComposer:
         """
         # Don't ask if it's not feeling curious enough
         if emotion.creativity < 0.3 and emotion.alertness < 0.3:
+            return None
+
+        # Questions about internal scaffolding are unanswerable by
+        # construction — the user cannot explain the mind's own
+        # bookkeeping ("what exactly is cat:emotion:positive?"). Only
+        # world concepts are legitimate targets.
+        if not is_world_concept(topic):
             return None
 
         # Don't ask about the same thing it asked recently (last 3)
@@ -106,8 +113,13 @@ class QuestionComposer:
         if not outgoing:
             return None
 
-        # Find low-confidence connections — things it's unsure about
-        uncertain = [e for e in outgoing if e.weight < 0.6]
+        # Find low-confidence connections — things it's unsure about.
+        # Scaffold neighbors (internal category hubs) can't be asked
+        # about — their "definition" is bookkeeping, not knowledge.
+        uncertain = [
+            e for e in outgoing
+            if e.weight < 0.6 and is_world_concept(e.target)
+        ]
         if uncertain:
             edge = self._rng.choice(uncertain)
             return {
@@ -132,6 +144,10 @@ class QuestionComposer:
         outgoing = self.network.get_edges(topic, direction="out")
         gaps: list[str] = []
         for edge in outgoing:
+            # Scaffold neighbors have no definition by design — asking
+            # about them can never resolve the "gap".
+            if not is_world_concept(edge.target):
+                continue
             neighbor = self.network.get_concept(edge.target)
             if neighbor:
                 defn = neighbor.properties.get("definition", "")
@@ -174,6 +190,7 @@ class QuestionComposer:
             multi = [
                 neighbor for neighbor, count in connection_count.items()
                 if count >= 2 and neighbor != topic
+                and is_world_concept(neighbor)
             ]
             if multi:
                 neighbor = self._rng.choice(multi)

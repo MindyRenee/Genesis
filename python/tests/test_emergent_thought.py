@@ -590,3 +590,132 @@ def test_abductive_inference_is_spoken_and_hedged() -> None:
     assert "possible" in spoken, (
         f"abductive conclusion lost its hedge: {spoken!r}"
     )
+
+
+class TestInsightWriteBack:
+    """An insight is a noticed connection — noticing it must close the loop.
+
+    Without write-back the same "novel connection" pair re-fired every
+    time it co-activated, because the gap was detected but never
+    recorded. The insight now lands in the graph as a tentative
+    related_to edge, so rediscovery is impossible by construction.
+    """
+
+    def test_novel_pair_writes_edge_and_does_not_refire(self):
+        from frontal_lobe.inner_life import SpontaneousThought
+        net = ConceptNetwork()
+        net.add_concept("alpha", confidence=0.8)
+        net.add_concept("beta", confidence=0.8)
+        il = _make_inner_life(net)
+        thought = SpontaneousThought(
+            content="alpha meets beta", trigger="reflection", timestamp=0,
+        )
+        insight = il.detect_insight(thought, net)
+        assert insight is not None, "unlinked pair should produce an insight"
+        # The noticed connection is now part of the graph.
+        edges = net.get_edges("alpha", "both")
+        assert any(
+            e.target == "beta" and e.origin == "insight" for e in edges
+        ), "insight should write a tentative edge with provenance"
+        # The same co-activation can never re-fire — the loop is closed.
+        assert il.detect_insight(thought, net) is None
+
+    def test_dream_insight_stays_hypothetical_until_recurrence(self):
+        from frontal_lobe.inner_life import SpontaneousThought
+        net = ConceptNetwork()
+        net.add_concept("gamma", confidence=0.8)
+        net.add_concept("delta", confidence=0.8)
+        il = _make_inner_life(net)
+        dream = SpontaneousThought(
+            content="gamma drifts with delta", trigger="dream",
+            timestamp=0, is_dream=True,
+        )
+        insight = il.detect_insight(dream, net)
+        assert insight is not None
+        edges = net.get_edges("gamma", "both")
+        tentative = [e for e in edges if e.origin == "insight"]
+        assert tentative and tentative[0].weight < 0.2, (
+            "a single dream sighting must stay below the rediscovery "
+            "threshold — dream pairings are hypothetical"
+        )
+        # A second dream sighting corroborates the pairing.
+        second = il.detect_insight(dream, net)
+        assert second is not None
+        edges = net.get_edges("gamma", "both")
+        assert max(e.weight for e in edges if e.target == "delta") >= 0.2
+        assert il.detect_insight(dream, net) is None
+
+
+class TestCuriosityPersistence:
+    """Asked questions must stay asked across a restart boundary."""
+
+    def test_asked_questions_survive_restore(self):
+        net = _make_network()
+        reasoning = Reasoner(net)
+        curiosity = Curiosity(net, reasoning)
+        net.add_concept("wobble", confidence=0.1)
+        emotion = _neutral_emotion()
+        first = curiosity.generate_questions(emotion, active_concepts=["wobble"])
+        assert any(q.target_concept == "wobble" for q in first), (
+            "a low-confidence world concept should raise a question"
+        )
+
+        restored = Curiosity(net, reasoning)
+        restored.restore_from_dict(curiosity.to_dict())
+        second = restored.generate_questions(emotion, active_concepts=["wobble"])
+        assert not any(q.target_concept == "wobble" for q in second), (
+            "the same question must not regenerate after a restart"
+        )
+
+    def test_restore_rejects_malformed_state(self):
+        curiosity = Curiosity(_make_network(), Reasoner(_make_network()))
+        with pytest.raises(TypeError):
+            curiosity.restore_from_dict({"asked_questions": "not-a-list"})
+
+
+class TestQuestionComposerScaffoldFilter:
+    """Internal scaffold nodes can never be question targets.
+
+    A structural hub like ``_cat:emotion:positive`` has no definition
+    and can never be given one by the user — it is bookkeeping, not
+    knowledge. Asking about it produced the repeated unanswerable
+    "what exactly is cat:emotion:positive?" loop.
+    """
+
+    def test_scaffold_topic_is_never_asked(self):
+        from frontal_lobe.question_composer import QuestionComposer
+        composer = QuestionComposer(ConceptNetwork(), seed=1)
+        emotion = _neutral_emotion()
+        assert composer.compose_follow_up("_cat:emotion:positive", emotion) is None
+        # The display-normalized spelling is the same node.
+        assert composer.compose_follow_up("cat:emotion:positive", emotion) is None
+
+    def test_scaffold_neighbor_is_not_a_gap_target(self):
+        from frontal_lobe.question_composer import QuestionComposer
+        net = ConceptNetwork()
+        net.add_concept("emotion", confidence=0.9)
+        net.add_concept("_cat:emotion:positive", confidence=0.2)
+        # A real gap neighbor, so the composer does produce questions —
+        # the scaffold node is a decoy that must never be picked.
+        net.add_concept("empathy", confidence=0.1)
+        net.add_edge(
+            "emotion", "_cat:emotion:positive",
+            RelationType.RELATED_TO, 0.9,
+        )
+        net.add_edge("emotion", "empathy", RelationType.RELATED_TO, 0.9)
+        composer = QuestionComposer(net, seed=1)
+        # Deterministic: empathy is the only legal gap target.
+        q = composer._find_gap_question("emotion")
+        assert q is not None and q["target_concept"] == "empathy", (
+            f"scaffold node leaked into gap question: {q}"
+        )
+        emotion = _neutral_emotion()
+        for _ in range(10):
+            q = composer.compose_follow_up("emotion", emotion)
+            if q is not None:
+                assert "cat:" not in str(q.get("target_concept", "")), (
+                    f"question targeted internal scaffolding: {q}"
+                )
+                assert "cat:" not in str(q.get("gap_detail", "")), (
+                    f"question embedded internal scaffolding: {q}"
+                )

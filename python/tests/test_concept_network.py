@@ -2055,6 +2055,12 @@ def test_is_world_concept_accepts_genuine_concepts(concept_id: str) -> None:
         "_cat:emotion:joy",
         "_cat:mode:contemplation",
         "identity:genesis",
+        # Display-normalized scaffold ids — the renderer strips the
+        # leading underscore ("_cat:emotion:joy" → "cat:emotion:joy");
+        # the bare spelling is the same internal node.
+        "cat:emotion:positive",
+        "col:sensory:visual",
+        "utt:greeting",
         # Function words
         "and",
         "it",

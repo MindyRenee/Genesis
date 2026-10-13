@@ -20,6 +20,22 @@ from .classify import (
 from .types import Concept, Edge, RelationType
 
 
+def _plausible_entity(name: str) -> bool:
+    """True if a parsed entity name could be a real concept.
+
+    Names must start with a letter and carry no digits — citation
+    fragments like "(2004)" and markup residue like ") that" survive
+    clause parsing on raw text but can never be world knowledge
+    (is_world_concept rejects digit-bearing names outright).
+    """
+    name = name.strip()
+    return (
+        len(name) >= 3
+        and name[0].isalpha()
+        and not any(ch.isdigit() for ch in name)
+    )
+
+
 class ExtractionMixin:
     """Mixin for :class:`ConceptNetwork` — see module docstring."""
     if TYPE_CHECKING:
@@ -367,6 +383,11 @@ class ExtractionMixin:
         if rel is None:
             return None
 
+        # Reject endpoints that can never be world concepts — citation
+        # fragments and markup residue parsed as entities.
+        if not _plausible_entity(subject) or not _plausible_entity(obj):
+            return None
+
         return self.add_edge(subject, obj, rel, origin="stated")
     def parse_relationships(self, text: str) -> list[tuple[str, RelationType, str]]:
         """Parse relationships from a natural language statement.
@@ -566,6 +587,12 @@ class ExtractionMixin:
             concepts = self.extract_from_text(clean)
             item = (concepts[0] if concepts else clean).lower()
             if len(item) < 3 or item in _FUNCTION_WORDS:
+                continue
+            # Reject names that can never be world concepts: citation
+            # fragments like "(2004)" and markup residue like ") that"
+            # parse as entities on raw text but start with punctuation
+            # or carry digits, which is_world_concept already rejects.
+            if not item[0].isalpha() or any(ch.isdigit() for ch in item):
                 continue
             items.append(item)
         return items

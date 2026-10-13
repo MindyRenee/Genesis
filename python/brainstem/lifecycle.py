@@ -1023,6 +1023,7 @@ class LifecycleMixin:
             ("memory_records", self.memory, lambda t, p: t.restore_records(p)),
             ("world_state", self.world, lambda t, p: t.restore_from_dict(p)),
             ("executive", self.brain.frontal.executive, lambda t, p: t.restore_from_dict(p)),
+            ("curiosity", self.brain.frontal.curiosity, lambda t, p: t.restore_from_dict(p)),
         )
         for key, target, restore in restorations:
             if key in data:
@@ -1197,6 +1198,7 @@ class LifecycleMixin:
                 },
                 world_state=self.world.to_dict(),
                 executive=self.brain.frontal.executive,
+                curiosity=self.brain.frontal.curiosity,
             )
             if not self.user_profile.save():
                 return False

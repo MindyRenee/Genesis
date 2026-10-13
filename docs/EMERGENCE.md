@@ -132,6 +132,41 @@ pinned as an *ignored, failing* test
 than tuned away. Unanticipated failure modes are the strongest evidence
 of emergence: scripted systems don't surprise their authors.
 
+## Emergent pathologies — observed, diagnosed, fixed
+
+The journal also showed three loops nobody designed — behaviors that
+emerged from the mechanisms and were pathological. They are documented
+here because they are the same class of evidence as the surprises:
+unspecified behavior, found by inspection, then repaired.
+
+- **Insight rediscovery**: `detect_insight` flagged "novel connection
+  cat and cognitive" on every co-activation because the noticing was
+  never written back — the gap stayed novel forever. Now the insight
+  *is* the learning: it writes a tentative `related_to` edge
+  (`origin="insight"`, 0.25 waking / 0.15 dream-derived, matching
+  dream-synthesis's hypothetical convention). Recurrence corroborates
+  instead of re-firing. `inner_life.py::_record_insight_edge`.
+- **Unanswerable self-questions**: "What exactly is
+  cat:emotion:positive?" recurred 28+ times. Two causes: the asked-set
+  lived only in memory (every restart reset the novelty window — now
+  persisted, `Curiosity.to_dict`), and the display layer strips the
+  leading underscore, so `_cat:emotion:positive` re-entered the
+  question pipeline as a bare scaffold id that no filter recognized.
+  `is_world_concept` now rejects scaffold families in either spelling,
+  and `QuestionComposer` cannot target internal bookkeeping at all.
+- **Zombie objectives**: a pending self-improvement proposal re-fed
+  `inspect:<file>` every heartbeat — the completed intention was
+  recreated on each ingest, and failures rescheduled with *rising*
+  priority. The executive now treats terminal status as terminal
+  (completed/abandoned objectives are never resurrected by a repeated
+  signal) and abandons an objective after 5 failed attempts.
+  `executive.py::_INTENTION_MAX_ATTEMPTS`.
+- **Citation junk as concepts**: names like `(2004)` and `) that`
+  entered the graph through the relationship parser's raw-text
+  fallback. The learning path now rejects names that start with
+  punctuation or carry digits — the same rule `is_world_concept`
+  already applied at question time. `extraction.py::_plausible_entity`.
+
 ## What this does not show
 
 - Content and developmental trajectory emerge inside engineered loops;

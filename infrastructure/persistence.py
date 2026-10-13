@@ -74,6 +74,7 @@ from frontal_lobe.self import (
     SelfImprovement,
     SelfModel,
 )
+from limbic_system.curiosity import Curiosity
 from limbic_system.emotional_regulator import (
     AllostaticLoadTracker,
     AllostaticState,
@@ -198,6 +199,7 @@ def save_state(
     inner_life_state: dict[str, Any] | None = None,
     world_state: dict[str, Any] | None = None,
     executive: ExecutiveFunction | None = None,
+    curiosity: Curiosity | None = None,
 ) -> None:
     """Save Genesis's cognitive state to disk.
 
@@ -233,6 +235,8 @@ def save_state(
         world_state: Its external world (presences, recent events,
             social clock) from :meth:`OuterWorld.to_dict`.
         executive: Persistent executive intentions and their outcomes.
+        curiosity: Asked/resolved question history and gap habituation —
+            the novelty window that stops questions re-firing on restart.
     """
     state: dict[str, Any] = {
         "version": 2,
@@ -273,6 +277,7 @@ def save_state(
         inner_life_state=inner_life_state,
         world_state=world_state,
         executive=executive,
+        curiosity=curiosity,
     )
 
     _atomic_write_state(data_dir, state)
@@ -390,6 +395,7 @@ def _add_optional_state(
     inner_life_state: dict[str, Any] | None = None,
     world_state: dict[str, Any] | None = None,
     executive: ExecutiveFunction | None = None,
+    curiosity: Curiosity | None = None,
 ) -> None:
     """Add optional state fields to the state dict."""
     if predictive_coding is not None:
@@ -450,6 +456,8 @@ def _add_optional_state(
         state["world_state"] = world_state
     if executive is not None:
         state["executive"] = executive.to_dict()
+    if curiosity is not None:
+        state["curiosity"] = curiosity.to_dict()
 
 
 def load_state(data_dir: str) -> dict[str, Any] | None:

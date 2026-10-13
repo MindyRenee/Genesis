@@ -198,3 +198,37 @@ def test_executive_does_not_reselect_active_intention() -> None:
         confidence=0.9,
     )
     assert executive.select_intention([intention, competing]) is competing
+
+
+def test_failing_intention_is_abandoned_after_max_attempts() -> None:
+    """An objective that keeps failing must stop being retried."""
+    executive = ExecutiveFunction()
+    intention = executive.form_intention("inspect:missing.py")
+    for _ in range(5):
+        executive.select_intention([intention])
+        executive.observe_intention(
+            intention, actual_outcome="unreadable", success=False,
+        )
+        executive.revise_intention(intention, reason="unreadable")
+    assert intention.status == "abandoned"
+    # An abandoned objective can never be selected again.
+    assert executive.select_intention([intention]) is None
+
+
+def test_terminal_intention_is_not_resurrected_by_signal() -> None:
+    """A completed objective stays done — a repeated signal must not
+    recreate it (the same pending proposal re-fed the same inspect
+    every heartbeat)."""
+    executive = ExecutiveFunction()
+    intention = executive.form_intention("inspect:arc.py", priority=0.7)
+    executive.select_intention([intention])
+    executive.observe_intention(
+        intention, actual_outcome="observed", success=True,
+    )
+    assert intention.status == "completed"
+
+    again = executive.form_intention("inspect:arc.py", priority=0.9)
+    assert again is intention
+    assert again.status == "completed"
+    assert again.priority == 0.7
+    assert executive.select_intention([again]) is None

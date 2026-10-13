@@ -51,6 +51,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 _INTENTION_PRIOR = 0.5  # reliability assumed for an untried kind
+# An objective that keeps failing stops being retried — without a cap,
+# revise_intention kept failed objectives pending with ever-rising
+# priority, so the same unachievable act ran forever.
+_INTENTION_MAX_ATTEMPTS = 5
 
 
 class TaskState(Enum):
@@ -413,7 +417,14 @@ class ExecutiveFunction:
         if not key:
             raise ValueError("objective must not be empty")
         current = self._intentions.get(key)
-        if current is not None and current.status not in {"completed", "abandoned"}:
+        if current is not None:
+            # A terminal objective stays terminal: a repeated signal
+            # does not resurrect it. Without this, a source that stays
+            # pending (a proposal awaiting human review, a gap that
+            # never closes) recreates the same objective every cycle
+            # and the actuator re-executes it forever.
+            if current.status in {"completed", "abandoned"}:
+                return current
             current.priority = max(current.priority, max(0.0, min(1.0, priority)))
             current.confidence = max(0.0, min(1.0, confidence))
             if reason:
@@ -488,7 +499,11 @@ class ExecutiveFunction:
             intention.status = "completed"
             error = 0.0 if intention.expected_outcome else 0.25
         else:
-            intention.status = "pending"
+            intention.status = (
+                "abandoned"
+                if intention.attempts >= _INTENTION_MAX_ATTEMPTS
+                else "pending"
+            )
             error = 1.0
         kind = intention.kind
         attempts, successes = self._kind_reliability.get(kind, (0, 0))
@@ -507,7 +522,23 @@ class ExecutiveFunction:
     def revise_intention(
         self, intention: ExecutiveIntention, *, reason: str = ""
     ) -> ExecutiveIntention:
-        """Keep an unfinished objective alive after failure and lower confidence."""
+        """Keep an unfinished objective alive after failure and lower confidence.
+
+        Objectives past the attempt cap are abandoned instead of
+        rescheduled — a goal that cannot be achieved is not a goal,
+        and endlessly retrying it starves every other intention.
+        """
+        if (
+            intention.status == "abandoned"
+            or intention.attempts >= _INTENTION_MAX_ATTEMPTS
+        ):
+            intention.status = "abandoned"
+            note = f"abandoned after {intention.attempts} attempts"
+            if reason:
+                note = f"{note}: {reason}"
+            intention.revision = note
+            intention.last_observation = reason or note
+            return intention
         intention.status = "pending"
         intention.confidence = max(0.05, intention.confidence * 0.8)
         intention.priority = min(1.0, intention.priority + 0.05)

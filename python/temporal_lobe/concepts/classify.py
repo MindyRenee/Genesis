@@ -379,6 +379,14 @@ _STRUCTURAL_PREFIXES: tuple[str, ...] = (
     # Task/competence machinery — internal markers, not world knowledge.
     "skill:", "goal:", "domain:", "spatial:", "var:", "type:",
 )
+# Display-normalized scaffold families: the display layer strips the
+# leading underscore from structural hubs, so "_cat:emotion:joy"
+# surfaces as "cat:emotion:joy". That bare spelling can re-enter the
+# network as a question target or a concept id — either form is
+# internal scaffolding, never world knowledge.
+_SCAFFOLD_FAMILIES: frozenset[str] = frozenset(
+    p.lstrip("_").rstrip(":") for p in _STRUCTURAL_PREFIXES
+)
 def is_world_concept(concept_id: str) -> bool:
     """Return True if *concept_id* looks like genuine world knowledge.
 
@@ -409,6 +417,13 @@ def is_world_concept(concept_id: str) -> bool:
 
     # Reject structural hubs
     if cid.startswith(_STRUCTURAL_PREFIXES):
+        return False
+
+    # Reject display-normalized scaffold ids — the bare spelling of an
+    # underscored hub ("cat:emotion:positive" for "_cat:emotion:positive")
+    # is the same internal node.
+    head, sep, _rest = cid.partition(":")
+    if sep and head.lstrip("_") in _SCAFFOLD_FAMILIES:
         return False
 
     # Strip polysemy sense suffix for the remaining checks
