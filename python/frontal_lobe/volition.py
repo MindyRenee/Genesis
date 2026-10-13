@@ -56,7 +56,11 @@ class Urge:
     def is_ready(self) -> bool:
         """Whether the urge is above threshold and off cooldown."""
         now = time.monotonic()
-        return self.value >= self.threshold and (now - self.last_action) >= self.cooldown
+        cooldown_elapsed = (
+            self.last_action <= 0.0
+            or (now - self.last_action) >= self.cooldown
+        )
+        return self.value >= self.threshold and cooldown_elapsed
 
     def consume(self) -> None:
         """Mark the urge as just acted on."""

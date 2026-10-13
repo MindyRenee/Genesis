@@ -1063,6 +1063,14 @@ def test_gw_on_ignition_not_subliminal() -> None:
 # ═══════════════════════════════════════════════════════════════════
 
 
+def test_urge_never_acted_starts_off_cooldown() -> None:
+    """last_action=0 means never acted, not acted at process boot."""
+    from frontal_lobe.volition import Urge
+
+    urge = Urge(name="boot", threshold=0.0, cooldown=3600.0, value=1.0)
+    assert urge.is_ready()
+
+
 def test_safeguard_urge_registered() -> None:
     """The safeguard urge ships in the default urge set."""
     from infrastructure.config import MindConfig
