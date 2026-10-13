@@ -1,0 +1,55 @@
+name: Bug report
+description: Report a reproducible failure in Genesis
+labels: ["bug"]
+body:
+  - type: input
+    id: commit
+    attributes:
+      label: Commit or version
+      description: The exact commit hash, tag, or installed version tested.
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      options:
+        - Rust daemon / IPC
+        - Python cognition
+        - ARC adapter / evaluation
+        - Persistence / lifecycle
+        - Install / packaging
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the command, error, and relevant output.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Steps or a small script that demonstrates the failure.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python version, Rust version, online/offline mode, and relevant hardware.
+  - type: textarea
+    id: state
+    attributes:
+      label: Persistent state impact
+      description: Did this modify, corrupt, or depend on existing developmental state? Do not attach private state dumps.

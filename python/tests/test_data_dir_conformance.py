@@ -44,7 +44,7 @@ PIN_NAME = ".genesis-data-dir"
 # A checkout that is not this one. Each case below combines a pin, an
 # explicit override, and a hostile ambient XDG so that any resolver which
 # honors the wrong input disagrees with the others.
-PINNED = "/state/pinned-checkout"
+PIN_FALLBACK = "/state/pinned-checkout"
 HOSTILE_XDG = "/sandbox/private/data"
 
 
@@ -222,16 +222,30 @@ def _cases() -> list[tuple[str, dict[str, str | None], str]]:
 
 
 def _real_pin() -> str:
-    """The value this checkout's pin file holds."""
-    text = (REPO / PIN_NAME).read_text().splitlines()
+    """The pin this checkout holds, or the test pin a clean clone gets."""
+    try:
+        text = (REPO / PIN_NAME).read_text().splitlines()
+    except FileNotFoundError:
+        return PIN_FALLBACK
     assert text, f"{PIN_NAME} is empty; it must name the data directory"
     return text[0].strip()
 
 
-# Every case below assumes this checkout is pinned, so read the real value
-# once and substitute it, rather than hard-coding a path that goes stale
-# when the pin changes.
+# Every case below assumes a pinned checkout. A development checkout may
+# carry its own ignored pin; a clean clone gets the same contract through
+# a temporary test pin that is removed afterward.
 PINNED = _real_pin()
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _checkout_pin():
+    pin = REPO / PIN_NAME
+    existed = pin.exists()
+    if not existed:
+        pin.write_text(f"{PINNED}\n")
+    yield
+    if not existed:
+        pin.unlink(missing_ok=True)
 
 
 @pytest.mark.parametrize(
@@ -328,7 +342,10 @@ def test_every_resolver_in_the_repo_is_covered() -> None:
             continue
         rel = path.relative_to(REPO)
         parts = rel.parts
-        if parts[0] in {"target", ".git", "tests", "python"} and parts[0] != "python":
+        if (
+            parts[0] in {"target", ".git", "tests"}
+            or parts[0].startswith(".venv")
+        ):
             continue
         if parts[0] == "python" and parts[1:2] == ("tests",):
             continue

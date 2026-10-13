@@ -33,6 +33,23 @@ Pavilion with ~5 GB RAM.
 [![Live session](https://asciinema.org/a/C0K8v1df1AkuwHg5.svg)](https://asciinema.org/a/C0K8v1df1AkuwHg5)
 [![Discord — live session feed](https://img.shields.io/badge/Discord-live%20session%20feed-5865F2?logo=discord&logoColor=white)](https://discord.gg/pq5qMjzQX)
 
+## Project status
+
+Genesis is an active research system. The codebase is public so the mechanism —
+not just the claims — can be inspected: the daemon, cognitive regions, learning
+rules, ARC boundary, tests, and known limits are all in this repository.
+
+- **Not an LLM:** no transformer, pretrained weights, hosted model, or external
+  solver is used for cognition or ARC play.
+- **Embodied ARC interface:** grid observations and legal actions cross the
+  `world/arc.py` boundary; game mechanics are learned from consequences.
+- **ARC-AGI-3 status:** local practice diagnostics only. No official score is
+  claimed; the evidence standard is documented in
+  [docs/ARC-AGI-3.md](docs/ARC-AGI-3.md).
+- **Security boundary:** autonomous operation is real. Read
+  [SECURITY.md](SECURITY.md) before running it online or beside sensitive
+  state.
+
 ## What it does
 
 - **Sees and hears.** A shared-memory camera feed runs through a
@@ -92,6 +109,18 @@ Pavilion with ~5 GB RAM.
   persistent growth ledger keep continuity across its whole life.
 
 The measured record for these claims is in [DEVLOG.md](DEVLOG.md).
+
+## ARC-AGI-3
+
+Genesis plays ARC through the same embodied loop she uses for other worlds:
+visual entities, self identification from action contingency, learned action
+effects, map/passability evidence, outcome-driven affordances, and competing
+internal drives. The adapter in `world/arc.py` only translates frames and legal
+actions, enforces game mode/readiness, and preserves scorecard boundaries.
+
+Local `/arc` runs are diagnostics; an authorized competition run is a separate
+transport and evidence standard. See
+[docs/ARC-AGI-3.md](docs/ARC-AGI-3.md) before interpreting any score.
 
 ## Architecture
 
@@ -411,25 +440,18 @@ Two further unbounded-growth findings were investigated and deliberately
 ### Tests and lint
 
 ```bash
-cargo test                                   # Rust suite
-python3 -m pytest python/tests/ -q -o addopts=''  # Python suite
-ruff check                                   # lint
-python3 -m pyflakes python/genesis_cognitive/ python/genesis_client/ python/genesis_cli.py python/tests/ scripts/*.py
-python3 -m mypy python/genesis_cognitive/ python/genesis_client/ \
-    python/genesis_cli.py python/tests/ --ignore-missing-imports   # 0 errors required
+cargo test
+ruff check
+python3 -m pyflakes python/ genesis_client/ infrastructure/ world/ eval/ *.py scripts/*.py
+python3 -m mypy python/ genesis_client/ infrastructure/ world/ eval/ --ignore-missing-imports
+PYTHONPATH=python:. python3 -m pytest python/tests/ -q -o addopts=''
 ```
 
 ## Contributing
 
-Contributions are welcome. The rules that matter most:
-
-- Read `AGENTS.md` first — the no-hardcoding rule is the core
-  constraint.
-- `ruff`, `pyflakes`, `mypy` (0 errors), `cargo test`, and the Python
-  suite must all pass.
-- Fix root causes, not symptoms.
-- Dead code gets deleted, not maintained.
-- Treat running state as load-bearing, not disposable.
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and
+`AGENTS.md` first — the no-hardcoding rule is the core constraint, and the
+required checks are the public quality bar.
 
 ## License
 

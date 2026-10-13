@@ -7,6 +7,15 @@ name = "genesis-cognitive"
 version = "0.2.0"
 requires-python = ">=3.12"
 description = "Genesis — a machine-native cognitive architecture: Rust subconscious daemon plus Python conscious mind, no external model"
+readme = "README.md"
+authors = [{ name = "Mindy Beatty" }]
+keywords = [
+    "active-inference",
+    "cognitive-architecture",
+    "embodied-ai",
+    "machine-learning",
+    "neuromodulation",
+]
 license = { text = "AGPL-3.0-only, with Ethical Use restrictions (see LICENSE)" }
 dependencies = [
     # Pinned mirrors of requirements.txt — update both together.
@@ -17,6 +26,7 @@ dependencies = [
     "Pillow==12.3.0",
     "opencv-python-headless==5.0.0.93",
     "pycairo==1.29.1",
+    "websockets==15.0.1",
 ]
 
 [project.optional-dependencies]
@@ -27,6 +37,11 @@ voice = [
     "sounddevice==0.5.2",
     "speechrecognition==3.14.2",
 ]
+
+[project.urls]
+Repository = "https://github.com/MindyRenee/Genesis"
+Issues = "https://github.com/MindyRenee/Genesis/issues"
+DOI = "https://doi.org/10.5281/zenodo.22817337"
 
 [project.scripts]
 genesis = "genesis_cli:_console_main"
