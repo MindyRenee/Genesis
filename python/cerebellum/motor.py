@@ -77,7 +77,14 @@ class SensorimotorLayer:
             observed[0] - expected[0], observed[1] - expected[1]
         )
         norm = math.hypot(*expected)
-        magnitude = 1.0 if norm == 0 else min(1.0, miss / norm)
+        # A predicted refusal has no stride to normalize against —
+        # graded on the miss alone: a body that stayed put confirmed
+        # it, any motion at all is the whole surprise.
+        magnitude = (
+            (0.0 if observed == expected else 1.0)
+            if norm == 0
+            else min(1.0, miss / norm)
+        )
         ema = self._error_ema.get(action, 0.0)
         self._error_ema[action] = (
             self._decay * magnitude + (1.0 - self._decay) * ema

@@ -89,6 +89,7 @@ def compose_spatial_field(
             entity.gone
             or entity.is_self
             or entity.part_of_self
+            or entity.state_of_self
             or entity.color in model.terrain_kinds
         ):
             continue

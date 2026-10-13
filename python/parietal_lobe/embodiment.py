@@ -27,10 +27,12 @@ What runs here is the embodied half of cognition:
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import time
 from collections import deque
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from basal_ganglia.world_policy import _SELECT_THRESHOLD, WorldPolicy
@@ -58,6 +60,7 @@ from genesis_client.protocol import (
     MODULE_SENSORY,
 )
 from genesis_client.swallow import note_swallowed
+from infrastructure.config import default_data_dir
 
 if TYPE_CHECKING:
     from parietal_lobe.grid import Grid
@@ -575,12 +578,58 @@ class EmbodimentMixin:
         except Exception as e:  # noqa: BLE001
             logger.debug(f"world act record failed: {e}")
         self.note_world_end("win" if win else None)
+        # Checkpoint the learned world at every episode boundary —
+        # a death or a win is exactly when new evidence lands.
+        self._save_world_learning()
+
+    @staticmethod
+    def _world_learning_file(game: str) -> Path:
+        safe = re.sub(r"[^A-Za-z0-9_.-]", "_", game)
+        return default_data_dir() / "world_learning" / f"{safe}.json"
+
+    def _save_world_learning(self) -> None:
+        """Persist this world's learned physics and verdicts.
+
+        Practice should compound: what one session's lives taught
+        the model is the next session's ground, not a re-derivation.
+        Advisory — a failed write must never interrupt play.
+        """
+        if not self._world_context:
+            return
+        try:
+            path = self._world_learning_file(self._world_context)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(self.world_model.export_learning()))
+        except Exception:
+            logger.debug("world learning save failed", exc_info=True)
+
+    def _load_world_learning(self) -> None:
+        """Restore what past sessions learned about this world."""
+        if not self._world_context:
+            return
+        try:
+            path = self._world_learning_file(self._world_context)
+            if path.exists():
+                self.world_model.import_learning(
+                    json.loads(path.read_text())
+                )
+        except Exception:
+            logger.debug("world learning load failed", exc_info=True)
+
+    def save_world_learning(self) -> None:
+        """Public checkpoint for run ends that never switch games."""
+        self._save_world_learning()
 
     def _begin_world(self, game: str, level: int) -> None:
         if self._world_context == game:
             return
+        # The outgoing world's learning is banked before the reset
+        # takes its episodic half; the incoming world's past lessons
+        # are restored after it — order matters both ways.
+        self._save_world_learning()
         self.reset_world(keep_learning=False)
         self._world_context = game
+        self._load_world_learning()
         self._world_task = None
         self._world_levels = level
         self._world_dry = 0
