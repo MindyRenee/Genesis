@@ -86,8 +86,12 @@ Do not run it without accepted competition rules and explicit authorization.
 - Focused boundary and world-model tests cover action translation, scorecard
   lifecycle, budget/reset accounting, readiness stops, map learning, identity
   recovery, and repeated transition failures.
-- Development diagnostics have completed levels on public practice
-  environments, including multiple `ft09` levels and the first `ls20` level.
+- Practice runs have completed public environments outright — `bt11`
+  fully, twice (88 and 127 steps) — plus multiple `ft09` levels and the
+  first `ls20` level in 10 of 19 recorded sweep runs. Replayable
+  recordings with per-move decision provenance are published under
+  `arc_practice/` in the
+  [genesis-eval](https://github.com/MindyRenee/genesis-eval) repository.
 - **No official ARC-AGI-3 score has been achieved or claimed from this
   repository.** Any future claim must cite the authorized scorecard and run
   artifacts, not a local diagnostic.

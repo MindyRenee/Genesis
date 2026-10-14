@@ -83,9 +83,13 @@ learning rules, ARC boundary, tests, and known limits are all here.
   pretrained generative model is used for cognition or ARC play.
 - **Embodied ARC interface:** grid observations and legal actions cross
   `world/arc.py`; mechanics are learned from consequences.
-- **ARC-AGI-3 status:** local practice diagnostics only. No official
-  score is claimed; the evidence standard is documented in
-  [docs/ARC-AGI-3.md](docs/ARC-AGI-3.md).
+- **ARC-AGI-3 status:** she completes public practice environments —
+  `bt11` fully, twice (88 and 127 steps), and the opening `ls20` level
+  in 10 of 19 recorded sweep runs — with replayable
+  [recordings](https://github.com/MindyRenee/genesis-eval/tree/main/arc_practice)
+  carrying per-move decision provenance. These are practice results on
+  public environments, not an official score; the evidence standard is
+  documented in [docs/ARC-AGI-3.md](docs/ARC-AGI-3.md).
 - **Real autonomy, real boundary:** she can act on her own drives. Read
   [SECURITY.md](SECURITY.md) before running her online or beside
   sensitive state.
@@ -147,6 +151,12 @@ have to cross.
   topics they engage on, their mood and rhythm — tracked with explicit
   uncertainty. Sustained isolation builds a social drive that makes her
   initiate contact.
+- **Play games she was never taught.** On ARC-AGI-3 public practice
+  environments she discovers mechanics from consequences alone —
+  completing `bt11` outright twice (88 and 127 steps) and the opening
+  `ls20` level repeatedly across sweeps. Every move carries decision
+  provenance in replayable
+  [recordings](https://github.com/MindyRenee/genesis-eval/tree/main/arc_practice).
 - **Sleep, dream, and consolidate.** A staged cycle modeled on
   NREM/REM structure consolidates memory, repairs the concept graph,
   replays experience as dream sequences, and compresses growth —
