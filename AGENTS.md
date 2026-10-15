@@ -2,11 +2,16 @@
 
 ## What this is
 Genesis is a machine-native cognitive architecture. The Rust crate
-(`genesis`) defines the core state schema — the memory-mapped hub of
-system state that every module reads from and writes to. The Python
-layer (`python/`, one top-level package per brain region) is
-the cognitive mind: perception,
-reasoning, language, introspection, and self-modeling.
+(`genesis`) is the body — the core state schema (the memory-mapped
+hub of system state that every module reads from and writes to), the
+neurochemical/physical dynamics, and the binaries (`genesis-daemon`,
+the IPC server; `retina`, the camera capture process). The Python
+layer is the cognitive mind: perception, reasoning, language,
+introspection, and self-modeling. Its brain-region packages live under `python/`
+(one package per region, plus `tests/`, `voices/`, and `_views/`);
+the support packages — `genesis_client` (IPC client, stewardship,
+swallow tally), `infrastructure`, `world`, `eval` — and the entry
+points (`mind.py`, `genesis_cli.py`) sit at the repo root.
 
 ## CRITICAL RULE: Never hardcode Genesis's responses
 Genesis's thoughts, speech, and self-expression must ALWAYS emerge
@@ -69,23 +74,38 @@ not — those must be generated, not recited.
   `ZIG_ROOT=` / `LIBCLANG_ROOT=` if yours differ. The include set must
   match `$ZIG cc -E -v -x c /dev/null` exactly — print it and copy the
   `<...>` search list. A partial set fails on `__STD_TYPE` inside
-  `stddef.h`. With this the Rust suite is ~600 tests (625 as of
-  October 2026) and takes ~2 min of test time once the release
-  build is warm (a cold release build is ~15 min more).
+  `stddef.h`. With this the Rust suite is 647 tests (646 passing, one
+  ignored — the documented REM-bout discrepancy — plus one ignored
+  doctest; as of October 2026) and takes ~4 min of test time once the
+  release build is warm (a cold release build is ~10–15 min more).
   Note that `. ./scripts/cargo-env.sh` must run in the *current*
   shell: piping the source (`. ./scripts/cargo-env.sh | tail`) runs it
   in a subshell, so the exported `PATH` is discarded and the build
   fails at link with `linker 'cc' not found`.
 - Run examples: `cargo run --example <name>`
 - Python 3.12+ (CI tests 3.12 and 3.14), dependencies pinned in
-  `python/requirements.txt` (runtime) and `python/requirements-dev.txt` (lint + test). Install with: `pip install -r python/requirements-dev.txt`
-- Lint: `ruff check` and `pyflakes` (both must pass)
-- Type check: `mypy python/ --ignore-missing-imports` (0 errors)
-- Optional native capabilities (not in requirements.txt, because the
-  wheels bind to system libraries that may be absent): microphone
-  (`vosk`, `sounddevice`, `speechrecognition`), voice (`piper-tts` +
-  `.onnx` models in `python/voices/`), and drawing (`pycairo`).
-  Install and **verify** with `./scripts/install_optional_deps.sh`
+  `python/requirements.txt` (runtime) and `python/requirements-dev.txt` (lint + test). Install with: `pip install -r python/requirements-dev.txt`.
+  The test suite needs the NLTK `wordnet` and `punkt_tab` corpora
+  (CI fetches them with `nltk.download` before running).
+- Lint: `ruff check` and `pyflakes python/ genesis_client/
+  infrastructure/ world/ eval/ *.py scripts/*.py` (both must pass —
+  these are the CI commands). `vulture` is also in
+  requirements-dev.txt for dead-function detection, but it is
+  deliberately not a CI gate: there is a known backlog to clear
+  first (see `scripts/hygiene.sh`).
+- Type check: `mypy python/ genesis_client/ infrastructure/ world/
+  eval/ --ignore-missing-imports` (0 errors — the scope is wider
+  than `python/` alone).
+- Optional native capabilities — the voice stack only: microphone
+  (`vosk`, `sounddevice`, `speechrecognition`) and voice
+  (`piper-tts` + `.onnx` models in `python/voices/`). These stay out
+  of requirements.txt (the `voice` extra in pyproject) because the
+  wheels bind system libraries that may be absent. `pycairo` used to
+  be in this list but is now a pinned runtime dependency — the wheel
+  is source-only on Linux, so on hosts with no C toolchain
+  `./scripts/install_optional_deps.sh` builds it through the Zig
+  shim; without it the canvas degrades off. Install and **verify**
+  the optional pieces with `./scripts/install_optional_deps.sh`
   (`--verify` to re-check). Verify rather than assume: `sounddevice`
   imports cleanly and only raises `OSError` when it dlopens a missing
   libportaudio, so a wheel-only install silently turns "no microphone"
@@ -378,7 +398,9 @@ pins both ids.
   same 21-byte reply. `ADVANCE_NEURO`'s dt is **ignored**: the daemon
   owns time, measures its own elapsed interval, and sub-steps at
   `neurochemical::DT` (100 ms, the resolution every rate constant is
-  expressed against). `Mind.advance_neuro()` takes no `dt`, so the
+  expressed against). `GenesisClient.advance_neuro()` takes no `dt`
+  (the 4-byte field stays on the wire as a placeholder; the heartbeat
+  calls `client.advance_neuro()`), so the
   coupling that let the mind dictate the body's integration rate cannot
   be reintroduced from the cognitive layer. `advance_physics(dt)` is the
   deliberate exception, used only by the causal assay against an isolated
@@ -458,7 +480,7 @@ the waking phases (Active, Alert, Flow, Stress, Drowsy, Overwhelmed).
 the things that were gated on it were checked:
 - N3 consolidation (the heavy pass: concept consolidation, edge discovery,
   downscaling, and compression) runs on each entry into N3. Measured over days
-  7–10 of the network: N3 is entered about twice a night and takes about 25%
+  8–10 of the network: N3 is entered about twice a night and takes about 25%
   of sleep, so the heavy pass does not run every cycle.
 - REM dreams and dream synthesis follow REM: about 24% of sleep.
 - Archiving of dormant concepts runs on the autosave timer and does not depend
@@ -564,12 +586,19 @@ divergence, ~8.7k concepts and 8 projects in a fork under
 supported launch path Python's
 `infrastructure/config.py::default_data_dir` resolves correctly even
 without knowing about the pin. That function now implements the full
-order anyway, so tools run outside `run.sh` agree: `infrastructure/config.py`,
-`scripts/hygiene.sh`, `scripts/prune_dead_concepts.py`,
-`scripts/migrate_edges_to_log.py`, `scripts/install_optional_deps.sh`,
-`setup_embeddings.py`, `examples/read_state.rs`, and
-`examples/recover.rs`. There is no remaining known deviation — check
-this list before adding a ninth resolver.
+order anyway, so tools run outside `run.sh` agree. The resolvers the
+conformance test exercises are `run.sh`, `scripts/hygiene.sh`,
+`scripts/prune_dead_concepts.py`, `scripts/migrate_edges_to_log.py`,
+`infrastructure/config.py`, `setup_embeddings.py`, and
+`eval/abstraction_gradient.py` (`DIR_RESOLVERS`).
+`scripts/install_optional_deps.sh` is an *asset* resolver — it resolves
+the vosk model dir (data dir + `vosk-models`), not the data dir, so it
+sits in `ASSET_RESOLVERS` instead. The Rust examples
+(`examples/read_state.rs`, `examples/recover.rs`) call
+`genesis::data_dir()`, the shared function pinned by
+`src/data_dir.rs`'s own precedence tests, so they cannot drift from the
+order. There is no remaining known deviation — check
+`DIR_RESOLVERS`/`ASSET_RESOLVERS` before adding another.
 
 **The list above is enforced, not aspirational.** Two test suites fail if
 any resolver drifts:
@@ -577,16 +606,16 @@ any resolver drifts:
 - `python/tests/test_data_dir_conformance.py` runs every resolver side by
   side under a hostile `XDG_DATA_HOME` and asserts they return run.sh's
   answer. It also greps the tree for files referencing the state
-  directory and fails if one is not in its list, so a tenth resolver
-  cannot be added silently.
+  directory and fails if one is not in `DIR_RESOLVERS` or
+  `ASSET_RESOLVERS`, so a new resolver cannot be added silently.
 - `src/data_dir.rs` has unit tests for the full precedence matrix,
   including blank-pin and blank-env cases.
 
 A blank or whitespace-only `GENESIS_DATA_DIR` counts as **unset**
 everywhere; treating it as set resolves the data dir to a garbage path
 built from the current directory. Adding a resolver means adding it to
-`DIR_RESOLVERS` in the conformance test, not just writing the `if`
-cascade again.
+`DIR_RESOLVERS` (or `ASSET_RESOLVERS` for asset paths) in the
+conformance test, not just writing the `if` cascade again.
 
 The Rust side resolves through `genesis::data_dir()` (a pure function
 over its inputs) rather than reimplementing the order, so the examples
@@ -609,16 +638,13 @@ default. LTM episodes and the derived vector/holographic/VQ indices
 have no supported union and are reported, not merged.
 
 ## State integrity
-Genesis is a long-running stateful system. Always shut down via `./run.sh --stop` (or Ctrl-C in the running terminal) — never kill
-processes directly. Do not corrupt the mmap'd state or drive the system
-into degenerate regimes for experimentation; see the "Operational notes"
-section of the README.
 Genesis is a long-running stateful system, designed to run for days at
 a time. Always shut down via `./run.sh --stop` (or Ctrl-C in the
 running terminal) — never `kill -9` or kill processes directly. The
 core state is memory-mapped, so a hard kill can lose unconsolidated
 memory or leave on-disk state inconsistent. Do not corrupt the mmap'd
-state or drive the system into degenerate regimes for experimentation.
+state or drive the system into degenerate regimes for experimentation;
+see the "Operational notes" section of the README.
 
 The state is cumulative and load-bearing: the developmental record *is*
 the system. Do not edit, truncate, or casually factory-reset it.
@@ -630,15 +656,16 @@ Other things worth knowing before experimenting:
 - **Disk grows slowly by design.** The episodic store is append-only
   (<1 KB per episode, linear). Expect months-to-years scale; watch
   small volumes. Everything that grows in memory is bounded and
-  explicitly so — episodic eviction
-  (`python/temporal_lobe/memory/memory.py`), attractor
-  trimming to 60% of Hopfield capacity
-  (`python/temporal_lobe/memory/systems.py`),
+  explicitly so — forgotten-record eviction after a 1 h grace period
+  (`python/temporal_lobe/memory/memory.py`), a flat 512-pattern
+  attractor ceiling (`_DEFAULT_MAX_PATTERNS` in
+  `python/temporal_lobe/memory/systems.py` — a growth bound, not the
+  ~0.138N Hopfield capacity, which would make the subsystem useless),
   executive suppression with release deadlines and 50 retained
   conversation threads / 200 topic-history entries
-  (`python/temporal_lobe/memory/working.py`), 500 retained learning
-  results and a
-  200-entry FIFO curiosity queue (`python/frontal_lobe/autonomous.py`),
+  (`python/temporal_lobe/memory/working.py`), a 500-entry learning
+  log, a 200-entry topic queue, and a 50-entry curiosity queue
+  (`python/frontal_lobe/autonomous.py`),
   5,000 review records with `stability` capped at 7 days
   (`python/temporal_lobe/memory/spaced_repetition.py`), and a
   4,096-entry LRU vector cache
@@ -675,8 +702,10 @@ and spills dormant ones to `concept_archive.db`. Archiving is a
 **memory-pressure valve, not a dormancy sweep**: `spill_dormant` returns
 early while the network is under the cap, so activation level alone never
 triggers it. Two call sites: `python/brainstem/lifecycle.py::_archive_dormant_concepts`
-(every 10th autosave cycle, ~50 min) and
-`python/temporal_lobe/concepts/consolidation.py::_consolidate_n3_heavy` (N3 slow-wave sleep).
+(every 10th autosave cycle — autosave runs every 5 min, so ~50 min) and
+`python/brainstem/sleep.py::_consolidate_n3_heavy` (N3 slow-wave sleep,
+which calls `ConceptNetwork.consolidate_during_sleep` in
+`python/temporal_lobe/concepts/consolidation.py`).
 It is not a REM behavior.
 
 Spilled concepts stay recallable — `add_concept` and `_resolve` pull
@@ -782,9 +811,13 @@ written at save time; the log's fold overwrites it at restore.
 
 ## Persistence and lifecycle verification
 - `python3 -m pytest python/tests/ -q -o addopts=''` runs the full Python
-  suite with an explicit summary. The daemon integration test uses a fresh,
-  temporary XDG data directory, runs the mind offline, and shuts down via
-  `run.sh --stop`; failed shutdown must preserve that temporary state.
+  suite with an explicit summary. The daemon integration test
+  (`test_integration_mind` in `python/tests/test_cognitive.py`) uses a
+  fresh `tempfile.mkdtemp` directory injected as `GENESIS_DATA_DIR`,
+  runs the mind offline (`Mind(socket_path, offline=True)`), and shuts
+  down via `run.sh --stop`; failed shutdown must preserve that temporary
+  state (the `--stop` runs `check=True`, so a failure raises before the
+  cleanup `rmtree`).
 - Focused state-integrity regressions live in
   `python/tests/test_cli_lifecycle.py` and `python/tests/test_persistence.py`.
 - Transfer/learning-compounding eval lives outside this checkout

@@ -44,6 +44,7 @@ of art."*
 - [Tests and lint](#tests-and-lint)
 - [Citing this work](#citing-this-work)
 - [Contributing](#contributing)
+- [License](#license)
 
 ## Why I built her
 
@@ -241,7 +242,7 @@ boundaries are the wiring diagram, not a duplicate of it.
 
 ### Systems engineering
 
-This is engineered for a 4.7 GB machine, not a datacenter, and the
+This is engineered for a ~5 GB machine, not a datacenter, and the
 low-level design reflects it:
 
 - **One page of core state, zero copies.** The 3,480-byte state
@@ -315,20 +316,12 @@ ratios, posterior variance, and likelihood normalization. The bounded
 `free_energy` telemetry is a monotonic map of excess VFE above a
 matched-observation reference; raw VFE is available in the cycle result.
 
-**The selection loop used to be inert, and was not.** Each policy's
-expected free energy was clamped to `[0, 2]`, but EFE is a relative
-score with an arbitrary zero, so a policy that beat the others by a
-hair scored slightly negative — and a `0.0` floor mapped that to
-exactly `0.0`. In the converged state (`precision` saturates within
-~25 s, so the policy-independent uncertainty term goes to zero while
-the epistemic term still exceeds the tiny expected surprise) *all nine*
-policies clamped to `0.0`, the argmin returned the first minimum, and
-index 0 is `noop`. The loop chose `noop` on every cycle, forever. The
-bound is now a symmetric finiteness guard, which preserves the
-ordering, and the softmax temperature is floored at the observed score
-spread rather than a constant ~300× larger. Policy selection is
-consequently live — which also means the characterisation below now
-describes behaviour that actually happens.
+**Policy selection is live — and provably wasn't before.** An earlier
+clamp mapped every converged policy's expected free energy to `0.0`,
+so the argmin returned index 0 — `noop` — on every cycle. The bound is
+now a symmetric finiteness guard that preserves ordering, and the
+softmax temperature is floored at the observed score spread rather than
+a constant ~300× larger.
 
 Policy scoring computes Gaussian expected free energy: expected
 negative log preference, including predictive variance, minus the
@@ -403,42 +396,47 @@ not. The test is whether a string is a *building block the engine
 composes from* or *the thing it says*.
 
 Enforcement is currently partial and should not be over-trusted. The
-rule is documented in `AGENTS.md` and several tests check that
-composed output is not a single fixed string
+rule is documented in `AGENTS.md`, and a few tests check that composed
+output is not a single fixed string
 (`python/tests/test_language.py::test_self_report_composes_from_fragments`,
 `python/tests/test_language.py::test_integration_greeting_varies`,
-`python/tests/test_self.py::test_identity_fragments_varies`). There is
-no lint rule and no test that would catch a newly added hardcoded
-sentence anywhere else in the tree. A September 2026 audit found
-three sites that reached speech verbatim; all are remediated as of
-October 2026: `python/frontal_lobe/self/composer.py`'s fallbacks
-return silence, `python/frontal_lobe/self/identity.py`'s stage table
-returns structural data marked not-for-speech, and
-`python/frontal_lobe/code_tools.py` routes results through the
-thought composer. The underlying pattern — composing from the graph,
-passing structure to the engine, and returning silence rather than a
-canned fallback when the network is empty — is followed well nearly
-everywhere.
+`python/tests/test_self.py::test_identity_fragments_varies`) — but no
+lint rule and no test would catch a newly hardcoded sentence anywhere
+else in the tree. The pattern that holds nearly everywhere: compose
+from the graph, pass structure to the engine, and return silence
+rather than a canned fallback when the network is empty.
 
 ## Getting started
 
-Requirements: Rust stable (edition 2024), Python 3.12, Linux. The
-daemon build needs **libclang** and kernel V4L2 headers
-(`sudo apt install libclang-dev linux-libc-dev` on Debian/Ubuntu).
+Requirements: Rust 1.85+ (edition 2024), Python 3.12+, Linux. The
+daemon build needs **libclang** and kernel V4L2 headers, and the
+canvas dependency (`pycairo`) builds from source — on Debian/Ubuntu:
+`sudo apt install libclang-dev linux-libc-dev libcairo2-dev pkg-config`.
 
 ```bash
 cargo build --release
 pip install -r python/requirements.txt
+python3 -c "import nltk; nltk.download('wordnet'); nltk.download('punkt_tab')"
 ./run.sh
 ```
 
-`run.sh` is the only supported way to start and stop Genesis. It
-launches the daemon, the cognitive CLI, the retina (camera), and TTS;
-Ctrl-C tears everything down gracefully. `./run.sh --stop` stops a
-running session; `./run.sh --offline` disables network access. State
-lives in `${XDG_DATA_HOME:-$HOME/.local/share}/genesis`. To mirror a
-session to a Discord channel as a read-only feed, put a channel
-webhook URL in `.genesis-discord` or export `GENESIS_DISCORD_WEBHOOK`.
+`run.sh` is the supported way to start and stop Genesis from a
+checkout (the packaged `genesis` command below is the installed
+equivalent). It launches the daemon, the cognitive CLI, the retina
+(camera), and TTS; Ctrl-C tears everything down gracefully.
+`./run.sh --stop` stops a running session; `./run.sh --offline`
+disables network access. With no camera or microphone she runs
+text-only — absent sensors are never reported as readings.
+
+State lives in `${XDG_DATA_HOME:-$HOME/.local/share}/genesis`;
+`GENESIS_DATA_DIR` or a `.genesis-data-dir` file in the checkout
+overrides it. To mirror a session to a Discord channel as a read-only
+feed, put a channel webhook URL in `.genesis-discord` or export
+`GENESIS_DISCORD_WEBHOOK`.
+
+On hosts with no system C toolchain, `cargo` fails at link with
+`linker 'cc' not found`; `. ./scripts/cargo-env.sh` provides a
+Zig-based shim (details in AGENTS.md).
 
 On first boot the instance is a fresh system — a small concept
 network, no memories, no learned names. Introduce yourself; teach it.
@@ -448,18 +446,19 @@ Optional voice dependencies (not in `requirements.txt`): `vosk`,
 
 ### Packaged install — the agent as a resident service
 
-`python/` is an installable package (`genesis-cognitive`): it provides
-a `genesis` command that is the packaged equivalent of `run.sh`.
-`scripts/install.sh` performs the whole local install — a venv at
-`~/.local/lib/genesis/venv` (editable, so the running code stays this
-checkout), the release binaries beside the interpreter, a
-`~/.local/bin/genesis` launcher, and an enabled `genesis.service`
-systemd user unit that runs `genesis --headless`.
+The repo root is an installable package (`genesis-cognitive`):
+`pip install .` provides a `genesis` command that is the packaged
+equivalent of `run.sh`. `scripts/install.sh` performs the whole local
+install — a venv at `~/.local/lib/genesis/venv` (editable, so the
+running code stays this checkout), the release binaries beside the
+interpreter, a `~/.local/bin/genesis` launcher, and an enabled
+`genesis.service` systemd user unit that runs `genesis --headless`.
 
 ```bash
 genesis              # interactive session (same as ./run.sh)
 genesis --headless   # resident mode, no prompt
 genesis --stop       # stop this data dir's processes (run.sh --stop)
+genesis --tail       # tail the daemon log
 systemctl --user start genesis    # resident
 journalctl --user -u genesis -f   # watch her logs
 ```
@@ -490,31 +489,28 @@ for the specific ceilings and the two known-unresolved cases.
 - **Restart occasionally.** Log rotation happens at startup; a
   months-long single session will grow them.
 - **Disk grows slowly by design.** The episodic store is append-only
-  (<1 KB per episode, linear growth). Expect months-to-years scale,
-  but watch small volumes. The "bench-verified" claim this used to
-  carry is not backed by anything in the repository — there is no
-  benchmark harness here to re-run. The one structure that could have
-  outgrown that estimate, the per-episode Python metadata, was
-  unbounded and is now evicted (see Growth bounds).
+  (<1 KB per episode, linear growth) — months-to-years scale is an
+  extrapolation from record size, not a benchmarked guarantee, so
+  watch small volumes. Per-episode Python metadata is bounded
+  (see Growth bounds).
 - **It does real background work.** Autonomous urges consume real
   CPU; interoception dampens heavy work under thermal strain, but
   keep an eye on marginal hardware.
 
 ### Growth bounds
 
-Everything that grows is bounded, and the bounds are now explicit rather
-than assumed. An earlier revision of this file claimed the same thing
-while seven structures grew without a cap; those were found and fixed.
+Everything that grows is bounded; the ceilings below are enforced in
+code and exercised by tests, not assumed.
 
 | Structure | File | Bound |
 |---|---|---|
-| Episodic records | `python/temporal_lobe/memory/memory.py` | Forgotten records are evicted after a 1 h grace period. `forget()` also runs in O(N log N) — it was O(N²) with two full list copies per record, holding the GIL on the autosave/think threads. |
-| Attractor patterns | `python/temporal_lobe/memory/systems.py` | Trimmed to 60% of the Hopfield capacity (~0.138·N), least-recently-retrieved first. Over-capacity networks converge to spurious attractors that were being returned as confident retrievals. Also trimmed on load, so an already-bloated state file self-heals. |
-| Executive suppression | `python/temporal_lobe/memory/working.py` | 64 entries, each with a 120 s release deadline. Previously permanent: every topic ever focused became un-attendable, since nothing released them outside tests. |
+| Episodic records | `python/temporal_lobe/memory/memory.py` | Forgotten records are evicted after a 1 h grace period; `forget()` runs in O(N log N). |
+| Attractor patterns | `python/temporal_lobe/memory/systems.py` | Flat ceiling of 512 patterns (`_DEFAULT_MAX_PATTERNS`), evicting least-recently-retrieved first — deliberately *not* a fraction of Hopfield capacity (~0.138·N = 8 at the production size of 64); past capacity, `over_capacity` marks returned ids as suggestions rather than confident retrievals. |
+| Executive suppression | `python/temporal_lobe/memory/working.py` | 64 entries, each auto-releasing on a 120 s deadline. |
 | Conversation threads | `python/temporal_lobe/memory/working.py` | 50 retained (lifetime total still reported). Each holds full turn text and is not persisted. |
 | Topic history | `python/temporal_lobe/memory/working.py` | 200 entries. |
 | Learning results | `python/frontal_lobe/autonomous.py` | 500 retained, oldest evicted; serialized in full on each autosave. |
-| Curiosity queue | `python/frontal_lobe/autonomous.py` | 200-entry FIFO, persisted. Also fixed from `pop(0)` (O(N)) to `popleft()` (O(1)). |
+| Curiosity queue | `python/frontal_lobe/autonomous.py` | 50-entry FIFO, persisted. |
 | Review records | `python/temporal_lobe/memory/spaced_repetition.py` | 5,000, evicting the highest-retention records. `stability` is capped at 7 days so a well-reviewed concept cannot become permanently undecayable. |
 | Ad-hoc vector cache | `python/temporal_lobe/concepts/embeddings.py` | 4,096 dense vectors, LRU. |
 
@@ -528,7 +524,7 @@ Two further unbounded-growth findings were investigated and deliberately
   technically correct, but an extracted proposition is earned, not
   recomputable geometry; this wants a non-listed origin.
 - `python/temporal_lobe/concepts/embeddings.py` builds a dense 5000² SVD (~100 MB, O(n³))
-  on a 4.7 GB machine. Correct, but the dominant memory spike.
+  on a ~5 GB machine. Correct, but the dominant memory spike.
 
 ### Tests and lint
 
