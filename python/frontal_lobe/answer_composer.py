@@ -909,9 +909,18 @@ class AnswerComposer:
         return None, ""
 
 
-    def _relation_verb(self, rel: RelationType) -> str:
-        """Convert a relation to a natural verb."""
+    def _relation_verb(self, rel: RelationType, obj: str = "") -> str:
+        """Convert a relation to a natural verb.
+
+        For has_property the object's form decides the frame —
+        "is clear" for bare property words, "has fur" for noun
+        objects.
+        """
         from temporal_lobe.concepts import RelationType as RT
+        from temporal_lobe.morphology import property_verb_phrase
+
+        if rel == RT.HAS_PROPERTY:
+            return property_verb_phrase(obj)
 
         verbs = {
             RT.CAUSES: "causes",
@@ -930,7 +939,6 @@ class AnswerComposer:
             RT.OPPOSITE_OF: "is opposite of",
             RT.CONTRADICTS: "contradicts",
             RT.EMERGES_FROM: "emerges from",
-            RT.HAS_PROPERTY: "has the property",
             RT.TEMPORAL_ORDER: "comes before",
             RT.AGENT_PATIENT: "acts on",
             RT.GOAL_DIRECTED: "aims to achieve",

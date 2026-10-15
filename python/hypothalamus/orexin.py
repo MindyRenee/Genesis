@@ -164,17 +164,17 @@ Arousal equation:
     (orexin weight = 0.20 — major arousal stabilizer, tied with NE
     for the highest weight)
 
-Sleep phase gating:
-    Orexin raises the adenosine/histamine barrier for entering sleep:
-    sleep_adn = 0.75 - 0.15 * mel - 0.05 * (1.0 - ox)
-    sleep_hist = 0.25 + 0.05 * mel - 0.05 * ox
-
-    High orexin makes it harder to fall asleep; low orexin makes it
-    easier. This makes sleep a multi-system decision, not adenosine
-    alone.
+Sleep-state role:
+    The chemistry-side sleep gate orexin used to modulate (the
+    adenosine/histamine barrier for entering NREM) is retired: the
+    sleep-wake network owns the stages, and orexin is driven by the
+    network (OX_FROM_LC * lc) — high while the LC runs, near-silent
+    in sleep. Low orexin still feeds the narcolepsy mechanism below
+    and lowers the Alert gates.
 
 Alert phase:
-    OX > 0.20 (enter) / 0.15 (stay) required for alertness
+    OX > 0.20 (enter) / 0.15 (stay) required for alertness; orexin
+    also lowers the NE/HIST enter thresholds (wake stabilizer)
 
 Narcolepsy:
     OX < 0.10 -> sudden sleep transitions (cataplexy)

@@ -178,9 +178,13 @@ def test_autonomous_learner_reuses_canonical_semantic_memory() -> None:
 def _make_profile(
     plasticity_gate: float = 0.5,
     bdnf_tonic: float = 0.4,
-    cortisol_tonic: float = 0.3,
+    cortisol_tonic: float = 0.03,
 ) -> PlasticityProfile:
-    """Create a minimal plasticity profile for testing."""
+    """Create a minimal plasticity profile for testing.
+
+    Cortisol values are on the substrate's reachable envelope:
+    ~0.02 resting, ~0.08 under sustained HPA drive.
+    """
     return PlasticityProfile(
         plasticity_gate=plasticity_gate,
         bdnf_effective=bdnf_tonic,
@@ -291,7 +295,7 @@ def test_learner_default_posture_is_neutral() -> None:
 
 def test_learner_update_posture_reads_profile() -> None:
     """_update_posture reads the profile and sets the posture."""
-    profile = _make_profile(plasticity_gate=0.70, cortisol_tonic=0.18)
+    profile = _make_profile(plasticity_gate=0.70, cortisol_tonic=0.03)
     learner = _make_learner(get_plasticity_profile=lambda: profile)
     learner._update_posture()
     assert learner.current_posture == LEARNING_POSTURE_RECEPTIVE
@@ -300,7 +304,7 @@ def test_learner_update_posture_reads_profile() -> None:
 
 def test_learner_blocks_learning_when_protective() -> None:
     """Learning is blocked under protective posture (chronic stress)."""
-    profile = _make_profile(plasticity_gate=0.25, cortisol_tonic=0.60)
+    profile = _make_profile(plasticity_gate=0.25, cortisol_tonic=0.07)
     learner = _make_learner(
         get_emotion=lambda: _make_emotion("neutral"),
         get_plasticity_profile=lambda: profile,
@@ -312,7 +316,7 @@ def test_learner_blocks_learning_when_protective() -> None:
 
 def test_learner_allows_learning_when_receptive() -> None:
     """Learning is allowed under receptive posture."""
-    profile = _make_profile(plasticity_gate=0.70, cortisol_tonic=0.18)
+    profile = _make_profile(plasticity_gate=0.70, cortisol_tonic=0.03)
     learner = _make_learner(
         get_emotion=lambda: _make_emotion("neutral"),
         get_plasticity_profile=lambda: profile,
@@ -324,7 +328,7 @@ def test_learner_allows_learning_when_receptive() -> None:
 
 def test_learner_allows_learning_when_recovering() -> None:
     """Learning is allowed under recovering posture."""
-    profile = _make_profile(plasticity_gate=0.40, bdnf_tonic=0.35, cortisol_tonic=0.35)
+    profile = _make_profile(plasticity_gate=0.40, bdnf_tonic=0.35, cortisol_tonic=0.04)
     learner = _make_learner(
         get_emotion=lambda: _make_emotion("neutral"),
         get_plasticity_profile=lambda: profile,
@@ -336,7 +340,7 @@ def test_learner_allows_learning_when_recovering() -> None:
 
 def test_learner_posture_skip_tracking() -> None:
     """Posture skips are tracked in stats."""
-    profile = _make_profile(plasticity_gate=0.25, cortisol_tonic=0.60)
+    profile = _make_profile(plasticity_gate=0.25, cortisol_tonic=0.07)
     learner = _make_learner(
         get_emotion=lambda: _make_emotion("neutral"),
         get_plasticity_profile=lambda: profile,
@@ -367,7 +371,7 @@ def test_learner_posture_falls_back_on_error() -> None:
 
 def test_learner_describe_posture() -> None:
     """describe_posture returns a human-readable string."""
-    profile = _make_profile(plasticity_gate=0.70, cortisol_tonic=0.18)
+    profile = _make_profile(plasticity_gate=0.70, cortisol_tonic=0.03)
     learner = _make_learner(get_plasticity_profile=lambda: profile)
     learner._update_posture()
     desc = learner.describe_posture()

@@ -234,13 +234,17 @@ Arousal equation:
 
 Valence equation:
     valence = DA*0.25 + SRT*0.25 + OXY*0.10 + END*0.15 + NE*0.10
-            - CORT*0.35 - glu_excess*0.15 + DA*SRT*0.10
+            - cort_stress*0.35 - glu_excess*0.15 + DA*SRT*0.10
     (dopamine weight = 0.25 — reward/wanting)
     (DA × SRT synergy = 0.10 — balanced mood when both high)
+    (cort_stress = cortisol expressed as a fraction of its reachable
+    envelope, (cort - 0.02) / (0.08 - 0.02) clamped to [0, 1] —
+    the raw level peaks near 0.08 and could never move valence on
+    the [0, 1] scale the coefficient was written for)
 
 Flow phase:
-    DA > 0.65 (enter) / 0.55 (stay) + ACh > 0.50 + NE > 0.40
-    + CORT < 0.30
+    DA > 0.40 (enter) / 0.352 (stay) + ACh > 0.44 + NE > 0.40
+    + CORT < 0.06 (STRESS_CORTISOL_GATE — flow excludes stress)
 
 
 ════════════════════════════════════════════════════════════════════════

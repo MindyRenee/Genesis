@@ -6,9 +6,12 @@ read files, traverse directories, and learn from local text sources
 
 ## Safety
 
-Exploration is sandboxed to the project root directory. Genesis cannot
-read files outside its project tree. File size is capped to prevent
-memory issues.
+Read scope is the whole filesystem by default (owner-granted), narrowed
+by ``GENESIS_EXPLORE_ROOTS`` or an explicit ``allowed_roots``. Credential
+and key material is never in scope — the explorer commits what it reads
+to the concept network, and secrets do not belong in long-term memory.
+Pseudo-filesystems (/proc, /sys, ...) are likewise excluded. File size is
+capped to prevent memory issues.
 
 ## Integration
 
@@ -65,6 +68,50 @@ MAX_FILE_SIZE = 256 * 1024
 # Maximum concepts to extract per file
 MAX_CONCEPTS_PER_FILE = 50
 
+# Sensitive material is never in scope, regardless of allowed roots:
+# the explorer commits what it reads to the concept network, and
+# credentials do not belong in a mind's long-term memory.
+_SENSITIVE_DIRS = {
+    ".ssh", ".gnupg", ".aws", ".azure", ".kube", ".docker",
+    ".password-store", ".mozilla", "google-chrome", "chromium",
+    "chromium-browser", "BraveSoftware", "keyrings",
+}
+_SENSITIVE_FILES = {
+    ".env", ".netrc", ".pgpass", ".git-credentials",
+    "id_rsa", "id_dsa", "id_ecdsa", "id_ed25519",
+    "credentials", "credentials.json", "secrets.json", "secrets.yaml",
+}
+_SENSITIVE_SUFFIXES = {".pem", ".key", ".kdbx", ".ppk", ".p12", ".pfx"}
+# Pseudo-filesystems: nothing under them is a document she can learn.
+_PSEUDO_ROOTS = {"/proc", "/sys", "/dev", "/run", "/boot", "/snap", "/lost+found"}
+# Their *names* as they appear under "/" — pruned when walking root.
+_ROOT_PRUNE = {p.lstrip("/") for p in _PSEUDO_ROOTS}
+
+
+def _is_sensitive(path: Path) -> bool:
+    """Credential/key material — out of scope under every root."""
+    parts = path.parts
+    if any(part in _SENSITIVE_DIRS for part in parts):
+        return True
+    name = path.name.lower()
+    return (
+        name in _SENSITIVE_FILES
+        or path.suffix.lower() in _SENSITIVE_SUFFIXES
+    )
+
+
+def default_allowed_roots() -> list[str]:
+    """Read scope for the explorer.
+
+    Whole filesystem by default (``.``-denylist rules still apply).
+    ``GENESIS_EXPLORE_ROOTS`` (os.pathsep-separated) narrows it for
+    deployments that want her confinement back.
+    """
+    raw = os.environ.get("GENESIS_EXPLORE_ROOTS", "").strip()
+    if raw:
+        return [r for r in raw.split(os.pathsep) if r]
+    return ["/"]
+
 
 @dataclass(slots=True)
 class FileExplorationResult:
@@ -92,14 +139,18 @@ class ExplorationResult:
 class Explorer:
     """Genesis's filesystem exploration system.
 
-    Reads and learns from text files in its project directory:
+    Reads and learns from text files anywhere in the allowed roots —
     documentation, configuration, notes, and other non-code text.
     Code files are handled by CodeLearner; this module handles everything else.
 
     Args:
         network: The concept network to add concepts to.
-        project_root: Root directory to explore (sandboxed to this tree).
+        project_root: Root directory that relative paths resolve against.
         client: Optional GenesisClient for storing exploration memories.
+        allowed_roots: Read scope. Defaults to the project root; pass
+            ``default_allowed_roots()`` for the deployment-wide scope
+            (``GENESIS_EXPLORE_ROOTS``, else the whole filesystem).
+            Sensitive material is denied under every root.
     """
 
     def __init__(
@@ -107,25 +158,43 @@ class Explorer:
         network: ConceptNetwork,
         project_root: str = ".",
         client=None,
+        allowed_roots: list[str] | None = None,
     ) -> None:
         """Bind to a concept network and prepare filesystem exploration state.
 
         Args:
             network: The concept network to add explored concepts to.
-            project_root: Root directory to explore from.
+            project_root: Root directory to explore from — also the
+                default scope when ``allowed_roots`` is not given.
             client: Optional GenesisClient for storing exploration memories.
+            allowed_roots: Everywhere she may read. Sensitive paths
+                (credentials, browser profiles, key material) are denied
+                regardless — see ``_SENSITIVE_DIRS``/``_SENSITIVE_FILES``.
         """
         self.network = network
         self.project_root = Path(project_root).resolve()
         self.client = client
+        roots = allowed_roots if allowed_roots is not None else [str(self.project_root)]
+        self._allowed_roots = tuple(
+            Path(r).expanduser().resolve() for r in roots
+        )
         self._explored_files: set[str] = set()
 
     def _inside_root(self, path: Path) -> bool:
-        """Return True if `path` resolves to a location inside project_root."""
+        """True if `path` is inside an allowed root and not sensitive."""
         try:
-            return path.resolve().is_relative_to(self.project_root)
-        except (ValueError, OSError):
+            resolved = path.resolve()
+        except OSError:
             return False
+        if _is_sensitive(resolved):
+            return False
+        if any(
+            resolved.is_relative_to(Path(p)) for p in _PSEUDO_ROOTS
+        ):
+            return False
+        return any(
+            resolved.is_relative_to(root) for root in self._allowed_roots
+        )
 
     def explore_directory(self, path: str | None = None, max_files: int = 50) -> ExplorationResult:
         """Explore a directory tree, learning from text files.
@@ -142,9 +211,11 @@ class Explorer:
             Summary of what was learned.
         """
         if path:
-            root = self.project_root / path
+            root = Path(path).expanduser()
+            if not root.is_absolute():
+                root = self.project_root / root
             if not self._inside_root(root):
-                logger.warning(f"Refusing to explore outside project root: {path}")
+                logger.warning(f"Refusing to explore outside allowed scope: {path}")
                 return ExplorationResult(files_explored=0, concepts_added=0, relationships_added=0)
         else:
             root = self.project_root
@@ -156,8 +227,14 @@ class Explorer:
         dirs_visited = 0
 
         for dirpath, dirnames, filenames in os.walk(root):
-            # Filter skip dirs in-place
-            dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS and not d.startswith(".")]
+            # Filter skip dirs in-place — plus credential stores and,
+            # at the filesystem root, the pseudo-filesystems.
+            dirnames[:] = [
+                d for d in dirnames
+                if d not in _SKIP_DIRS and not d.startswith(".")
+                and d not in _SENSITIVE_DIRS
+                and not (dirpath == "/" and d in _ROOT_PRUNE)
+            ]
             dirs_visited += 1
 
             for filename in filenames:
@@ -226,14 +303,10 @@ class Explorer:
             if not path.exists() or not path.is_file():
                 return None
 
-            # Security: ensure file is within project root
+            # Scope: within an allowed root, never sensitive material
             resolved = path.resolve()
-            try:
-                if not resolved.is_relative_to(self.project_root):
-                    logger.warning(f"Skipping file outside project root: {filepath}")
-                    return None
-            except ValueError:
-                logger.warning(f"Skipping file outside project root: {filepath}")
+            if not self._inside_root(resolved):
+                logger.warning(f"Skipping file outside allowed scope: {filepath}")
                 return None
 
             # Size check
@@ -254,8 +327,13 @@ class Explorer:
 
             lines = text.count("\n") + 1
 
+            try:
+                display = str(resolved.relative_to(self.project_root))
+            except ValueError:
+                display = str(resolved)
+
             return FileExplorationResult(
-                filepath=str(resolved.relative_to(self.project_root)),
+                filepath=display,
                 file_type=file_type,
                 lines=lines,
                 concepts_added=concepts_added,
@@ -430,15 +508,18 @@ class Explorer:
         This is the user-facing method for guided exploration.
 
         Args:
-            path: Path to explore (relative to project_root).
+            path: Path to explore — relative to project_root or
+                absolute within the allowed roots.
 
         Returns:
             Human-readable summary of what was found.
         """
-        full_path = self.project_root / path
+        full_path = Path(path).expanduser()
+        if not full_path.is_absolute():
+            full_path = self.project_root / full_path
 
         if not self._inside_root(full_path):
-            return f"Refusing to explore outside project root: {path}"
+            return f"Refusing to explore outside allowed scope: {path}"
 
         if not full_path.exists():
             return f"Path not found: {path}"

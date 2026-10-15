@@ -77,7 +77,11 @@ fn step(t: f64, s: State, dt: f64) -> State {
 fn simulate(hours: f64, every: usize) -> Vec<(f64, State, bool)> {
     let dt = 1.0 / 3600.0;
     let n = (hours / dt).round() as usize;
-    let mut s = State { vv: 0.0, vm: 0.0, h: 15.0 };
+    let mut s = State {
+        vv: 0.0,
+        vm: 0.0,
+        h: 15.0,
+    };
     let mut out = Vec::new();
     for i in 0..n {
         let t = i as f64 * dt;

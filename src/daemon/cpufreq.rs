@@ -197,15 +197,6 @@ pub struct BodyControlState {
 ///
 /// Returns `None` if the script cannot be found, in which case cpufreq
 /// control silently no-ops (graceful degradation).
-// Android exposes no Linux CPUFreq sysfs contract to Genesis. The phone's
-// thermal/power scheduler remains Android's responsibility; Genesis still
-// observes whatever portable body signals are available.
-#[cfg(target_os = "android")]
-fn helper_path() -> Option<&'static str> {
-    None
-}
-
-#[cfg(not(target_os = "android"))]
 fn helper_path() -> Option<&'static str> {
     static PATH: OnceLock<Option<String>> = OnceLock::new();
     PATH.get_or_init(|| {
@@ -1134,7 +1125,8 @@ pub fn derive_epp(effective_levels: &[f32; 18]) -> String {
     }
 
     // Arousal: dopamine pushes toward performance, GABA/adenosine/
-    // cortisol push toward power saving.
+    // CRH push toward power saving. (CRH, not cortisol: the stress
+    // signal enters at the top of the HPA axis — see interoception.)
     let arousal = (da * 0.40) - (gaba * 0.25 + adn * 0.20 + crh * 0.15);
     // Map arousal [-0.6, 0.4] to EPP profiles:
     //   arousal > 0.15  → "performance"

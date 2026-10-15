@@ -141,16 +141,17 @@ Arousal equation:
                        + OX*0.20 + EPI*0.10
     (histamine weight = 0.15 — wake maintenance)
 
-Sleep phase:
-    HIST < 0.25 (enter) / 0.38 (stay) required for sleep
-    (The stay-asleep threshold (0.38) is above the histamine
-    baseline (0.30) so that small perturbations from its own normal
-    activity don't break the sleep state. A deliberate wake cascade
-    sends histamine +0.20, pushing it to ~0.48 — well above 0.38.)
+Sleep state:
+    The chemistry-side histamine sleep gate (HIST < 0.25) is retired:
+    the sleep-wake network owns the stages, and histamine is driven
+    by the network (HIST_FROM_LC * lc) — near-silent in NREM and REM,
+    ~0.30 in waking.
 
 Alert phase:
-    HIST > 0.55 (enter) / 0.45 (stay) + NE > 0.55 + GABA < 0.40
-    + MEL < 0.30 + OX > 0.20
+    NE > 0.50 (enter) / 0.47 (stay) + HIST > 0.34 (enter) / 0.32
+    (stay) + GABA < 0.40 + MEL < 0.30 (enter) / 0.40+h (stay)
+    + OX > 0.20 (enter) / 0.15 (stay), with the orexin
+    bonus lowering the NE/HIST thresholds.
 
 
 ════════════════════════════════════════════════════════════════════════

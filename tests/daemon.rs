@@ -1327,7 +1327,10 @@ fn advance_neuro_steps_the_sleep_network() {
         tl.advance_neuro(&mmap);
     }
     let after = mmap.read_consistent().expect("read").sleep_network;
-    assert!(after.iter().all(|v| v.is_finite()), "network went non-finite: {after:?}");
+    assert!(
+        after.iter().all(|v| v.is_finite()),
+        "network went non-finite: {after:?}"
+    );
     assert_ne!(after, before, "the sleep network did not advance");
     drop(mmap);
     let _ = std::fs::remove_file(&path);
@@ -1444,7 +1447,7 @@ fn test_inference_signals_are_readable_by_the_cognitive_mind() {
     // doing without asking the daemon to run physics for it. The daemon
     // writes InferenceSignals on every tick; this asserts the block is
     // actually populated and lands where the Python parser expects it
-    // (offset 3228, 64 bytes).
+    // (offset 3416, 64 bytes).
     let path = std::env::temp_dir().join(format!(
         "genesis_sig_{}.bin",
         std::time::SystemTime::now()

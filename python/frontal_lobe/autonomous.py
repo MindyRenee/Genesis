@@ -1869,6 +1869,28 @@ class AutonomousLearner:
             self._was_offline = False
         return False
 
+    def _work_ready(self) -> bool:
+        """Whether learning may proceed — False while emotionally
+        gated or past the per-session page limit, waiting on
+        _state_event either way.
+
+        Emotional gating: don't learn if it's in a bad state. Learning
+        requires curiosity and openness; if it's stressed, overwhelmed,
+        or anxious, it should rest instead. The wait blocks on
+        _state_event — wake when state changes, not on a fixed timer —
+        with a periodic re-check in case the event was missed
+        (defensive). The page limit resets on each start().
+        """
+        if not self._should_learn():
+            self._state_event.clear()
+            self._state_event.wait(timeout=60)
+            return False
+        if self._session_pages >= MAX_PAGES_PER_SESSION:
+            self._state_event.clear()
+            self._state_event.wait(timeout=60)
+            return False
+        return True
+
     def _run(self) -> None:
         """Main loop — event-driven, runs in background thread.
 
@@ -1896,22 +1918,7 @@ class AutonomousLearner:
                 # it learns (acquisition aggressiveness, bridging, etc.).
                 self._update_posture()
 
-                # Emotional gating — don't learn if it's in a bad state.
-                # Learning requires curiosity and openness. If it's stressed,
-                # overwhelmed, or anxious, it should rest instead.
-                # Block on _state_event — wake when state changes, not on
-                # a fixed timer.
-                if not self._should_learn():
-                    self._state_event.clear()
-                    # Wait for a state change, with a periodic re-check
-                    # in case the event was missed (defensive).
-                    self._state_event.wait(timeout=60)
-                    continue
-
-                # Check per-session page limit (resets on each start())
-                if self._session_pages >= MAX_PAGES_PER_SESSION:
-                    self._state_event.clear()
-                    self._state_event.wait(timeout=60)
+                if not self._work_ready():
                     continue
 
                 # Get a topic to learn about
@@ -2539,20 +2546,7 @@ class AutonomousLearner:
         )
         self._learning_log.append(result)
 
-        # ── Visual learning ─────────────────────────────────────
-        # When learning from Wikipedia, also fetch the article's lead
-        # image and learn the visual-concept association. This is how
-        # Genesis learns to see: it encounters images in context while
-        # reading, just like a child seeing pictures in a book.
-        # Fetching the lead image needs the network, so only do it when
-        # the query that produced this result was online. Offline, a
-        # cached Wikipedia article must not trigger a network fetch.
-        if (
-            sr.source_name == "wikipedia"
-            and not is_dictionary
-            and not self._sources.last_query_offline
-        ):
-            self._try_visual_learning(sr.title, topic)
+        self._maybe_learn_visually(sr, is_dictionary, topic)
 
         self._send_learning_impulses(
             topic, all_learned_concepts, new_relationships, surprise,
@@ -2570,6 +2564,23 @@ class AutonomousLearner:
         )
 
         return result
+
+    def _maybe_learn_visually(
+        self, sr: SourceResult, is_dictionary: bool, topic: str
+    ) -> None:
+        """Visual learning: when learning from Wikipedia, also fetch the
+        article's lead image and learn the visual-concept association.
+        This is how Genesis learns to see: it encounters images in
+        context while reading, just like a child seeing pictures in a
+        book. Fetching the lead image needs the network, so only do it
+        when the query that produced this result was online. Offline, a
+        cached Wikipedia article must not trigger a network fetch."""
+        if (
+            sr.source_name == "wikipedia"
+            and not is_dictionary
+            and not self._sources.last_query_offline
+        ):
+            self._try_visual_learning(sr.title, topic)
 
     def _extract_learning_material(
         self, text: str, topic: str, source: dict[str, Any] | None = None,
@@ -3578,6 +3589,42 @@ class AutonomousLearner:
         """
         source_neighbors = self.network.get_neighbors(source_domain)
         target_neighbors = self.network.get_neighbors(target_domain)
+        similarity = self._transfer_similarity(source_neighbors, target_neighbors)
+
+        target_by_rel: dict[str, list[str]] = {}
+        target_degrees: dict[str, int] = {}
+        for tgt, rel, _ in target_neighbors:
+            target_by_rel.setdefault(rel.value, []).append(tgt)
+            target_degrees[tgt] = len(self.network.get_neighbors(tgt))
+
+        source_degrees = {
+            src: len(self.network.get_neighbors(src))
+            for src, _, _ in source_neighbors
+        }
+
+        mappings, concepts_transferred, relationships_transferred = (
+            self._transfer_mappings(
+                source_neighbors, target_by_rel, target_degrees,
+                source_degrees, similarity, target_domain,
+            )
+        )
+
+        return TransferResult(
+            source_domain=source_domain,
+            target_domain=target_domain,
+            similarity=similarity,
+            mappings=mappings,
+            concepts_transferred=concepts_transferred,
+            relationships_transferred=relationships_transferred,
+        )
+
+    @staticmethod
+    def _transfer_similarity(
+        source_neighbors: list[tuple[Any, Any, float]],
+        target_neighbors: list[tuple[Any, Any, float]],
+    ) -> float:
+        """Domain similarity from relation-type profiles, local
+        degree compatibility, and name overlap."""
 
         def relation_profile(neighbors: list[tuple[Any, Any, float]]) -> dict[str, float]:
             profile: dict[str, float] = {}
@@ -3613,7 +3660,7 @@ class AutonomousLearner:
 
         # Relation schema is the strongest signal; exact lexical overlap
         # is deliberately weak because it rewards vocabulary coincidence.
-        similarity = max(
+        return max(
             0.0,
             min(
                 1.0,
@@ -3623,17 +3670,17 @@ class AutonomousLearner:
             ),
         )
 
-        target_by_rel: dict[str, list[str]] = {}
-        target_degrees: dict[str, int] = {}
-        for tgt, rel, _ in target_neighbors:
-            target_by_rel.setdefault(rel.value, []).append(tgt)
-            target_degrees[tgt] = len(self.network.get_neighbors(tgt))
-
-        source_degrees = {
-            src: len(self.network.get_neighbors(src))
-            for src, _, _ in source_neighbors
-        }
-
+    def _transfer_mappings(
+        self,
+        source_neighbors: list[tuple[Any, Any, float]],
+        target_by_rel: dict[str, list[str]],
+        target_degrees: dict[str, int],
+        source_degrees: dict[str, int],
+        similarity: float,
+        target_domain: str,
+    ) -> tuple[list[tuple[str, str]], list[str], int]:
+        """Bind each source neighbor to its best target-role match and
+        reinforce the mapped edge in the target graph."""
         mappings: list[tuple[str, str]] = []
         concepts_transferred: list[str] = []
         relationships_transferred = 0
@@ -3709,14 +3756,7 @@ class AutonomousLearner:
             )
             relationships_transferred += 1
 
-        return TransferResult(
-            source_domain=source_domain,
-            target_domain=target_domain,
-            similarity=similarity,
-            mappings=mappings,
-            concepts_transferred=concepts_transferred,
-            relationships_transferred=relationships_transferred,
-        )
+        return mappings, concepts_transferred, relationships_transferred
 
     # ─── Social learning ─────────────────────────────────────────
 

@@ -283,21 +283,7 @@ class RelationsAgent:
         before = self._transition_state(world)
         violations = world.violations()
         if violations:
-            # Record every violated goal as a *pair* failure before
-            # acting — the memory applies no matter which side moves.
-            involvement: dict[_Config, int] = {}
-            for goal in violations:
-                configs: list[_Config] = []
-                for pos, (name, _) in self._placed_as.items():
-                    if name in (goal.a, goal.b):
-                        configs.append((name, pos))
-                if len(configs) == 2:
-                    key = self._pair_key(configs[0], configs[1])
-                    self._pair_penalty[key] = (
-                        self._pair_penalty.get(key, 0) + 1
-                    )
-                for config in configs:
-                    involvement[config] = involvement.get(config, 0) + 1
+            involvement = self._record_violations(world, violations)
             if not involvement:
                 return self._finish(world, "STUCK")
             sig = frozenset(violations)
@@ -333,32 +319,10 @@ class RelationsAgent:
                         return "PLAYING"
             # First try "switch these two": a swap is the only repair
             # that changes a *full* row, where lifting a party just
-            # frees the same slot it came from. Descend on the honest
-            # violation count, preferring to move entrenched mistakes
-            # and jittered on ties so equal swaps don't 2-cycle.
-            n_viol = len(violations)
-            swap_choice: tuple[int, int] | None = None
-            swap_key: tuple[float, float] | None = None
-            for name, pos in involvement:
-                for pos_b in world.board:
-                    if pos_b == pos:
-                        continue
-                    hypo = dict(world.board)
-                    hypo[pos], hypo[pos_b] = hypo[pos_b], hypo[pos]
-                    after = sum(
-                        1
-                        for g in world.goals
-                        if world.goal_state_of(g, hypo) == "no"
-                    )
-                    if after >= n_viol:
-                        continue
-                    skey = (
-                        float(after),
-                        -self._config_suspicion((name, pos))
-                        + self._rng.random(),
-                    )
-                    if swap_key is None or skey < swap_key:
-                        swap_key, swap_choice = skey, (pos, pos_b)
+            # frees the same slot it came from.
+            swap_choice = self._find_repair_swap(
+                world, involvement, len(violations)
+            )
             if swap_choice is not None:
                 pa, pb = swap_choice
                 name_a = world.board[pa].name
@@ -412,6 +376,60 @@ class RelationsAgent:
         if world.complete():
             return self._finish(world, "WIN")
         return "PLAYING"
+
+    def _record_violations(
+        self, world: Arrangement, violations
+    ) -> dict[_Config, int]:
+        """Record every violated goal as a *pair* failure before
+        acting — the memory applies no matter which side moves —
+        and return each involved config's violation count."""
+        involvement: dict[_Config, int] = {}
+        for goal in violations:
+            configs: list[_Config] = []
+            for pos, (name, _) in self._placed_as.items():
+                if name in (goal.a, goal.b):
+                    configs.append((name, pos))
+            if len(configs) == 2:
+                key = self._pair_key(configs[0], configs[1])
+                self._pair_penalty[key] = (
+                    self._pair_penalty.get(key, 0) + 1
+                )
+            for config in configs:
+                involvement[config] = involvement.get(config, 0) + 1
+        return involvement
+
+    def _find_repair_swap(
+        self,
+        world: Arrangement,
+        involvement: dict[_Config, int],
+        n_viol: int,
+    ) -> tuple[int, int] | None:
+        """Search for the swap that most reduces the honest violation
+        count — descending on entrenched mistakes, jittered on ties so
+        equal swaps don't 2-cycle."""
+        swap_choice: tuple[int, int] | None = None
+        swap_key: tuple[float, float] | None = None
+        for name, pos in involvement:
+            for pos_b in world.board:
+                if pos_b == pos:
+                    continue
+                hypo = dict(world.board)
+                hypo[pos], hypo[pos_b] = hypo[pos_b], hypo[pos]
+                after = sum(
+                    1
+                    for g in world.goals
+                    if world.goal_state_of(g, hypo) == "no"
+                )
+                if after >= n_viol:
+                    continue
+                skey = (
+                    float(after),
+                    -self._config_suspicion((name, pos))
+                    + self._rng.random(),
+                )
+                if swap_key is None or skey < swap_key:
+                    swap_key, swap_choice = skey, (pos, pos_b)
+        return swap_choice
 
     def solve(
         self, world: Arrangement, max_steps: int = 500

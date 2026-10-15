@@ -11,7 +11,8 @@ Dependencies (passed to ``__init__``):
     - regulator: EmotionalRegulator for neurochemical responses to interactions
     - self_model: SelfModel for learning user facts and interests
     - td_learner: TDLearner for dopamine signal
-    - recognize_bonded_user: callable for creator detection
+    - is_steward_speaker: callable reporting whether the current
+      attributed speaker is the authenticated steward
     - last_summary_getter: callable returning last neuro summary
     - last_memory_mode_getter: callable returning current memory mode
 """
@@ -55,7 +56,7 @@ class MemoryStore:
         regulator: EmotionalRegulator | None,
         self_model: SelfModel,
         td_learner: TDLearner,
-        recognize_bonded_user: Callable[[str], bool],
+        is_steward_speaker: Callable[[], bool],
         last_summary_getter: Callable[[], Any],
         last_memory_mode_getter: Callable[[], str],
     ) -> None:
@@ -65,7 +66,7 @@ class MemoryStore:
         self._regulator = regulator
         self._self_model = self_model
         self._td_learner = td_learner
-        self._recognize_bonded_user = recognize_bonded_user
+        self._is_steward_speaker = is_steward_speaker
         self._last_summary_getter = last_summary_getter
         self._last_memory_mode_getter = last_memory_mode_getter
 
@@ -88,7 +89,7 @@ class MemoryStore:
         if self._regulator is None:
             return
 
-        is_bonded_user = self._recognize_bonded_user(perception.raw_text)
+        is_steward = self._is_steward_speaker()
         is_encouragement = perception.intent == Intent.ENCOURAGEMENT
         is_correction = perception.intent == Intent.CORRECTION
         is_comfort = perception.intent == Intent.COMFORT
@@ -99,7 +100,7 @@ class MemoryStore:
             sentiment=perception.sentiment,
             is_encouragement=is_encouragement,
             is_correction=is_correction,
-            is_bonded_user=is_bonded_user,
+            is_steward=is_steward,
             is_deep_conversation=is_deep,
             is_comfort=is_comfort,
         )

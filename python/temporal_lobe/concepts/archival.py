@@ -372,7 +372,21 @@ class ArchivalMixin:
             )
             return 0
 
-        # Find spillable concepts, sorted by activation (most dormant first)
+        to_spill = self._spill_candidates(
+            activation_threshold, protected_origins, max_in_memory
+        )
+        if not to_spill:
+            return 0
+        return self._commit_spill(to_spill)
+
+    def _spill_candidates(
+        self,
+        activation_threshold: float,
+        protected_origins: frozenset[str],
+        max_in_memory: int,
+    ) -> set[str]:
+        """The dormant, unprotected, never-reviewed concept ids to
+        spill — most dormant first, enough to reach the memory budget."""
         spillable: list[tuple[float, str]] = []
         for cid, concept in list(self._concepts.items()):
             if concept.origin in protected_origins:
@@ -396,10 +410,14 @@ class ArchivalMixin:
                 "not protected); working memory cannot be trimmed",
                 len(self._concepts), max_in_memory, activation_threshold,
             )
-            return 0
+            return set()
+        return {cid for _, cid in spillable[:n_to_spill]}
 
+    def _commit_spill(self, to_spill: set[str]) -> int:
+        """Serialize, archive, and evict the chosen concepts — in that
+        order, so a failed archive write leaves working memory intact
+        rather than silently pruning knowledge."""
         before = len(self._concepts)
-        to_spill = {cid for _, cid in spillable[:n_to_spill]}
 
         # Serialize and archive in batch
         items: list[tuple[str, dict[str, Any], set[str]]] = []
@@ -417,52 +435,55 @@ class ArchivalMixin:
             logger.warning(f"archive batch spill failed: {e}")
             spilled = 0
 
-        if spilled > 0:
-            to_spill = {cid for cid, _, _ in items}
-            # Archive edges involving spilled concepts.
-            if not self._archive_spilled_edges(to_spill):
-                return 0
-            # Remove from working memory (concepts + aliases, NOT
-            # edges). Only reached when the batch COMMIT succeeded —
-            # archive_concepts_batch is transactional, so spilled > 0
-            # means every item is on disk. If the archive write failed,
-            # the concepts must stay in working memory: removing them
-            # here would silently revert the spill to destructive
-            # pruning and lose the knowledge entirely.
-            self._remove_spilled_from_working_memory(to_spill)
-            try:
-                archive_count = self._archive.count()
-            except (sqlite3.Error, RuntimeError):
-                archive_count = -1
+        if spilled <= 0:
+            return spilled
 
-            # Verify the spill actually happened rather than trusting the
-            # batch count. A spill that reports success but leaves
-            # working memory untouched is the failure mode that hid here
-            # for as long as the archive existed: the concepts were
-            # written, an exception during edge archiving aborted the
-            # trim, the caller caught it, and the next run repeated it.
-            # Working memory then stayed over budget indefinitely while
-            # everything reported "archived" — so assert the observable
-            # effect instead of inferring it.
-            after = len(self._concepts)
-            if after >= before:
-                logger.error(
-                    "Spill reported %d concepts archived but working memory "
-                    "did not shrink (was %d, now %d). The concepts are on "
-                    "disk but still resident; the next spill will treat "
-                    "them as spillable again. This is a bug in "
-                    "_remove_spilled_from_working_memory.",
-                    spilled, before, after,
-                )
-            logger.info(
-                "Spilled %d dormant concepts to archive "
-                "(working: %d, archive: %d)",
-                spilled,
-                len(self._concepts),
-                archive_count,
+        to_spill = {cid for cid, _, _ in items}
+        # Archive edges involving spilled concepts.
+        if not self._archive_spilled_edges(to_spill):
+            return 0
+        # Remove from working memory (concepts + aliases, NOT
+        # edges). Only reached when the batch COMMIT succeeded —
+        # archive_concepts_batch is transactional, so spilled > 0
+        # means every item is on disk. If the archive write failed,
+        # the concepts must stay in working memory: removing them
+        # here would silently revert the spill to destructive
+        # pruning and lose the knowledge entirely.
+        self._remove_spilled_from_working_memory(to_spill)
+        try:
+            archive_count = self._archive.count()
+        except (sqlite3.Error, RuntimeError):
+            archive_count = -1
+
+        # Verify the spill actually happened rather than trusting the
+        # batch count. A spill that reports success but leaves
+        # working memory untouched is the failure mode that hid here
+        # for as long as the archive existed: the concepts were
+        # written, an exception during edge archiving aborted the
+        # trim, the caller caught it, and the next run repeated it.
+        # Working memory then stayed over budget indefinitely while
+        # everything reported "archived" — so assert the observable
+        # effect instead of inferring it.
+        after = len(self._concepts)
+        if after >= before:
+            logger.error(
+                "Spill reported %d concepts archived but working memory "
+                "did not shrink (was %d, now %d). The concepts are on "
+                "disk but still resident; the next spill will treat "
+                "them as spillable again. This is a bug in "
+                "_remove_spilled_from_working_memory.",
+                spilled, before, after,
             )
+        logger.info(
+            "Spilled %d dormant concepts to archive "
+            "(working: %d, archive: %d)",
+            spilled,
+            len(self._concepts),
+            archive_count,
+        )
 
         return spilled
+
     def _concept_to_dict(self, concept: Concept) -> dict[str, Any]:
         """Serialize a Concept to a dict for archiving."""
         return {

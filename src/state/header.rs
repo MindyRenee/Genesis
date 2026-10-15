@@ -27,6 +27,10 @@ pub const MAGIC: [u8; 4] = *b"GNSX";
 ///   stale. Migration from v2 to v3 initializes the 6 new chemicals
 ///   at defaults (in case they were zeroed by an older binary) and
 ///   fills the new coupling matrix rows/columns.
+/// - **v4**: inserts the persistent `IonState` ahead of the checksum
+///   (3416 bytes).
+/// - **v5**: inserts the sleep-wake network ahead of `ions` (3480
+///   bytes).
 pub const SCHEMA_VERSION: u32 = 5;
 
 /// Header for the memory-mapped core state.
@@ -67,8 +71,9 @@ pub struct CoreStateHeader {
     /// zero-initialized, which would write stack garbage into the
     /// mmap'd state file. The checksum covers bytes [0..40) (magic
     /// through heartbeat) and [48..checksum_offset) (instance_id
-    /// through manifest), so this field at offset 12 IS covered by
-    /// the CRC. Only `seq_lock` at offset 40..48 is excluded.
+    /// through the fields before the checksum), so this field at
+    /// offset 12 IS covered by the CRC. Only `seq_lock` at offset
+    /// 40..48 is excluded.
     pub _pad: [u8; 4],
     /// Milliseconds-timestamp when the state was first created.
     pub created_at: u64,

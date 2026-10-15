@@ -33,18 +33,12 @@ from __future__ import annotations
 
 import json
 import logging
-import os
+import queue
 import re
-import shutil
-import subprocess
 import threading
-import time
 from collections import deque
 from collections.abc import Callable
-from pathlib import Path
 from typing import Any
-
-from android_tools import find_termux_command
 
 __all__ = ["AmbientListener", "contains_wake_word", "strip_wake_word"]
 
@@ -236,16 +230,6 @@ class AmbientListener:
         (Vosk's VAD is conservative; our counter catches longer pauses
         that Vosk hasn't finalized yet).
         """
-        import queue
-
-# Android/Termux does not expose the Android microphone through
-        # the normal Linux ALSA/sounddevice path. Use Termux:API to obtain
-        # a short recording, then feed that PCM/WAV data to the same Vosk
-        # recognizer used by the desktop listener.
-        if find_termux_command("termux-microphone-record"):
-            self._listen_loop_android()
-            return
-
         # Same dlopen caveat as the speech path: sounddevice without
         # PortAudio raises OSError, and a listener that cannot open an
         # input device must stop cleanly rather than take the thread
@@ -264,57 +248,13 @@ class AmbientListener:
         # Thread-safe queue for final results from the audio callback
         final_queue: queue.Queue[str] = queue.Queue()
 
-        # Speech activity tracking (shared between callback and main loop)
-        speech_state = {"active": False, "last_partial": ""}
+        # Speech activity tracking (shared between callback and main loop);
+        # silence_blocks is the energy-gate counter (see _audio_callback).
+        speech_state = {"active": False, "last_partial": "", "silence_blocks": 0}
 
-        # Silence block counter for the energy gate (see audio_callback).
-        # Nonlocal inside the callback; reset to 0 on speech.
-        _silence_block_count = 0
-
-        import numpy as _np
-
-        def audio_callback(indata: bytes, frames: int, time_info: object, status: object) -> None:
-            """Process incoming audio: feed to Vosk and queue final results.
-
-            Energy-gates the audio: Vosk's AcceptWaveform runs full
-            neural network inference on every block, which is the
-            dominant CPU cost of the ambient listener (~20% of one
-            core). By computing a cheap RMS energy check first and
-            only feeding blocks above the silence threshold to Vosk,
-            we skip the expensive inference during silence (which is
-            the vast majority of the time for an always-on listener).
-            """
-            nonlocal _silence_block_count
-            data = indata.tobytes() if hasattr(indata, "tobytes") else bytes(indata)
-
-            # Mute the mic while she is speaking to prevent her from
-            # hearing her own TTS output and looping back.
-            if self._is_speaking is not None and self._is_speaking():
-                return
-
-            # Energy gate: compute RMS on the int16 samples and skip
-            # Vosk processing for silence. This avoids running the
-            # neural network on ~99% of blocks (silence), cutting
-            # the ambient listener's CPU usage dramatically.
-            samples = _np.frombuffer(data, dtype=_np.int16).astype(_np.float32)
-            rms = _np.sqrt(_np.mean(samples ** 2)) if len(samples) > 0 else 0.0
-            if rms < _SILENCE_RMS_THRESHOLD:
-                # Even in silence, we must call AcceptWaveform
-                # periodically so Vosk's internal VAD can finalize
-                # any pending utterance. Feed a zero block every ~1s
-                # (every 16th block at 64ms/block) to flush.
-                _silence_block_count += 1
-                if _silence_block_count % 16 != 0:
-                    return
-                data = b"\x00" * len(data)
-            else:
-                _silence_block_count = 0
-
-            # AcceptWaveform returns 1 when a final result is ready
-            if recognizer.AcceptWaveform(data):
-                self._handle_final_result(recognizer, final_queue)
-            # Track partial results for speech activity
-            self._track_partial(recognizer, speech_state)
+        audio_callback = self._make_audio_callback(
+            recognizer, final_queue, speech_state
+        )
 
         try:
             with sd.RawInputStream(
@@ -337,158 +277,58 @@ class AmbientListener:
             logger.exception(f"Ambient listener crashed: {e}")
             self._running = False
 
-    def _listen_loop_android(self) -> None:
-        """Capture Android microphone audio through Termux:API.
+    def _make_audio_callback(
+        self, recognizer, final_queue: queue.Queue[str], speech_state: dict
+    ):
+        """Build the sounddevice callback bound to this recognizer.
 
-        Termux:API records compressed Android audio (AAC/MPEG-4 by default).
-        We convert the completed recording to 16 kHz mono PCM/WAV with the
-        local ffmpeg binary, then decode it with the same Vosk model and emit
-        the resulting utterance. This is intentionally a bridge at the
-        sensor boundary; recognition remains Genesis's existing offline Vosk
-        path.
+        Process incoming audio: feed to Vosk and queue final results.
+
+        Energy-gates the audio: Vosk's AcceptWaveform runs full
+        neural network inference on every block, which is the
+        dominant CPU cost of the ambient listener (~20% of one
+        core). By computing a cheap RMS energy check first and
+        only feeding blocks above the silence threshold to Vosk,
+        we skip the expensive inference during silence (which is
+        the vast majority of the time for an always-on listener).
         """
-        import wave
+        import numpy as _np
 
-        from vosk import KaldiRecognizer
+        def audio_callback(
+            indata: bytes, frames: int, time_info: object, status: object
+        ) -> None:
+            data = indata.tobytes() if hasattr(indata, "tobytes") else bytes(indata)
 
-        command = find_termux_command("termux-microphone-record")
-        ffmpeg = shutil.which("ffmpeg")
-        if command is None or ffmpeg is None:
-            self._init_error = (
-                "Android microphone requires Termux:API and ffmpeg "
-                "for offline Vosk decoding"
-            )
-            self._running = False
-            return
-
-        data_dir = os.environ.get("GENESIS_DATA_DIR", str(Path.home() / ".genesis"))
-        output_dir = Path(data_dir) / "android_audio"
-        output_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-        source_path = output_dir / "ambient.m4a"
-        wav_path = output_dir / "ambient.wav"
-
-        while self._running:
+            # Mute the mic while she is speaking to prevent her from
+            # hearing her own TTS output and looping back.
             if self._is_speaking is not None and self._is_speaking():
-                threading.Event().wait(0.25)
-                continue
+                return
 
-            try:
-                proc = subprocess.run(
-                    [
-                        command,
-                        "-f",
-                        str(source_path),
-                        "-l",
-                        "2",
-                        "-r",
-                        str(self.sample_rate),
-                        "-c",
-                        "1",
-                    ],
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    timeout=10,
-                    check=False,
-                )
-                if proc.returncode != 0:
-                    logger.debug(
-                        "Android microphone start failed: %s",
-                        proc.stderr.strip(),
-                    )
-                    threading.Event().wait(0.5)
-                    continue
+            # Energy gate: compute RMS on the int16 samples and skip
+            # Vosk processing for silence. This avoids running the
+            # neural network on ~99% of blocks (silence), cutting
+            # the ambient listener's CPU usage dramatically.
+            samples = _np.frombuffer(data, dtype=_np.int16).astype(_np.float32)
+            rms = _np.sqrt(_np.mean(samples ** 2)) if len(samples) > 0 else 0.0
+            if rms < _SILENCE_RMS_THRESHOLD:
+                # Even in silence, we must call AcceptWaveform
+                # periodically so Vosk's internal VAD can finalize
+                # any pending utterance. Feed a zero block every ~1s
+                # (every 16th block at 64ms/block) to flush.
+                speech_state["silence_blocks"] += 1
+                if speech_state["silence_blocks"] % 16 != 0:
+                    return
+                data = b"\x00" * len(data)
+            else:
+                speech_state["silence_blocks"] = 0
 
-                # Termux:API starts recording asynchronously. The command
-                # returning only means the recorder accepted the request;
-                # the MPEG-4 container is not finalized until recording
-                # actually stops. Poll the API status before handing the
-                # file to ffmpeg, otherwise the container metadata can be
-                # incomplete and decoding races the recorder.
-                deadline = time.monotonic() + 5.0
-                while self._running and time.monotonic() < deadline:
-                    status = subprocess.run(
-                        [command, "-i"],
-                        stdin=subprocess.DEVNULL,
-                        capture_output=True,
-                        text=True,
-                        timeout=2,
-                        check=False,
-                    )
-                    if status.returncode == 0:
-                        try:
-                            info = json.loads(status.stdout)
-                        except json.JSONDecodeError:
-                            info = {}
-                        if not info.get("isRecording", False):
-                            break
-                    threading.Event().wait(0.1)
+            # AcceptWaveform returns 1 when a final result is ready
+            if recognizer.AcceptWaveform(data):
+                self._handle_final_result(recognizer, final_queue)
+            # Track partial results for speech activity
+            self._track_partial(recognizer, speech_state)
 
-                if not source_path.is_file():
-                    threading.Event().wait(0.5)
-                    continue
-
-                decode = subprocess.run(
-                    [
-                        ffmpeg,
-                        "-hide_banner",
-                        "-loglevel",
-                        "error",
-                        "-y",
-                        "-i",
-                        str(source_path),
-                        "-ar",
-                        str(self.sample_rate),
-                        "-ac",
-                        "1",
-                        "-f",
-                        "wav",
-                        str(wav_path),
-                    ],
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    timeout=10,
-                    check=False,
-                )
-                if decode.returncode != 0 or not wav_path.is_file():
-                    logger.debug(
-                        "Android microphone decode failed: %s",
-                        decode.stderr.strip(),
-                    )
-                    continue
-
-                with wave.open(str(wav_path), "rb") as audio:
-                    recognizer = KaldiRecognizer(
-                        self._vosk_model, audio.getframerate()
-                    )
-                    recognizer.SetWords(True)
-                    while True:
-                        frames = audio.readframes(4096)
-                        if not frames:
-                            break
-                        recognizer.AcceptWaveform(frames)
-                    result = json.loads(recognizer.FinalResult())
-                text = result.get("text", "").strip()
-                if text:
-                    self._emit(text)
-            except (
-                OSError,
-                subprocess.SubprocessError,
-                wave.Error,
-                json.JSONDecodeError,
-            ) as e:
-                logger.debug("Android microphone capture failed: %s", e)
-            finally:
-                for path in (source_path, wav_path):
-                    try:
-                        path.unlink()
-                    except FileNotFoundError:
-                        pass
-
-            threading.Event().wait(0.1)
+        return audio_callback
 
     def _handle_final_result(self, recognizer: Any, final_queue: Any) -> None:
         """Parse a final Vosk result and queue accepted text.

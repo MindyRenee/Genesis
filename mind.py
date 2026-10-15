@@ -52,7 +52,7 @@ from frontal_lobe.self import (
     SelfModel,
 )
 from frontal_lobe.tools.code_learner import CodeLearner
-from frontal_lobe.tools.explorer import Explorer
+from frontal_lobe.tools.explorer import Explorer, default_allowed_roots
 from limbic_system.limbic import LimbicSystem
 from occipital_lobe.occipital import OccipitalLobe
 from occipital_lobe.perception import FaceRecognizer
@@ -559,11 +559,15 @@ class Mind(
             project_root=str(code_root()),
         )
 
-        # Explorer — filesystem exploration for docs, config, text files
+        # Explorer — filesystem exploration for docs, config, text
+        # files. Owner-granted whole-machine read scope; credential
+        # material stays denied regardless (see explorer's sensitive
+        # lists). GENESIS_EXPLORE_ROOTS narrows it per deployment.
         self.explorer = Explorer(
             network=self.brain.frontal.network,
             project_root=str(self.code_learner.project_root),
             client=self.client,
+            allowed_roots=default_allowed_roots(),
         )
 
         # Bug reporter — scans its own code for issues and logs them.
@@ -746,6 +750,7 @@ class Mind(
         max_steps: int = 200,
         instructions: str = "this is a video game",
         web: bool = False,
+        fresh: bool = False,
     ) -> list[ArcResult]:
         """Play ARC-AGI-3 games as herself, in game mode.
 
@@ -755,10 +760,17 @@ class Mind(
         side of the run. Game mode wraps every game, and her readiness
         gate refuses or stops play, not the caller. Game mode is
         restored to whatever it was before the call.
+
+        ``fresh=True`` is the cold-start measurement: persisted world
+        learning is neither read nor written for the run's span, so
+        the result carries only what she brought as priors — and her
+        banked experience is left exactly as it was.
         """
         from world.arc import ArcPractice
 
         was_gaming = self.is_gaming
+        prev_fresh = getattr(self, "_fresh_world_run", False)
+        self._fresh_world_run = fresh
         self.enter_game_mode()
         try:
             if web:
@@ -777,13 +789,17 @@ class Mind(
         finally:
             if not was_gaming:
                 self.exit_game_mode()
+            self._fresh_world_run = prev_fresh
 
     def evaluate_arc(
         self, *, max_steps: int = 200, competition: bool = False,
+        fresh: bool = False,
     ) -> ArcEvaluation:
         from world.arc import ArcCompetition, ArcPractice
 
         was_gaming = self.is_gaming
+        prev_fresh = getattr(self, "_fresh_world_run", False)
+        self._fresh_world_run = fresh
         self.enter_game_mode()
         try:
             adapter = ArcCompetition(self) if competition else ArcPractice(self)
@@ -791,6 +807,7 @@ class Mind(
         finally:
             if not was_gaming:
                 self.exit_game_mode()
+            self._fresh_world_run = prev_fresh
 
     def _init_runtime_state(self) -> None:
         """Initialize runtime flags, thread handles, and live-thought listeners."""

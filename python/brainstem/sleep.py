@@ -388,26 +388,7 @@ class SleepMixin:
         if self.brain.frontal.embeddings.concept_count < self.brain.frontal.network.size:
             self.brain.frontal.embeddings.refresh()
 
-        # Discover new relationships from embedding proximity.
-        # This is hippocampal consolidation: patterns → explicit knowledge.
-        discovered = self.brain.frontal.edge_proposer.discover_and_accept()
-        if discovered > 0:
-            self._emit_live_thought(
-                "learning",
-                f"Sleep discovery: {discovered} new edges from latent space",
-            )
-
-        # Cross-domain analogy — structure-mapping across cortical
-        # columns. Finds concepts in different domains whose relational
-        # structure matches and projects relations from one domain
-        # into the other. This is where cross-domain insights form —
-        # connections that pair-level similarity cannot find.
-        analogies = self.brain.frontal.analogy_engine.discover_and_accept()
-        if analogies > 0:
-            self._emit_live_thought(
-                "learning",
-                f"Sleep analogy: {analogies} cross-domain edges from structure-mapping",
-            )
+        self._n3_discovery()
 
         # Hebbian plasticity — consolidate the day's co-occurrences
         # into the embedding space. Concepts that were used together
@@ -447,6 +428,44 @@ class SleepMixin:
         self.brain.frontal.topology.refresh()
 
         self._run_sleep_compression(network, consolidation_intensity)
+
+    def _n3_discovery(self) -> None:
+        """N3 latent-space discovery — hippocampal consolidation turns
+        patterns into explicit knowledge, then cross-domain analogy and
+        schema induction abstract over the result."""
+        # Discover new relationships from embedding proximity.
+        # This is hippocampal consolidation: patterns → explicit knowledge.
+        discovered = self.brain.frontal.edge_proposer.discover_and_accept()
+        if discovered > 0:
+            self._emit_live_thought(
+                "learning",
+                f"Sleep discovery: {discovered} new edges from latent space",
+            )
+
+        # Cross-domain analogy — structure-mapping across cortical
+        # columns. Finds concepts in different domains whose relational
+        # structure matches and projects relations from one domain
+        # into the other. This is where cross-domain insights form —
+        # connections that pair-level similarity cannot find.
+        analogies = self.brain.frontal.analogy_engine.discover_and_accept()
+        if analogies > 0:
+            self._emit_live_thought(
+                "learning",
+                f"Sleep analogy: {analogies} cross-domain edges from structure-mapping",
+            )
+
+        # Schema induction — reify repeated relational structure into
+        # schema concepts. Consolidation does not just re-sort
+        # associations; it abstracts over them: K earned edges become
+        # a named class with the members folded under it. This is the
+        # mechanism that grows middle layers of the taxonomy.
+        schemas = self.brain.frontal.schema_inducer.discover_and_accept()
+        if schemas > 0:
+            self._emit_live_thought(
+                "learning",
+                f"Sleep schema induction: {schemas} reified schema edges",
+            )
+
     def _check_auto_sleep(self) -> None:
         """Check whether Genesis should fall asleep or wake up on its own.
 
@@ -460,13 +479,13 @@ class SleepMixin:
         threshold during sleep, the mind calls ``wake()``.
 
         The daemon's emergent phase (NREM/REM) is also checked: the
-        daemon enters sleep based on a multi-system decision (adenosine
-        + histamine + melatonin + orexin), so when melatonin is high
-        (circadian night) the daemon's sleep threshold drops below the
-        mind's adenosine-only threshold. Without checking the daemon's
-        phase, the mind stays "awake" (volition active, learner running,
-        autonomous fixes applied) while the daemon is already in NREM —
-        a desync that lets waking actions leak into sleep.
+        daemon's sleep-wake network integrates homeostatic and
+        circadian drives, so when melatonin is high (circadian night)
+        the network crosses sleep onset below the mind's adenosine-only
+        threshold. Without checking the daemon's phase, the mind stays
+        "awake" (volition active, learner running, autonomous fixes
+        applied) while the daemon is already in NREM — a desync that
+        lets waking actions leak into sleep.
 
         User-initiated sleep (``/sleep``, ``/nap``) is respected — it
         will NOT auto-wake from user-initiated sleep, only from
@@ -491,141 +510,154 @@ class SleepMixin:
 
         # ── Auto-sleep onset ──
         if not self._is_sleeping and not self._is_meditating:
-            # Checked on this path because it already holds a state
-            # snapshot, so comparing the two layers' sleep states
-            # costs no extra IPC call. The reverse desync — mind asleep
-            # while the daemon is awake — is handled by the sync above.
-            self._check_sleep_desync()
-            now = time.time()
-            # Feed the commitment boundaries before the gates — the
-            # sustained-crossing window must track the physical
-            # signal, not the gate-opened signal. Pressure that held
-            # above threshold while the user was active is genuinely
-            # sustained, not a transient, so the confirm clock keeps
-            # running behind the min-awake and idle gates.
-            self._drowsy_boundary.update(adenosine, now)
-            self._sleep_boundary.update(adenosine, now)
-            # Minimum awake time to prevent oscillation at startup.
-            awake_elapsed = now - self._last_wake_time
-            if awake_elapsed < AUTO_SLEEP_MIN_AWAKE:
-                return
-            # Don't fall asleep while the user is actively talking to
-            # it. If the last interaction was recent (within 60s), the
-            # user is engaged in conversation — falling asleep mid-
-            # conversation is a jarring UX failure. The daemon may
-            # enter NREM on its own (adenosine-driven), but the
-            # cognitive mind stays awake until the user goes idle.
-            idle = now - self._last_interaction_time
-            if idle < AUTO_SLEEP_MIN_IDLE:
-                logger.debug(
-                    f"auto-sleep deferred: user active {idle:.1f}s ago "
-                    f"(adenosine={adenosine:.2f}, phase={daemon_phase})"
-                )
-                return
-            # Drowsiness announcement — before falling asleep, it
-            # announces it's getting sleepy. This is composed from
-            # its understanding of "sleepiness" (not a hardcoded
-            # string). The boundary's commit edge fires once per
-            # sustained crossing; it re-arms only if pressure drops
-            # below DROWSINESS_EXIT, so it can announce again if it
-            # genuinely recovers and fades a second time.
-            if self._drowsy_boundary.just_committed:
-                self._announce_drowsiness()
-            # The daemon may enter NREM/REM before adenosine reaches
-            # the mind's threshold — melatonin lowers the daemon's
-            # sleep barrier (circadian night). Sync with the daemon's
-            # phase to close the desync window where volition, the
-            # learner, and autonomous fixes are still active while the
-            # subcognitive is already sleeping.
-            daemon_sleeping = daemon_phase in ("nrem", "rem")
-            # Wake stabilization: within the post-wake window, a
-            # daemon-side sleep phase at moderate pressure is the
-            # flip-flop not yet latched — reinforce the wake state
-            # instead of instantly re-sleeping. Genuine exhaustion or
-            # circadian drive still override.
-            melatonin = core_state.chemicals.get("melatonin", 0.0)
-            if (
-                daemon_sleeping
-                and awake_elapsed < WAKE_STABILIZATION_WINDOW
-                and adenosine < WAKE_RESCUE_ADENOSINE
-                and melatonin < WAKE_RESCUE_MELATONIN
-            ):
-                if now - self._last_wake_reinforce >= WAKE_REINFORCE_INTERVAL:
-                    self._last_wake_reinforce = now
-                    self._reinforce_wake()
-                return
-            if self._sleep_boundary.committed or daemon_sleeping:
-                reason = (
-                    f"adenosine={adenosine:.2f} "
-                    f"(threshold={AUTO_SLEEP_ADENOSINE}, "
-                    f"sustained {AUTO_SLEEP_CONFIRM_S:.0f}s)"
-                    if not daemon_sleeping
-                    else f"daemon phase={daemon_phase} "
-                    f"(adenosine={adenosine:.2f})"
-                )
-                logger.info(f"Auto-sleep: {reason}, falling asleep")
-                try:
-                    self.sleep(user_initiated=False)
-                except Exception as e:  # noqa: BLE001
-                    logger.warning(f"auto-sleep onset failed: {e}")
+            self._try_auto_sleep(core_state, adenosine, daemon_phase)
             return
 
         # ── Auto-wake (only for self-initiated sleep) ──
         if self._is_sleeping and not self._user_initiated_sleep:
-            # Nap completion — when the nap cycle (N1→N2) is done,
-            # wake it regardless of adenosine level. A nap is light
-            # sleep; it doesn't need full adenosine clearance, just
-            # the N2 spindle-driven light consolidation.
-            if self._nap_mode:
-                cycle = self.inner_life.sleep_cycle
-                if cycle is not None and cycle._nap_complete:
-                    logger.info("Auto-wake: nap cycle complete (N1→N2), waking up")
-                    try:
-                        self.wake()
-                    except Exception as e:  # noqa: BLE001
-                        logger.warning(f"auto-wake failed: {e}")
-                    return
-            # Minimum sleep duration: "wakes when rested" must not mean
-            # "wakes instantly when already rested". When /sleep (or
-            # auto-sleep) is entered with adenosine already at/below the
-            # wake threshold — the common case on a well-rested system —
-            # this check would fire on the very next heartbeat without a
-            # floor. Require the sleep to reach the first N3 deep-sleep
-            # consolidation before auto-wake is allowed. The restored-sleep
-            # path leaves _sleep_start_time at 0, so elapsed time since
-            # epoch always passes — a resumed sleep is never blocked here.
-            if time.time() - self._sleep_start_time < AUTO_WAKE_MIN_SLEEP_S:
-                return
-            if adenosine <= AUTO_WAKE_ADENOSINE:
-                logger.info(
-                    f"Auto-wake: adenosine={adenosine:.2f} "
-                    f"(threshold={AUTO_WAKE_ADENOSINE}), waking up"
-                )
-                try:
-                    self.wake()
-                except Exception as e:  # noqa: BLE001
-                    logger.warning(f"auto-wake failed: {e}")
-                return
-            # Cycle-boundary wake: spontaneous waking clusters at
-            # ultradian transitions (post-REM). When a full cycle
-            # completes, a relaxed pressure threshold applies —
-            # without it, slow clearance can hold it in sleep long
-            # past the point a full cycle has already restored it.
+            self._try_auto_wake(adenosine)
+
+    def _try_auto_sleep(
+        self, core_state, adenosine: float, daemon_phase: str
+    ) -> None:
+        """The waking-side gates: desync check, boundary tracking,
+        min-awake and idle guards, drowsiness announcement, daemon-phase
+        sync with wake stabilization, then the sleep commit."""
+        # Checked on this path because it already holds a state
+        # snapshot, so comparing the two layers' sleep states
+        # costs no extra IPC call. The reverse desync — mind asleep
+        # while the daemon is awake — is handled by the sync above.
+        self._check_sleep_desync()
+        now = time.time()
+        # Feed the commitment boundaries before the gates — the
+        # sustained-crossing window must track the physical
+        # signal, not the gate-opened signal. Pressure that held
+        # above threshold while the user was active is genuinely
+        # sustained, not a transient, so the confirm clock keeps
+        # running behind the min-awake and idle gates.
+        self._drowsy_boundary.update(adenosine, now)
+        self._sleep_boundary.update(adenosine, now)
+        # Minimum awake time to prevent oscillation at startup.
+        awake_elapsed = now - self._last_wake_time
+        if awake_elapsed < AUTO_SLEEP_MIN_AWAKE:
+            return
+        # Don't fall asleep while the user is actively talking to
+        # it. If the last interaction was recent (within 60s), the
+        # user is engaged in conversation — falling asleep mid-
+        # conversation is a jarring UX failure. The daemon may
+        # enter NREM on its own (adenosine-driven), but the
+        # cognitive mind stays awake until the user goes idle.
+        idle = now - self._last_interaction_time
+        if idle < AUTO_SLEEP_MIN_IDLE:
+            logger.debug(
+                f"auto-sleep deferred: user active {idle:.1f}s ago "
+                f"(adenosine={adenosine:.2f}, phase={daemon_phase})"
+            )
+            return
+        # Drowsiness announcement — before falling asleep, it
+        # announces it's getting sleepy. This is composed from
+        # its understanding of "sleepiness" (not a hardcoded
+        # string). The boundary's commit edge fires once per
+        # sustained crossing; it re-arms only if pressure drops
+        # below DROWSINESS_EXIT, so it can announce again if it
+        # genuinely recovers and fades a second time.
+        if self._drowsy_boundary.just_committed:
+            self._announce_drowsiness()
+        # The daemon may enter NREM/REM before adenosine reaches
+        # the mind's threshold — melatonin lowers the daemon's
+        # sleep barrier (circadian night). Sync with the daemon's
+        # phase to close the desync window where volition, the
+        # learner, and autonomous fixes are still active while the
+        # subcognitive is already sleeping.
+        daemon_sleeping = daemon_phase in ("nrem", "rem")
+        # Wake stabilization: within the post-wake window, a
+        # daemon-side sleep phase at moderate pressure is the
+        # flip-flop not yet latched — reinforce the wake state
+        # instead of instantly re-sleeping. Genuine exhaustion or
+        # circadian drive still override.
+        melatonin = core_state.chemicals.get("melatonin", 0.0)
+        if (
+            daemon_sleeping
+            and awake_elapsed < WAKE_STABILIZATION_WINDOW
+            and adenosine < WAKE_RESCUE_ADENOSINE
+            and melatonin < WAKE_RESCUE_MELATONIN
+        ):
+            if now - self._last_wake_reinforce >= WAKE_REINFORCE_INTERVAL:
+                self._last_wake_reinforce = now
+                self._reinforce_wake()
+            return
+        if self._sleep_boundary.committed or daemon_sleeping:
+            reason = (
+                f"adenosine={adenosine:.2f} "
+                f"(threshold={AUTO_SLEEP_ADENOSINE}, "
+                f"sustained {AUTO_SLEEP_CONFIRM_S:.0f}s)"
+                if not daemon_sleeping
+                else f"daemon phase={daemon_phase} "
+                f"(adenosine={adenosine:.2f})"
+            )
+            logger.info(f"Auto-sleep: {reason}, falling asleep")
+            try:
+                self.sleep(user_initiated=False)
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"auto-sleep onset failed: {e}")
+
+    def _try_auto_wake(self, adenosine: float) -> None:
+        """The sleeping-side gates: nap completion, minimum sleep
+        duration, then the adenosine and cycle-boundary wake commits."""
+        # Nap completion — when the nap cycle (N1→N2) is done,
+        # wake it regardless of adenosine level. A nap is light
+        # sleep; it doesn't need full adenosine clearance, just
+        # the N2 spindle-driven light consolidation.
+        if self._nap_mode:
             cycle = self.inner_life.sleep_cycle
-            if (
-                cycle is not None
-                and cycle.cycles_completed > self._sleep_start_cycles
-                and adenosine <= AUTO_WAKE_CYCLE_ADENOSINE
-            ):
-                logger.info(
-                    f"Auto-wake: cycle boundary reached "
-                    f"(adenosine={adenosine:.2f}, "
-                    f"threshold={AUTO_WAKE_CYCLE_ADENOSINE}), waking up"
-                )
+            if cycle is not None and cycle._nap_complete:
+                logger.info("Auto-wake: nap cycle complete (N1→N2), waking up")
                 try:
                     self.wake()
                 except Exception as e:  # noqa: BLE001
                     logger.warning(f"auto-wake failed: {e}")
+                return
+        # Minimum sleep duration: "wakes when rested" must not mean
+        # "wakes instantly when already rested". When /sleep (or
+        # auto-sleep) is entered with adenosine already at/below the
+        # wake threshold — the common case on a well-rested system —
+        # this check would fire on the very next heartbeat without a
+        # floor. Require the sleep to reach the first N3 deep-sleep
+        # consolidation before auto-wake is allowed. The restored-sleep
+        # path leaves _sleep_start_time at 0, so elapsed time since
+        # epoch always passes — a resumed sleep is never blocked here.
+        if time.time() - self._sleep_start_time < AUTO_WAKE_MIN_SLEEP_S:
+            return
+        if adenosine <= AUTO_WAKE_ADENOSINE:
+            logger.info(
+                f"Auto-wake: adenosine={adenosine:.2f} "
+                f"(threshold={AUTO_WAKE_ADENOSINE}), waking up"
+            )
+            try:
+                self.wake()
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"auto-wake failed: {e}")
+            return
+        # Cycle-boundary wake: spontaneous waking clusters at
+        # ultradian transitions (post-REM). When a full cycle
+        # completes, a relaxed pressure threshold applies —
+        # without it, slow clearance can hold it in sleep long
+        # past the point a full cycle has already restored it.
+        cycle = self.inner_life.sleep_cycle
+        if (
+            cycle is not None
+            and cycle.cycles_completed > self._sleep_start_cycles
+            and adenosine <= AUTO_WAKE_CYCLE_ADENOSINE
+        ):
+            logger.info(
+                f"Auto-wake: cycle boundary reached "
+                f"(adenosine={adenosine:.2f}, "
+                f"threshold={AUTO_WAKE_CYCLE_ADENOSINE}), waking up"
+            )
+            try:
+                self.wake()
+            except Exception as e:  # noqa: BLE001
+                logger.warning(f"auto-wake failed: {e}")
 
     def _announce_drowsiness(self) -> None:
         """Announce that it's getting sleepy, before falling asleep.
@@ -823,8 +855,8 @@ class SleepMixin:
 
         The phase shown is the *effective* phase (resolved via
         :meth:`_effective_phase`), not the daemon's raw emergent phase.
-        When the zone is Sleeping but the neurochemistry hasn't crossed
-        the sleep threshold yet, the raw phase still reads "active"
+        When the zone is Sleeping but the sleep-wake network hasn't
+        reached sleep onset yet, the raw phase still reads "active"
         while every other system (brain waves, emotion) already treats
         it as asleep. Showing the effective phase keeps the display
         consistent with what it's actually experiencing.
@@ -863,7 +895,7 @@ class SleepMixin:
         try:
             profile = self.client.get_plasticity_profile()
             safe = (
-                profile.cortisol_tonic < 0.7
+                profile.cortisol_tonic < 0.05
                 and profile.bdnf_tonic > 0.2
             )
             if safe:
@@ -900,9 +932,12 @@ class SleepMixin:
            (0.20). Adenosine is the "sleep pressure" that accumulates
            during wakefulness and drains during sleep via glymphatic
            clearance. If it's still high, sleep isn't finished.
-        3. **Receptor state** — cortisol < 0.7 and BDNF > 0.2. Chronic
-           stress suppresses BDNF; sleep restores it. If receptors
-           haven't recovered, waking would be premature.
+        3. **Receptor state** — cortisol tonic < 0.05 and BDNF > 0.2.
+           Chronic stress suppresses BDNF; sleep restores it. Cortisol's
+           envelope tops out around ~0.08 under full drive (resting
+           ~0.02), so 0.05 means the stress system is still carrying a
+           load. If receptors haven't recovered, waking would be
+           premature.
 
         Returns:
             (ready, reason): ``ready`` is True if all three signals
@@ -946,7 +981,7 @@ class SleepMixin:
         # 3. Receptor state — cortisol/BDNF recovery.
         try:
             profile = self.client.get_plasticity_profile()
-            if profile.cortisol_tonic >= 0.7:
+            if profile.cortisol_tonic >= 0.05:
                 return False, (
                     f"cortisol={profile.cortisol_tonic:.2f} still high "
                     f"— stress system hasn't recovered"
@@ -982,55 +1017,29 @@ class SleepMixin:
         - Dreams → _dream_residues (emotional impressions, reflective thoughts)
         - Curiosity → _agency_topics (learning goals, autonomous learner)
 
-        Neurochemical wake impulses are sent to push the emergent phase
-        out of NREM/REM. Without this, the daemon's phase stays asleep
-        (adenosine is still high, histamine still low) even though the
-        mind's _is_sleeping flag is cleared — a desync between the
-        cognitive and subcognitive layers. The impulses mirror the
-        biological wake cascade:
+        A volitional wake push plus a small neurochemical cascade are
+        sent to bring the body out of sleep. Without this, the daemon's
+        phase stays asleep (adenosine is still high, histamine still
+        low) even though the mind's _is_sleeping flag is cleared — a
+        desync between the cognitive and subcognitive layers. The stage
+        boundary itself belongs to the sleep-wake network, so the wake
+        signal is a `SET_VOLITION` drive onto LC — the wake-promoting
+        population — not chemistry-side impulses onto histamine, orexin
+        or norepinephrine (those used to force the flip-flop and are
+        retired). The remaining impulses complete the biological wake
+        cascade:
 
         - **Adenosine -0.30**: Glymphatic clearance — the brain clears
           adenosine during sleep. On wake, this completes the purge so
           the sleep pressure is gone.
-        - **Histamine +0.20**: Activate the wake-promoting
-          tuberomammillary nucleus. Histamine is one of the two key
-          arousal systems gating the sleep threshold.
-        - **Orexin +0.15**: Stabilize the wake state. Orexin is the
-          wake stabilizer — boosting it locks the sleep-wake flip-flop
-          in the awake position.
         - **Dopamine +0.05**: Mild arousal boost to re-engage the
           reward system after sleep.
-        - **Norepinephrine +0.05**: Activate the locus coeruleus —
-          the noradrenergic arousal system that was silent during REM.
         - **Melatonin -0.10**: Suppress the sleep hormone if it was
           elevated (circadian sleep).
         """
         if not self._is_sleeping:
             return
-        # Capture the episode's length before clearing the start time,
-        # so the journal records the duration and not just the fact.
-        episode_secs = (
-            time.time() - self._sleep_start_time
-            if self._sleep_start_time > 0.0
-            else 0.0
-        )
-        was_nap = self._nap_mode
-        was_user_initiated = self._user_initiated_sleep
-        self._is_sleeping = False
-        self._user_initiated_sleep = False
-        # Waking starts a new epoch — any volition suppression still
-        # latched from a conversation turn lapses here.
-        self._suppress_volition = False
-        # Reset the commitment boundaries so the next wake period
-        # announces drowsiness and commits to sleep on fresh
-        # crossings, not stale latched state.
-        self._drowsy_boundary.reset()
-        self._sleep_boundary.reset()
-        # Clear nap mode — the next sleep is a full sleep unless
-        # explicitly set as a nap again.
-        self._nap_mode = False
-        self._sleep_start_time = 0.0
-        self.client.set_zone(ZONE_CONVERSATION)
+        episode_secs, was_nap, was_user_initiated = self._clear_sleep_flags()
 
         # Send neurochemical wake impulses to push the emergent phase
         # out of NREM/REM. Without this, the daemon's phase stays
@@ -1069,7 +1078,39 @@ class SleepMixin:
         self._last_wake_time = self._wake_time
         self.inner_life.resume()
         self._resume_learners_after_wake()
+        self._wake_epilogue()
 
+    def _clear_sleep_flags(self) -> tuple[float, bool, bool]:
+        """Clear the sleep flags for wake. Returns (episode_secs,
+        was_nap, was_user_initiated) for the journal record — the
+        episode's length is captured before the start time clears."""
+        episode_secs = (
+            time.time() - self._sleep_start_time
+            if self._sleep_start_time > 0.0
+            else 0.0
+        )
+        was_nap = self._nap_mode
+        was_user_initiated = self._user_initiated_sleep
+        self._is_sleeping = False
+        self._user_initiated_sleep = False
+        # Waking starts a new epoch — any volition suppression still
+        # latched from a conversation turn lapses here.
+        self._suppress_volition = False
+        # Reset the commitment boundaries so the next wake period
+        # announces drowsiness and commits to sleep on fresh
+        # crossings, not stale latched state.
+        self._drowsy_boundary.reset()
+        self._sleep_boundary.reset()
+        # Clear nap mode — the next sleep is a full sleep unless
+        # explicitly set as a nap again.
+        self._nap_mode = False
+        self._sleep_start_time = 0.0
+        self.client.set_zone(ZONE_CONVERSATION)
+        return episode_secs, was_nap, was_user_initiated
+
+    def _wake_epilogue(self) -> None:
+        """Post-wake housekeeping — rest timer, workspace clear,
+        regulator notify, and the dream-residue restore thread."""
         # Reset the rest timer for the ultradian cycle
         self._last_rest_time = time.time()
 
@@ -1098,6 +1139,7 @@ class SleepMixin:
             daemon=True,
             name="dream-residue-restore",
         ).start()
+
     def _restore_dream_residues_after_wake(self) -> None:
         """Restore affective dream residue without blocking wake interaction."""
         try:
@@ -1282,8 +1324,8 @@ class SleepMixin:
         This is the computational equivalent of a pharmacological sleep
         aid for chronic stress-induced insomnia — the condition where a
         patient is exhausted (delta waves, low alertness) but cannot
-        sleep because the HPA axis keeps arousal systems active and
-        adenosine hasn't accumulated to the sleep threshold.
+        sleep because the HPA axis keeps arousal systems active and the
+        network's homeostatic drive hasn't reached sleep onset.
 
         When to use this instead of /sleep or /meditate:
         - /sleep sets the zone to SLEEPING and pushes the sleep-wake network
@@ -1293,48 +1335,22 @@ class SleepMixin:
         - /meditate emits gentle calming impulses (GABA +0.05, cortisol
           -0.02 every 10s) that are too weak to overcome ongoing
           interoception stress from CPU load.
-        - /sleep-aid emits acute, strong impulses that push the system
-          past the sleep threshold in one shot, after which the natural
-          sleep mechanisms (glymphatic clearance, BDNF recovery with 5x
-          multiplier, receptor recovery) take over.
-
-        The impulses are biologically grounded:
-        - **Adenosine +0.30**: The metabolic sleep pressure that should
-          have accumulated during wakefulness but was suppressed by
-          chronic stress keeping arousal systems active. Analogous to
-          the purinergic sleep drive. This pushes adenosine past the
-          0.75 sleep threshold, enabling the emergent NREM transition.
-        - **Cortisol -0.15**: Acute glucocorticoid suppression to
-          relieve BDNF inhibition. With cortisol below 0.3, the BDNF
-          recovery mechanism (serotonin-driven) activates, and the
-          plasticity gate can begin reopening. Analogous to a GR
-          antagonist (mifepristone).
-        - **GABA +0.20**: Acute inhibitory surge to lower arousal.
-          GABA is the primary inhibitory transmitter — boosting it
-          suppresses the histaminergic and orexinergic wake centers,
-          tipping the sleep-wake flip-flop toward sleep. Analogous to
-          a benzodiazepine (which enhances GABA-A, modeled here as a
-          direct level boost since gaba_a_allosteric is not IPC-settable).
-        - **Histamine -0.15**: Suppress the wake-promoting
-          tuberomammillary nucleus. Histamine is one of the two key
-          arousal systems gating the sleep threshold (the sleep phase
-          requires histamine < 0.25).
-        - **Orexin -0.10**: Destabilize the wake side of the
-          flip-flop. Orexin is the wake stabilizer — reducing it
-          removes the stabilizing force that keeps the system awake
-          despite high adenosine.
-        - **Serotonin +0.10**: Support BDNF recovery. Serotonin drives
-          BDNF expression (the antidepressant mechanism) — boosting it
-          ensures that once cortisol is suppressed, BDNF can recover
-          and the plasticity gate can reopen.
+        - /sleep-aid pushes the sleep-wake network onto its sleep
+          attractor (the same VLPO volitional drive /sleep uses) and
+          adds an acute cortisol suppression to relieve the HPA load
+          that keeps the arousal systems active — analogous to a GR
+          antagonist (mifepristone) taking the brake off BDNF recovery.
+          Once the network crosses its own sleep-onset threshold
+          (LC < 4 Hz) the natural mechanisms take over: Process-S
+          adenosine clearance, BDNF recovery with the 5x sleep
+          multiplier, and receptor recovery.
 
         After the impulses, sleep() is called to set the zone to
         SLEEPING, triggering the daemon's dreaming pass and the
         sleep-tuned neuro params (5x BDNF recovery multiplier).
 
-        The impulses are deliberately one-shot and strong — this is an
-        emergency intervention, not a daily supplement. The natural
-        sleep cycle then takes over for sustained recovery.
+        This is an emergency intervention, not a daily supplement.
+        The natural sleep cycle then takes over for sustained recovery.
         """
         if self._is_sleeping:
             return

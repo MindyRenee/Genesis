@@ -719,13 +719,11 @@ def test_inner_life_gets_a_shutdown_budget_matching_its_longest_phase() -> None:
 
     from brainstem.lifecycle import LifecycleMixin
 
-    src = inspect.getsource(LifecycleMixin.stop)
-    assert "_SUBSYSTEM_STOP_TIMEOUTS" in src, (
-        "shutdown must give inner life a budget matched to its longest phase"
-    )
-    assert '"InnerLife": 45.0' in src, (
+    budgets = LifecycleMixin._SUBSYSTEM_STOP_TIMEOUTS
+    assert budgets["InnerLife"] >= 30.0, (
         "the inner-life budget must exceed an N3 consolidation pass"
     )
+    src = inspect.getsource(LifecycleMixin._stop_subsystems)
     # And the default must stay short, so other subsystems are not given
     # slack they never needed.
     assert ".get(name, 5.0)" in src, "the 5 s default must be preserved"

@@ -117,28 +117,24 @@ Acetylcholinesterase (AChE) degradation:
     but preserves the key property: ACh is the fastest-degrading
     neurotransmitter in the model.
 
-Cholinergic rebound during sleep:
-    During sustained NREM, ACh rebounds from its suppressed level
-    (~0.15-0.25) toward the REM threshold (0.50+). This is the
-    biological basis of the NREM->REM transition within the
-    ultradian cycle.
+Network-driven release (sleep):
+    The scripted cholinergic rebound is retired. When the sleep-wake
+    network is running, ACh is driven directly by the network's
+    populations (LC for waking, REM-on for REM) toward a linear
+    release target — the network, not a threshold latch, produces
+    the cholinergic rebound into REM:
 
-    During early NREM (adenosine still high, >0.65): ACh stays low
-    (0.20) for slow-wave sleep.
-    During late NREM (adenosine <= 0.65): ACh rebounds toward 0.65
-    to trigger the NREM->REM transition.
-    During REM: ACh is held at 0.65 to maintain the REM state.
+        ach_target = ACH_BASE + ACH_FROM_LC * lc + ACH_FROM_REM * rem
+        level relaxes toward target: level -> target - exp(-rate) * (target - level)
 
-    The cholinergic/aminergic flip-flop (Hobson & McCarley, 1975):
+    Steady states follow the microdialysis profile (Vazquez &
+    Baghdoyan, 2001): NREM 0.34, waking 0.58, REM 0.77 — the
+    cholinergic/aminergic flip-flop (Hobson & McCarley, 1975):
     REM-on cells (cholinergic) are active while REM-off cells
     (noradrenergic, serotonergic) are silenced.
 
-    ach_target = 0.65 if (adn < 0.65 or phase == REM) else 0.20
-    ach_rate = 0.001 * dt_scale
-    new_ach = ach_target - exp(-ach_rate) * (ach_target - current_ach)
-
-    The main loop skips ACh during sleep (when in rebound or REM)
-    so the homeostatic/coupling forces don't fight this mechanism.
+    While network-driven, the main loop skips ACh entirely (continue)
+    so the homeostatic/coupling forces don't fight the release target.
 
 GABA disinhibition:
     When GABA is very high (>0.8) AND ACh is high (>0.6), GABA
@@ -165,10 +161,10 @@ AChE degradation (excess-only):
     level -= ach_excess * (1 - decay_factor)
     where ACH_DEGRADATION_RATE = 0.03
 
-Cholinergic rebound (during sleep):
-    ach_target = 0.65 if (adn < 0.65 or phase == REM) else 0.20
-    ach_rate = 0.001 * dt_scale
-    new_ach = ach_target - exp(-ach_rate) * (ach_target - current_ach)
+Network release target (network-driven states):
+    ach_target = ACH_BASE + ACH_FROM_LC * lc + ACH_FROM_REM * rem
+    level -> ach_target - exp(-rate * dt_scale) * (ach_target - level)
+    steady states: NREM 0.34, waking 0.58, REM 0.77
 
 
 ════════════════════════════════════════════════════════════════════════
@@ -200,11 +196,13 @@ Arousal equation:
     (ACh weight = 0.15 — cortical activation)
 
 REM phase:
-    ACh > 0.50 (enter) / 0.40 (stay) + NE < 0.30 (enter) / 0.35 (stay)
-    (cholinergic high, aminergic low = dreaming)
+    Owned by the Rust sleep-wake network — REM-on firing above 3 Hz.
+    The chemistry-side ACh/NE REM gates are retired; the network's
+    drive produces the cholinergic-high, aminergic-silent REM profile
+    (ACh 0.77, NE ~0, serotonin 0.07).
 
 Flow phase:
-    DA > 0.65 + ACh > 0.50 + NE > 0.40 + CORT < 0.30
+    DA > 0.40 + ACh > 0.44 + NE > 0.40 + CORT < 0.30
 
 GABA disinhibition:
     ACh > 0.6 + GABA > 0.8 -> glutamate disinhibition

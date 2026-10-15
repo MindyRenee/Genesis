@@ -65,126 +65,99 @@ class ToolRegistry:
 
     def _register_builtins(self) -> None:
         """Register the built-in tools that ship with Genesis."""
-        self.register(
-            Tool(
+        for name, description, fn in (
+            (
                 "compile_python",
                 "Compile a Python file to check for syntax errors.",
                 compile_python_file,
-            )
-        )
-        self.register(
-            Tool(
+            ),
+            (
                 "run_pytest",
                 "Run pytest on a test file or directory and return the result.",
                 run_pytest,
-            )
-        )
-        self.register(
-            Tool(
+            ),
+            (
                 "read_file",
                 "Read the contents of a file for inspection.",
                 read_file,
-            )
-        )
-        self.register(
-            Tool(
+            ),
+            (
                 "analyze_python",
                 "Structural analysis of a Python file: symbols, call "
                 "edges, per-function cyclomatic complexity, imports, "
                 "and optional impact analysis for a named symbol. "
                 "Read-only.",
                 analyze_python_file,
-            )
-        )
-        self.register(
-            Tool(
+            ),
+            (
                 "write_file",
                 "Write content to a file, creating it and parent dirs if needed.",
                 write_file,
-            )
-        )
-        self.register(
-            Tool(
+            ),
+            (
                 "make_dir",
                 "Create a directory, including parents.",
                 make_dir,
-            )
-        )
-        self.register(
-            Tool(
+            ),
+            (
                 "list_dir",
                 "List the contents of a directory.",
                 list_dir,
-            )
-        )
-        self.register(
-            Tool(
+            ),
+            (
                 "delete_file",
                 "Delete a file (refuses to delete directories).",
                 delete_file,
-            )
-        )
-        self.register(
-            Tool(
+            ),
+            (
                 "move_file",
                 "Move or rename a file within the project root.",
                 move_file,
-            )
-        )
-        self.register(
-            Tool(
+            ),
+            (
                 "run_shell",
-                "Run a shell command sandboxed to the project root. "
+                "Run a shell command with the project root as cwd. "
                 "Blocked: sudo, rm -rf /, dd, mkfs, curl, wget, ssh. "
                 "Timeout: 30s default, 120s max.",
                 run_shell,
-            )
-        )
-        self.register(
-            Tool(
+            ),
+            (
                 "concept_lookup",
                 "Look up a concept in the knowledge network and describe it.",
                 concept_lookup,
-            )
-        )
-        self.register(
-            Tool(
+            ),
+            (
                 "web_search",
                 "Search the web for a query and return result URLs. "
                 "Read-only. Adult/malware content is blocked. "
                 "Use this when it doesn't know something and wants "
                 "to look it up — in conversation, for fun, or to learn.",
                 web_search,
-            )
-        )
-        self.register(
-            Tool(
+            ),
+            (
                 "web_fetch",
                 "Fetch a web page and extract its readable text. "
                 "Read-only GET. Adult/malware URLs are refused. "
                 "Use after web_search to read a specific result page.",
                 web_fetch,
-            )
-        )
-        self.register(
-            Tool(
+            ),
+            (
                 "sense_cpu",
                 "Feel her own CPU effort — governor, clock speed, how many "
                 "cores she is allowed to use, and whether she can move the "
                 "governor. Read-only proprioception of the machine body.",
                 sense_cpu,
-            )
-        )
-        self.register(
-            Tool(
+            ),
+            (
                 "set_cpu_effort",
                 "Change how hard her own process works: 'slow' pins her to "
                 "one core and idles her disk I/O, 'fast' restores every core "
                 "and normal I/O, 'auto' leaves scheduling alone. Reversible "
                 "in both directions — never a one-way door.",
                 set_cpu_effort,
-            )
-        )
+            ),
+        ):
+            self.register(Tool(name, description, fn))
 
     def register(self, tool: Tool) -> None:
         """Add a tool to the registry, keyed by its name."""
@@ -551,7 +524,7 @@ def move_file(
         return ToolResult(success=False, error=str(e))
 
 
-# ─── Shell tool (sandboxed) ───────────────────────────────────────────
+# ─── Shell tool (cwd-bounded) ─────────────────────────────────────────
 
 
 # Commands that are always blocked — too dangerous for autonomous use.
@@ -588,12 +561,12 @@ def run_shell(
     project_root: str = ".",
     timeout: int = 30,
 ) -> ToolResult:
-    """Run a shell command sandboxed to `project_root`.
+    """Run a shell command with `project_root` as its working directory.
 
-    The command runs with `cwd=project_root` so it can only affect
-    files in that directory (assuming the command itself doesn't
-    escape via absolute paths — but destructive absolute-path
-    commands are blocked below).
+    This is cwd-bounded, not an OS sandbox: the command can still name
+    absolute paths or start interpreters. Callers that expose this to
+    autonomous behavior must policy-gate the command shape first (the
+    acting loop only admits internally built measurement commands).
 
     Safety guards:
     - Blocked patterns: ``rm -rf /``, ``sudo``, ``dd``, ``mkfs``,

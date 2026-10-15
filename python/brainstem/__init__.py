@@ -379,6 +379,12 @@ _EXPORTS: dict[str, str] = {
     # cognitive modulation (attention / integration / consolidation)
     "IonCognitiveContext": "brainstem.electrochemistry",
     "interpret_ions": "brainstem.electrochemistry",
+    # The substrate interface — the machine's own physical dynamics
+    # (throughput/jitter/P-states/interrupts, and the acoustic
+    # self-emission) read as wave-oscillator stimulus
+    "apply_field_stimulus": "brainstem.field_probe",
+    "field_phase_lock": "brainstem.field_probe",
+    "apply_audio_stimulus": "brainstem.field_audio",
     # The proto-self — Damasio's primordial self is rooted in the
     # brainstem's body-mapping nuclei (NTS, parabrachial, PAG,
     # reticular formation): the first map of "how the organism is"

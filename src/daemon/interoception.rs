@@ -3284,7 +3284,7 @@ fn read_throttle_state() -> f32 {
 /// Cumulative jiffies spent at the maximum P-state and across all
 /// P-states, summed over cores from cpufreq stats/time_in_state.
 /// Returns (top, all). (0, 0) if cpufreq stats are unavailable.
-fn read_time_in_state() -> (u64, u64) {
+pub(crate) fn read_time_in_state() -> (u64, u64) {
     let mut top = 0u64;
     let mut all = 0u64;
     let Ok(entries) = fs::read_dir("/sys/devices/system/cpu") else {

@@ -309,7 +309,7 @@ fn compute_compact_tag(full_tag: &[f32; LTM_TAG_SIZE]) -> [f32; 4] {
     let glu_excess = (glu - 0.70).max(0.0);
     let da_srt_synergy = da * srt * 0.10;
     let valence = da * 0.25 + srt * 0.25 + oxy * 0.10 + end * 0.15 + ne * 0.10
-        - cort * 0.35
+        - crate::state::neurochemical::cortisol_stress_fraction(cort) * 0.35
         - glu_excess * 0.15
         + da_srt_synergy;
 

@@ -6,6 +6,7 @@ derivable-edge rejection, and the ConceptNetwork wiring that makes
 ``_edges`` a materialized view of the log.
 """
 
+import contextlib
 import json
 
 from temporal_lobe.concepts.edge_log import (
@@ -569,8 +570,6 @@ def test_network_does_not_mutate_weight_when_canonical_write_fails(monkeypatch):
 
     network._edge_log = FailingLog()
     before = edge.weight
-    try:
+    with contextlib.suppress(OSError):
         network.set_edge_weight("a", "b", RelationType.IS_A, 0.9)
-    except OSError:
-        pass
     assert edge.weight == before

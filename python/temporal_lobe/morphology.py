@@ -535,6 +535,101 @@ def hedge_verb_phrase(verb_phrase: str) -> str:
 
 # ─── Copula ─────────────────────────────────────────────────────
 
+# English prepositions — a closed grammatical class. A verb phrase
+# ending in one ("is characterized by", "has to do with") licenses a
+# noun complement only: it cannot take a bare adjective.
+PREPOSITIONS = frozenset({
+    "to", "from", "of", "on", "in", "with", "by", "for", "at",
+    "toward", "towards", "into", "onto", "upon", "against",
+    "as", "like", "before", "after",
+})
+
+# Verb lemmas that license an adjectival complement — copulas and
+# copular verbs of perception/state ("seems", "remains").
+COPULAR_STARTERS = frozenset({
+    "is", "are", "am", "was", "were", "be", "been", "being",
+    "seems", "seem", "appears", "appear", "feels", "feel",
+    "looks", "look", "remains", "remain", "becomes", "become",
+    "stays", "stay", "sounds", "sound", "tastes", "taste",
+    "smells", "smell", "grows", "grow", "turns", "turn",
+})
+
+
+def is_copular_frame(verb_phrase: str) -> bool:
+    """True when a verb phrase licenses an adjectival complement.
+
+    Copular frames ("is", "seems", "looks") and possessive-property
+    frames ending in "being" ("has the property of being") accept
+    bare adjectives; transitive verbs ("has", "wears", "contains")
+    do not.
+    """
+    words = verb_phrase.lower().split()
+    return bool(words) and (
+        words[0] in COPULAR_STARTERS or words[-1] in {"being", "been"}
+    )
+
+
+def ends_in_preposition(verb_phrase: str) -> bool:
+    """True when a verb phrase's last word is a preposition — it
+    requires a noun complement ("is characterized by fur", never
+    "is characterized by clear")."""
+    words = verb_phrase.lower().split()
+    return bool(words) and words[-1] in PREPOSITIONS
+
+
+# Determiners and quantifiers that mark a noun object: a has_property
+# object opening with one takes "has" ("it has two wings", "it has
+# the trait"), while a bare property word takes the copula.
+_PROPERTY_OBJECT_OPENERS = frozenset({
+    "a", "an", "the", "my", "its", "our", "their", "his", "her",
+    "your", "this", "that", "these", "those", "some", "any", "no",
+    "each", "every", "either", "neither", "another", "few", "many",
+    "much", "more", "most", "several", "both", "plenty", "lots",
+    "enough",
+})
+
+
+def property_verb_phrase(object_text: str) -> str:
+    """Choose "is" or "has" for a has_property edge by object form.
+
+    has_property conflates two English frames — "X is clear"
+    (adjectival property) and "X has fur" (noun object). Determined,
+    quantified, or plural objects take "has"; bare property words
+    take the copula. Without this, composition produces "it is
+    characterized by clear" or "it has clear" — neither is English.
+    """
+    words = object_text.lower().split()
+    if not words:
+        return "is"
+    if (
+        is_plural_np(object_text)
+        or words[0] in _PROPERTY_OBJECT_OPENERS
+        or words[0][0].isdigit()
+    ):
+        return "has"
+    return "is"
+
+
+def property_verb_candidates(
+    object_text: str, candidates: list[str]
+) -> list[str]:
+    """Filter verb candidates for a has_property edge to those whose
+    complement license fits the object. Always non-empty.
+
+    Noun objects ("fur", "two wings") accept any learned verb —
+    transitive and copular-by-preposition frames both work. Bare
+    property words ("clear", "purple") accept only copular frames
+    that do not end in a preposition, so "is characterized by" is
+    dropped and "is" / "has the property of being" survive.
+    """
+    if property_verb_phrase(object_text) == "has":
+        return candidates or ["has"]
+    copular = [
+        v for v in candidates
+        if is_copular_frame(v) and not ends_in_preposition(v)
+    ]
+    return copular or ["is"]
+
 
 def is_plural_np(text: str) -> bool:
     """Return True if a noun phrase is plural.

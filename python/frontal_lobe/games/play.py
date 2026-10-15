@@ -29,7 +29,10 @@ import random
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .sorter import ShapeSorter
 
 from parietal_lobe.grid import Grid
 
@@ -726,20 +729,10 @@ def normalize_offered(raw: Any, fallback_name: str) -> dict | None:
         task.update(spec)
         return task
     if family == "assembly":
-        gen = raw.get("generate")
-        if not isinstance(gen, dict):
+        spec = _assembly_spec(raw)
+        if spec is None:
             return None
-        try:
-            rows, cols = int(gen["rows"]), int(gen["cols"])
-        except (KeyError, TypeError, ValueError):
-            return None
-        if not (1 <= rows <= 8 and 1 <= cols <= 8):
-            return None
-        task["generate"] = {
-            "rows": rows,
-            "cols": cols,
-            "seed": gen.get("seed"),
-        }
+        task.update(spec)
         return task
     if family == "relations":
         spec = _relations_spec(raw)
@@ -760,38 +753,59 @@ def normalize_offered(raw: Any, fallback_name: str) -> dict | None:
         task.update(spec)
         return task
     if family == "system":
-        # An offered system game may only name an executable inside
-        # the system game directories — an offer can't point her at
-        # arbitrary programs.
-        raw_cmd = str(raw.get("command", "")).strip()
-        exe = Path(raw_cmd).resolve() if raw_cmd else None
-        allowed = exe is not None and any(
-            str(exe).startswith(str(Path(d).resolve()) + os.sep)
-            for d in _SYSTEM_GAME_DIRS
-        )
-        if (
-            exe is None or not allowed
-            or not exe.is_file() or not os.access(exe, os.X_OK)
-        ):
+        spec = _system_offered(raw)
+        if spec is None:
             return None
-        task.update({
-            "command": str(exe),
-            "actions": [
-                str(a) for a in raw.get("actions") or _SYSTEM_ACTIONS
-            ],
-        })
-        for opt in (
-            "cell_px", "max_steps", "time_budget",
-            "title_pattern", "key_hold", "start_keys",
-            "instructions", "goal",
-        ):
-            if raw.get(opt) is not None:
-                task[opt] = raw[opt]
-        observe = _normalize_observe(raw.get("observe"))
-        if observe is not None:
-            task["observe"] = observe
+        task.update(spec)
         return task
     return None
+
+
+def _assembly_spec(raw: dict) -> dict | None:
+    gen = raw.get("generate")
+    if not isinstance(gen, dict):
+        return None
+    try:
+        rows, cols = int(gen["rows"]), int(gen["cols"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not (1 <= rows <= 8 and 1 <= cols <= 8):
+        return None
+    return {"generate": {"rows": rows, "cols": cols, "seed": gen.get("seed")}}
+
+
+def _system_offered(raw: dict) -> dict | None:
+    """An offered system game may only name an executable inside the
+    system game directories — an offer can't point her at arbitrary
+    programs."""
+    raw_cmd = str(raw.get("command", "")).strip()
+    exe = Path(raw_cmd).resolve() if raw_cmd else None
+    allowed = exe is not None and any(
+        str(exe).startswith(str(Path(d).resolve()) + os.sep)
+        for d in _SYSTEM_GAME_DIRS
+    )
+    if (
+        exe is None or not allowed
+        or not exe.is_file() or not os.access(exe, os.X_OK)
+    ):
+        return None
+    spec: dict[str, Any] = {
+        "command": str(exe),
+        "actions": [
+            str(a) for a in raw.get("actions") or _SYSTEM_ACTIONS
+        ],
+    }
+    for opt in (
+        "cell_px", "max_steps", "time_budget",
+        "title_pattern", "key_hold", "start_keys",
+        "instructions", "goal",
+    ):
+        if raw.get(opt) is not None:
+            spec[opt] = raw[opt]
+    observe = _normalize_observe(raw.get("observe"))
+    if observe is not None:
+        spec["observe"] = observe
+    return spec
 
 
 def _normalize_observe(raw: Any) -> dict | None:
@@ -1254,38 +1268,7 @@ class GamePlay:
         self.attempts[name] = self.attempts.get(name, 0) + 1
         self.mastery[name] = max(self.mastery.get(name, 0.0), score)
 
-        # Learn from the miss: rules that verified on the training
-        # pairs but guessed wrong on test are proven counterexamples —
-        # record them so the next attempt can't walk the same path.
-        # When nothing verified, the best near-miss is recorded so a
-        # retry pushes past it rather than stalling on it again.
-        failure = ""
-        if not solved:
-            proven_wrong = list(sol.verified_rules)
-            if sol.hypothesis is not None:
-                proven_wrong.append(sol.hypothesis.describe())
-            known = self.failed.setdefault(name, [])
-            for rule in proven_wrong:
-                if rule not in known:
-                    known.append(rule)
-            del known[32:]
-            # Learn from the observed wrong answer, not just its rule
-            # spelling. Different hypotheses can be behaviorally equivalent
-            # on the held-out test; the next attempt must move past that
-            # prediction without excluding the whole transform family.
-            bad_predictions = self.failed_predictions.setdefault(name, [])
-            for guesses in sol.guesses:
-                key = reasoner.prediction_key(guesses)
-                if key not in bad_predictions:
-                    bad_predictions.append(key)
-            del bad_predictions[32:]
-            if sol.verified_rules:
-                failure = (
-                    f"overfit: {sol.verified_rules[0]} verified on "
-                    f"train but missed test"
-                )
-            elif sol.failure is not None:
-                failure = sol.failure.describe()
+        failure = "" if solved else self._record_miss(name, sol, reasoner)
         self._save()
         try:
             # The held-out test is the external verifier: only its
@@ -1314,21 +1297,53 @@ class GamePlay:
             failure=failure,
         )
 
+    def _record_miss(
+        self, name: str, sol: Any, reasoner: SpatialReasoner
+    ) -> str:
+        """Learn from the miss: rules that verified on the training
+        pairs but guessed wrong on test are proven counterexamples —
+        record them so the next attempt can't walk the same path.
+        When nothing verified, the best near-miss is recorded so a
+        retry pushes past it rather than stalling on it again.
+        Returns the failure summary."""
+        proven_wrong = list(sol.verified_rules)
+        if sol.hypothesis is not None:
+            proven_wrong.append(sol.hypothesis.describe())
+        known = self.failed.setdefault(name, [])
+        for rule in proven_wrong:
+            if rule not in known:
+                known.append(rule)
+        del known[32:]
+        # Learn from the observed wrong answer, not just its rule
+        # spelling. Different hypotheses can be behaviorally equivalent
+        # on the held-out test; the next attempt must move past that
+        # prediction without excluding the whole transform family.
+        bad_predictions = self.failed_predictions.setdefault(name, [])
+        for guesses in sol.guesses:
+            key = reasoner.prediction_key(guesses)
+            if key not in bad_predictions:
+                bad_predictions.append(key)
+        del bad_predictions[32:]
+        if sol.verified_rules:
+            return (
+                f"overfit: {sol.verified_rules[0]} verified on "
+                f"train but missed test"
+            )
+        if sol.failure is not None:
+            return sol.failure.describe()
+        return ""
+
     def _attempt_sorter(
         self, task: dict, reasoner: SpatialReasoner
     ) -> GameAttempt:
         """One sorter episode through the competence substrate."""
         from .sorter import (
-            Block,
             PerceptualSorter,
             PerceptualSorterAgent,
-            ShapeSorter,
-            Slot,
             SorterAgent,
         )
 
         name = str(task["name"])
-        gen = task.get("generate")
         # A "perceptual" sorter is seen, not read: the world renders
         # its pieces and apertures, the oracle stops leaking `matched`
         # on candidates, and the agent learns seen-similarity→cost
@@ -1337,46 +1352,7 @@ class GamePlay:
         perceptual = (
             bool(task.get("perceptual")) and self.cortex is not None
         )
-        if gen:
-            seed = gen.get("seed")
-            base = ShapeSorter.generate(
-                int(gen["slots"]),
-                random.Random(
-                    seed if seed is not None else random.randrange(2**30)
-                ),
-                difficulty=int(gen["difficulty"]),
-                decoys=int(gen["decoys"]),
-                has_lid=bool(gen.get("lid", True)),
-            )
-            sorter: ShapeSorter = base
-            if perceptual:
-                sorter = PerceptualSorter(
-                    base.slots,
-                    [*base.pool.values(), *base.in_top],
-                    has_lid=base.has_lid,
-                    cortex=self.cortex,
-                    seed=hash(name) & 0x7FFFFFFF,
-                )
-        else:
-            sorter = ShapeSorter(
-                [
-                    Slot(i, tuple(sorted(s.items())))
-                    for i, s in enumerate(task["slots"])
-                ],
-                [
-                    Block(i, tuple(sorted(b.items())))
-                    for i, b in enumerate(task["blocks"])
-                ],
-                has_lid=bool(task.get("lid", True)),
-            )
-            if perceptual:
-                sorter = PerceptualSorter(
-                    sorter.slots,
-                    [*sorter.pool.values(), *sorter.in_top],
-                    has_lid=sorter.has_lid,
-                    cortex=self.cortex,
-                    seed=hash(name) & 0x7FFFFFFF,
-                )
+        sorter = self._build_sorter(task, perceptual, name)
         # A fresh agent each attempt — cross-attempt learning lives
         # in the shared task competence, so skills earned on earlier
         # sorters (and structurally similar tasks) apply as priors.
@@ -1433,6 +1409,55 @@ class GamePlay:
             family="sorter",
             details={"placements": placements} if placements else {},
         )
+
+    def _build_sorter(
+        self, task: dict, perceptual: bool, name: str
+    ) -> ShapeSorter:
+        """Instantiate the sorter — generated or literal spec — wrapped
+        in PerceptualSorter when the cortex is wired."""
+        from .sorter import Block, PerceptualSorter, ShapeSorter, Slot
+
+        gen = task.get("generate")
+        if gen:
+            seed = gen.get("seed")
+            base = ShapeSorter.generate(
+                int(gen["slots"]),
+                random.Random(
+                    seed if seed is not None else random.randrange(2**30)
+                ),
+                difficulty=int(gen["difficulty"]),
+                decoys=int(gen["decoys"]),
+                has_lid=bool(gen.get("lid", True)),
+            )
+            if not perceptual:
+                return base
+            return PerceptualSorter(
+                base.slots,
+                [*base.pool.values(), *base.in_top],
+                has_lid=base.has_lid,
+                cortex=self.cortex,
+                seed=hash(name) & 0x7FFFFFFF,
+            )
+        sorter = ShapeSorter(
+            [
+                Slot(i, tuple(sorted(s.items())))
+                for i, s in enumerate(task["slots"])
+            ],
+            [
+                Block(i, tuple(sorted(b.items())))
+                for i, b in enumerate(task["blocks"])
+            ],
+            has_lid=bool(task.get("lid", True)),
+        )
+        if perceptual:
+            sorter = PerceptualSorter(
+                sorter.slots,
+                [*sorter.pool.values(), *sorter.in_top],
+                has_lid=sorter.has_lid,
+                cortex=self.cortex,
+                seed=hash(name) & 0x7FFFFFFF,
+            )
+        return sorter
 
     def _attempt_sequence(
         self, task: dict, reasoner: SpatialReasoner
@@ -1784,8 +1809,6 @@ class GamePlay:
         game directories — an offered spec can't name arbitrary
         programs.
         """
-        from .windowed import X11Game
-
         name = str(task["name"])
         raw_cmd = str(task.get("command", ""))
         exe = Path(raw_cmd).resolve()
@@ -1798,22 +1821,7 @@ class GamePlay:
             or not exe.is_file() or not os.access(exe, os.X_OK)
         ):
             return None
-        env = self._system_envs.get(name)
-        if env is None or env.command != [str(exe)]:
-            env = X11Game(
-                [str(exe)],
-                title_pattern=str(task.get("title_pattern") or name),
-                actions=[
-                    str(a) for a in task.get("actions") or _SYSTEM_ACTIONS
-                ],
-                cell_px=int(task.get("cell_px", 12)),
-                key_hold=float(task.get("key_hold", 0.35)),
-                start_keys=[
-                    str(k) for k in task.get("start_keys") or []
-                ],
-                observe=task.get("observe"),
-            )
-            self._system_envs[name] = env
+        env = self._system_env(task, name, exe)
         max_steps = int(task.get("max_steps", 300))
         res = None
         try:
@@ -1886,6 +1894,28 @@ class GamePlay:
                 "goal": str(task.get("goal", "")),
             },
         )
+
+    def _system_env(self, task: dict, name: str, exe: Path) -> Any:
+        """Get or create the windowed environment for this system game."""
+        from .windowed import X11Game
+
+        env = self._system_envs.get(name)
+        if env is None or env.command != [str(exe)]:
+            env = X11Game(
+                [str(exe)],
+                title_pattern=str(task.get("title_pattern") or name),
+                actions=[
+                    str(a) for a in task.get("actions") or _SYSTEM_ACTIONS
+                ],
+                cell_px=int(task.get("cell_px", 12)),
+                key_hold=float(task.get("key_hold", 0.35)),
+                start_keys=[
+                    str(k) for k in task.get("start_keys") or []
+                ],
+                observe=task.get("observe"),
+            )
+            self._system_envs[name] = env
+        return env
 
     def status(self) -> dict[str, float]:
         """Mastery per game — how good she's gotten at each."""

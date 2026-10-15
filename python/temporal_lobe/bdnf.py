@@ -96,13 +96,14 @@ SPECIAL DYNAMICS
 ════════════════════════════════════════════════════════════════════════
 
 BDNF recovery after stress:
-    When cortisol has dropped below 0.3 (stress is over) and BDNF
-    is still below its baseline (depleted by chronic stress), BDNF
-    gets a recovery boost proportional to the serotonin level.
-    Serotonin drives BDNF expression — this is why SSRIs help
-    depression (increasing serotonin promotes BDNF recovery).
+    When cortisol has cleared below the stress-phase gate (0.06 —
+    stress is over) and BDNF is still below its baseline (depleted
+    by chronic stress), BDNF gets a recovery boost proportional to
+    the serotonin level. Serotonin drives BDNF expression — this is
+    why SSRIs help depression (increasing serotonin promotes BDNF
+    recovery).
 
-    if cort_level < 0.3 and bdnf_level < bdnf_baseline:
+    if cort_level < 0.06 and bdnf_level < bdnf_baseline:
         recovery = srt_level * bdnf_recovery_rate * dt_scale
         bdnf_level += recovery
 

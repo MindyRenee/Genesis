@@ -35,9 +35,13 @@ wakefulness and is cleared by the glymphatic system during sleep.
 RECEPTOR ADAPTATION MULTIPLIER
 ════════════════════════════════════════════════════════════════════════
 
-    multiplier = 1.0
+    multiplier = 0.3
 
-Adenosine receptors adapt at the baseline reference rate.
+The somnogenic receptor is A1, which resists downregulation — A1Rs
+are not readily phosphorylated and internalize slowly (half-life of
+several hours), where A2A/A2B downregulate in under an hour
+(Klaasse et al., 2008). The slow multiplier keeps effective adenosine
+from collapsing under chronic sleep pressure.
 
 
 ════════════════════════════════════════════════════════════════════════
@@ -117,38 +121,41 @@ Sleep pressure mechanism (Process S):
         Biological default: r' = 0.055/h (τ = 18.2 hours), derived
         from EEG slow-wave activity buildup during wakefulness.
 
-    During SLEEP (NREM/REM):
-        The glymphatic system directly clears adenosine from the
-        extracellular space:
+    During SLEEP (NREM/REM — the network's stage, or the mind's
+    Sleeping zone):
+        The glymphatic system clears adenosine toward its lower
+        asymptote exponentially (Daan, Beersma & Borbély, 1984):
 
-        level -= adenosine_clearance_rate * dt_scale
+        S(t+dt) = L + exp(-dt_hours / chi_s) * (S(t) - L)
 
-        Biological default: 0.000002/tick at 10Hz → ~7.6 hours to
-        clear from 0.75 back to 0.20, matching the human ~8h sleep
-        period (Porkka-Heiskanen et al., 1997).
+        where:
+            L = 0.20 (lower asymptote, the resting baseline)
+            chi_s = 4.2 h — the clearance time constant fitted from
+                    the exponential decline of EEG slow-wave activity
+                    across baseline and post-deprivation sleep
+
+        The earlier linear decrement is retired: it made the two
+        directions asymmetric and could not reach the cholinergic
+        rebound the REM stage needs (REM occupancy measured 0%).
+        Exponential clearance crosses 0.90 → 0.65 in ~1.9 h, inside
+        the first NREM bouts.
 
     The main loop SKIPS adenosine during sleep (continue) so the
     homeostatic/coupling forces don't crash the level to the
     resting baseline (0.20) in seconds, overriding the slow
     (hours-timescale) glymphatic clearance.
 
-Exhaustion override:
-    When raw adenosine (metabolic sleep pressure) is extreme
-    (>0.90), force sleep regardless of histamine or orexin. This
-    is the "passing out from exhaustion" mechanism — in humans,
-    extreme sleep deprivation eventually overcomes all arousal
-    systems (Borbély & Achermann, 1999).
-
-    if adn_raw > 0.90:
-        return NREM (or REM if already in REM with ACh > 0.40, NE < 0.35)
-
-    This prevents the fatal feedback trap where receptor burnout
-    suppresses effective adenosine so much that sleep can never be
-    entered, trapping the system awake without recovery.
+Sleep onset is network-owned:
+    There is no adenosine exhaustion override. Sleep onset and the
+    NREM/REM stages are decided by the sourced sleep-wake network
+    (ModelDB 244485) in the Rust substrate — LC firing below 4 Hz is
+    sleep onset — and injected into the phase. Adenosine is the
+    homeostatic pressure *signal* the mind reads for voluntary sleep
+    and drowsiness, not the body's sleep gate.
 
 No baseline adaptation:
     Adenosine has its own dedicated sleep-pressure mechanism that
-    directly modifies its baseline. The general baseline adaptation
+    directly manages its level. The general baseline adaptation
     would fight with that mechanism, so it is skipped.
 
 
@@ -168,7 +175,9 @@ Sleep pressure (wakefulness — saturating exponential):
         dt_hours = dt_scale * DT / 3600
 
 Glymphatic clearance (sleep):
-    level -= clearance_rate * dt_scale
+    S(t+dt) = L + exp(-dt_hours / chi_s) * (S(t) - L)
+    where:
+        L = 0.20, chi_s = 4.2 h
 
 Effective level, coupling force, vesicular pool, tonic/phasic,
 receptor adaptation: same general formulas as dopamine.py.
@@ -202,24 +211,20 @@ Arousal equation (sleep promoter):
     weighted more than GABA because adenosine is the primary
     homeostatic sleep drive)
 
-Sleep phase:
-    adn > sleep_adn (0.75 enter / 0.65 stay, modulated by MEL and OX)
-    + hist < sleep_hist (0.25 enter / 0.38 stay)
+Sleep stages (NREM/REM):
+    Owned by the Rust sleep-wake network, not this layer. The
+    chemistry-side adenosine/histamine sleep gates are retired;
+    the network's LC firing below 4 Hz is sleep onset.
 
-    The adenosine signal uses a 50/50 blend of effective (receptor-
-    mediated) and raw (metabolic) levels:
+    The adenosine signal still blends effective (receptor-mediated)
+    and raw (metabolic) levels for the *waking* classifier:
     adn = adn_eff * 0.5 + adn_raw * 0.5
 
-    This ensures that extreme sleep pressure (raw adenosine > 0.90)
-    can still trigger sleep even when receptor sensitivity is at
-    floor (0.50), preventing the feedback trap where receptor
-    burnout makes sleep impossible.
+    so high metabolic pressure gates Drowsy even when receptor
+    sensitivity is at floor.
 
 Drowsy phase:
     adn > 0.50 (enter) / 0.40 (stay) + arousal < 0.30 (enter) / 0.46 (stay)
-
-Exhaustion override:
-    if adn_raw > 0.90: force NREM (or REM if already in REM)
 
 
 ════════════════════════════════════════════════════════════════════════
@@ -261,7 +266,7 @@ class Adenosine:
     index: int = CHEM_ADENOSINE
     name: str = "adenosine"
     baseline: float = 0.20
-    receptor_adaptation_multiplier: float = 1.0
+    receptor_adaptation_multiplier: float = 0.3
     receptor_subtypes: tuple[str, str] = ("A1", "A2A")
     receptor_subtype_balance: tuple[float, float] = (1.0, 1.0)
     max_impulse: float = 0.1
@@ -271,8 +276,8 @@ class Adenosine:
     brain_waves: tuple[str, ...] = ("delta", "theta")
     circadian_modifier: str = "1.0 (no circadian modulation)"
     role: str = "sleep pressure, Process S, glymphatic clearance"
-    accumulation_rate: float = 0.055  # per hour (biological default)
-    clearance_rate: float = 0.000002  # per tick at 10Hz (biological default)
+    accumulation_rate: float = 0.055  # per hour (biological default, tau = 18.2 h)
+    clearance_tau_hours: float = 4.2  # chi_s, Daan/Beersma/Borbély 1984
     activity_coupling: float = 0.5
     upper_asymptote: float = 0.95
-    exhaustion_threshold: float = 0.90
+    lower_asymptote: float = 0.20

@@ -13,7 +13,7 @@
 //! - **Versioned**: magic bytes + schema version detect format mismatches.
 //! - **Checksummed**: CRC32 detects corruption from crashes mid-write.
 //!
-//! ## Schema v4 layout (3416 bytes)
+//! ## Schema v5 layout (3480 bytes)
 //!
 //! ```text
 //! offset  field             type                size
@@ -23,26 +23,27 @@
 //! 2472    zones             ActiveZones          96
 //! 2568    memory            MemoryPointers      120
 //! 2688    manifest          RuntimeManifest     536
-//! 3224    ions              IonState            124
-//! 3348    checksum          u32                   4
-//! 3352    inference_signals InferenceSignals      64
-//! 3416    TOTAL                                  3416 bytes
+//! 3224    sleep_network     SleepState           64
+//! 3288    ions              IonState            124
+//! 3412    checksum          u32                   4
+//! 3416    inference_signals InferenceSignals      64
+//! 3480    TOTAL                                  3480 bytes
 //! ```
 //!
-//! Schema v4 inserted `ions` ahead of the checksum, so every field
-//! after `manifest` moved and a v3 file cannot be reinterpreted in
-//! place — `legacy_v3::GenesisCoreStateV3` decodes it and converts.
-//! The ion block sits *inside* the CRC32 region because resting
-//! concentrations, gradients and membrane potential are authoritative
-//! state, not derived: dropping them would reset the cell's resting
-//! state on every restart.
+//! Schema v5 inserted the sleep-wake network ahead of `ions`. Schema
+//! v4 had inserted `ions` ahead of the checksum, so both v3 and v4
+//! files are decoded through their byte-exact legacy types and widened
+//! rather than reinterpreted in place. The sleep network and ion block
+//! sit *inside* the CRC32 region because they are authoritative state,
+//! not derived: dropping them would reset the body's sleep pressure or
+//! the cell's resting state on every restart.
 //!
-//! That's ~3.3 KB — fits in a single 4 KB page with room to spare.
+//! That's ~3.4 KB — fits in a single 4 KB page with room to spare.
 //!
-//! The tail is a reserve sized to exactly `size_of::<InferenceSignals>()`
-//! so that adding a signal field cannot shift anything else. Such a
-//! growth is a *size* migration, not a version one: see
-//! [`GenesisCoreState::migrate_layout`].
+//! The tail is `inference_signals`, sized to exactly
+//! `size_of::<InferenceSignals>()` so that adding a signal field
+//! cannot shift anything else. Such a growth is a *size* migration,
+//! not a version one: see [`GenesisCoreState::migrate_layout`].
 //!
 //! ## What's new in v3
 //!
@@ -94,38 +95,36 @@ use super::header::{CoreStateHeader, SCHEMA_VERSION};
 use super::inference::InferenceSignals;
 use super::ions::IonState;
 use super::manifest::RuntimeManifest;
-use super::sleep_network::{INITIAL as SLEEP_INITIAL, State as SleepState};
 use super::memory::MemoryPointers;
 use super::neurochemical::{NeuroTickParams, NeurochemicalId, NeurochemicalVector};
+use super::sleep_network::{INITIAL as SLEEP_INITIAL, State as SleepState};
 use super::zones::{ActiveZones, CognitiveZone, MentalPhase};
 
 use core::sync::atomic::{AtomicU64, Ordering, fence};
 
-/// Reserved bytes at the end of the struct for future expansion
-/// within schema v3 (does not require a version bump). The
-/// [`InferenceSignals`] struct occupies this space — it is 64 bytes,
-/// matching the reserved region exactly.
+/// Size of the [`InferenceSignals`] tail. The field began as the
+/// schema-v3 reserved region (which let it grow without a version
+/// bump), and it still occupies exactly 64 bytes at the end of the
+/// struct.
 ///
-/// The reserve is defined as exactly `size_of::<InferenceSignals>()`
-/// (asserted at the bottom of this file) so that adding a signal field
-/// cannot shift any other field's offset. It is *not* padded out to the
-/// struct's own size: `inference_signals` starts at 3352 (after the ion
-/// block and the checksum that schema v4 inserted ahead of it) and ends
-/// at 3352 + 64 = 3416, which is the struct's size exactly.
+/// `inference_signals` now starts at 3416, after the checksum that
+/// follows the schema-v5 sleep network and schema-v4 ion block, and
+/// ends at 3416 + 64 = 3480, which is the struct's size exactly.
 pub const RESERVED_BYTES: usize = 64;
 
 /// The struct size under schema v3 before [`InferenceSignals`] gained
 /// `policy_authority` — that field took the reserve from 60 to 64 bytes
 /// and the struct from 3288 to 3296.
 ///
-/// This is a *size* migration, not a version one: the schema label
-/// stayed at 3 deliberately, because the reserve exists precisely so
-/// that growing the signals block does not move any other field. A v3
-/// state file written before the field existed therefore carries
-/// `version = 3` but `state_size = 3288`, and [`GenesisCoreState::verify`]
-/// reports [`CoreStateError::SizeMismatch`] — a variant that
+/// This was a *size* migration, not a version one: the schema label
+/// stayed at 3 deliberately, because the reserve existed precisely so
+/// that growing the signals block would not move any other field. A v3
+/// state file written before the field existed therefore carried
+/// `version = 3` but `state_size = 3288`, and the v3 verifier reported
+/// [`CoreStateError::SizeMismatch`] — a variant that
 /// [`GenesisCoreState::migrate_state`] never sees, because it dispatches
-/// on version. [`GenesisCoreState::migrate_layout`] handles it.
+/// on version. [`GenesisCoreState::migrate_layout`] retains the
+/// same-version growth path.
 pub const LEGACY_SIZE: u32 = 3288;
 
 /// CRC32 polynomial (IEEE 802.3 — same as zlib / PNG).
@@ -486,21 +485,20 @@ impl GenesisCoreState {
     ///
     /// [`Self::migrate_state`] dispatches on `header.version`, so it
     /// cannot help a file whose version label is already correct but
-    /// whose `header.state_size` predates a layout change. That is the
-    /// case the reserve was meant to make harmless: adding a field to
-    /// [`InferenceSignals`] grows the reserve, which grows the struct,
-    /// and no other field moves. The version stays 3, so
-    /// [`Self::verify`] gets past its version check and fails on size
-    /// instead.
+    /// whose `header.state_size` predates a same-version layout growth.
+    /// This preserves the path the schema-v3 reserve was designed for:
+    /// adding a field at the end of [`InferenceSignals`] grew only the
+    /// signals tail, so no earlier field moved and the version stayed
+    /// unchanged.
     ///
-    /// The one layout change handled here is the 3288 → 3296 growth
-    /// from `InferenceSignals::policy_authority`. Because every
-    /// [`InferenceSignals`] field kept its offset and only one was
+    /// The one historical layout change handled here is the 3288 →
+    /// 3296 growth from `InferenceSignals::policy_authority`. Because
+    /// every [`InferenceSignals`] field kept its offset and only one was
     /// appended at the end, the migration is: zero the new tail, record
-    /// the new size, and recompute the checksum. Nothing before
-    /// `inference_signals` is touched, so the header, the 18
-    /// neurochemicals, the zones, memory pointers and manifest all
-    /// survive intact.
+    /// the current size, and recompute the checksum. Nothing before
+    /// `inference_signals` is touched, so the header, neurochemicals,
+    /// zones, memory pointers, manifest, sleep network, and ions all
+    /// survive intact in a same-version snapshot.
     ///
     /// Zeroing is the correct value rather than merely a safe one:
     /// `policy_authority` is the authority cognition grants the
@@ -538,21 +536,21 @@ impl GenesisCoreState {
         Ok(())
     }
 
-    /// Zero the alignment padding between the end of `inference_signals`
-    /// and [`Self::SIZE`].
+    /// Zero the padding, if any, between the end of
+    /// `inference_signals` and [`Self::SIZE`].
     ///
-    /// The CRC covers offsets 0..40 and 48..`checksum`, so the padding
+    /// The CRC covers offsets 0..40 and 48..`checksum`, so such padding
     /// is outside every integrity check — but it is inside `SIZE`, and
     /// `open()` copies the whole struct out of the mapping with
-    /// `read_volatile`. Leaving it stale would make the migrated file
-    /// differ byte-for-byte between machines for no reason. It also
-    /// guarantees `policy_authority` reads as 0.0 rather than as
-    /// whatever an older binary left at that offset.
+    /// `read_volatile`. Leaving it stale would make a migrated file
+    /// differ byte-for-byte between machines for no reason. Under the
+    /// current layout the signals block ends exactly at `SIZE`, so
+    /// this is a no-op retained for same-version tail growth.
     ///
     /// # Panics
     ///
     /// Debug builds only: if the signals block no longer ends at or
-    /// before [`Self::SIZE`], the reserve and the struct have drifted
+    /// before [`Self::SIZE`], the tail and the struct have drifted
     /// apart and the range computed below would be meaningless.
     pub fn write_end_tail(&mut self) {
         let base = self as *mut Self as *mut u8;
@@ -577,12 +575,12 @@ impl GenesisCoreState {
     ///
     /// The checksum covers two regions:
     /// 1. offset 0..40 (magic through heartbeat)
-    /// 2. offset 48..`checksum` (instance_id through manifest end)
+    /// 2. offset 48..`checksum` (instance_id through the field before
+    ///    the checksum)
     ///
     /// `header.seq_lock` (offset 40..48) is excluded because it changes
-    /// on every write, making the checksum unstable.
-    /// `_reserved` (now `inference_signals`) and `checksum` at the
-    /// end are excluded.
+    /// on every write, making the checksum unstable. `checksum` and
+    /// `inference_signals` at the end are excluded.
     pub fn compute_checksum(&self) -> u32 {
         let ptr = self as *const Self as *const u8;
         // Anchor to the field's actual offset rather than deriving it
@@ -604,7 +602,8 @@ impl GenesisCoreState {
             // Both lengths are ≥ 0 and their end offsets are ≤ SIZE.
             // Region 1: offset 0..40 (magic through heartbeat, before seq_lock)
             let r1 = core::slice::from_raw_parts(ptr, 40);
-            // Region 2: offset 48..checksum_offset (instance_id through manifest)
+            // Region 2: offset 48..checksum_offset (instance_id through
+            // the fields before the checksum)
             let r2 = core::slice::from_raw_parts(ptr.add(48), checksum_offset - 48);
             (r1, r2)
         };
@@ -957,10 +956,8 @@ const _: () = {
         "InferenceSignals must exactly fill the reserved region"
     );
     // The signals block must end inside the struct, or `write_end_tail`
-    // would compute a range outside it. Today it ends 4 bytes short of
-    // `SIZE` — the struct's 8-byte alignment — and that padding is the
-    // only slack left, which is why the reserve must never exceed the
-    // signals size (asserted above).
+    // would compute a range outside it. Under schema v5 it ends exactly
+    // at `SIZE`, leaving no padding tail.
     assert!(
         offset_of!(GenesisCoreState, inference_signals) + RESERVED_BYTES <= GenesisCoreState::SIZE
     );

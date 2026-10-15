@@ -206,6 +206,12 @@ impl MemoryPointers {
         cortisol_eff: f32,
         bdnf_eff: f32,
     ) {
+        // Cortisol is used throughout this function as a fraction of
+        // its reachable envelope (~0.02 rest, ~0.08 peak — see
+        // CORTISOL_PEAK_LEVEL): against the raw level every cortisol
+        // term here could move by only a few percent.
+        let cort_stress = crate::state::neurochemical::cortisol_stress_fraction(cortisol_eff);
+
         // Encoding: reward salience (DA) + novelty (NE) + signal-to-noise (ACh)
         self.encoding_weight = crate::state::sanitize::finite_clamp(
             dopamine_eff * 0.4 + norepinephrine_eff * 0.3 + acetylcholine_eff * 0.3,
@@ -219,7 +225,7 @@ impl MemoryPointers {
         // formation), ACh boosts encoding quality, and there's a baseline so
         // consolidation never fully stops.
         self.consolidation_weight = crate::state::sanitize::finite_clamp(
-            cortisol_eff * 0.3 + acetylcholine_eff * 0.4 + 0.3,
+            cort_stress * 0.3 + acetylcholine_eff * 0.4 + 0.3,
             0.0,
             1.0,
         );
@@ -237,14 +243,15 @@ impl MemoryPointers {
         // (de Quervain et al., 2009). Weights normalized to sum to 1.0:
         // ACh 0.40 + SRT 0.25 + CORT 0.35 = 1.0.
         self.retrieval_weight = crate::state::sanitize::finite_clamp(
-            acetylcholine_eff * 0.40 + serotonin_eff * 0.25 + (1.0 - cortisol_eff) * 0.35,
+            acetylcholine_eff * 0.40 + serotonin_eff * 0.25 + (1.0 - cort_stress) * 0.35,
             0.0,
             1.0,
         );
 
-        // Plasticity: BDNF promotes, cortisol suppresses
+        // Plasticity: BDNF promotes, cortisol suppresses (same
+        // envelope-normalized stress fraction as recompute_derived).
         self.plasticity_gate =
-            crate::state::sanitize::finite_clamp(bdnf_eff * (1.0 - cortisol_eff * 0.5), 0.0, 1.0);
+            crate::state::sanitize::finite_clamp(bdnf_eff * (1.0 - cort_stress * 0.5), 0.0, 1.0);
     }
 
     /// Whether the system can form new long-term memories right now.

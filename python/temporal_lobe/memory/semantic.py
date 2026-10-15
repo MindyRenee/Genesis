@@ -920,7 +920,7 @@ class SemanticMemory:
         # not become generic facts in the concept network (e.g. "name
         # is_a Y" creates the backwards definition "Y is a name").
         # The user's actual name is tracked by the memory system /
-        # cognition layer (MemorySystem.learn_user_fact, _recognize_bonded_user).
+        # cognition layer (MemorySystem.learn_user_fact, _recognize_speaker).
         # We intentionally do not store it as a semantic fact here.
 
         # "my X is Y" → has_property(X, Y). Captures "my favorite

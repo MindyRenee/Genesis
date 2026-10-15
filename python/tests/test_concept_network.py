@@ -937,12 +937,13 @@ def test_cortical_tick_decay() -> None:
     net = ConceptNetwork()
     net.add_concept("alpha", confidence=0.8)
     net.add_concept("beta", confidence=0.8)
-    # No edges — no spreading, only decay
-    _c(net, "alpha").activation = 0.9
-    _c(net, "beta").activation = 0.5
+    # No edges — no spreading, only decay. Below the sustain
+    # threshold the field is still dissipative.
+    _c(net, "alpha").activation = 0.2
+    _c(net, "beta").activation = 0.15
 
     initial_alpha = _c(net, "alpha").activation
-    net.cortical_tick(arousal=0.3, gaba=0.5, ach=0.1, serotonin=0.5, noise=0.0)
+    net.cortical_tick(arousal=0.3, gaba=0.5, ach=0.0, serotonin=0.5, noise=0.0)
     after_alpha = _c(net, "alpha").activation
     assert after_alpha < initial_alpha, "activation should decay"
 
@@ -1098,15 +1099,16 @@ def test_cortical_tick_stability() -> None:
 
 
 def test_utterance_words_provenance() -> None:
-    """Utterance word retrieval exposes seed vs learned provenance."""
+    """Acquired utterance words attach to the hub as learned, not seed."""
     net = ConceptNetwork()
     from temporal_lobe.vocabulary import Vocabulary
-    Vocabulary(seed=42, network=net)  # seeds utterance words into net
+    vocab = Vocabulary(seed=42, network=net)  # creates hubs, no words
+    vocab.acquire_utterance_words("hello", "greeting")
 
     items = net.find_utterance_words_with_provenance("greeting_word")
-    assert items, "expected seeded greeting words"
+    assert items, "expected acquired greeting words"
     for item in items:
-        assert item.is_seed, f"seeded utterance should be marked as seed: {item}"
+        assert not item.is_seed, f"acquired utterance should be learned: {item}"
 
 
 # ======================================================================
@@ -3806,7 +3808,10 @@ class TestConcurrentConceptMutation:
             while not stop.is_set():
                 try:
                     net.add_concept(f"learned_{n}", confidence=0.6)
-                except BaseException as e:  # noqa: BLE001
+                except (Exception, KeyboardInterrupt, SystemExit) as e:  # noqa: BLE001
+                    # Soak harness: any fault class the network leaks —
+                    # including interpreter-level ones — is recorded so
+                    # the assertion can name it. Not a silent swallow.
                     errors.append(e)
                     return
                 n += 1
@@ -3817,7 +3822,8 @@ class TestConcurrentConceptMutation:
         try:
             for _ in range(iterations):
                 scan()
-        except BaseException as e:  # noqa: BLE001
+        except (Exception, KeyboardInterrupt, SystemExit) as e:  # noqa: BLE001
+            # Same: the point is to record every leak, whatever its type.
             errors.append(e)
         finally:
             stop.set()

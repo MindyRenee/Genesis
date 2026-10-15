@@ -232,65 +232,19 @@ def create_project(
     Returns:
         A ProjectResult describing what was created.
     """
-    # Internal namespaced IDs (``python:…``, ``_cat:…``, ``skill:…``)
-    # are code/utterance/task machinery, not knowledge topics. Letting
-    # one through fuses the namespace into a garbage package name
-    # (``_cat:cause:guarded_cortisol`` → ``catcauseguarded_cortisol``)
-    # and leaks internals into user-facing projects.
-    if ":" in description.strip():
-        logger.debug(
-            f"create_project: refusing internal symbol topic "
-            f"{description!r}"
-        )
-        return ProjectResult(
-            name="",
-            path="",
-            error="internal symbol",
-        )
+    refused = _refuse_internal_topic(description)
+    if refused is not None:
+        return refused
 
     name = _sanitize_name(description)
     projects_root = str(Path(data_dir) / "projects")
+    refused = _refuse_existing(name, description, projects_root)
+    if refused is not None:
+        return refused
 
-    # If a project about this exact topic already exists, don't create
-    # a duplicate. The old behavior appended _2, _3, _4 … producing
-    # modes, modes_2, modes_3, modes_4, modes_5, modes_6, modes_7,
-    # modes_8 — eight copies of the same project. That's not creative
-    # output, it's a loop. It should pick a different topic instead.
-    # The caller (_pick_creation_topic) is responsible for filtering
-    # already-built topics, but this is a safety net.
-    if Path(projects_root, name).exists():
-        logger.debug(
-            f"create_project: '{name}' already exists, skipping "
-            f"(topic: {description!r})"
-        )
-        return ProjectResult(
-            name=name,
-            path=str(Path(projects_root, name)),
-            error="already exists",
-        )
+    result = ProjectResult(name=name, path=str(Path(projects_root) / name))
 
-    project_root = str(Path(projects_root) / name)
-
-    result = ProjectResult(name=name, path=project_root)
-    tools = get_tools()
-
-    # Gather what it knows about the topic from its concept network.
-    # This is the raw material the composer works with — its actual
-    # concepts, definitions, and typed edges.
-    knowledge = gather_knowledge(description, network)
-
-    if knowledge is not None:
-        # Compose real content from its knowledge.
-        main_py = compose_main_module(name, description, knowledge)
-        test_py = compose_test_module(name, knowledge)
-        readme = compose_readme(name, description, knowledge)
-    else:
-        # Fallback scaffold — it doesn't know enough about this topic
-        # to compose a knowledge base. Keep it minimal but valid.
-        knowledge = None
-        main_py = _scaffold_main(name, description)
-        test_py = _scaffold_test(name)
-        readme = _scaffold_readme(name, description)
+    main_py, test_py, readme = _compose_contents(name, description, network)
 
     # Create the directory structure and files
     files_to_write: list[tuple[str, str]] = [
@@ -305,7 +259,70 @@ def create_project(
     ]
 
     return _write_and_verify(
-        result, tools, name, projects_root, files_to_write,
+        result, get_tools(), name, projects_root, files_to_write,
+    )
+
+
+def _refuse_internal_topic(description: str) -> ProjectResult | None:
+    """Internal namespaced IDs (``python:…``, ``_cat:…``, ``skill:…``)
+    are code/utterance/task machinery, not knowledge topics. Letting
+    one through fuses the namespace into a garbage package name
+    (``_cat:cause:guarded_cortisol`` → ``catcauseguarded_cortisol``)
+    and leaks internals into user-facing projects."""
+    if ":" in description.strip():
+        logger.debug(
+            f"create_project: refusing internal symbol topic "
+            f"{description!r}"
+        )
+        return ProjectResult(
+            name="",
+            path="",
+            error="internal symbol",
+        )
+    return None
+
+
+def _refuse_existing(
+    name: str, description: str, projects_root: str
+) -> ProjectResult | None:
+    """If a project about this exact topic already exists, don't create
+    a duplicate. The old behavior appended _2, _3, _4 … producing
+    modes, modes_2, modes_3, modes_4, modes_5, modes_6, modes_7,
+    modes_8 — eight copies of the same project. That's not creative
+    output, it's a loop. It should pick a different topic instead.
+    The caller (_pick_creation_topic) is responsible for filtering
+    already-built topics, but this is a safety net."""
+    if Path(projects_root, name).exists():
+        logger.debug(
+            f"create_project: '{name}' already exists, skipping "
+            f"(topic: {description!r})"
+        )
+        return ProjectResult(
+            name=name,
+            path=str(Path(projects_root, name)),
+            error="already exists",
+        )
+    return None
+
+
+def _compose_contents(
+    name: str, description: str, network: ConceptNetwork | None
+) -> tuple[str, str, str]:
+    """Gather what it knows about the topic from its concept network —
+    the raw material the composer works with — and compose real
+    content from it. If it doesn't know enough, fall back to a
+    minimal but valid scaffold."""
+    knowledge = gather_knowledge(description, network)
+    if knowledge is not None:
+        return (
+            compose_main_module(name, description, knowledge),
+            compose_test_module(name, knowledge),
+            compose_readme(name, description, knowledge),
+        )
+    return (
+        _scaffold_main(name, description),
+        _scaffold_test(name),
+        _scaffold_readme(name, description),
     )
 
 

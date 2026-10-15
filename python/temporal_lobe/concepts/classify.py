@@ -315,6 +315,8 @@ def _infer_concept_origin(concept_id: str) -> str:
         return "code"
     if concept_id.startswith("identity:"):
         return "identity"
+    if concept_id.startswith("_gen:"):
+        return "reified"
     return "conversation"
 def _strip_prefix(cid: str, prefixes: tuple[str, ...] = ("python:", "rust:")) -> str:
     """Strip a known prefix from a concept ID, if present."""
@@ -376,6 +378,10 @@ _CODE_PREFIXES: tuple[str, ...] = (
 )
 _STRUCTURAL_PREFIXES: tuple[str, ...] = (
     "_cat:", "_col:", "identity:", "_utt:",
+    # Reified schema hubs — classes induced from shared relational
+    # structure during sleep consolidation. Internal machinery, not
+    # world words.
+    "_gen:",
     # Task/competence machinery — internal markers, not world knowledge.
     "skill:", "goal:", "domain:", "spatial:", "var:", "type:",
 )

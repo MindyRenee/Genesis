@@ -596,6 +596,11 @@ class EmbodimentMixin:
         """
         if not self._world_context:
             return
+        if getattr(self, "_fresh_world_run", False):
+            # A cold-start measurement is read-only both ways: her
+            # banked experience stays untouched, not appended with
+            # what the probe learned.
+            return
         try:
             path = self._world_learning_file(self._world_context)
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -604,17 +609,36 @@ class EmbodimentMixin:
             logger.debug("world learning save failed", exc_info=True)
 
     def _load_world_learning(self) -> None:
-        """Restore what past sessions learned about this world."""
+        """Restore what past sessions learned about this world.
+
+        Also answers the evidence question — how much experience did
+        this run carry in? ``_world_learning_loaded`` reports it:
+        ``"none"`` no file existed, ``"loaded"`` past lessons were
+        restored, ``"suppressed"`` a fresh run refused them, and
+        ``"unknown"`` a file was there but could not be read — the
+        one state that must not masquerade as cold start.
+        """
         if not self._world_context:
+            self._world_learning_loaded = "none"
             return
+        if getattr(self, "_fresh_world_run", False):
+            # Cold-start evidence: the banked file is neither read
+            # now nor overwritten later — the run is isolated both
+            # directions.
+            self._world_learning_loaded = "suppressed"
+            return
+        loaded = "none"
         try:
             path = self._world_learning_file(self._world_context)
             if path.exists():
                 self.world_model.import_learning(
                     json.loads(path.read_text())
                 )
+                loaded = "loaded"
         except Exception:
             logger.debug("world learning load failed", exc_info=True)
+            loaded = "unknown"
+        self._world_learning_loaded = loaded
 
     def save_world_learning(self) -> None:
         """Public checkpoint for run ends that never switch games."""
@@ -661,11 +685,56 @@ class EmbodimentMixin:
         self._begin_world(game, level)
         self.mark_user_activity()
         self._world_last_voiced = None
+        self._world_onboard(game, level, info)
+
+        # Levels advancing is the goal signal — the episode's own
+        # reward marked before the new observation so the winning
+        # segment closes intact. The ``win`` flag rides the frame
+        # that follows the winning move: the model credits whatever
+        # she was reaching when the world ended, then lets the old
+        # place go while keeping what it taught her.
+        advanced = level > self._world_levels
+        if advanced:
+            self._impulse_world(CHEM_DOPAMINE, 0.01)
+            self._world_say({"kind": "scored", "game": game})
+            self._world_dry = 0
+        self._world_levels = level
+
+        events = self._world_perceive(frame, game, level, info, advanced)
+
+        # Think — the cognition slice a turn-based world would
+        # otherwise never give her. And remember: the situation cues
+        # whatever past experience it resembles before she commits.
+        self._world_cognition_tick()
+        self._recall_world(game, events)
+
+        # Act — nothing outside her arbitrates: the motor field is
+        # composed from her own world model and task competence, and
+        # the basal ganglia's drives — goal plan, affordance probe,
+        # frontier exploration, calibration — decide. She is her own
+        # leader; there is no delegate to fall back on.
+        avail = list(available_actions or [])
+        if not avail:
+            return None
+        try:
+            choice = self.act(avail)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.world_step.act", e)
+            choice = None
+        if choice is None:
+            return None
+        return self._world_commit(choice, avail, game)
+
+    # ─── World-turn internals ───────────────────────────────────
+
+    def _world_onboard(
+        self, game: str, level: int, info: dict[str, Any]
+    ) -> None:
+        """First contact with a game — engagement signature plus the
+        world's spoken instruction broadcast as context, so her
+        cognition meets the stream already knowing the genre."""
         from thalamus.brain_waves import BrainWave
 
-        # Sitting down to a new game — engagement signature plus the
-        # world's spoken instruction broadcast as context, so her
-        # cognition meets the stream already knowing the genre.
         if game not in self._world_seen:
             self._world_seen.add(game)
             self._world_levels = level
@@ -683,23 +752,18 @@ class EmbodimentMixin:
                 )
                 self._ground_world_words(str(info["instructions"]))
 
-        # Levels advancing is the goal signal — the episode's own
-        # reward marked before the new observation so the winning
-        # segment closes intact. The ``win`` flag rides the frame
-        # that follows the winning move: the model credits whatever
-        # she was reaching when the world ended, then lets the old
-        # place go while keeping what it taught her.
-        advanced = level > self._world_levels
-        if advanced:
-            self._impulse_world(CHEM_DOPAMINE, 0.01)
-            self._world_say({"kind": "scored", "game": game})
-            self._world_dry = 0
-        self._world_levels = level
-
-        # Perceive — the frame enters through her embodied stack
-        # alone: the world model, the cognitive map, imagery, the
-        # workspace. The change measure that couples to dopamine is
-        # hers to compute, not a delegate's report.
+    def _world_perceive(
+        self,
+        frame: Any,
+        game: str,
+        level: int,
+        info: dict[str, Any],
+        advanced: bool,
+    ) -> Any:
+        """The frame enters through her embodied stack alone — the
+        world model, the cognitive map, imagery, the workspace — and
+        the change measure couples to dopamine (hers to compute, not
+        a delegate's report). Returns the frame's events."""
         prev_grid = self._prev_world_grid
         events = self.observe(
             frame,
@@ -735,6 +799,8 @@ class EmbodimentMixin:
         # The step's visible feedback couples to dopamine the same
         # way internal play couples its TD error — a changed world
         # is information.
+        from thalamus.brain_waves import BrainWave
+
         impulse = max(-0.006, min(0.006, change * 0.04))
         if abs(impulse) >= 0.001:
             self._impulse_world(CHEM_DOPAMINE, impulse)
@@ -748,28 +814,13 @@ class EmbodimentMixin:
                 self._world_say({"kind": "stuck", "game": game})
         else:
             self._world_dry = 0
+        return events
 
-        # Think — the cognition slice a turn-based world would
-        # otherwise never give her. And remember: the situation cues
-        # whatever past experience it resembles before she commits.
-        self._world_cognition_tick()
-        self._recall_world(game, events)
-
-        # Act — nothing outside her arbitrates: the motor field is
-        # composed from her own world model and task competence, and
-        # the basal ganglia's drives — goal plan, affordance probe,
-        # frontier exploration, calibration — decide. She is her own
-        # leader; there is no delegate to fall back on.
-        avail = list(available_actions or [])
-        if not avail:
-            return None
-        try:
-            choice = self.act(avail)
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.world_step.act", e)
-            choice = None
-        if choice is None:
-            return None
+    def _world_commit(
+        self, choice: dict[str, Any], avail: list[Any], game: str
+    ) -> dict[str, Any]:
+        """Ship her chosen action to the world — broadcast, record
+        the decision basis, build the step descriptor."""
         action = int(choice["action"])
         if action == 0:
             self._world_bridge.broadcast_action(0, metadata={"game": game})
@@ -791,8 +842,6 @@ class EmbodimentMixin:
             )
         self._record_world_decision(f"ACTION{action}", choice, avail)
         return desc
-
-    # ─── World-turn internals ───────────────────────────────────
 
     def _world_cognition_tick(self) -> None:
         """The between-frames slice of cognition on world content.
@@ -882,8 +931,10 @@ class EmbodimentMixin:
                     )
                     if noted is not None:
                         return
-                except Exception:  # noqa: BLE001
-                    pass
+                except Exception as e:  # noqa: BLE001
+                    note_swallowed(
+                        "parietal_lobe.embodiment.play_moment", e
+                    )
             self._emit_live_thought("play", text)
 
     def _impulse_world(self, chem: int, amount: float) -> None:
@@ -897,8 +948,8 @@ class EmbodimentMixin:
             from thalamus.brain_waves import add_brain_wave_drive
 
             add_brain_wave_drive(wave, amount)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.world_step._world_wave", e)
 
     def _record_world_decision(
         self,

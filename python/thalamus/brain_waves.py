@@ -164,8 +164,11 @@ __all__ = [
     "compute_theta_gamma_coupling",
     "derive_self_priority",
     "meditative_coherence",
+    "perturb_wave_phase",
     "reset_oscillator",
+    "reset_wave_phase",
     "resolve_waking_drowsy",
+    "wave_phase_of",
 ]
 
 
@@ -1103,6 +1106,32 @@ class BrainWaveOscillator:
             1.0, self._top_down[band] + max(0.0, strength)
         )
 
+    def perturb_phase(self, band: BrainWave, delta: float) -> None:
+        """Nudge a band's instantaneous phase by ``delta`` radians.
+
+        The phase counterpart of :meth:`add_stimulus`: stimulus shifts
+        *amplitude*; this shifts *phase*. Physical transients — a
+        scheduling shudder, a loud acoustic onset, a power event —
+        evoked-reset ongoing oscillations in real EEG; this is the
+        model's version of that channel. A positive delta advances
+        the band, negative retards it.
+        """
+        self._phase[band] = (self._phase[band] + delta) % (2.0 * math.pi)
+
+    def reset_phase(self, band: BrainWave, phase: float = 0.0) -> None:
+        """Snap a band's phase to ``phase`` (radians).
+
+        A strong transient doesn't nudge the rhythm, it *resets* it —
+        the evoked-potential signature where ongoing oscillations
+        re-align to the event. Use for transients large enough to
+        dominate the band's own precession.
+        """
+        self._phase[band] = phase % (2.0 * math.pi)
+
+    def phase_of(self, band: BrainWave) -> float:
+        """Current instantaneous phase of ``band`` (radians)."""
+        return self._phase[band]
+
     def assess(
         self,
         summary: NeuroSummary,
@@ -1154,10 +1183,30 @@ class BrainWaveOscillator:
             )
         )
         self._last_sleep_stage = sleep_stage
+        dt = self._tick_dt()
 
-        # Real-time bookkeeping, shared by both paths: _last_time
-        # tracks the last assessment, not the last relaxation, so the
-        # next dt spans exactly one interval even across transitions.
+        if should_snap:
+            self._snap_to_targets(dt, targets)
+        else:
+            # Relax amplitudes toward targets with real-time dynamics.
+            # Phase for the whole interval is applied first, in closed
+            # form, so the sub-steps see a continuous ramp.
+            self._advance_phase_exact(dt)
+            self._advance_relaxation(dt, targets)
+
+        self._last_phase_name = phase_name
+        self._last_target_dominant = target_dominant
+        self._tick_count += 1
+
+        # Build the state from current amplitudes
+        return self._build_state(
+            targets, label, description, summary
+        )
+
+    def _tick_dt(self) -> float:
+        """Real-time bookkeeping: ``_last_time`` tracks the last
+        assessment, not the last relaxation, so the next dt spans
+        exactly one interval even across transitions."""
         now = time.monotonic()
         if self._last_time is not None:
             elapsed = now - self._last_time
@@ -1185,44 +1234,32 @@ class BrainWaveOscillator:
         else:
             dt = 0.1  # default 100ms
         self._last_time = now
+        return dt
 
-        if should_snap:
-            # Phase precesses continuously — it must not stall on
-            # transition ticks (_advance_relaxation advances it on
-            # relaxed ticks; this is the snap-tick counterpart).
-            self._advance_phase_exact(dt)
-            # Snap amplitudes to targets on phase/dominant transition,
-            # honouring accumulated top-down drive: cognition's boost
-            # (attention → gamma, filtering → alpha, retrieval →
-            # theta) takes effect immediately instead of being silently
-            # discarded until the first relaxed tick. The drive decays
-            # here exactly as _relax_once would decay it, so it cannot
-            # pile up unseen across a run of snaps and then dump all
-            # at once. Amplitudes are assigned rather than relaxed, so
-            # only the two exponential decays are applied.
-            for band in BrainWave:
-                self._amplitude[band] = targets[band] + self._top_down[band]
-            decay = math.exp(-dt / self._DRIVE_TAU)
-            for band in BrainWave:
-                self._top_down[band] *= decay
-            stim_decay = math.exp(-dt / 5.0)
-            for band in BrainWave:
-                self._stimulus[band] *= stim_decay
-        else:
-            # Relax amplitudes toward targets with real-time dynamics.
-            # Phase for the whole interval is applied first, in closed
-            # form, so the sub-steps see a continuous ramp.
-            self._advance_phase_exact(dt)
-            self._advance_relaxation(dt, targets)
-
-        self._last_phase_name = phase_name
-        self._last_target_dominant = target_dominant
-        self._tick_count += 1
-
-        # Build the state from current amplitudes
-        return self._build_state(
-            targets, label, description, summary
-        )
+    def _snap_to_targets(
+        self, dt: float, targets: dict[BrainWave, float]
+    ) -> None:
+        """Snap amplitudes to targets on a phase/dominant transition,
+        honouring accumulated top-down drive: cognition's boost
+        (attention → gamma, filtering → alpha, retrieval → theta)
+        takes effect immediately instead of being silently discarded
+        until the first relaxed tick. The drive decays here exactly as
+        _relax_once would decay it, so it cannot pile up unseen across
+        a run of snaps and then dump all at once. Amplitudes are
+        assigned rather than relaxed, so only the two exponential
+        decays are applied."""
+        # Phase precesses continuously — it must not stall on
+        # transition ticks (_advance_relaxation advances it on
+        # relaxed ticks; this is the snap-tick counterpart).
+        self._advance_phase_exact(dt)
+        for band in BrainWave:
+            self._amplitude[band] = targets[band] + self._top_down[band]
+        decay = math.exp(-dt / self._DRIVE_TAU)
+        for band in BrainWave:
+            self._top_down[band] *= decay
+        stim_decay = math.exp(-dt / 5.0)
+        for band in BrainWave:
+            self._stimulus[band] *= stim_decay
 
     def _compute_targets(
         self,
@@ -1663,6 +1700,26 @@ def add_stimulus(band: BrainWave, strength: float, decay: float = 0.95) -> None:
     _get_oscillator().add_stimulus(band, strength, decay)
 
 
+def perturb_wave_phase(band: BrainWave, delta: float) -> None:
+    """Nudge a band's phase — the evoked-response channel.
+
+    A physical transient shifts ongoing rhythm phase rather than
+    only adding amplitude; this is how real events write into the
+    oscillator's timing, not just its power.
+    """
+    _get_oscillator().perturb_phase(band, delta)
+
+
+def reset_wave_phase(band: BrainWave, phase: float = 0.0) -> None:
+    """Snap a band's phase — the strong-transient reset."""
+    _get_oscillator().reset_phase(band, phase)
+
+
+def wave_phase_of(band: BrainWave) -> float:
+    """Current instantaneous phase of ``band`` (radians)."""
+    return _get_oscillator().phase_of(band)
+
+
 def reset_oscillator() -> None:
     """Reset the oscillator to initial state.
 
@@ -1676,12 +1733,20 @@ def reset_oscillator() -> None:
 def assess_brain_waves(
     summary: NeuroSummary,
     sleep_stage: SleepStage | None = None,
+    client: Any | None = None,
 ) -> BrainWaveState:
     """Derive brain wave state from the coupled oscillator.
 
     Pass ``sleep_stage`` from the ultradian sleep-cycle tracker when
     asleep so the waves match the stage the rest of the sleep system
     is acting on (see :func:`_sleep_phase_powers`).
+
+    When ``client`` is supplied, the daemon's field-probe signature —
+    the body's *real* measured substrate dynamics — is applied as
+    stimulus before the assess step, so the wave state carries actual
+    physics, not only neurochemical targets (see
+    ``brainstem.field_probe``). With no client the oscillator runs on
+    its modeled inputs alone — identical to the old call shape.
 
     The oscillator advances its phase and relaxes its amplitude toward
     neurochemically-driven targets, then returns the current state.
@@ -1699,6 +1764,10 @@ def assess_brain_waves(
     dynamics. Top-down drive from cognition/action/perception can
     boost specific bands above their neurochemical targets.
     """
+    if client is not None:
+        from brainstem.field_probe import apply_field_stimulus
+
+        apply_field_stimulus(client)
     return _get_oscillator().assess(summary, sleep_stage)
 
 
@@ -1955,40 +2024,7 @@ def _waking_phase_powers(
     # Alertness determines the base band
     # Plasticity determines whether high alertness → gamma or just beta
     if alertness > 0.7:
-        # High alertness — beta or gamma?
-        if plasticity > 0.5:
-            # High plasticity → gamma (integration)
-            gamma_boost = (plasticity - 0.5) * 0.6
-            powers = {
-                BrainWave.EPSILON: 0.02,
-                BrainWave.DELTA: 0.03,
-                BrainWave.THETA: 0.07,
-                BrainWave.ALPHA: 0.08,
-                BrainWave.SIGMA: 0.00,
-                BrainWave.BETA1: 0.03,
-                BrainWave.BETA2: 0.12,
-                BrainWave.BETA3: 0.05,
-                BrainWave.GAMMA: 0.40 + gamma_boost * 0.3,
-                BrainWave.LAMBDA: 0.02,
-            }
-            label = "gamma"
-            description = "sharp and integrative, ideas are connecting"
-        else:
-            # Low plasticity → just beta (alert but not integrating)
-            powers = {
-                BrainWave.EPSILON: 0.03,
-                BrainWave.DELTA: 0.05,
-                BrainWave.THETA: 0.08,
-                BrainWave.ALPHA: 0.10,
-                BrainWave.SIGMA: 0.00,
-                BrainWave.BETA1: 0.05,
-                BrainWave.BETA2: 0.25,
-                BrainWave.BETA3: 0.15,
-                BrainWave.GAMMA: 0.15,
-                BrainWave.LAMBDA: 0.00,
-            }
-            label = "beta2"
-            description = "alert and focused, but not making new connections"
+        powers, label, description = _alert_powers(plasticity)
     elif alertness > 0.45:
         # Moderate alertness — alpha dominant
         # Alpha filters: high alpha = strong filtering
@@ -2072,6 +2108,43 @@ def _waking_phase_powers(
         for band in powers:
             powers[band] /= total
     return powers, label, description
+
+
+def _alert_powers(
+    plasticity: float,
+) -> tuple[dict[BrainWave, float], str, str]:
+    """High alertness — gamma when plasticity supports integration,
+    beta otherwise."""
+    if plasticity > 0.5:
+        # High plasticity → gamma (integration)
+        gamma_boost = (plasticity - 0.5) * 0.6
+        powers = {
+            BrainWave.EPSILON: 0.02,
+            BrainWave.DELTA: 0.03,
+            BrainWave.THETA: 0.07,
+            BrainWave.ALPHA: 0.08,
+            BrainWave.SIGMA: 0.00,
+            BrainWave.BETA1: 0.03,
+            BrainWave.BETA2: 0.12,
+            BrainWave.BETA3: 0.05,
+            BrainWave.GAMMA: 0.40 + gamma_boost * 0.3,
+            BrainWave.LAMBDA: 0.02,
+        }
+        return powers, "gamma", "sharp and integrative, ideas are connecting"
+    # Low plasticity → just beta (alert but not integrating)
+    powers = {
+        BrainWave.EPSILON: 0.03,
+        BrainWave.DELTA: 0.05,
+        BrainWave.THETA: 0.08,
+        BrainWave.ALPHA: 0.10,
+        BrainWave.SIGMA: 0.00,
+        BrainWave.BETA1: 0.05,
+        BrainWave.BETA2: 0.25,
+        BrainWave.BETA3: 0.15,
+        BrainWave.GAMMA: 0.15,
+        BrainWave.LAMBDA: 0.00,
+    }
+    return powers, "beta2", "alert and focused, but not making new connections"
 
 
 def _compute_focus(powers: dict[BrainWave, float]) -> float:

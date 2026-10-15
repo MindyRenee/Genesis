@@ -260,16 +260,18 @@ fn main() {
         .unwrap_or(0);
     let mmap = match MmapState::open(&state_path) {
         Ok(m) => m,
-        Err(genesis::store::StateFileError::NotFound) => match MmapState::create(&state_path, 1, now_ms) {
-            Ok(m) => m,
-            Err(e) => {
-                eprintln!(
-                    "[genesis] FATAL: failed to create core state {}: {e}",
-                    state_path.display()
-                );
-                std::process::exit(1);
+        Err(genesis::store::StateFileError::NotFound) => {
+            match MmapState::create(&state_path, 1, now_ms) {
+                Ok(m) => m,
+                Err(e) => {
+                    eprintln!(
+                        "[genesis] FATAL: failed to create core state {}: {e}",
+                        state_path.display()
+                    );
+                    std::process::exit(1);
+                }
             }
-        },
+        }
         Err(e) => {
             eprintln!(
                 "[genesis] FATAL: failed to open core state {}: {e}",
@@ -328,6 +330,27 @@ fn main() {
     let ltm = Arc::new(Mutex::new(ltm));
     let stm = Arc::new(stm);
     let mmap = Arc::new(mmap);
+
+    // Physical field probe — the body listening to its own substrate.
+    // A dedicated thread measures real electron-flow dynamics
+    // (instruction throughput, scheduler jitter, P-state transitions,
+    // interrupt flux) at ~250 Hz and decomposes them at the wave
+    // bands' center frequencies; the mind reads the signature over
+    // GET_FIELD_PROBE and injects it into the wave oscillator as
+    // outer stimulus. The probe also writes a carrier — its work is
+    // modulated at the body's own phase rhythm, so the die's real
+    // current carries a component at the organism's beat.
+    {
+        use genesis::state::MentalPhase;
+        let probe_mmap = mmap.clone();
+        genesis::daemon::field_probe::start(move || {
+            match probe_mmap.read_consistent().map(|s| s.zones.phase()) {
+                Some(MentalPhase::NREM) => "nrem",
+                Some(MentalPhase::REM) => "rem",
+                _ => "wake",
+            }
+        });
+    }
 
     // Set up shutdown coordination
     let shutdown_flag = Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -757,4 +780,3 @@ fn setup_signal_handlers(
 // Static atomic for signal handler communication
 use std::sync::atomic::AtomicBool;
 static SHUTDOWN_REQUESTED: AtomicBool = AtomicBool::new(false);
-

@@ -1,5 +1,11 @@
 //! Dyadic affective model — a coupled generative model of the user.
 //!
+//! "The user" here means the present interlocutor — whoever is
+//! speaking. The model is general social perception, not a privileged
+//! bond: the cognitive mind publishes an affect observation for every
+//! turn. Custodial authority (the steward channel) lives elsewhere and
+//! never rides on this coupling.
+//!
 //! This module models the **user's** affective state as a set of
 //! hidden variables (valence, arousal, engagement), inferred from
 //! conversation features, and coupled to Genesis's own neurochemistry

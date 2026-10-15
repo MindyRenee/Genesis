@@ -310,7 +310,7 @@ def main(argv: list[str]) -> int:
             _FALLBACK_ENV, ""
         ).strip()
         if not url:
-            print("no webhook set (GENESIS_DISCORD_ARC_WEBHOOK)")
+            sys.stderr.write("no webhook set (GENESIS_DISCORD_ARC_WEBHOOK)\n")
             return 1
         feed = DiscordFeed(url)
         try:
@@ -318,7 +318,7 @@ def main(argv: list[str]) -> int:
         finally:
             feed.close()
         return 0
-    print(__doc__)
+    sys.stderr.write(__doc__ or "")
     return 2
 
 

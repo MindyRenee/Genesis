@@ -53,6 +53,34 @@ if TYPE_CHECKING:
 __all__ = ["SelfInquiryHandler"]
 
 
+def _is_activity_question(lower: str) -> bool:
+    """Whether the (lowercased) message asks about her recent
+    activity — 'what have you been doing?', 'how have you been?',
+    'what's new?'."""
+    return (
+        any(p in lower for p in (
+            "been doing", "been up to", "been working",
+            "been thinking", "been feeling", "been dreaming",
+            "been reading", "been learning", "been exploring",
+            "been studying",
+        ))
+        or ("how have you been" in lower)
+        or ("what have you been" in lower)
+        or (
+            "what" in lower and "up to" in lower and "you" in lower
+        )
+        or (
+            "what" in lower
+            and any(w in lower for w in ("new", "going on", "happening"))
+            and "you" in lower
+        )
+        or (
+            "what are you" in lower
+            and any(w in lower for w in ("doing", "working on", "up to"))
+        )
+    )
+
+
 class SelfInquiryHandler:
     """Route and answer self-directed questions from concept-network knowledge.
 
@@ -264,65 +292,13 @@ class SelfInquiryHandler:
         not concept-network knowledge queries. They need access to its
         recent activity log, not its semantic graph.
         """
-        is_activity_question = (
-            any(p in lower for p in (
-                "been doing", "been up to", "been working",
-                "been thinking", "been feeling", "been dreaming",
-                "been reading", "been learning", "been exploring",
-                "been studying",
-            ))
-            or ("how have you been" in lower)
-            or ("what have you been" in lower)
-            or (
-                "what" in lower and "up to" in lower and "you" in lower
-            )
-            or (
-                "what" in lower
-                and any(w in lower for w in ("new", "going on", "happening"))
-                and "you" in lower
-            )
-            or (
-                "what are you" in lower
-                and any(w in lower for w in ("doing", "working on", "up to"))
-            )
-        )
-        if not is_activity_question:
+        if not _is_activity_question(lower):
             return None
 
         # Collect semantic fragments from its recent activity.
         # These are building blocks (seeds) the self-composer weaves
         # into natural language — not pre-written sentences.
-        activity_fragments: list[str] = []
-        activity_type: str = "activity"
-
-        # 1. Recent self-directed learning events
-        try:
-            recent_events = self._self_learner.get_recent_events(5)
-            for event in recent_events:
-                if event.description and len(activity_fragments) < 3:
-                    activity_fragments.append(event.description)
-                    if event.event_type == "self_study":
-                        activity_type = "self_study"
-                    elif event.event_type == "conversation":
-                        activity_type = "conversation"
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "frontal_lobe.self_inquiry.self_inquiry_recent_activity",
-                e,
-            )
-
-        # 2. Recent reflection insights — what it noticed about itself
-        try:
-            recent_insights = self._reflection.get_recent_insights(3)
-            for insight in recent_insights:
-                desc = insight.describe()
-                if desc and len(activity_fragments) < 5:
-                    activity_fragments.append(desc)
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "frontal_lobe.self_inquiry.self_inquiry_recent_activity",
-                e,
-            )
+        activity_fragments, activity_type = self._activity_fragments()
 
         # 3. Compose from its actual state using the self-composer.
         # self_reflection_fragments selects what it knows, what it's
@@ -371,6 +347,43 @@ class SelfInquiryHandler:
                 "self_fragments": fragments,
             },
         )
+
+    def _activity_fragments(self) -> tuple[list[str], str]:
+        """Recent learning events and reflection insights — the
+        raw material the composer words. Returns (fragments, the
+        dominant activity type)."""
+        activity_fragments: list[str] = []
+        activity_type: str = "activity"
+
+        # 1. Recent self-directed learning events
+        try:
+            recent_events = self._self_learner.get_recent_events(5)
+            for event in recent_events:
+                if event.description and len(activity_fragments) < 3:
+                    activity_fragments.append(event.description)
+                    if event.event_type == "self_study":
+                        activity_type = "self_study"
+                    elif event.event_type == "conversation":
+                        activity_type = "conversation"
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "frontal_lobe.self_inquiry.self_inquiry_recent_activity",
+                e,
+            )
+
+        # 2. Recent reflection insights — what it noticed about itself
+        try:
+            recent_insights = self._reflection.get_recent_insights(3)
+            for insight in recent_insights:
+                desc = insight.describe()
+                if desc and len(activity_fragments) < 5:
+                    activity_fragments.append(desc)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "frontal_lobe.self_inquiry.self_inquiry_recent_activity",
+                e,
+            )
+        return activity_fragments, activity_type
 
     # ─── Existential ─────────────────────────────────────────────
 
@@ -447,7 +460,7 @@ class SelfInquiryHandler:
             summary = self._client.get_neuro_summary()
             from thalamus.brain_waves import assess_brain_waves
 
-            waves = assess_brain_waves(summary)
+            waves = assess_brain_waves(summary, client=self._client)
             fragments = self._self_composer.emotional_state_fragments(
                 emotion, waves, self._network
             )
@@ -487,7 +500,13 @@ class SelfInquiryHandler:
                 },
             )
 
-        # Body / embodiment inquiry
+        return self._embodiment_inquiry(lower, emotion)
+
+    def _embodiment_inquiry(
+        self, lower: str, emotion: EmotionalState
+    ) -> Thought | None:
+        """Body / embodiment inquiry — "your body", "your hardware",
+        "too hot", connectivity — seeded from the measured substrate."""
         _BODY_KEYWORDS = (
             "your body", "your hardware", "your cpu", "your frequency",
             "how fast", "running yourself", "controlling your",
@@ -496,63 +515,63 @@ class SelfInquiryHandler:
             "your network", "are you online", "are you offline",
             "can you reach", "your connectivity",
         )
-        if any(kw in lower for kw in _BODY_KEYWORDS):
-            body = self._self_model.body_model
-            seeds: list[str] = []
-            if body.thermally_capped:
-                seeds.extend(["heat", "thermal", "temperature"])
-            if body.cpu_governor == "powersave":
-                seeds.extend(["sleep", "rest", "melatonin"])
-            elif body.cognitive_nice <= -3:
-                seeds.extend(["attention", "focus", "dopamine"])
-            elif body.cognitive_nice >= 8:
-                seeds.extend(["rest", "sleep", "adenosine"])
-            if body.io_class == "idle":
-                seeds.extend(["stress", "cortisol"])
-            elif body.io_class.startswith(("best-effort-0", "best-effort-1")):
-                seeds.extend(["learning", "plasticity"])
-            if not body.network_connected:
-                seeds.extend(["offline", "connectivity", "network"])
-            # The substrate itself leads, then whatever is happening to
-            # it right now, then which regions are carrying the work.
-            #
-            # Order matters because the composer takes the first seed
-            # it can resolve into a thought. A question about her body
-            # should be answered *as* a question about her body, so
-            # "body"/"silicon" lead; the condition-specific seeds above
-            # already take precedence for a specific complaint ("are you
-            # overheating?"), and the activity tiers are supporting
-            # detail rather than the subject. Leading with the busiest
-            # region instead made her answer "how is your body" with a
-            # thought about reasoning.
-            seeds.extend(["body", "cpu", "hardware", "silicon", "substrate"])
-            # What the substrate is doing to it right now, most urgent
-            # first. The involuntary channels — throttling, stalls,
-            # entropy, battery wear — were measured and stored for a
-            # long time without reaching anything that could speak of
-            # them; these are seeds, so she still composes the words
-            # from her own knowledge of each condition.
-            seeds.extend(
-                seed for seed, _urgency in self._self_model.body_condition_seeds()
-            )
-            # Which parts of it are actually firing — the measured
-            # brain parts and per-process tiers, offered so she
-            # composes from her own knowledge of them rather than from
-            # a canned description of her load.
-            seeds.extend(self._self_model.activity_seeds())
+        if not any(kw in lower for kw in _BODY_KEYWORDS):
+            return None
+        body = self._self_model.body_model
+        seeds: list[str] = []
+        if body.thermally_capped:
+            seeds.extend(["heat", "thermal", "temperature"])
+        if body.cpu_governor == "powersave":
+            seeds.extend(["sleep", "rest", "melatonin"])
+        elif body.cognitive_nice <= -3:
+            seeds.extend(["attention", "focus", "dopamine"])
+        elif body.cognitive_nice >= 8:
+            seeds.extend(["rest", "sleep", "adenosine"])
+        if body.io_class == "idle":
+            seeds.extend(["stress", "cortisol"])
+        elif body.io_class.startswith(("best-effort-0", "best-effort-1")):
+            seeds.extend(["learning", "plasticity"])
+        if not body.network_connected:
+            seeds.extend(["offline", "connectivity", "network"])
+        # The substrate itself leads, then whatever is happening to
+        # it right now, then which regions are carrying the work.
+        #
+        # Order matters because the composer takes the first seed
+        # it can resolve into a thought. A question about her body
+        # should be answered *as* a question about her body, so
+        # "body"/"silicon" lead; the condition-specific seeds above
+        # already take precedence for a specific complaint ("are you
+        # overheating?"), and the activity tiers are supporting
+        # detail rather than the subject. Leading with the busiest
+        # region instead made her answer "how is your body" with a
+        # thought about reasoning.
+        seeds.extend(["body", "cpu", "hardware", "silicon", "substrate"])
+        # What the substrate is doing to it right now, most urgent
+        # first. The involuntary channels — throttling, stalls,
+        # entropy, battery wear — were measured and stored for a
+        # long time without reaching anything that could speak of
+        # them; these are seeds, so she still composes the words
+        # from her own knowledge of each condition.
+        seeds.extend(
+            seed for seed, _urgency in self._self_model.body_condition_seeds()
+        )
+        # Which parts of it are actually firing — the measured
+        # brain parts and per-process tiers, offered so she
+        # composes from her own knowledge of them rather than from
+        # a canned description of her load.
+        seeds.extend(self._self_model.activity_seeds())
 
-            for seed in seeds:
-                thought = self._composer.compose_about(seed, emotion, focused=True)
-                if thought and thought.content and thought.confidence > 0.3:
-                    return Thought(
-                        content=thought.content,
-                        intent="self_report",
-                        emotion=emotion.label,
-                        confidence=thought.confidence,
-                        topics=[seed],
-                        metadata={"field": "embodiment"},
-                    )
-
+        for seed in seeds:
+            thought = self._composer.compose_about(seed, emotion, focused=True)
+            if thought and thought.content and thought.confidence > 0.3:
+                return Thought(
+                    content=thought.content,
+                    intent="self_report",
+                    emotion=emotion.label,
+                    confidence=thought.confidence,
+                    topics=[seed],
+                    metadata={"field": "embodiment"},
+                )
         return None
 
     # ─── Knowledge gaps ──────────────────────────────────────────

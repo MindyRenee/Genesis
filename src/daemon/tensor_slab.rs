@@ -154,7 +154,13 @@ impl Tensor {
             return Err(TensorError::PayloadTooShort);
         }
         let shape: Vec<u32> = (0..ndim)
-            .map(|i| u32::from_le_bytes(buf[2 + i * 4..6 + i * 4].try_into().unwrap()))
+            .map(|i| {
+                u32::from_le_bytes(
+                    buf[2 + i * 4..6 + i * 4]
+                        .try_into()
+                        .expect("slice is 4 bytes; buf.len() >= header checked above"),
+                )
+            })
             .collect();
         let nbytes = checked_elements(&shape)?
             .checked_mul(width)

@@ -19,9 +19,21 @@ use genesis::state::neurochemical::{
     NetworkLevels, NeuroTickParams, NeurochemicalId, NeurochemicalVector,
 };
 
-const NREM: NetworkLevels = NetworkLevels { lc: 0.151, vlpo: 0.771, rem: 0.011 };
-const WAKE: NetworkLevels = NetworkLevels { lc: 0.963, vlpo: 0.021, rem: 0.0 };
-const REM: NetworkLevels = NetworkLevels { lc: 0.133, vlpo: 0.896, rem: 0.976 };
+const NREM: NetworkLevels = NetworkLevels {
+    lc: 0.151,
+    vlpo: 0.771,
+    rem: 0.011,
+};
+const WAKE: NetworkLevels = NetworkLevels {
+    lc: 0.963,
+    vlpo: 0.021,
+    rem: 0.0,
+};
+const REM: NetworkLevels = NetworkLevels {
+    lc: 0.133,
+    vlpo: 0.896,
+    rem: 0.976,
+};
 
 /// Steady-state levels of (ACh, serotonin, NE, GABA) under fixed network input.
 fn equilibrium(net: NetworkLevels) -> [f32; 4] {
@@ -53,11 +65,22 @@ fn steady_release_levels_match_the_calibrated_data() {
         ("GABA", [0.82, 0.50, 0.30]),
     ];
     // Histamine and orexin are wake-active and silent in sleep.
-    let (hist_n, hist_w, hist_r) = (equilibrium_hist(NREM), equilibrium_hist(WAKE), equilibrium_hist(REM));
-    assert!(hist_n < 0.02 && hist_r < 0.02, "histamine in sleep: NREM {hist_n} REM {hist_r}");
+    let (hist_n, hist_w, hist_r) = (
+        equilibrium_hist(NREM),
+        equilibrium_hist(WAKE),
+        equilibrium_hist(REM),
+    );
+    assert!(
+        hist_n < 0.02 && hist_r < 0.02,
+        "histamine in sleep: NREM {hist_n} REM {hist_r}"
+    );
     assert!((hist_w - 0.30).abs() < 0.02, "histamine awake {hist_w}");
     for (k, (name, target)) in want.iter().enumerate() {
-        for (state, got, goal) in [("NREM", n[k], target[0]), ("wake", w[k], target[1]), ("REM", r[k], target[2])] {
+        for (state, got, goal) in [
+            ("NREM", n[k], target[0]),
+            ("wake", w[k], target[1]),
+            ("REM", r[k], target[2]),
+        ] {
             assert!(
                 (got - goal).abs() < 0.02,
                 "{name} in {state}: steady {got:.3}, calibrated {goal:.3}"
@@ -67,7 +90,11 @@ fn steady_release_levels_match_the_calibrated_data() {
 }
 
 fn equilibrium_hist(net: NetworkLevels) -> f32 {
-    let params = NeuroTickParams { maturation_level: 1.0, network_levels: Some(net), ..Default::default() };
+    let params = NeuroTickParams {
+        maturation_level: 1.0,
+        network_levels: Some(net),
+        ..Default::default()
+    };
     let mut v = NeurochemicalVector::new(1);
     for _ in 0..300_000u32 {
         v.tick_with_params(&params);
@@ -80,7 +107,11 @@ fn equilibrium_hist(net: NetworkLevels) -> f32 {
 #[test]
 fn arousal_orders_the_stages_and_sits_in_the_bands() {
     let arousal = |net: NetworkLevels| {
-        let params = NeuroTickParams { maturation_level: 1.0, network_levels: Some(net), ..Default::default() };
+        let params = NeuroTickParams {
+            maturation_level: 1.0,
+            network_levels: Some(net),
+            ..Default::default()
+        };
         let mut v = NeurochemicalVector::new(1);
         for _ in 0..300_000u32 {
             v.tick_with_params(&params);
@@ -88,9 +119,15 @@ fn arousal_orders_the_stages_and_sits_in_the_bands() {
         v.arousal
     };
     let (n, w, r) = (arousal(NREM), arousal(WAKE), arousal(REM));
-    assert!(n < r && r < w, "arousal ordering: NREM {n} REM {r} wake {w}");
+    assert!(
+        n < r && r < w,
+        "arousal ordering: NREM {n} REM {r} wake {w}"
+    );
     assert!(n <= 0.25, "NREM arousal {n} should be low");
-    assert!((0.35..=0.55).contains(&r), "REM arousal {r} should be moderate");
+    assert!(
+        (0.35..=0.55).contains(&r),
+        "REM arousal {r} should be moderate"
+    );
 }
 
 #[test]
@@ -104,4 +141,37 @@ fn release_ordering_matches_the_data() {
     assert!(n[3] > w[3] && w[3] > r[3], "GABA ordering");
     // NE: silent in REM.
     assert!(r[2] < 0.02, "NE should be silent in REM, got {}", r[2]);
+}
+
+/// Process S must clear when the *network* is asleep, not only when the
+/// mind's zone says Sleeping. `zone_sleeping` is set from a snapshot taken
+/// before the tick, so when the network has crossed into sleep while the
+/// zone still reads awake (idle-deferral, a stalled mind, any desync),
+/// adenosine would otherwise keep accumulating during actual sleep.
+#[test]
+fn adenosine_clears_when_the_network_sleeps() {
+    let tick = |net: NetworkLevels| {
+        let mut v = NeurochemicalVector::new(1);
+        v.get_mut(NeurochemicalId::Adenosine).unwrap().level = 0.80;
+        let params = NeuroTickParams {
+            maturation_level: 1.0,
+            zone_sleeping: false,
+            network_levels: Some(net),
+            ..NeuroTickParams::COMPRESSED
+        };
+        for _ in 0..600u32 {
+            v.tick_with_params(&params);
+        }
+        v.get(NeurochemicalId::Adenosine).unwrap().level
+    };
+    let asleep = tick(NREM);
+    let awake = tick(WAKE);
+    assert!(
+        asleep < 0.80,
+        "adenosine must clear while the network sleeps (zone still awake): {asleep}"
+    );
+    assert!(
+        awake >= asleep,
+        "adenosine must not clear faster while the network is awake: asleep {asleep} awake {awake}"
+    );
 }

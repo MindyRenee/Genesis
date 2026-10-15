@@ -133,8 +133,8 @@ mod tests {
     }
 
     fn tmpdir(name: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir()
-            .join(format!("genesis-datadir-{name}-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("genesis-datadir-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("create temp dir");
         dir
@@ -149,7 +149,10 @@ mod tests {
         let root = tmpdir("explicit");
         write_pin(&root, "/pinned");
         assert_eq!(
-            resolve(&env(Some("/explicit"), Some("/hostile"), Some("/home/w")), &root),
+            resolve(
+                &env(Some("/explicit"), Some("/hostile"), Some("/home/w")),
+                &root
+            ),
             PathBuf::from("/explicit"),
             "GENESIS_DATA_DIR must win over the pin and XDG_DATA_HOME"
         );

@@ -51,12 +51,39 @@ import os
 from dataclasses import dataclass, field
 from inspect import signature
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    from mind import Mind
+from typing import Any, Protocol
 
 _HEALTH_EVERY_STEPS = 25
+
+
+class _Readiness(Protocol):
+    """What the loop asks of a health probe."""
+
+    ok: bool
+    reasons: tuple[str, ...]
+
+
+class _PlayerMind(Protocol):
+    """The mind contract this loop consumes.
+
+    ``Mind`` satisfies it; so does the named reference policy in
+    ``world/arc_baseline.py`` — the denominator runs through the
+    same loop by wearing the same face, which is what makes its
+    number comparable to hers.
+    """
+
+    @property
+    def is_gaming(self) -> bool: ...
+    @property
+    def game_decision(self) -> dict[str, Any] | None: ...
+    def readiness(self, *, require_body: bool = True) -> _Readiness: ...
+    def world_step(
+        self,
+        frame: Any,
+        available_actions: list[Any] | None = None,
+        info: dict[str, Any] | None = None,
+    ) -> dict[str, Any] | None: ...
+    def world_episode_end(self, outcome: str, game: str = "the game") -> None: ...
 
 
 @dataclass
@@ -72,6 +99,19 @@ class ArcResult:
     score: float | None = None
     scorecard_id: str | None = None
     reasons: tuple[str, ...] = field(default_factory=tuple)
+    # Steps spent at each completed level, in order — the within-game
+    # learning curve. A level she re-completes after a death appends
+    # again; the relearning is part of the evidence.
+    level_steps: list[int] = field(default_factory=list)
+    # How much experience this run carried in: "none" no prior file
+    # existed, "loaded" persisted world learning was restored,
+    # "suppressed" a fresh run refused it, "unknown" it failed to
+    # read. A result that doesn't say is not evidence.
+    prior_learning: str = "none"
+    # Which bid source won each submitted move — the priors-vs-learning
+    # question ("was it the plan or the babbling?") answered from the
+    # recording, not argued about it.
+    decision_sources: dict[str, int] = field(default_factory=dict)
 
     @property
     def won(self) -> bool:
@@ -93,7 +133,7 @@ class ArcPractice:
 
     def __init__(
         self,
-        mind: Mind,
+        mind: _PlayerMind,
         environments_dir: str | Path | None = None,
         recordings_dir: str | Path | None = None,
         instructions: str = "",
@@ -237,7 +277,7 @@ class ArcPractice:
         return evaluation
 
     def _play(self, result: ArcResult, max_steps: int) -> ArcResult:
-        from arcengine import ComplexAction, GameAction, GameState
+        from arcengine import GameAction, GameState
 
         game_id = result.game_id
         env = self._arcade.make(
@@ -252,10 +292,21 @@ class ArcPractice:
         if frame is None:
             frame = env.reset()
         result.resets = 1
+        # Level-boundary bookkeeping: skill acquisition has a speed,
+        # and it is the honest evidence — the steps each level cost,
+        # not the claim that learning happened.
+        prev_levels = getattr(frame, "levels_completed", 0) or 0
+        level_start = 0
         step_signature = signature(env.step)
         while frame is not None:
             result.levels_completed = frame.levels_completed
             result.win_levels = frame.win_levels
+            if frame.levels_completed != prev_levels:
+                for _ in range(max(0, frame.levels_completed - prev_levels)):
+                    result.level_steps.append(result.steps - level_start)
+                    level_start = result.steps
+                prev_levels = frame.levels_completed
+                level_start = result.steps
             state = getattr(frame.state, "name", str(frame.state))
             if state == GameState.WIN.name:
                 result.state = state
@@ -288,51 +339,18 @@ class ArcPractice:
             if not frame.available_actions:
                 result.state = "NO_ACTIONS"
                 break
-            info: dict[str, Any] = {
-                "game": game_id,
-                "level": frame.levels_completed,
-                "win_levels": frame.win_levels,
-            }
-            # The manual is delivered once per game, on the first
-            # frame — her cognition gets the genre framing before
-            # the first move.
-            if self._instructions and game_id not in self._info_sent:
-                info["instructions"] = self._instructions
-                self._info_sent.add(game_id)
-            desc = self._mind.world_step(
-                frame.frame[-1],
-                # The interface's own action semantics ride the
-                # whitelist — a complex action is one that takes a
-                # coordinate, exactly the label convention the
-                # world model consumes. What pointing *does* is
-                # still hers to learn.
-                available_actions=[
-                    {
-                        "action": int(a),
-                        "label": (
-                            "coordinate"
-                            if GameAction.from_id(int(a)).action_type
-                            is ComplexAction
-                            else "simple"
-                        ),
-                    }
-                    for a in frame.available_actions
-                ],
-                info=info,
-            )
-            if desc is None:
+            chosen = self._choose_action(frame, game_id)
+            if chosen is None:
                 result.state = "NO_ACTION"
                 break
-            action, data = self._to_step(desc)
-            if action is not GameAction.RESET and action.value not in frame.available_actions:
-                raise ValueError("Chosen action is not available in this observation")
+            action, data, reasoning = chosen
             result.steps += 1
             if action is GameAction.RESET:
                 result.resets += 1
-            # Her decision basis rides the step — the recording
-            # keeps what her striatum actually computed, not a
-            # retelling.
-            reasoning = self._mind.game_decision
+            source = str((reasoning or {}).get("source", "unknown"))
+            result.decision_sources[source] = (
+                result.decision_sources.get(source, 0) + 1
+            )
             try:
                 step_signature.bind(action, data=data, reasoning=reasoning)
             except TypeError:  # older wrappers without the field
@@ -341,7 +359,62 @@ class ArcPractice:
                 frame = env.step(action, data=data, reasoning=reasoning)
         if frame is None:
             result.state = "NO_OBSERVATION"
+        result.prior_learning = getattr(
+            self._mind, "_world_learning_loaded", "none"
+        )
         return result
+
+    def _choose_action(
+        self, frame: Any, game_id: str
+    ) -> tuple[Any, Any, dict[str, Any] | None] | None:
+        """One decision: offer the whitelist, validate her pick.
+
+        Returns ``(action, data, reasoning)`` — her decision basis
+        rides the step so the recording keeps what her striatum
+        actually computed — or None when she abstains. An offered
+        action outside the whitelist is an adapter-contract breach,
+        not a miss: it raises.
+        """
+        from arcengine import ComplexAction, GameAction
+
+        info: dict[str, Any] = {
+            "game": game_id,
+            "level": frame.levels_completed,
+            "win_levels": frame.win_levels,
+        }
+        # The manual is delivered once per game, on the first
+        # frame — her cognition gets the genre framing before
+        # the first move.
+        if self._instructions and game_id not in self._info_sent:
+            info["instructions"] = self._instructions
+            self._info_sent.add(game_id)
+        desc = self._mind.world_step(
+            frame.frame[-1],
+            # The interface's own action semantics ride the
+            # whitelist — a complex action is one that takes a
+            # coordinate, exactly the label convention the
+            # world model consumes. What pointing *does* is
+            # still hers to learn.
+            available_actions=[
+                {
+                    "action": int(a),
+                    "label": (
+                        "coordinate"
+                        if GameAction.from_id(int(a)).action_type
+                        is ComplexAction
+                        else "simple"
+                    ),
+                }
+                for a in frame.available_actions
+            ],
+            info=info,
+        )
+        if desc is None:
+            return None
+        action, data = self._to_step(desc)
+        if action is not GameAction.RESET and action.value not in frame.available_actions:
+            raise ValueError("Chosen action is not available in this observation")
+        return action, data, self._mind.game_decision
 
 
 class ArcCompetition(ArcPractice):

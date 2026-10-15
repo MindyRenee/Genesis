@@ -726,13 +726,11 @@ class SelfImprovement:
     }
 
     # Top-level modules beside python/ — the assembled mind, the
-    # console entry, and the platform adapters.
+    # console entry, and support adapters.
     _OWN_SOURCE_FILES: ClassVar[set[str]] = {
         "mind.py",
         "genesis_cli.py",
         "commitment.py",
-        "android_camera.py",
-        "android_tools.py",
         "discord_feed.py",
         "setup_embeddings.py",
     }
@@ -841,14 +839,10 @@ class SelfImprovement:
 
         applied: list[dict[str, Any]] = []
 
-        # Get current bugs
-        try:
-            scan_result = self.bug_reporter.scan()
-        except (OSError, SyntaxError, ValueError) as e:
-            logger.warning(f"Autonomous fix: bug scan failed: {e}")
-            return []
-
-        for bug in scan_result.bugs:
+        # Consume the open-issue list the audit left on the books.
+        # Scanning is the bug_scan urge's job — the felt drive; this
+        # path fixes what was found, it doesn't go looking.
+        for bug in self.bug_reporter.open_reports():
             if len(applied) >= max_fixes:
                 break
 
@@ -873,6 +867,9 @@ class SelfImprovement:
                 result = None
             if result is not None:
                 applied.append(result)
+                # The fix landed — discharge the report now rather
+                # than leaving it open until the next audit.
+                self.bug_reporter.resolve(bug.file, bug.category)
 
         if applied:
             logger.info(
@@ -1373,22 +1370,15 @@ class SelfImprovement:
 
         proposals: list[Proposal] = []
 
-        # Get recent bug reports. Use a high max_files to ensure we
-        # reach Genesis's own source — when scanning from the project
-        # root, rglob returns files in filesystem order, and the first
-        # 100 may be scripts/Rust files before reaching python/.
-        try:
-            scan_result = self.bug_reporter.scan(
-                max_files=500, include_tests=False
-            )
-            bugs = scan_result.bugs
-            logger.info(
-                f"Self-improvement: bug scan found {len(bugs)} bugs "
-                f"({scan_result.new_bugs} new)"
-            )
-        except (OSError, SyntaxError, ValueError) as e:
-            logger.warning(f"Self-improvement: bug scan failed: {e}")
-            return []
+        # Consume the open-issue list the bug-scan urge produced. The
+        # scan is the felt audit; proposals only act on what it found —
+        # generating proposals must not rescan the tree itself. Test
+        # files stay out of proposals (the old include_tests=False).
+        bugs = [
+            b for b in self.bug_reporter.open_reports()
+            if "test" not in Path(b.file).name.lower()
+            and "tests" not in Path(b.file).parts
+        ]
 
         # Prioritize by severity: warnings before style issues.
         # A silent_except (warning) is more important than a print_in_code (style).
@@ -3178,7 +3168,20 @@ class HeuristicExperiment:
                 file_path=file_path, description=description,
                 status="reverted", reason="replacement produced no change",
             )
+        return self._workspace_verify_promote(
+            file_path, source, modified_source, description,
+        )
 
+    def _workspace_verify_promote(
+        self,
+        file_path: str,
+        source: str,
+        modified_source: str,
+        description: str,
+    ) -> ExperimentRecord:
+        """Verify the edited file in the workspace tree — sync the
+        workspace copy, py_compile fast-fail, full test gate — and
+        promote it into the live tree only on a clean pass."""
         self._workspace.ensure()
         ws_file = Path(self._workspace.path) / file_path
 

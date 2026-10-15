@@ -143,7 +143,7 @@ class ConceptNetwork(
         "contradicts": ["contradicts", "is at odds with", "is incompatible with"],
         "prevents": ["prevents", "blocks", "stops"],
         "instance_of": ["is an example of", "is an instance of"],
-        "has_property": ["has the property of being", "is characterized by"],
+        "has_property": ["is", "has", "has the property of being"],
         "related_to": ["relates to", "connects to", "has to do with"],
         "goal_directed": ["aims to", "works toward"],
         "temporal_order": ["comes before", "precedes"],

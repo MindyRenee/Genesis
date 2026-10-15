@@ -91,6 +91,7 @@ from .protocol import (
     FIND_SIMILAR,
     GET_BODY_CONTROL,
     GET_BODY_STATE,
+    GET_FIELD_PROBE,
     GET_INFERENCE_SUMMARY,
     GET_ION_SUMMARY,
     GET_MEMORY_STATS,
@@ -124,6 +125,8 @@ from .protocol import (
     RETRIEVE_EPISODE,
     SAVE_INFERENCE,
     SEARCH_EPISODES,
+    SET_FIELD_CARRIER,
+    SET_FIELD_PHASE,
     SET_POLICY_AUTHORITY,
     SET_VOLITION,
     SET_WAKE_ALARM,
@@ -157,6 +160,7 @@ from .types import (
     BodyState,
     CoreState,
     Episode,
+    FieldProbeSignature,
     InferenceSummary,
     IonSummary,
     MemoryStats,
@@ -486,7 +490,7 @@ class GenesisClient:
         return PingResponse.unpack(resp)
 
     def get_state(self, *, timeout: float | None = None) -> CoreState:
-        """Get the full core state (3416 bytes), parsed into useful fields."""
+        """Get the full core state (3480 bytes), parsed into useful fields."""
         resp = self._request(GET_STATE, timeout=timeout)
         return CoreState.unpack(resp)
 
@@ -506,6 +510,71 @@ class GenesisClient:
         """
         resp = self._request(GET_ION_SUMMARY, timeout=timeout)
         return IonSummary.unpack(resp)
+
+    def get_field_probe(self, *, timeout: float | None = None) -> FieldProbeSignature | None:
+        """Get the body's real substrate signature (v2: 114 bytes; v1: 102).
+
+        The daemon's field-probe thread samples real electron-flow
+        dynamics — instruction throughput, scheduler jitter, P-state
+        transitions, interrupt flux — at ~250 Hz and decomposes them
+        at the wave bands' center frequencies. It also writes a
+        carrier rhythm into real work keyed to the body's phase.
+
+        Returns ``None`` when the probe isn't running or the daemon
+        predates the command: an absent channel is no reading, never
+        a zero reading — same discipline as ``get_sensor_presence``.
+        """
+        try:
+            resp = self._request(GET_FIELD_PROBE, timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return None
+        if not resp or resp[0] >= 0x80:
+            return None
+        return FieldProbeSignature.unpack(resp)
+
+    def set_field_phase(
+        self, phase: float, *, timeout: float | None = None
+    ) -> bool:
+        """Push the mind's modeled carrier-band phase into the probe.
+
+        The physics-follows-model leg of the mutual phase lock: the
+        probe extrapolates the pushed phase at its carrier rate and
+        pulls the generator's phase toward it each tick. A target not
+        refreshed within 5 s is dropped — a dead mind can't steer
+        the body's rhythm.
+
+        Returns ``False`` when the probe isn't running or the daemon
+        predates the command — an absent channel, never silent.
+        """
+        try:
+            resp = self._request(
+                SET_FIELD_PHASE, _F32.pack(phase), timeout=timeout
+            )
+        except (ConnectionError, OSError, ProtocolError):
+            return False
+        return bool(resp) and resp[0] == 1
+
+    def set_field_carrier(
+        self, depth: float, freq: float = 0.0, *, timeout: float | None = None
+    ) -> bool:
+        """Set the carrier's real-work modulation — the write side.
+
+        ``depth`` 0..1 scales the work-slice modulation (0 =
+        unmodulated work, carrier silent). ``freq`` 0 hands the rhythm
+        back to the body's phase; positive overrides it (clamped
+        0.1..100 Hz) so evaluation can drive arbitrary bands —
+        including epsilon-rate infraslow where the thermal field can
+        hold an oscillation.
+
+        Returns ``False`` when the probe isn't running or the daemon
+        predates the command — an absent channel, never silent.
+        """
+        payload = _F32.pack(depth) + _F32.pack(freq)
+        try:
+            resp = self._request(SET_FIELD_CARRIER, payload, timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return False
+        return bool(resp) and resp[0] == 1
 
     # ─── Tensor slab ──────────────────────────────────────────
     # Named multidimensional tensors shared with the daemon — world

@@ -358,6 +358,138 @@ def test_reset_returning_game_over_is_bounded(monkeypatch):
     assert env.resets == 4
 
 
+def test_level_steps_record_per_level_costs(monkeypatch):
+    """Steps per completed level — the within-game learning curve."""
+
+    class _LevelingEnv(_FakeEnv):
+        def __init__(self):
+            super().__init__()
+            self._levels = 0
+
+        def step(self, action, data=None, reasoning=None):
+            self.steps += 1
+            if self.steps in (2, 4):
+                self._levels += 1
+            if self.steps >= 5:
+                return _Frame(self.grid, state=_State.WIN, levels=3, win=3)
+            return _Frame(self.grid, levels=self._levels, win=3)
+
+    result = _practice(monkeypatch, _LevelingEnv()).play("fake", max_steps=10)
+    assert result.won
+    assert result.level_steps == [2, 2, 1]
+    assert sum(result.level_steps) <= result.steps
+
+
+def test_level_steps_recompletion_appends_after_death(monkeypatch):
+    """A level re-completed after a reset appends a second cost."""
+
+    class _DieAndRelevel(_FakeEnv):
+        def __init__(self):
+            super().__init__()
+            self._phase = 0
+
+        def step(self, action, data=None, reasoning=None):
+            self.steps += 1
+            self._phase += 1
+            if self._phase == 2:
+                return _Frame(self.grid, state=_State.GAME_OVER, levels=1)
+            if self._phase == 4:
+                return _Frame(self.grid, state=_State.WIN, levels=2, win=2)
+            return _Frame(self.grid, levels=1, win=2)
+
+    result = _practice(monkeypatch, _DieAndRelevel()).play("fake", max_steps=10)
+    assert result.won
+    assert result.level_steps == [1, 1, 1]
+
+
+def test_decision_sources_tally_winning_channels(monkeypatch):
+    """Which bid won each submitted move — counted, not argued."""
+    env = _FakeEnv(win_after=3)
+    result = _practice(monkeypatch, env).play("fake", max_steps=10)
+    assert result.decision_sources == {"explore": 3}
+
+
+def test_prior_learning_reports_carried_experience(monkeypatch):
+    """The result says whether past lessons rode into the run."""
+    mind = _StubMind()
+    mind._world_learning_loaded = "loaded"
+    result = _practice(monkeypatch, _FakeEnv(win_after=1), mind=mind).play(
+        "fake", max_steps=5
+    )
+    assert result.prior_learning == "loaded"
+
+    result = _practice(monkeypatch, _FakeEnv(win_after=1)).play(
+        "fake", max_steps=5
+    )
+    assert result.prior_learning == "none"
+
+
+def test_mind_play_arc_fresh_scope_and_restore(monkeypatch):
+    """A cold-start run sets the flag inside and restores it after."""
+    import mind as mind_mod
+
+    seen = []
+
+    class _Stub:
+        is_gaming = False
+        _fresh_world_run = False
+
+        def enter_game_mode(self):
+            self.is_gaming = True
+
+        def exit_game_mode(self):
+            self.is_gaming = False
+
+    class _Practice:
+        def __init__(self, mind, instructions=""):
+            self._m = mind
+
+        def play(self, game, max_steps=0):
+            seen.append(self._m._fresh_world_run)
+            return ArcResult(game_id=game, state="BUDGET")
+
+    monkeypatch.setattr("world.arc.ArcPractice", _Practice)
+    stub = _Stub()
+    mind_mod.Mind.play_arc(stub, ["g"], fresh=True)
+    assert seen == [True]
+    assert stub._fresh_world_run is False
+
+    seen.clear()
+    mind_mod.Mind.play_arc(stub, ["g"])
+    assert seen == [False]
+
+
+def test_mind_evaluation_fresh_scope(monkeypatch):
+    import mind as mind_mod
+    from world.arc import ArcEvaluation
+
+    seen = []
+
+    class Subject:
+        is_gaming = False
+        _fresh_world_run = False
+
+        def enter_game_mode(self):
+            self.is_gaming = True
+
+        def exit_game_mode(self):
+            self.is_gaming = False
+
+    class Practice:
+        def __init__(self, mind):
+            self._m = mind
+
+        def play_all(self, max_steps):
+            seen.append(self._m._fresh_world_run)
+            return ArcEvaluation(mode="offline", games=[])
+
+    monkeypatch.setattr("world.arc.ArcPractice", Practice)
+    subject = Subject()
+    mind_mod.Mind.evaluate_arc(subject, max_steps=5, fresh=True)
+    assert seen == [True]
+    assert subject._fresh_world_run is False
+
+
 def test_missing_observation_is_not_reported_as_budget(monkeypatch):
     class MissingFrameEnv(_FakeEnv):
         def step(self, action, data=None, reasoning=None):
@@ -524,13 +656,60 @@ def test_arc_command_selects_full_suite(flag, competition):
         score=75.0,
     ))
     report = _cmd_arc(subject, f"{flag} --steps 12")
-    assert calls == [{"max_steps": 12, "competition": competition}]
+    assert calls == [{"max_steps": 12, "competition": competition, "fresh": False}]
     assert "75.00%" in report
     assert "levels 1/1" in report
 
 
+def test_arc_command_passes_fresh_scope():
+    from genesis_cli import _cmd_arc
+    from world.arc import ArcEvaluation
+
+    seen = []
+    subject = SimpleNamespace(
+        play_arc=lambda games, **kw: seen.append((games, kw))
+        or [ArcResult(game_id=g) for g in games]
+    )
+    _cmd_arc(subject, "g --fresh")
+    assert seen == [(["g"], {"max_steps": 200, "fresh": True})]
+
+    seen.clear()
+    subject = SimpleNamespace(
+        evaluate_arc=lambda **kw: seen.append(kw) or ArcEvaluation(
+            mode="offline", games=[]
+        )
+    )
+    _cmd_arc(subject, "--all --fresh --steps 7")
+    assert seen == [{"max_steps": 7, "competition": False, "fresh": True}]
+
+
+def test_arc_command_runs_baseline_not_agent(monkeypatch):
+    import world.arc_baseline as baseline_mod
+    from genesis_cli import _cmd_arc
+
+    calls = []
+
+    class _Runner:
+        def __init__(self, policy):
+            calls.append(policy)
+
+        def play(self, game, max_steps):
+            calls.append((game, max_steps))
+            return ArcResult(game_id=game, state="BUDGET", steps=max_steps)
+
+    monkeypatch.setattr(baseline_mod, "ArcBaseline", _Runner)
+    subject = SimpleNamespace(
+        play_arc=lambda **kw: pytest.fail("baseline ran the agent")
+    )
+    out = _cmd_arc(subject, "g1 --baseline uniform --steps 9")
+    assert calls == ["uniform", ("g1", 9)]
+    assert "baseline 'uniform'" in out and "BUDGET" in out
+
+
 @pytest.mark.parametrize("args", ["--steps", "g --steps nope", "g --steps 0",
-                                   "--competition g", "--all --competition"])
+                                   "--competition g", "--all --competition",
+                                   "--competition --baseline uniform",
+                                   "--baseline"])
 def test_arc_command_rejects_invalid_requests_without_play(args):
     from genesis_cli import _cmd_arc
 

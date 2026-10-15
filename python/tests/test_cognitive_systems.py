@@ -1117,24 +1117,27 @@ def test_safeguard_urge_dynamics() -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Volition drive decomposition — audit appetite vs open-work state
+# Volition drive decomposition — felt audit vs open-work state
 # ═══════════════════════════════════════════════════════════════════
 #
-# The bug_scan urge is an *appetite*: it grows with time since the
-# last completed scan and is discharged by scanning itself. The
-# open-bug count is a *state*: it drives the improve urge (the
+# The bug_scan urge is an *interoceptive appetite*: it grows while she
+# feels something wrong — fresh swallowed failures, a hot error
+# signal, sustained caution — and is discharged by scanning itself.
+# The open-bug count is a *state*: it drives the improve urge (the
 # behavior that resolves bugs) and discharges only when bugs are
 # fixed. Conflating them made bug_scan compulsive — a count-driven
 # urge can never be discharged by scanning, so it re-fired on every
-# cooldown forever.
+# cooldown forever. And a clock-driven urge fires when nothing is
+# wrong, so recency now only stretches how long felt unease lingers.
 
 
-def test_bug_scan_urge_driven_by_recency_not_bug_count() -> None:
-    """bug_scan's stimulus is audit recency; improve keeps the open count."""
+def test_bug_scan_urge_driven_by_discomfort_not_bug_count() -> None:
+    """bug_scan's stimulus is felt wrongness; improve keeps the count."""
     from infrastructure.config import MindConfig
 
     urges = {u.name: u for u in MindConfig().volition.urges}
-    assert "scan_recency" in urges["bug_scan"].stimuli
+    assert "self_discomfort" in urges["bug_scan"].stimuli
+    assert "scan_recency" in urges["bug_scan"].stimuli  # backstop only
     assert "bug_count" not in urges["bug_scan"].stimuli
     # The open-work state drives the fixing behavior, not the looking.
     assert "bug_count" in urges["improve"].stimuli
@@ -1164,7 +1167,7 @@ def test_bug_scan_urge_ignores_bug_count() -> None:
 
 
 def test_bug_scan_urge_discharged_by_scan() -> None:
-    """A completed scan discharges the appetite; it regrows and re-fires."""
+    """A completed scan discharges the appetite; felt distress re-fires it."""
     from frontal_lobe.volition import Urge
 
     from infrastructure.config import MindConfig
@@ -1178,30 +1181,55 @@ def test_bug_scan_urge_discharged_by_scan() -> None:
         cooldown=cfg.cooldown,
         stimuli=dict(cfg.stimuli),
     )
-    # Never scanned — fully due. Fires within ~10 minutes.
+    # Felt wrongness is the primary drive — full distress crosses
+    # threshold within a couple of minutes, not on a clock.
     fired_at = None
     for t in range(1, 900):
-        urge.tick({"scan_recency": 1.0}, 1.0)
+        urge.tick({"self_discomfort": 1.0, "scan_recency": 0.0}, 1.0)
         if urge.is_ready():
             fired_at = t
             break
     assert fired_at is not None
     urge.consume()
-    # The scan discharges the appetite: recency resets to 0 and the
-    # urge must not re-fire through the cooldown window.
-    for _ in range(300):
-        urge.tick({"scan_recency": 0.0}, 1.0)
+    # Felt-clean: neither the appetite nor the faint recency backstop
+    # may re-fire inside this window — nothing is wrong, nothing scans.
+    for _ in range(600):
+        urge.tick({"self_discomfort": 0.0, "scan_recency": 0.0}, 1.0)
     assert not urge.is_ready()
-    # The appetite regrows — the periodic audit is preserved. The
-    # real-clock cooldown is simulated as elapsed (last_action reset)
-    # because this loop runs in milliseconds, not seconds.
+    # Distress returns — the urge regrows and re-fires. The real-clock
+    # cooldown is simulated as elapsed (last_action reset) because
+    # this loop runs in milliseconds, not seconds.
     urge.last_action = 0.0
     for _ in range(1200):
-        urge.tick({"scan_recency": 1.0}, 1.0)
+        urge.tick({"self_discomfort": 1.0, "scan_recency": 0.0}, 1.0)
         if urge.is_ready():
             break
     else:
-        pytest.fail("audit appetite never regrew after a completed scan")
+        pytest.fail("audit appetite never regrew under felt distress")
+
+
+def test_bug_scan_urge_sleeps_when_clean() -> None:
+    """No felt wrongness + partial recency = no scan. The clock alone
+    must not pace audits."""
+    from frontal_lobe.volition import Urge
+
+    from infrastructure.config import MindConfig
+
+    cfg = next(u for u in MindConfig().volition.urges if u.name == "bug_scan")
+    urge = Urge(
+        name=cfg.name,
+        threshold=cfg.threshold,
+        growth=cfg.growth,
+        decay=cfg.decay,
+        cooldown=cfg.cooldown,
+        stimuli=dict(cfg.stimuli),
+    )
+    # An hour since the last scan, nothing felt wrong — under the old
+    # schedule this context fired reliably; now it must stay below
+    # threshold for the whole window.
+    for _ in range(1200):
+        urge.tick({"self_discomfort": 0.0, "scan_recency": 0.25}, 1.0)
+    assert not urge.is_ready()
 
 
 def test_open_bug_count_excludes_resolved() -> None:

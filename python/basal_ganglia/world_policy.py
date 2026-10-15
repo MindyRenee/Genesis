@@ -56,6 +56,7 @@ if TYPE_CHECKING:
     from basal_ganglia.motor_field import MotorField
     from parietal_lobe.world_model import (
         Cell,
+        PartSig,
         SimState,
         WorldEntity,
         WorldModel,
@@ -81,6 +82,14 @@ _PLAN_STALL_DECAY = 6
 # pickup restores it. The drive is homeostatic — it says nothing
 # about which things are fuel; the meter's kind does.
 _LOW_RESERVE = 0.5
+
+# Reembodiment is a hypothesis too: once every action in the
+# repertoire has been exercised this many times and nothing has
+# moved contingently, the measurement is in — this world has no
+# avatar to rebind to. The channel concedes (returns no bid) so the
+# other drives can work a pointer-style world instead of spending
+# the whole episode asking a question that has been answered.
+_REEMBODY_SAMPLE_BOUND = 8
 
 
 class WorldPolicy:
@@ -230,101 +239,15 @@ class WorldPolicy:
         ]
         if not bids:
             return None
-        # Outcome gating: a bid whose action her own forward model
-        # already predicts will fail is not a real offer — issuing it
-        # spends a move re-confirming evidence she has. The forward
-        # model is consulted only where it has learned physics: an
-        # unknown effect is still a question, a known-but-failing
-        # transition is a veto.
         start = self._model.start_state()
         if start is not None:
-            nonfatal = [
-                b
-                for b in bids
-                if not self._model.action_fatal(
-                    start, str(b["action"])
-                )
-            ]
-            # A predicted death is a veto, not a fallback candidate.
-            # If every *bid* is lethal the repertoire itself may still
-            # contain an escape — the drives do not have to have asked
-            # for it before survival gets to use it. When every offered
-            # action is fatal, the least-explored one is still the only
-            # experiment a mandatory-action world leaves open.
-            if not nonfatal:
-                escape_safe = [
-                    a for a in available
-                    if not self._model.action_fatal(start, str(a))
-                ]
-                escape = [
-                    a for a in escape_safe
-                    if not self._known_failure(start, str(a))
-                ] or escape_safe
-                if not escape:
-                    # Some interfaces do not offer silence: returning
-                    # nothing ends the attempt more surely than the
-                    # predicted contact does. With every offered act
-                    # condemned, the least-explored one is the only
-                    # remaining experiment — uncertainty in the lethal
-                    # forecast is preferable to certain forfeiture.
-                    action = self._explore_action(
-                        self._model.self_entity, available
-                    )
-                    forced = {
-                        "action": action,
-                        "cell": self._cell_for(action),
-                        "source": "forced",
-                        "weight": 0.05,
-                    }
-                    self._persist = self._expected(forced)
-                    return forced
-                action = self._explore_action(
-                    self._model.self_entity, escape
-                )
-                nonfatal = [{
-                    "action": action,
-                    "cell": self._cell_for(action),
-                    "source": "evade",
-                    "weight": 0.35,
-                }]
-            bids = nonfatal
-            viable = [
-                b
-                for b in bids
-                if not self._known_failure(start, str(b["action"]))
-            ]
-            if viable:
-                bids = viable
-            else:
-                alternates = [
-                    a for a in available
-                    if not self._model.action_fatal(start, str(a))
-                    and not self._known_failure(start, str(a))
-                ]
-                if not alternates:
-                    waits = [
-                        a for a in available
-                        if not self._model.action_fatal(start, str(a))
-                    ]
-                    if not waits:
-                        return None
-                    action = self._wait_action(waits)
-                    bids = [{
-                        "action": action,
-                        "cell": self._cell_for(action),
-                        "source": "wait",
-                        "weight": _SELECT_THRESHOLD + 0.01,
-                    }]
-                else:
-                    action = self._explore_action(
-                        self._model.self_entity, alternates
-                    )
-                    bids = [{
-                        "action": action,
-                        "cell": self._cell_for(action),
-                        "source": "evade",
-                        "weight": 0.35,
-                    }]
+            gated = self._survival_gate(bids, available, start)
+            if gated is None:
+                return None
+            if isinstance(gated, dict):
+                self._persist = self._expected(gated)
+                return gated
+            bids = gated
         winner = max(bids, key=self._strength)
         self._track_pursuit(winner)
         me = self._model.self_entity
@@ -357,6 +280,105 @@ class WorldPolicy:
             self._persist = None
         self._persist = self._expected(winner)
         return winner
+
+    def _survival_gate(
+        self,
+        bids: list[dict[str, Any]],
+        available: list[str],
+        start: SimState,
+    ) -> list[dict[str, Any]] | dict[str, Any] | None:
+        """Veto bids the forward model predicts will fail or kill.
+
+        A bid whose action her own forward model already predicts
+        will fail is not a real offer — issuing it spends a move
+        re-confirming evidence she has. The forward model is
+        consulted only where it has learned physics: an unknown
+        effect is still a question, a known-but-failing transition
+        is a veto.
+
+        Returns the filtered bid list, a terminal action dict when
+        the gate itself must answer (``forced``), or None when no
+        offered act survives the model's forecast.
+        """
+        nonfatal = [
+            b for b in bids
+            if not self._model.action_fatal(start, str(b["action"]))
+        ]
+        # A predicted death is a veto, not a fallback candidate.
+        # If every *bid* is lethal the repertoire itself may still
+        # contain an escape — the drives do not have to have asked
+        # for it before survival gets to use it. When every offered
+        # action is fatal, the least-explored one is still the only
+        # experiment a mandatory-action world leaves open.
+        if not nonfatal:
+            escape_safe = [
+                a for a in available
+                if not self._model.action_fatal(start, str(a))
+            ]
+            escape = [
+                a for a in escape_safe
+                if not self._known_failure(start, str(a))
+            ] or escape_safe
+            if not escape:
+                # Some interfaces do not offer silence: returning
+                # nothing ends the attempt more surely than the
+                # predicted contact does. With every offered act
+                # condemned, the least-explored one is the only
+                # remaining experiment — uncertainty in the lethal
+                # forecast is preferable to certain forfeiture.
+                action = self._explore_action(
+                    self._model.self_entity, available
+                )
+                return {
+                    "action": action,
+                    "cell": self._cell_for(action),
+                    "source": "forced",
+                    "weight": 0.05,
+                }
+            action = self._explore_action(
+                self._model.self_entity, escape
+            )
+            nonfatal = [{
+                "action": action,
+                "cell": self._cell_for(action),
+                "source": "evade",
+                "weight": 0.35,
+            }]
+        bids = nonfatal
+        viable = [
+            b for b in bids
+            if not self._known_failure(start, str(b["action"]))
+        ]
+        if viable:
+            return viable
+        alternates = [
+            a for a in available
+            if not self._model.action_fatal(start, str(a))
+            and not self._known_failure(start, str(a))
+        ]
+        if not alternates:
+            waits = [
+                a for a in available
+                if not self._model.action_fatal(start, str(a))
+            ]
+            if not waits:
+                return None
+            action = self._wait_action(waits)
+            return [{
+                "action": action,
+                "cell": self._cell_for(action),
+                "source": "wait",
+                "weight": _SELECT_THRESHOLD + 0.01,
+            }]
+        action = self._explore_action(
+            self._model.self_entity, alternates
+        )
+        return [{
+            "action": action,
+            "cell": self._cell_for(action),
+            "source": "evade",
+            "weight": 0.35,
+        }]
 
     def _known_failure(self, start: SimState, action: str) -> bool:
         """The action has a learned effect and it fails from here.
@@ -530,6 +552,8 @@ class WorldPolicy:
         ]
         candidates = non_reset or available
         least = min(self._reembody_tries[a] for a in candidates)
+        if least >= _REEMBODY_SAMPLE_BOUND:
+            return None
         choices = [
             a for a in candidates if self._reembody_tries[a] == least
         ]
@@ -984,46 +1008,7 @@ class WorldPolicy:
         sig = model.self_signature()
         if sig is None:
             return None
-        retrials = [
-            e
-            for e in model.entities.values()
-            if not e.gone
-            and not e.is_self
-            and not e.part_of_self
-            and e.blocked_states
-            and (
-                (
-                    sig not in e.blocked_states
-                    and sig not in e.open_states
-                )
-                or (
-                    # Its verdict is from an older epoch — hidden
-                    # state may have moved since it was taken.
-                    sig in e.blocked_states
-                    and e.blocked_epochs.get(sig)
-                    not in (None, model._state_epoch)
-                )
-            )
-            and not model.is_display(e)
-            and not model.hazard_entity(e)
-        ]
-        if model.blocked_kinds:
-            retrials += [
-                e
-                for e in model.entities.values()
-                if not e.gone
-                and (
-                    e.color in model.transforms
-                    # Kinds whose unexplained contact opened a fresh
-                    # epoch — candidate hidden-state changers even
-                    # when the rewrite never reached her surface.
-                    or e.color in model._state_changers
-                )
-                and sig not in e.open_states
-                and not model.is_display(e)
-                and not model.hazard_entity(e)
-                and e not in retrials
-            ]
+        retrials = self._retrial_candidates(model, sig)
         if not retrials:
             return None
         # Stable questions first. A mobile entity's current cells are
@@ -1106,6 +1091,56 @@ class WorldPolicy:
             "source": "reprobe",
             "weight": 0.55,
         }
+
+    def _retrial_candidates(
+        self, model: WorldModel, sig: tuple[PartSig, ...]
+    ) -> list[WorldEntity]:
+        """Entities worth an instrumental retrial: things that refused
+        a body whose signature this body has no verdict for, plus —
+        while any kind refuses her current state — kinds that rewrote
+        her before (transformers manufacture the state the gate hasn't
+        refused)."""
+        retrials = [
+            e
+            for e in model.entities.values()
+            if not e.gone
+            and not e.is_self
+            and not e.part_of_self
+            and e.blocked_states
+            and (
+                (
+                    sig not in e.blocked_states
+                    and sig not in e.open_states
+                )
+                or (
+                    # Its verdict is from an older epoch — hidden
+                    # state may have moved since it was taken.
+                    sig in e.blocked_states
+                    and e.blocked_epochs.get(sig)
+                    not in (None, model._state_epoch)
+                )
+            )
+            and not model.is_display(e)
+            and not model.hazard_entity(e)
+        ]
+        if model.blocked_kinds:
+            retrials += [
+                e
+                for e in model.entities.values()
+                if not e.gone
+                and (
+                    e.color in model.transforms
+                    # Kinds whose unexplained contact opened a fresh
+                    # epoch — candidate hidden-state changers even
+                    # when the rewrite never reached her surface.
+                    or e.color in model._state_changers
+                )
+                and sig not in e.open_states
+                and not model.is_display(e)
+                and not model.hazard_entity(e)
+                and e not in retrials
+            ]
+        return retrials
 
     def _frontier_step(self, available: list[str]) -> str | None:
         """One step along the committed frontier route.

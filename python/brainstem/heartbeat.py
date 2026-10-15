@@ -64,8 +64,8 @@ class HeartbeatMixin:
           fatigue, Chaudhuri & Behan, 2000)
         - sustained_activity: time since last rest, normalized (BRAC,
           Kleitman 1963 — ~90 min activity cycles with mandatory rest)
-        - elevated_cortisol: subclinical stress (cortisol 0.20-0.50,
-          below stress phase but above resting)
+        - elevated_cortisol: subclinical stress (cortisol above
+          resting ~0.02, below the 0.06 stress-phase gate)
         """
         overstimulation = 0.0
         receptor_fatigue = 0.0
@@ -95,9 +95,9 @@ class HeartbeatMixin:
 
         try:
             summary = self.client.get_neuro_summary()
-            # Elevated cortisol: 0.20-0.50 is subclinical stress
-            # (below the 0.65 stress phase threshold but above rest)
-            # We approximate using global_tone and valence since
+            # Elevated cortisol: above resting (~0.02) but below the
+            # 0.06 stress-phase gate is subclinical stress. We
+            # approximate using global_tone and valence since
             # NeuroSummary doesn't expose cortisol directly.
             if summary.global_tone > 0.35 and summary.valence < 0.1:
                 elevated_cortisol = min(
@@ -584,11 +584,13 @@ class HeartbeatMixin:
         last_associate_time: float,
         last_dream_time: float,
         last_inference_save_time: float,
-    ) -> tuple[float, float, float]:
-        """Run associate, dream, and save_inference (heartbeat steps 7-9).
+        last_identity_time: float,
+    ) -> tuple[float, float, float, float]:
+        """Run associate, dream, save_inference, and identity synthesis
+        (heartbeat steps 7-9b).
 
         Returns updated (last_associate_time, last_dream_time,
-        last_inference_save_time).
+        last_inference_save_time, last_identity_time).
         """
         # ── 7. Associate (event-driven) ──
         # It finds associations when new episodes have been
@@ -635,11 +637,15 @@ class HeartbeatMixin:
                     e,
                 )
 
-        return last_associate_time, last_dream_time, last_inference_save_time
+        # ── 9b. Emergent identity synthesis (every ~5 min) ──
+        last_identity_time = self._heartbeat_identity(now, last_identity_time)
+
+        return (last_associate_time, last_dream_time,
+                last_inference_save_time, last_identity_time)
+
     def _heartbeat_sensors(
         self,
         now: float,
-        heartbeat_modules: tuple,
         last_heartbeat_time: float,
         last_sensor_time: float,
     ) -> tuple[float, float]:
@@ -655,52 +661,19 @@ class HeartbeatMixin:
 
         Returns updated (last_heartbeat_time, last_sensor_time).
         """
+        heartbeat_modules = (
+            MODULE_SENSORY,
+            MODULE_MOTOR,
+            MODULE_LANGUAGE,
+            MODULE_MEMORY,
+            MODULE_REASONING,
+            MODULE_METACOGNITION,
+        )
         channel = getattr(getattr(self, "brain", None), "thalamus", None)
         if now - last_heartbeat_time >= 10.0:
-            # Normalize accumulated per-module work into activity
-            # shares and report them with the heartbeat — this is
-            # how the daemon learns which brain part was firing.
-            #
-            # Every known module reports every round, including ones
-            # that did no measured work this window. The daemon's
-            # manifest cpu_share is write-only: UPDATE_MODULE_STATUS
-            # omits the field when the payload is short, and the
-            # daemon then leaves the previous value in place. Sending
-            # None for an idle module would therefore pin it at its
-            # last busy-window load — a module that went quiet would
-            # keep reporting phantom CPU, and total_cpu_load would
-            # ratchet toward its clamp. Idleness has to be stated as
-            # an explicit 0.0.
-            with self._module_seconds_lock:
-                total_work = sum(self._module_seconds.values())
-                shares = (
-                    {
-                        m: s / total_work
-                        for m, s in self._module_seconds.items()
-                    }
-                    if total_work > 0.0
-                    else {}
-                )
-                known = set(self._known_modules)
-                self._module_seconds.clear()
-            # The registered modules always report so their liveness is
-            # maintained; the sampler's modules report their measured
-            # share. A module in both sets is sent once, with the
-            # measured value. A module that posted a message for the
-            # other regions publishes it in the same heartbeat.
-            for module_id in set(heartbeat_modules) | known:
-                task_id = channel.take(module_id) if channel is not None else None
-                try:
-                    self.client.heartbeat_module(
-                        module_id, shares.get(module_id, 0.0),
-                        task_id=task_id,
-                    )
-                except (OSError, ConnectionError) as e:
-                    note_swallowed(
-                        "mind.heartbeat._heartbeat_sensors",
-                        e,
-                    )
-
+            total_work = self._report_module_heartbeats(
+                heartbeat_modules, channel
+            )
             # Cognitive work is metabolic work. total_work is measured
             # execution — seconds the sampler observed Genesis code at
             # a leaf frame during this window. Adenosine is the ATP
@@ -729,42 +702,98 @@ class HeartbeatMixin:
             last_heartbeat_time = now
 
         if now - last_sensor_time >= 5.0:
+            self._poll_body_sensors(channel)
+            last_sensor_time = now
+
+        return last_heartbeat_time, last_sensor_time
+
+    def _report_module_heartbeats(self, heartbeat_modules, channel) -> float:
+        """Report per-module activity shares with the heartbeat and
+        return this window's total measured work seconds.
+
+        Normalize accumulated per-module work into activity shares —
+        this is how the daemon learns which brain part was firing.
+
+        Every known module reports every round, including ones that
+        did no measured work this window. The daemon's manifest
+        cpu_share is write-only: UPDATE_MODULE_STATUS omits the field
+        when the payload is short, and the daemon then leaves the
+        previous value in place. Sending None for an idle module would
+        therefore pin it at its last busy-window load — a module that
+        went quiet would keep reporting phantom CPU, and
+        total_cpu_load would ratchet toward its clamp. Idleness has to
+        be stated as an explicit 0.0.
+        """
+        with self._module_seconds_lock:
+            total_work = sum(self._module_seconds.values())
+            shares = (
+                {
+                    m: s / total_work
+                    for m, s in self._module_seconds.items()
+                }
+                if total_work > 0.0
+                else {}
+            )
+            known = set(self._known_modules)
+            self._module_seconds.clear()
+        # The registered modules always report so their liveness is
+        # maintained; the sampler's modules report their measured
+        # share. A module in both sets is sent once, with the
+        # measured value. A module that posted a message for the
+        # other regions publishes it in the same heartbeat.
+        for module_id in set(heartbeat_modules) | known:
+            task_id = channel.take(module_id) if channel is not None else None
             try:
-                body_state = self.client.read_sensors()
-                if body_state is not None:
-                    # Which sensors this machine actually has. Fetched
-                    # with the body state rather than counted from it:
-                    # a BodyState field exists whether or not hardware
-                    # backs it, so without this the self-model would
-                    # treat an absent battery as a reading.
-                    presence = self.client.get_sensor_presence()
-                    # The same reading serves both layers. The
-                    # interoception layer turns it into an acute
-                    # stress signal; the self-model keeps the raw
-                    # hardware so the cognitive mind knows what it is
-                    # made of and what it is short of. One IPC call,
-                    # two consumers — the fetch already happened.
-                    self.regulator.interoception.update_from_body_state(body_state)
-                    self.self_model.update_hardware_body(body_state, presence)
-                report = self.client.get_subsystem_telemetry()
-                self.regulator.interoception.update_subsystem_telemetry(report)
-                # Feed the same report into its self-model — which
-                # part of it is firing becomes part of what it
-                # knows about itself (body_model.subsystem_activity /
-                # module_activity → embodiment_facts → language).
-                self.self_model.update_brain_activity(report)
-                # Deliver the same report to the regions that posted
-                # a message — the channel is carried on this sample.
-                if channel is not None:
-                    channel.deliver(getattr(report, "modules", ()))
-            except (OSError, ConnectionError, ValueError) as e:
+                self.client.heartbeat_module(
+                    module_id, shares.get(module_id, 0.0),
+                    task_id=task_id,
+                )
+            except (OSError, ConnectionError) as e:
                 note_swallowed(
                     "mind.heartbeat._heartbeat_sensors",
                     e,
                 )
-            last_sensor_time = now
+        return total_work
 
-        return last_heartbeat_time, last_sensor_time
+    def _poll_body_sensors(self, channel) -> None:
+        """One sensor sample, shared by three consumers: the
+        interoception layer (acute stress), the self-model (raw
+        hardware and per-module activity), and the thalamic channel
+        (posted module messages)."""
+        try:
+            body_state = self.client.read_sensors()
+            if body_state is not None:
+                # Which sensors this machine actually has. Fetched
+                # with the body state rather than counted from it:
+                # a BodyState field exists whether or not hardware
+                # backs it, so without this the self-model would
+                # treat an absent battery as a reading.
+                presence = self.client.get_sensor_presence()
+                # The same reading serves both layers. The
+                # interoception layer turns it into an acute
+                # stress signal; the self-model keeps the raw
+                # hardware so the cognitive mind knows what it is
+                # made of and what it is short of. One IPC call,
+                # two consumers — the fetch already happened.
+                self.regulator.interoception.update_from_body_state(body_state)
+                self.self_model.update_hardware_body(body_state, presence)
+            report = self.client.get_subsystem_telemetry()
+            self.regulator.interoception.update_subsystem_telemetry(report)
+            # Feed the same report into its self-model — which
+            # part of it is firing becomes part of what it
+            # knows about itself (body_model.subsystem_activity /
+            # module_activity → embodiment_facts → language).
+            self.self_model.update_brain_activity(report)
+            # Deliver the same report to the regions that posted
+            # a message — the channel is carried on this sample.
+            if channel is not None:
+                channel.deliver(getattr(report, "modules", ()))
+        except (OSError, ConnectionError, ValueError) as e:
+            note_swallowed(
+                "mind.heartbeat._heartbeat_sensors",
+                e,
+            )
+
     def _heartbeat_connectivity(
         self, now: float, last_connectivity_time: float
     ) -> float:
@@ -977,6 +1006,10 @@ class HeartbeatMixin:
         # oscillator, adenosine sleep pressure, and cortisol clearance
         # would all run at the wrong rate.
         last_advance_mono = time.monotonic()
+        # Reset volition engine's tick clock so the first dt reflects
+        # actual elapsed time since the heartbeat started, not since
+        # Mind.__init__ (which can be many seconds earlier during init).
+        self.volition._last_tick = time.time()
         return (
             last_stm_count, last_body_control_sig, last_heartbeat_time,
             last_sensor_time, last_body_control_time, last_connectivity_time,
@@ -984,6 +1017,25 @@ class HeartbeatMixin:
             last_inference_save_time, last_identity_time, last_self_priority,
             last_learner_phase, last_learner_wave, last_advance_mono,
         )
+
+    def _heartbeat_identity(
+        self, now: float, last_identity_time: float
+    ) -> float:
+        """Emergent identity synthesis (every ~5 min) — synthesizes who
+        it is from its actual experience and feeds it back into the
+        self-model, closing the loop: experience → emergent identity →
+        self-model → behavior. Returns the updated last-run time."""
+        if now - last_identity_time >= 300.0 and not self._is_sleeping:
+            try:
+                self.emergent_identity()
+            except Exception as e:  # noqa: BLE001
+                note_swallowed(
+                    "mind.heartbeat._heartbeat_loop",
+                    e,
+                )
+            return now
+        return last_identity_time
+
     def _heartbeat_loop(self) -> None:
         """Reactive cycle — the mind's own living rhythm.
 
@@ -1005,15 +1057,6 @@ class HeartbeatMixin:
         The loop paces itself, but the work is threshold-gated: if
         nothing crosses a threshold, the cycle does nothing.
         """
-        heartbeat_modules = (
-            MODULE_SENSORY,
-            MODULE_MOTOR,
-            MODULE_LANGUAGE,
-            MODULE_MEMORY,
-            MODULE_REASONING,
-            MODULE_METACOGNITION,
-        )
-
         # Track state for change detection
         (
             last_stm_count, last_body_control_sig, last_heartbeat_time,
@@ -1022,11 +1065,6 @@ class HeartbeatMixin:
             last_inference_save_time, last_identity_time, last_self_priority,
             last_learner_phase, last_learner_wave, last_advance_mono,
         ) = self._heartbeat_init_state()
-
-        # Reset volition engine's tick clock so the first dt reflects
-        # actual elapsed time since the heartbeat started, not since
-        # Mind.__init__ (which can be many seconds earlier during init).
-        self.volition._last_tick = time.time()
 
         while self._running:
             # One guard for the whole cycle.
@@ -1060,7 +1098,7 @@ class HeartbeatMixin:
 
                 # ── 3-4. Heartbeat modules and sensors ──
                 last_heartbeat_time, last_sensor_time = self._heartbeat_sensors(
-                    now, heartbeat_modules, last_heartbeat_time, last_sensor_time,
+                    now, last_heartbeat_time, last_sensor_time,
                 )
 
                 # ── 5. Body control ──
@@ -1083,26 +1121,13 @@ class HeartbeatMixin:
                     now, last_stm_count, last_consolidate_time,
                 )
 
-                # ── 7-9. Associate, dream, save inference ──
+                # ── 7-9b. Associate, dream, save inference, identity ──
                 (last_associate_time, last_dream_time,
-                 last_inference_save_time) = self._heartbeat_periodic_maintenance(
-                    now, last_associate_time, last_dream_time, last_inference_save_time,
+                 last_inference_save_time,
+                 last_identity_time) = self._heartbeat_periodic_maintenance(
+                    now, last_associate_time, last_dream_time,
+                    last_inference_save_time, last_identity_time,
                 )
-
-                # ── 9b. Emergent identity synthesis (every ~5 min) ──
-                # Synthesizes who it is from its actual experience and
-                # feeds it back into the self-model. This closes the loop:
-                # experience → emergent identity → self-model → behavior.
-                if now - last_identity_time >= 300.0 and not self._is_sleeping:
-                    try:
-                        self.emergent_identity()
-                        last_identity_time = now
-                    except Exception as e:  # noqa: BLE001
-                        note_swallowed(
-                            "mind.heartbeat._heartbeat_loop",
-                            e,
-                        )
-                        last_identity_time = now
 
                 # ── 10-13. Auto-sleep, volition, warn, cognition ──
                 self._heartbeat_final_steps()
@@ -1118,4 +1143,5 @@ class HeartbeatMixin:
                     f"({type(e).__name__}: {e}); continuing",
                     exc_info=True,
                 )
+                note_swallowed("mind.heartbeat.cycle", e)
             time.sleep(1.0)

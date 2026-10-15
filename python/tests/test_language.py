@@ -665,15 +665,21 @@ def test_generative_engine_no_empty_output() -> None:
 def test_integration_greeting_varies() -> None:
     """Greetings vary across multiple calls (not always the same).
 
-    The engine composes greetings from the concept network's seeded
-    utterance vocabulary (EXPRESSES edges from the ``greeting_word``
-    hub), matching production where ``mind.py`` always passes
-    ``network=shared_network``. Without a network the greeting slot
-    is empty and output collapses to the invariant fallback.
+    The engine composes greetings from vocabulary *acquired* into
+    the concept network — words heard as greetings attach to the
+    ``greeting_word`` hub via EXPRESSES edges and then compete for
+    production. Without acquisition the greeting population is
+    empty and output collapses to the invariant fallback.
     """
     model = _make_self_model()
     engine = GenerativeLanguage(model, seed=None, network=ConceptNetwork())  # random seed
     emotion = _make_emotion()
+
+    # Acquire greeting vocabulary through the comprehension-tagged
+    # speech act, the same path production uses when she hears
+    # "hello" and "hey there" as greetings.
+    engine.vocabulary.acquire_utterance_words("hello", "greeting")
+    engine.vocabulary.acquire_utterance_words("hey", "greeting")
 
     greetings = set()
     for _ in range(20):

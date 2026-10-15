@@ -170,15 +170,7 @@ class VQCodebook:
             raise ValueError("residual_scale must be finite and positive")
         if n == 0:
             # No data to train on — set empty state
-            self._prototypes = np.zeros((0, d), dtype=np.float32)
-            self._prototype_ids = np.zeros((0,), dtype=np.int32)
-            self._residuals = np.zeros((0, d), dtype=np.int8)
-            self._concept_names = []
-            self._reconstruction_error = 0.0
-            self._relative_reconstruction_error = 0.0
-            self._reconstruction_cosine = 0.0
-            self._residual_saturation_fraction = 0.0
-            self._training_iters = 0
+            self._reset_to_empty(d)
             return {
                 "final_error": 0.0,
                 "relative_error": 0.0,
@@ -190,6 +182,52 @@ class VQCodebook:
             }
         k = min(self.k, n)  # can't have more prototypes than points
 
+        prototypes, iters = self._train_kmeans(
+            vectors, k, iters, batch_size, seed
+        )
+        self._prototypes = prototypes
+        self._training_iters = iters
+
+        # Encode all vectors
+        self._encode_all(vectors, concept_names)
+
+        stats = {
+            "final_error": self._reconstruction_error,
+            "relative_error": self._relative_reconstruction_error,
+            "cosine": self._reconstruction_cosine,
+            "saturation": self._residual_saturation_fraction,
+            "iters": float(self._training_iters),
+            "k": float(k),
+            "n": float(n),
+        }
+        logger.info(
+            "VQ codebook trained: k=%d, n=%d, error=%.6f, iters=%d",
+            k, n, self._reconstruction_error, self._training_iters,
+        )
+        return stats
+
+    def _reset_to_empty(self, d: int) -> None:
+        """Zero out the trained state for an empty training set."""
+        self._prototypes = np.zeros((0, d), dtype=np.float32)
+        self._prototype_ids = np.zeros((0,), dtype=np.int32)
+        self._residuals = np.zeros((0, d), dtype=np.int8)
+        self._concept_names = []
+        self._reconstruction_error = 0.0
+        self._relative_reconstruction_error = 0.0
+        self._reconstruction_cosine = 0.0
+        self._residual_saturation_fraction = 0.0
+        self._training_iters = 0
+
+    def _train_kmeans(
+        self,
+        vectors: np.ndarray,
+        k: int,
+        iters: int,
+        batch_size: int,
+        seed: int,
+    ) -> tuple[np.ndarray, int]:
+        """Mini-batch k-means. Returns (prototypes, iters_run)."""
+        n = vectors.shape[0]
         rng = np.random.default_rng(seed)
 
         # Initialize prototypes via random sampling (k-means++ is
@@ -197,7 +235,6 @@ class VQCodebook:
         indices = rng.choice(n, size=k, replace=False)
         prototypes = vectors[indices].copy().astype(np.float32)
 
-        # Mini-batch k-means
         prev_error = float("inf")
         for iteration in range(iters):
             # Sample a mini-batch
@@ -226,30 +263,9 @@ class VQCodebook:
             error = self._compute_error(vectors, prototypes)
             if abs(prev_error - error) < 1e-6:
                 # Converged
-                iters = iteration + 1
-                break
+                return prototypes, iteration + 1
             prev_error = error
-
-        self._prototypes = prototypes
-        self._training_iters = iters
-
-        # Encode all vectors
-        self._encode_all(vectors, concept_names)
-
-        stats = {
-            "final_error": self._reconstruction_error,
-            "relative_error": self._relative_reconstruction_error,
-            "cosine": self._reconstruction_cosine,
-            "saturation": self._residual_saturation_fraction,
-            "iters": float(self._training_iters),
-            "k": float(k),
-            "n": float(n),
-        }
-        logger.info(
-            "VQ codebook trained: k=%d, n=%d, error=%.6f, iters=%d",
-            k, n, self._reconstruction_error, self._training_iters,
-        )
-        return stats
+        return prototypes, iters
 
     def _compute_error(self, vectors: np.ndarray, prototypes: np.ndarray) -> float:
         """Compute mean squared reconstruction error."""

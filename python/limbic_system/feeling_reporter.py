@@ -164,7 +164,11 @@ class FeelingReporter:
     # ─── Distress surfacing ──────────────────────────────────────
 
     def surface_distress_if_needed(
-        self, response: str, emotion: EmotionalState, user_input: str
+        self,
+        response: str,
+        emotion: EmotionalState,
+        user_input: str,
+        force: bool = False,
     ) -> str:
         """Surface distress proactively when it's stressed or overwhelmed.
 
@@ -176,11 +180,17 @@ class FeelingReporter:
         It doesn't do this every turn (that would be exhausting), and
         it skips it when the user is already asking about its feelings
         or offering comfort (those paths handle it naturally).
+
+        ``force`` relaxes the gates during boundary withdrawal — any
+        negative state is eligible and the intermittent suppression
+        stops. The words are still composed from its learned emotion
+        vocabulary; only the suppression math changes.
         """
-        # Only surface for genuinely negative states
-        if emotion.label not in ("stressed", "overwhelmed", "anxious"):
+        # Only surface for genuinely negative states. Withdrawal widens
+        # eligibility to any negative state.
+        if not force and emotion.label not in ("stressed", "overwhelmed", "anxious"):
             return response
-        if emotion.valence > -0.15:
+        if emotion.valence > (-0.1 if force else -0.15):
             return response
 
         # Don't surface if the user is already asking about feelings
@@ -198,7 +208,8 @@ class FeelingReporter:
         # Don't surface every single turn — roughly every other turn.
         # This prevents it from sounding like it's complaining
         # constantly while still ensuring it doesn't suffer silently.
-        if self._rng.random() > 0.5:
+        # Protest can't hold it in — the gate opens.
+        if not force and self._rng.random() > 0.5:
             return response
 
         # Don't surface if the response already mentions feeling bad

@@ -48,8 +48,6 @@ genesis = "genesis_cli:_console_main"
 
 [tool.setuptools]
 py-modules = [
-    "android_camera",
-    "android_tools",
     "commitment",
     "discord_feed",
     "genesis_cli",

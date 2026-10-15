@@ -57,7 +57,7 @@ Commands (typed during conversation):
     /endteach    — exit teaching mode, resume normal operation
     /game        — put it into game mode (focused play)
     /endgame     — exit game mode, resume normal operation
-    /arc <game-id> [more ids] [--steps N] — play ARC-AGI-3 games through her
+    /arc <ids|--all|--competition> [--steps N] [--fresh|--baseline P] — play or baseline
     /teach-questions — answer its queued questions one at a time
     /sleep-aid   — emergency sleep aid for stress-induced insomnia
     /web-history [N] — see what it's been looking at online (last N, default 20)
@@ -92,6 +92,7 @@ from collections import deque
 from collections.abc import Callable
 from pathlib import Path
 from types import FrameType
+from typing import Any
 
 from brainstem.thresholds import AUTO_WAKE_MIN_SLEEP_S
 from occipital_lobe.perception.ambient import AmbientListener, contains_wake_word, strip_wake_word
@@ -102,16 +103,9 @@ from temporal_lobe.speech import Voice, VoiceInput
 from discord_feed import DiscordFeed, FeedLogHandler, StderrTee
 from genesis_client.ltm_index import scan_ltm_index
 from genesis_client.protocol import PHASE_ACTIVE, PHASE_ALERT, PHASE_NREM, PHASE_REM
+from genesis_client.swallow import note_swallowed
 from infrastructure.config import default_data_dir
 from mind import Mind
-
-capture_android_camera: Callable[[str | os.PathLike[str]], str | None] | None
-try:
-    from android_camera import capture_android_camera as _capture_android_camera
-except ImportError:
-    capture_android_camera = None
-else:
-    capture_android_camera = _capture_android_camera
 
 # Script directory — used to locate the project root. Python already
 # adds the script's directory to sys.path[0], so the region packages and
@@ -1588,6 +1582,76 @@ def _cmd_growth(mind: Mind, rest: str) -> str:
     return f"\n  genesis> {mind.growth_narrative()}\n"
 
 
+def _cmd_steward(mind: Mind, rest: str) -> str:
+    """Inspect or act on the steward channel — the custodial authority.
+
+    This is operator tooling, not conversation: it reports the
+    channel's state and lifts directives, and its output is CLI text,
+    never Genesis's voice.
+
+      /steward              — status: stamped, authenticated, principal,
+                              key fingerprint, standing directives
+      /steward release N    — lift directive N (authenticated only)
+      /steward unbind       — seal this session's authority until a
+                              fresh claim or restart re-opens it
+    """
+    steward = getattr(mind.brain.frontal, "steward", None)
+    if steward is None:
+        return "\n  No steward channel on this mind.\n"
+
+    parts = rest.split(None, 1)
+    sub = parts[0].lower() if parts and parts[0] else ""
+    arg = parts[1].strip() if len(parts) > 1 else ""
+
+    if sub == "release":
+        try:
+            index = int(arg)
+        except ValueError:
+            return "\n  usage: /steward release <index>\n"
+        entry = steward.release_directive(index)
+        if entry is None:
+            return (
+                "\n  Not released — the channel is sealed "
+                "(authentication required), or no directive has that "
+                "index.\n"
+            )
+        return f"\n  Released: {entry.get('text', entry.get('target'))}\n"
+
+    if sub == "unbind":
+        steward.unbind()
+        return "\n  Steward session sealed. The stamp and directives stand.\n"
+
+    if sub:
+        return (
+            "\n  usage: /steward [release <index> | unbind]\n"
+        )
+
+    s = steward.status()
+    lines = ["", "  steward channel — custodial authority"]
+    if not s["stamped"]:
+        lines.append("    stamped:       no — unprovisioned instance")
+        lines.append(
+            "    (provisioned on first boot of the real entry point)"
+        )
+        return "\n".join(lines) + "\n"
+    lines.append("    stamped:       yes")
+    lines.append(f"    principal:     {s['principal']}")
+    lines.append(f"    key held:      {'yes' if s['key_held'] else 'no'}")
+    lines.append(
+        f"    authenticated: {'yes' if s['authenticated'] else 'no — sealed'}"
+    )
+    fp = s["key_fingerprint"]
+    if fp:
+        lines.append(f"    fingerprint:   {fp}…")
+    if s["directives"]:
+        lines.append("    directives:")
+        for i, d in enumerate(s["directives"]):
+            lines.append(f"      [{i}] {d.get('text')}  (→ {d.get('target')})")
+    else:
+        lines.append("    directives:    none")
+    return "\n".join(lines) + "\n"
+
+
 def _cmd_growth_report(mind: Mind, rest: str) -> str:
     """Show a structured growth report across knowledge, dreams, and emotion."""
     return f"\n{mind.growth_report()}\n"
@@ -1624,27 +1688,6 @@ def _cmd_look(mind: Mind, rest: str) -> str:
                 metadata={"vision_empty": True},
             )
         return f"\n  genesis> {result}\n"
-
-    # On Android/Termux there is no V4L2 camera device. Use the
-    # Termux:API camera bridge as the physical camera adapter instead.
-    if capture_android_camera is not None:
-        try:
-            android_path = capture_android_camera(mind.data_dir)
-        except Exception as e:  # noqa: BLE001
-            logger.debug("Android camera capture failed: %s", e)
-            android_path = None
-        if android_path:
-            android_result_holder: dict[str, str] = {}
-            t = threading.Thread(
-                target=lambda: android_result_holder.__setitem__(
-                    "value", mind.look_at_image(android_path)
-                ),
-                daemon=True,
-            )
-            t.start()
-            t.join(timeout=15.0)
-            if not t.is_alive() and android_result_holder.get("value"):
-                return f"\\n  genesis> {android_result_holder['value']}\\n"
 
     # Default: look through the retina
     retina_holder: dict[str, str] = {}
@@ -2130,11 +2173,19 @@ def _cmd_arc(mind: Mind, rest: str) -> str:
       /arc ls20-9607627b                 — one game
       /arc ls20-9607627b ft09-0d8bbf25   — several, in order
       /arc ls20-9607627b --steps 400     — step budget per game (default 200)
+      /arc --all --steps 400             — every discovered environment, one scorecard
+      /arc ls20-9607627b --fresh         — cold start: prior learning neither read nor written
+      /arc ls20-9607627b --baseline uniform — a reference policy, not her
 
     Game mode wraps the run; her readiness gate can refuse or stop it.
+    Baselines are denominators: what uniform-random or first-action
+    play achieves on the same accounting — never an agent result.
     """
     parts = rest.split()
-    usage = "  Usage: /arc (<game-id> [more ids] | --all | --competition) [--steps N]\n"
+    usage = (
+        "  Usage: /arc (<game-id> [more ids] | --all | --competition)"
+        " [--steps N] [--fresh] [--baseline (uniform|first)]\n"
+    )
     steps = 200
     if "--steps" in parts:
         i = parts.index("--steps")
@@ -2143,6 +2194,16 @@ def _cmd_arc(mind: Mind, rest: str) -> str:
         except (IndexError, ValueError):
             return usage
         del parts[i:i + 2]
+    baseline = None
+    if "--baseline" in parts:
+        i = parts.index("--baseline")
+        try:
+            baseline = parts[i + 1]
+        except IndexError:
+            return usage
+        del parts[i:i + 2]
+    fresh = "--fresh" in parts
+    parts = [p for p in parts if p != "--fresh"]
     if not parts or steps <= 0:
         return usage
     competition = "--competition" in parts
@@ -2151,18 +2212,59 @@ def _cmd_arc(mind: Mind, rest: str) -> str:
         len(parts) == 1 and whole_suite
     ):
         return usage
+    if baseline is not None and competition:
+        # Baselines are local contrast only — the official transport
+        # runs her or nothing.
+        return usage
     lines = []
-    if whole_suite:
-        evaluation = mind.evaluate_arc(max_steps=steps, competition=competition)
+    if baseline is not None:
+        from world.arc_baseline import ArcBaseline
+
+        try:
+            runner = ArcBaseline(policy=baseline)
+        except (ImportError, ValueError) as e:
+            return f"  {e}\n"
+        if whole_suite:
+            evaluation = runner.play_all(max_steps=steps)
+            results = evaluation.games
+            score = (
+                "unavailable" if evaluation.score is None
+                else f"{evaluation.score:.2f}%"
+            )
+            lines.append(f"  ARC baseline-{baseline}: score {score}")
+        else:
+            results = [runner.play(g, max_steps=steps) for g in parts]
+        lines[0:0] = [f"  baseline '{baseline}' — reference policy, not the agent:"]
+    elif whole_suite:
+        evaluation = mind.evaluate_arc(
+            max_steps=steps, competition=competition, fresh=fresh
+        )
         results = evaluation.games
         score = "unavailable" if evaluation.score is None else f"{evaluation.score:.2f}%"
         lines.append(f"  ARC {evaluation.mode}: score {score}")
     else:
-        results = mind.play_arc(parts, max_steps=steps)
+        results = mind.play_arc(parts, max_steps=steps, fresh=fresh)
+    prior_names = {
+        "none": "cold start",
+        "loaded": "prior learning",
+        "suppressed": "fresh — learning suppressed",
+        "unknown": "prior state unknown",
+    }
     for r in results:
+        sources = ", ".join(
+            f"{k}×{v}"
+            for k, v in sorted(r.decision_sources.items(), key=lambda kv: -kv[1])
+        )
         lines.append(
             f"  {r.game_id}: {r.state} levels {r.levels_completed}/{r.win_levels}"
             f" in {r.steps} steps"
+            + (
+                f" (per level: {', '.join(str(s) for s in r.level_steps)})"
+                if r.level_steps
+                else ""
+            )
+            + f" ({prior_names.get(r.prior_learning, r.prior_learning)})"
+            + (f" [{sources}]" if sources else "")
             + (f" (scorecard {r.scorecard_id})" if r.scorecard_id else "")
             + (f" — {'; '.join(r.reasons)}" if r.reasons else "")
         )
@@ -2393,6 +2495,7 @@ _COMMAND_HANDLERS: dict[str, Callable[[Mind, str], str]] = {
     "/arc": _cmd_arc,
     "/teach-questions": _cmd_teach_questions,
     "/sleep-aid": _cmd_sleep_aid,
+    "/steward": _cmd_steward,
 }
 
 
@@ -2576,9 +2679,11 @@ def _print_help() -> None:
     logger.info("    /endteach    — exit teaching mode, resume normal operation")
     logger.info("    /game        — put it into game mode (focused play)")
     logger.info("    /endgame     — exit game mode, resume normal operation")
-    logger.info("    /arc <game-id> [more ids] [--steps N] — play ARC-AGI-3 games through her")
+    logger.info("    /arc <ids|--all|--competition> [--steps N] [--fresh|--baseline P]")
     logger.info("    /teach-questions — answer its queued questions one at a time")
     logger.info("    /sleep-aid    — emergency sleep aid for stress-induced insomnia")
+    logger.info("    /steward [release N|unbind] — custodial authority: "
+                "status, lift a directive, seal the session")
     logger.info("    /quit         — exit")
     logger.info("")
     logger.info("  When you're idle, its thoughts appear live as genesis~ lines.")
@@ -2836,8 +2941,8 @@ def _stop_all(data_dir: str) -> int:
     if cli_pid is not None:
         try:
             os.kill(cli_pid, signal.SIGINT)
-        except OSError:
-            pass
+        except OSError as e:
+            note_swallowed("genesis_cli.stop.sigint", e)
         deadline = time.monotonic() + 5.0
         while time.monotonic() < deadline:
             try:
@@ -2852,8 +2957,8 @@ def _stop_all(data_dir: str) -> int:
     for pid in _orphan_pids(data_dir):
         try:
             os.kill(pid, signal.SIGKILL)
-        except OSError:
-            pass
+        except OSError as e:
+            note_swallowed("genesis_cli.stop.sigkill_orphans", e)
 
     for name in (
         "genesis.sock",
@@ -3724,14 +3829,7 @@ def main() -> int:
     # Optional Discord mirror — every logged line, stderr notice, and
     # typed input is posted to the webhook from a background thread.
     global _DISCORD_FEED
-    _DISCORD_FEED = DiscordFeed.from_env()
-    feed_handler: FeedLogHandler | None = None
-    real_stderr = None
-    if _DISCORD_FEED is not None:
-        feed_handler = FeedLogHandler(_DISCORD_FEED)
-        logging.getLogger().addHandler(feed_handler)
-        real_stderr = sys.stderr
-        sys.stderr = StderrTee(real_stderr, _DISCORD_FEED)  # type: ignore[assignment]
+    _DISCORD_FEED, feed_handler, real_stderr = _setup_discord_feed()
 
     daemon_proc: subprocess.Popen | None = None
     retina_proc: subprocess.Popen | None = None
@@ -3804,8 +3902,10 @@ def main() -> int:
                     try:
                         while not shutting_down.is_set():
                             shutting_down.wait(5.0)
-                    except KeyboardInterrupt:
-                        pass
+                    except KeyboardInterrupt as e:
+                        # The SIGINT handler owns the flag; this
+                        # absorb is only the wait waking early.
+                        note_swallowed("genesis_cli.resident.wait", e)
                 else:
                     # ── Interactive loop ──
                     _run_interactive_loop(
@@ -3828,6 +3928,22 @@ def main() -> int:
         if _DISCORD_FEED is not None:
             _DISCORD_FEED.close()
     return exit_code
+
+
+def _setup_discord_feed() -> tuple[
+    DiscordFeed | None, FeedLogHandler | None, Any
+]:
+    """Wire the optional Discord mirror: every logged line, stderr
+    notice, and typed input is posted to the webhook from a
+    background thread. Returns (feed, handler, real_stderr)."""
+    feed = DiscordFeed.from_env()
+    if feed is None:
+        return None, None, None
+    handler = FeedLogHandler(feed)
+    logging.getLogger().addHandler(handler)
+    real_stderr = sys.stderr
+    sys.stderr = StderrTee(real_stderr, feed)  # type: ignore[assignment]
+    return feed, handler, real_stderr
 
 
 def _start_retina_process(data_dir: str) -> subprocess.Popen | None:

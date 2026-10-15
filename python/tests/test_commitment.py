@@ -8,7 +8,11 @@ the per-tick re-digitization of the concept network's analog state.
 
 import pytest
 from temporal_lobe.concepts import ConceptNetwork, RelationType
-from temporal_lobe.concepts.dynamics import SPARK_MIN, SWEEP_INTERVAL_TICKS
+from temporal_lobe.concepts.dynamics import (
+    SPARK_MIN,
+    SUSTAIN_THRESHOLD,
+    SWEEP_INTERVAL_TICKS,
+)
 
 from commitment import CommitmentBoundary
 
@@ -140,12 +144,12 @@ def test_tick_snaps_subfloor_activation() -> None:
     signal = net.get_concept("signal")
     assert residue is not None and signal is not None
     residue.activation = 0.003  # below ACTIVATION_NOISE_FLOOR (0.005)
-    signal.activation = 0.5
+    signal.activation = 0.2  # below SUSTAIN_THRESHOLD — still dissipative
 
-    net.cortical_tick(arousal=0.3, gaba=0.5, ach=0.1, serotonin=0.5, noise=0.0)
+    net.cortical_tick(arousal=0.3, gaba=0.5, ach=0.0, serotonin=0.5, noise=0.0)
 
     assert residue.activation == 0.0
-    assert 0.0 < signal.activation < 0.5  # decayed but alive
+    assert 0.0 < signal.activation < 0.2  # decayed but alive
 
 
 def test_tick_leaves_no_subfloor_tail() -> None:
@@ -288,3 +292,87 @@ def test_sweep_rebuilds_set_and_clears_residue() -> None:
     assert "unmarked" in net._active_ids
     assert residue.activation == 0.0
     assert "residue" not in net._active_ids
+
+
+# ─── Recurrence — the field's self-excitation loop ──────────────
+
+
+def test_suprathreshold_coalition_persists() -> None:
+    """A coalition above the sustain threshold rebuilds its own
+    activation — the flow maintains its potential between inputs
+    instead of evaporating."""
+    net = ConceptNetwork()
+    net.add_concept("alpha", confidence=0.8)
+    net.add_concept("beta", confidence=0.8)
+    net.add_edge("alpha", "beta", RelationType.RELATED_TO, weight=0.9)
+    net.add_edge("beta", "alpha", RelationType.RELATED_TO, weight=0.9)
+    alpha = net.get_concept("alpha")
+    beta = net.get_concept("beta")
+    assert alpha is not None and beta is not None
+    alpha.activation = 0.6
+    beta.activation = 0.5
+
+    for _ in range(30):
+        net.cortical_tick(arousal=0.5, gaba=0.3, ach=0.2, serotonin=0.5, noise=0.0)
+
+    # Thirty ticks of decay would dissolve a purely dissipative
+    # field to nothing — the sustaining coalition is still alive.
+    assert alpha.activation > 0.0
+    assert beta.activation > 0.0
+
+
+def test_subthreshold_activation_still_decays() -> None:
+    """Below the threshold nothing changed — a lone weak activation
+    dies on schedule. Sparks can't bootstrap permanent attractors."""
+    net = ConceptNetwork()
+    net.add_concept("faint", confidence=0.8)
+    faint = net.get_concept("faint")
+    assert faint is not None and faint.activation is not None
+    faint.activation = 0.12  # below SUSTAIN_THRESHOLD
+
+    for _ in range(60):
+        net.cortical_tick(arousal=0.3, gaba=0.3, ach=0.0, serotonin=0.5, noise=0.0)
+
+    assert faint.activation == 0.0
+
+
+def test_dominant_coalition_suppresses_rivals() -> None:
+    """Divisive normalization makes dominance cost the field —
+    a strong coalition's persistence starves weaker rivals."""
+    net = ConceptNetwork()
+    for name in ("strong", "strong_ally", "weak"):
+        net.add_concept(name, confidence=0.8)
+    net.add_edge("strong", "strong_ally", RelationType.RELATED_TO, weight=0.9)
+    net.add_edge("strong_ally", "strong", RelationType.RELATED_TO, weight=0.9)
+    strong = net.get_concept("strong")
+    ally = net.get_concept("strong_ally")
+    weak = net.get_concept("weak")
+    assert strong is not None and ally is not None and weak is not None
+    strong.activation = 0.8
+    ally.activation = 0.7
+    weak.activation = 0.15  # isolated, just under threshold
+
+    for _ in range(60):
+        net.cortical_tick(arousal=0.5, gaba=0.3, ach=0.0, serotonin=0.5, noise=0.0)
+
+    assert strong.activation > 0.0
+    assert weak.activation == 0.0  # starved out by the dominant regime
+
+
+def test_threshold_separates_regimes() -> None:
+    """The threshold is the regime boundary: just below dies,
+    just above lives."""
+    net = ConceptNetwork()
+    net.add_concept("below", confidence=0.8)
+    net.add_concept("above", confidence=0.8)
+    below = net.get_concept("below")
+    above = net.get_concept("above")
+    assert below is not None and above is not None
+    below.activation = SUSTAIN_THRESHOLD - 0.05
+    above.activation = SUSTAIN_THRESHOLD + 0.05
+
+    for _ in range(60):
+        net.cortical_tick(arousal=0.3, gaba=0.3, ach=0.0, serotonin=0.5, noise=0.0)
+
+    assert below.activation == 0.0
+    assert above.activation > 0.0

@@ -487,14 +487,18 @@ impl IonState {
         // ATP consumption counts Na⁺/K⁺-ATPase and PMCA cycles, not passive
         // channels, NCX, or KCC2. ATP availability gates these pumps: adenosine is
         // treated as an ATP-depletion signal, cortisol adds a smaller stress
-        // cost, and sustained ionic workload consumes capacity.
+        // cost, and sustained ionic workload consumes capacity. Cortisol is
+        // expressed as a fraction of its reachable envelope (~0.02 rest,
+        // ~0.08 peak) — the raw level could never move this term.
         let atp_consumption = nak + pmca;
         let pump_capacity = NAK_MAX_RATE_MM_PER_S + pmca_max / CALCIUM_FREE_FRACTION;
         let load_target = finite_clamp(atp_consumption / pump_capacity, 0.0, 1.0);
         let load_alpha = 1.0 - (-dt / 5.0).exp();
         self.energy_load += (load_target - self.energy_load) * load_alpha;
         let atp_target = finite_clamp(
-            1.0 - 0.35 * adenosine - 0.35 * self.energy_load - 0.10 * cortisol,
+            1.0 - 0.35 * adenosine
+                - 0.35 * self.energy_load
+                - 0.10 * crate::state::neurochemical::cortisol_stress_fraction(cortisol),
             0.0,
             1.0,
         );

@@ -282,7 +282,7 @@ def test_respond_to_interaction_dampening_when_stressed() -> None:
         sentiment=0.5,
         is_encouragement=True,
         is_correction=False,
-        is_bonded_user=True,
+        is_steward=True,
         is_deep_conversation=False,
     )
     amounts = chem_amounts(impulses)
@@ -304,7 +304,7 @@ def test_respond_to_interaction_full_when_calm() -> None:
         sentiment=0.5,
         is_encouragement=True,
         is_correction=False,
-        is_bonded_user=True,
+        is_steward=True,
         is_deep_conversation=False,
     )
     amounts = chem_amounts(impulses)

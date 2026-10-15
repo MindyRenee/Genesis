@@ -338,7 +338,10 @@ do_report() {
             source_cache_b=$(dir_bytes "$RUNTIME_DIR/source_cache")
         fi
 
-        # Orphaned backups (stale — not created by any current code path)
+        # Orphaned backups (stale — not created by any current code path).
+        # `*.pre-prune-backup*` is deliberately absent: prune backups are the
+        # only rollback for a destructive concept-graph prune, so they are
+        # recovery material rather than disposable artifacts.
         local backup_b=0
         local backup_files=""
         while IFS= read -r f; do
@@ -350,7 +353,6 @@ do_report() {
             -name "*.pre-restore-backup" \
             -o -name "*.pre-cleanup*" \
             -o -name "*.pre-proposal*" \
-            -o -name "*.pre-prune-backup*" \
             -o -name "core_state.bin.bak.*" \
             -o -name "*.ltm_store.*.pre-restore-backup" \
             -o -name "ltm_store.*.pre-restore-backup" \
@@ -777,9 +779,11 @@ Two locations are tracked:
   PROJECT  — the source tree (build artifacts, caches, source code)
   RUNTIME  — ~/.local/share/genesis/ (live state + runtime artifacts)
 
-The --clean variants are safe: they never touch source code, configs,
-binary assets (python/voices/), live runtime state (cognitive_state,
-ltm_store, concept_archive, drawings, etc.), or the release binary.
+The --clean variants are safe for source and live state: they never touch
+source code, configs, binary assets (python/voices/), or live runtime
+state (cognitive_state, ltm_store, concept_archive, drawings, etc.).
+--clean-debug preserves target/release; --clean removes it too, and
+run.sh rebuilds it on demand.
 
 Every byte is classified:
   SOURCE   — irreplaceable (code, configs, assets, live state, docs)

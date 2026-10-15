@@ -34,6 +34,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from genesis_client.swallow import note_swallowed
+
 __all__ = ["Workspace", "WorkspaceStats"]
 
 # Never copied into the workspace: build output, dependency trees,
@@ -187,8 +189,8 @@ class Workspace:
                 subprocess.run(command, check=True, capture_output=True)
                 if self.is_materialized():
                     return
-            except (subprocess.CalledProcessError, OSError):
-                pass
+            except (subprocess.CalledProcessError, OSError) as e:
+                note_swallowed("workspace.materialize.rsync", e)
         # No rsync, or it failed — fall back to a plain copy so the
         # workspace still works.
         dst.mkdir(parents=True, exist_ok=True)

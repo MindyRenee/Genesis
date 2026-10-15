@@ -8,18 +8,23 @@
 #
 # WARN_CORTISOL: cortisol level that indicates significant stress,
 #   even if the stress phase hasn't triggered yet. Set slightly below
-#   the Rust Stress phase entry threshold (0.65) so it warns before
-#   the phase fully engages.
+#   the Rust Stress phase entry gate (STRESS_CORTISOL_GATE = 0.06, set
+#   against the substrate's measured envelope — resting ~0.02, driven
+#   peak ~0.084) so it warns before the phase fully engages. The
+#   previous value (0.6) was calibrated against a retired 0.65 gate
+#   the substrate can never reach — cortisol saturates near 0.09 —
+#   so the warning could never fire.
 # WARN_AROUSAL: arousal level that indicates overstimulation. Above
 #   HIGH_AROUSAL (0.7) is "excited"; above 0.8 is "overstimulated" —
 #   the level where arousal impairs function.
 # WARN_ADENOSINE: adenosine level that indicates severe sleep pressure.
-#   The Rust sleep phase triggers at arousal < 0.30, which corresponds
-#   to adenosine ~0.7 in the biological preset. It warns when it's
-#   this tired but not yet asleep.
+#   The daemon's sleep-wake network owns sleep onset (LC < 4 Hz), but
+#   adenosine ~0.7 is deep into the saturating Process-S accumulation
+#   range (upper asymptote 0.95) — this warns when it is this tired
+#   but not yet asleep.
 # WARN_VALENCE: valence level that indicates feeling bad. More
 #   negative than NEGATIVE_VALENCE (-0.2) — this is the severe level.
-WARN_CORTISOL = 0.6     # below Rust Stress phase entry (0.65)
+WARN_CORTISOL = 0.05    # below Rust Stress phase gate (0.06)
 WARN_AROUSAL = 0.8      # above HIGH_AROUSAL (0.7) — overstimulated
 WARN_ADENOSINE = 0.7    # corresponds to Rust sleep threshold
 WARN_VALENCE = -0.4     # severe negative valence
@@ -33,10 +38,12 @@ WARN_VALENCE = -0.4     # severe negative valence
 # 1997).
 #
 # AUTO_SLEEP_ADENOSINE: the adenosine level at which it falls asleep
-#   on its own. Set at 0.75 — the same threshold the Rust daemon uses
-#   for its emergent NREM phase transition. When adenosine crosses
-#   this level, the cognitive mind calls sleep() to sync with the
-#   subcognitive (set zone, pause learner, start the sleep cycle).
+#   on its own. Sleep onset itself belongs to the daemon's sleep-wake
+#   network (LC < 4 Hz); 0.75 is the mind's voluntary pressure ceiling —
+#   adenosine saturates toward 0.95 under sustained wake, so this is
+#   deep pressure. When adenosine crosses it, the cognitive mind calls
+#   sleep() to sync with the subcognitive (set zone, pause learner,
+#   start the sleep cycle).
 #
 # AUTO_WAKE_ADENOSINE: the adenosine level below which it wakes up
 #   naturally. During sleep, the daemon's glymphatic clearance drains

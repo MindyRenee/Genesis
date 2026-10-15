@@ -337,17 +337,55 @@ class GlobalWorkspace:
             True if the broadcast ignited (crossed threshold), False
             if it was below threshold (remained noncognitive).
         """
-        # Brain-wave-modulated ignition threshold.
-        # Gamma: long-range synchrony → easier ignition (lower threshold).
-        # Delta: deep rest → harder ignition (higher threshold).
-        effective_threshold = self.ignition_threshold
+        effective_threshold = self._effective_threshold(brain_waves)
+        to_distribute, ignited, just_ignited, recurrent_ignitions = (
+            self._contend(content, source, activation, metadata, effective_threshold)
+        )
+
+        # Distribute outside the lock to avoid holding it while
+        # modules process the broadcast (they may be slow).
+        for item in to_distribute:
+            self._distribute(item)
+            if id(item) in just_ignited and self.on_ignition is not None:
+                try:
+                    self.on_ignition(item, id(item) in recurrent_ignitions)
+                except Exception as e:  # noqa: BLE001
+                    # The ignition hook must never crash the workspace
+                    note_swallowed(
+                        "frontal_lobe.global_workspace.broadcast",
+                        e,
+                    )
+        return ignited
+
+    def _effective_threshold(
+        self, brain_waves: BrainWaveState | None
+    ) -> float:
+        """Brain-wave-modulated ignition threshold.
+        Gamma: long-range synchrony → easier ignition (lower threshold).
+        Delta: deep rest → harder ignition (higher threshold)."""
+        effective = self.ignition_threshold
         if brain_waves is not None:
             if brain_waves.dominant == BrainWave.GAMMA:
-                effective_threshold -= 0.1 * brain_waves.integration
+                effective -= 0.1 * brain_waves.integration
             elif brain_waves.dominant == BrainWave.DELTA:
-                effective_threshold += 0.15
-            effective_threshold = max(0.3, min(0.95, effective_threshold))
+                effective += 0.15
+            effective = max(0.3, min(0.95, effective))
+        return effective
 
+    def _contend(
+        self,
+        content: Any,
+        source: str,
+        activation: float,
+        metadata: dict[str, Any] | None,
+        effective_threshold: float,
+    ) -> tuple[list[WorkspaceItem], bool, set[int], set[int]]:
+        """The in-lock competition: refresh fast path, candidate
+        ignition, coalition ignitions from the pending pool, and
+        capacity enforcement.
+
+        Returns (items to distribute, whether the candidate ignited,
+        ids that just ignited, ids that ignited recurrently)."""
         to_distribute: list[WorkspaceItem] = []
         ignited = False
         just_ignited: set[int] = set()
@@ -414,20 +452,7 @@ class GlobalWorkspace:
 
                 self._enforce_capacity(just_ignited)
 
-        # Distribute outside the lock to avoid holding it while
-        # modules process the broadcast (they may be slow).
-        for item in to_distribute:
-            self._distribute(item)
-            if id(item) in just_ignited and self.on_ignition is not None:
-                try:
-                    self.on_ignition(item, id(item) in recurrent_ignitions)
-                except Exception as e:  # noqa: BLE001
-                    # The ignition hook must never crash the workspace
-                    note_swallowed(
-                        "frontal_lobe.global_workspace.broadcast",
-                        e,
-                    )
-        return ignited
+        return to_distribute, ignited, just_ignited, recurrent_ignitions
 
     def _distribute(self, item: WorkspaceItem) -> None:
         """Distribute an item to all registered modules."""

@@ -60,6 +60,7 @@ __all__ = [
     "FIND_SIMILAR",
     "GET_BODY_CONTROL",
     "GET_BODY_STATE",
+    "GET_FIELD_PROBE",
     "GET_INFERENCE_SUMMARY",
     "GET_ION_SUMMARY",
     "GET_MEMORY_STATS",
@@ -135,6 +136,8 @@ __all__ = [
     "SENSOR_RAPL",
     "SENSOR_SUPPLY_VOLTAGE",
     "SENSOR_TEMPERATURE",
+    "SET_FIELD_CARRIER",
+    "SET_FIELD_PHASE",
     "SET_POLICY_AUTHORITY",
     "SET_VOLITION",
     "SET_WAKE_ALARM",
@@ -262,6 +265,39 @@ SET_POLICY_AUTHORITY = 35
 # (0 = sleep, drives VLPO; 1 = wake, drives LC) + [f32 magnitude].
 # Response: [u8 ack]. Decays on the physics clock.
 SET_VOLITION = 46
+
+# The body's real measured substrate dynamics — the daemon's field
+# probe decomposes instruction throughput, scheduler jitter, P-state
+# transitions, and interrupt flux at the wave bands' center
+# frequencies, and reports the carrier rhythm it writes into real
+# work. Response: v2 is 114 bytes — [u8 version][10 f32 throughput
+# bands][10 f32 jitter bands][f32 throughput_mean][f32 jitter_cv]
+# [f32 pstate_rate][f32 irq_rate][f32 carrier_hz][u8 samples_ok]
+# [f32 carrier_lag][f32 carrier_phase][f32 carrier_coherence].
+# v1 is 102 bytes without the three phase fields.
+# Layout: `src/daemon/field_probe.rs`. Additive: no CoreState or
+# BodyState layout changes, so PROTOCOL_VERSION stays 3. A daemon
+# without a running probe returns a single error byte — an absent
+# channel, never a healthy zero.
+GET_FIELD_PROBE = 47
+
+# Push the mind's modeled carrier-band phase into the probe's
+# generator — the physics-follows-model leg of the mutual phase
+# lock. Request: [f32 phase_rad]. The probe extrapolates it at the
+# carrier rate and pulls its generator phase toward it each tick
+# (bounded first-order pull); a target not refreshed within 5 s is
+# dropped so a dead mind can't steer the body's rhythm. Reply:
+# [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
+SET_FIELD_PHASE = 48
+
+# Carrier write control — the modulation depth and frequency of the
+# probe's real-work carrier. Request: [f32 depth][f32 freq_hz].
+# Depth 0..1 (0 = unmodulated work); freq 0 hands the rhythm back to
+# the body's phase, positive overrides it (clamped 0.1..100 Hz) so
+# evaluation can drive arbitrary bands — including epsilon-rate
+# infraslow where the thermal field can hold an oscillation.
+# Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
+SET_FIELD_CARRIER = 49
 
 # Which optional hardware sensors this machine actually has.
 # Response: [u16 mask] — a bitmask of SENSOR_* below. A set bit means

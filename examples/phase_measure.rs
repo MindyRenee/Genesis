@@ -61,7 +61,11 @@ fn main() {
         print!(" {:>7}", format!("R{r}"));
     }
     println!();
-    for (label, row) in table.iter().enumerate().filter(|(_, row)| row.iter().any(|n| *n > 0)) {
+    for (label, row) in table
+        .iter()
+        .enumerate()
+        .filter(|(_, row)| row.iter().any(|n| *n > 0))
+    {
         print!("  {:<12}", MentalPhase::from_u8(label as u8).label());
         for n in row {
             print!(" {n:>7}");

@@ -129,9 +129,9 @@ Phasic boost:
 
 BDNF recovery driver:
     Serotonin drives BDNF expression — this is why SSRIs help
-    depression. When cortisol drops below 0.3 and BDNF is below
-    baseline, BDNF gets a recovery boost proportional to serotonin
-    level.
+    depression. When cortisol clears below the stress-phase gate
+    (0.06) and BDNF is below baseline, BDNF gets a recovery boost
+    proportional to serotonin level.
 
     recovery = srt_level * bdnf_recovery_rate * dt_scale
 
@@ -191,8 +191,14 @@ Valence equation:
     (DA × SRT synergy = 0.10 — balanced mood when both high)
 
 Stress phase:
-    CORT > 0.65 + SRT < 0.35 + hysteresis
-    (low serotonin is a stress indicator)
+    CORT > 0.06 + NE > 0.45 + SRT < 0.35 + hysteresis
+    (low serotonin is a stress indicator; the cortisol gate sits
+    inside the substrate's measured envelope — peak ~0.084)
+
+Sleep-state role:
+    When the sleep-wake network runs, serotonin is driven toward
+    SRT_BASE + SRT_FROM_LC * lc - SRT_FROM_REM * rem — the REM-off
+    dorsal raphe profile: waking 0.39, NREM 0.22, REM 0.07.
 
 BDNF/plasticity:
     plasticity_gate = BDNF * (1 - CORT * 0.5)

@@ -16,6 +16,8 @@ Subsystems:
         (``topology.py``)
     EdgeProposer — proposes new edges between concepts
         (``edge_proposer.py``)
+    SchemaInducer, ReifiedSchema — reifies repeated relational
+        structure into schema concepts (``schema_induction.py``)
     ConceptArchive, open_archive — cold storage for pruned concepts
         (``archive.py``)
 """
@@ -38,6 +40,7 @@ from .edge_proposer import EdgeProposer
 from .embeddings import EmbeddingStore
 from .holographic import HolographicGraph, circular_convolve, circular_correlate
 from .network import ConceptNetwork
+from .schema_induction import ReifiedSchema, SchemaInducer
 from .topology import NetworkTopology
 from .types import (
     Concept,
@@ -62,7 +65,9 @@ __all__ = [
     "EmbeddingStore",
     "HolographicGraph",
     "NetworkTopology",
+    "ReifiedSchema",
     "RelationType",
+    "SchemaInducer",
     "_column_of",
     "_normalize_id",
     "circular_convolve",

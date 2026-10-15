@@ -68,6 +68,56 @@ _INCOMPLETE_COPULA_BOUNDARY_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Slot-boundary artifacts — composition debris, not style:
+# - terminal punctuation followed by a continuation mark
+#   ("Right. — that's", "Yes. , I")
+# - continuation marks crowding a final punctuation position
+#   ("wondering —?", "curious about,?", "trails off—.")
+_CONTINUATION_ARTIFACT_RE = re.compile(
+    r"[.!?]\s+[—–-]|[,;:—–-]+\s*[.!?]"
+)
+
+
+# Words that carry no propositional content on their own — pronouns
+# and copulas. A sentence built from only these ("I.", "I'm I.",
+# "it is it.") is degenerate: it articulates nothing.
+_DEGENERATE_WORDS = frozenset({
+    "i", "me", "my", "you", "your", "he", "she", "it", "its", "we",
+    "our", "they", "their", "them", "him", "her", "us", "this", "that",
+    "these", "those", "i'm", "i am", "am", "is", "are", "was", "were",
+    "be", "been", "being",
+})
+
+
+# Contraction fragments after tokenization — "I'm" splits into
+# ["i", "m"], "it's" into ["it", "s"]. The fragment half is a
+# copula/auxiliary remnant, not content.
+_CONTRACTION_FRAGMENTS = frozenset({"m", "re", "s", "ve", "ll", "d"})
+
+
+def _is_degenerate_sentence(sentence: str) -> bool:
+    """True when a sentence contains only pronouns and copulas.
+
+    "I.", "I'm I.", "it is it." — the surface is well-formed but the
+    sentence says nothing. Better to say nothing than this.
+    """
+    words = [w.casefold() for w in _WORD_RE.findall(sentence)]
+    if not words:
+        return True
+    if len(words) > 4:
+        return False
+    content = [
+        w for w in words
+        if w not in _CONTRACTION_FRAGMENTS
+        and w not in {"am", "is", "are", "was", "were", "be", "been", "being"}
+    ]
+    if not content:
+        return True
+    if all(w in _DEGENERATE_WORDS for w in content):
+        return True
+    # pronoun + copula + same pronoun ("I'm I", "it is it")
+    return len(set(content)) == 1 and content[0] in _DEGENERATE_WORDS
+
 
 def _is_plain_content_frame(structure: SentenceStructure) -> bool:
     """True when a structure is just ``{content}`` plus punctuation.
@@ -531,6 +581,10 @@ class GenerativeLanguage(Language):
             # empty and are suppressed by the caller.
             if thought.metadata.get("knowledge") is not None:
                 return ""
+            # A lone pronoun or function word is not an utterance —
+            # returning it emits "I." as a self-report.
+            if _is_degenerate_sentence(thought.content):
+                return ""
             return thought.content
         return max(
             candidates,
@@ -622,6 +676,12 @@ class GenerativeLanguage(Language):
             score -= 0.25
         if _MULTISPACE_RE.search(text) or _SPACE_BEFORE_PUNCT_RE.search(text):
             score -= 0.15
+        # Slot-boundary artifacts: terminal punctuation followed by a
+        # continuation mark (". —", ".,") and continuation marks before
+        # terminal punctuation (",?", "—."). Both are composition
+        # debris, not deliberate style.
+        if _CONTINUATION_ARTIFACT_RE.search(text):
+            score -= 0.2
 
         sentences = [
             sentence.strip()
@@ -646,6 +706,7 @@ class GenerativeLanguage(Language):
                 or not first_letter
                 or first_letter.islower()
                 or incomplete
+                or _is_degenerate_sentence(sentence)
             ):
                 malformed += 1
         if sentences:
@@ -703,9 +764,79 @@ class GenerativeLanguage(Language):
     def _compose_grammar(self, thought: Thought, emotion: EmotionalState) -> str:
         """Compose text using grammar + vocabulary (the fallback path)."""
         intent = thought.intent
+        context = self._grammar_context(thought)
 
-        # Build context for slot filling
-        context: dict[str, Any] = {
+        # Determine how many sentences to generate
+        num_sentences = self._determine_length(intent, emotion, thought)
+
+        pool, num_sentences = self._structure_pool(
+            intent, context, num_sentences
+        )
+
+        # Select the first (content-bearing) sentence structure
+        emotion_weight = emotion.creativity * 0.5 + emotion.openness_to_engage * 0.5
+        first_structure = self.grammar.select_structure(
+            intent, emotion_weight, pool=pool
+        )
+
+        # Generate the first sentence (carries the {content} slot)
+        sentences: list[str] = []
+        first_sentence = self._fill_structure(
+            first_structure, context, emotion, thought
+        )
+        if first_sentence:
+            sentences.append(first_sentence)
+
+        # Generate follow-up sentences using content-free structures.
+        # This prevents the content-echo defect: when every structure
+        # fills the same {content} slot, multi-sentence output repeats
+        # the content ("A dog is a mammal. A dog is a mammal."). The
+        # follow-up structures express reflection, qualification, or
+        # engagement WITHOUT repeating the content.
+        for _ in range(num_sentences - 1):
+            followup = self.grammar.select_followup(intent, emotion_weight)
+            if followup is None:
+                break  # no follow-up structures for this intent
+            sentence = self._fill_structure(
+                followup, context, emotion, thought
+            )
+            if sentence:
+                sentences.append(sentence)
+
+        # Drop content-free sentences (empty strings, bare punctuation
+        # like "." left when every slot in the structure was empty).
+        # If nothing has word content, fall back to the raw content —
+        # a bare "." is never an acceptable utterance.
+        sentences = [s for s in sentences if re.search(r"\w", s)]
+        # Drop degenerate sentences — a lone pronoun ("I.") or a
+        # pronoun-copula echo of itself ("I'm I.", "it is it.")
+        # articulates nothing. If nothing survives, the thought is
+        # unverbalized: return empty rather than reciting the raw
+        # content, so the caller can suppress it.
+        sentences = [s for s in sentences if not _is_degenerate_sentence(s)]
+        if not sentences:
+            # Fall back to the raw content — unless it too is
+            # degenerate. A lone "I" is unverbalized, not an utterance.
+            sentences = (
+                [] if _is_degenerate_sentence(thought.content)
+                else [thought.content]
+            )
+        if not sentences:
+            return ""
+
+        # Apply voice
+        text = self.voice.apply(sentences, emotion, intent)
+
+        return text
+
+    def _grammar_context(self, thought: Thought) -> dict[str, Any]:
+        """Build the slot-filling context from a thought's metadata.
+
+        Every entry is structured data the vocabulary composes words
+        from — self-description fragments, relation/situation answers,
+        feeling fragments, vision scenes. The sources supply facts; the
+        vocabulary supplies the phrasing."""
+        return {
             "content": thought.content,
             "topics": thought.topics,
             "confidence": thought.confidence,
@@ -798,31 +929,37 @@ class GenerativeLanguage(Language):
             "problem_result": thought.metadata.get("problem_result"),
         }
 
-        # Determine how many sentences to generate
-        num_sentences = self._determine_length(intent, emotion, thought)
+    def _structure_pool(
+        self,
+        intent: str,
+        context: dict[str, Any],
+        num_sentences: int,
+    ) -> tuple[list[SentenceStructure] | None, int]:
+        """Narrow the sentence-structure pool for special content.
 
-        # When the thought carries self-description fragments, the
-        # vocabulary composes complete sentence candidates ("I care
-        # about X", "Alice is a creator"). Copula frames ("I am
-        # {content}") only fit when every candidate is guaranteed to
-        # lead with "I'm" — i.e. when the fragments carry name/trait/
-        # complement material. Otherwise they're excluded so the frame
-        # can't produce "I am care about X".
+        When the thought carries self-description fragments, the
+        vocabulary composes complete sentence candidates ("I care
+        about X", "Alice is a creator"). Copula frames ("I am
+        {content}") only fit when every candidate is guaranteed to
+        lead with "I'm" — i.e. when the fragments carry name/trait/
+        complement material. Otherwise they're excluded so the frame
+        can't produce "I am care about X".
+
+        Composed knowledge content is already a complete
+        multi-sentence statement — definition, relationship clauses,
+        discovery, memory, and a confidence closing are composed
+        inside the vocabulary. Frames that glue a tail onto
+        {content} assume the slot is a single clause, and follow-up
+        sentences would stack hedges onto a finished paragraph.
+        Restrict to a plain carrier so the composed text stands on
+        its own.
+        """
         pool: list[SentenceStructure] | None = None
         if context.get("self_fragments"):
             pool = self._self_fragment_pool(
                 self.grammar.get_structures(intent),
                 context["self_fragments"],
             )
-
-        # Composed knowledge content is already a complete
-        # multi-sentence statement — definition, relationship clauses,
-        # discovery, memory, and a confidence closing are composed
-        # inside the vocabulary. Frames that glue a tail onto
-        # {content} ("{content} and that's because {reason_clause}.")
-        # assume the slot is a single clause, and follow-up sentences
-        # would stack hedges onto a finished paragraph. Restrict to a
-        # plain carrier so the composed text stands on its own.
         if context.get("knowledge") or context.get("definition"):
             plain = [
                 s
@@ -832,49 +969,7 @@ class GenerativeLanguage(Language):
             if plain:
                 pool = plain
                 num_sentences = 1
-
-        # Select the first (content-bearing) sentence structure
-        emotion_weight = emotion.creativity * 0.5 + emotion.openness_to_engage * 0.5
-        first_structure = self.grammar.select_structure(
-            intent, emotion_weight, pool=pool
-        )
-
-        # Generate the first sentence (carries the {content} slot)
-        sentences: list[str] = []
-        first_sentence = self._fill_structure(
-            first_structure, context, emotion, thought
-        )
-        if first_sentence:
-            sentences.append(first_sentence)
-
-        # Generate follow-up sentences using content-free structures.
-        # This prevents the content-echo defect: when every structure
-        # fills the same {content} slot, multi-sentence output repeats
-        # the content ("A dog is a mammal. A dog is a mammal."). The
-        # follow-up structures express reflection, qualification, or
-        # engagement WITHOUT repeating the content.
-        for _ in range(num_sentences - 1):
-            followup = self.grammar.select_followup(intent, emotion_weight)
-            if followup is None:
-                break  # no follow-up structures for this intent
-            sentence = self._fill_structure(
-                followup, context, emotion, thought
-            )
-            if sentence:
-                sentences.append(sentence)
-
-        # Drop content-free sentences (empty strings, bare punctuation
-        # like "." left when every slot in the structure was empty).
-        # If nothing has word content, fall back to the raw content —
-        # a bare "." is never an acceptable utterance.
-        sentences = [s for s in sentences if re.search(r"\w", s)]
-        if not sentences:
-            sentences = [thought.content]
-
-        # Apply voice
-        text = self.voice.apply(sentences, emotion, intent)
-
-        return text
+        return pool, num_sentences
 
     def _fill_structure(
         self,
@@ -893,7 +988,8 @@ class GenerativeLanguage(Language):
         personality = self.self_model.personality
         parts: list[str] = []
         prev_literal = ""
-        for seg in structure.segments:
+        segments = structure.segments
+        for i, seg in enumerate(segments):
             if isinstance(seg, Literal):
                 parts.append(seg.text)
                 prev_literal = seg.text
@@ -925,9 +1021,28 @@ class GenerativeLanguage(Language):
                     and word
                     and prev_literal
                     and prev_literal.rstrip().endswith(("I am", "I'm"))
-                    and word.startswith(("I am ", "I'm ", "I "))
+                    and (
+                        word.startswith(("I am ", "I'm ", "I "))
+                        or word.rstrip(".!?").strip().lower()
+                        in ("i", "i'm", "i am")
+                    )
                 ):
                     word = self._strip_leading_pronoun(word)
+                # Continuation-punctuation guard: a slot fill ending in
+                # terminal punctuation leaves ". —" or ".," artifacts
+                # when the next literal continues the same sentence —
+                # one that opens with a comma/dash or a lowercase word.
+                # (A literal opening with a capital letter begins a new
+                # sentence, where the fill's terminal mark belongs.)
+                if word and word[-1] in ".!?":
+                    nxt = segments[i + 1] if i + 1 < len(segments) else None
+                    if isinstance(nxt, Literal):
+                        lead = nxt.text.lstrip()
+                        if (
+                            lead[:1] in ("—", "–", ",", ";", ":")
+                            or lead[:1].islower()
+                        ):
+                            word = word.rstrip(".!?").rstrip()
                 parts.append(word)
 
         text = "".join(parts)
@@ -943,13 +1058,15 @@ class GenerativeLanguage(Language):
             # Strip trailing "?" if the content already ends with one,
             # then add exactly one. This prevents "??" when the slot
             # content (e.g. question_content) already ends with "?".
-            text = text.rstrip("?").rstrip() + "?"
+            # Continuation punctuation an emptied slot left behind
+            # (",?", "—?") is stripped as well.
+            text = text.rstrip("?").rstrip().rstrip(",;:—–-").rstrip() + "?"
         elif structure.sentence_type.value == "exclamatory":
             if not text.endswith("!"):
-                text = text.rstrip(".").rstrip() + "!"
+                text = text.rstrip(".").rstrip().rstrip(",;:—–-").rstrip() + "!"
         else:
             if not text.endswith((".", "!", "?")):
-                text += "."
+                text = text.rstrip(",;:—–-").rstrip() + "."
 
         return text.strip()
 
@@ -1005,11 +1122,15 @@ class GenerativeLanguage(Language):
         applied to content that already starts with "I am"/"I'm"/"I ",
         the result is a pronoun collision ("I'm I am Genesis...").
         This strips the leading pronoun so the frame wraps the
-        predicate, not the full first-person sentence.
+        predicate, not the full first-person sentence. A bare "I",
+        "I'm", or "I am" as the entire slot fill reduces to empty —
+        "I'm I." and "I'm I'm." are not utterances.
         """
         for prefix in ("I am ", "I'm ", "I "):
             if word.startswith(prefix):
                 return word[len(prefix):]
+        if word.rstrip(".!?").strip().lower() in ("i", "i'm", "i am"):
+            return ""
         return word
 
     def _determine_length(self, intent: str, emotion: EmotionalState, thought: Thought) -> int:

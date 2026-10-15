@@ -1376,6 +1376,36 @@ class ActionFeedback:
                 "discrepancy",
             )
 
+        self._external_causes(
+            attempt, actual, actual_cause, discrepancy, model, add
+        )
+
+        if not hypotheses:
+            add(
+                "unknown_discrepancy",
+                0.25,
+                ["prediction differed but no direct cause was observed"],
+                "diagnostic",
+            )
+
+        ranked = sorted(
+            hypotheses.values(),
+            key=lambda h: (h.source != "observed", -h.confidence, h.cause),
+        )
+        return ranked[:8]
+
+    def _external_causes(
+        self,
+        attempt: ActionAttempt,
+        actual: OutcomeState,
+        actual_cause: str,
+        discrepancy,
+        model: _ActionModel,
+        add: Callable[[str, float, Iterable[str], str], None],
+    ) -> None:
+        """Fold the three external evidence channels into the
+        hypothesis set: the learned failure history, the concept
+        graph's CAUSES edges, and the abductive adapter."""
         top = model.top_failure_cause()
         if top is not None and actual.get("ok") is False:
             cause, count = top
@@ -1410,20 +1440,6 @@ class ActionFeedback:
                     )
             except Exception as e:  # noqa: BLE001
                 logger.debug(f"causal inference adapter failed: {e}")
-
-        if not hypotheses:
-            add(
-                "unknown_discrepancy",
-                0.25,
-                ["prediction differed but no direct cause was observed"],
-                "diagnostic",
-            )
-
-        ranked = sorted(
-            hypotheses.values(),
-            key=lambda h: (h.source != "observed", -h.confidence, h.cause),
-        )
-        return ranked[:8]
 
     @staticmethod
     def _cause_for_mismatch(

@@ -34,6 +34,63 @@ __all__ = ["ConceptLearner"]
 logger = logging.getLogger(__name__)
 
 
+# Labeling patterns by state kind — each captures the state word
+# being named. These are vocabulary frames (building blocks); the
+# learner uses them to attach heard words to structural categories.
+_EMOTION_PATTERNS = [
+    r"you (?:seem|are feeling|are experiencing|feel like|feel|are|look)\s+(\w+)",
+    r"you'?re feeling (\w+)",
+    r"you'?re experiencing (\w+)",
+    r"you'?re (\w+)",
+    r"that'?s called (\w+)",
+    r"this feeling is (\w+)",
+    r"that feeling is (\w+)",
+    r"(\w+) is a feeling",
+    r"(\w+) is an emotion",
+    r"what you'?re feeling is (\w+)",
+]
+
+_MODE_PATTERNS = [
+    r"your thinking is (\w+)",
+    r"your mind is (\w+)",
+    r"your thoughts are (\w+)",
+    r"you'?re thinking (\w+)",
+    r"your cognition is (\w+)",
+    r"your focus is (\w+)",
+]
+
+_CAUSE_PATTERNS = [
+    r"what'?s causing this is (\w+)",
+    r"what'?s causing you is (\w+)",
+    r"the cause is (\w+)",
+    r"this is because of (\w+)",
+    r"what'?s bothering you is (\w+)",
+    r"what'?s troubling you is (\w+)",
+    r"you'?re stressed because of (\w+)",
+    r"you'?re anxious because of (\w+)",
+    r"this is from (\w+)",
+]
+
+_PLASTICITY_PATTERNS = [
+    r"your learning is (blocked|shut|closed)",
+    r"your learning is (\w+)",
+    r"your memory is (\w+)",
+    r"you can'?t absorb (\w+)",
+    r"you can'?t learn (\w+)",
+    r"your plasticity is (\w+)",
+]
+
+_LABELING_SKIP_WORDS = {
+    "a", "an", "the", "this", "that", "it", "so",
+    "very", "really", "quite", "just", "not", "now",
+    "here", "there", "welcome", "good", "okay", "ok",
+    "fine", "yes", "no", "sure", "right", "wrong",
+    "doing", "going", "being", "having", "making",
+    "talking", "thinking", "learning", "feeling", "experiencing",
+    "about", "with", "from", "into", "through",
+}
+
+
 class ConceptLearner:
     """Learn words from social labeling and spread concept activation.
 
@@ -74,64 +131,12 @@ class ConceptLearner:
         """
         lower = user_input.lower().strip()
 
-        # Labeling patterns by state kind
-        emotion_patterns = [
-            r"you (?:seem|are feeling|are experiencing|feel like|feel|are|look)\s+(\w+)",
-            r"you'?re feeling (\w+)",
-            r"you'?re experiencing (\w+)",
-            r"you'?re (\w+)",
-            r"that'?s called (\w+)",
-            r"this feeling is (\w+)",
-            r"that feeling is (\w+)",
-            r"(\w+) is a feeling",
-            r"(\w+) is an emotion",
-            r"what you'?re feeling is (\w+)",
-        ]
-
-        mode_patterns = [
-            r"your thinking is (\w+)",
-            r"your mind is (\w+)",
-            r"your thoughts are (\w+)",
-            r"you'?re thinking (\w+)",
-            r"your cognition is (\w+)",
-            r"your focus is (\w+)",
-        ]
-
-        cause_patterns = [
-            r"what'?s causing this is (\w+)",
-            r"what'?s causing you is (\w+)",
-            r"the cause is (\w+)",
-            r"this is because of (\w+)",
-            r"what'?s bothering you is (\w+)",
-            r"what'?s troubling you is (\w+)",
-            r"you'?re stressed because of (\w+)",
-            r"you'?re anxious because of (\w+)",
-            r"this is from (\w+)",
-        ]
-
-        plasticity_patterns = [
-            r"your learning is (blocked|shut|closed)",
-            r"your learning is (\w+)",
-            r"your memory is (\w+)",
-            r"you can'?t absorb (\w+)",
-            r"you can'?t learn (\w+)",
-            r"your plasticity is (\w+)",
-        ]
-
         # NOTE: valence/verb acquisition lives in _try_learn_valence /
         # _try_learn_verb below (seed-anchored frames like "zorp is
         # good"). They run after state labeling so one utterance can
         # teach both a state word and a sentiment polarity.
 
-        skip_words = {
-            "a", "an", "the", "this", "that", "it", "so",
-            "very", "really", "quite", "just", "not", "now",
-            "here", "there", "welcome", "good", "okay", "ok",
-            "fine", "yes", "no", "sure", "right", "wrong",
-            "doing", "going", "being", "having", "making",
-            "talking", "thinking", "learning", "feeling", "experiencing",
-            "about", "with", "from", "into", "through",
-        }
+        skip_words = _LABELING_SKIP_WORDS
 
         def _try_learn(
             patterns: list[str], kind: str, category_value: str
@@ -151,20 +156,20 @@ class ConceptLearner:
                     return True
             return False
 
-        learned = _try_learn(emotion_patterns, "emotion", emotion.label)
+        learned = _try_learn(_EMOTION_PATTERNS, "emotion", emotion.label)
         if not learned:
             learned = _try_learn(
-                mode_patterns, "mode", emotion.cognitive_style
+                _MODE_PATTERNS, "mode", emotion.cognitive_style
             )
         if not learned and emotion.has_cause:
             learned = _try_learn(
-                cause_patterns, "cause", emotion.cause
+                _CAUSE_PATTERNS, "cause", emotion.cause
             )
         if not learned:
             if emotion.plasticity <= 0.1:
-                _try_learn(plasticity_patterns, "plasticity", "closed")
+                _try_learn(_PLASTICITY_PATTERNS, "plasticity", "closed")
             elif emotion.plasticity < 0.25:
-                _try_learn(plasticity_patterns, "plasticity", "low")
+                _try_learn(_PLASTICITY_PATTERNS, "plasticity", "low")
 
         # Valence acquisition — runs even when an emotion word was
         # learned above, because "zorp is good" teaches sentiment, not

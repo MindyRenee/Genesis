@@ -583,51 +583,8 @@ class SituationModel:
         raw = result.raw_text
         pred = prop.predicate.lower()
         subjects = self._subjects(prop, raw, result.resolved_references)
-
-        # Sanitize role fillers. "because" never splits a clause in
-        # the parser, so a stated reason can glue onto a goal,
-        # location, or object — split it off as causation before it
-        # contaminates a place or entity name.
-        goal, goal_cause = _split_cause(prop.roles.get(_ROLE_GOAL) or "")
-        loc, loc_cause = _split_cause(prop.roles.get(_ROLE_LOCATION) or "")
-        obj, obj_cause = _split_cause(prop.object.strip())
-        attr = prop.roles.get(_ROLE_ATTRIBUTE)
-        ben = prop.roles.get(_ROLE_BENEFICIARY)
-
-        # Separate purposes from destinations. "to buy milk" is an
-        # intention (infinitive); "to the kitchen" is a place. When a
-        # purpose overwrote a stated destination in the GOAL role,
-        # recover the earlier "to <NP>" from the raw text. Raw-text
-        # extraction is clause-blind, so it only runs when the result
-        # holds a single proposition — otherwise a sibling clause's
-        # purpose could be misattributed to this one.
-        destination = goal
-        intention = ""
-        single = len(result.propositions) <= 1
-        purpose_m = _PURPOSE_RE.search(raw) if single else None
-        if purpose_m:
-            intention = purpose_m.group(1)
-        elif goal and _is_purpose(goal):
-            intention = goal
-            if single:
-                destination = _destination_before(raw, goal.split()[0])
-            else:
-                destination = ""
-
-        time_marker, time_cause = _split_cause(
-            prop.roles.get(_ROLE_TIME) or ""
-        )
-        self._ctx = _EventCtx(
-            subjects=subjects,
-            obj=obj,
-            location=_place(loc) if loc else "",
-            destination=_place(destination) if destination else "",
-            intention=intention.strip(),
-            cause_text=goal_cause or loc_cause or obj_cause or time_cause,
-            time_marker=time_marker.strip(),
-            tense=prop.tense,
-            negated=prop.negated,
-            uncertain=uncertain,
+        destination, obj, ben, loc, attr = self._build_event_ctx(
+            prop, result, raw, subjects, uncertain
         )
 
         # ── Embedded clause: attributed content, not world state ──
@@ -641,6 +598,7 @@ class SituationModel:
             content = _describe_prop(prop.embedded)
             if prop.negated:
                 content = f"not {content}"
+            assert self._ctx is not None  # _build_event_ctx always sets it
             self._ctx.obj = content
             self._ctx.extra_participants = tuple(
                 e
@@ -663,50 +621,7 @@ class SituationModel:
             return
 
         # ── Relations expressed through copula/attributes ──
-        dir_m = _DIR_OF_RE.search(raw)
-        pos_m = _POS_OF_RE.search(raw)
-        fits_m = _FITS_RE.search(raw)
-        bigger_m = _BIGGER_RE.search(raw)
-        afraid_m = _AFRAID_RE.search(raw)
-
-        if dir_m and subjects:
-            d, target = dir_m.group(1).lower(), _norm(dir_m.group(2))
-            for s in subjects:
-                self.place_dir[s][d] = target
-            self._log(subjects[0], f"is {d} of", target)
-            return
-        if pos_m and subjects:
-            rel = (pos_m.group(1) or pos_m.group(3) or "").lower()
-            target = _norm(pos_m.group(2) or pos_m.group(4) or "")
-            if rel and target:
-                for s in subjects:
-                    self.pos_rel[s][rel] = target
-                # left/right and above/below are converse pairs —
-                # store the inverse so "is circle left of square?"
-                # answers no rather than unknown.
-                self.pos_rel[target][_POS_OPPOSITE[rel]] = subjects[0]
-                self._log(subjects[0], f"is {rel} of", target)
-            return
-        if fits_m:
-            small, big = _norm(fits_m.group(1)), _norm(fits_m.group(2))
-            if small and big and small != big:
-                self.smaller_than[small].add(big)
-                self._log(small, "fits in", big)
-            return
-        if bigger_m:
-            a = _norm(bigger_m.group(1))
-            b = _norm(bigger_m.group(3))
-            if bigger_m.group(2) in ("bigger", "larger"):
-                self.smaller_than[b].add(a)
-            else:
-                self.smaller_than[a].add(b)
-            self._log(a, f"is {bigger_m.group(2)} than", b)
-            return
-        if afraid_m and subjects:
-            feared = _norm(afraid_m.group(1))
-            for s in subjects:
-                self._entity(s).fears.add(feared)
-            self._log(subjects[0], "is afraid of", feared)
+        if self._apply_relation_patterns(subjects, raw):
             return
 
         # ── Motion: subject moves to the destination ──
@@ -750,6 +665,117 @@ class SituationModel:
         # Anything else still lands in the event log.
         if subjects:
             self._log(subjects[0], pred, _norm(obj) if obj else "")
+
+    def _build_event_ctx(
+        self,
+        prop: Proposition,
+        result: ComprehensionResult,
+        raw: str,
+        subjects: list[str],
+        uncertain: bool,
+    ) -> tuple[str, str, str | None, str, str | None]:
+        """Sanitize the role fillers and build ``self._ctx``.
+
+        Returns the fillers the applying branches still consume
+        directly: (destination, object, beneficiary, location,
+        attribute). "because" never splits a clause in the parser, so
+        a stated reason can glue onto a goal, location, or object —
+        split it off as causation before it contaminates a place or
+        entity name.
+        """
+        goal, goal_cause = _split_cause(prop.roles.get(_ROLE_GOAL) or "")
+        loc, loc_cause = _split_cause(prop.roles.get(_ROLE_LOCATION) or "")
+        obj, obj_cause = _split_cause(prop.object.strip())
+        attr = prop.roles.get(_ROLE_ATTRIBUTE)
+        ben = prop.roles.get(_ROLE_BENEFICIARY)
+
+        # Separate purposes from destinations. "to buy milk" is an
+        # intention (infinitive); "to the kitchen" is a place. When a
+        # purpose overwrote a stated destination in the GOAL role,
+        # recover the earlier "to <NP>" from the raw text. Raw-text
+        # extraction is clause-blind, so it only runs when the result
+        # holds a single proposition — otherwise a sibling clause's
+        # purpose could be misattributed to this one.
+        destination = goal
+        intention = ""
+        single = len(result.propositions) <= 1
+        purpose_m = _PURPOSE_RE.search(raw) if single else None
+        if purpose_m:
+            intention = purpose_m.group(1)
+        elif goal and _is_purpose(goal):
+            intention = goal
+            if single:
+                destination = _destination_before(raw, goal.split()[0])
+            else:
+                destination = ""
+
+        time_marker, time_cause = _split_cause(
+            prop.roles.get(_ROLE_TIME) or ""
+        )
+        self._ctx = _EventCtx(
+            subjects=subjects,
+            obj=obj,
+            location=_place(loc) if loc else "",
+            destination=_place(destination) if destination else "",
+            intention=intention.strip(),
+            cause_text=goal_cause or loc_cause or obj_cause or time_cause,
+            time_marker=time_marker.strip(),
+            tense=prop.tense,
+            negated=prop.negated,
+            uncertain=uncertain,
+        )
+        return destination, obj, ben, loc, attr
+
+    def _apply_relation_patterns(self, subjects: list[str], raw: str) -> bool:
+        """Relations expressed through copula/attributes — direction,
+        position, containment, size, fear. Returns True when one
+        matched and was applied."""
+        dir_m = _DIR_OF_RE.search(raw)
+        pos_m = _POS_OF_RE.search(raw)
+        fits_m = _FITS_RE.search(raw)
+        bigger_m = _BIGGER_RE.search(raw)
+        afraid_m = _AFRAID_RE.search(raw)
+
+        if dir_m and subjects:
+            d, target = dir_m.group(1).lower(), _norm(dir_m.group(2))
+            for s in subjects:
+                self.place_dir[s][d] = target
+            self._log(subjects[0], f"is {d} of", target)
+            return True
+        if pos_m and subjects:
+            rel = (pos_m.group(1) or pos_m.group(3) or "").lower()
+            target = _norm(pos_m.group(2) or pos_m.group(4) or "")
+            if rel and target:
+                for s in subjects:
+                    self.pos_rel[s][rel] = target
+                # left/right and above/below are converse pairs —
+                # store the inverse so "is circle left of square?"
+                # answers no rather than unknown.
+                self.pos_rel[target][_POS_OPPOSITE[rel]] = subjects[0]
+                self._log(subjects[0], f"is {rel} of", target)
+            return True
+        if fits_m:
+            small, big = _norm(fits_m.group(1)), _norm(fits_m.group(2))
+            if small and big and small != big:
+                self.smaller_than[small].add(big)
+                self._log(small, "fits in", big)
+            return True
+        if bigger_m:
+            a = _norm(bigger_m.group(1))
+            b = _norm(bigger_m.group(3))
+            if bigger_m.group(2) in ("bigger", "larger"):
+                self.smaller_than[b].add(a)
+            else:
+                self.smaller_than[a].add(b)
+            self._log(a, f"is {bigger_m.group(2)} than", b)
+            return True
+        if afraid_m and subjects:
+            feared = _norm(afraid_m.group(1))
+            for s in subjects:
+                self._entity(s).fears.add(feared)
+            self._log(subjects[0], "is afraid of", feared)
+            return True
+        return False
 
     def _apply_possessive_copula(
         self, subjects: list[str], attr_text: str, uncertain: bool

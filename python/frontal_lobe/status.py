@@ -400,7 +400,7 @@ class StatusMixin:
 
         Args:
             core_state: A pre-fetched CoreState to avoid a redundant
-                IPC round-trip and 3296-byte struct unpack. When
+                IPC round-trip and 3480-byte struct unpack. When
                 ``None`` (the common case), the state is fetched from
                 the daemon. Callers that already have a fresh CoreState
                 (e.g. ``warn()`` which fetches it once for threshold
@@ -532,7 +532,7 @@ class StatusMixin:
         string.
 
         ``core_state`` is the already-fetched state — passing it avoids
-        a redundant get_state() IPC call + 3296-byte unpack for each
+        a redundant get_state() IPC call + 3480-byte unpack for each
         warning phrase. Without this, warn() with 8 warning conditions
         would unpack the state 9 times.
         """
@@ -640,7 +640,7 @@ class StatusMixin:
             cycle = getattr(self.inner_life, "sleep_cycle", None)
             if cycle is not None:
                 stage = cycle.current_stage
-        return assess_brain_waves(summary, stage)
+        return assess_brain_waves(summary, stage, client=self.client)
     def readiness(self, *, require_body: bool = True) -> ReadinessReport:
         """Whether she is fit for demanding focused work right now.
 
@@ -931,36 +931,46 @@ class StatusMixin:
         development. Only records a milestone if the value has changed
         since the last snapshot.
         """
-        # Knowledge dimension
+        self._record_knowledge_growth()
+        self._record_competence_growth()
+        self._record_self_improvement_growth()
+        self._record_dream_growth()
+        self._record_analogy_growth()
+        self._record_inner_life_growth()
+
+    def _record_knowledge_growth(self) -> None:
+        net = self.brain.frontal.network
         self.growth_ledger.record(
             "knowledge", "concept_count",
-            self.brain.frontal.network.total_concept_count,
-            f"Concept network: {self.brain.frontal.network.total_concept_count} concepts",
+            net.total_concept_count,
+            f"Concept network: {net.total_concept_count} concepts",
         )
         self.growth_ledger.record(
             "knowledge", "edge_count",
-            self.brain.frontal.network.edge_count,
-            f"Relationships: {self.brain.frontal.network.edge_count} edges",
+            net.edge_count,
+            f"Relationships: {net.edge_count} edges",
         )
         # Quality metrics: non-monotonic, can go up or down.
         self.growth_ledger.record(
             "knowledge", "mean_edge_weight",
-            round(self.brain.frontal.network.mean_edge_weight, 4),
-            f"Mean edge weight: {self.brain.frontal.network.mean_edge_weight:.3f}",
+            round(net.mean_edge_weight, 4),
+            f"Mean edge weight: {net.mean_edge_weight:.3f}",
         )
         self.growth_ledger.record(
             "knowledge", "mean_concept_confidence",
-            round(self.brain.frontal.network.mean_concept_confidence, 4),
-            f"Mean concept confidence: {self.brain.frontal.network.mean_concept_confidence:.3f}",
+            round(net.mean_concept_confidence, 4),
+            f"Mean concept confidence: {net.mean_concept_confidence:.3f}",
         )
         self.growth_ledger.record(
             "knowledge", "network_density",
-            round(self.brain.frontal.network.network_density, 4),
-            f"Network density: {self.brain.frontal.network.network_density:.4f}",
+            round(net.network_density, 4),
+            f"Network density: {net.network_density:.4f}",
         )
-        # Competence dimension: learned abilities — schemas recognized,
-        # verified skills consolidated, episodes experienced. This is
-        # the procedural counterpart to the knowledge metrics.
+
+    def _record_competence_growth(self) -> None:
+        """Learned abilities — schemas recognized, verified skills
+        consolidated, episodes experienced. The procedural counterpart
+        to the knowledge metrics."""
         competence = self.brain.frontal.task_competence
         self.growth_ledger.record(
             "competence", "skill_count",
@@ -979,7 +989,7 @@ class StatusMixin:
             f"{sum(s.episodes for s in competence.schemas.values())}",
         )
 
-        # Self-improvement dimension
+    def _record_self_improvement_growth(self) -> None:
         proposals = self.self_improvement.get_all_proposals()
         accepted = sum(1 for p in proposals if p.status.value == "accepted")
         self.growth_ledger.record(
@@ -998,7 +1008,7 @@ class StatusMixin:
             f"Applied experiments: {self.heuristic_experiment.applied_count}",
         )
 
-        # Dream synthesis dimension
+    def _record_dream_growth(self) -> None:
         dream_stats = self.inner_life.dream_synthesis_stats
         self.growth_ledger.record(
             "dreams", "insights_validated",
@@ -1011,7 +1021,8 @@ class StatusMixin:
             f"Dream synthesis proposals: {dream_stats.get('proposed', 0)}",
         )
 
-        # Analogy dimension — cross-domain structure-mapping insights
+    def _record_analogy_growth(self) -> None:
+        """Cross-domain structure-mapping insights."""
         analogy_engine = self.brain.frontal.analogy_engine
         self.growth_ledger.record(
             "analogy", "insights_validated",
@@ -1024,7 +1035,7 @@ class StatusMixin:
             f"Analogous pairs found: {analogy_engine.pairs_found}",
         )
 
-        # Inner life dimension
+    def _record_inner_life_growth(self) -> None:
         self.growth_ledger.record(
             "inner_life", "thought_count",
             self.inner_life.thought_count,
@@ -1040,6 +1051,7 @@ class StatusMixin:
             self.inner_life.dream_count,
             f"Dream sequences: {self.inner_life.dream_count}",
         )
+
     def growth_narrative(self) -> str:
         """Return a first-person narrative of Genesis's growth."""
         self.record_growth_snapshot()

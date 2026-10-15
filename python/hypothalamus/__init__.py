@@ -73,11 +73,15 @@ Circadian timing is the two-process model (Borbély, 1982): a homeostatic
 sleep pressure ``S`` that rises in wake and falls in sleep, and a
 circadian drive ``C``. Sleep onset occurs when ``S`` reaches an upper
 threshold, and waking when it falls to a lower one, with ``C`` shifting
-those thresholds. The implemented sleep switch in ``brainstem.sleep`` maps
-``S`` to adenosine (``AUTO_SLEEP_ADENOSINE``) and ``C`` to melatonin,
-the SCN's output: melatonin lowers the sleep threshold at circadian
-night. The wake rescue applies only while melatonin is below
-``WAKE_RESCUE_MELATONIN``; above it, the circadian drive takes precedence.
+those thresholds. In Genesis the two processes are embodied separately:
+the daemon's sleep-wake network owns onset (LC < 4 Hz) with its own
+homeostat and a Serkh–Forger circadian oscillator entrained to local
+light, while the mind maps ``S`` to the adenosine level
+(``AUTO_SLEEP_ADENOSINE``) and reads melatonin — the SCN's output — as
+the ``C`` signal: melatonin is a sleep-promoter in the arousal equation
+at circadian night. The wake rescue applies only while melatonin is
+below ``WAKE_RESCUE_MELATONIN``; above it, the circadian drive takes
+precedence.
 
 ════════════════════════════════════════════════════════════════════════
 CLAIMS

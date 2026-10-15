@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import os
 import random
+import sys
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -57,7 +58,8 @@ _DBG = bool(os.environ.get("GENESIS_AGENT_DEBUG"))
 
 
 def _dbg(msg: str) -> None:
-    print(f"    [dbg] {msg}")
+    # stderr, not print — debug output must not pollute stdout
+    sys.stderr.write(f"    [dbg] {msg}\n")
 
 
 @dataclass
@@ -157,6 +159,246 @@ def _color_centroid(grid: Grid, color: int) -> tuple[float, float] | None:
     return sum(rs) / len(rs), sum(cs) / len(cs)
 
 
+class _GoalView:
+    """Per-frame goal predicates for one ``_pick_goal`` call.
+
+    Eligibility, probation, strikes, spend, and openability all close
+    over a single frame's grid, body, and signature — holding them on
+    a view object keeps ``_pick_goal`` an orchestration while the
+    verdicts keep their original wording. Build it *after*
+    ``_read_gate_requirements``: ``openable_now`` consults
+    ``agent._req_diffs``.
+    """
+
+    def __init__(
+        self,
+        agent: SpatialAgent,
+        grid: Grid,
+        body: set[tuple[int, int]] | frozenset[tuple[int, int]] | None,
+        cur_sig: Any,
+    ) -> None:
+        self.agent = agent
+        self.grid = grid
+        self.body = body
+        self.cur_sig = cur_sig
+        # A locked goal makes key-stations worth re-visiting — but a
+        # walkable station is "open" the moment she stands on it, so
+        # the open-color filter must not silence it. Only stations
+        # earned by observed key-state changes get this exemption.
+        self.stations_matter = bool(
+            agent._gated_cells or agent._gate_blocked
+        )
+        # Interface territory: marked meters plus enrolled display
+        # panels — pixels that are her own state, not the world.
+        self.inside = agent._ui_cells | {
+            cell
+            for key in agent._readout_keys
+            for cell in agent._readout_cells.get(key, frozenset())
+        }
+
+    def openable_now(self, obj: Any) -> bool:
+        """This gate's recorded opener — or posted requirement —
+        matches my current key."""
+        agent = self.agent
+        if agent._req_diffs.get(agent._obj_key(obj)) == set():
+            return True
+        if self.cur_sig is None:
+            return False
+        return (
+            agent._gate_openers.get(agent._obj_signature(obj, self.grid))
+            == self.cur_sig
+        )
+
+    def self_echo(self, obj: Any) -> bool:
+        """An object that draws a fragment of her own body
+        pixel-for-pixel elsewhere is a status glyph — her icon
+        re-rendered on a panel — not something to walk to. The test
+        is silhouette equality under translation for the matching
+        body color: same cell count, same normalized shape."""
+        body, grid = self.body, self.grid
+        if not body:
+            return False
+        mine = {
+            cell for cell in body if grid.at(*cell) == obj.color
+        }
+        if not mine or len(mine) != len(obj.cells):
+            return False
+        mr0 = min(r for r, _ in mine)
+        mc0 = min(c for _, c in mine)
+        or0 = min(r for r, _ in obj.cells)
+        oc0 = min(c for _, c in obj.cells)
+        return {(r - mr0, c - mc0) for r, c in mine} == {
+            (r - or0, c - oc0) for r, c in obj.cells
+        }
+
+    def eligible(self, obj: Any) -> bool:
+        """Everything but the provisional reachability verdict."""
+        agent, body, inside = self.agent, self.body, self.inside
+        if inside and all(cell in inside for cell in obj.cells):
+            # An enrolled display's panel or a marked meter —
+            # its pixels are the interface, her own state, not
+            # a thing in the world.
+            return False
+        if self.self_echo(obj):
+            return False
+        return (
+            obj.color != agent.avatar_color
+            and not (body and set(obj.cells) & body)
+            and obj.color not in agent._hazard_colors
+            and (
+                obj.color not in agent._open_colors
+                or len(obj.cells) <= 64
+                or (
+                    self.stations_matter
+                    and obj.color in agent._station_colors
+                )
+            )
+            and not all(
+                cell in agent._blocked_cells for cell in obj.cells
+            )
+            and (
+                not any(
+                    cell in agent._gated_cells for cell in obj.cells
+                )
+                or self.openable_now(obj)
+            )
+        )
+
+    def on_probation(self, obj: Any) -> bool:
+        """Goal BFS couldn't reach — retried as the map grows.
+
+        Marks consolidate onto the neighbourhood that earned them —
+        a flickering icon re-segments into fragments whose cells
+        don't cover the mark, so the verdict has to match the same
+        window that anchored it, not the pixels of this frame's
+        fragment.
+        """
+        agent = self.agent
+        return any(
+            len(agent._visited_cells) - seen < max(200, seen // 8)
+            and any(
+                abs(mark[0] - r) <= 5 and abs(mark[1] - c) <= 5
+                for r, c in obj.cells
+            )
+            for mark, seen in agent._unreachable_goals.items()
+        )
+
+    def struck_out(self, obj: Any) -> bool:
+        """Unreachable three times running — a verdict, not a
+        probation. The strike survives the pool-exhaustion wipe,
+        so repeated proof against the same place is final."""
+        return any(
+            count >= 3
+            and any(
+                abs(mark[0] - r) <= 5 and abs(mark[1] - c) <= 5
+                for r, c in obj.cells
+            )
+            for mark, count in self.agent._unreach_strikes.items()
+        )
+
+    def spent(self, g: Any) -> bool:
+        """A goal is spent if any of its cells lies inside a footprint
+        she already occupied — or reached for — at this signature.
+        Spent goals leave the tier competition entirely; the
+        whole-set fallback only fires when nothing is left to try."""
+        return any(
+            sig == self.cur_sig
+            and any(
+                r0 <= r < r0 + h and c0 <= c < c0 + w
+                for r, c in g.cells
+            )
+            for r0, c0, h, w, sig in self.agent._tried_at_state
+        )
+
+    def frontier(self, scene: Any) -> list[Any] | None:
+        """The eligible, unstruck, off-probation objects — with the
+        probation-wipe fallback when every candidate is marked.
+        ``None`` clears ``_goal_cells``: nothing is left to try."""
+        agent = self.agent
+        goals = [
+            obj for obj in scene.objects
+            if self.eligible(obj) and not self.on_probation(obj)
+            and not self.struck_out(obj)
+        ]
+        if goals:
+            return goals
+        pool = [
+            obj
+            for obj in scene.objects
+            if self.eligible(obj) and not self.struck_out(obj)
+        ]
+        if pool:
+            # Every candidate is probationary — the verdicts were
+            # recorded against a smaller map, and the frontier is
+            # gone, so probation can never expire on its own.
+            # Wipe the marks and let BFS retry: a sealed goal
+            # simply re-earns its mark, a reachable one resumes.
+            agent._unreachable_goals.clear()
+            return pool
+        agent._goal_cells = frozenset()
+        return None
+
+    def dump_drops(self, scene: Any) -> None:
+        """Debug: why each small object fell out of the pool."""
+        agent, body, inside = self.agent, self.body, self.inside
+        for o in scene.objects:
+            if len(o.cells) > 30:
+                continue
+            why = (
+                "inside" if inside and all(c in inside for c in o.cells)
+                else "echo" if self.self_echo(o)
+                else "avcol" if o.color == agent.avatar_color
+                else "body" if body and set(o.cells) & body
+                else "haz" if o.color in agent._hazard_colors
+                else "open" if (
+                    o.color in agent._open_colors
+                    and len(o.cells) > 64
+                    and not (
+                        self.stations_matter
+                        and o.color in agent._station_colors
+                    )
+                )
+                else "blk" if all(
+                    c in agent._blocked_cells for c in o.cells
+                )
+                else "gated" if (
+                    any(c in agent._gated_cells for c in o.cells)
+                    and not self.openable_now(o)
+                )
+                else "prob" if self.on_probation(o)
+                else "struck" if self.struck_out(o)
+                else "OK"
+            )
+            if why != "OK":
+                _dbg(
+                    f"drop c{o.color}@{round(o.centroid[0])},"
+                    f"{round(o.centroid[1])} n={len(o.cells)} {why}"
+                )
+
+    def dump_commit(
+        self,
+        scene: Any,
+        committed: tuple[Any, frozenset[tuple[int, int]]],
+        reach: dict[tuple[int, int], int] | None,
+    ) -> None:
+        """Debug: whether the committed goal survived this frame."""
+        agent = self.agent
+        col, cells = committed
+        alive_obj = [
+            obj for obj in scene.objects
+            if obj.color == col and set(obj.cells) & cells
+        ]
+        if not alive_obj:
+            _dbg(f"commit-gone c{col}")
+        for obj in alive_obj:
+            _dbg(
+                f"commit-alive c{col} elig={self.eligible(obj)} "
+                f"prob={self.on_probation(obj)} spent={self.spent(obj)} "
+                f"reachN={len(reach or {})} "
+                f"strikes={dict(agent._unreach_strikes)}"
+            )
+
+
 class SpatialAgent:
     """An agency-detecting, navigating agent over the spatial layer.
 
@@ -190,6 +432,15 @@ class SpatialAgent:
         self.stats: dict[Any, ActionStats] = {}
         self._last_frame: Grid | None = None
         self._last_action: Any = None
+        self._init_agency_state()
+        self._init_semantic_state()
+        self._init_planning_state()
+        self._init_attribution_state()
+        self._init_interface_state()
+
+    def _init_agency_state(self) -> None:
+        """Body identity and self-motion evidence — the learned
+        self-model that persists across episodes."""
         # Learned self-model — persists across episodes.
         self.avatar_color: int | None = None
         # Agency evidence, per action per color: [Σdr, Σdc, n]. The
@@ -204,6 +455,29 @@ class SpatialAgent:
         # shape-under-translation is what a wall can't counterfeit.
         self._avatar_last: tuple[float, float] | None = None
         self._avatar_shape: frozenset[tuple[int, int]] = frozenset()
+        self._avatar_sig: tuple[tuple[int, ...], ...] | None = None
+        # Co-moving body colors: multi-color avatars present each
+        # band as a separate object; a color whose displacement
+        # agrees with the primary body's under every shared action
+        # is part of her, not a hazard, goal, or consumable.
+        self._co_colors: set[int] = set()
+        # Solo-motion evidence: a color that displaced while the body
+        # didn't (a bump, a frozen frame) moves on its own — enemies
+        # patrol through her collisions; her bands wait with her.
+        self._solo_moves: dict[int, int] = {}
+        self._prev_anchor: tuple[int, int, int, int] | None = None
+        # Life-loss across a hidden frame: the avatar sprite goes
+        # invisible on the death frame, then reappears at spawn.
+        self._missing_avatar_at: tuple[float, float] | None = None
+        # Her signature has been *seen* to vary — only then can a
+        # body/display token be trusted to carry state. Before that,
+        # a constant body token would manufacture constant nonsense
+        # diffs against every requirement.
+        self._sig_varies = False
+
+    def _init_semantic_state(self) -> None:
+        """Learned world semantics — hazards, pickups, stations,
+        gates, and collision-mapped terrain."""
         # Learned hazard model: colors that move on their own (not
         # caused by its action). Moving things that aren't its are
         # almost always things to avoid, not goals — collectibles and
@@ -233,13 +507,9 @@ class SpatialAgent:
         # key state changes.
         self._gated_cells: set[tuple[int, int]] = set()
         self._touch_fail: dict[tuple[int, int], int] = {}
-        self._avatar_sig: tuple[tuple[int, ...], ...] | None = None
         # Lethal colors: contact caused a respawn. Strongest evidence
         # there is — consumption signals can never un-mark these.
         self._lethal_colors: set[int] = set()
-        # Life-loss across a hidden frame: the avatar sprite goes
-        # invisible on the death frame, then reappears at spawn.
-        self._missing_avatar_at: tuple[float, float] | None = None
         # Gate affordance memory: object pattern -> avatar signature
         # that opened it (or signatures that failed). Learned from
         # touch outcomes; persists across episodes.
@@ -278,17 +548,7 @@ class SpatialAgent:
         # Floor can't refuse a move — a wall wearing the frame's
         # modal color still can, so "blocked" is judged against
         # evidence of openness, not frequency.
-        # Co-moving body colors: multi-color avatars present each
-        # band as a separate object; a color whose displacement
-        # agrees with the primary body's under every shared action
-        # is part of her, not a hazard, goal, or consumable.
-        self._co_colors: set[int] = set()
-        # Solo-motion evidence: a color that displaced while the body
-        # didn't (a bump, a frozen frame) moves on its own — enemies
-        # patrol through her collisions; her bands wait with her.
-        self._solo_moves: dict[int, int] = {}
         self._open_colors: set[int] = set()
-        self._prev_anchor: tuple[int, int, int, int] | None = None
         # Bump memory: (anchor_r, anchor_c, action) — a move that
         # displaced nothing at that spot must not be retried there.
         # Every action costs budget; a known bump is pure waste.
@@ -298,6 +558,16 @@ class SpatialAgent:
         # rejecting the current state — cleared on signature change,
         # when the same destination may accept).
         self._bumped_moves: set[tuple[int, int, Any]] = set()
+        self._bumped_gates: set[tuple[int, int, Any]] = set()
+        # Interaction novelty (the coach's hint): colors it has never
+        # touched are worth touching — consequences can't be learned
+        # without contact. This is a prior about *how to explore*,
+        # not an answer.
+        self._touched_colors: set[int] = set()
+
+    def _init_planning_state(self) -> None:
+        """Committed subgoals, planner targets, and exploration
+        bookkeeping — the state a plan survives on."""
         # Committed subgoal: (color, remembered cells) of the object
         # she is traveling toward. Identity by shared footprint, not
         # centroid — occlusion reshapes a blob's centroid while its
@@ -318,12 +588,6 @@ class SpatialAgent:
         # approach or frontier. Re-picking nearest every frame
         # oscillates between midpoints; a plan means finishing it.
         self._plan_target: tuple[int, int] | None = None
-        self._bumped_gates: set[tuple[int, int, Any]] = set()
-        # Interaction novelty (the coach's hint): colors it has never
-        # touched are worth touching — consequences can't be learned
-        # without contact. This is a prior about *how to explore*,
-        # not an answer.
-        self._touched_colors: set[int] = set()
         # Objects whose disappearance is fully explained by her own
         # silhouette — occluded, not proven consumed. Resolved when
         # the cells come back into view: still gone means taken,
@@ -338,6 +602,10 @@ class SpatialAgent:
         # can never help, so complex actions target fresh cells.
         self._click_outcomes: dict[tuple[int, int], float] = {}
         self._pending_click: tuple[int, int] | None = None
+
+    def _init_attribution_state(self) -> None:
+        """Outcome credit assignment — which actions, clicks, and
+        colors precede wins and deaths."""
         # Death credit assignment, per-episode presence: action ->
         # [episodes used, episodes died]. The fatal choice in these
         # games is often delayed — a bad move dooms the level but the
@@ -364,6 +632,18 @@ class SpatialAgent:
         # Introducer blame: action name or click cell -> times it
         # brought a known doom-marker into the world.
         self._doom_blame: dict[Any, int] = {}
+        # Deaths with no killer in evidence — the step budget, not a
+        # hazard. Counted so dithering has a felt cost without
+        # poisoning the terrain memory. ``_last_death_at`` paces the
+        # detector: a tracking flicker masquerades as a teleport-
+        # respawn every other frame, and a life cannot actually be
+        # spent twice in that span.
+        self._spent_deaths = 0
+        self._last_death_at = -99
+
+    def _init_interface_state(self) -> None:
+        """Non-body panels — constraint boards, detached readouts,
+        interface regions, and reachability verdicts."""
         # The constraint-board specialist: when a screen is tiled
         # boards + marker blocks and the action space is clicks, its
         # induced rule turns wandering clicks into a plan. Silent
@@ -410,19 +690,6 @@ class SpatialAgent:
         self._gate_requirements: dict[
             tuple[int, int], tuple[int, frozenset[tuple[int, int]]]
         ] = {}
-        # Her signature has been *seen* to vary — only then can a
-        # body/display token be trusted to carry state. Before that,
-        # a constant body token would manufacture constant nonsense
-        # diffs against every requirement.
-        self._sig_varies = False
-        # Deaths with no killer in evidence — the step budget, not a
-        # hazard. Counted so dithering has a felt cost without
-        # poisoning the terrain memory. ``_last_death_at`` paces the
-        # detector: a tracking flicker masquerades as a teleport-
-        # respawn every other frame, and a life cannot actually be
-        # spent twice in that span.
-        self._spent_deaths = 0
-        self._last_death_at = -99
 
     # ── Learning ──────────────────────────────────────────────
 
@@ -833,11 +1100,20 @@ class SpatialAgent:
         The floor itself is excluded: it shifts in mirror of the
         body and would fake contingency.
         """
-        best_color, best_spread = self.avatar_color, 0.0
         colors: set[int] = set()
         for per_color in self._action_color_disp.values():
             colors.update(per_color)
         colors.discard(background)
+        self._find_body_color(colors, prev, cur)
+        self._find_co_colors(colors)
+
+    def _find_body_color(
+        self, colors: set[int], prev: Grid | None, cur: Grid | None
+    ) -> None:
+        """The body color is the one whose per-action displacement
+        means disagree most — self-movers and HUD counters move the
+        same way under every action, so their means agree."""
+        best_color, best_spread = self.avatar_color, 0.0
         for color in colors:
             means = [
                 (rec[0] / rec[2], rec[1] / rec[2])
@@ -857,104 +1133,109 @@ class SpatialAgent:
                 continue  # barely moves under anything — not a body
             if spread > best_spread:
                 best_color, best_spread = color, spread
-        if (
+        if not (
             best_spread >= 1.0
             and best_color is not None
             and self.avatar_color != best_color
         ):
-            first = self.avatar_color is None
-            self.avatar_color = best_color
-            if first:
-                # The body was found — every displacement it already
-                # produced under each action is *that action's* learned
-                # effect. Reattributing the ledger keeps early strides
-                # instead of discarding everything learned pre-agency.
-                for a, per_color in self._action_color_disp.items():
-                    rec = per_color.get(best_color)
-                    if rec is None:
-                        continue
-                    st = self._stat(a)
-                    st.dr, st.dc, st.moves = rec[0], rec[1], int(rec[2])
-                    # The color ledger is a summed centroid — the per-
-                    # transition detail is lost, so seed the modal
-                    # stride from the aggregate: a uniform estimate is
-                    # a weaker prior than real deltas but better than
-                    # discarding everything learned pre-agency.
-                    key = (
-                        round(rec[0] / rec[2]),
-                        round(rec[1] / rec[2]),
-                    )
-                    st.delta_counts[key] = int(rec[2])
-                if prev is not None and cur is not None:
-                    # Bootstrap identity from arrival evidence: among
-                    # same-colored things, the body is the one whose
-                    # cells are newest — a wall's cells were already
-                    # there; the mover's just arrived.
-                    scene = perceive(
-                        cur,
-                        background=self._background(cur),
-                        compute_relations=False,
-                    )
-                    prev_cells = prev.cells_with(best_color)
-                    cands = [
-                        o for o in scene.objects if o.color == best_color
-                    ]
-                    if cands:
-                        obj = max(
-                            cands,
-                            key=lambda o: len(set(o.cells) - prev_cells),
-                        )
-                        self._avatar_shape = obj.cells
-                        self._avatar_last = obj.centroid
-        # Co-moving colors: a multi-color body's other bands move
-        # identically under the same actions. Any color whose
-        # per-action mean displacement agrees with the body's on
-        # every action they share is part of her — an enemy's
-        # motion doesn't shadow hers, and a HUD counter changes
-        # the same way under every action, so neither qualifies.
+            return
+        first = self.avatar_color is None
+        self.avatar_color = best_color
+        if not first:
+            return
+        # The body was found — every displacement it already
+        # produced under each action is *that action's* learned
+        # effect. Reattributing the ledger keeps early strides
+        # instead of discarding everything learned pre-agency.
+        for a, per_color in self._action_color_disp.items():
+            rec = per_color.get(best_color)
+            if rec is None:
+                continue
+            st = self._stat(a)
+            st.dr, st.dc, st.moves = rec[0], rec[1], int(rec[2])
+            # The color ledger is a summed centroid — the per-
+            # transition detail is lost, so seed the modal
+            # stride from the aggregate: a uniform estimate is
+            # a weaker prior than real deltas but better than
+            # discarding everything learned pre-agency.
+            key = (
+                round(rec[0] / rec[2]),
+                round(rec[1] / rec[2]),
+            )
+            st.delta_counts[key] = int(rec[2])
+        if prev is not None and cur is not None:
+            # Bootstrap identity from arrival evidence: among
+            # same-colored things, the body is the one whose
+            # cells are newest — a wall's cells were already
+            # there; the mover's just arrived.
+            scene = perceive(
+                cur,
+                background=self._background(cur),
+                compute_relations=False,
+            )
+            prev_cells = prev.cells_with(best_color)
+            cands = [
+                o for o in scene.objects if o.color == best_color
+            ]
+            if cands:
+                obj = max(
+                    cands,
+                    key=lambda o: len(set(o.cells) - prev_cells),
+                )
+                self._avatar_shape = obj.cells
+                self._avatar_last = obj.centroid
+
+    def _find_co_colors(self, colors: set[int]) -> None:
+        """Co-moving colors: a multi-color body's other bands move
+        identically under the same actions. Any color whose
+        per-action mean displacement agrees with the body's on
+        every action they share is part of her — an enemy's
+        motion doesn't shadow hers, and a HUD counter changes
+        the same way under every action, so neither qualifies."""
         self._co_colors.clear()
-        if self.avatar_color is not None:
-            prim = {
-                a: (rec[0] / rec[2], rec[1] / rec[2])
-                for a, per_color in self._action_color_disp.items()
-                if (rec := per_color.get(self.avatar_color))
-                and rec[2] >= 1
-            }
-            for color in colors:
-                if color == self.avatar_color:
+        if self.avatar_color is None:
+            return
+        prim = {
+            a: (rec[0] / rec[2], rec[1] / rec[2])
+            for a, per_color in self._action_color_disp.items()
+            if (rec := per_color.get(self.avatar_color))
+            and rec[2] >= 1
+        }
+        for color in colors:
+            if color == self.avatar_color:
+                continue
+            if self._solo_moves.get(color, 0) >= 3:
+                # It moves when she doesn't — a self-mover
+                # that happened to agree twice, not a limb.
+                continue
+            agree = 0
+            for a, per_color in self._action_color_disp.items():
+                rec = per_color.get(color)
+                if rec is None or rec[2] < 1 or a not in prim:
                     continue
-                if self._solo_moves.get(color, 0) >= 3:
-                    # It moves when she doesn't — a self-mover
-                    # that happened to agree twice, not a limb.
-                    continue
-                agree = 0
-                for a, per_color in self._action_color_disp.items():
-                    rec = per_color.get(color)
-                    if rec is None or rec[2] < 1 or a not in prim:
-                        continue
-                    mr, mc = rec[0] / rec[2], rec[1] / rec[2]
-                    pr, pc = prim[a]
-                    # A co-moving band's mean keeps the body's
-                    # *direction*, diluted in magnitude by static
-                    # same-colored objects. A self-mover's mean
-                    # holds its own heading under every action —
-                    # it can't align with both north and south.
-                    # Agreement is directional (cosine), not
-                    # magnitude.
-                    mag_m = (mr * mr + mc * mc) ** 0.5
-                    mag_p = (pr * pr + pc * pc) ** 0.5
-                    if (
-                        mag_m >= 0.3
-                        and mag_p > 0
-                        and (mr * pr + mc * pc) / (mag_m * mag_p)
-                        >= 0.7
-                    ):
-                        agree += 1
-                if agree >= 2:
-                    self._co_colors.add(color)
-            # Her other bands can't be hazards — they only ever
-            # "move" because she moved.
-            self._hazard_colors -= self._avatar_colors
+                mr, mc = rec[0] / rec[2], rec[1] / rec[2]
+                pr, pc = prim[a]
+                # A co-moving band's mean keeps the body's
+                # *direction*, diluted in magnitude by static
+                # same-colored objects. A self-mover's mean
+                # holds its own heading under every action —
+                # it can't align with both north and south.
+                # Agreement is directional (cosine), not
+                # magnitude.
+                mag_m = (mr * mr + mc * mc) ** 0.5
+                mag_p = (pr * pr + pc * pc) ** 0.5
+                if (
+                    mag_m >= 0.3
+                    and mag_p > 0
+                    and (mr * pr + mc * pc) / (mag_m * mag_p)
+                    >= 0.7
+                ):
+                    agree += 1
+            if agree >= 2:
+                self._co_colors.add(color)
+        # Her other bands can't be hazards — they only ever
+        # "move" because she moved.
+        self._hazard_colors -= self._avatar_colors
 
     @property
     def _avatar_colors(self) -> set[int]:
@@ -1005,44 +1286,7 @@ class SpatialAgent:
             and self._last_action is not None
             and not discontinuous
         ):
-            prev = self._last_frame
-            change = self._learn_from_step(
-                prev, grid, self._last_action
-            )
-            if self._task_context is not None:
-                # The shared substrate learns the same affordance data
-                # in a domain-general, persistable form. Its check is
-                # also a surprise signal: when the world defies an
-                # action's learned effects, renew curiosity instead of
-                # repeating a now-suspect policy.
-                check = self.task_competence.record_transition(
-                    self._task_context,
-                    str(self._last_action),
-                    self._transition_state(prev),
-                    self._transition_state(grid),
-                )
-                # The terminal transition's changed variables are the
-                # abduction signal for goal inference — keep them for
-                # record_episode.
-                self._last_transition_changes = check.observed_changes
-                if check.predicted and check.score < 0.6:
-                    self._grit_steps = max(self._grit_steps, 20)
-            # Omen tracking: colors that newly appear after an action
-            # (or click) are that action's visible consequences. Doom
-            # often leaves a marker long before the death lands — a
-            # "bad" sprite, a wound, a wrong piece. When the segment
-            # ends, colors introduced along the way get outcome records
-            # and consistent doom-markers blame their introducer.
-            source: Any = (
-                self._pending_click
-                if self._pending_click is not None
-                else self._last_action
-            )
-            prev_colors = {v for _r, _c, v in prev.iter_cells()}
-            for _r, _c, v in grid.iter_cells():
-                if v not in prev_colors:
-                    self._seg_introduced.setdefault(v, source)
-                    self._cur_episode_colors.add(v)
+            change = self._learn_transition(self._last_frame, grid)
         if self._pending_click is not None:
             if discontinuous:
                 # The world reset between click and frame — no
@@ -1064,28 +1308,7 @@ class SpatialAgent:
         anchor = self._avatar_anchor(grid)
         if anchor is not None:
             self._visited_cells.add((anchor[0], anchor[1]))
-            # Whatever now fills the space she just vacated is by
-            # definition open — cells her body occupied cannot be
-            # solid. This is how floor-colored walls stay marked
-            # while real floor stays trusted. Only cells outside her
-            # current silhouette count: she still occupies the rest —
-            # what shows there is her own display, not freed floor.
-            cur_box = {
-                (r, c)
-                for r in range(anchor[0], anchor[0] + anchor[2])
-                for c in range(anchor[1], anchor[1] + anchor[3])
-            }
-            box = None if discontinuous else self._prev_anchor
-            if box is not None:
-                for r in range(box[0], box[0] + box[2]):
-                    for c in range(box[1], box[1] + box[3]):
-                        if not (
-                            0 <= r < grid.height and 0 <= c < grid.width
-                        ) or (r, c) in cur_box:
-                            continue
-                        v = grid.at(r, c)
-                        if v not in self._avatar_colors:
-                            self._open_colors.add(v)
+            self._note_vacated(grid, anchor, discontinuous)
             self._prev_anchor = anchor
             # Occupancy outranks motion suspicion: a color she has
             # stood inside cannot be a hazard — floor-colored blobs
@@ -1099,6 +1322,74 @@ class SpatialAgent:
         self._last_frame = grid
         self._boards.observe(grid)
         return change
+
+    def _learn_transition(self, prev: Grid, grid: Grid) -> float:
+        """Learn from one frame step: physics, task competence, omens."""
+        change = self._learn_from_step(
+            prev, grid, self._last_action
+        )
+        if self._task_context is not None:
+            # The shared substrate learns the same affordance data
+            # in a domain-general, persistable form. Its check is
+            # also a surprise signal: when the world defies an
+            # action's learned effects, renew curiosity instead of
+            # repeating a now-suspect policy.
+            check = self.task_competence.record_transition(
+                self._task_context,
+                str(self._last_action),
+                self._transition_state(prev),
+                self._transition_state(grid),
+            )
+            # The terminal transition's changed variables are the
+            # abduction signal for goal inference — keep them for
+            # record_episode.
+            self._last_transition_changes = check.observed_changes
+            if check.predicted and check.score < 0.6:
+                self._grit_steps = max(self._grit_steps, 20)
+        # Omen tracking: colors that newly appear after an action
+        # (or click) are that action's visible consequences. Doom
+        # often leaves a marker long before the death lands — a
+        # "bad" sprite, a wound, a wrong piece. When the segment
+        # ends, colors introduced along the way get outcome records
+        # and consistent doom-markers blame their introducer.
+        source: Any = (
+            self._pending_click
+            if self._pending_click is not None
+            else self._last_action
+        )
+        prev_colors = {v for _r, _c, v in prev.iter_cells()}
+        for _r, _c, v in grid.iter_cells():
+            if v not in prev_colors:
+                self._seg_introduced.setdefault(v, source)
+                self._cur_episode_colors.add(v)
+        return change
+
+    def _note_vacated(
+        self, grid: Grid, anchor: tuple[int, int, int, int], discontinuous: bool
+    ) -> None:
+        """Whatever now fills the space she just vacated is by
+        definition open — cells her body occupied cannot be
+        solid. This is how floor-colored walls stay marked
+        while real floor stays trusted. Only cells outside her
+        current silhouette count: she still occupies the rest —
+        what shows there is her own display, not freed floor."""
+        cur_box = {
+            (r, c)
+            for r in range(anchor[0], anchor[0] + anchor[2])
+            for c in range(anchor[1], anchor[1] + anchor[3])
+        }
+        box = None if discontinuous else self._prev_anchor
+        if box is None:
+            return
+        for r in range(box[0], box[0] + box[2]):
+            for c in range(box[1], box[1] + box[3]):
+                if not (
+                    0 <= r < grid.height and 0 <= c < grid.width
+                ) or (r, c) in cur_box:
+                    continue
+                v = grid.at(r, c)
+                if v not in self._avatar_colors:
+                    self._open_colors.add(v)
 
     def _learn_blocked(self, prev: Grid, cur: Grid, action: Any) -> None:
         """Collision → terrain: a move that displaced nothing hit a wall.
@@ -1401,84 +1692,9 @@ class SpatialAgent:
         cur_objects = list(cur_scene.objects)
         basis_changed = False
         for key, pobj in prev_map.items():
-            # The display's glyph can drift inside its panel — a
-            # rotating icon keeps its region but not its cells. The
-            # same display is whichever current object still covers
-            # most of its old footprint; a walker loses overlap.
-            pcells = set(pobj.cells)
-            prows = [r for r, _ in pcells]
-            pcols = [c for _, c in pcells]
-            pr0, pr1 = min(prows), max(prows)
-            pc0, pc1 = min(pcols), max(pcols)
-            best, shared = None, 0
-            for cand in cur_objects:
-                # Region, not pixels: a redrawn glyph keeps none of
-                # its old cells but all of its old rectangle.
-                common = sum(
-                    1 for r, c in cand.cells
-                    if pr0 <= r <= pr1 and pc0 <= c <= pc1
-                )
-                if common > shared:
-                    best, shared = cand, common
-            if best is None or shared < max(
-                3, min(len(pcells), len(best.cells)) // 2
+            if self._check_readout(
+                key, pobj, cur_objects, prev, cur, contact
             ):
-                continue  # moved or vanished — a world object
-            rec = self._readout_stats.setdefault(key, [0, 0, 0])
-            rec[0] += 1
-            # Compare the panel's contents over the union box, not
-            # object signatures — the same rectangle in both frames
-            # is the honest "did the display change" test.
-            rows = [r for r, _ in pcells] + [r for r, _ in best.cells]
-            cols = [c for _, c in pcells] + [c for _, c in best.cells]
-            r0, r1 = min(rows), max(rows)
-            c0, c1 = min(cols), max(cols)
-            # Her own body passing over the box is occlusion, not a
-            # redraw — vacating the cells flips them back with no
-            # contact, which otherwise reads as a free change. Cells
-            # showing her colors in either frame can't testify about
-            # the display, so they don't count.
-            changed = any(
-                prev.at(r, c) != cur.at(r, c)
-                and prev.at(r, c) not in self._avatar_colors
-                and cur.at(r, c) not in self._avatar_colors
-                for r in range(r0, r1 + 1)
-                for c in range(c0, c1 + 1)
-            )
-            if not changed:
-                continue
-            if contact:
-                rec[1] += 1
-            else:
-                rec[2] += 1
-                if rec[2] >= 2:
-                    # Redrew on its own schedule — a meter or a
-                    # detached display, the interface not the world.
-                    # One flicker isn't proof; two is a pattern.
-                    for rr in range(r0, r1 + 1):
-                        for cc in range(c0, c1 + 1):
-                            self._ui_cells.add((rr, cc))
-            if (
-                key not in self._readout_keys
-                and rec[0] >= 4
-                and rec[1] >= 1
-                and rec[2] == 0
-            ):
-                self._readout_keys.append(key)
-                self._readout_keys.sort()
-                # Enroll the rectangle, not the glyph: the signature
-                # reads a stable region whose contents may move.
-                self._readout_cells[key] = frozenset(
-                    (r, c)
-                    for r in range(r0, r1 + 1)
-                    for c in range(c0, c1 + 1)
-                )
-                basis_changed = True
-            elif key in self._readout_keys and rec[2] >= 3:
-                # Repeated free changes — a meter after all. One or
-                # two are contact-misses on station re-touches.
-                self._readout_keys.remove(key)
-                self._readout_cells.pop(key, None)
                 basis_changed = True
         if basis_changed:
             # Enrollment coincides with the change it is for — the
@@ -1495,6 +1711,100 @@ class SpatialAgent:
                     if rcells:
                         sig = sig + self._cells_signature(rcells, prev)
                 self._avatar_sig = sig
+
+    def _check_readout(
+        self,
+        key: tuple[int, int],
+        pobj: Any,
+        cur_objects: list[Any],
+        prev: Grid,
+        cur: Grid,
+        contact: bool,
+    ) -> bool:
+        """Track one candidate display across the frame pair.
+
+        Returns True when the enrollment basis changed (a readout
+        joined or left the signature set)."""
+        # The display's glyph can drift inside its panel — a
+        # rotating icon keeps its region but not its cells. The
+        # same display is whichever current object still covers
+        # most of its old footprint; a walker loses overlap.
+        pcells = set(pobj.cells)
+        prows = [r for r, _ in pcells]
+        pcols = [c for _, c in pcells]
+        pr0, pr1 = min(prows), max(prows)
+        pc0, pc1 = min(pcols), max(pcols)
+        best, shared = None, 0
+        for cand in cur_objects:
+            # Region, not pixels: a redrawn glyph keeps none of
+            # its old cells but all of its old rectangle.
+            common = sum(
+                1 for r, c in cand.cells
+                if pr0 <= r <= pr1 and pc0 <= c <= pc1
+            )
+            if common > shared:
+                best, shared = cand, common
+        if best is None or shared < max(
+            3, min(len(pcells), len(best.cells)) // 2
+        ):
+            return False  # moved or vanished — a world object
+        rec = self._readout_stats.setdefault(key, [0, 0, 0])
+        rec[0] += 1
+        # Compare the panel's contents over the union box, not
+        # object signatures — the same rectangle in both frames
+        # is the honest "did the display change" test.
+        rows = [r for r, _ in pcells] + [r for r, _ in best.cells]
+        cols = [c for _, c in pcells] + [c for _, c in best.cells]
+        r0, r1 = min(rows), max(rows)
+        c0, c1 = min(cols), max(cols)
+        # Her own body passing over the box is occlusion, not a
+        # redraw — vacating the cells flips them back with no
+        # contact, which otherwise reads as a free change. Cells
+        # showing her colors in either frame can't testify about
+        # the display, so they don't count.
+        changed = any(
+            prev.at(r, c) != cur.at(r, c)
+            and prev.at(r, c) not in self._avatar_colors
+            and cur.at(r, c) not in self._avatar_colors
+            for r in range(r0, r1 + 1)
+            for c in range(c0, c1 + 1)
+        )
+        if not changed:
+            return False
+        if contact:
+            rec[1] += 1
+        else:
+            rec[2] += 1
+            if rec[2] >= 2:
+                # Redrew on its own schedule — a meter or a
+                # detached display, the interface not the world.
+                # One flicker isn't proof; two is a pattern.
+                for rr in range(r0, r1 + 1):
+                    for cc in range(c0, c1 + 1):
+                        self._ui_cells.add((rr, cc))
+        if (
+            key not in self._readout_keys
+            and rec[0] >= 4
+            and rec[1] >= 1
+            and rec[2] == 0
+        ):
+            self._readout_keys.append(key)
+            self._readout_keys.sort()
+            # Enroll the rectangle, not the glyph: the signature
+            # reads a stable region whose contents may move.
+            self._readout_cells[key] = frozenset(
+                (r, c)
+                for r in range(r0, r1 + 1)
+                for c in range(c0, c1 + 1)
+            )
+            return True
+        if key in self._readout_keys and rec[2] >= 3:
+            # Repeated free changes — a meter after all. One or
+            # two are contact-misses on station re-touches.
+            self._readout_keys.remove(key)
+            self._readout_cells.pop(key, None)
+            return True
+        return False
 
     def _detect_gates_and_stations(self, prev: Grid, cur: Grid) -> None:
         """Learn gate and station semantics from touch consequences.
@@ -1537,128 +1847,161 @@ class SpatialAgent:
             compute_relations=False,
         )
         body, cur_body, strip, moved = self._contact_map(prev, cur)
-
-        # Spending is positional: whatever lies inside the tile she
-        # stands on — or reached for and was refused — is consumed
-        # under this state. A station's offer is spent once used, a
-        # gate's try is recorded. Component-level keys fragment on
-        # occlusion (her sprite covers the cells it stands on), but
-        # an anchor's footprint is exact. Each mark goes under the
-        # pre-transition signature as well as the current one: a
-        # display can redraw a frame late, and the tile was spent
-        # either way.
-        if sig is not None:
-            marks = {sig}
-            if self._avatar_sig is not None and self._avatar_sig != sig:
-                marks.add(self._avatar_sig)
-            after_anchor = self._avatar_anchor(cur)
-            if moved and after_anchor is not None:
-                for m in marks:
-                    self._tried_at_state.add(
-                        (after_anchor[0], after_anchor[1],
-                         after_anchor[2], after_anchor[3], m)
-                    )
-            if not moved and strip:
-                r0 = min(r for r, _ in strip)
-                c0 = min(c for _, c in strip)
-                h = max(r for r, _ in strip) - r0 + 1
-                w = max(c for _, c in strip) - c0 + 1
-                for m in marks:
-                    self._tried_at_state.add((r0, c0, h, w, m))
-            if self._avatar_sig is not None and self._avatar_sig != sig:
-                # The change may be credited a frame late: whatever
-                # she last stood on caused it, so that tile is spent
-                # under the new state as well.
-                pa = self._avatar_anchor(prev)
-                if pa is not None:
-                    self._tried_at_state.add(
-                        (pa[0], pa[1], pa[2], pa[3], sig)
-                    )
-
+        self._record_state_marks(prev, cur, sig, strip, moved)
         for obj in scene.objects:
-            bg = self._background(cur)
-            if obj.color in (0, bg, self.avatar_color):
-                continue
-            if body and set(obj.cells) & body:
-                continue  # her other bands aren't stations or gates
-            if obj.color in self._lethal_colors:
-                continue
-            cells = set(obj.cells)
-            # Reached: she is on it, or it was her move's destination
-            # (a landed station or an open gate both qualify).
-            reached = bool(cells & cur_body) or bool(cells & strip)
-            # Refused: she tried to enter and stayed put — the gate
-            # signal. The floor never refuses her, so walkable
-            # terrain can never teach itself locked.
-            refused = (not moved) and bool(cells & strip)
-            if (
-                not moved
-                and not strip
-                and body
-                and min(
-                    abs(br - r) + abs(bc - c)
-                    for r, c in cells
-                    for br, bc in body
-                )
-                <= 1
-            ):
-                refused = True
-            if not reached and not refused:
-                continue
-            if (
-                obj.color in self._open_colors
-                and obj.color not in self._station_colors
-                and len(obj.cells) > 64
-            ):
-                # She is standing in this color's cells — a floor
-                # cannot gate the body that occupies it. A small
-                # decal still can: stations are walked-on by
-                # design, so their colors prove open on the first
-                # touch while their effect fires on the next.
-                continue
-            self._touched_colors.add(obj.color)
-            remaining = sum(
-                1 for r, c in obj.cells if cur.at(r, c) == obj.color
+            self._classify_touch(
+                obj, scene, prev, cur, body, cur_body, strip, moved, sig
             )
-            if (
-                refused
-                and remaining > len(obj.cells) // 2
-                and obj.color not in self._open_colors
-            ):
-                # Refused and it persisted — a gate if it stays that
-                # way. Only the cells she reached for accrue blame.
-                # A color she has already walked on cannot be the
-                # lock — without that exemption, floor cells inside a
-                # refused strip get gated and the corridor itself
-                # disappears from the planner.
-                for cell in cells & strip:
-                    self._touch_fail[cell] = (
-                        self._touch_fail.get(cell, 0) + 1
-                    )
-                    if self._touch_fail[cell] >= 2:
-                        self._gated_cells.add(cell)
-                # Record which avatar signature this gate rejected.
-                if self._avatar_sig is not None:
-                    self._gate_blocked.setdefault(
-                        self._obj_signature(obj, prev), set()
-                    ).add(self._avatar_sig)
-                # And read what it asked for: gates that post their
-                # requirement show a signature-shaped icon on or
-                # beside the refused tile.
-                req = self._requirement_token(obj, scene, prev)
-                if req is not None:
-                    self._gate_requirements[self._obj_key(obj)] = req
-            # Station: avatar's own signature changed while on it.
-            if (
-                reached
-                and self._avatar_sig is not None
-                and sig is not None
-                and sig != self._avatar_sig
-            ):
-                self._station_colors.add(obj.color)
-                self._station_effects[obj.color] = self._effect_dims(
-                    prev, cur
+        self._note_signature_change(sig)
+
+    def _record_state_marks(
+        self,
+        prev: Grid,
+        cur: Grid,
+        sig: Any,
+        strip: set[tuple[int, int]],
+        moved: bool,
+    ) -> None:
+        """Mark the tiles spent under this signature.
+
+        Spending is positional: whatever lies inside the tile she
+        stands on — or reached for and was refused — is consumed
+        under this state. A station's offer is spent once used, a
+        gate's try is recorded. Component-level keys fragment on
+        occlusion (her sprite covers the cells it stands on), but
+        an anchor's footprint is exact. Each mark goes under the
+        pre-transition signature as well as the current one: a
+        display can redraw a frame late, and the tile was spent
+        either way.
+        """
+        if sig is None:
+            return
+        marks = {sig}
+        if self._avatar_sig is not None and self._avatar_sig != sig:
+            marks.add(self._avatar_sig)
+        after_anchor = self._avatar_anchor(cur)
+        if moved and after_anchor is not None:
+            for m in marks:
+                self._tried_at_state.add(
+                    (after_anchor[0], after_anchor[1],
+                     after_anchor[2], after_anchor[3], m)
                 )
+        if not moved and strip:
+            r0 = min(r for r, _ in strip)
+            c0 = min(c for _, c in strip)
+            h = max(r for r, _ in strip) - r0 + 1
+            w = max(c for _, c in strip) - c0 + 1
+            for m in marks:
+                self._tried_at_state.add((r0, c0, h, w, m))
+        if self._avatar_sig is not None and self._avatar_sig != sig:
+            # The change may be credited a frame late: whatever
+            # she last stood on caused it, so that tile is spent
+            # under the new state as well.
+            pa = self._avatar_anchor(prev)
+            if pa is not None:
+                self._tried_at_state.add(
+                    (pa[0], pa[1], pa[2], pa[3], sig)
+                )
+
+    def _classify_touch(
+        self,
+        obj: Any,
+        scene: Any,
+        prev: Grid,
+        cur: Grid,
+        body: set[tuple[int, int]] | frozenset[tuple[int, int]] | None,
+        cur_body: set[tuple[int, int]] | frozenset[tuple[int, int]] | None,
+        strip: set[tuple[int, int]],
+        moved: bool,
+        sig: Any,
+    ) -> None:
+        """Read one contacted object as gate, station, or neither."""
+        bg = self._background(cur)
+        if obj.color in (0, bg, self.avatar_color):
+            return
+        if body and set(obj.cells) & body:
+            return  # her other bands aren't stations or gates
+        if obj.color in self._lethal_colors:
+            return
+        cells = set(obj.cells)
+        # Reached: she is on it, or it was her move's destination
+        # (a landed station or an open gate both qualify).
+        reached = bool(cur_body and cells & cur_body) or bool(cells & strip)
+        # Refused: she tried to enter and stayed put — the gate
+        # signal. The floor never refuses her, so walkable
+        # terrain can never teach itself locked.
+        refused = (not moved) and bool(cells & strip)
+        if (
+            not moved
+            and not strip
+            and body
+            and min(
+                abs(br - r) + abs(bc - c)
+                for r, c in cells
+                for br, bc in body
+            )
+            <= 1
+        ):
+            refused = True
+        if not reached and not refused:
+            return
+        if (
+            obj.color in self._open_colors
+            and obj.color not in self._station_colors
+            and len(obj.cells) > 64
+        ):
+            # She is standing in this color's cells — a floor
+            # cannot gate the body that occupies it. A small
+            # decal still can: stations are walked-on by
+            # design, so their colors prove open on the first
+            # touch while their effect fires on the next.
+            return
+        self._touched_colors.add(obj.color)
+        remaining = sum(
+            1 for r, c in obj.cells if cur.at(r, c) == obj.color
+        )
+        if (
+            refused
+            and remaining > len(obj.cells) // 2
+            and obj.color not in self._open_colors
+        ):
+            # Refused and it persisted — a gate if it stays that
+            # way. Only the cells she reached for accrue blame.
+            # A color she has already walked on cannot be the
+            # lock — without that exemption, floor cells inside a
+            # refused strip get gated and the corridor itself
+            # disappears from the planner.
+            for cell in cells & strip:
+                self._touch_fail[cell] = (
+                    self._touch_fail.get(cell, 0) + 1
+                )
+                if self._touch_fail[cell] >= 2:
+                    self._gated_cells.add(cell)
+            # Record which avatar signature this gate rejected.
+            if self._avatar_sig is not None:
+                self._gate_blocked.setdefault(
+                    self._obj_signature(obj, prev), set()
+                ).add(self._avatar_sig)
+            # And read what it asked for: gates that post their
+            # requirement show a signature-shaped icon on or
+            # beside the refused tile.
+            req = self._requirement_token(obj, scene, prev)
+            if req is not None:
+                self._gate_requirements[self._obj_key(obj)] = req
+        # Station: avatar's own signature changed while on it.
+        if (
+            reached
+            and self._avatar_sig is not None
+            and sig is not None
+            and sig != self._avatar_sig
+        ):
+            self._station_colors.add(obj.color)
+            self._station_effects[obj.color] = self._effect_dims(
+                prev, cur
+            )
+
+    def _note_signature_change(self, sig: Any) -> None:
+        """Bookkeep an observed signature transition and commit it."""
         if sig is not None and self._avatar_sig != sig:
             # Her shown state actually changed — displays and
             # signatures only carry state once they've been seen to.
@@ -2266,239 +2609,144 @@ class SpatialAgent:
         # the station class worth the walk — and a requirement her
         # shown state already satisfies predicts an open gate
         # before any success has been recorded.
-        self._req_diffs: dict[tuple[int, int], set[str]] = {}
-        needed_dims: set[str] = set()
-        mine_toks = self._self_display_tokens(grid)
-        if mine_toks:
-            gate_spots = {cell[:2] for cell in self._gated_cells} | {
-                (r, c) for r, c, _a in self._bumped_gates
-            }
-            for o in scene.objects:
-                if not o.cells:
-                    continue
-                if o.color in self._avatar_colors or o.color == bg:
-                    continue
-                if body and set(o.cells) & body:
-                    continue
-                key = self._obj_key(o)
-                req = self._gate_requirements.get(key)
-                if req is None and (
-                    key in gate_spots
-                    or any(cell in self._gated_cells for cell in o.cells)
-                    or any(
-                        (r, c) in gate_spots for r, c in o.cells
-                    )
-                    or self._has_nested_icon(o, scene)
-                ):
-                    req = self._requirement_token(o, scene, grid)
-                if req is None:
-                    continue
-                self._gate_requirements[key] = req
-                d = min(
-                    (self._sig_diffs(m, req) for m in mine_toks),
-                    key=len,
-                )
-                self._req_diffs[key] = d
-                needed_dims |= d
-
-        def openable_now(obj: Any) -> bool:
-            """This gate's recorded opener — or posted requirement —
-            matches my current key."""
-            if self._req_diffs.get(self._obj_key(obj)) == set():
-                return True
-            if cur_sig is None:
-                return False
-            return (
-                self._gate_openers.get(self._obj_signature(obj, grid))
-                == cur_sig
-            )
-
-        # A locked goal makes key-stations worth re-visiting — but a
-        # walkable station is "open" the moment she stands on it, so
-        # the open-color filter must not silence it. Only stations
-        # earned by observed key-state changes get this exemption.
-        stations_matter = bool(self._gated_cells or self._gate_blocked)
-
-        # Interface territory: marked meters plus enrolled display
-        # panels — pixels that are her own state, not the world.
-        inside = self._ui_cells | {
-            cell
-            for key in self._readout_keys
-            for cell in self._readout_cells.get(key, frozenset())
-        }
-
-        # Self-echo: an object that draws a fragment of her own body
-        # pixel-for-pixel elsewhere is a status glyph — her icon
-        # re-rendered on a panel — not something to walk to. The test
-        # is silhouette equality under translation for the matching
-        # body color: same cell count, same normalized shape.
-        def self_echo(obj: Any) -> bool:
-            if not body:
-                return False
-            mine = {
-                cell for cell in body if grid.at(*cell) == obj.color
-            }
-            if not mine or len(mine) != len(obj.cells):
-                return False
-            mr0 = min(r for r, _ in mine)
-            mc0 = min(c for _, c in mine)
-            or0 = min(r for r, _ in obj.cells)
-            oc0 = min(c for _, c in obj.cells)
-            return {(r - mr0, c - mc0) for r, c in mine} == {
-                (r - or0, c - oc0) for r, c in obj.cells
-            }
-
-        def eligible(obj: Any) -> bool:
-            """Everything but the provisional reachability verdict."""
-            if inside and all(cell in inside for cell in obj.cells):
-                # An enrolled display's panel or a marked meter —
-                # its pixels are the interface, her own state, not
-                # a thing in the world.
-                return False
-            if self_echo(obj):
-                return False
-            return (
-                obj.color != self.avatar_color
-                and not (body and set(obj.cells) & body)
-                and obj.color not in self._hazard_colors
-                and (
-                    obj.color not in self._open_colors
-                    or len(obj.cells) <= 64
-                    or (
-                        stations_matter
-                        and obj.color in self._station_colors
-                    )
-                )
-                and not all(
-                    cell in self._blocked_cells for cell in obj.cells
-                )
-                and (
-                    not any(
-                        cell in self._gated_cells for cell in obj.cells
-                    )
-                    or openable_now(obj)
-                )
-            )
-
-        def on_probation(obj: Any) -> bool:
-            """Goal BFS couldn't reach — retried as the map grows.
-
-            Marks consolidate onto the neighbourhood that earned them —
-            a flickering icon re-segments into fragments whose cells
-            don't cover the mark, so the verdict has to match the same
-            window that anchored it, not the pixels of this frame's
-            fragment.
-            """
-            return any(
-                len(self._visited_cells) - seen < max(200, seen // 8)
-                and any(
-                    abs(mark[0] - r) <= 5 and abs(mark[1] - c) <= 5
-                    for r, c in obj.cells
-                )
-                for mark, seen in self._unreachable_goals.items()
-            )
-
-        def struck_out(obj: Any) -> bool:
-            """Unreachable three times running — a verdict, not a
-            probation. The strike survives the pool-exhaustion wipe,
-            so repeated proof against the same place is final."""
-            return any(
-                count >= 3
-                and any(
-                    abs(mark[0] - r) <= 5 and abs(mark[1] - c) <= 5
-                    for r, c in obj.cells
-                )
-                for mark, count in self._unreach_strikes.items()
-            )
+        needed_dims = self._read_gate_requirements(scene, grid, body, bg)
+        view = _GoalView(self, grid, body, cur_sig)
 
         if _DBG:
-            for o in scene.objects:
-                if len(o.cells) <= 30:
-                    why = (
-                        "inside" if inside and all(c in inside for c in o.cells)
-                        else "echo" if self_echo(o)
-                        else "avcol" if o.color == self.avatar_color
-                        else "body" if body and set(o.cells) & body
-                        else "haz" if o.color in self._hazard_colors
-                        else "open" if (
-                            o.color in self._open_colors
-                            and len(o.cells) > 64
-                            and not (
-                                stations_matter
-                                and o.color in self._station_colors
-                            )
-                        )
-                        else "blk" if all(c in self._blocked_cells for c in o.cells)
-                        else "gated" if (
-                            any(c in self._gated_cells for c in o.cells)
-                            and not openable_now(o)
-                        )
-                        else "prob" if on_probation(o)
-                        else "struck" if struck_out(o)
-                        else "OK"
-                    )
-                    if why != "OK":
-                        _dbg(
-                            f"drop c{o.color}@{round(o.centroid[0])},"
-                            f"{round(o.centroid[1])} n={len(o.cells)} {why}"
-                        )
+            view.dump_drops(scene)
 
-        goals = [
-            obj for obj in scene.objects
-            if eligible(obj) and not on_probation(obj)
-            and not struck_out(obj)
-        ]
-        if not goals:
-            pool = [
-                obj
-                for obj in scene.objects
-                if eligible(obj) and not struck_out(obj)
-            ]
-            if pool:
-                # Every candidate is probationary — the verdicts were
-                # recorded against a smaller map, and the frontier is
-                # gone, so probation can never expire on its own.
-                # Wipe the marks and let BFS retry: a sealed goal
-                # simply re-earns its mark, a reachable one resumes.
-                self._unreachable_goals.clear()
-                goals = pool
-            else:
-                self._goal_cells = frozenset()
-                return None
+        goals = view.frontier(scene)
+        if goals is None:
+            return None
         if pos is None:
             self._goal_cells = frozenset(goals[0].cells)
             return goals[0].centroid
-        # A goal is spent if any of its cells lies inside a footprint
-        # she already occupied — or reached for — at this signature.
-        # Spent goals leave the tier competition entirely; the
-        # whole-set fallback only fires when nothing is left to try.
-        def spent(g: Any) -> bool:
-            return any(
-                sig == cur_sig
-                and any(
-                    r0 <= r < r0 + h and c0 <= c < c0 + w
-                    for r, c in g.cells
-                )
-                for r0, c0, h, w, sig in self._tried_at_state
-            )
-
-        candidates = [g for g in goals if not spent(g)] or goals
+        candidates = [g for g in goals if not view.spent(g)] or goals
         if _DBG and self._committed_goal is not None:
-            col, cells = self._committed_goal
-            alive_obj = [
-                obj for obj in scene.objects
-                if obj.color == col and set(obj.cells) & cells
-            ]
-            if not alive_obj:
-                _dbg(f"commit-gone c{col}")
-            for obj in alive_obj:
-                _dbg(
-                    f"commit-alive c{col} elig={eligible(obj)} "
-                    f"prob={on_probation(obj)} spent={spent(obj)} "
-                    f"reachN={len(reach or {})} "
-                    f"strikes={dict(self._unreach_strikes)}"
-                )
+            view.dump_commit(scene, self._committed_goal, reach)
 
+        tiers = self._goal_tiers(
+            candidates, needed_dims, cur_sig, grid, scene, view.inside,
+            view.openable_now,
+        )
+
+        candidates, tiers, pool, costs, sealed_ids, cand_objs = (
+            self._reachable_goals(candidates, tiers, grid, reach)
+        )
+        # Commitment: the object she set out for stays the target
+        # while it remains a plausible goal *at all* — re-deciding
+        # "nearest" every frame, or dropping the trek because the
+        # tier ladder shifted under her, ping-pongs between distant
+        # goals and burns the move budget on transit, not progress.
+        # Tiers arbitrate fresh choices; they don't commute a walk
+        # already half-finished.
+        held = self._hold_commitment(pool, cand_objs, sealed_ids, body)
+        if held is not None:
+            return held
+        if not pool:
+            if _DBG:
+                _dbg(
+                    f"pool-empty goals={len(goals)} "
+                    f"cand={len(candidates)} sealed={len(sealed_ids)}"
+                )
+            self._committed_goal = None
+            self._goal_cells = frozenset()
+            return None
+        if _DBG:
+            def _c(objs: list[Any]) -> str:
+                return ",".join(
+                    f"c{o.color}@{round(o.centroid[0])},{round(o.centroid[1])}"
+                    for o in objs[:4]
+                )
+            _dbg(
+                "tiers "
+                + " ".join(
+                    f"{name}={_c(tier)}"
+                    for name, tier in zip(
+                        (
+                            "open", "retried", "needed", "val",
+                            "sta", "icon", "unt",
+                        ),
+                        tiers,
+                        strict=True,
+                    )
+                )
+                + f" cand={_c(candidates)}"
+            )
+        chosen = min(
+            pool,
+            key=lambda g: (
+                costs.get(id(g)) is None,
+                costs.get(id(g)) or 0.0,
+                abs(g.centroid[0] - pos[0])
+                + abs(g.centroid[1] - pos[1]),
+            ),
+        )
+        self._committed_goal = (
+            chosen.color,
+            frozenset(chosen.cells),
+        )
+        self._goal_cells = frozenset(chosen.cells)
+        self._commit_missing = 0
+        return chosen.centroid
+
+    def _read_gate_requirements(
+        self,
+        scene: Any,
+        grid: Grid,
+        body: set[tuple[int, int]] | frozenset[tuple[int, int]] | None,
+        bg: int,
+    ) -> set[str]:
+        """Mine the board for posted gate requirements; return the
+        dimensions my current signature is still missing."""
+        self._req_diffs: dict[tuple[int, int], set[str]] = {}
+        needed_dims: set[str] = set()
+        mine_toks = self._self_display_tokens(grid)
+        if not mine_toks:
+            return needed_dims
+        gate_spots = {cell[:2] for cell in self._gated_cells} | {
+            (r, c) for r, c, _a in self._bumped_gates
+        }
+        for o in scene.objects:
+            if not o.cells:
+                continue
+            if o.color in self._avatar_colors or o.color == bg:
+                continue
+            if body and set(o.cells) & body:
+                continue
+            key = self._obj_key(o)
+            req = self._gate_requirements.get(key)
+            if req is None and (
+                key in gate_spots
+                or any(cell in self._gated_cells for cell in o.cells)
+                or any(
+                    (r, c) in gate_spots for r, c in o.cells
+                )
+                or self._has_nested_icon(o, scene)
+            ):
+                req = self._requirement_token(o, scene, grid)
+            if req is None:
+                continue
+            self._gate_requirements[key] = req
+            d = min(
+                (self._sig_diffs(m, req) for m in mine_toks),
+                key=len,
+            )
+            self._req_diffs[key] = d
+            needed_dims |= d
+        return needed_dims
+
+    def _goal_tiers(
+        self,
+        candidates: list[Any],
+        needed_dims: set[str],
+        cur_sig: Any,
+        grid: Grid,
+        scene: Any,
+        inside: set[tuple[int, int]],
+        openable_now: Any,
+    ) -> list[list[Any]]:
+        """Priority tiers over the surviving candidates."""
         # Highest priority: gates empirically known to open for the
         # avatar's current key state.
         openable = [g for g in candidates if openable_now(g)]
@@ -2571,14 +2819,37 @@ class SpatialAgent:
         untouched = [
             g for g in candidates if g.color not in self._touched_colors
         ]
-        pool = (
-            openable or retried or needed or valuable or stations
-            or iconed or untouched or candidates
-        )
-        # Reachability: an object is committable only when some
-        # passable anchor can touch one of its cells. Without the
-        # map (early frames, no anchor yet) everything counts as
-        # reachable and the pick stays nearest-first.
+        return [
+            openable, retried, needed, valuable, stations, iconed,
+            untouched,
+        ]
+
+    def _reachable_goals(
+        self,
+        candidates: list[Any],
+        tiers: list[list[Any]],
+        grid: Grid,
+        reach: dict[tuple[int, int], int] | None,
+    ) -> tuple[
+        list[Any],
+        list[list[Any]],
+        list[Any],
+        dict[int, float | None],
+        set[int],
+        list[Any],
+    ]:
+        """Reachability and sealed-evidence pass.
+
+        An object is committable only when some passable anchor can
+        touch one of its cells. Without the map (early frames, no
+        anchor yet) everything counts as reachable. Proven-sealed
+        objects — every approach already refused *and the refusal
+        taught nothing* — drop unconditionally: contact alone can't
+        tell a sealed box from a goal; the refusal ledger can.
+        Returns the filtered candidates, filtered tiers, the
+        re-picked pool, the cost map, the sealed id set, and the
+        pre-filter candidate list for commitment checks.
+        """
         fp = self._avatar_anchor(grid)
         fh, fw = (fp[2], fp[3]) if fp is not None else (1, 1)
         reach_map = reach or {}
@@ -2605,12 +2876,8 @@ class SpatialAgent:
         anything_reachable = any(
             c is not None for c in costs.values()
         )
-        # Proven-sealed objects: every reachable contact approach has
-        # already been refused *and the refusal taught nothing* — no
-        # requirement posted, nothing consumed, pure dead scenery.
-        # Contact alone can't tell a sealed box from a goal; the
-        # refusal ledger can. A gate whose refusal posted a
-        # requirement stays alive — the station tiers own it.
+        # A gate whose refusal posted a requirement stays alive —
+        # the station tiers own it.
         sealed_ids = {
             id(g)
             for g in candidates
@@ -2628,129 +2895,93 @@ class SpatialAgent:
         # the mark-and-repick cycle. Proven-sealed candidates drop
         # unconditionally: a dead end is never a goal.
         cand_objs = list(candidates)
+        pool = next((t for t in tiers if t), candidates)
         if anything_reachable or sealed_ids:
-            openable = [g for g in openable if alive(g)]
-            retried = [g for g in retried if alive(g)]
-            needed = [g for g in needed if alive(g)]
-            valuable = [g for g in valuable if alive(g)]
-            stations = [g for g in stations if alive(g)]
-            iconed = [g for g in iconed if alive(g)]
-            untouched = [g for g in untouched if alive(g)]
+            tiers = [[g for g in tier if alive(g)] for tier in tiers]
             candidates = [g for g in candidates if alive(g)]
-            pool = (
-                openable or retried or needed or valuable or stations
-                or iconed or untouched or candidates
-            )
-        # Commitment: the object she set out for stays the target
-        # while it remains a plausible goal *at all* — re-deciding
-        # "nearest" every frame, or dropping the trek because the
-        # tier ladder shifted under her, ping-pongs between distant
-        # goals and burns the move budget on transit, not progress.
-        # Tiers arbitrate fresh choices; they don't commute a walk
-        # already half-finished.
-        if self._committed_goal is not None:
-            col, cells = self._committed_goal
-            if any(
-                id(g) in sealed_ids
-                and g.color == col
-                and set(g.cells) & cells
-                for g in cand_objs
-            ):
-                # Proven sealed — every approach already refused and
-                # the refusal posted no requirement. A dead end gets
-                # no flicker grace.
-                self._committed_goal = None
-                self._goal_cells = frozenset()
-                self._commit_missing = 0
-            else:
-                # The trek holds only inside the active tier's pool:
-                # a locked gate that posted a requirement yields to
-                # the station that unlocks it — *that* is the walk,
-                # not the gate it can't yet enter — and the retried
-                # tier brings the gate back once the state turns.
-                for g in pool:
-                    if g.color == col and set(g.cells) & cells:
-                        # Refresh the remembered silhouette — her
-                        # cover and re-segmentation reshape it frame
-                        # to frame. Fully occluded keeps the last
-                        # sighting.
-                        if g.cells:
-                            self._committed_goal = (
-                                col,
-                                frozenset(g.cells),
-                            )
-                        self._goal_cells = frozenset(g.cells)
-                        self._commit_missing = 0
-                        return g.centroid
-                if any(
-                    g.color == col and set(g.cells) & cells
-                    for g in cand_objs
-                ):
-                    # Perceived but out-tiered — a real demotion,
-                    # not a flicker. The remembered cells stay in
-                    # the requirement ledger for the retry.
-                    self._committed_goal = None
-                    self._goal_cells = frozenset()
-                    self._commit_missing = 0
-                elif body and self._goal_cells and set(body) & set(
-                    self._goal_cells
-                ):
-                    # Standing where it was and nothing answered —
-                    # the target is spent, not flickering.
-                    self._committed_goal = None
-                    self._goal_cells = frozenset()
-                    self._commit_missing = 0
-                elif self._goal_cells and self._commit_missing < 8:
-                    # Not perceived this frame — occlusion and icon
-                    # redraws split a blob for a step. The remembered
-                    # footprint keeps pointing the plan at it.
-                    self._commit_missing += 1
-                    rs = [r for r, _ in self._goal_cells]
-                    cs = [c for _, c in self._goal_cells]
-                    return (
-                        sum(rs) / len(rs),
-                        sum(cs) / len(cs),
-                    )
-                else:
-                    self._committed_goal = None
-                    self._commit_missing = 0
-        if not pool:
-            if _DBG:
-                _dbg(
-                    f"pool-empty goals={len(goals)} "
-                    f"cand={len(candidates)} sealed={len(sealed_ids)}"
-                )
+            pool = next((t for t in tiers if t), candidates)
+        return candidates, tiers, pool, costs, sealed_ids, cand_objs
+
+    def _hold_commitment(
+        self,
+        pool: list[Any],
+        cand_objs: list[Any],
+        sealed_ids: set[int],
+        body: set[tuple[int, int]] | frozenset[tuple[int, int]] | None,
+    ) -> tuple[float, float] | None:
+        """Reconcile the committed goal against this frame's pool.
+
+        Returns the remembered or refreshed centroid while the trek
+        still holds; ``None`` releases the pick to a fresh choice.
+        """
+        if self._committed_goal is None:
+            return None
+        col, cells = self._committed_goal
+        if any(
+            id(g) in sealed_ids
+            and g.color == col
+            and set(g.cells) & cells
+            for g in cand_objs
+        ):
+            # Proven sealed — every approach already refused and
+            # the refusal posted no requirement. A dead end gets
+            # no flicker grace.
             self._committed_goal = None
             self._goal_cells = frozenset()
+            self._commit_missing = 0
             return None
-        if _DBG:
-            def _c(objs: list[Any]) -> str:
-                return ",".join(
-                    f"c{o.color}@{round(o.centroid[0])},{round(o.centroid[1])}"
-                    for o in objs[:4]
-                )
-            _dbg(
-                f"tiers open={_c(openable)} retried={_c(retried)} "
-                f"needed={_c(needed)} val={_c(valuable)} "
-                f"sta={_c(stations)} icon={_c(iconed)} "
-                f"unt={_c(untouched)} cand={_c(candidates)}"
+        # The trek holds only inside the active tier's pool:
+        # a locked gate that posted a requirement yields to
+        # the station that unlocks it — *that* is the walk,
+        # not the gate it can't yet enter — and the retried
+        # tier brings the gate back once the state turns.
+        for g in pool:
+            if g.color == col and set(g.cells) & cells:
+                # Refresh the remembered silhouette — her
+                # cover and re-segmentation reshape it frame
+                # to frame. Fully occluded keeps the last
+                # sighting.
+                if g.cells:
+                    self._committed_goal = (
+                        col,
+                        frozenset(g.cells),
+                    )
+                self._goal_cells = frozenset(g.cells)
+                self._commit_missing = 0
+                return g.centroid
+        if any(
+            g.color == col and set(g.cells) & cells
+            for g in cand_objs
+        ):
+            # Perceived but out-tiered — a real demotion,
+            # not a flicker. The remembered cells stay in
+            # the requirement ledger for the retry.
+            self._committed_goal = None
+            self._goal_cells = frozenset()
+            self._commit_missing = 0
+        elif body and self._goal_cells and set(body) & set(
+            self._goal_cells
+        ):
+            # Standing where it was and nothing answered —
+            # the target is spent, not flickering.
+            self._committed_goal = None
+            self._goal_cells = frozenset()
+            self._commit_missing = 0
+        elif self._goal_cells and self._commit_missing < 8:
+            # Not perceived this frame — occlusion and icon
+            # redraws split a blob for a step. The remembered
+            # footprint keeps pointing the plan at it.
+            self._commit_missing += 1
+            rs = [r for r, _ in self._goal_cells]
+            cs = [c for _, c in self._goal_cells]
+            return (
+                sum(rs) / len(rs),
+                sum(cs) / len(cs),
             )
-        chosen = min(
-            pool,
-            key=lambda g: (
-                costs.get(id(g)) is None,
-                costs.get(id(g)) or 0.0,
-                abs(g.centroid[0] - pos[0])
-                + abs(g.centroid[1] - pos[1]),
-            ),
-        )
-        self._committed_goal = (
-            chosen.color,
-            frozenset(chosen.cells),
-        )
-        self._goal_cells = frozenset(chosen.cells)
-        self._commit_missing = 0
-        return chosen.centroid
+        else:
+            self._committed_goal = None
+            self._commit_missing = 0
+        return None
 
     # ── Deliberation: pathing over learned terrain ────────────
 
@@ -3035,10 +3266,32 @@ class SpatialAgent:
             # pathing to a different touching anchor would orbit.
             return None
 
+        target, goal_hit = self._select_plan_target(
+            came, dist, start, reaches_goal
+        )
+        if goal_cell is not None and goal_hit is None and len(dist) > 8:
+            self._mark_unreachable(goal_cell)
+        if target is None or target == start:
+            return None
+        while (parent := came[target][0]) != start:
+            if parent is None:
+                return None
+            target = parent
+        return came[target][1]
+
+    def _select_plan_target(
+        self,
+        came: dict[tuple[int, int], tuple[tuple[int, int] | None, Any]],
+        dist: dict[tuple[int, int], int],
+        start: tuple[int, int],
+        reaches_goal: Any,
+    ) -> tuple[tuple[int, int] | None, tuple[int, int] | None]:
+        """Choose this frame's route target; return (target, goal_hit).
+
+        ``came`` inserts in BFS order — the first touching anchor
+        found is the nearest plan."""
         frontier_hit: tuple[int, int] | None = None
         goal_hit: tuple[int, int] | None = None
-        # ``came`` inserts in BFS order — the first touching anchor
-        # found is the nearest plan.
         for node in came:
             if node == start:
                 continue
@@ -3082,39 +3335,27 @@ class SpatialAgent:
         else:
             target = frontier_hit
         self._plan_target = target if target != start else None
-        if (
-            goal_cell is not None
-            and goal_hit is None
-            and len(dist) > 8
-        ):
-            # The whole passable space known so far was searched —
-            # probation, not a verdict: the mark records how much map
-            # was known, and new territory reopens the question.
-            # Strikes survive the retry: the same neighbourhood
-            # re-earning the verdict is accumulating proof. But a
-            # search that barely left the anchor — a pocket, an
-            # uncalibrated move set — proves nothing about the goal,
-            # so it earns no mark at all.
-            strike = next(
-                (
-                    cell
-                    for cell in self._unreach_strikes
-                    if abs(cell[0] - goal_cell[0]) <= 5
-                    and abs(cell[1] - goal_cell[1]) <= 5
-                ),
-                goal_cell,
-            )
-            self._unreach_strikes[strike] = (
-                self._unreach_strikes.get(strike, 0) + 1
-            )
-            self._unreachable_goals[strike] = len(self._visited_cells)
-        if target is None or target == start:
-            return None
-        while (parent := came[target][0]) != start:
-            if parent is None:
-                return None
-            target = parent
-        return came[target][1]
+        return target, goal_hit
+
+    def _mark_unreachable(self, goal_cell: tuple[int, int]) -> None:
+        """The whole passable space known so far was searched —
+        probation, not a verdict: the mark records how much map
+        was known, and new territory reopens the question.
+        Strikes survive the retry: the same neighbourhood
+        re-earning the verdict is accumulating proof."""
+        strike = next(
+            (
+                cell
+                for cell in self._unreach_strikes
+                if abs(cell[0] - goal_cell[0]) <= 5
+                and abs(cell[1] - goal_cell[1]) <= 5
+            ),
+            goal_cell,
+        )
+        self._unreach_strikes[strike] = (
+            self._unreach_strikes.get(strike, 0) + 1
+        )
+        self._unreachable_goals[strike] = len(self._visited_cells)
 
     def _navigate(
         self, grid: Grid, action_space: list[Any]
@@ -3160,32 +3401,53 @@ class SpatialAgent:
         # approaches the nearest object.
         ctx = self._task_context
         state = self._transition_state(grid) if ctx is not None else None
+        danger = self._danger_cells(grid)
+        return self._approach_step(
+            grid, nav_space, pos, goal, anchor, ctx, state, danger
+        )
+
+    def _danger_cells(self, grid: Grid) -> list[tuple[float, float]]:
+        """Known-hazard footprints — now, next predicted step, and
+        one ring out (hazards can spread: flood/tide mechanics)."""
         danger: list[tuple[float, float]] = []
-        if self._hazard_colors:
-            scene = perceive(
-                grid, background=self._background(grid),
-                compute_relations=False,
-            )
-            max_threat = grid.height * grid.width * 0.25
-            for obj in scene.objects:
-                if obj.color in self._hazard_colors:
-                    if len(obj.cells) > max_threat:
-                        continue
-                    danger.extend(obj.cells)
-                    v = self._hazard_velocity.get(obj.color)
-                    if v is not None:
-                        # Predict where the hazard will be next step —
-                        # danger is its future footprint, not just now.
-                        danger.extend(
-                            (r + v[0], c + v[1]) for r, c in obj.cells
-                        )
-                    # Hazards can also spread (flood/tide mechanics):
-                    # cells adjacent to a hazard cell are unsafe too.
+        if not self._hazard_colors:
+            return danger
+        scene = perceive(
+            grid, background=self._background(grid),
+            compute_relations=False,
+        )
+        max_threat = grid.height * grid.width * 0.25
+        for obj in scene.objects:
+            if obj.color in self._hazard_colors:
+                if len(obj.cells) > max_threat:
+                    continue
+                danger.extend(obj.cells)
+                v = self._hazard_velocity.get(obj.color)
+                if v is not None:
+                    # Predict where the hazard will be next step —
+                    # danger is its future footprint, not just now.
                     danger.extend(
-                        (r + dr, c + dc)
-                        for r, c in obj.cells
-                        for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1))
+                        (r + v[0], c + v[1]) for r, c in obj.cells
                     )
+                danger.extend(
+                    (r + dr, c + dc)
+                    for r, c in obj.cells
+                    for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1))
+                )
+        return danger
+
+    def _approach_step(
+        self,
+        grid: Grid,
+        nav_space: list[Any],
+        pos: tuple[float, float],
+        goal: tuple[float, float],
+        anchor: tuple[int, int, int, int] | None,
+        ctx: Any,
+        state: Any,
+        danger: list[tuple[float, float]],
+    ) -> Any | None:
+        """Score each viable action by predicted distance to goal."""
         best, best_cost = None, float("inf")
         for action in nav_space:
             st = self.stats.get(action)

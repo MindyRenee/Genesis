@@ -1587,12 +1587,11 @@ fn test_ipc_bind_failure_signals_shutdown() {
     let server = IpcServer::new(&path);
     let flag = server.shutdown_flag();
 
-    let mmap = std::sync::Arc::new(MmapState::create(
-        temp_path("ipc-bind-state", "bin"), 1, 0
-    ).expect("state"));
-    let stm = std::sync::Arc::new(RingBuffer::create(
-        temp_path("ipc-bind-stm", "bin"), 4
-    ).expect("stm"));
+    let mmap = std::sync::Arc::new(
+        MmapState::create(temp_path("ipc-bind-state", "bin"), 1, 0).expect("state"),
+    );
+    let stm =
+        std::sync::Arc::new(RingBuffer::create(temp_path("ipc-bind-stm", "bin"), 4).expect("stm"));
     let ltm_base = temp_base("ipc-bind-ltm");
     let ltm = std::sync::Arc::new(std::sync::Mutex::new(
         LtmStore::create(&ltm_base, 64).expect("ltm"),

@@ -530,3 +530,74 @@ def test_function_length_threshold_scripts_vs_core() -> None:
     script_bugs = _scan_tree({"python/genesis_cli.py": func})
     assert any(b.category == "long_function" for b in core_bugs)
     assert not any(b.category == "long_function" for b in script_bugs)
+
+
+# ─── open_reports / resolve — the felt-audit read path ───────────
+
+
+def _reporter_with_bug(source: str) -> tuple:
+    """Temp root + file + reporter whose first scan already ran."""
+    root = tempfile.mkdtemp()
+    path = os.path.join(root, "sample.py")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(textwrap.dedent(source))
+    rep = BugReporter(
+        project_root=root,
+        log_path=os.path.join(root, "bug_reports.jsonl"),
+    )
+    rep.scan(max_files=5)
+    return root, path, rep
+
+
+def test_open_reports_reads_log_without_rescanning() -> None:
+    """open_reports returns what the last audit left on the books —
+    it is a read of the log, not a fresh derivation from the tree."""
+    _root, path, rep = _reporter_with_bug(
+        """
+        def f():
+            try:
+                x = 1
+            except Exception:
+                pass
+        """
+    )
+    assert any(b.category == "silent_except" for b in rep.open_reports())
+
+    # The file is fixed on disk, but the open list is the audit's word
+    # until a scan or a successful fix discharges it.
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(
+            "import logging\nlogger = logging.getLogger(__name__)\n"
+            "def f():\n    try:\n        x = 1\n"
+            "    except Exception as e:\n"
+            "        logger.debug('f failed: %s', e)\n"
+        )
+    still = rep.open_reports()
+    assert any(b.category == "silent_except" for b in still)
+
+    rep.scan(max_files=5)
+    assert not rep.open_reports()
+
+
+def test_resolve_discharges_fixed_report() -> None:
+    """resolve() moves a repaired report to history immediately —
+    the open list drops it, history records it resolved, and a
+    second resolve is a no-op."""
+    root, _path, rep = _reporter_with_bug(
+        """
+        def f():
+            try:
+                x = 1
+            except Exception:
+                pass
+        """
+    )
+    assert rep.resolve("sample.py", "silent_except")
+    assert not rep.open_reports()
+    assert not rep.resolve("sample.py", "silent_except")
+
+    history = os.path.join(root, "bug_reports_history.jsonl")
+    with open(history, encoding="utf-8") as f:
+        archived = f.read()
+    assert '"status": "resolved"' in archived
+    assert "silent_except" in archived

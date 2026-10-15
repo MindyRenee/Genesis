@@ -82,6 +82,12 @@ _REPEATED_PUNCT_RE = re.compile(r"([.!?])\1+")
 # Detect sentences (for length checking)
 _SENTENCE_END_RE = re.compile(r"[.!?]+\s*$")
 
+# Slot-boundary artifacts — composition debris, not style:
+# terminal punctuation followed by a continuation mark ("Right. —")
+# and continuation marks crowding final punctuation ("about,?", "—.")
+_TERMINAL_BEFORE_CONTINUATION_RE = re.compile(r"([.!?])\s+([—–-])")
+_CONTINUATION_BEFORE_TERMINAL_RE = re.compile(r"[,;:—–-]+\s*([.!?])")
+
 
 @dataclass(slots=True)
 class RepairAction:
@@ -147,6 +153,7 @@ class SelfMonitor:
         known_facts: dict[str, str] | None = None,
         language: Any = None,
         comprehension: Any = None,
+        network: Any = None,
     ) -> None:
         """Initialize the self-monitor.
 
@@ -160,11 +167,17 @@ class SelfMonitor:
                 perceptual inner loop — the monitor "hears" planned
                 speech by running it back through comprehension and
                 catching propositions that fail to parse.
+            network: Optional ConceptNetwork — semantic memory.
+                Claims the perceptual loop extracts from planned
+                output are verified against its edges (factual
+                consistency, not just surface form).
         """
         self._pragmatic_reasoner = PragmaticReasoner()
         self._known_facts = known_facts or {}
         self._language = language
         self._comprehension = comprehension
+        self._network = network
+        self._claim_relations: dict[str, Any] | None = None
         self._repair_count = 0
         self._check_count = 0
         self._repair_history: list[RepairAction] = []
@@ -237,6 +250,11 @@ class SelfMonitor:
         current, factual_repairs = self._check_facts(current, all_facts)
         repairs.extend(factual_repairs)
 
+        # Semantic consistency — verify articulated claims against the
+        # concept network's own edges.
+        current, claim_repairs = self._check_network_claims(current)
+        repairs.extend(claim_repairs)
+
         if repairs:
             self._repair_count += 1
             self._repair_history.extend(repairs)
@@ -292,6 +310,21 @@ class SelfMonitor:
         current, repair = self._fix_space_before_punctuation(current)
         if repair is not None:
             repairs.append(repair)
+
+        # Fix slot-boundary artifacts — terminal punctuation followed
+        # by a continuation mark ("Right. — that's") and continuation
+        # marks crowding final punctuation ("about,?", "—."). Both are
+        # composition debris from emptied slots.
+        current, repair = self._fix_boundary_artifacts(current)
+        if repair is not None:
+            repairs.append(repair)
+
+        # Drop degenerate sentences — a lone pronoun ("I.") or a
+        # pronoun-copula echo ("I'm I.", "it is it.") articulates
+        # nothing. Multi-sentence output loses them; a lone degenerate
+        # sentence is flagged but kept.
+        current, degenerate_repairs = self._drop_degenerate_sentences(current)
+        repairs.extend(degenerate_repairs)
 
         # Ensure sentence-ending punctuation
         current, repair = self._ensure_sentence_punctuation(current)
@@ -484,6 +517,73 @@ class SelfMonitor:
                 fixed=new,
             )
         return text, None
+
+    def _fix_boundary_artifacts(
+        self, text: str
+    ) -> tuple[str, RepairAction | None]:
+        """Repair punctuation artifacts left by emptied slot fills.
+
+        Two defect shapes:
+        - terminal punctuation before a continuation mark —
+          "Right. — that's art." → "Right — that's art."
+        - continuation marks crowding final punctuation —
+          "curious about,?" → "curious about?"
+        """
+        original = text
+        new = _TERMINAL_BEFORE_CONTINUATION_RE.sub(r" \2", text)
+        new = _CONTINUATION_BEFORE_TERMINAL_RE.sub(r"\1", new)
+        if new != original:
+            return new, RepairAction(
+                check_type="grammar",
+                issue="punctuation artifact at a clause boundary",
+                repair="removed stray punctuation at the boundary",
+                original=original,
+                fixed=new,
+            )
+        return text, None
+
+    def _drop_degenerate_sentences(
+        self, text: str
+    ) -> tuple[str, list[RepairAction]]:
+        """Drop sentences that articulate nothing.
+
+        A sentence made only of pronouns and copulas ("I.", "I'm I.",
+        "it is it.") is a formulation failure — the surface is
+        well-formed but the sentence says nothing. When other
+        sentences carry the utterance, the empty ones are dropped;
+        when every sentence is degenerate, the text is flagged but
+        kept — silence is the caller's decision, not the monitor's.
+        """
+        from .generator import _is_degenerate_sentence
+
+        repairs: list[RepairAction] = []
+        sentences = [
+            s.strip()
+            for s in re.split(r"(?<=[.!?])\s+", text.strip())
+            if s.strip()
+        ]
+        if len(sentences) < 2:
+            if sentences and _is_degenerate_sentence(sentences[0]):
+                repairs.append(RepairAction(
+                    check_type="grammar",
+                    issue=f"degenerate utterance: '{sentences[0]}'",
+                    repair="noted — sentence articulates no content",
+                    original=text,
+                    fixed=text,
+                ))
+            return text, repairs
+        kept = [s for s in sentences if not _is_degenerate_sentence(s)]
+        if 0 < len(kept) < len(sentences):
+            new = " ".join(kept)
+            repairs.append(RepairAction(
+                check_type="grammar",
+                issue="degenerate sentence(s) in output",
+                repair="dropped content-free sentence(s)",
+                original=text,
+                fixed=new,
+            ))
+            return new, repairs
+        return text, repairs
 
     def _ensure_sentence_punctuation(
         self, text: str
@@ -866,6 +966,220 @@ class SelfMonitor:
                     )
 
         return current, repairs
+
+    # ─── Check 5: Semantic consistency ─────────────────────────
+
+    def _check_network_claims(
+        self, text: str
+    ) -> tuple[str, list[RepairAction]]:
+        """Verify articulated claims against the concept network.
+
+        The perceptual loop reparses planned output into propositions;
+        this check resolves each proposition's subject and object to
+        network entities and compares what the sentence asserts
+        against the edges actually stored. Contradictions are noted —
+        novel claims pass silently, because absence of an edge is
+        ignorance, not error.
+        """
+        repairs: list[RepairAction] = []
+        if self._network is None or self._comprehension is None:
+            return text, repairs
+        try:
+            result = self._comprehension.comprehend(text)
+        except Exception:  # noqa: BLE001 — monitoring must never crash output
+            return text, repairs
+
+        for prop in self._iter_props(result.propositions):
+            if not prop.verb_found:
+                continue
+            subj = self._claim_entity(prop.subject)
+            obj = self._claim_entity(prop.object)
+            if not subj or not obj:
+                continue
+            subj_concept = self._network.get_concept(subj)
+            if subj_concept is None:
+                continue
+            obj_concept = self._network.get_concept(obj)
+            obj_id = obj_concept.id if obj_concept is not None else None
+            pair_edges = [
+                e
+                for e in self._network.get_edges(subj_concept.id, "out")
+                if obj_id is not None and e.target == obj_id
+            ]
+            relation = self._asserted_relation(prop.predicate)
+            issue = self._claim_contradiction(
+                prop, relation, pair_edges, subj_concept.id, obj_id
+            )
+            if issue:
+                repairs.append(RepairAction(
+                    check_type="factual",
+                    issue=issue,
+                    repair="noted — claim conflicts with concept network",
+                    original=text,
+                    fixed=text,
+                ))
+        return text, repairs
+
+    @staticmethod
+    def _iter_props(propositions: list[Any]) -> Any:
+        """Yield each proposition plus its embedded complement —
+        "I think water is wet" asserts the embedded clause."""
+        for prop in propositions:
+            yield prop
+            if getattr(prop, "embedded", None) is not None:
+                yield prop.embedded
+
+    @staticmethod
+    def _claim_entity(phrase: str) -> str:
+        """Normalize a proposition's subject/object to a candidate
+        concept name — empty when it can't carry a world entity.
+
+        Leading function words are stripped to reach the head ("the
+        water" → "water"); a phrase made only of function words —
+        pronouns, indefinites, question words — carries no checkable
+        entity. Uses the comprehension layer's canonical function-
+        word class, not a parallel list.
+        """
+        from temporal_lobe.concepts import _FUNCTION_WORDS
+
+        words = (phrase or "").lower().replace("_", " ").split()
+        while words and words[0] in _FUNCTION_WORDS:
+            words = words[1:]
+        return " ".join(words).strip()
+
+    def _claim_relation_map(self) -> dict[str, Any]:
+        """Surface predicate → RelationType, derived from the
+        network's own relation-verb seeds — no separate lexical
+        table to drift out of sync. Each seed phrase maps under
+        itself and its deconjugated head verb ("causes" → "cause",
+        "makes possible" → "make")."""
+        if self._claim_relations is None:
+            from temporal_lobe.concepts import ConceptNetwork, RelationType
+            from temporal_lobe.morphology import deconjugate_verb
+
+            table: dict[str, Any] = {}
+            for rel_key, phrases in ConceptNetwork._RELATION_VERB_SEEDS.items():
+                try:
+                    rel = RelationType(rel_key)
+                except ValueError:
+                    continue
+                for phrase in phrases:
+                    table.setdefault(phrase, rel)
+                    head = phrase.split()[0]
+                    for base in deconjugate_verb(head):
+                        table.setdefault(base, rel)
+            self._claim_relations = table
+        return self._claim_relations
+
+    def _asserted_relation(self, predicate: str) -> Any:
+        """Map a proposition's predicate to the relation it asserts.
+
+        Returns a RelationType for lexical predicates, the string
+        "copular" for bare is/are/was claims ("water is clear" — an
+        attributive claim, verified against property/class edges),
+        or None when the predicate maps to nothing checkable.
+        """
+        pred = (predicate or "").lower().strip()
+        if not pred:
+            return None
+        if pred.split()[0] in (
+            "is", "are", "was", "were", "be", "been", "being", "am",
+        ):
+            return "copular"
+        from temporal_lobe.morphology import deconjugate_verb
+
+        table = self._claim_relation_map()
+        if pred in table:
+            return table[pred]
+        # Longest-prefix match for phrasal predicates ("leads to").
+        best: tuple[int, Any] | None = None
+        for phrase, rel in table.items():
+            if " " in phrase and pred.startswith(phrase):
+                if best is None or len(phrase) > best[0]:
+                    best = (len(phrase), rel)
+        if best is not None:
+            return best[1]
+        for base in deconjugate_verb(pred.split()[0]):
+            if base in table:
+                return table[base]
+        return None
+
+    def _claim_contradiction(
+        self,
+        prop: Any,
+        relation: Any,
+        pair_edges: list[Any],
+        subj_id: str,
+        obj_id: str | None,
+    ) -> str | None:
+        """Return an issue string when a proposition conflicts with
+        stored edges — None when it is corroborated or unverifiable."""
+        from temporal_lobe.concepts import RelationType as RT
+
+        positive = {
+            RT.IS_A, RT.HAS_PROPERTY, RT.INSTANCE_OF, RT.PART_OF,
+            RT.CAUSES, RT.ENABLES, RT.LEADS_TO, RT.CREATES,
+            RT.DEPENDS_ON, RT.SIMILAR_TO, RT.EMERGES_FROM,
+        }
+        adversarial = {RT.OPPOSITE_OF, RT.CONTRADICTS}
+        facilitative = {RT.CAUSES, RT.ENABLES, RT.LEADS_TO, RT.CREATES}
+        inhibitory = {RT.PREVENTS, RT.HARMS}
+
+        subj, obj = prop.subject, prop.object
+        pair_relations = {e.relation for e in pair_edges}
+
+        if prop.negated:
+            hits = pair_relations & positive
+            if hits:
+                rel = sorted(hits, key=lambda r: r.value)[0].value
+                return (
+                    f"output denies '{subj}–{obj}' but the network "
+                    f"asserts {rel}"
+                )
+            return None
+
+        hits = pair_relations & adversarial
+        if hits:
+            rel = sorted(hits, key=lambda r: r.value)[0].value
+            return (
+                f"output claims '{subj}–{obj}' but the network "
+                f"marks them {rel}"
+            )
+        if relation in facilitative and pair_relations & inhibitory:
+            rel = sorted(
+                pair_relations & inhibitory, key=lambda r: r.value
+            )[0].value
+            return f"output claims '{subj}–{obj}' but the network asserts {rel}"
+        if relation in inhibitory and pair_relations & facilitative:
+            rel = sorted(
+                pair_relations & facilitative, key=lambda r: r.value
+            )[0].value
+            return f"output claims '{subj}–{obj}' but the network asserts {rel}"
+
+        # Antonym two-hop for attributive claims: "water is dry"
+        # contradicts the stored property its object opposes —
+        # water has_property wet, dry opposite_of wet.
+        attributive = relation == "copular" or relation in (
+            {RT.IS_A, RT.HAS_PROPERTY, RT.INSTANCE_OF} & {relation}
+        )
+        if attributive and obj_id is not None:
+            obj_antonyms = {
+                e.target
+                for e in self._network.get_edges(obj_id, "out")
+                if e.relation in adversarial
+            }
+            if obj_antonyms:
+                conflicting = [
+                    e.target
+                    for e in self._network.get_edges(subj_id, "out")
+                    if e.relation in positive and e.target in obj_antonyms
+                ]
+                if conflicting:
+                    return (
+                        f"output claims '{subj} is {obj}' but '{obj}' "
+                        f"opposes stored '{conflicting[0]}'"
+                    )
+        return None
 
     # ─── Introspection ──────────────────────────────────────────
 

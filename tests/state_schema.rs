@@ -18,8 +18,26 @@ use genesis::state::*;
 
 // ─── Size assertions ──────────────────────────────────────────
 
-const ASLEEP_NET: [f64; 8] = [0.5, 4.5, 0.0, 4.0, 214.116748078719, 0.00114912794709424, -1.15530846944936, 0.604617443838918];
-const ASLEEP_REM: [f64; 8] = [0.5, 0.5, 4.0, 4.0, 214.116748078719, 0.00114912794709424, -1.15530846944936, 0.604617443838918];
+const ASLEEP_NET: [f64; 8] = [
+    0.5,
+    4.5,
+    0.0,
+    4.0,
+    214.116748078719,
+    0.00114912794709424,
+    -1.15530846944936,
+    0.604617443838918,
+];
+const ASLEEP_REM: [f64; 8] = [
+    0.5,
+    0.5,
+    4.0,
+    4.0,
+    214.116748078719,
+    0.00114912794709424,
+    -1.15530846944936,
+    0.604617443838918,
+];
 
 #[test]
 fn test_struct_sizes() {
@@ -676,9 +694,11 @@ fn test_network_stage_does_not_chatter_across_a_sleep_episode() {
     }
     assert!(saw_nrem, "NREM must occur over two days");
     assert!(saw_rem, "REM must occur over two days");
-    assert!(transitions < 200, "stage chattered: {transitions} transitions");
+    assert!(
+        transitions < 200,
+        "stage chattered: {transitions} transitions"
+    );
 }
-
 
 #[test]
 fn test_sleep_episode_produces_ultradian_nrem_rem_cycles() {
@@ -702,8 +722,14 @@ fn test_sleep_episode_produces_ultradian_nrem_rem_cycles() {
             prev = now;
         }
     }
-    assert!(nrem_bouts >= 3, "expected repeated NREM bouts over two days, saw {nrem_bouts}");
-    assert!(rem_bouts >= 2, "expected repeated REM bouts over two days, saw {rem_bouts}");
+    assert!(
+        nrem_bouts >= 3,
+        "expected repeated NREM bouts over two days, saw {nrem_bouts}"
+    );
+    assert!(
+        rem_bouts >= 2,
+        "expected repeated REM bouts over two days, saw {rem_bouts}"
+    );
 }
 
 #[test]
@@ -792,7 +818,11 @@ fn test_emergent_phase_default_active() {
 fn test_plasticity_gate_high_with_good_neurochemistry() {
     let mut vec = NeurochemicalVector::new(0);
     vec.get_mut(NeurochemicalId::BDNF).unwrap().level = 0.70;
-    vec.get_mut(NeurochemicalId::Cortisol).unwrap().level = 0.10;
+    // 0.02 is the substrate's measured resting level — cortisol's
+    // suppression is expressed against its reachable envelope
+    // (~0.02–0.08), so a raw 0.10 here would be *maximum* stress,
+    // not low.
+    vec.get_mut(NeurochemicalId::Cortisol).unwrap().level = 0.02;
     vec.recompute_derived();
     assert!(
         vec.plasticity_gate > 0.5,
@@ -886,11 +916,13 @@ fn test_gating_cortisol_boosts_consolidation() {
     // High cortisol should INCREASE consolidation weight (acute stress
     // enhances emotional memory consolidation). This was previously
     // broken — cortisol cancelled itself out in the formula.
+    // Cortisol is scaled by its reachable envelope: 0.02 is resting,
+    // 0.08 is the sustained-drive peak.
     let mut low_cort = MemoryPointers::new();
-    low_cort.update_gating(0.50, 0.50, 0.50, 0.50, 0.10, 0.50);
+    low_cort.update_gating(0.50, 0.50, 0.50, 0.50, 0.02, 0.50);
 
     let mut high_cort = MemoryPointers::new();
-    high_cort.update_gating(0.50, 0.50, 0.50, 0.50, 0.90, 0.50);
+    high_cort.update_gating(0.50, 0.50, 0.50, 0.50, 0.08, 0.50);
 
     assert!(
         high_cort.consolidation_weight > low_cort.consolidation_weight,
@@ -898,10 +930,10 @@ fn test_gating_cortisol_boosts_consolidation() {
         high_cort.consolidation_weight,
         low_cort.consolidation_weight
     );
-    // Verify the actual values: 0.10*0.3 + 0.50*0.4 + 0.3 = 0.53
-    // vs: 0.90*0.3 + 0.50*0.4 + 0.3 = 0.77
-    assert!((low_cort.consolidation_weight - 0.53).abs() < 0.01);
-    assert!((high_cort.consolidation_weight - 0.77).abs() < 0.01);
+    // Verify the actual values on the normalized envelope:
+    // 0*0.3 + 0.50*0.4 + 0.3 = 0.50 vs: 1*0.3 + 0.50*0.4 + 0.3 = 0.80
+    assert!((low_cort.consolidation_weight - 0.50).abs() < 0.01);
+    assert!((high_cort.consolidation_weight - 0.80).abs() < 0.01);
 }
 
 // ─── Zone transitions with override ───────────────────────────
@@ -1140,7 +1172,10 @@ fn test_sleep_state_is_owned_by_the_network() {
     vec.get_mut(NeurochemicalId::Histamine).unwrap().level = 0.15;
     vec.recompute_derived();
     let chem = vec.phase();
-    assert!(chem != MentalPhase::NREM && chem != MentalPhase::REM, "chemistry alone: {chem:?}");
+    assert!(
+        chem != MentalPhase::NREM && chem != MentalPhase::REM,
+        "chemistry alone: {chem:?}"
+    );
     assert_eq!(stage(&ASLEEP_NET, chem), MentalPhase::NREM);
 }
 #[test]
@@ -1383,6 +1418,8 @@ fn test_zone_sleeping_runs_adenosine_clearance() {
 
     // Rested chemistry: moderate adenosine (0.30), normal histamine —
     // the emergent phase stays Active; only the zone says Sleeping.
+    // SAFETY: the test thread is the only writer to this local state;
+    // no concurrent write transaction is active.
     unsafe { state.write_begin(0) };
     state
         .neurochemicals
@@ -1459,7 +1496,11 @@ fn test_acetylcholine_release_is_higher_under_rem_drive_than_nrem() {
     let run = |rem: f32| {
         let params = NeuroTickParams {
             maturation_level: 1.0,
-            network_levels: Some(NetworkLevels { lc: 0.0, vlpo: 0.0, rem }),
+            network_levels: Some(NetworkLevels {
+                lc: 0.0,
+                vlpo: 0.0,
+                rem,
+            }),
             ..Default::default()
         };
         let mut vec = NeurochemicalVector::new(1);
@@ -1906,12 +1947,19 @@ fn test_extreme_adenosine_alone_does_not_force_sleep() {
     // Exhaustion no longer forces sleep from the chemistry. With the network
     // awake, extreme adenosine and burnt-out receptors leave her awake.
     let mut state = GenesisCoreState::new(1, 1000);
-    let adn = state.neurochemicals.get_mut(NeurochemicalId::Adenosine).unwrap();
+    let adn = state
+        .neurochemicals
+        .get_mut(NeurochemicalId::Adenosine)
+        .unwrap();
     adn.receptor_sensitivity = 0.5;
     adn.desensitization_factor = 0.2;
     adn.internalization_factor = 0.45;
     adn.level = 0.95;
-    state.neurochemicals.get_mut(NeurochemicalId::Histamine).unwrap().level = 0.50;
+    state
+        .neurochemicals
+        .get_mut(NeurochemicalId::Histamine)
+        .unwrap()
+        .level = 0.50;
     state.neurochemicals.recompute_derived();
     state.sync_neurochemistry_to_state();
     state.apply_network_phase();
@@ -1929,12 +1977,19 @@ fn test_chemistry_alone_never_reports_sleep() {
     // chemistry's own phase is never a sleep stage. The stage shown to her is
     // set by the sleep-wake network (see `apply_network_phase`).
     let mut state = GenesisCoreState::new(1, 1000);
-    let adn = state.neurochemicals.get_mut(NeurochemicalId::Adenosine).unwrap();
+    let adn = state
+        .neurochemicals
+        .get_mut(NeurochemicalId::Adenosine)
+        .unwrap();
     adn.receptor_sensitivity = 0.50;
     adn.desensitization_factor = 0.5;
     adn.internalization_factor = 0.5;
     adn.level = 0.99;
-    state.neurochemicals.get_mut(NeurochemicalId::Histamine).unwrap().level = 0.10;
+    state
+        .neurochemicals
+        .get_mut(NeurochemicalId::Histamine)
+        .unwrap()
+        .level = 0.10;
     state.neurochemicals.recompute_derived();
     state.sync_neurochemistry_to_state();
     let phase = state.neurochemicals.phase();

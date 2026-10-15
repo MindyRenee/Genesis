@@ -791,30 +791,7 @@ class Comprehension:
         speech_act = self._identify_speech_act(raw_text)
 
         # Extract propositions from each clause
-        propositions: list[Proposition] = []
-        focus = ""
-        for clause in clauses:
-            # Shared-subject VP coordination ("I came and saw the
-            # water") and gapped VP coordination ("put the star in
-            # its hole and the moon in its slot") each expand into
-            # one clause per conjunct, all getting the full
-            # extraction pipeline.
-            for gapped in self._expand_gapped_coordination(clause):
-                for sub_clause in self._expand_vp_coordination(gapped):
-                    prop = self._extract_proposition(sub_clause)
-                    if prop.subject or prop.predicate:
-                        propositions.append(prop)
-                    # Record the questioned constituent — the gap the
-                    # speaker wants filled, not an argument of the
-                    # proposition.
-                    if not focus and prop.focus:
-                        focus = prop.focus
-
-        # Restrictive relative clauses embedded in an object ("a
-        # machine that has two parts") carry a second proposition —
-        # the relativized clause is about the head noun, not part of
-        # the NP string. Split it out so both facts are available.
-        propositions = self._extract_relative_propositions(propositions)
+        propositions, focus = self._extract_propositions(clauses)
 
         # Resolve pronoun references
         speaker = context.get("speaker", "user")
@@ -840,16 +817,65 @@ class Comprehension:
         # Update recent entities for future calls
         self._update_recent_entities(propositions, resolved)
 
-        # ── Figurative language detection (right-hemisphere) ──
-        # After the basic semantic parse, run metaphor, irony, and
-        # idiom detection. These enrich the comprehension result with
-        # cross-domain mappings and non-literal meanings that the
-        # left-hemisphere (proposition extraction) would miss.
+        return self._assemble_result(
+            raw_text, speech_act, propositions, key_concepts, resolved,
+            is_negated, focus, confidence, clauses, parse_coverage,
+            unresolved_tokens, diagnostics,
+        )
+
+    def _extract_propositions(
+        self, clauses: list[str]
+    ) -> tuple[list[Proposition], str]:
+        """Extract propositions from every clause, expanding shared-
+        subject VP coordination ("I came and saw the water") and
+        gapped VP coordination ("put the star in its hole and the
+        moon in its slot") into one clause per conjunct. Returns the
+        propositions and the questioned constituent (focus)."""
+        propositions: list[Proposition] = []
+        focus = ""
+        for clause in clauses:
+            for gapped in self._expand_gapped_coordination(clause):
+                for sub_clause in self._expand_vp_coordination(gapped):
+                    prop = self._extract_proposition(sub_clause)
+                    if prop.subject or prop.predicate:
+                        propositions.append(prop)
+                    # Record the questioned constituent — the gap the
+                    # speaker wants filled, not an argument of the
+                    # proposition.
+                    if not focus and prop.focus:
+                        focus = prop.focus
+
+        # Restrictive relative clauses embedded in an object ("a
+        # machine that has two parts") carry a second proposition —
+        # the relativized clause is about the head noun, not part of
+        # the NP string. Split it out so both facts are available.
+        return self._extract_relative_propositions(propositions), focus
+
+    def _assemble_result(
+        self,
+        raw_text: str,
+        speech_act: SpeechActType,
+        propositions: list[Proposition],
+        key_concepts: list[ConceptRole],
+        resolved: dict[str, str],
+        is_negated: bool,
+        focus: str,
+        confidence: float,
+        clauses: list[str],
+        parse_coverage: float,
+        unresolved_tokens: list[str],
+        diagnostics: list[str],
+    ) -> ComprehensionResult:
+        """Run figurative-language detection and assemble the result.
+
+        Metaphor, irony, and idiom detection enrich the parse with
+        cross-domain mappings and non-literal meanings the
+        left-hemisphere proposition extraction would miss."""
         metaphor = self._figurative.detect_metaphor(raw_text)
         irony = self._figurative.detect_irony(raw_text)
         idiom = self._figurative.detect_idiom(raw_text)
 
-        result = ComprehensionResult(
+        return ComprehensionResult(
             raw_text=raw_text,
             speech_act=speech_act,
             propositions=propositions,
@@ -868,8 +894,6 @@ class Comprehension:
             unresolved_tokens=unresolved_tokens,
             diagnostics=diagnostics,
         )
-
-        return result
 
     # ─── Speech act identification ──────────────────────────────
 
@@ -1388,22 +1412,8 @@ class Comprehension:
         # subject, so the reported content is indistinguishable from
         # what the speaker asserts. Parsing the tail separately keeps
         # the distinction available to :attr:`Proposition.embedded`.
-        complement = self._split_complement(words)
-        if complement is not None:
-            verb_index, tail_words = complement
-            embedded = self._extract_proposition(" ".join(tail_words))
-            # The matrix clause is built directly rather than
-            # re-parsed: "believes" is the reported verb whether or not
-            # the morphology module happens to know the word, and a
-            # mental-state complement is a simple subject-verb frame
-            # with nothing after the verb to mis-parse.
-            matrix = Proposition(
-                subject=" ".join(words[:verb_index]),
-                predicate=words[verb_index],
-                verb_found=True,
-            )
-            if embedded.subject or embedded.predicate:
-                matrix.embedded = embedded
+        matrix = self._split_complement_proposition(words)
+        if matrix is not None:
             return matrix
         if not words:
             return Proposition()
@@ -1482,6 +1492,33 @@ class Comprehension:
             tense=tense,
             passive=passive,
         )
+
+    def _split_complement_proposition(
+        self, words: list[str]
+    ) -> Proposition | None:
+        """Parse a that-complement clause ("John believes THAT Mary is
+        in the kitchen") into a matrix proposition with the embedded
+        clause attached.
+
+        The matrix clause is built directly rather than re-parsed:
+        "believes" is the reported verb whether or not the morphology
+        module happens to know the word, and a mental-state complement
+        is a simple subject-verb frame with nothing after the verb to
+        mis-parse. Returns None when the clause has no complement.
+        """
+        complement = self._split_complement(words)
+        if complement is None:
+            return None
+        verb_index, tail_words = complement
+        embedded = self._extract_proposition(" ".join(tail_words))
+        matrix = Proposition(
+            subject=" ".join(words[:verb_index]),
+            predicate=words[verb_index],
+            verb_found=True,
+        )
+        if embedded.subject or embedded.predicate:
+            matrix.embedded = embedded
+        return matrix
 
     def _extract_subject(self, words: list[str], verb_idx: int) -> str:
         """Extract the subject from the words before the main verb."""
@@ -1772,7 +1809,10 @@ class Comprehension:
                 )
             ):
                 return 0, first_lower, False
+        return self._scan_main_verb(words)
 
+    def _scan_main_verb(self, words: list[str]) -> tuple[int, str, bool]:
+        """Scan for the main verb — the declarative path."""
         saw_aux = False
         post_aux_noun = -1
         lexical_aux = -1
@@ -1800,37 +1840,11 @@ class Comprehension:
                 return i, word_lower, True
 
             if saw_aux:
-                # After an auxiliary, subject material intervenes:
-                # pronouns and determiners are part of the subject,
-                # so keep scanning for a real verb form.
-                if word_lower in _SUBJECT_PRONOUNS:
-                    continue
-                if word_lower in self._DETERMINERS:
-                    # A determiner after a skipped content word opens
-                    # a new NP — the skipped word was the verb
-                    # ("will WATER the plants"). But a have/do aux
-                    # claims the verb slot first: "has exactly TWO of
-                    # these" is possession, not "exactly" the verb.
-                    if post_aux_noun >= 0:
-                        if lexical_aux >= 0:
-                            return (
-                                lexical_aux,
-                                words[lexical_aux].lower().rstrip(",.!?;:"),
-                                False,
-                            )
-                        return (
-                            post_aux_noun,
-                            words[post_aux_noun].lower().rstrip(",.!?;:"),
-                            False,
-                        )
-                    continue
-                if is_verb_form(word_lower) or self._looks_like_verb(word_lower):
-                    return i, word_lower, False
-                # Non-verb content word (a subject noun like "cats"
-                # in "do cats sleep") — remember it; if no real verb
-                # appears, it was the verb all along.
-                if post_aux_noun < 0:
-                    post_aux_noun = i
+                hit, post_aux_noun = self._post_aux_verb(
+                    words, i, word_lower, post_aux_noun, lexical_aux
+                )
+                if hit is not None:
+                    return hit[0], hit[1], False
                 continue
 
             # Check for common action verb patterns
@@ -1874,19 +1888,55 @@ class Comprehension:
         # water plants"). The lexical reading wins for have/do: a
         # non-verb-like complement under them is possession, not a
         # participle that lost its suffix.
-        if lexical_aux >= 0:
-            return (
-                lexical_aux,
-                words[lexical_aux].lower().rstrip(",.!?;:"),
-                False,
-            )
-        if post_aux_noun >= 0:
-            return (
-                post_aux_noun,
-                words[post_aux_noun].lower().rstrip(",.!?;:"),
-                False,
-            )
+        for candidate in (lexical_aux, post_aux_noun):
+            if candidate >= 0:
+                return (
+                    candidate,
+                    words[candidate].lower().rstrip(",.!?;:"),
+                    False,
+                )
         return -1, "", False
+
+    def _post_aux_verb(
+        self,
+        words: list[str],
+        i: int,
+        word_lower: str,
+        post_aux_noun: int,
+        lexical_aux: int,
+    ) -> tuple[tuple[int, str] | None, int]:
+        """One word after an auxiliary: a hit ``(index, verb)``, or
+        ``None`` plus the updated ``post_aux_noun``.
+
+        After an auxiliary, subject material intervenes: pronouns and
+        determiners are part of the subject, so keep scanning for a
+        real verb form.
+        """
+        if word_lower in _SUBJECT_PRONOUNS:
+            return None, post_aux_noun
+        if word_lower in self._DETERMINERS:
+            # A determiner after a skipped content word opens
+            # a new NP — the skipped word was the verb
+            # ("will WATER the plants"). But a have/do aux
+            # claims the verb slot first: "has exactly TWO of
+            # these" is possession, not "exactly" the verb.
+            if post_aux_noun >= 0:
+                winner = (
+                    lexical_aux if lexical_aux >= 0 else post_aux_noun
+                )
+                return (
+                    winner,
+                    words[winner].lower().rstrip(",.!?;:"),
+                ), post_aux_noun
+            return None, post_aux_noun
+        if is_verb_form(word_lower) or self._looks_like_verb(word_lower):
+            return (i, word_lower), post_aux_noun
+        # Non-verb content word (a subject noun like "cats"
+        # in "do cats sleep") — remember it; if no real verb
+        # appears, it was the verb all along.
+        if post_aux_noun < 0:
+            post_aux_noun = i
+        return None, post_aux_noun
 
     # Auxiliaries that are also lexical verbs — have (possession)
     # and do (light verb) can be the main verb when nothing
@@ -2007,11 +2057,18 @@ class Comprehension:
         if not words:
             return "", {}
 
-        roles: dict[SemanticRole, str] = {}
+        obj, i = self._collect_object(words, is_copular)
+        return self._parse_role_phrases(words, i, obj, by_is_agent)
+
+    def _collect_object(
+        self, words: list[str], is_copular: bool
+    ) -> tuple[str, int]:
+        """Collect the direct object — words until a preposition.
+
+        Returns the object string and the index where role parsing
+        resumes."""
         obj_parts: list[str] = []
         i = 0
-
-        # Collect the direct object (words until a preposition)
         while i < len(words):
             word_lower = words[i].lower().rstrip(",.!?;:")
             if word_lower in _PREPOSITIONS:
@@ -2062,10 +2119,19 @@ class Comprehension:
                 break
             obj_parts.append(words[i])
             i += 1
-
         obj = " ".join(obj_parts).strip() if obj_parts else ""
+        return obj, i
 
-        # Parse prepositional phrases into roles
+    def _parse_role_phrases(
+        self,
+        words: list[str],
+        i: int,
+        obj: str,
+        by_is_agent: bool,
+    ) -> tuple[str, dict[SemanticRole, str]]:
+        """Parse prepositional phrases into semantic roles, from
+        index ``i`` onward."""
+        roles: dict[SemanticRole, str] = {}
         last_role: SemanticRole | None = None
         while i < len(words):
             prep = words[i].lower().rstrip(",.!?;:")

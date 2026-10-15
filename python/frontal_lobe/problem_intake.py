@@ -438,10 +438,64 @@ def _classification_spec(result: ComprehensionResult) -> dict | None:
     ISA propositions onto a kind assert labels; a wh-question over
     the plural kind is the query.
     """
-    # Pass 1 — kind declarations: "a tessel is a machine", "wugs are
-    # birds".
-    kinds: dict[str, str] = {}  # kind → superordinate head
-    supers: dict[str, str] = {}  # superordinate head → kind
+    kinds, supers = _kind_declarations(result)
+    if not kinds:
+        return None
+
+    resolved = getattr(result, "resolved_references", None) or {}
+
+    pred_raw_obj, items, asserted = _items_and_labels(
+        result, kinds, supers, resolved
+    )
+    if pred_raw_obj is None or not items:
+        return None
+
+    # The query: a question naming the kind ("which are tessels"),
+    # or asserted labels to check.
+    query = result.is_question and any(
+        _deplural(t) in kinds
+        for p in result.propositions
+        for t in _tokens(f"{p.subject} {p.object}")
+    )
+    if not query and not asserted:
+        return None
+
+    # "has all three / everything" items expand to the attribute
+    # vocabulary — which is the union of the items' concrete attrs
+    # AND the rule's own enumerated set ("at least two of: a spin,
+    # a charge, a color" names members no item may show). A bare
+    # "these parts" rule reference resolves to that vocabulary too.
+    vocab = sorted({a for it in items for a in it["has"] if a != "__all__"})
+    pred_spec = _predicate_from_object(pred_raw_obj, vocab)
+    if pred_spec is None:
+        return None
+    vocab = sorted(set(vocab) | set(pred_spec.get("of") or []))
+    for it in items:
+        if "__all__" in it["has"]:
+            it["has"] = list(vocab)
+    for name, label in asserted.items():
+        for it in items:
+            if it["name"] == name:
+                it["label"] = label
+    kind = next(iter(kinds))
+    spec: dict[str, Any] = {
+        "family": "classification",
+        "kind": kind,
+        "predicate": pred_spec,
+        "items": items,
+    }
+    spec["name"] = _name("classification", spec)
+    spec["hint"] = result.raw_text.strip()[:240]
+    return spec
+
+
+def _kind_declarations(
+    result: ComprehensionResult,
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Pass 1 — kind declarations: "a tessel is a machine", "wugs are
+    birds". Returns (kind → superordinate head, superordinate → kind)."""
+    kinds: dict[str, str] = {}
+    supers: dict[str, str] = {}
     for p in result.propositions:
         if p.predicate not in _COPULA or not p.object or p.negated:
             continue
@@ -452,11 +506,18 @@ def _classification_spec(result: ComprehensionResult) -> dict | None:
         if kind and sup and kind != sup:
             kinds[kind] = sup
             supers.setdefault(sup, kind)
-    if not kinds:
-        return None
+    return kinds, supers
 
-    resolved = getattr(result, "resolved_references", None) or {}
 
+def _items_and_labels(
+    result: ComprehensionResult,
+    kinds: dict[str, str],
+    supers: dict[str, str],
+    resolved: dict,
+) -> tuple[str | None, list[dict[str, Any]], dict[str, bool]]:
+    """Pass 2 — rule bodies (indefinite CONTAINS) and items/labels
+    (definite CONTAINS / ISA onto a kind). Returns (rule object's raw
+    text, items, asserted labels)."""
     def _entity_name(subject: str) -> str:
         """Pronoun subjects resolve through comprehension's
         reference map; definite NPs normalize directly."""
@@ -465,8 +526,6 @@ def _classification_spec(result: ComprehensionResult) -> dict | None:
             return _np_name(resolved[s])
         return _np_name(subject)
 
-    # Pass 2 — rule bodies (indefinite CONTAINS) and items/labels
-    # (definite CONTAINS / ISA onto a kind).
     pred_raw_obj: str | None = None
     items: list[dict[str, Any]] = []
     seen_items: set[str] = set()
@@ -519,46 +578,7 @@ def _classification_spec(result: ComprehensionResult) -> dict | None:
                 and target in kinds
             ):
                 asserted[name] = not p.negated
-    if pred_raw_obj is None or not items:
-        return None
-
-    # The query: a question naming the kind ("which are tessels"),
-    # or asserted labels to check.
-    query = result.is_question and any(
-        _deplural(t) in kinds
-        for p in result.propositions
-        for t in _tokens(f"{p.subject} {p.object}")
-    )
-    if not query and not asserted:
-        return None
-
-    # "has all three / everything" items expand to the attribute
-    # vocabulary — which is the union of the items' concrete attrs
-    # AND the rule's own enumerated set ("at least two of: a spin,
-    # a charge, a color" names members no item may show). A bare
-    # "these parts" rule reference resolves to that vocabulary too.
-    vocab = sorted({a for it in items for a in it["has"] if a != "__all__"})
-    pred_spec = _predicate_from_object(pred_raw_obj, vocab)
-    if pred_spec is None:
-        return None
-    vocab = sorted(set(vocab) | set(pred_spec.get("of") or []))
-    for it in items:
-        if "__all__" in it["has"]:
-            it["has"] = list(vocab)
-    for name, label in asserted.items():
-        for it in items:
-            if it["name"] == name:
-                it["label"] = label
-    kind = next(iter(kinds))
-    spec: dict[str, Any] = {
-        "family": "classification",
-        "kind": kind,
-        "predicate": pred_spec,
-        "items": items,
-    }
-    spec["name"] = _name("classification", spec)
-    spec["hint"] = result.raw_text.strip()[:240]
-    return spec
+    return pred_raw_obj, items, asserted
 
 
 def _minimal_period(run: list[str]) -> int:
@@ -887,6 +907,21 @@ def _sorter_spec(result: ComprehensionResult) -> dict | None:
     )
     if not slots or not blocks or not (imperative or linked or sorter_word):
         return None
+    return _build_sorter_spec(slots, blocks, result)
+
+
+def _build_sorter_spec(
+    slots: dict[str, set[str]],
+    blocks: dict[str, set[str]],
+    result: ComprehensionResult,
+) -> dict:
+    """Assemble the sorter task spec from the scanned slots/blocks.
+
+    A lid is assumed present unless a proposition negates it; a heard
+    sorter is a physical object — the described attrs are its physics,
+    but the agent works it by sight through the visual cortex when one
+    is wired in.
+    """
     lid = not any(
         "lid" in (p.subject + " " + (p.object or "")).lower()
         and p.negated
@@ -903,9 +938,6 @@ def _sorter_spec(result: ComprehensionResult) -> dict | None:
             for attrs in blocks.values()
         ],
         "lid": lid,
-        # A heard sorter is a physical object — the described attrs
-        # are its physics, but the agent works it by sight through
-        # the visual cortex when one is wired in.
         "perceptual": True,
     }
     spec["name"] = _name("sorter", spec)

@@ -365,6 +365,36 @@ pub mod cmd {
     /// Additive: PROTOCOL_VERSION is unaffected.
     pub const SET_VOLITION: u8 = 46;
 
+    /// Physical field-probe signature — the body's real measured
+    /// substrate dynamics (throughput/jitter band energies, P-state
+    /// and interrupt rates, carrier frequency) decomposed at the wave
+    /// bands' center frequencies. Response: 114 bytes (v2; v1 was
+    /// 102 bytes without phase fields), layout in `daemon::field_probe`.
+    /// Additive: PROTOCOL_VERSION is unaffected.
+    /// When the probe thread isn't running the reply is a single
+    /// `READ_FAILED` byte, so an unavailable channel never reads as
+    /// a healthy zero.
+    pub const GET_FIELD_PROBE: u8 = 47;
+
+    /// Push the mind's modeled carrier-band phase into the probe's
+    /// generator — the physics-follows-model leg of the mutual phase
+    /// lock. Request: [f32 phase_rad]. The probe extrapolates it at
+    /// the carrier rate and pulls its generator phase toward it each
+    /// tick (bounded first-order pull); a target not refreshed within
+    /// 5 s is dropped so a dead mind can't steer the body's rhythm.
+    /// Reply: [u8 ack]. Additive: PROTOCOL_VERSION unaffected.
+    pub const SET_FIELD_PHASE: u8 = 48;
+
+    /// Set the carrier's real-work modulation — the write side of the
+    /// embodiment experiment. Request: [f32 depth][f32 freq_hz].
+    /// Depth 0..1 scales the work-slice modulation (0 = unmodulated
+    /// work, carrier silent). Freq 0 hands the rhythm back to the
+    /// body's phase; positive overrides it (clamped 0.1..100 Hz) so
+    /// evaluation can drive arbitrary bands — including epsilon-rate
+    /// infraslow where the thermal field can hold an oscillation.
+    /// Reply: [u8 ack]. Additive: PROTOCOL_VERSION unaffected.
+    pub const SET_FIELD_CARRIER: u8 = 49;
+
     // ─── Tensor slab ──────────────────────────────────────────
     // Named multidimensional tensors shared between the daemon and
     // the cognitive mind — world frames, salience fields, embeddings,
@@ -1651,7 +1681,7 @@ impl IpcClient {
         Ok(!resp.is_empty() && resp[0] == 1)
     }
 
-    /// Get the full core state (3296 bytes).
+    /// Get the full core state (3480 bytes).
     pub fn get_state(&mut self) -> std::io::Result<GenesisCoreState> {
         let resp = self.request(cmd::GET_STATE, &[])?;
         if resp.len() < core::mem::size_of::<GenesisCoreState>() {
@@ -3214,6 +3244,49 @@ pub fn default_handler(
             super::interoception::read_sensor_presence()
                 .to_le_bytes()
                 .to_vec()
+        }
+
+        cmd::GET_FIELD_PROBE => {
+            // The body's real measured substrate dynamics — the probe
+            // thread's rolling band signature. READ_FAILED when the
+            // probe isn't running: an absent channel is an error, not
+            // a zero reading.
+            match super::field_probe::shared() {
+                Some(probe) => probe.signature(),
+                None => vec![error::READ_FAILED],
+            }
+        }
+
+        cmd::SET_FIELD_PHASE => {
+            // The mind pushes its modeled carrier-band phase; the
+            // probe's generator chases it — physics follows model.
+            if payload.len() < 4 {
+                return vec![error::PAYLOAD_TOO_SHORT];
+            }
+            let phase = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
+            match super::field_probe::shared() {
+                Some(probe) => {
+                    probe.set_phase_target(phase);
+                    vec![1u8]
+                }
+                None => vec![error::READ_FAILED],
+            }
+        }
+
+        cmd::SET_FIELD_CARRIER => {
+            // Carrier write control — depth and frequency override.
+            if payload.len() < 8 {
+                return vec![error::PAYLOAD_TOO_SHORT];
+            }
+            let depth = f32::from_le_bytes(payload[0..4].try_into().unwrap_or_default());
+            let freq = f32::from_le_bytes(payload[4..8].try_into().unwrap_or_default());
+            match super::field_probe::shared() {
+                Some(probe) => {
+                    probe.set_carrier(depth, freq);
+                    vec![1u8]
+                }
+                None => vec![error::READ_FAILED],
+            }
         }
 
         cmd::SET_WAKE_ALARM => {

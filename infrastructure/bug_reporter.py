@@ -1602,17 +1602,48 @@ class BugReporter:
 
             return len(new_bugs), len(resolved_keys)
 
+    def open_reports(self) -> list[BugReport]:
+        """The currently-open issues, without rescanning.
+
+        The running list holds only open issues — resolved ones are
+        archived to history — so every entry in it is fair game for
+        fixing or proposal-building. Consumers (the improve urge's
+        autonomous fixes, proposal generation) read this; only the
+        felt bug-scan urge audits.
+        """
+        return self._load_preserved_bugs(None)
+
+    def resolve(self, file: str, category: str) -> bool:
+        """Discharge an open report — fixed, not merely re-scanned clean.
+
+        A successful fix calls this so the running list reflects the
+        repair immediately instead of waiting for the next audit.
+        Returns True if a matching open report was found and archived.
+        """
+        key = (file, category)
+        with self._log_lock:
+            if key not in self._open_keys:
+                return False
+            self._open_keys.discard(key)
+            # _archive_resolved rewrites the running list itself, so
+            # the resolved entry leaves the log and lands in history.
+            self._archive_resolved({key})
+        return True
+
     def _load_preserved_bugs(
-        self, preserved_keys: set[tuple[str, str]]
+        self, preserved_keys: set[tuple[str, str]] | None
     ) -> list[BugReport]:
         """Load BugReport entries from the running list for unscanned files.
 
         When a partial scan (max_files limit) skips files, their
         previously-open bugs must be carried forward unchanged. This
         reads the current running list and returns entries matching
-        the preserved keys.
+        the preserved keys. ``None`` returns every entry — the read
+        path behind ``open_reports``.
         """
-        if not preserved_keys or not self.log_path.exists():
+        if preserved_keys is not None and not preserved_keys:
+            return []
+        if not self.log_path.exists():
             return []
         try:
             lines = self.log_path.read_text(encoding="utf-8").splitlines()
@@ -1627,7 +1658,7 @@ class BugReporter:
             except (json.JSONDecodeError, KeyError):
                 continue
             key = (entry.get("file", ""), entry.get("category", ""))
-            if key in preserved_keys:
+            if preserved_keys is None or key in preserved_keys:
                 preserved.append(BugReport(
                     file=entry.get("file", ""),
                     line=entry.get("line", 0),

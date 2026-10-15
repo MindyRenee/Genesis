@@ -1967,17 +1967,19 @@ impl ActiveInferenceEngine {
         //      contributed almost nothing.
         //
         //   2. It inverted under the most severe condition it exists
-        //      to detect. Acute stress (cortisol 0.5) produced a
-        //      burden of 0.15, which is *below* the 0.20 recovery
-        //      threshold, so the system drained load while she was in
-        //      acute stress.
+        //      to detect. Acute stress (cortisol 0.5, on the old
+        //      full-range scale — today's reachable envelope is
+        //      ~0.02–0.08) produced a burden of 0.15, which is *below*
+        //      the 0.20 recovery threshold, so the system drained
+        //      load while she was in acute stress.
         //
         //   3. Any linear reweighting failed to fix this, because the
         //      components are not on the same scale. Anticipated
         //      demand and surprise are unbounded; stress-axis
-        //      elevation is bounded to [0,1]. Measured, a noise spike
-        //      to 1.0 scored 0.478 while genuine cortisol stress at
-        //      0.90 scored 0.433 — the measure preferred the artifact.
+        //      elevation is bounded to [0,1]. Measured on the old
+        //      scale, a noise spike to 1.0 scored 0.478 while genuine
+        //      cortisol stress at 0.90 scored 0.433 — the measure
+        //      preferred the artifact.
         //
         // The fix is structural, not a threshold adjustment. Per
         // McEwen, the mediators *are* cortisol, epinephrine and
@@ -1999,8 +2001,6 @@ impl ActiveInferenceEngine {
             let cort = crate::state::neurochemical::NeurochemicalId::Cortisol as usize;
             let epi = crate::state::neurochemical::NeurochemicalId::Epinephrine as usize;
             let nore = crate::state::neurochemical::NeurochemicalId::Norepinephrine as usize;
-            let cort_rest =
-                crate::state::neurochemical::NeurochemicalId::Cortisol.default_baseline();
             let epi_rest =
                 crate::state::neurochemical::NeurochemicalId::Epinephrine.default_baseline();
             let nore_rest =
@@ -2009,8 +2009,11 @@ impl ActiveInferenceEngine {
             // the range available above it. Cortisol rests at zero and
             // is the most load-bearing mediator, so it is weighted
             // highest; norepinephrine is normal at wake and only
-            // notable well above it.
-            let cort_elev = (post[cort] - cort_rest).max(0.0);
+            // notable well above it. Cortisol's own range is its
+            // reachable envelope (~0.02 rest, ~0.08 peak) — without that
+            // normalisation its share of the burden could never exceed
+            // ~0.17, inverting the intended weighting.
+            let cort_elev = crate::state::neurochemical::cortisol_stress_fraction(post[cort]);
             let epi_elev = (post[epi] - epi_rest).max(0.0) / (1.0 - epi_rest);
             let nore_elev = (post[nore] - nore_rest).max(0.0) / (1.0 - nore_rest);
             crate::state::sanitize::finite_clamp(

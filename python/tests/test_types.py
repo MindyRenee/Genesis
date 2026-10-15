@@ -142,8 +142,8 @@ def test_plasticity_profile_posture_receptive() -> None:
     data.extend(_F32.pack(0.70))   # plasticity_gate (high)
     data.extend(_F32.pack(0.65))   # bdnf_effective
     data.extend(_F32.pack(0.60))   # bdnf_tonic
-    data.extend(_F32.pack(0.20))   # cortisol_effective
-    data.extend(_F32.pack(0.18))   # cortisol_tonic (low)
+    data.extend(_F32.pack(0.03))   # cortisol_effective
+    data.extend(_F32.pack(0.03))   # cortisol_tonic (low — envelope is ~0.02 rest/0.08 peak)
     data.extend(_F32.pack(0.55))   # dopamine_effective
     data.extend(_F32.pack(0.50))   # serotonin_effective
     data.extend(_F32.pack(0.0))    # coupling_drift
@@ -161,8 +161,8 @@ def test_plasticity_profile_posture_protective() -> None:
     data.extend(_F32.pack(0.25))   # plasticity_gate (low)
     data.extend(_F32.pack(0.15))   # bdnf_effective
     data.extend(_F32.pack(0.12))   # bdnf_tonic
-    data.extend(_F32.pack(0.80))   # cortisol_effective
-    data.extend(_F32.pack(0.60))   # cortisol_tonic (high — chronic stress)
+    data.extend(_F32.pack(0.08))   # cortisol_effective (peak of the reachable envelope)
+    data.extend(_F32.pack(0.07))   # cortisol_tonic (high — chronic stress, ~83% of envelope)
     data.extend(_F32.pack(0.30))   # dopamine_effective
     data.extend(_F32.pack(0.25))   # serotonin_effective
     data.extend(_F32.pack(0.01))   # coupling_drift
@@ -180,8 +180,8 @@ def test_plasticity_profile_posture_recovering() -> None:
     data.extend(_F32.pack(0.40))   # plasticity_gate (mid)
     data.extend(_F32.pack(0.35))   # bdnf_effective
     data.extend(_F32.pack(0.35))   # bdnf_tonic (rising)
-    data.extend(_F32.pack(0.30))   # cortisol_effective
-    data.extend(_F32.pack(0.35))   # cortisol_tonic (dropping below stress)
+    data.extend(_F32.pack(0.04))   # cortisol_effective
+    data.extend(_F32.pack(0.04))   # cortisol_tonic (dropping below stress, ~33% of envelope)
     data.extend(_F32.pack(0.40))   # dopamine_effective
     data.extend(_F32.pack(0.45))   # serotonin_effective
     data.extend(_F32.pack(0.005))  # coupling_drift
@@ -199,8 +199,8 @@ def test_plasticity_profile_posture_neutral() -> None:
     data.extend(_F32.pack(0.45))   # plasticity_gate (mid)
     data.extend(_F32.pack(0.40))   # bdnf_effective
     data.extend(_F32.pack(0.20))   # bdnf_tonic (low — not recovering)
-    data.extend(_F32.pack(0.30))   # cortisol_effective
-    data.extend(_F32.pack(0.30))   # cortisol_tonic (mid)
+    data.extend(_F32.pack(0.05))   # cortisol_effective
+    data.extend(_F32.pack(0.045))  # cortisol_tonic (mid-envelope, ~42%)
     data.extend(_F32.pack(0.40))   # dopamine_effective
     data.extend(_F32.pack(0.40))   # serotonin_effective
     data.extend(_F32.pack(0.0))    # coupling_drift

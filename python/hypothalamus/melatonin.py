@@ -34,10 +34,10 @@ level; the circadian oscillator drives the level up at night.
 RECEPTOR ADAPTATION MULTIPLIER
 ════════════════════════════════════════════════════════════════════════
 
-    multiplier = 0.5
+    multiplier = 0.4
 
-Melatonin receptors adapt slowly — hormonal receptors have slow
-turnover.
+Melatonin receptors adapt slowly — MT1/MT2 are hormone-mediated
+receptors with slow turnover.
 
 
 ════════════════════════════════════════════════════════════════════════
@@ -109,11 +109,11 @@ Circadian oscillator drive:
     - Biological night (0.85-0.15, wrap): melatonin stays at 1.
     - Morning offset (0.15-0.30): melatonin falls from 1 to 0.
 
-    The level approaches a target set by the circadian factor:
-    mel_target = mel_factor * 0.80  (peak ~0.80 at midnight)
-    mel_approach_rate = 0.05 * dt_scale  (fast approach, ~2 seconds)
-    mel_delta = (mel_target - level) * mel_approach_rate
-    level += mel_delta
+    The level approaches a target set by the circadian factor via an
+    exponential approach (time-invariant, stable at large dt):
+    mel_target = mel_factor * 0.80          (peak ~0.80 at midnight)
+    mel_alpha  = 1 - exp(-0.5 * dt)         (rate 0.5/s, tau ~2 s)
+    level += (mel_target - level) * mel_alpha
 
     Coupling forces from other chemicals (NE, cortisol, orexin
     inhibition) still apply — they can suppress melatonin even at
@@ -134,9 +134,8 @@ Homeostatic force:
 Melatonin secretion (circadian approach):
     mel_factor = piecewise smoothstep based on circadian_phase
     mel_target = mel_factor * 0.80
-    mel_approach_rate = 0.05 * dt_scale
-    mel_delta = (mel_target - level) * mel_approach_rate
-    level += mel_delta
+    mel_alpha  = 1 - exp(-0.5 * dt)   # rate 0.5/s, tau ~2 s
+    level += (mel_target - level) * mel_alpha
 
 Melatonin factor (piecewise smoothstep):
     smoothstep(t) = t^2 * (3 - 2t)  for t in [0, 1]
@@ -193,13 +192,14 @@ Arousal equation (sleep promoter):
     receptor activation, supplements the direct GABA/adenosine
     sleep drive, especially at the circadian night)
 
-Sleep phase gating:
-    Melatonin lowers the adenosine/histamine barrier for entering
-    sleep:
-    sleep_adn = 0.75 - 0.15 * mel - 0.05 * (1.0 - ox)
-    sleep_hist = 0.25 + 0.05 * mel - 0.05 * ox
-
-    High melatonin (circadian night) makes it easier to fall asleep.
+Sleep-state role:
+    The chemistry-side sleep gate that melatonin used to modulate
+    (the adenosine/histamine threshold for entering NREM) is retired:
+    the sleep-wake network owns the sleep stages. Melatonin's
+    circadian influence on sleep now runs through the arousal
+    equation above (the MEL*0.35 sleep-promoter weight) and through
+    the network's own circadian oscillator, which is light-entrained
+    on the same local clock.
 
 Alert phase:
     MEL < 0.30 (enter) / 0.40 + h (stay) required for alertness

@@ -55,6 +55,7 @@ from __future__ import annotations
 
 import logging
 import random
+import re
 from typing import TYPE_CHECKING, Any
 
 from frontal_lobe.self import PersonalityTraits
@@ -65,6 +66,7 @@ from temporal_lobe.morphology import (
     copula,
     is_plural_np,
     person_pronoun,
+    property_verb_candidates,
 )
 
 from .voice import Voice
@@ -96,7 +98,7 @@ _RELATION_VERB_SEEDS: dict[str, list[str]] = {
     "harms": ["harms", "hurts", "damages"],
     "prevents": ["prevents", "blocks", "stops"],
     "contradicts": ["contradicts", "is at odds with"],
-    "has_property": ["has the property of being", "is characterized by"],
+    "has_property": ["is", "has", "has the property of being"],
     "related_to": ["relates to", "connects to"],
     "goal_directed": ["aims to", "works toward"],
     "temporal_order": ["comes before", "precedes"],
@@ -166,6 +168,14 @@ _PREPOSITIONS = frozenset({
     "as", "like", "before", "after",
 })
 
+# Complementizers and subordinators that open a clausal object
+# ("makes possible that art exists"). Clausal objects are heavy and
+# never prepose before a particle.
+_CLAUSAL_OBJECT_RE = re.compile(
+    r"^(?:that|whether|if|when|how|what|why|who|which|whom|whose|"
+    r"where|for\s+\w+\s+to)\b",
+    re.IGNORECASE,
+)
 
 class GraphWalkGenerator:
     """Generate sentences by walking the concept network.
@@ -520,42 +530,8 @@ class GraphWalkGenerator:
                 # Take top N by score, respecting branch factor
                 top_edges = scored[:max_branch]
 
-                for edge, neighbor, is_incoming in top_edges:
-                    if len(results) >= _MAX_TOTAL_CLAUSES:
-                        break
-                    if neighbor in visited:
-                        continue
-                    # Skip code-structure and generic edges
-                    rel_key = edge.relation.value
-                    if rel_key in _CODE_RELATIONS:
-                        continue
-                    if rel_key in _GENERIC_RELATIONS and len(results) > 0:
-                        # Only use generic edges if we have nothing better
-                        continue
-
-                    # Skip code concepts and noisy targets — these
-                    # produce garbled output like "Clear relates to Python"
-                    # when a code concept leaks through a related_to edge.
-                    if self._is_noisy_target(neighbor):
-                        continue
-
-                    # Get verb for this relation
-                    verb = self._verb_for_relation(edge.relation)
-                    if not verb:
-                        continue
-
-                    # Assign subject/object by direction so the clause
-                    # expresses the relationship with the correct agent.
-                    if is_incoming:
-                        # edge: neighbor → current. "neighbor {verb} current."
-                        subject_id, object_id = neighbor, current
-                    else:
-                        # edge: current → neighbor. "current {verb} neighbor."
-                        subject_id, object_id = current, neighbor
-
-                    results.append((subject_id, verb, object_id, edge.weight))
-                    visited.add(neighbor)
-                    next_frontier.append(neighbor)
+                self._collect_edges(current, top_edges, visited, results,
+                                    next_frontier)
 
             frontier = next_frontier
             if not frontier:
@@ -573,6 +549,62 @@ class GraphWalkGenerator:
             )
 
         return results
+
+    def _collect_edges(
+        self,
+        current: str,
+        top_edges: list[tuple[Any, str, bool]],
+        visited: set[str],
+        results: list[tuple[str, str, str, float]],
+        next_frontier: list[str],
+    ) -> None:
+        """Collect one frontier concept's scored edges into the walk.
+
+        Appends (subject, verb, object, weight) tuples to ``results``
+        and unseen neighbors to ``next_frontier``, stopping at
+        ``_MAX_TOTAL_CLAUSES``.
+        """
+        for edge, neighbor, is_incoming in top_edges:
+            if len(results) >= _MAX_TOTAL_CLAUSES:
+                break
+            if neighbor in visited:
+                continue
+            # Skip code-structure and generic edges
+            rel_key = edge.relation.value
+            if rel_key in _CODE_RELATIONS:
+                continue
+            if rel_key in _GENERIC_RELATIONS and len(results) > 0:
+                # Only use generic edges if we have nothing better
+                continue
+
+            # Skip code concepts and noisy targets — these
+            # produce garbled output like "Clear relates to Python"
+            # when a code concept leaks through a related_to edge.
+            if self._is_noisy_target(neighbor):
+                continue
+
+            # Assign subject/object by direction so the clause
+            # expresses the relationship with the correct agent.
+            if is_incoming:
+                # edge: neighbor → current. "neighbor {verb} current."
+                subject_id, object_id = neighbor, current
+            else:
+                # edge: current → neighbor. "current {verb} neighbor."
+                subject_id, object_id = current, neighbor
+
+            # Get verb for this relation — the object shapes
+            # the choice for relations whose frames differ by
+            # complement type (has_property: "is clear" vs
+            # "has fur").
+            verb = self._verb_for_relation(
+                edge.relation, object_id
+            )
+            if not verb:
+                continue
+
+            results.append((subject_id, verb, object_id, edge.weight))
+            visited.add(neighbor)
+            next_frontier.append(neighbor)
 
     def _add_latent_discoveries(
         self,
@@ -861,7 +893,7 @@ class GraphWalkGenerator:
         if edges:
             # No usable definition — start with the first edge
             return self._compose_first_clause(
-                opening, is_hedge, seed_concept, seed_display, edges[0]
+                opening, is_hedge, seed_concept, seed_display, edges[0],
             ), edges[1:]
 
         return None, edges
@@ -898,25 +930,12 @@ class GraphWalkGenerator:
             return f"{opening} {subject} {verb_obj}."
         if opening:
             return f"{opening} {seed_display}, {subject} {verb_obj}."
-        # No opening — add a knowledge-framing seed so the response
-        # doesn't start as a bare mechanical listing ("Ocean relates to
-        # tropical air."). The framing is a grammatical seed (building
-        # block); the content (subject, verb, object) comes from the
-        # concept network. This gives the response conversational depth
-        # — it's sharing what it knows, not reciting an edge list.
+        # No opening — assert the walked clause plainly: the seed is
+        # named as subject, verb+object composed from the edge. No
+        # canned knowledge-framing preamble; her words are the
+        # composition itself.
         first = subject[0].upper() + subject[1:] if subject else subject
-        # Use a varied framing seed. The pronoun makes the clause
-        # flow naturally after the framing.
-        seed_pron, _ = person_pronoun(
-            seed_concept, self._network, seed_display
-        )
-        frame = self._rng.choice([
-            f"what I know about {seed_display} is that {seed_pron} {verb_obj}",
-            f"as far as I understand, {first.lower()} {verb_obj}",
-            f"one thing I can say about {seed_display} is that {seed_pron} {verb_obj}",
-        ])
-        # Capitalize the first word of the frame for sentence start
-        return frame[0].upper() + frame[1:] + "."
+        return f"{first} {verb_obj}."
 
     def _object_phrase(self, object_id: str, seed_concept: str) -> str:
         """Display name for a clause's object, pronominalizing the seed.
@@ -957,9 +976,14 @@ class GraphWalkGenerator:
 
         The distinction is encoded by whether the verb's last word is a
         preposition (defined in ``_PREPOSITIONS``, a closed grammatical
-        class). Non-pronoun objects always follow the verb regardless.
+        class). Light noun-phrase objects (up to four words, no clause)
+        prepose the way pronouns do — "makes art possible", "brings
+        hydration about" — while heavy and clausal objects stay
+        postposed ("makes possible the survival of every species",
+        "makes possible that art exists").
         """
-        if obj not in self._OBJECT_PRONOUN_SET:
+        light_np = len(obj.split()) <= 4 and not _CLAUSAL_OBJECT_RE.match(obj)
+        if obj not in self._OBJECT_PRONOUN_SET and not light_np:
             return f"{verb} {obj}"
         words = verb.split()
         if len(words) < 2:
@@ -1050,16 +1074,31 @@ class GraphWalkGenerator:
 
     # ─── Helpers ───────────────────────────────────────────────
 
-    def _verb_for_relation(self, relation: RelationType) -> str | None:
+    def _verb_for_relation(
+        self, relation: RelationType, object_id: str = ""
+    ) -> str | None:
         """Get a verb phrase for a relation type.
 
         Prefers learned verbs from the concept network, falls back
-        to seed verbs.
+        to seed verbs. For has_property the object's form decides the
+        frame — copular for bare property words ("it is clear"),
+        possessive for noun objects ("it has fur") — and learned verbs
+        are kept only when their complement license fits, so a learned
+        "is characterized by" cannot produce "is characterized by
+        clear".
         """
         rel_key = relation.value
 
         # Try learned verbs from the concept network
         learned = self._network.find_relation_verbs(relation)
+
+        if rel_key == "has_property":
+            return self._rng.choice(
+                property_verb_candidates(
+                    self._display_name(object_id), learned
+                )
+            )
+
         if learned:
             return self._rng.choice(learned)
 

@@ -47,6 +47,7 @@ import threading
 import time
 from typing import TYPE_CHECKING, Any, cast
 
+from genesis_client.swallow import note_swallowed
 from world.arc import ArcResult
 
 if TYPE_CHECKING:
@@ -59,6 +60,10 @@ _TASK_URL = "https://arcprize.org/tasks/{game}"
 # 'w' posts /api/cmd/ACTION1, 'a'→3, 's'→2, 'd'→4); arrows work too
 # but WASD is what the human hand uses. ACTION5 is spacebar per the
 # legend, ACTION7 is undo on Z; RESET is its own on-screen button.
+# This table is actuation only — which key posts which action id is
+# wire protocol, the same information the page's legend gives a human.
+# What an action *does* in a game is never told to her here either;
+# direction semantics stay hers to learn from consequences.
 _KEY_FOR_ACTION: dict[int, tuple[str, int]] = {
     1: ("w", 87),
     2: ("s", 83),
@@ -145,8 +150,8 @@ class _Browser:
         if self._ws is not None:
             try:
                 await self._ws.close()
-            except Exception:  # noqa: BLE001 — already gone
-                pass
+            except Exception as e:  # noqa: BLE001 — already gone
+                note_swallowed("world.arc_web.ws_close", e)
         self.responses.clear()
         self.bodies.clear()
         await self._connect()
@@ -171,8 +176,8 @@ class _Browser:
                 if pages:
                     ws_url = pages[0]["webSocketDebuggerUrl"]
                     break
-            except Exception:  # noqa: BLE001 — startup race only
-                pass
+            except Exception as e:  # noqa: BLE001 — startup race only
+                note_swallowed("world.arc_web.ws_probe", e)
             await asyncio.sleep(0.3)
         if ws_url is None:
             raise RuntimeError("chromium never opened a debug page")
@@ -183,8 +188,8 @@ class _Browser:
         try:
             async for raw in self._ws:
                 self._dispatch(json.loads(raw))
-        except Exception:  # noqa: BLE001 — socket dies on close
-            pass
+        except Exception as e:  # noqa: BLE001 — socket dies on close
+            note_swallowed("world.arc_web.reader", e)
         # The socket is gone: every outstanding command is
         # undeliverable. Fail its future so callers see a dead
         # transport instead of waiting forever.
@@ -216,8 +221,9 @@ class _Browser:
         if "body" in body:
             try:
                 self.bodies[rid] = json.loads(body["body"])
-            except (KeyError, ValueError):
-                pass
+            except (KeyError, ValueError) as e:
+                # Non-JSON response body — nothing to record.
+                note_swallowed("world.arc_web.body_json", e)
 
     async def _cmd(self, method: str, **params) -> dict:
         self._mid += 1
@@ -259,8 +265,8 @@ class _Browser:
     def close(self) -> None:
         try:
             self._proc.terminate()
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("world.arc_web.proc_terminate", e)
 
 
 class ArcWebPractice:
@@ -335,6 +341,26 @@ class ArcWebPractice:
         if not hit:
             self._browser.key("r", 82)
 
+    @staticmethod
+    def _action_label(action_id: int) -> str:
+        """The same structural contract ``world.arc`` keeps.
+
+        ``"coordinate"`` when the action takes a target cell — public
+        interface structure, read from the action enum the page's own
+        protocol implements — ``"simple"`` otherwise. Never a
+        direction: what a control *does* is developer knowledge, and
+        on this substrate as on the SDK it stays hers to learn.
+        """
+        try:
+            from arcengine import ComplexAction, GameAction
+        except ImportError:
+            return "simple"
+        try:
+            action = GameAction.from_id(action_id)
+        except (KeyError, ValueError):
+            return "simple"
+        return "coordinate" if action.action_type is ComplexAction else "simple"
+
     def _act(self, desc: dict[str, Any]) -> None:
         """Her decision -> the page's control surface."""
         aid = int(desc["action"])
@@ -343,6 +369,15 @@ class ArcWebPractice:
             return
         if "x" in desc and "y" in desc:
             # Coordinate action — click the cell inside the canvas.
+            x, y = desc["x"], desc["y"]
+            if (
+                type(x) is not int
+                or type(y) is not int
+                or not (0 <= x < 64 and 0 <= y < 64)
+            ):
+                raise ValueError(
+                    "Coordinate actions require integer x,y in [0, 63]"
+                )
             box = self._browser.js(
                 "JSON.stringify(document.querySelectorAll('canvas')[0]"
                 ".getBoundingClientRect())"
@@ -364,6 +399,8 @@ class ArcWebPractice:
                         **extra,
                     )
             return
+        if self._action_label(aid) == "coordinate":
+            raise ValueError("Coordinate actions require integer x,y")
         key = _KEY_FOR_ACTION.get(aid)
         if key is not None:
             self._browser.key(*key)
@@ -399,9 +436,24 @@ class ArcWebPractice:
         self._browser.responses.clear()
         self._start_game()
         obs = self._latest_frame()
+        if obs is not None:
+            # Starting the session is the initialization reset — the
+            # same count ``world.arc`` keeps, so the substrates' costs
+            # read identically.
+            result.resets = 1
+        prev_levels = (obs or {}).get("levels_completed", 0)
+        level_start = 0
         while result.steps < max_steps and obs is not None:
             result.levels_completed = obs.get("levels_completed", 0)
             result.win_levels = obs.get("win_levels", 0)
+            if result.levels_completed != prev_levels:
+                # Steps each level cost — the within-game learning
+                # curve, kept identically on both substrates.
+                for _ in range(max(0, result.levels_completed - prev_levels)):
+                    result.level_steps.append(result.steps - level_start)
+                    level_start = result.steps
+                prev_levels = result.levels_completed
+                level_start = result.steps
             state = str(obs.get("state", "NOT_FINISHED"))
             if state == "WIN":
                 result.state = state
@@ -409,77 +461,114 @@ class ArcWebPractice:
                 break
             if state == "GAME_OVER":
                 self._mind.world_episode_end("over", game_id)
+                if result.steps >= max_steps:
+                    result.state = state
+                    break
+                # A death is a checkpoint — recovery stops the run
+                # when she isn't well, and the restart is a submitted
+                # action with a reset's cost either way.
+                if (reasons := self._check_readiness()) is not None:
+                    result.state = "UNWELL"
+                    result.reasons = reasons
+                    break
+                result.steps += 1
+                result.resets += 1
                 marker = len(self._browser.bodies)
                 self._reset()
                 obs = self._wait_frame(marker)
                 if obs is None:
                     result.state = "TRANSPORT_DEAD"
                     break
-                if (reasons := self._check_readiness()) is not None:
-                    result.state = "UNWELL"
-                    result.reasons = reasons
-                    break
                 continue
-            available = obs.get("available_actions") or []
-            if not available:
-                result.state = "NO_ACTIONS"
+            obs, terminal = self._web_turn(obs, result, game_id)
+            if terminal is not None:
+                result.state = terminal
                 break
-            info: dict[str, Any] = {
-                "game": game_id,
-                "level": result.levels_completed,
-                "win_levels": result.win_levels,
-            }
-            if self._instructions and game_id not in self._info_sent:
-                info["instructions"] = self._instructions
-                self._info_sent.add(game_id)
-            grid = obs["frame"][-1]
-            desc = self._mind.world_step(
-                grid,
-                available_actions=[
-                    {
-                        "action": int(a),
-                        "label": (
-                            {1: "up", 2: "down", 3: "left", 4: "right"}
-                            .get(int(a), "simple")
-                        ),
-                    }
-                    for a in available
-                ],
-                info=info,
-            )
-            result.steps += 1
-            if desc is None:
-                break
-            marker = len(self._browser.bodies)
-            self._act(desc)
-            obs = self._wait_frame(marker)
-            if obs is None:
-                # The page went quiet — possibly a reload that took
-                # the session's renderer with it. Re-attach once
-                # before calling the transport dead.
-                try:
-                    self._browser.reconnect()
-                    self._browser.call("Page.enable")
-                    self._browser.call("Network.enable")
-                except Exception:  # noqa: BLE001
-                    pass
-                else:
-                    obs = self._wait_frame(len(self._browser.bodies))
-                if obs is None:
-                    # End the episode rather than rehearse a
-                    # frozen world into her physics.
-                    result.state = "TRANSPORT_DEAD"
-                    break
             if result.steps % _HEALTH_EVERY_STEPS == 0:
                 if (reasons := self._check_readiness()) is not None:
                     result.state = "UNWELL"
                     result.reasons = reasons
                     break
-        if result.state == "NOT_FINISHED" and obs is not None:
-            result.state = str(obs.get("state", "BUDGET"))
-            if result.state == "NOT_FINISHED":
-                result.state = "BUDGET"
+        if result.state == "NOT_FINISHED":
+            if obs is None:
+                # The page never produced a frame — a dead transport,
+                # not an unfinished run.
+                result.state = "TRANSPORT_DEAD"
+            else:
+                result.state = str(obs.get("state", "BUDGET"))
+                if result.state == "NOT_FINISHED":
+                    result.state = "BUDGET"
+        result.prior_learning = getattr(
+            self._mind, "_world_learning_loaded", "none"
+        )
         return result
+
+    def _web_turn(
+        self, obs: dict[str, Any], result: ArcResult, game_id: str
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        """One decision cycle over the page transport.
+
+        Returns ``(next_obs, terminal_state)`` — ``terminal_state``
+        is None when the world answered and the loop continues, else
+        the state the result closes with: ``NO_ACTIONS``,
+        ``NO_ACTION``, or ``TRANSPORT_DEAD`` (a silent page gets one
+        reconnect before the transport is declared dead).
+        """
+        available = obs.get("available_actions") or []
+        if not available:
+            return None, "NO_ACTIONS"
+        info: dict[str, Any] = {
+            "game": game_id,
+            "level": result.levels_completed,
+            "win_levels": result.win_levels,
+        }
+        if self._instructions and game_id not in self._info_sent:
+            info["instructions"] = self._instructions
+            self._info_sent.add(game_id)
+        desc = self._mind.world_step(
+            obs["frame"][-1],
+            available_actions=[
+                {"action": int(a), "label": self._action_label(int(a))}
+                for a in available
+            ],
+            info=info,
+        )
+        if desc is None:
+            return None, "NO_ACTION"
+        aid = int(desc["action"])
+        if aid != 0 and aid not in {int(a) for a in available}:
+            raise ValueError(
+                "Chosen action is not available in this observation"
+            )
+        result.steps += 1
+        if aid == 0:
+            result.resets += 1
+        decision = getattr(self._mind, "game_decision", None) or {}
+        source = str(decision.get("source", "unknown"))
+        result.decision_sources[source] = (
+            result.decision_sources.get(source, 0) + 1
+        )
+        marker = len(self._browser.bodies)
+        self._act(desc)
+        next_obs = self._wait_frame(marker)
+        if next_obs is not None:
+            return next_obs, None
+        # The page went quiet — possibly a reload that took the
+        # session's renderer with it. Re-attach once before calling
+        # the transport dead.
+        try:
+            self._browser.reconnect()
+            self._browser.call("Page.enable")
+            self._browser.call("Network.enable")
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("world.arc_web.reconnect", e)
+        else:
+            next_obs = self._wait_frame(len(self._browser.bodies))
+        if next_obs is None:
+            # End the episode rather than rehearse a frozen world
+            # into her physics.
+            return None, "TRANSPORT_DEAD"
+        return next_obs, None
 
     def close(self) -> None:
         self._browser.close()

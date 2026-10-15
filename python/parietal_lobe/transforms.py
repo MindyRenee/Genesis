@@ -1583,15 +1583,30 @@ def instantiate(family: str, params: dict[str, object]) -> Transform | None:
 
     Dispatch is via a registry mapping family names to builder callables.
     """
-    def _color() -> int | None:
-        v = params.get("color")
-        return v if isinstance(v, int) else None
+    builder = _instantiate_registry(params).get(family)
+    return builder() if builder else None
 
-    def _dir() -> str | None:
-        d = params.get("direction")
-        return d if d in ("down", "up", "left", "right") else None
 
-    # Simple no-param builders
+def _instantiate_registry(
+    params: dict[str, object],
+) -> dict[str, Callable[[], Transform | None]]:
+    """The family → builder table for ``instantiate``.
+
+    Every builder closes over ``params`` and validates the entries its
+    family needs, returning ``None`` when a required parameter is
+    missing or mistyped.
+    """
+    registry: dict[str, Callable[[], Transform | None]] = {
+        **_simple_builders(),
+        **_color_builders(params),
+        **_direction_builders(params),
+        **_param_builders(params),
+    }
+    return registry
+
+
+def _simple_builders() -> dict[str, Callable[[], Transform]]:
+    """Families needing no parameters."""
     simple: dict[str, Callable[[], Transform]] = {
         "self_tile": lambda: Transform("self_tile", _mk_self_tile(), {}),
         "repeat_down": lambda: Transform("repeat_down", _mk_repeat_down(), {}),
@@ -1609,8 +1624,17 @@ def instantiate(family: str, params: dict[str, object]) -> Transform | None:
         "eye_ray": lambda: Transform("eye_ray", _mk_eye_ray(), {}),
         "cross_fill": lambda: Transform("cross_fill", _mk_cross_fill(), {}),
     }
+    return simple
 
-    # Color-param builders
+
+def _color_builders(
+    params: dict[str, object],
+) -> dict[str, Callable[[], Transform | None]]:
+    """Families parameterized by a ``color`` entry."""
+    def _color() -> int | None:
+        v = params.get("color")
+        return v if isinstance(v, int) else None
+
     def _with_color(
         mk_fn: Callable[[int], TransformFn], name: str | None = None
     ) -> Transform | None:
@@ -1638,8 +1662,22 @@ def instantiate(family: str, params: dict[str, object]) -> Transform | None:
         "fill_lanes": lambda: _with_color(lambda c: _mk_fill_lanes(c), "fill_lanes"),
         "ring_unique": lambda: _with_color(_mk_ring_unique, "ring_unique"),
     }
+    return color_builders
 
-    # Direction builders
+
+def _direction_builders(
+    params: dict[str, object],
+) -> dict[str, Callable[[], Transform | None]]:
+    """Families parameterized by a ``direction`` entry (gravity,
+    settle) plus the raw direction-keyed builders."""
+    def _dir() -> str | None:
+        d = params.get("direction")
+        return d if d in ("down", "up", "left", "right") else None
+
+    def _color() -> int | None:
+        v = params.get("color")
+        return v if isinstance(v, int) else None
+
     dir_builders: dict[str, Callable[[str], Transform | None]] = {
         "gravity": lambda d: (
             Transform(f"gravity_{d}_{c}", _mk_gravity(d, c), {"direction": d, "color": c})
@@ -1649,14 +1687,8 @@ def instantiate(family: str, params: dict[str, object]) -> Transform | None:
         "settle": lambda d: (
             Transform(f"settle_{d}", _mk_settle(d), {"direction": d}) if d else None
         ),
-        "shift": lambda d: (
-            Transform("shift", _mk_shift(dr, dc, cl), {"dr": dr, "dc": dc, "clamp": cl})
-            if isinstance(dr := params.get("dr"), int) and isinstance(dc := params.get("dc"), int)
-            and isinstance(cl := params.get("clamp", False), bool) else None
-        ),
     }
 
-    # Parameterized builders
     def _gravity() -> Transform | None:
         d = _dir()
         return dir_builders["gravity"](d) if d else None
@@ -1664,6 +1696,18 @@ def instantiate(family: str, params: dict[str, object]) -> Transform | None:
     def _settle() -> Transform | None:
         d = _dir()
         return dir_builders["settle"](d) if d else None
+
+    return {"gravity": _gravity, "settle": _settle}
+
+
+def _param_builders(
+    params: dict[str, object],
+) -> dict[str, Callable[[], Transform | None]]:
+    """Families parameterized by non-direction entries — dr/dc/clamp,
+    n, axis, tables, markers, anchors."""
+    def _color() -> int | None:
+        v = params.get("color")
+        return v if isinstance(v, int) else None
 
     def _shift() -> Transform | None:
         dr, dc = params.get("dr"), params.get("dc")
@@ -1689,12 +1733,6 @@ def instantiate(family: str, params: dict[str, object]) -> Transform | None:
             {"axis": axis, "color": c},
         )
 
-    def _classify_shape() -> Transform | None:
-        table = params.get("table")
-        if not isinstance(table, dict):
-            return None
-        return Transform("classify_shape", _mk_classify_shape(table), {"table": table})
-
     def _bridge_endpoints() -> Transform | None:
         m = params.get("marker")
         if not isinstance(m, int):
@@ -1707,17 +1745,6 @@ def instantiate(family: str, params: dict[str, object]) -> Transform | None:
             return None
         return Transform("cross_rays", _mk_cross_rays(clash), {"clash": clash})
 
-    def _cross_halos() -> Transform | None:
-        raw = params.get("table")
-        if not isinstance(raw, dict):
-            return None
-        halo_map: _HaloTable = {}
-        for key, halo in raw.items():
-            halo_map[int(key)] = tuple(
-                (int(dr), int(dc), int(k)) for dr, dc, k in halo
-            )
-        return Transform("cross_halos", _mk_cross_halos(halo_map), {"table": raw})
-
     def _count_blocks() -> Transform | None:
         ccolor = params.get("color")
         cwidth = params.get("width")
@@ -1728,13 +1755,6 @@ def instantiate(family: str, params: dict[str, object]) -> Transform | None:
             _mk_count_blocks(ccolor, cwidth),
             {"color": ccolor, "width": cwidth},
         )
-
-    def _draw_lines() -> Transform | None:
-        lraw = params.get("table")
-        if not isinstance(lraw, dict):
-            return None
-        lines = {int(k): str(a) for k, a in lraw.items()}
-        return Transform("draw_lines", _mk_draw_lines(lines), {"table": lraw})
 
     def _axes_stamp() -> Transform | None:
         c = params.get("color")
@@ -1762,43 +1782,56 @@ def instantiate(family: str, params: dict[str, object]) -> Transform | None:
         return Transform("shear", _mk_shear(dr, dc), {"dr": dr, "dc": dc}) \
             if isinstance(dr, int) and isinstance(dc, int) else None
 
-    # Direction entries bind the registry-time direction once.
-    # ``_dir()`` is a pure read of ``params``, so sampling it here is
-    # identical to sampling it at builder-invocation time — and it
-    # gives mypy a narrowable local instead of an uninferrable
-    # double-call lambda.
-    def _dir_entry(key: str) -> Callable[[], Transform | None]:
-        d = _dir()
-
-        def _build() -> Transform | None:
-            return dir_builders[key](d) if d else None
-
-        return _build
-
-    # Composite registry
-    registry: dict[str, Callable[[], Transform | None]] = {
-        **simple,
-        **color_builders,
-        **{k: _dir_entry(k) for k in dir_builders if k != "shift"},
-        "gravity": _gravity,
-        "settle": _settle,
+    out: dict[str, Callable[[], Transform | None]] = {
         "shift": _shift,
         "extend_down": _extend_down,
         "mark_uniform": _mark_uniform,
-        "classify_shape": _classify_shape,
         "bridge_endpoints": _bridge_endpoints,
         "cross_rays": _cross_rays,
-        "cross_halos": _cross_halos,
         "count_blocks": _count_blocks,
-        "draw_lines": _draw_lines,
         "axes_stamp": _axes_stamp,
         "attract_to": _attract_to,
         "radial_map": _radial_map,
         "shear": _shear,
     }
+    out.update(_table_param_builders(params))
+    return out
 
-    builder = registry.get(family)
-    return builder() if builder else None
+
+def _table_param_builders(
+    params: dict[str, object],
+) -> dict[str, Callable[[], Transform | None]]:
+    """Builders parameterized by a ``table`` entry — classify_shape,
+    cross_halos, draw_lines."""
+    def _classify_shape() -> Transform | None:
+        table = params.get("table")
+        if not isinstance(table, dict):
+            return None
+        return Transform("classify_shape", _mk_classify_shape(table), {"table": table})
+
+    def _cross_halos() -> Transform | None:
+        raw = params.get("table")
+        if not isinstance(raw, dict):
+            return None
+        halo_map: _HaloTable = {}
+        for key, halo in raw.items():
+            halo_map[int(key)] = tuple(
+                (int(dr), int(dc), int(k)) for dr, dc, k in halo
+            )
+        return Transform("cross_halos", _mk_cross_halos(halo_map), {"table": raw})
+
+    def _draw_lines() -> Transform | None:
+        lraw = params.get("table")
+        if not isinstance(lraw, dict):
+            return None
+        lines = {int(k): str(a) for k, a in lraw.items()}
+        return Transform("draw_lines", _mk_draw_lines(lines), {"table": lraw})
+
+    return {
+        "classify_shape": _classify_shape,
+        "cross_halos": _cross_halos,
+        "draw_lines": _draw_lines,
+    }
 
 
 def _propose_gravity(examples: list[Example]) -> list[Transform]:

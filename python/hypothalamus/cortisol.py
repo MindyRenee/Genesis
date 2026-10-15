@@ -115,8 +115,10 @@ No homeostatic set-point:
     and decays via clearance mechanisms.
 
     The homeostatic force is zero for cortisol. Instead, it gets
-    a constant decay toward zero (leaky integrator):
-    level *= exp(-0.005 * dt)  (half-life ~138 seconds)
+    a first-order metabolic decay toward zero (leaky integrator)
+    at the measured plasma half-life (~66 min):
+    level *= exp(-CORTISOL_METABOLIC_RATE * dt)
+    where CORTISOL_METABOLIC_RATE = 1.75e-4/s
 
 HPA axis cascade:
     Cortisol is the endpoint of the HPA cascade:
@@ -139,12 +141,14 @@ Cortisol metabolic clearance (hepatic 11β-HSD):
     ABOVE its baseline.
 
     cort_excess = max(0, level - baseline)
-    eff_clearance = CORTISOL_CLEARANCE_RATE * cort_excess * dt_scale
-    level *= 1.0 - clamp(eff_clearance, 0.0, 0.5)
+    clearance_exponent = CORTISOL_CLEARANCE_RATE * cort_excess * dt_scale
+    level *= exp(-clearance_exponent)
 
     This models the biological upregulation of 11β-HSD2 under
     sustained high cortisol, creating a soft ceiling that prevents
-    cortisol from pinning at the hard clamp.
+    cortisol from pinning at the hard clamp. The exponential form
+    composes exactly over sub-steps, so the decay is invariant to
+    the caller's tick cadence.
 
 Hard clamp:
     Cortisol is hard-clamped to [0, cortisol_max] (default 0.80)
@@ -181,7 +185,8 @@ Homeostatic force:
     homeostatic_force = 0.0  (no homeostatic set-point)
 
 Metabolic decay (leaky integrator):
-    level *= exp(-0.005 * dt)  (half-life ~138 seconds)
+    level *= exp(-CORTISOL_METABOLIC_RATE * dt)
+    where CORTISOL_METABOLIC_RATE = 1.75e-4/s (half-life ~66 min)
 
 HPA cascade (ACTH -> cortisol):
     acth_drive = acth_level * 0.01 * maturation
@@ -189,8 +194,8 @@ HPA cascade (ACTH -> cortisol):
 
 Cortisol clearance:
     cort_excess = max(0, level - baseline)
-    eff_clearance = CORTISOL_CLEARANCE_RATE * cort_excess * dt_scale
-    level *= 1.0 - clamp(eff_clearance, 0.0, 0.5)
+    clearance_exponent = CORTISOL_CLEARANCE_RATE * cort_excess * dt_scale
+    level *= exp(-clearance_exponent)
 
 Negative feedback to ACTH:
     acth_level -= cort_eff * 0.02 * dt_scale
@@ -228,24 +233,33 @@ ROLE IN EMERGENT PHASES
 
 Valence equation:
     valence = DA*0.25 + SRT*0.25 + OXY*0.10 + END*0.15 + NE*0.10
-            - CORT*0.35 - glu_excess*0.15 + DA*SRT*0.10
+            - cort_stress*0.35 - glu_excess*0.15 + DA*SRT*0.10
     (cortisol weight = -0.35 — the strongest negative contributor)
+    (cort_stress = cortisol as a fraction of its reachable envelope,
+    (cort - 0.02) / (0.08 - 0.02) clamped to [0, 1] — the raw level
+    peaks near 0.08, so on the raw scale the drag could never
+    exceed ~0.03)
 
 Plasticity gate:
-    plasticity_gate = BDNF * (1 - CORT * 0.5)
-    (cortisol suppresses plasticity)
+    plasticity_gate = BDNF * (1 - cort_stress * 0.5)
+    (cortisol suppresses plasticity; at the ~0.08 reachable peak this
+    gives the intended 50% suppression rather than the ~4% a raw
+    level would produce)
 
 Stress phase:
-    CORT > 0.65 (enter) / 0.55 (stay) + NE > 0.60 + SRT < 0.35
+    CORT > 0.06 (enter) / 0.053 (stay) + NE > 0.45 + SRT < 0.35
+    (gate set inside the measured envelope — cortisol peaks ~0.084)
 
 Overwhelmed phase:
-    CORT > 0.75 (enter) / 0.65 (stay) + NE > 0.75 + global_tone > 0.7
+    CORT > 0.069 (enter) / 0.066 (stay) + NE > 0.509
+    (1.15x/1.1x and 1.13x/1.07x the Stress gates)
 
 Flow phase:
-    CORT < 0.30 (required — low stress for flow)
+    CORT < 0.06 (required — flow cannot fire while cortisol sits
+    in stress territory; STRESS_CORTISOL_GATE)
 
 BDNF recovery:
-    When CORT < 0.3 and BDNF < baseline:
+    When CORT < 0.06 (STRESS_CORTISOL_GATE) and BDNF < baseline:
     recovery = srt_level * bdnf_recovery_rate * dt_scale
     (serotonin drives BDNF recovery after stress)
 
@@ -308,6 +322,6 @@ class Cortisol:
     circadian_modifier: str = "1.0 (NO circadian modulation — stress hormone)"
     role: str = "stress response, HPA cascade, BDNF suppression"
     hard_clamp_max: float = 0.80
-    metabolic_decay_rate: float = 0.005
-    clearance_rate: float = 0.05
+    metabolic_decay_rate: float = 1.75e-4
+    clearance_rate: float = 0.08
     hpa_feedback_rate: float = 0.02

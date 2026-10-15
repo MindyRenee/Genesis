@@ -20,7 +20,7 @@ from frontal_lobe.tools.project_creator import create_project, manage_project_li
 from frontal_lobe.volition import Urge, Volition
 
 from genesis_client.protocol import CHEM_NAMES, MODULE_METACOGNITION
-from genesis_client.swallow import note_swallowed
+from genesis_client.swallow import note_swallowed, total_swallowed
 from infrastructure.journal import record_error
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,13 @@ logger = logging.getLogger(__name__)
 # running bug scan or code-learning burst must lose every scheduler
 # handoff to a live think(), not coin-flip it for the core.
 _VOLITION_NICE = 10
+
+# Cortisol's reachable envelope: the Rust substrate's effective
+# cortisol equilibrates near ~0.08 under full HPA drive (resting
+# ~0.02, stress-phase gate 0.06, hard clamp 0.80 is never reached),
+# so palette consumers see "fraction of the physiological stress
+# range" rather than a raw level pinned near zero.
+CORTISOL_PALETTE_RANGE = 0.08
 
 
 def _lower_thread_priority(nice: int = _VOLITION_NICE) -> None:
@@ -75,9 +82,15 @@ class VolitionMixin:
                 )
             )
 
-        # Monotonic timestamp of the last completed bug scan
-        # (0.0 = never scanned — the audit appetite starts fully due).
-        self._bug_scan_last_completed: float = 0.0
+        # Monotonic timestamp of the last completed bug scan. Boot is
+        # the baseline — audit recency accrues from startup so the
+        # hygiene backstop takes the full recency window to build,
+        # instead of booting "fully overdue" and scanning on arrival.
+        self._bug_scan_last_completed: float = time.monotonic()
+        # Swallowed-failure tally as of the previous volition tick.
+        # None = unread yet; the first read adopts the current count
+        # so the pre-existing ledger doesn't dump as a boot-time spike.
+        self._last_swallow_total: int | None = None
         return engine
     def self_invoke(self, command: str, args: str = "") -> str | None:
         """Invoke a slash command from its own cognitive process.
@@ -153,20 +166,75 @@ class VolitionMixin:
           below stress phase but above resting)
         """
         idle = max(0.0, time.time() - self._last_interaction_time)
-        # Open bugs only — the resolved padding in recent_bugs() exists
-        # for the track-record display, not for drives. The improve urge
-        # (the behavior that resolves bugs) consumes this signal; the
-        # bug_scan urge must not, because scanning cannot discharge it.
+        drives = self._drive_signals()
+        interoceptive = self._read_interoceptive_signals()
+        emotional_intensity, creativity = self._affect_signals()
+        wave_data = self._read_wave_and_adenosine()
+        self._shape_adenosine(wave_data)
+        threat_data = self._read_threat_signals()
+        concept_growth = self._concept_growth()
+        social_isolation = self._social_isolation()
+        boredom, games_available = self._play_signals(
+            idle, emotional_intensity, concept_growth
+        )
+
+        # Conscious world focus — an ignited world broadcast or a
+        # pinned engaged world means an outer world is holding her
+        # attention (she is *in* a game, a percept just fired). This
+        # is focus expressed as state: engagement attenuates the
+        # appetitive drives — boredom, idle time, off-task curiosity,
+        # audit appetite, social pressure, expression — the way
+        # absorption does, so the urges simply never cross their
+        # thresholds rather than being switched off upstream. The
+        # interoceptive, wave, and threat signals pass untouched:
+        # an absorbed person still has a body, and defensive needs
+        # always out-compete a game.
+        free = 1.0 - self.world_engagement()
+
+        appetitive = {
+            **drives,
+            "boredom": boredom,
+            "games_available": games_available,
+            "idle_seconds": min(
+                1.0,
+                idle / self.config.volition.idle_normalization_seconds,
+            ),
+            "speech_queue_size": min(
+                1.0,
+                len(self._speech_queue)
+                / self.config.volition.speech_queue_size_normalization,
+            ),
+            "emotional_intensity": emotional_intensity,
+            "creativity": creativity,
+            "concept_growth": concept_growth,
+            "social_isolation": social_isolation,
+        }
+        return {
+            **{k: v * free for k, v in appetitive.items()},
+            **interoceptive,
+            **wave_data,
+            **threat_data,
+        }
+
+    def _drive_signals(self) -> dict[str, float]:
+        """The maintenance-channel drive inputs, normalized to [0, 1].
+
+        Open bugs only — the resolved padding in recent_bugs() exists
+        for the track-record display, not for drives. The improve urge
+        (the behavior that resolves bugs) consumes this signal; the
+        bug_scan urge must not, because scanning cannot discharge it.
+        Audit recency for bug_scan is time since the last completed
+        scan normalized to the audit period — a faint background
+        "haven't checked myself in a long while", not the primary
+        drive. What paces real audits is self_discomfort: the urge
+        grows while she is feeling something wrong and decays when
+        she isn't.
+        """
         try:
             bug_count = min(1.0, self.bug_reporter.open_bug_count() / 20.0)
         except Exception as e:  # noqa: BLE001
             logger.warning(f"bug count failed: {e}")
             bug_count = 0.0
-        # Audit recency for the bug_scan urge — time since the last
-        # completed scan, normalized to the audit period. Never
-        # scanned counts as fully due. The scan itself discharges
-        # this (see _perform_bug_scan), so the urge paces real
-        # audits instead of re-firing on an unresolvable count.
         since_scan = time.monotonic() - self._bug_scan_last_completed
         scan_recency = (
             1.0
@@ -186,38 +254,74 @@ class VolitionMixin:
         except Exception as e:  # noqa: BLE001
             logger.warning(f"curiosity assessment failed: {e}")
             curiosity = 0.0
+        return {
+            "bug_count": bug_count,
+            "scan_recency": scan_recency,
+            "pending_proposals": pending,
+            "curiosity": curiosity,
+            "self_discomfort": self._self_discomfort(),
+        }
 
-        interoceptive = self._read_interoceptive_signals()
+    def _self_discomfort(self) -> float:
+        """Felt wrongness — the interoceptive drive to self-audit.
 
-        # Emotional intensity for the drawing urge — how strongly it
-        # feels right now. High arousal OR strong valence (positive or
-        # negative) both drive the urge to express.
-        emotional_intensity = 0.0
-        creativity = 0.0
+        Three channels of "something is off": fresh swallowed
+        exceptions (silent failures accumulating — every catch site
+        in both layers records to the tally), the error monitor's
+        current error signal (recent prediction mistakes, the
+        ERN-like transient), and its sustained caution level
+        (lingering wariness between turns). The bug_scan urge
+        integrates this rather than raw elapsed time, so she audits
+        herself when she feels damage — not on a schedule.
+        """
+        try:
+            total = total_swallowed()
+            if self._last_swallow_total is None:
+                self._last_swallow_total = total
+            delta = max(0, total - self._last_swallow_total)
+            self._last_swallow_total = total
+            fresh_damage = min(1.0, delta / 4.0)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.volition._self_discomfort", e)
+            fresh_damage = 0.0
+        try:
+            monitor = self.brain.frontal.error_monitor
+            err_now = min(1.0, monitor.compute_error_signal())
+            caution = min(1.0, monitor.get_caution_level())
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.volition._self_discomfort", e)
+            err_now = caution = 0.0
+        return min(
+            1.0,
+            0.55 * fresh_damage + 0.25 * err_now + 0.2 * caution,
+        )
+
+    def _affect_signals(self) -> tuple[float, float]:
+        """Emotional intensity and creativity for the expression urge —
+        how strongly it feels right now. High arousal OR strong valence
+        (positive or negative) both drive the urge to express."""
         try:
             emotion = self.feel()
             if emotion:
-                emotional_intensity = max(
-                    emotion.arousal,
-                    abs(emotion.valence),
+                return (
+                    max(emotion.arousal, abs(emotion.valence)),
+                    getattr(emotion, "creativity", 0.0),
                 )
-                creativity = getattr(emotion, "creativity", 0.0)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._volition_context",
                 e,
             )
+        return 0.0, 0.0
 
-        wave_data = self._read_wave_and_adenosine()
-        threat_data = self._read_threat_signals()
-
-        # Voluntary sleep-pressure shaping. The urge integrates only
-        # pressure above the drowsy-band floor — residual sub-drowsy
-        # adenosine is grogginess that fades, not a reason to sleep.
-        # Within the post-wake stabilization window the excess is
-        # additionally dampened so the urge can only re-form from
-        # genuinely high pressure or after the latch has had time
-        # to hold.
+    def _shape_adenosine(self, wave_data: dict[str, Any]) -> None:
+        """Voluntary sleep-pressure shaping. The urge integrates only
+        pressure above the drowsy-band floor — residual sub-drowsy
+        adenosine is grogginess that fades, not a reason to sleep.
+        Within the post-wake stabilization window the excess is
+        additionally dampened so the urge can only re-form from
+        genuinely high pressure or after the latch has had time
+        to hold."""
         adn = wave_data.get("adenosine_level")
         if isinstance(adn, (int, float)):
             adn_drive = max(0.0, adn - SLEEP_URGE_ADENOSINE_FLOOR)
@@ -226,30 +330,30 @@ class VolitionMixin:
                 adn_drive *= wake_age / WAKE_STABILIZATION_WINDOW
             wave_data["adenosine_level"] = adn_drive
 
-        # Concept network growth for the introspection and self-mission
-        # urges — new concepts since the last volition tick. Normalized
-        # to [0, 1] over 50 new concepts (a meaningful growth burst).
-        concept_growth = 0.0
+    def _concept_growth(self) -> float:
+        """New concepts since the last volition tick, normalized to
+        [0, 1] over 50 new concepts (a meaningful growth burst) — feeds
+        the introspection and self-mission urges."""
         try:
             current_count = self.brain.frontal.network.total_concept_count
             delta = max(0, current_count - self._last_concept_count)
-            concept_growth = min(1.0, delta / 50.0)
             self._last_concept_count: int = current_count
+            return min(1.0, delta / 50.0)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._volition_context",
                 e,
             )
+            return 0.0
 
-        # Social isolation from its external world — how long it has
-        # been since anyone engaged it. Dampened by unanswered
-        # outreach bids: after several calls into silence, the room's
-        # quiet is expected, so the pressure eases (habituation).
-        # Sharpened by what it's learned about the target: silence
-        # from someone whose responsiveness posterior has collapsed is
-        # expected and isolates less; silence from a responsive
-        # presence still registers at full weight.
-        social_isolation = 0.0
+    def _social_isolation(self) -> float:
+        """Time since anyone engaged it, from its external world.
+        Dampened by unanswered outreach bids: after several calls into
+        silence, the room's quiet is expected, so the pressure eases
+        (habituation). Sharpened by what it's learned about the target:
+        silence from someone whose responsiveness posterior has
+        collapsed is expected and isolates less; silence from a
+        responsive presence still registers at full weight."""
         try:
             social_isolation = self.world.social_isolation() * (
                 1.0 - 0.2 * min(3, self.world.unanswered_bids)
@@ -262,19 +366,26 @@ class VolitionMixin:
                 r = target.belief.responsiveness
                 trust = min(1.0, r.evidence / 8.0)
                 social_isolation *= 1.0 - 0.5 * (1.0 - r.mean) * trust
+            return social_isolation
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._volition_context",
                 e,
             )
+            return 0.0
 
-        # Play signals. Boredom is genuine understimulation — awake,
-        # idle, unengaged, nothing new arriving — the classic
-        # precondition for wanting to play. ``games_available`` is the
-        # standing fact of her collection: games are always there if
-        # she wants them, so the option itself exerts a small pull.
-        boredom = 0.0
-        games_available = 0.0
+    def _play_signals(
+        self,
+        idle: float,
+        emotional_intensity: float,
+        concept_growth: float,
+    ) -> tuple[float, float]:
+        """Boredom and games_available. Boredom is genuine
+        understimulation — awake, idle, unengaged, nothing new arriving
+        — the classic precondition for wanting to play.
+        ``games_available`` is the standing fact of her collection:
+        games are always there if she wants them, so the option itself
+        exerts a small pull."""
         try:
             idle_norm = min(
                 1.0,
@@ -285,53 +396,17 @@ class VolitionMixin:
                 * (1.0 - emotional_intensity)
                 * (1.0 - min(1.0, concept_growth))
             )
-            games_available = (
-                1.0 if self.game_play.has_games() else 0.0
+            return (
+                boredom,
+                1.0 if self.game_play.has_games() else 0.0,
             )
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._volition_context",
                 e,
             )
+            return 0.0, 0.0
 
-        # Conscious world focus — an ignited world broadcast or a
-        # pinned engaged world means an outer world is holding her
-        # attention (she is *in* a game, a percept just fired). This
-        # is focus expressed as state: engagement attenuates the
-        # appetitive drives — boredom, idle time, off-task curiosity,
-        # audit appetite, social pressure, expression — the way
-        # absorption does, so the urges simply never cross their
-        # thresholds rather than being switched off upstream. The
-        # interoceptive, wave, and threat signals pass untouched:
-        # an absorbed person still has a body, and defensive needs
-        # always out-compete a game.
-        world_engagement = self.world_engagement()
-        free = 1.0 - world_engagement
-
-        return {
-            "bug_count": bug_count * free,
-            "scan_recency": scan_recency * free,
-            "pending_proposals": pending * free,
-            "curiosity": curiosity * free,
-            "boredom": boredom * free,
-            "games_available": games_available * free,
-            "idle_seconds": min(
-                1.0,
-                idle / self.config.volition.idle_normalization_seconds,
-            ) * free,
-            "speech_queue_size": min(
-                1.0,
-                len(self._speech_queue)
-                / self.config.volition.speech_queue_size_normalization,
-            ) * free,
-            **interoceptive,
-            "emotional_intensity": emotional_intensity * free,
-            "creativity": creativity * free,
-            **wave_data,
-            **threat_data,
-            "concept_growth": concept_growth * free,
-            "social_isolation": social_isolation * free,
-        }
     def _act_on_volition(self, ready: list[str]) -> list[str]:
         """Run each ready urge action in its own background thread.
 
@@ -343,6 +418,23 @@ class VolitionMixin:
         stress loop: CPU load → interoception → CRH → cortisol →
         protective posture → (still running heavy CPU) → more cortisol.
         """
+        # Custodial restraint — the steward's standing directives veto
+        # urges at the gate. An urge that matches a directive never
+        # reaches the performers; the veto is logged so restraint is
+        # legible, not silent.
+        steward = getattr(self.brain.frontal, "steward", None)
+        if steward is not None:
+            restrained = [
+                r for r in ready
+                if steward.directed_against(r) is not None
+            ]
+            if restrained:
+                logger.info(
+                    f"volition restrained by steward directive: "
+                    f"{restrained}"
+                )
+                ready = [r for r in ready if r not in restrained]
+
         # Gate heavy CPU activities on learning posture
         posture = self._get_current_posture()
         from genesis_client.types import LEARNING_POSTURE_PROTECTIVE
@@ -565,7 +657,9 @@ class VolitionMixin:
 
         self._emit_volition_thought(("bug", "code", "scan"), "thinking")
         try:
-            result = self.bug_reporter.scan(max_files=20)
+            # Felt scans are rare — when one fires it audits the whole
+            # tree, not the same twenty priority files every time.
+            result = self.bug_reporter.scan(max_files=1000)
             # The audit appetite is discharged by the scan itself —
             # record completion whether or not anything new was found.
             self._bug_scan_last_completed = time.monotonic()
@@ -844,148 +938,9 @@ class VolitionMixin:
         emotion = self.feel()
 
         def _say(moment: dict) -> None:
-            """Her inner voice on a play moment — words composed by
-            her own language system from the event, never recited."""
-            if vocab is None:
-                return
-            try:
-                text = vocab._compose_play_moment(moment, emotion)
-            except Exception:  # noqa: BLE001
-                return
-            if text:
-                inner = getattr(self.brain.frontal, "inner_life", None)
-                if inner is not None:
-                    try:
-                        noted = inner.note_thought(
-                            text,
-                            trigger="play",
-                            intent="play",
-                            metadata={
-                                "topic": moment.get("game", ""),
-                                "moment": moment.get("kind", ""),
-                            },
-                        )
-                        if noted is not None:
-                            return
-                    except Exception:  # noqa: BLE001
-                        pass
-                self._emit_live_thought("play", text)
+            self._play_say(vocab, emotion, moment)
 
-        # The live couplings — what a body does while playing. Every
-        # signal is a bounded impulse into the chemistry the body
-        # integrates; the feeling that comes of it is hers, computed
-        # by the substrate, never declared here.
-        #
-        # - TD error → phasic dopamine (Schultz 1998; Koepp 1998:
-        #   striatal dopamine during real play). The game's own
-        #   reward teaches her mid-game, not just at the end.
-        # - Threat rising → norepinephrine + acetylcholine
-        #   (orienting — the post-encounter vigilance of the
-        #   predatory-imminence continuum, Fanselow; Mobbs 2007).
-        # - Circa-strike (threat >= 0.7) → the adrenaline moment:
-        #   a sharper NE burst and beta2 drive.
-        # - Escape → relief IS reward (averted-punishment RPE —
-        #   Leknes 2011; omission-of-threat dopamine scales with
-        #   how bad it almost was): dopamine + endorphin.
-        # - Death → dopamine dip + NE spike + a trace of cortisol
-        #   (HPA is slow chemistry; it only earns a trickle when
-        #   losses keep coming — a single death is a sting, not
-        #   a stressor).
-        stats = {
-            "deaths": 0, "escapes": 0, "scored": 0,
-            "peak_threat": 0.0, "dry": 0, "voiced": 0,
-        }
-        _on_step = None
-        try:
-            from thalamus.brain_waves import BrainWave, add_brain_wave_drive
-
-            from genesis_client.protocol import (
-                CHEM_ACETYLCHOLINE,
-                CHEM_CORTISOL,
-                CHEM_DOPAMINE,
-                CHEM_ENDORPHIN,
-                CHEM_NOREPINEPHRINE,
-            )
-
-            add_brain_wave_drive(BrainWave.BETA2, 0.15)
-            self._learner_neuro_impulse(CHEM_ACETYLCHOLINE, 0.004)
-            _say({
-                "kind": "start", "game": game,
-                "goal": task.get("goal", ""),
-            })
-
-            def _step_coupled(st) -> None:
-                impulse = max(-0.006, min(0.006, st.td_error * 0.04))
-                if abs(impulse) >= 0.001:
-                    self._learner_neuro_impulse(CHEM_DOPAMINE, impulse)
-                    add_brain_wave_drive(
-                        BrainWave.GAMMA if impulse > 0
-                        else BrainWave.BETA2,
-                        min(0.25, abs(impulse) * 40))
-
-                threat = st.threat
-                stats["peak_threat"] = max(
-                    stats["peak_threat"], threat)
-                if threat >= 0.7:
-                    self._learner_neuro_impulse(
-                        CHEM_NOREPINEPHRINE, 0.006)
-                    add_brain_wave_drive(BrainWave.BETA2, 0.3)
-                    if stats["voiced"] < 8:
-                        stats["voiced"] += 1
-                        _say({"kind": "danger", "game": game})
-                elif threat > stats["peak_threat"] - 0.15:
-                    self._learner_neuro_impulse(
-                        CHEM_NOREPINEPHRINE, 0.002 * threat)
-                    self._learner_neuro_impulse(
-                        CHEM_ACETYLCHOLINE, 0.001 * threat)
-
-                if "escaped" in st.events:
-                    stats["escapes"] += 1
-                    # Relief scales with how bad it almost was.
-                    relief = 0.003 + 0.006 * stats["peak_threat"]
-                    self._learner_neuro_impulse(CHEM_DOPAMINE, relief)
-                    self._learner_neuro_impulse(
-                        CHEM_ENDORPHIN, relief * 0.7)
-                    stats["peak_threat"] = 0.0
-                    if stats["voiced"] < 8:
-                        stats["voiced"] += 1
-                        _say({"kind": "close", "game": game})
-
-                if "death" in st.events:
-                    stats["deaths"] += 1
-                    self._learner_neuro_impulse(
-                        CHEM_DOPAMINE, -0.008)
-                    self._learner_neuro_impulse(
-                        CHEM_NOREPINEPHRINE, 0.008)
-                    self._learner_neuro_impulse(
-                        CHEM_CORTISOL, 0.001 * stats["deaths"])
-                    if stats["voiced"] < 8:
-                        stats["voiced"] += 1
-                        _say({"kind": "death", "game": game})
-
-                if "scored" in st.events:
-                    stats["scored"] += 1
-                    stats["dry"] = 0
-                    if stats["voiced"] < 8:
-                        stats["voiced"] += 1
-                        _say({
-                            "kind": "scored" if stats["scored"] > 1
-                            else "discovery",
-                            "game": game,
-                        })
-                else:
-                    stats["dry"] += 1
-                    if stats["dry"] == 25 and stats["voiced"] < 8:
-                        stats["voiced"] += 1
-                        _say({"kind": "stuck", "game": game})
-
-                for ev in ("won", "over"):
-                    if ev in st.events and stats["voiced"] < 9:
-                        stats["voiced"] += 1
-                        _say({"kind": ev, "game": game})
-            _on_step = _step_coupled
-        except Exception as e:  # noqa: BLE001
-            note_swallowed("mind.volition._perform_play", e)
+        stats, _on_step = self._play_couplings(game, task, _say)
 
         # The interrupt: the user showing up (or rest beginning, or
         # volition being suppressed — she puts the game down when the
@@ -1013,7 +968,187 @@ class VolitionMixin:
             return
         if result is None:
             return
+        self._record_play_outcome(result, game, prior_best, stats, _say)
 
+    def _play_say(
+        self, vocab: Any, emotion: Any, moment: dict
+    ) -> None:
+        """Her inner voice on a play moment — words composed by
+        her own language system from the event, never recited."""
+        if vocab is None:
+            return
+        try:
+            text = vocab._compose_play_moment(moment, emotion)
+        except Exception:  # noqa: BLE001 — a voice hiccup is not a crash
+            return
+        if not text:
+            return
+        inner = getattr(self.brain.frontal, "inner_life", None)
+        if inner is not None:
+            try:
+                noted = inner.note_thought(
+                    text,
+                    trigger="play",
+                    intent="play",
+                    metadata={
+                        "topic": moment.get("game", ""),
+                        "moment": moment.get("kind", ""),
+                    },
+                )
+                if noted is not None:
+                    return
+            except Exception as e:  # noqa: BLE001
+                note_swallowed(
+                    "basal_ganglia.volition.play_moment", e
+                )
+        self._emit_live_thought("play", text)
+
+    def _play_couplings(
+        self, game: str, task: dict, say: Any
+    ) -> tuple[dict, Any]:
+        """The live couplings — what a body does while playing.
+
+        Every signal is a bounded impulse into the chemistry the body
+        integrates; the feeling that comes of it is hers, computed
+        by the substrate, never declared here.
+
+        - TD error → phasic dopamine (Schultz 1998; Koepp 1998:
+          striatal dopamine during real play). The game's own
+          reward teaches her mid-game, not just at the end.
+        - Threat rising → norepinephrine + acetylcholine
+          (orienting — the post-encounter vigilance of the
+          predatory-imminence continuum, Fanselow; Mobbs 2007).
+        - Circa-strike (threat >= 0.7) → the adrenaline moment:
+          a sharper NE burst and beta2 drive.
+        - Escape → relief IS reward (averted-punishment RPE —
+          Leknes 2011; omission-of-threat dopamine scales with
+          how bad it almost was): dopamine + endorphin.
+        - Death → dopamine dip + NE spike + a trace of cortisol
+          (HPA is slow chemistry; it only earns a trickle when
+          losses keep coming — a single death is a sting, not
+          a stressor).
+
+        Returns ``(stats, on_step)`` — the per-episode counters and
+        the step callback, or ``None`` when the coupling imports
+        are unavailable.
+        """
+        stats = {
+            "deaths": 0, "escapes": 0, "scored": 0,
+            "peak_threat": 0.0, "dry": 0, "voiced": 0,
+        }
+        try:
+            from thalamus.brain_waves import BrainWave, add_brain_wave_drive
+
+            from genesis_client.protocol import CHEM_ACETYLCHOLINE
+
+            add_brain_wave_drive(BrainWave.BETA2, 0.15)
+            self._learner_neuro_impulse(CHEM_ACETYLCHOLINE, 0.004)
+            say({
+                "kind": "start", "game": game,
+                "goal": task.get("goal", ""),
+            })
+
+            def _step_coupled(st: Any) -> None:
+                self._play_step_coupled(st, stats, game, say)
+            return stats, _step_coupled
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.volition._perform_play", e)
+            return stats, None
+
+    def _play_step_coupled(
+        self, st: Any, stats: dict, game: str, say: Any
+    ) -> None:
+        """One coupled play step — TD error, threat, and events each
+        push a bounded impulse into the substrate. Only reachable after
+        the coupling imports in ``_play_couplings`` have succeeded."""
+        from thalamus.brain_waves import BrainWave, add_brain_wave_drive
+
+        from genesis_client.protocol import (
+            CHEM_ACETYLCHOLINE,
+            CHEM_CORTISOL,
+            CHEM_DOPAMINE,
+            CHEM_ENDORPHIN,
+            CHEM_NOREPINEPHRINE,
+        )
+
+        impulse = max(-0.006, min(0.006, st.td_error * 0.04))
+        if abs(impulse) >= 0.001:
+            self._learner_neuro_impulse(CHEM_DOPAMINE, impulse)
+            add_brain_wave_drive(
+                BrainWave.GAMMA if impulse > 0
+                else BrainWave.BETA2,
+                min(0.25, abs(impulse) * 40))
+
+        threat = st.threat
+        stats["peak_threat"] = max(
+            stats["peak_threat"], threat)
+        if threat >= 0.7:
+            self._learner_neuro_impulse(
+                CHEM_NOREPINEPHRINE, 0.006)
+            add_brain_wave_drive(BrainWave.BETA2, 0.3)
+            if stats["voiced"] < 8:
+                stats["voiced"] += 1
+                say({"kind": "danger", "game": game})
+        elif threat > stats["peak_threat"] - 0.15:
+            self._learner_neuro_impulse(
+                CHEM_NOREPINEPHRINE, 0.002 * threat)
+            self._learner_neuro_impulse(
+                CHEM_ACETYLCHOLINE, 0.001 * threat)
+
+        if "escaped" in st.events:
+            stats["escapes"] += 1
+            # Relief scales with how bad it almost was.
+            relief = 0.003 + 0.006 * stats["peak_threat"]
+            self._learner_neuro_impulse(CHEM_DOPAMINE, relief)
+            self._learner_neuro_impulse(
+                CHEM_ENDORPHIN, relief * 0.7)
+            stats["peak_threat"] = 0.0
+            if stats["voiced"] < 8:
+                stats["voiced"] += 1
+                say({"kind": "close", "game": game})
+
+        if "death" in st.events:
+            stats["deaths"] += 1
+            self._learner_neuro_impulse(
+                CHEM_DOPAMINE, -0.008)
+            self._learner_neuro_impulse(
+                CHEM_NOREPINEPHRINE, 0.008)
+            self._learner_neuro_impulse(
+                CHEM_CORTISOL, 0.001 * stats["deaths"])
+            if stats["voiced"] < 8:
+                stats["voiced"] += 1
+                say({"kind": "death", "game": game})
+
+        if "scored" in st.events:
+            stats["scored"] += 1
+            stats["dry"] = 0
+            if stats["voiced"] < 8:
+                stats["voiced"] += 1
+                say({
+                    "kind": "scored" if stats["scored"] > 1
+                    else "discovery",
+                    "game": game,
+                })
+        else:
+            stats["dry"] += 1
+            if stats["dry"] == 25 and stats["voiced"] < 8:
+                stats["voiced"] += 1
+                say({"kind": "stuck", "game": game})
+
+        for ev in ("won", "over"):
+            if ev in st.events and stats["voiced"] < 9:
+                stats["voiced"] += 1
+                say({"kind": ev, "game": game})
+
+    def _record_play_outcome(
+        self,
+        result: Any,
+        game: str,
+        prior_best: float,
+        stats: dict,
+        say: Any,
+    ) -> None:
+        """Feel, broadcast, store, and articulate the play result."""
         # Feel the outcome — a real neurochemical response through
         # her emotional regulator: reward on a win, partial reward on
         # progress, a bounded prediction-error dip on a loss. An
@@ -1022,7 +1157,7 @@ class VolitionMixin:
         interrupted = result.failure == "interrupted"
         felt = None
         if interrupted:
-            _say({"kind": "stopped", "game": game})
+            say({"kind": "stopped", "game": game})
         else:
             try:
                 felt = self.regulator.respond_to_play(
@@ -1350,13 +1485,19 @@ class VolitionMixin:
         except Exception:  # noqa: BLE001
             emotion = None
 
-        # Build the neurochemistry input from effective levels
+        # Build the neurochemistry input from effective levels.
+        # Cortisol is normalized against its reachable envelope:
+        # the substrate's effective cortisol tops out around ~0.08
+        # under full HPA drive (hard clamp 0.80, but production and
+        # clearance equilibrate far below it; resting ~0.02), so the
+        # palette gets "fraction of the stress range" rather than a
+        # raw level that could never lift its thresholds.
         chem = state.chemicals
         neuro_input = NeurochemistryInput(
             dopamine=chem.get("dopamine", 0.5),
             serotonin=chem.get("serotonin", 0.5),
             gaba=chem.get("gaba", 0.5),
-            cortisol=chem.get("cortisol", 0.0),
+            cortisol=min(1.0, chem.get("cortisol", 0.0) / CORTISOL_PALETTE_RANGE),
             oxytocin=chem.get("oxytocin", 0.25),
             endorphin=chem.get("endorphin", 0.25),
             bdnf=chem.get("bdnf", 0.5),
@@ -1367,30 +1508,7 @@ class VolitionMixin:
         )
 
         try:
-            # Gather recently active concepts to bias technique selection.
-            # This is how its understanding influences what it draws —
-            # if it's been talking about sacred geometry, the sacred
-            # geometry technique gets a selection boost.
-            active_concepts: list[str] = []
-            try:
-                for turn in self.brain.frontal.working_memory.get_recent_turns(3):
-                    active_concepts.extend(turn.topics)
-            except Exception as e:  # noqa: BLE001
-                note_swallowed(
-                    "mind.volition.draw",
-                    e,
-                )
-            # Also include the most activated concepts from the network
-            try:
-                for name, activation in self.brain.frontal.network.most_activated(5):
-                    if activation > 0.1:
-                        active_concepts.append(name)
-            except Exception as e:  # noqa: BLE001
-                note_swallowed(
-                    "mind.volition.draw",
-                    e,
-                )
-
+            active_concepts = self._active_concepts_for_drawing()
             result = self.canvas.draw(
                 emotion=emotion,
                 neurochemistry=neuro_input,
@@ -1413,6 +1531,35 @@ class VolitionMixin:
                 e,
             )
             return None
+
+    def _active_concepts_for_drawing(self) -> list[str]:
+        """Gather recently active concepts to bias technique selection.
+
+        This is how its understanding influences what it draws —
+        if it's been talking about sacred geometry, the sacred
+        geometry technique gets a selection boost.
+        """
+        active_concepts: list[str] = []
+        try:
+            for turn in self.brain.frontal.working_memory.get_recent_turns(3):
+                active_concepts.extend(turn.topics)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.volition.draw",
+                e,
+            )
+        # Also include the most activated concepts from the network
+        try:
+            for name, activation in self.brain.frontal.network.most_activated(5):
+                if activation > 0.1:
+                    active_concepts.append(name)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.volition.draw",
+                e,
+            )
+        return active_concepts
+
     def _store_drawing_event(self, chem: dict, result: DrawingResult) -> None:
         """Store a drawing as an STM event for later reflection.
 
@@ -1656,26 +1803,7 @@ class VolitionMixin:
         """
         # Gather topics it's already built projects about so it
         # doesn't create duplicates (modes, modes_2, modes_3, …).
-        already_built: set[str] = set()
-        try:
-            network = self.brain.frontal.network
-            # Snapshot first: the concept dict is shared with the
-            # learning and consolidation threads, which add to it
-            # concurrently. Iterating it live raises "dictionary changed
-            # size during iteration".
-            for _name, node in list(network._concepts.items()):
-                if node.properties.get("type") == "project":
-                    # The definition is "a Python project Genesis
-                    # created about <topic>" — extract the topic.
-                    defn = node.properties.get("definition", "")
-                    prefix = "a Python project Genesis created about "
-                    if defn.startswith(prefix):
-                        already_built.add(defn[len(prefix):].strip())
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.volition._pick_creation_topic",
-                e,
-            )
+        already_built = self._topics_already_built()
 
         def _is_code_symbol(topic: str) -> bool:
             """True if ``topic`` is an internal symbol, not knowledge.
@@ -1740,6 +1868,31 @@ class VolitionMixin:
             )
 
         return None
+
+    def _topics_already_built(self) -> set[str]:
+        """Topics it has already built projects about."""
+        already_built: set[str] = set()
+        try:
+            network = self.brain.frontal.network
+            # Snapshot first: the concept dict is shared with the
+            # learning and consolidation threads, which add to it
+            # concurrently. Iterating it live raises "dictionary changed
+            # size during iteration".
+            for _name, node in list(network._concepts.items()):
+                if node.properties.get("type") == "project":
+                    # The definition is "a Python project Genesis
+                    # created about <topic>" — extract the topic.
+                    defn = node.properties.get("definition", "")
+                    prefix = "a Python project Genesis created about "
+                    if defn.startswith(prefix):
+                        already_built.add(defn[len(prefix):].strip())
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.volition._pick_creation_topic",
+                e,
+            )
+        return already_built
+
     def _perform_introspect(self) -> None:
         """Introspect because the introspection urge crossed threshold.
 

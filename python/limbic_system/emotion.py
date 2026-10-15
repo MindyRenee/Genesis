@@ -287,10 +287,13 @@ class EmotionalState:
 #
 # Cortisol boundary for the "guarded" override:
 #   GUARDED_CORTISOL: cortisol above this with positive valence
-#     triggers the guarded override. 0.5 is below the Rust Stress
-#     phase entry threshold (0.65) — the override catches "silent
-#     stress" where cortisol is elevated but hasn't reached the
-#     stress phase yet.
+#     triggers the guarded override. 0.05 is just below the Rust
+#     Stress phase gate (0.06, set against the substrate's measured
+#     envelope — resting ~0.02, driven peak ~0.084) — the override
+#     catches "silent stress" where cortisol is elevated but hasn't
+#     reached the stress phase yet. The previous 0.5 was calibrated
+#     against a retired 0.65 gate the substrate can never reach, so
+#     this path could never fire.
 HIGH_AROUSAL = 0.7
 LOW_AROUSAL = 0.4
 POSITIVE_VALENCE = 0.3
@@ -300,7 +303,7 @@ MILD_NEGATIVE_VALENCE = -0.1
 PLASTICITY_CLOSED = 0.1   # matches Rust can_form_new_memories()
 PLASTICITY_LOW = 0.25     # silent stress boundary
 PLASTICITY_HIGH = 0.6     # flexible thinking boundary
-GUARDED_CORTISOL = 0.5    # below Rust Stress phase (0.65) — catches silent stress
+GUARDED_CORTISOL = 0.05   # just below the Rust Stress gate (0.06) — catches silent stress
 
 
 def assess_emotion(
@@ -537,6 +540,6 @@ def _guarded_cause_category(
     """Derive the cause category for a guarded state."""
     if plasticity < 0.2:
         return CauseCategory.GUARDED_PLASTICITY
-    if cortisol > 0.5:
+    if cortisol > GUARDED_CORTISOL:
         return CauseCategory.GUARDED_CORTISOL
     return CauseCategory.GUARDED_GENERAL

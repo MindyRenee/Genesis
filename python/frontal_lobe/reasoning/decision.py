@@ -404,6 +404,36 @@ class DecisionMaker:
         # selector performs the separate competition/gating computation:
         # salience -> striatal drive -> STN/global threshold ->
         # selective disinhibition.
+        selected, bg_inhibited, bg_conflict = self._bg_gate(candidates)
+        overridden = selected.action_type != default_action
+
+        # 5. Check for uncertainty-driven action switching.
+        selected, uncertainty_switched = self._uncertainty_switch(
+            candidates, selected, confidence, uncertainty
+        )
+        overridden = overridden or (
+            uncertainty_switched and selected.action_type != default_action
+        )
+
+        # 6. Apply executive inhibition.
+        selected, inhibition_applied = self._executive_inhibit(
+            candidates, selected, bg_inhibited,
+        )
+
+        # Build notes, result, and track stats.
+        return self._finalize_decision(
+            selected, candidates, default_action,
+            overridden, uncertainty_switched, inhibition_applied,
+            confidence, uncertainty,
+            conflict=bg_conflict,
+        )
+
+    def _bg_gate(
+        self,
+        candidates: list[CandidateAction],
+    ) -> tuple[CandidateAction, bool, float]:
+        """Basal-ganglia selection over the evaluated candidates —
+        returns (selected candidate, inhibited flag, conflict)."""
         selectable = [
             c for c in candidates
             if not c.inhibited and c.action_type != ActionType.WITHHOLD
@@ -424,40 +454,42 @@ class DecisionMaker:
             c.bg_conflict = bg_result.conflict
 
         if bg_result.selected is None:
-            selected = next(
+            return next(
                 (c for c in candidates if c.action_type == ActionType.WITHHOLD),
                 max(candidates, key=lambda c: c.composite_score),
-            )
-            bg_inhibited = True
-        else:
-            selected = by_action[bg_result.selected]
-            bg_inhibited = False
-        overridden = selected.action_type != default_action
+            ), True, bg_result.conflict
+        return by_action[bg_result.selected], False, bg_result.conflict
 
-        # 5. Check for uncertainty-driven action switching.
-        uncertainty_switched = False
+    @staticmethod
+    def _uncertainty_switch(
+        candidates: list[CandidateAction],
+        selected: CandidateAction,
+        confidence: float,
+        uncertainty: float,
+    ) -> tuple[CandidateAction, bool]:
+        """Low confidence + high uncertainty on an ANSWER → ask
+        instead. Returns (selected, switched)."""
         if (
             selected.action_type == ActionType.ANSWER
             and confidence < _UNCERTAINTY_SWITCH_THRESHOLD
             and uncertainty > _UNCERTAINTY_SWITCH_THRESHOLD
         ):
-            # Low confidence + high uncertainty → switch to asking.
             ask_candidate = next(
                 (c for c in candidates if c.action_type == ActionType.ASK),
                 None,
             )
             if ask_candidate is not None:
-                selected = ask_candidate
-                uncertainty_switched = True
-                if not overridden:
-                    overridden = True
+                return ask_candidate, True
+        return selected, False
 
-        # 6. Apply executive inhibition.
-        # The impulse strength is the candidate's composite score — a
-        # weak candidate has a weak impulse, which is easily inhibited by
-        # the executive's stop-signal threshold. Passing ``1.0 - score``
-        # would invert the semantics: weak candidates would get strong
-        # impulses and never be inhibited, making this path dead code.
+    def _executive_inhibit(
+        self,
+        candidates: list[CandidateAction],
+        selected: CandidateAction,
+        bg_inhibited: bool,
+    ) -> tuple[CandidateAction, bool]:
+        """Executive stop-signal check — a weak impulse (low composite
+        score) is easily inhibited. Returns (selected, inhibited)."""
         inhibition_applied = bg_inhibited
         if (
             self.executive is not None
@@ -473,16 +505,8 @@ class DecisionMaker:
                     None,
                 )
                 if withhold is not None:
-                    selected = withhold
-                    inhibition_applied = True
-
-        # Build notes, result, and track stats.
-        return self._finalize_decision(
-            selected, candidates, default_action,
-            overridden, uncertainty_switched, inhibition_applied,
-            confidence, uncertainty,
-            conflict=bg_result.conflict,
-        )
+                    return withhold, True
+        return selected, inhibition_applied
 
     def _finalize_decision(
         self,

@@ -245,56 +245,12 @@ class SleepCompressor:
         # protect against that.
         edge_snapshot = [copy.copy(e) for e in network.edges]
 
-        # Per-phase timings. A single `elapsed_s` for the whole pass could
-        # not say which phase was slow, and the first real diagnosis of
-        # this pass had to wait on a stack dump at a shutdown timeout.
-        # These land in the sleep-compression stats line, which the journal
-        # already records, so the cost is visible every cycle.
-        phase_seconds: dict[str, float] = {}
-
-        def _timed(name: str, fn, *a):
-            t = time.time()
-            out = fn(*a)
-            phase_seconds[name] = time.time() - t
-            return out
-
         try:
-            # Phase 1: Quantize
-            if embeddings is not None:
-                stats.update(
-                    _timed("quantize_s", self._phase_quantize, network, embeddings),
-                )
-
-            # Phase 2: Holographize
             stats.update(
-                _timed("holographize_s", self._phase_holographize, network),
-            )
-
-            # Phase 3: Compact LTM
-            if ltm_client is not None:
-                stats.update(
-                    _timed("compact_ltm_s", self._phase_compact_ltm, network, ltm_client),
+                self._run_phases(
+                    network, embeddings, ltm_client, consolidation_intensity
                 )
-
-            # Synaptic homeostasis (scaled by brain-wave-derived
-            # consolidation intensity — deep sleep downscales more
-            # aggressively, stress-disrupted sleep is gentler).
-            stats.update(
-                _timed(
-                    "homeostasis_s",
-                    self._apply_homeostasis,
-                    network,
-                    consolidation_intensity,
-                ),
             )
-            # A compact string, so it renders in the existing
-            # sleep-compression stats line without widening the stats
-            # value type to admit a dict.
-            stats["phase_seconds"] = " ".join(
-                f"{name}={elapsed:.1f}s"
-                for name, elapsed in phase_seconds.items()
-            )
-
         except Exception as e:  # noqa: BLE001
             # Restore the edge snapshot — the network is unchanged.
             # The holographic graph may have received some additive
@@ -324,6 +280,68 @@ class SleepCompressor:
 
         stats["elapsed_s"] = time.time() - t0
         logger.info("Sleep compression complete: %s", stats)
+        return stats
+
+    def _run_phases(
+        self,
+        network: ConceptNetwork,
+        embeddings: EmbeddingStore | None,
+        ltm_client: object | None,
+        consolidation_intensity: float,
+    ) -> dict[str, int | float | str]:
+        """Run the timed compression phases and return their stats.
+
+        Per-phase timings are recorded: a single ``elapsed_s`` for the
+        whole pass could not say which phase was slow, and the first
+        real diagnosis of this pass had to wait on a stack dump at a
+        shutdown timeout. These land in the sleep-compression stats
+        line, which the journal already records, so the cost is
+        visible every cycle.
+        """
+        stats: dict[str, int | float | str] = {}
+        phase_seconds: dict[str, float] = {}
+
+        def _timed(name: str, fn, *a):
+            t = time.time()
+            out = fn(*a)
+            phase_seconds[name] = time.time() - t
+            return out
+
+        # Phase 1: Quantize
+        if embeddings is not None:
+            stats.update(
+                _timed("quantize_s", self._phase_quantize, network, embeddings),
+            )
+
+        # Phase 2: Holographize
+        stats.update(
+            _timed("holographize_s", self._phase_holographize, network),
+        )
+
+        # Phase 3: Compact LTM
+        if ltm_client is not None:
+            stats.update(
+                _timed("compact_ltm_s", self._phase_compact_ltm, network, ltm_client),
+            )
+
+        # Synaptic homeostasis (scaled by brain-wave-derived
+        # consolidation intensity — deep sleep downscales more
+        # aggressively, stress-disrupted sleep is gentler).
+        stats.update(
+            _timed(
+                "homeostasis_s",
+                self._apply_homeostasis,
+                network,
+                consolidation_intensity,
+            ),
+        )
+        # A compact string, so it renders in the existing
+        # sleep-compression stats line without widening the stats
+        # value type to admit a dict.
+        stats["phase_seconds"] = " ".join(
+            f"{name}={elapsed:.1f}s"
+            for name, elapsed in phase_seconds.items()
+        )
         return stats
 
     def _maybe_rebuild_holographic_graph(self, network: ConceptNetwork) -> None:

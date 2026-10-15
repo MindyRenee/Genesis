@@ -19,7 +19,7 @@
 //! ## Why mmap instead of read/write?
 //!
 //! On a 4.7 GB RAM machine, we can't afford to hold copies of state
-//! in heap memory. With mmap, the OS manages paging — the ~3.2 KB
+//! in heap memory. With mmap, the OS manages paging — the ~3.4 KB
 //! state struct occupies a single page (4 KB), and the kernel keeps
 //! it cached or pages it out as needed. We get a direct pointer to
 //! the file's contents with zero copy.
@@ -66,11 +66,11 @@
 //! ## File layout
 //!
 //! ```text
-//! offset 0:     GenesisCoreState (3416 bytes)
-//! offset 3416:  (unused, padding to page boundary)
+//! offset 0:     GenesisCoreState (3480 bytes)
+//! offset 3480:  (unused, padding to page boundary)
 //! ```
 //!
-//! The state struct is 3416 bytes and the file is page-aligned, so the
+//! The state struct is 3480 bytes and the file is page-aligned, so the
 //! mapping is at least one page and the state sits at its start. (On a
 //! host with a 64 KiB page — aarch64, for instance — `page_align_up`
 //! expands the file to 64 KiB, not 4 KiB.)
@@ -90,7 +90,7 @@ use crate::state::legacy_v3::GenesisCoreStateV3;
 use crate::state::legacy_v4::GenesisCoreStateV4;
 use crate::state::{CoreStateError, GenesisCoreState};
 
-/// The logical file size — one 4K page. The state struct (3416 bytes)
+/// The logical file size — one 4K page. The state struct (3480 bytes)
 /// fits comfortably, with the rest as padding.
 const FILE_SIZE: usize = 4096;
 
@@ -167,13 +167,14 @@ pub(crate) fn local_seconds_of_day(now_ms: u64) -> i64 {
 /// stack.
 ///
 /// Writers are serialised by an in-process `Mutex` ([`modify`]) and a
-/// cross-process `flock(LOCK_EX)` advisory lock on the state file. The
-/// `&mut GenesisCoreState` handed to the modify closure is the sole
-/// Rust reference to the mmap'd memory within this process for the
-/// duration of the closure — no reader creates a competing `&`. The
-/// flock ensures that only one process can write at a time, preventing
-/// two processes from simultaneously incrementing `seq_lock` and
-/// publishing a torn state.
+/// cross-process `flock(LOCK_EX)` advisory lock on the state file.
+/// [`modify`] copies the current snapshot to an owned stack value,
+/// hands the closure a `&mut GenesisCoreState` to that private copy,
+/// and publishes it with volatile byte copies that preserve the live
+/// `seq_lock` word. No production write path creates a Rust reference
+/// into the mmap'd memory. The flock ensures that only one process can
+/// write at a time, preventing two processes from simultaneously
+/// incrementing `seq_lock` and publishing a torn state.
 ///
 /// Cross-process reads remain lock-free — the seqlock protocol ensures
 /// tear-free reads regardless of what any process does. Only writers
@@ -209,16 +210,11 @@ pub struct MmapState {
 // The safety of concurrent access is ensured by:
 //   - Reads: `read`/`read_consistent` use volatile byte copies through
 //     raw pointers — no Rust references to the mmap'd memory are
-//     created, so readers never alias a writer's reference.
-//   - Writes: `modify` acquires `write_lock` before creating the
-//     `&mut GenesisCoreState`, ensuring no other thread in this
-//     process has a competing reference.
-//
-// Note: the second bullet gives *exclusion*, not sound aliasing. See
-// the module-level "The writer does create a `&mut`" section — a
-// reader's `read_volatile` on bytes covered by a live `&mut` is still
-// UB under Stacked/Tree Borrows, and this impl is only correct today
-// because volatile loads cannot be optimised away.
+//     created.
+//   - Writes: `modify` acquires `write_lock`, mutates an owned stack
+//     snapshot, then `publish_stack` uses volatile byte copies under
+//     the seqlock — no production writer creates a reference into the
+//     mapping.
 unsafe impl Send for MmapState {}
 unsafe impl Sync for MmapState {}
 
@@ -477,6 +473,11 @@ impl MmapState {
         if let Err(e) = snapshot.verify() {
             match e {
                 crate::state::CoreStateError::VersionMismatch { found: 2, .. } => {
+                    // SAFETY: `ptr` is the live MAP_SHARED mapping of
+                    // `mapped_len()` bytes and `fd` is its open file
+                    // descriptor; the open-time flock is held and no
+                    // `MmapState` exists yet, so the migrate sees an
+                    // exclusive stack copy.
                     snapshot =
                         unsafe { Self::migrate_and_snapshot(ptr, fd, |s| s.migrate_state(2))? };
                 }
@@ -554,6 +555,10 @@ impl MmapState {
                     };
                 }
                 other => {
+                    // SAFETY: `fd`/`ptr` are the valid, exclusively
+                    // owned descriptors of the mapping made above; we
+                    // unlock before unmapping and never touch either
+                    // again on this path.
                     unsafe {
                         Self::unlock_file(fd);
                         munmap(ptr as *mut c_void, mapped_len());
@@ -601,6 +606,11 @@ impl MmapState {
         snapshot.neurochemicals.recompute_derived();
         snapshot.header.last_updated = open_now_ms;
         snapshot.checksum = snapshot.compute_checksum();
+        // SAFETY: `ptr` is the live MAP_SHARED mapping of
+        // `mapped_len()` bytes returned by `do_mmap` above; every
+        // munmap path returns before this point, so the mapping is
+        // still valid here. `publish_stack` drives the seqlock
+        // protocol itself and writes only inside the mapped range.
         unsafe { Self::publish_stack(ptr, &snapshot) };
         if let Err(e) = Self::do_msync(ptr, mapped_len()) {
             unsafe {
@@ -656,9 +666,7 @@ impl MmapState {
             .header
             .seq_lock;
         if seq_lock & 1 == 1 {
-            let seq = unsafe {
-                AtomicU64::from_ptr(ptr.add(Self::SEQ_LOCK_OFFSET) as *mut u64)
-            };
+            let seq = unsafe { AtomicU64::from_ptr(ptr.add(Self::SEQ_LOCK_OFFSET) as *mut u64) };
             seq.fetch_add(1, Ordering::Release);
         }
 
@@ -666,6 +674,8 @@ impl MmapState {
         // open-time flock before returning the live mapping; subsequent
         // writers synchronize through MmapState::write_lock plus this file
         // lock in their normal write path.
+        // SAFETY: `fd` is valid and still holds the flock acquired at
+        // open.
         unsafe { Self::unlock_file(fd) };
 
         Ok(Self {
@@ -874,6 +884,10 @@ impl MmapState {
                 // Releasing earlier would let another process start
                 // its own publish mid-window, tearing the state and
                 // the sequence lock.
+                // SAFETY: `self.ptr` is a valid MAP_SHARED mapping of
+                // `GenesisCoreState::SIZE` bytes; the in-process
+                // `write_lock` guard and the flock exclude every other
+                // writer.
                 unsafe { Self::publish_stack(self.ptr, &next) };
                 // SAFETY: `self.fd` is valid and we hold the lock.
                 unsafe { Self::unlock_file(self.fd) };
@@ -1082,6 +1096,9 @@ impl MmapState {
     /// reading or writing the state simultaneously.
     #[allow(clippy::mut_from_ref)]
     pub unsafe fn state_mut(&self) -> &mut GenesisCoreState {
+        // SAFETY: `self.ptr` is the live mapping of a
+        // `GenesisCoreState`; exclusive access is the caller's
+        // obligation per this function's # Safety contract.
         unsafe { &mut *(self.ptr as *mut GenesisCoreState) }
     }
 
@@ -1250,8 +1267,8 @@ impl MmapState {
         // async-signal-safe and does not allocate.
         let rc = unsafe { flock(fd, LOCK_EX | LOCK_NB) };
         if rc != 0 {
-            // Use Rust's platform-neutral errno accessor. Android's
-            // Bionic libc does not expose glibc's __errno_location().
+            // Use Rust's platform-neutral errno accessor rather than a
+            // libc-specific errno symbol.
             let errno = std::io::Error::last_os_error().raw_os_error();
             if errno == Some(libc::EWOULDBLOCK) || errno == Some(libc::EAGAIN) {
                 return Err(StateFileError::FileLockBusy);
@@ -1348,7 +1365,6 @@ impl std::fmt::Display for StateFileError {
 
 impl std::error::Error for StateFileError {}
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1369,9 +1385,11 @@ mod tests {
         let state = MmapState::create(&path, 7, 1_000).unwrap();
 
         for now_ms in 1_001..=1_010 {
-            state.modify(now_ms, |s| {
-                s.header.heartbeat = s.header.heartbeat.wrapping_add(1);
-            }).unwrap();
+            state
+                .modify(now_ms, |s| {
+                    s.header.heartbeat = s.header.heartbeat.wrapping_add(1);
+                })
+                .unwrap();
             assert!(
                 state.read_consistent().is_some(),
                 "published state must remain readable after modify at {now_ms}"
@@ -1404,6 +1422,8 @@ mod tests {
         legacy.header.version = 4;
         legacy.header.state_size = core::mem::size_of::<GenesisCoreStateV4>() as u32;
         // The v4 checksum covers bytes 0..40 and 48..(its checksum offset).
+        // SAFETY: `legacy` is a repr(C) POD struct live on the stack; the
+        // slice covers exactly its size and does not outlive this scope.
         let bytes = unsafe {
             core::slice::from_raw_parts(
                 &legacy as *const GenesisCoreStateV4 as *const u8,
@@ -1417,6 +1437,8 @@ mod tests {
             .collect();
         legacy.checksum = crc32_ieee(&covered);
         let mut file = vec![0u8; 4096];
+        // SAFETY: same as above — reinterpreting the stack fixture as its
+        // own bytes to write the on-disk v4 image.
         let raw = unsafe {
             core::slice::from_raw_parts(
                 &legacy as *const GenesisCoreStateV4 as *const u8,
@@ -1452,7 +1474,9 @@ mod tests {
         drop(state);
 
         let reopened = MmapState::open(&path).unwrap();
-        let snapshot = reopened.read_consistent().expect("migrated state must be readable");
+        let snapshot = reopened
+            .read_consistent()
+            .expect("migrated state must be readable");
 
         assert_eq!(snapshot.header.state_size, GenesisCoreState::SIZE as u32);
         assert_eq!(snapshot.header.instance_id, 42);

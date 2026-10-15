@@ -28,6 +28,8 @@ from typing import Any
 
 from parietal_lobe.grid import Grid
 
+from genesis_client.swallow import note_swallowed
+
 from .environment import GameObservation, GameOutcome
 
 logger = logging.getLogger(__name__)
@@ -131,8 +133,8 @@ class _Display:
     def close(self) -> None:
         try:
             self.lib.XCloseDisplay(self.handle)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("frontal_lobe.games.windowed.xclose", e)
         self.handle = None
 
 
@@ -332,8 +334,10 @@ class X11Game:
             except (OSError, subprocess.TimeoutExpired):
                 try:
                     self._proc.kill()
-                except OSError:
-                    pass
+                except OSError as e:
+                    note_swallowed(
+                        "frontal_lobe.games.windowed.proc_kill", e
+                    )
         if self._display is not None:
             self._display.close()
             self._display = None

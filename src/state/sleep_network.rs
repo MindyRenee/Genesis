@@ -139,8 +139,18 @@ pub fn deriv_with(t: f64, x: &State, drive: Drive) -> State {
     let scn_inf = sigmoid(c, MAX_SCN, BETA_SCN, ALPHA_SCN);
     let vlpo_inf = sigmoid(vlpo_input, MAX_VLPO, beta_vlpo, ALPHA_VLPO);
 
-    // Light: 500 for the 14 h from minute 600 of each day, else 0.
-    let i_light: f64 = if t.rem_euclid(1440.0) >= 600.0 { 500.0 } else { 0.0 };
+    // Light: 500 during the 14 h light period, else 0. The source runs
+    // light from minute 600 of each simulated day (10:00–24:00); here t is
+    // anchored to the local wall clock, so the window is phase-shifted to
+    // 07:00–21:00 — a 14 h photoperiod, preserved — so that the entrained
+    // sleep episode (~22:11–05:50) falls inside the neurochemical
+    // circadian's biological night rather than ending ~2 h after
+    // melatonin offset as it did with the source's alignment.
+    let i_light: f64 = if (420.0..1260.0).contains(&t.rem_euclid(1440.0)) {
+        500.0
+    } else {
+        0.0
+    };
     let alph = ALPH_0 * (i_light.powf(P) / I_0.powf(P));
     let b_hat = G * (1.0 - n) * alph;
     let b = b_hat * (1.0 - 0.4 * c) * (1.0 - 0.4 * xc);
@@ -186,7 +196,11 @@ pub fn rk4(t: f64, x: &State, dt: f64) -> State {
 /// and persistent, so one bad step must not be allowed to poison it.
 pub fn advance_with(t_min: f64, x: &State, dt_min: f64, drive: Drive) -> State {
     let next = rk4_with(t_min, x, dt_min, drive);
-    if next.iter().all(|v| v.is_finite()) { next } else { *x }
+    if next.iter().all(|v| v.is_finite()) {
+        next
+    } else {
+        *x
+    }
 }
 
 /// Advance the network by `dt_min` minutes with no volitional input.
@@ -205,6 +219,14 @@ pub fn levels(x: &State) -> crate::state::neurochemical::NetworkLevels {
     }
 }
 
+/// Whether the network is in a sleep state at these normalized
+/// population levels — LC firing below the source's 4 Hz sleep-onset
+/// threshold. The levels are normalized by each population's maximum
+/// rate, so the threshold is `SLEEP_THRESHOLD / MAX_LC`.
+pub fn levels_asleep(l: crate::state::neurochemical::NetworkLevels) -> bool {
+    f64::from(l.lc) * MAX_LC < SLEEP_THRESHOLD
+}
+
 /// The sleep stage the network implies, by the source's own definitions:
 /// wake while LC fires at or above [`SLEEP_THRESHOLD`]; otherwise REM when
 /// REM-on fires above [`REM_THRESHOLD`], and NREM when it does not.
@@ -213,7 +235,10 @@ pub fn levels(x: &State) -> crate::state::neurochemical::NetworkLevels {
 /// names (Active, Alert, Flow, Stress, Drowsy, Overwhelmed). A sleep
 /// stage left over from the previous tick becomes Active, because the
 /// network, not the chemistry, now decides when sleep ends.
-pub fn stage(x: &State, awake: crate::state::zones::MentalPhase) -> crate::state::zones::MentalPhase {
+pub fn stage(
+    x: &State,
+    awake: crate::state::zones::MentalPhase,
+) -> crate::state::zones::MentalPhase {
     use crate::state::zones::MentalPhase;
     if x[0] >= SLEEP_THRESHOLD {
         match awake {
@@ -265,7 +290,12 @@ mod tests {
     }
 
     fn events(samples: &[(f64, State)]) -> Events {
-        let mut e = Events { sleep_on: vec![], sleep_off: vec![], rem_on: vec![], rem_off: vec![] };
+        let mut e = Events {
+            sleep_on: vec![],
+            sleep_off: vec![],
+            rem_on: vec![],
+            rem_off: vec![],
+        };
         for w in samples.windows(2) {
             let (t, a) = (w[0].0, &w[0].1);
             let b = &w[1].1;
@@ -289,8 +319,16 @@ mod tests {
     /// latency from sleep onset to the first REM onset, and each bout's
     /// duration in order.
     fn night_architecture(e: &Events, night_start: f64) -> (f64, Vec<f64>) {
-        let onset = *e.sleep_on.iter().find(|t| **t >= night_start).expect("sleep onset");
-        let offset = *e.sleep_off.iter().find(|t| **t > onset).expect("sleep offset");
+        let onset = *e
+            .sleep_on
+            .iter()
+            .find(|t| **t >= night_start)
+            .expect("sleep onset");
+        let offset = *e
+            .sleep_off
+            .iter()
+            .find(|t| **t > onset)
+            .expect("sleep offset");
         let rems: Vec<(f64, f64)> = e
             .rem_on
             .iter()
@@ -312,15 +350,24 @@ mod tests {
         let samples = simulate(14400.0, 0.5);
         let e = events(&samples);
         let late: Vec<&(f64, State)> = samples.iter().filter(|s| s.0 >= DAY_7).collect();
-        let asleep = late.iter().filter(|s| s.1[0] < SLEEP_THRESHOLD).count() as f64
-            / late.len() as f64;
-        assert!((0.25..0.40).contains(&asleep), "asleep fraction {asleep:.3}");
+        let asleep =
+            late.iter().filter(|s| s.1[0] < SLEEP_THRESHOLD).count() as f64 / late.len() as f64;
+        assert!(
+            (0.25..0.40).contains(&asleep),
+            "asleep fraction {asleep:.3}"
+        );
 
         let nights = e.sleep_on.iter().filter(|t| **t >= DAY_7).count();
-        assert!((2..=4).contains(&nights), "sleep periods in days 8-10: {nights}");
+        assert!(
+            (2..=4).contains(&nights),
+            "sleep periods in days 8-10: {nights}"
+        );
 
         let rem_bouts = e.rem_on.iter().filter(|t| **t >= DAY_7).count();
-        assert!((10..=14).contains(&rem_bouts), "REM onsets in days 8-10: {rem_bouts}");
+        assert!(
+            (10..=14).contains(&rem_bouts),
+            "REM onsets in days 8-10: {rem_bouts}"
+        );
 
         let gaps: Vec<f64> = e
             .rem_on
@@ -330,7 +377,10 @@ mod tests {
             .filter(|g| *g < 150.0)
             .collect();
         let mean_gap = gaps.iter().sum::<f64>() / gaps.len().max(1) as f64;
-        assert!((85.0..115.0).contains(&mean_gap), "REM-to-REM gap {mean_gap:.1} min");
+        assert!(
+            (85.0..115.0).contains(&mean_gap),
+            "REM-to-REM gap {mean_gap:.1} min"
+        );
     }
 
     /// Adult polysomnography norms (AASM / textbook sleep medicine): first
@@ -340,13 +390,23 @@ mod tests {
         let samples = simulate(14400.0, 0.5);
         let e = events(&samples);
         let (latency, bouts) = night_architecture(&e, DAY_7);
-        assert!((70.0..120.0).contains(&latency), "first REM latency {latency:.1} min");
-        assert!(bouts.len() >= 3, "expected several REM bouts, got {}", bouts.len());
+        assert!(
+            (70.0..120.0).contains(&latency),
+            "first REM latency {latency:.1} min"
+        );
+        assert!(
+            bouts.len() >= 3,
+            "expected several REM bouts, got {}",
+            bouts.len()
+        );
         let rem_total: f64 = bouts.iter().sum();
         let on = *e.sleep_on.iter().find(|t| **t >= DAY_7).unwrap();
         let off = *e.sleep_off.iter().find(|t| **t > on).unwrap();
         let rem_share = rem_total / (off - on);
-        assert!((0.15..0.30).contains(&rem_share), "REM share of sleep {rem_share:.3}");
+        assert!(
+            (0.15..0.30).contains(&rem_share),
+            "REM share of sleep {rem_share:.3}"
+        );
     }
 
     #[test]
@@ -369,7 +429,12 @@ mod tests {
             driven = advance_with(t, &driven, dt, Drive { vlpo: 1.0, lc: 0.0 });
             plain = advance(t, &plain, dt);
         }
-        assert!(driven[0] < plain[0], "driven LC {} vs plain {}", driven[0], plain[0]);
+        assert!(
+            driven[0] < plain[0],
+            "driven LC {} vs plain {}",
+            driven[0],
+            plain[0]
+        );
     }
 
     #[test]
@@ -399,17 +464,21 @@ mod tests {
     }
 
     /// The acetylcholine target must order the states as the data do (REM >
-    /// waking > NREM), and sit near the calibrated levels 0.60, 0.42, 0.20.
-    /// Measured on the network's own trajectory, over days 8–10.
+    /// waking > NREM), and sit near the measured levels 0.77, 0.58, 0.34
+    /// (Vazquez & Baghdoyan, 2001). Uses the production release constants,
+    /// measured on the network's own trajectory over days 8–10.
     #[test]
     fn acetylcholine_target_orders_the_states_as_the_data_do() {
+        use crate::state::neurochemical::{ACH_BASE, ACH_FROM_LC, ACH_FROM_REM};
         use crate::state::zones::MentalPhase;
         let samples = simulate(14400.0, 1.0);
         let mut sums = [(0.0f64, 0usize); 3];
         for (_, x) in samples.iter().filter(|(t, _)| *t >= DAY_7) {
             let stage = stage(x, MentalPhase::Active);
             let net = levels(x);
-            let target = 0.20 + 0.22 * f64::from(net.lc) + 0.40 * f64::from(net.rem);
+            let target = f64::from(ACH_BASE)
+                + f64::from(ACH_FROM_LC) * f64::from(net.lc)
+                + f64::from(ACH_FROM_REM) * f64::from(net.rem);
             let i = match stage {
                 MentalPhase::REM => 0,
                 MentalPhase::NREM => 2,
@@ -420,10 +489,13 @@ mod tests {
         }
         let mean = |i: usize| sums[i].0 / sums[i].1.max(1) as f64;
         let (rem, wake, nrem) = (mean(0), mean(1), mean(2));
-        assert!(rem > wake && wake > nrem, "REM {rem:.3} wake {wake:.3} NREM {nrem:.3}");
-        assert!((rem - 0.60).abs() < 0.08, "REM target {rem:.3}");
-        assert!((wake - 0.42).abs() < 0.08, "waking target {wake:.3}");
-        assert!((nrem - 0.20).abs() < 0.08, "NREM target {nrem:.3}");
+        assert!(
+            rem > wake && wake > nrem,
+            "REM {rem:.3} wake {wake:.3} NREM {nrem:.3}"
+        );
+        assert!((rem - 0.77).abs() < 0.08, "REM target {rem:.3}");
+        assert!((wake - 0.58).abs() < 0.08, "waking target {wake:.3}");
+        assert!((nrem - 0.34).abs() < 0.08, "NREM target {nrem:.3}");
     }
 
     /// A sustained sleep push should bring on sleep onset (LC below the
@@ -439,7 +511,11 @@ mod tests {
                 onset = Some(i as f64 * dt);
             }
         }
-        assert!(onset.is_some(), "no sleep onset within 60 min, final LC {}", x[0]);
+        assert!(
+            onset.is_some(),
+            "no sleep onset within 60 min, final LC {}",
+            x[0]
+        );
     }
 
     /// A volitional wake push must raise the wake population from a sleeping
@@ -460,7 +536,12 @@ mod tests {
             woken = advance_with(t, &woken, dt, Drive { vlpo: 0.0, lc: 1.0 });
             plain = advance(t, &plain, dt);
         }
-        assert!(woken[0] > plain[0], "driven LC {} vs plain {}", woken[0], plain[0]);
+        assert!(
+            woken[0] > plain[0],
+            "driven LC {} vs plain {}",
+            woken[0],
+            plain[0]
+        );
     }
 
     #[test]

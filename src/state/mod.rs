@@ -3,11 +3,11 @@
 //! This module defines the single fixed-layout structure that holds
 //! Genesis's entire runtime state. See [`core_state::GenesisCoreState`].
 //!
-//! ## Schema v3.2 architecture
+//! ## Schema v5 architecture
 //!
 //! ```text
 //! ┌──────────────────────────────────────────────────────────────┐
-//! │                  GenesisCoreState (3416 bytes)                │
+//! │                  GenesisCoreState (3480 bytes)                │
 //! │  memory-mapped, lock-free readable, CRC32 checksummed         │
 //! │                                                               │
 //! │  ┌──────────────┐  ┌────────────────────────────────────────┐ │
@@ -27,8 +27,8 @@
 //! │  │    flags      │  │    retrieval, plasticity                ││
 //! │  └──────────────┘  └────────────────────────────────────────┘ │
 //! │  ┌──────────────┐  ┌────────────────────────────────────────┐ │
-//! │  │ Manifest      │  │  Checksum + InferenceSignals           │ │
-//! │  │  16 modules   │  │  CRC32 + 64 bytes active inference     │ │
+//! │  │ Manifest      │  │  Sleep network + ions + checksum       │ │
+//! │  │  16 modules   │  │  + 64 bytes active inference           │ │
 //! │  └──────────────┘  └────────────────────────────────────────┘ │
 //! └──────────────────────────────────────────────────────────────┘
 //! ```

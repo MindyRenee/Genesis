@@ -196,95 +196,100 @@ def run_chemical_assay(
     settle(client, ticks=settle_ticks, dt=dt)
 
     for chem_id in sorted(CHEM_NAMES):
-        name = CHEM_NAMES[chem_id]
-        pre = client.get_state()
-
-        # Drift control. The system is not quiescent between samples:
-        # adenosine accumulates sleep pressure continuously while
-        # awake, and the whole coupled system relaxes after startup.
-        # Without a same-length, impulse-free control, that background
-        # motion is indistinguishable from the impulse's own effect,
-        # and gets reported as the chemical's response to the dose.
-        #
-        # Adenosine is the clearest case: its "response" to a 0.30
-        # impulse measured +0.197, which is ordinary sleep-pressure
-        # accumulation, not a response to anything. Subtracting the
-        # control is what makes this a *causal* assay, as the module
-        # describes itself.
-        control_pre = client.get_state()
-        for _ in range(FAST_TICKS):
-            client.advance_physics(dt)
-        control_fast = client.get_state()
-        for _ in range(SLOW_EXTRA_TICKS):
-            client.advance_physics(dt)
-        control_slow = client.get_state()
-
-        client.neuro_impulse(chem_id, impulse)
-        for _ in range(FAST_TICKS):
-            client.advance_physics(dt)
-        fast = client.get_state()
-        for _ in range(SLOW_EXTRA_TICKS):
-            client.advance_physics(dt)
-        slow = client.get_state()
-
-        for snap, tag in ((fast, "fast"), (slow, "slow")):
-            if not _is_finite_state(snap):
-                raise ValueError(
-                    f"non-finite state after {name} impulse ({tag} point)"
-                )
-
-        # Background motion over the measurement window, per chemical.
-        fast_drift = {
-            n: control_fast.chemicals[n] - control_pre.chemicals[n]
-            for n in CHEM_NAMES.values()
-        }
-        slow_drift = {
-            n: control_slow.chemicals[n] - control_pre.chemicals[n]
-            for n in CHEM_NAMES.values()
-        }
-        d_self_fast = (
-            fast.chemicals[name] - pre.chemicals[name] - fast_drift[name]
-        )
-        d_self_slow = (
-            slow.chemicals[name] - pre.chemicals[name] - slow_drift[name]
-        )
-
-        coupled: list[tuple[str, float]] = []
-        for other_id, other_name in CHEM_NAMES.items():
-            if other_id == chem_id:
-                continue
-            coupled.append(
-                (
-                    other_name,
-                    slow.chemicals[other_name]
-                    - pre.chemicals[other_name]
-                    - slow_drift[other_name],
-                )
-            )
-        coupled.sort(key=lambda kv: abs(kv[1]), reverse=True)
-
         result.effects.append(
-            ChemicalEffect(
-                chem_id=chem_id,
-                name=name,
-                impulse=impulse,
-                pre_self=pre.chemicals[name],
-                post_fast_self=pre.chemicals[name] + d_self_fast,
-                post_slow_self=pre.chemicals[name] + d_self_slow,
-                d_arousal_fast=fast.arousal - pre.arousal,
-                d_arousal_slow=slow.arousal - pre.arousal,
-                d_valence_fast=fast.valence - pre.valence,
-                d_valence_slow=slow.valence - pre.valence,
-                d_plasticity_slow=slow.plasticity_gate - pre.plasticity_gate,
-                d_encoding_slow=slow.encoding_weight - pre.encoding_weight,
-                d_consolidation_slow=slow.consolidation_weight - pre.consolidation_weight,
-                d_retrieval_slow=slow.retrieval_weight - pre.retrieval_weight,
-                phase_pre=pre.phase_name,
-                phase_fast=fast.phase_name,
-                phase_slow=slow.phase_name,
-                top_coupled=[[n, d] for n, d in coupled[:TOP_COUPLED]],
-            )
+            _measure_chemical(client, chem_id, impulse, dt)
         )
         settle(client, ticks=washout_ticks, dt=dt)
 
     return result
+
+
+def _measure_chemical(
+    client: GenesisClient, chem_id: int, impulse: float, dt: float
+) -> ChemicalEffect:
+    """Impulse one chemical and measure the drift-subtracted response.
+
+    Drift control: the system is not quiescent between samples —
+    adenosine accumulates sleep pressure continuously while awake, and
+    the whole coupled system relaxes after startup. Without a
+    same-length, impulse-free control, that background motion is
+    indistinguishable from the impulse's own effect. Adenosine is the
+    clearest case: its "response" to a 0.30 impulse measured +0.197,
+    which is ordinary sleep-pressure accumulation. Subtracting the
+    control is what makes this a *causal* assay.
+    """
+    name = CHEM_NAMES[chem_id]
+    pre = client.get_state()
+
+    control_pre = client.get_state()
+    for _ in range(FAST_TICKS):
+        client.advance_physics(dt)
+    control_fast = client.get_state()
+    for _ in range(SLOW_EXTRA_TICKS):
+        client.advance_physics(dt)
+    control_slow = client.get_state()
+
+    client.neuro_impulse(chem_id, impulse)
+    for _ in range(FAST_TICKS):
+        client.advance_physics(dt)
+    fast = client.get_state()
+    for _ in range(SLOW_EXTRA_TICKS):
+        client.advance_physics(dt)
+    slow = client.get_state()
+
+    for snap, tag in ((fast, "fast"), (slow, "slow")):
+        if not _is_finite_state(snap):
+            raise ValueError(
+                f"non-finite state after {name} impulse ({tag} point)"
+            )
+
+    # Background motion over the measurement window, per chemical.
+    fast_drift = {
+        n: control_fast.chemicals[n] - control_pre.chemicals[n]
+        for n in CHEM_NAMES.values()
+    }
+    slow_drift = {
+        n: control_slow.chemicals[n] - control_pre.chemicals[n]
+        for n in CHEM_NAMES.values()
+    }
+    d_self_fast = (
+        fast.chemicals[name] - pre.chemicals[name] - fast_drift[name]
+    )
+    d_self_slow = (
+        slow.chemicals[name] - pre.chemicals[name] - slow_drift[name]
+    )
+
+    coupled: list[tuple[str, float]] = []
+    for other_id, other_name in CHEM_NAMES.items():
+        if other_id == chem_id:
+            continue
+        coupled.append(
+            (
+                other_name,
+                slow.chemicals[other_name]
+                - pre.chemicals[other_name]
+                - slow_drift[other_name],
+            )
+        )
+    coupled.sort(key=lambda kv: abs(kv[1]), reverse=True)
+
+    return ChemicalEffect(
+        chem_id=chem_id,
+        name=name,
+        impulse=impulse,
+        pre_self=pre.chemicals[name],
+        post_fast_self=pre.chemicals[name] + d_self_fast,
+        post_slow_self=pre.chemicals[name] + d_self_slow,
+        d_arousal_fast=fast.arousal - pre.arousal,
+        d_arousal_slow=slow.arousal - pre.arousal,
+        d_valence_fast=fast.valence - pre.valence,
+        d_valence_slow=slow.valence - pre.valence,
+        d_plasticity_slow=slow.plasticity_gate - pre.plasticity_gate,
+        d_encoding_slow=slow.encoding_weight - pre.encoding_weight,
+        d_consolidation_slow=slow.consolidation_weight - pre.consolidation_weight,
+        d_retrieval_slow=slow.retrieval_weight - pre.retrieval_weight,
+        phase_pre=pre.phase_name,
+        phase_fast=fast.phase_name,
+        phase_slow=slow.phase_name,
+        top_coupled=[[n, d] for n, d in coupled[:TOP_COUPLED]],
+    )

@@ -197,7 +197,7 @@ def test_ownership_pins(
 
 # Modules that are not brain functions and are documented as such:
 # support layers, the environment interface, the orchestrator, the
-# task environments, and the two platform adapters.
+# task environments, and the platform adapter.
 _ALLOWLIST: dict[str, str] = {
     "mind": "the assembled mind — a top-level module, not a region",
     "genesis_cli": "the console entrypoint — a top-level module, not a region",
@@ -208,8 +208,6 @@ _ALLOWLIST: dict[str, str] = {
     "commitment": "top-level support module",
     "discord_feed": "platform adapter",
     "setup_embeddings": "one-off embedding setup script",
-    "android_camera": "platform adapter",
-    "android_tools": "platform adapter",
     "_views": "the view machinery itself",
     # Constant tables — no class/function to carry __module__, but the
     # file is brainstem's autonomic setpoints

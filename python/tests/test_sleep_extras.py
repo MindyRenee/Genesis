@@ -1088,7 +1088,7 @@ def test_sleep_aid_sets_sleeping_zone():
 @dataclass
 class _MockPlasticityProfile:
     """Mock plasticity profile for wake_readiness receptor checks."""
-    cortisol_tonic: float = 0.3
+    cortisol_tonic: float = 0.03
     bdnf_tonic: float = 0.5
 
 
@@ -1100,7 +1100,7 @@ class _WakeReadinessMockClient(_MockClient):
     def __init__(
         self,
         adenosine: float = 0.1,
-        cortisol: float = 0.3,
+        cortisol: float = 0.03,
         bdnf: float = 0.5,
     ) -> None:
         super().__init__()
@@ -1133,7 +1133,7 @@ class _WakeReadinessMockClient(_MockClient):
 def _make_wake_readiness_mind(
     data_dir: str,
     adenosine: float = 0.1,
-    cortisol: float = 0.3,
+    cortisol: float = 0.03,
     bdnf: float = 0.5,
 ) -> Mind:
     """Create a Mind with a mock client configured for wake_readiness tests."""
@@ -1190,8 +1190,10 @@ def test_wake_readiness_blocks_on_high_adenosine():
 def test_wake_readiness_blocks_on_high_cortisol():
     """wake_readiness() should return False when cortisol is still high."""
     with tempfile.TemporaryDirectory() as data_dir:
+        # 0.07 is above the 0.05 wake gate and inside the substrate's
+        # reachable envelope (resting ~0.02, sustained-drive peak ~0.08).
         mind = _make_wake_readiness_mind(
-            data_dir, adenosine=0.1, cortisol=0.8, bdnf=0.5
+            data_dir, adenosine=0.1, cortisol=0.07, bdnf=0.5
         )
         mind._is_sleeping = True
 
@@ -1204,7 +1206,7 @@ def test_wake_readiness_blocks_on_low_bdnf():
     """wake_readiness() should return False when BDNF is still low."""
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_wake_readiness_mind(
-            data_dir, adenosine=0.1, cortisol=0.3, bdnf=0.1
+            data_dir, adenosine=0.1, cortisol=0.03, bdnf=0.1
         )
         mind._is_sleeping = True
 
@@ -1220,7 +1222,7 @@ def test_wake_readiness_ready_when_all_signals_pass():
 
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_wake_readiness_mind(
-            data_dir, adenosine=0.1, cortisol=0.3, bdnf=0.5
+            data_dir, adenosine=0.1, cortisol=0.03, bdnf=0.5
         )
         mind._is_sleeping = True
 
@@ -1239,7 +1241,7 @@ def test_wake_readiness_ready_with_no_sleep_cycle():
     """wake_readiness() should pass the stage check if no cycle is active."""
     with tempfile.TemporaryDirectory() as data_dir:
         mind = _make_wake_readiness_mind(
-            data_dir, adenosine=0.1, cortisol=0.3, bdnf=0.5
+            data_dir, adenosine=0.1, cortisol=0.03, bdnf=0.5
         )
         mind._is_sleeping = True
         # No sleep cycle set — inner_life.sleep_cycle is None

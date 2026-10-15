@@ -974,37 +974,7 @@ class SelfComposer:
                 ("pred", f"am learning more about {joined}"),
             ]
         if insight.type == "pattern":
-            # Inner-life insights are stored as "A ↔ B" semantic
-            # fragments — a connection it noticed between concepts.
-            if "↔" in content:
-                a, _, b = content.partition("↔")
-                a, b = a.strip(), b.strip()
-                if a and b:
-                    da = self._display_detail(a)
-                    db = self._display_detail(b)
-                    return [
-                        ("pred", f"noticed a connection between {da} and {db}"),
-                        ("pred", f"keep seeing {da} connect to {db}"),
-                    ]
-                return []
-            # Repetition diagnostics: "repeating response pattern: X"
-            # / "overusing response pattern: X (7/10)" — the counts are
-            # bookkeeping; the pattern name is the content.
-            for marker in ("repeating response pattern",
-                           "overusing response pattern"):
-                if content.startswith(marker) and ": " in content:
-                    detail = content.split(": ", 1)[1].strip()
-                    # Strip the "(7/10)"-style occurrence counts.
-                    detail = detail.split("(")[0].strip()
-                    if not detail:
-                        return []
-                    verb = ("repeating" if marker.startswith("repeating")
-                            else "overusing")
-                    return [
-                        ("pred", f"keep {verb} the '{detail}' response pattern"),
-                        ("pred", f"notice I keep {verb} the '{detail}' pattern"),
-                    ]
-            return []
+            return self._pattern_predicates(content)
         if insight.type == "mood":
             # "mood trend: more positive (delta=+0.20)" — the delta is
             # bookkeeping; the direction is the content.
@@ -1015,6 +985,43 @@ class SelfComposer:
             if not direction:
                 return []
             return [("clause", f"my mood has been trending {direction}")]
+        return []
+
+    def _pattern_predicates(
+        self, content: str
+    ) -> list[tuple[str, str]]:
+        """Predicate fragments for "pattern" insights — connections
+        noticed ("A ↔ B") or repetition diagnostics."""
+        # Inner-life insights are stored as "A ↔ B" semantic
+        # fragments — a connection it noticed between concepts.
+        if "↔" in content:
+            a, _, b = content.partition("↔")
+            a, b = a.strip(), b.strip()
+            if a and b:
+                da = self._display_detail(a)
+                db = self._display_detail(b)
+                return [
+                    ("pred", f"noticed a connection between {da} and {db}"),
+                    ("pred", f"keep seeing {da} connect to {db}"),
+                ]
+            return []
+        # Repetition diagnostics: "repeating response pattern: X"
+        # / "overusing response pattern: X (7/10)" — the counts are
+        # bookkeeping; the pattern name is the content.
+        for marker in ("repeating response pattern",
+                       "overusing response pattern"):
+            if content.startswith(marker) and ": " in content:
+                detail = content.split(": ", 1)[1].strip()
+                # Strip the "(7/10)"-style occurrence counts.
+                detail = detail.split("(")[0].strip()
+                if not detail:
+                    return []
+                verb = ("repeating" if marker.startswith("repeating")
+                        else "overusing")
+                return [
+                    ("pred", f"keep {verb} the '{detail}' response pattern"),
+                    ("pred", f"notice I keep {verb} the '{detail}' pattern"),
+                ]
         return []
 
     @staticmethod

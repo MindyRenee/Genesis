@@ -34,7 +34,6 @@ import wave
 from pathlib import Path
 from typing import Any
 
-from android_tools import find_termux_command
 from infrastructure.config import VOSK_MODEL_NAME, vosk_model_dir
 
 logger = logging.getLogger(__name__)
@@ -147,7 +146,6 @@ class Voice:
 
     def __init__(self) -> None:
         """Detect available TTS backends and load the Piper voice model."""
-        self._termux_tts = find_termux_command("termux-tts-speak")
         self._piper_available = self._check_piper()
         self._espeak_available = self._check_espeak()
         self._model = (
@@ -200,13 +198,11 @@ class Voice:
 
     def is_available(self) -> bool:
         """True if any TTS backend is available."""
-        return bool(self._termux_tts or self._piper_available or self._espeak_available)
+        return bool(self._piper_available or self._espeak_available)
 
     def describe(self) -> str:
         """Human-readable description of the current TTS setup."""
-        if self._termux_tts:
-            return "Voice: Android Termux:API TTS"
-        elif self._piper_available and self._model:
+        if self._piper_available and self._model:
             return f"Voice: Piper neural TTS ({self._model.name})"
         elif self._espeak_available:
             return "espeak-ng (fallback)"
@@ -300,9 +296,7 @@ class Voice:
         rate_factor = max(0.9, min(1.8, rate_factor))
 
         try:
-            if self._termux_tts:
-                self._speak_termux(text, blocking, rate_factor)
-            elif self._piper_available and self._model:
+            if self._piper_available and self._model:
                 self._speak_piper(text, blocking, rate_factor)
             elif self._espeak_available:
                 self._speak_espeak(text, blocking, rate_factor)
@@ -388,49 +382,6 @@ class Voice:
             if self._speaking_count > 0:
                 return True
         return time.time() - self._last_spoke_time < self._speech_tail
-
-    def _speak_termux(self, text: str, blocking: bool, rate_factor: float = 1.0) -> None:
-        """Speak through Android system TTS via Termux:API."""
-        if not self._termux_tts:
-            return
-        rate = max(50, min(200, round(rate_factor * 80)))
-        try:
-            proc = subprocess.Popen(
-                [self._termux_tts, "-r", str(rate), text],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            with self._procs_lock:
-                self._all_procs.append(proc)
-            self._play_proc = proc
-            if blocking:
-                proc.wait(timeout=60)
-            else:
-                threading.Thread(
-                    target=self._wait_for_termux_tts,
-                    args=(proc,),
-                    daemon=True,
-                ).start()
-        except (OSError, subprocess.SubprocessError) as e:
-            logger.debug(f"Termux TTS failed: {e}")
-            self._done_speaking()
-
-    def _wait_for_termux_tts(self, proc: subprocess.Popen) -> None:
-        """Reap an asynchronous Termux TTS process."""
-        try:
-            proc.wait(timeout=60)
-        except (OSError, subprocess.TimeoutExpired):
-            try:
-                proc.terminate()
-            except OSError:
-                pass
-        finally:
-            with self._procs_lock:
-                try:
-                    self._all_procs.remove(proc)
-                except ValueError:
-                    pass
-            self._done_speaking()
 
     def _speak_piper(self, text: str, blocking: bool, rate_factor: float = 1.0) -> None:
         """Speak using Piper neural TTS."""

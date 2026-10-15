@@ -493,6 +493,12 @@ Top-level modules referenced by this subsystem (multi-subsystem):
         embedding proximity. Runs during sleep (hippocampal replay
         + consolidation). Temporal subsystem + sleep interaction.
 
+    (concepts/) schema_induction.py
+        SchemaInducer — reifies repeated relational structure into
+        schema concepts (``_gen:`` hubs) during sleep consolidation.
+        The abstraction step of consolidation: shared roles collapse
+        into named classes. Temporal subsystem + sleep interaction.
+
     (concepts/) topology.py
         NetworkTopology — graph-theoretic metrics on the concept
         network. Computes clustering, small-world properties,
@@ -692,6 +698,10 @@ _EXPORTS: dict[str, str] = {
     # Hippocampal-replay-driven edge discovery during sleep, and
     # graph-theoretic analysis of the knowledge structure
     "EdgeProposer": "temporal_lobe.concepts.edge_proposer",
+    # Schema induction — reifying repeated relational structure into
+    # schema concepts during sleep consolidation
+    "SchemaInducer": "temporal_lobe.concepts.schema_induction",
+    "ReifiedSchema": "temporal_lobe.concepts.schema_induction",
     "NetworkTopology": "temporal_lobe.concepts.topology",
     # The auditory-temporal pathway: cochlea -> A1 -> Wernicke's area
     "AmbientListener": "occipital_lobe.perception.ambient",

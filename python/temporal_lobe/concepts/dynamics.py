@@ -50,6 +50,43 @@ DORMANT_SPARK_COEFF = 2.5e-5
 SPARK_MIN = 0.06
 SPARK_MAX = 0.14
 
+# ─── Recurrence — the field's self-excitation loop ──────────────
+#
+# Without it the field is purely dissipative: every tick runs
+# decay → spread → noise → snap, and activation only ever runs
+# down. Recurrence closes the loop — supra-threshold activation
+# feeds back into itself, so a coherent coalition can persist
+# between inputs instead of evaporating after each one.
+#
+# SUSTAIN_THRESHOLD: activation at or above this gets the logistic
+# self-input ``a += RECURRENCE_GAIN * a * (1 - a)`` — the same form
+# as the workspace settle's sustain term, at field scale. 0.25 sits
+# above the spark band (SPARK_MAX = 0.14) so a lone ignition can't
+# bootstrap a permanent attractor, but low enough that a coalition
+# of neighbors trading activation can reach it through mutual
+# reinforcement.
+#
+# RECURRENCE_GAIN: must beat the worst-case decay. At the
+# threshold: 0.4 * 0.25 * 0.75 = 0.075 vs decay 0.20 * 0.25 = 0.05 —
+# it sustains even under maximum GABA damping, and grows faster as
+# activation rises. Decay still wins below the threshold, so
+# transient activity still dies.
+#
+# NORMALIZATION_GAIN / FIELD_ENERGY_BUDGET: divisive
+# normalization with a carrying capacity. Below the budget the
+# field is free — activation costs nothing. Above it, every active
+# concept is divided by ``1 + GAIN * (total - budget)``, so the
+# field can hold a few attractors but not all of them: each
+# coalition's dominance is bought at the others' expense. Without
+# the budget the logistic always beats decay and *everything* over
+# threshold locks at ~0.87 — a saturated field that never
+# switches (the seizure corner). The budget is what turns
+# coexistence into competition.
+SUSTAIN_THRESHOLD = 0.25
+RECURRENCE_GAIN = 0.4
+FIELD_ENERGY_BUDGET = 4.0
+NORMALIZATION_GAIN = 0.05
+
 
 class DynamicsMixin:
     """Mixin for :class:`ConceptNetwork` — see module docstring."""
@@ -497,6 +534,9 @@ class DynamicsMixin:
         # ─── 4. ACh focus (winner-take-all) ─────────────────────
         self._apply_ach_focus(ach_focus)
 
+        # ─── 4b. Recurrence — the field feeds back into itself ──
+        self._apply_recurrence()
+
         # ─── 5. Periodic full-field sweep ───────────────────────
         # Rebuilds the active set (catching activation writes that
         # bypassed _mark_active) and re-digitizes the whole field.
@@ -759,6 +799,46 @@ class DynamicsMixin:
                     )
                 else:
                     concept.activation *= (1.0 - ach_focus * 0.5)
+
+    def _apply_recurrence(self) -> None:
+        """Field self-excitation + divisive normalization.
+
+        The flow rebuilding its own potential: concepts at or above
+        ``SUSTAIN_THRESHOLD`` feed their activation back into
+        themselves (logistic sustain — the same form the workspace
+        settle uses on broadcast items), then every active concept
+        is divided by the shared energy budget. A coalition's
+        dominance is bought at the field's expense, so regimes
+        compete instead of saturating together.
+
+        Below the threshold nothing changes — sparks still decay
+        unless reinforced and noise still dies. Only a coalition
+        strong enough to reach the threshold gets to persist.
+        """
+        if not self._active_ids:
+            return
+        total = 0.0
+        sustaining: set[str] = set()
+        for cid in self._active_ids:
+            concept = self._concepts.get(cid)
+            if concept is None:
+                continue
+            a = concept.activation or 0.0
+            total += a
+            if a >= SUSTAIN_THRESHOLD:
+                sustaining.add(cid)
+        if not sustaining:
+            return
+        norm = 1.0 + NORMALIZATION_GAIN * max(0.0, total - FIELD_ENERGY_BUDGET)
+        for cid in self._active_ids:
+            concept = self._concepts.get(cid)
+            if concept is None or concept.activation is None:
+                continue
+            a = concept.activation
+            if cid in sustaining:
+                a += RECURRENCE_GAIN * a * (1.0 - a)
+            concept.activation = min(1.0, a / norm)
+
     def _compute_effective_inhibition(
         self,
         column: str,

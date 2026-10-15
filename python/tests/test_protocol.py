@@ -23,6 +23,7 @@ from genesis_client.protocol import (
     CHEM_NAMES,
     CHEM_SEROTONIN,
     DT_NOMINAL_STEP,
+    GET_FIELD_PROBE,
     GET_ION_SUMMARY,
     GET_NEURO_SUMMARY,
     GET_SENSOR_PRESENCE,
@@ -51,6 +52,8 @@ from genesis_client.protocol import (
     PHASE_STRESS,
     PING,
     PROTOCOL_VERSION,
+    SET_FIELD_CARRIER,
+    SET_FIELD_PHASE,
     SET_WAKE_ALARM,
     SHUTDOWN,
     STORE_EPISODE,
@@ -235,6 +238,12 @@ def test_command_ids():
     # GET_SENSOR_PRESENCE, so GET_ION_SUMMARY must not collide.
     assert GET_ION_SUMMARY == 40
     assert GET_SENSOR_PRESENCE == 36
+    # The field probe is additive and continues past SET_VOLITION;
+    # the phase-lock push is its additive sibling, as is the
+    # carrier write control used by the ring-down experiment.
+    assert GET_FIELD_PROBE == 47
+    assert SET_FIELD_PHASE == 48
+    assert SET_FIELD_CARRIER == 49
 
 
 def test_chemical_ids():

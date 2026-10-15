@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from mind import Mind
-
 import copy
 import logging
 import threading
 import time
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from genesis_client.protocol import (
     CHEM_ADENOSINE,
@@ -33,6 +28,9 @@ from genesis_client.protocol import (
 )
 from genesis_client.swallow import note_swallowed, set_swallow_sink
 
+if TYPE_CHECKING:
+    from mind import Mind
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,6 +50,13 @@ def _thread_name(ident: int) -> str:
 
 class LifecycleMixin:
     """Mixin for :class:`Mind` — see module docstring."""
+
+    # Per-subsystem shutdown budgets — matched to the longest
+    # uninterruptible phase each can legitimately be in (InnerLife's
+    # synchronous N3 consolidation pass takes ~20 s). Anything not
+    # listed joins with the default timeout.
+    _SUBSYSTEM_STOP_TIMEOUTS: ClassVar[dict[str, float]] = {"InnerLife": 45.0}
+
     if TYPE_CHECKING:
         # Attributes and cross-mixin methods are provided by the
         # composed class (see mind.py).
@@ -66,6 +71,7 @@ class LifecycleMixin:
         this restores its concept network, reflections, and narrative
         from previous conversations.
         """
+        self._provision_stewardship()
         self._start_connect_and_register()
         try:
             self._start_restore_state()
@@ -78,6 +84,32 @@ class LifecycleMixin:
         self._start_autonomous_subsystems()
         self._start_engage_restored_sleep()
         self._start_background_threads()
+    def _provision_stewardship(self) -> None:
+        """First-boot steward provisioning — explicit, at the entry point.
+
+        ``Stewardship.load`` (run in the frontal lobe's constructor) is
+        strictly read-only: it can authenticate an existing credential
+        but never creates one. Creation happens only here — a data dir
+        with no stamp gets its instance key and provenance stamp; a
+        stamped dir (including a copy whose key it cannot read) is left
+        exactly as found, sealed. ``provision`` mutates the loaded
+        channel in place, so the frontal lobe's steward object needs
+        no re-wiring.
+        """
+        steward = getattr(self.brain.frontal, "steward", None)
+        if steward is None:
+            return
+        try:
+            if steward.provision():
+                logger.info("steward channel authenticated")
+            elif steward.stamped:
+                logger.info(
+                    "steward channel sealed — stamped to a key this "
+                    "process does not hold"
+                )
+        except OSError as e:
+            logger.warning(f"steward provisioning failed: {e}")
+
     def _start_connect_and_register(self) -> None:
         """Connect to the daemon and register cognitive modules.
 
@@ -575,34 +607,64 @@ class LifecycleMixin:
         # shutdown accounting.
         self._module_sampler.stop()
 
-        # Stop the heartbeat thread BEFORE saving state. The
-        # heartbeat calls _check_auto_sleep() every second, which
-        # can auto-wake it if adenosine is low. Without joining the
-        # heartbeat first, there is a race: the heartbeat wakes it
-        # between /quit and _save_state(), so the saved state says
-        # is_sleeping=False even though it was asleep when the user
-        # quit. Joining the heartbeat ensures its sleep state at the
-        # moment of /quit is what gets saved. Join without a timeout:
-        # a timed-out writer would still be alive when the archive is
-        # closed below.
-        clean_shutdown &= self._join_shutdown_thread(
-            self._heartbeat_thread, "heartbeat"
-        )
+        clean_shutdown &= self._join_service_threads()
+        clean_shutdown &= self._stop_subsystems()
+        clean_shutdown &= self._drain_shutdown_workers()
+        clean_shutdown &= self._persist_shutdown_state()
+        clean_shutdown &= self._release_daemon()
 
-        # Join the autosave thread before saving — otherwise an
-        # in-flight autosave can race the shutdown save and the
-        # archive close below.
-        clean_shutdown &= self._join_shutdown_thread(
-            self._autosave_thread, "autosave"
-        )
-        clean_shutdown &= self._join_shutdown_thread(
-            self._notification_thread, "notifications"
-        )
+        # Close the cognitive journal last of all writers — it is the
+        # record of everything above. Clearing the active binding stops
+        # stray record_error calls from a stale module touching it.
+        journal = getattr(self, "journal", None)
+        if journal is not None:
+            journal.close()
+        from infrastructure.journal import set_active
+        set_active(None)
+        # Detach the swallow sink too, so a late catch site in a
+        # shutting-down subsystem cannot write to a closed journal.
+        set_swallow_sink(None)
 
-        # Stop the autonomous learner, inner life, and regulator.
-        # Their public stop methods use bounded joins; wait here for
-        # any thread they leave behind before state is saved and the
-        # concept archive is closed.
+        return clean_shutdown
+
+    def _join_service_threads(self) -> bool:
+        """Join the heartbeat, autosave, and notification threads.
+
+        The heartbeat goes BEFORE saving state: it calls
+        _check_auto_sleep() every second, which can auto-wake it if
+        adenosine is low. Without joining the heartbeat first, there
+        is a race — the heartbeat wakes it between /quit and
+        _save_state(), so the saved state says is_sleeping=False even
+        though it was asleep when the user quit. Joining the heartbeat
+        ensures its sleep state at the moment of /quit is what gets
+        saved. Join without a timeout: a timed-out writer would still
+        be alive when the archive is closed below. The autosave join
+        prevents an in-flight autosave racing the shutdown save.
+        """
+        clean = True
+        for thread, name in (
+            (self._heartbeat_thread, "heartbeat"),
+            (self._autosave_thread, "autosave"),
+            (self._notification_thread, "notifications"),
+        ):
+            clean &= self._join_shutdown_thread(thread, name)
+        return clean
+
+    def _stop_subsystems(self) -> bool:
+        """Stop the autonomous learner, inner life, and regulator, then
+        join whatever threads they leave behind.
+
+        Subsystems get a shutdown budget matched to the longest
+        uninterruptible phase they can legitimately be in. Inner life
+        drives sleep-stage transitions synchronously, and an N3
+        consolidation pass takes ~20 s — longer than the default 5 s
+        join. Interrupting one mid-pass is the thing to avoid, since it
+        is writing to the concept network, the edge log, and the
+        archive at the same time. So it is given room to finish what it
+        started, and the wait is bounded so a genuine hang still
+        surfaces rather than blocking shutdown forever.
+        """
+        clean = True
         try:
             self.learner.stop()
             self.inner_life.stop()
@@ -612,71 +674,73 @@ class LifecycleMixin:
                 "mind.lifecycle.stop",
                 e,
             )# user pressed Ctrl+C — still try to save
-            clean_shutdown = False
-        # Subsystems get a shutdown budget matched to the longest
-        # uninterruptible phase they can legitimately be in. Inner life
-        # drives sleep-stage transitions synchronously, and an N3
-        # consolidation pass takes ~20 s — longer than the default 5 s
-        # join. Interrupting one mid-pass is the thing to avoid, since it
-        # is writing to the concept network, the edge log, and the
-        # archive at the same time. So it is given room to finish what it
-        # started, and the wait is bounded so a genuine hang still
-        # surfaces rather than blocking shutdown forever.
-        _SUBSYSTEM_STOP_TIMEOUTS = {"InnerLife": 45.0}
+            clean = False
         for subsystem in (self.learner, self.inner_life, self.regulator):
             name = type(subsystem).__name__
-            clean_shutdown &= self._join_shutdown_thread(
+            clean &= self._join_shutdown_thread(
                 getattr(subsystem, "_thread", None),
                 name,
-                timeout=_SUBSYSTEM_STOP_TIMEOUTS.get(name, 5.0),
+                timeout=self._SUBSYSTEM_STOP_TIMEOUTS.get(name, 5.0),
             )
+        return clean
 
-        # Volition workers are tracked only by name. Suppression above
-        # prevents new urges from starting; wait for in-flight actions
-        # to clear before serializing the shared cognitive state.
-        # Bounded wait — an unbounded loop here can hang shutdown
-        # forever if a worker never clears.
+    def _drain_shutdown_workers(self) -> bool:
+        """Wait out the tracked workers — volition bids, the
+        sleep-stage worker, and any in-flight think — before the state
+        save and archive close.
+
+        Volition workers are tracked only by name; suppression prevents
+        new urges from starting, and the wait for in-flight actions is
+        bounded so a worker that never clears cannot hang shutdown
+        forever. The sleep-stage worker drains whatever it already
+        accepted: an N3 pass writes the concept network, the canonical
+        edge log and the SQLite archive at once, and letting one run
+        into those being closed underneath it is exactly the torn
+        state this ordering exists to prevent.
+        """
+        clean = True
         _volition_deadline = time.monotonic() + 5.0
         while self._volition_active and time.monotonic() < _volition_deadline:
             time.sleep(0.05)
         if self._volition_active:
             logger.warning("volition workers did not clear during shutdown; continuing")
-            clean_shutdown = False
+            clean = False
 
-        # Stop the sleep-stage worker *before* the state save and the
-        # archive close below. An N3 pass writes the concept network, the
-        # canonical edge log and the SQLite archive; letting one run into
-        # either of those being closed underneath it is exactly the kind
-        # of torn state the shutdown ordering exists to prevent. It drains
-        # whatever it already accepted before exiting.
         sleep_worker = getattr(self, "_sleep_stage_worker", None)
         if sleep_worker is not None:
-            if not sleep_worker.stop(timeout=_SUBSYSTEM_STOP_TIMEOUTS["InnerLife"]):
+            if not sleep_worker.stop(
+                timeout=self._SUBSYSTEM_STOP_TIMEOUTS["InnerLife"]
+            ):
                 logger.warning(
                     "sleep-stage worker did not exit; a consolidation pass "
                     "may still have been running",
                 )
-                clean_shutdown = False
+                clean = False
 
-        worker = self._active_think_worker
-        clean_shutdown &= self._join_shutdown_thread(worker, "think")
+        clean &= self._join_shutdown_thread(self._active_think_worker, "think")
+        return clean
 
-        # Save state before anything else — this is the critical step.
-        # Keep cleaning up even if it fails, but report the failure to
-        # the caller instead of presenting the shutdown as successful.
-        # Track save success separately from clean_shutdown so callers
-        # can distinguish "a background thread lingered" from "the
-        # state save actually failed" — the live session hit the former
-        # (a poller's 10s sleep outlasted its 5s join) and the CLI
-        # wrongly warned that state may not have been saved.
+    def _persist_shutdown_state(self) -> bool:
+        """Save cognitive state, then close the archive and edge log.
+
+        The save is the critical step — cleanup continues even if it
+        fails, but the failure is reported instead of presenting the
+        shutdown as successful. Save success is tracked separately from
+        the wider clean flag so callers can distinguish "a background
+        thread lingered" from "the state save actually failed" — the
+        live session hit the former (a poller's 10s sleep outlasted its
+        5s join) and the CLI wrongly warned that state may not have
+        been saved.
+        """
+        clean = True
         try:
             save_ok = self._save_state()
             self._shutdown_save_ok: bool | None = save_ok
-            clean_shutdown &= save_ok
+            clean &= save_ok
         except Exception as e:  # noqa: BLE001
             logger.warning(f"shutdown save failed: {e}")
             self._shutdown_save_ok = False
-            clean_shutdown = False
+            clean = False
 
         # Close the concept archive's SQLite connection only after the
         # threads above have actually exited.
@@ -689,7 +753,7 @@ class LifecycleMixin:
                     "mind.lifecycle.stop",
                     e,
                 )
-                clean_shutdown = False
+                clean = False
 
         # Close the canonical edge log — already fsynced at save, this
         # just releases the file handle.
@@ -702,11 +766,16 @@ class LifecycleMixin:
                     "mind.lifecycle.stop",
                     e,
                 )
+        return clean
 
-        # Deregister cognitive modules from the manifest. `Stopping`
-        # first: they are alive and winding down, which is a different
-        # observation from `Stopped` and lets a reader distinguish a
-        # clean shutdown from a crash that skipped this.
+    def _release_daemon(self) -> bool:
+        """Deregister modules, go idle, and disconnect.
+
+        Modules are marked `Stopping` first — they are alive and
+        winding down, which is a different observation from `Stopped`
+        and lets a reader distinguish a clean shutdown from a crash
+        that skipped this.
+        """
         self._mark_modules_stopping()
         for module_id in self._registered_modules():
             try:
@@ -734,21 +803,8 @@ class LifecycleMixin:
                 "mind.lifecycle.stop",
                 e,
             )
-            clean_shutdown = False
-
-        # Close the cognitive journal last of all writers — it is the
-        # record of everything above. Clearing the active binding stops
-        # stray record_error calls from a stale module touching it.
-        journal = getattr(self, "journal", None)
-        if journal is not None:
-            journal.close()
-        from infrastructure.journal import set_active
-        set_active(None)
-        # Detach the swallow sink too, so a late catch site in a
-        # shutting-down subsystem cannot write to a closed journal.
-        set_swallow_sink(None)
-
-        return clean_shutdown
+            return False
+        return True
 
     @staticmethod
     def _join_shutdown_thread(
@@ -1065,6 +1121,16 @@ class LifecycleMixin:
                 (self, "_user_initiated_sleep", user_sleep),
                 (self.inner_life, "_sleep_cycle", cycle),
             ))
+        self._stage_inner_life(data, scalar_updates)
+        return pending
+
+    def _stage_inner_life(
+        self,
+        data: dict[str, Any],
+        scalar_updates: list[tuple[Any, str, Any]],
+    ) -> None:
+        """Stage the inner-life counters (thought/dream/lucid counts)
+        for commit."""
         if "inner_life_state" in data:
             ils = data["inner_life_state"]
             try:
@@ -1090,7 +1156,6 @@ class LifecycleMixin:
                 )
         else:
             logger.debug("inner_life_state not found in saved state")
-        return pending
 
     def _stage_sleep_state(
         self, data: dict[str, Any]

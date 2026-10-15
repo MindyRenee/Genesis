@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import struct
 from dataclasses import dataclass, field
+from typing import ClassVar
 
 from .protocol import (
     _F32,
@@ -284,11 +285,17 @@ class PlasticityProfile:
         # Chronic stress: sustained cortisol above baseline + low
         # plasticity gate. The tonic (sustained) cortisol signal is
         # the chronic-stress indicator, not the acute effective level.
-        if self.cortisol_tonic > 0.45 and self.plasticity_gate < 0.4:
+        # Cortisol's reachable envelope is ~0.02 (rest) to ~0.08
+        # (sustained-drive peak) — the raw level tops out below every
+        # threshold a full-range reading would support, so it is
+        # expressed as a fraction of the envelope first. On that scale
+        # 0.45 ≈ tonic 0.047 (sustained elevation) and 0.40 ≈ 0.044.
+        cort_frac = min(1.0, max(0.0, (self.cortisol_tonic - 0.02) / 0.06))
+        if cort_frac > 0.45 and self.plasticity_gate < 0.4:
             return LEARNING_POSTURE_PROTECTIVE
 
         # Receptive: high plasticity gate (BDNF-driven) + low cortisol.
-        if self.plasticity_gate > 0.55 and self.cortisol_tonic < 0.40:
+        if self.plasticity_gate > 0.55 and cort_frac < 0.40:
             return LEARNING_POSTURE_RECEPTIVE
 
         # Recovering: BDNF is meaningful but not yet high, cortisol
@@ -296,7 +303,7 @@ class PlasticityProfile:
         # transitioning out of a protective state.
         if (
             0.25 < self.plasticity_gate <= 0.55
-            and self.cortisol_tonic < 0.45
+            and cort_frac < 0.45
             and self.bdnf_tonic > 0.30
         ):
             return LEARNING_POSTURE_RECOVERING
@@ -1876,4 +1883,68 @@ class BodyControlState:
             cpu_epp=cpu_epp,
             cpu_boost=cpu_boost,
             description=description,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class FieldProbeSignature:
+    """The body's real measured substrate dynamics (v2: 114 bytes; v1: 102).
+
+    Produced by the daemon's field-probe thread: band energies of two
+    real fast channels — instruction throughput and scheduler jitter —
+    decomposed at the wave bands' center frequencies, plus slow
+    counters and the carrier rhythm the probe writes into real work.
+    ``band_energy`` values are baseline-relative: ≈0.125 is typical
+    for that band on this machine, higher means elevated vs. its own
+    history. ``lambda`` is above the probe's Nyquist bound and always
+    reads 0 — an absent channel, not a measured silence.
+    """
+
+    throughput_bands: tuple[float, ...]  # 10 band energies
+    jitter_bands: tuple[float, ...]      # 10 band energies
+    throughput_mean: float               # iters/s, EMA
+    jitter_cv: float                     # coefficient of variation
+    pstate_rate: float                   # frequency transitions/s
+    irq_rate: float                      # interrupts/s
+    carrier_freq: float                  # Hz; 0 = carrier off
+    samples_ok: bool                     # rings warmed
+    # v2 phase-lock fields — None on a v1 daemon (absent channel,
+    # never a zero reading):
+    carrier_lag: float | None = None     # rad: substrate response lag
+    carrier_phase: float | None = None   # rad: generator phase mod 2π
+    carrier_coherence: float | None = None  # 0..1 lock-strength
+
+    WIRE_LEN: ClassVar[int] = 102
+    WIRE_LEN_V2: ClassVar[int] = 114
+
+    @classmethod
+    def unpack(cls, data: bytes) -> FieldProbeSignature:
+        """Unpack a v1 (102-byte) or v2 (114-byte) signature."""
+        if len(data) < cls.WIRE_LEN:
+            raise ValueError(
+                f"FieldProbeSignature needs {cls.WIRE_LEN} bytes, got {len(data)}"
+            )
+        if data[0] not in (1, 2):
+            raise ValueError(f"unknown field-probe version {data[0]}")
+        vals = struct.unpack_from("<20f", data, 1)
+        scalars = struct.unpack_from("<5f", data, 81)
+        lag = phase = coherence = None
+        if data[0] == 2:
+            if len(data) < cls.WIRE_LEN_V2:
+                raise ValueError(
+                    f"v2 signature needs {cls.WIRE_LEN_V2} bytes, got {len(data)}"
+                )
+            lag, phase, coherence = struct.unpack_from("<3f", data, 102)
+        return cls(
+            throughput_bands=vals[0:10],
+            jitter_bands=vals[10:20],
+            throughput_mean=scalars[0],
+            jitter_cv=scalars[1],
+            pstate_rate=scalars[2],
+            irq_rate=scalars[3],
+            carrier_freq=scalars[4],
+            samples_ok=bool(data[101]),
+            carrier_lag=lag,
+            carrier_phase=phase,
+            carrier_coherence=coherence,
         )

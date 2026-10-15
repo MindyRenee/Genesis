@@ -505,8 +505,25 @@ class Reasoner:
         - If the edges differ, predict the weaker/more general one.
         - Confidence is higher when the path is structurally consistent.
         """
-        results: list[ReasoningResult] = []
+        scored = self._scored_gap_candidates(concept_id)
+        return [
+            self._hypothesis_result(concept_id, score, candidate, paths)
+            for score, candidate, paths in scored[:5]
+        ]
 
+    def _scored_gap_candidates(
+        self, concept_id: str
+    ) -> list[
+        tuple[
+            float,
+            str,
+            list[tuple[str, RelationType, float, RelationType, float]],
+        ]
+    ]:
+        """Find concepts two hops out with no direct edge from
+        ``concept_id``, scored by path strength times convergent
+        support — the cap keeps the strongest hypotheses, not the
+        first five in dict order."""
         # Find concepts 2 hops away, tracking edge types AND weights —
         # hypothesis strength should reflect the actual links, not
         # just their count.
@@ -536,8 +553,6 @@ class Reasoner:
                             )
                         )
 
-        # Score candidates before committing — the cap should keep the
-        # strongest hypotheses, not the first five in dict order.
         scored: list[
             tuple[
                 float,
@@ -557,65 +572,71 @@ class Reasoner:
             score = best_strength * (0.5 + 0.5 * support)
             scored.append((score, candidate, paths))
         scored.sort(key=lambda item: -item[0])
+        return scored
 
-        for score, candidate, paths in scored[:5]:
-            path_relations: list[tuple[RelationType, RelationType]] = []
-            for _inter, rel_to_inter, _w1, rel_to_candidate, _w2 in paths:
-                path_relations.append((rel_to_inter, rel_to_candidate))
+    def _hypothesis_result(
+        self,
+        concept_id: str,
+        score: float,
+        candidate: str,
+        paths: list[tuple[str, RelationType, float, RelationType, float]],
+    ) -> ReasoningResult:
+        """Compose one hypothesis result for a scored gap candidate —
+        predicted relation, hedged conclusion, and paired evidence."""
+        from temporal_lobe.morphology import hedge_verb_phrase
 
-            suggested_relation = self._predict_hypothesis_relation(path_relations)
-            from temporal_lobe.morphology import hedge_verb_phrase
-            # Confidence: structural consistency (same relation both
-            # hops), path strength, and independent support.
-            consistent_paths = sum(
-                1 for r1, r2 in path_relations if r1 == r2
+        path_relations: list[tuple[RelationType, RelationType]] = []
+        for _inter, rel_to_inter, _w1, rel_to_candidate, _w2 in paths:
+            path_relations.append((rel_to_inter, rel_to_candidate))
+
+        suggested_relation = self._predict_hypothesis_relation(path_relations)
+        # Confidence: structural consistency (same relation both
+        # hops), path strength, and independent support.
+        consistent_paths = sum(
+            1 for r1, r2 in path_relations if r1 == r2
+        )
+        base_conf = 0.2 + 0.4 * score
+        if consistent_paths > 0:
+            base_conf += 0.15 * min(consistent_paths, 2)
+
+        # Build a grammatically correct hypothesis conclusion.
+        # Relation types are not all verbs — "part_of" is a
+        # prepositional phrase, "is_a" is a copular construction.
+        # Use "might be <relation>" for prepositional/copular
+        # types, and "might <verb>" for verbal types.
+        # Phrase from the relation's verb seed, then hedge. Raw
+        # relation tokens are not verbs: "might be is_a" and
+        # "might causes" are both ungrammatical.
+        from frontal_lobe.graph_walk import _RELATION_VERB_SEEDS
+        seeds = _RELATION_VERB_SEEDS.get(suggested_relation.value) or []
+        verb_phrase = seeds[0] if seeds else suggested_relation.value.replace("_", " ")
+        hedged = hedge_verb_phrase(verb_phrase)
+        through = ", ".join(p[0] for p in paths)
+        conclusion = (
+            f"{concept_id} {hedged} "
+            f"{candidate} (currently connected only through {through})"
+        )
+        evidence = [f"gap: no direct {concept_id} → {candidate}"]
+        structured_path: list[tuple[str, str, str, float]] = []
+        for inter, first_rel, first_w1, rel, w2 in paths:
+            # Preserve the exact first hop paired with this second hop.
+            evidence.append(f"{concept_id} → {inter}")
+            evidence.append(f"{inter} {rel.value} {candidate}")
+            structured_path.append(
+                (concept_id, first_rel.value, inter, first_w1)
             )
-            base_conf = 0.2 + 0.4 * score
-            if consistent_paths > 0:
-                base_conf += 0.15 * min(consistent_paths, 2)
-
-            # Build a grammatically correct hypothesis conclusion.
-            # Relation types are not all verbs — "part_of" is a
-            # prepositional phrase, "is_a" is a copular construction.
-            # Use "might be <relation>" for prepositional/copular
-            # types, and "might <verb>" for verbal types.
-            # Phrase from the relation's verb seed, then hedge. Raw
-            # relation tokens are not verbs: "might be is_a" and
-            # "might causes" are both ungrammatical.
-            from frontal_lobe.graph_walk import _RELATION_VERB_SEEDS
-            seeds = _RELATION_VERB_SEEDS.get(suggested_relation.value) or []
-            verb_phrase = seeds[0] if seeds else suggested_relation.value.replace("_", " ")
-            hedged = hedge_verb_phrase(verb_phrase)
-            through = ", ".join(p[0] for p in paths)
-            conclusion = (
-                f"{concept_id} {hedged} "
-                f"{candidate} (currently connected only through {through})"
-            )
-            evidence = [f"gap: no direct {concept_id} → {candidate}"]
-            structured_path: list[tuple[str, str, str, float]] = []
-            for inter, first_rel, first_w1, rel, w2 in paths:
-                # Preserve the exact first hop paired with this second hop.
-                evidence.append(f"{concept_id} → {inter}")
-                evidence.append(f"{inter} {rel.value} {candidate}")
-                structured_path.append(
-                    (concept_id, first_rel.value, inter, first_w1)
-                )
-                structured_path.append((inter, rel.value, candidate, w2))
-            results.append(
-                ReasoningResult(
-                    conclusion=conclusion,
-                    reasoning_type=ReasoningType.HYPOTHESIS,
-                    evidence=evidence,
-                    confidence=base_conf,
-                    novel=True,
-                    knowledge=[
-                        (suggested_relation.value, candidate, base_conf),
-                    ],
-                    path=structured_path,
-                )
-            )
-
-        return results
+            structured_path.append((inter, rel.value, candidate, w2))
+        return ReasoningResult(
+            conclusion=conclusion,
+            reasoning_type=ReasoningType.HYPOTHESIS,
+            evidence=evidence,
+            confidence=base_conf,
+            novel=True,
+            knowledge=[
+                (suggested_relation.value, candidate, base_conf),
+            ],
+            path=structured_path,
+        )
 
     @staticmethod
     def _predict_hypothesis_relation(
@@ -1110,63 +1131,16 @@ class Reasoner:
             # used by the existing test suite. Natural
             # English "what causes X?" is handled by `_answer_what_is`
             # which reports "X is caused by Y" from incoming edges.
-            causes: list[tuple[str, float, str]] = []
-            for edge in self.network.get_edges(subject, "out"):
-                if edge.relation == RelationType.CAUSES:
-                    causes.append((edge.target, edge.weight, edge.relation.value))
-                    if len(causes) >= 4:
-                        break
-            if causes:
-                if len(causes) == 1:
-                    return ReasoningResult(
-                        conclusion=f"{subject} causes {causes[0][0]}",
-                        reasoning_type=ReasoningType.DEDUCTIVE,
-                        evidence=[f"{subject} causes {causes[0][0]}"],
-                        confidence=causes[0][1],
-                    )
-                else:
-                    targets = [c[0] for c in causes]
-                    conclusion = f"{subject} causes {', '.join(targets[:-1])}, and {targets[-1]}"
-                    evidence = [f"{subject} causes {t}" for t in targets]
-                    avg_conf = sum(c[1] for c in causes) / len(causes)
-                    return ReasoningResult(
-                        conclusion=conclusion,
-                        reasoning_type=ReasoningType.DEDUCTIVE,
-                        evidence=evidence,
-                        confidence=avg_conf,
-                    )
+            return self._multi_edge_answer(
+                subject, RelationType.CAUSES, "causes",
+            )
 
         elif question_type == "what_is_it_part_of":
             # "What is X part of?" → find larger things X belongs to.
             # These are outgoing PART_OF edges: X is part of Y.
-            wholes: list[tuple[str, float]] = []
-            for edge in self.network.get_edges(subject, "out"):
-                if edge.relation == RelationType.PART_OF:
-                    wholes.append((edge.target, edge.weight))
-                    if len(wholes) >= 4:
-                        break
-            if wholes:
-                if len(wholes) == 1:
-                    return ReasoningResult(
-                        conclusion=f"{subject} is part of {wholes[0][0]}",
-                        reasoning_type=ReasoningType.DEDUCTIVE,
-                        evidence=[f"{subject} part_of {wholes[0][0]}"],
-                        confidence=wholes[0][1],
-                    )
-                else:
-                    targets = [w[0] for w in wholes]
-                    conclusion = (
-                        f"{subject} is part of "
-                        f"{', '.join(targets[:-1])}, and {targets[-1]}"
-                    )
-                    evidence = [f"{subject} part_of {t}" for t in targets]
-                    avg_conf = sum(w[1] for w in wholes) / len(wholes)
-                    return ReasoningResult(
-                        conclusion=conclusion,
-                        reasoning_type=ReasoningType.DEDUCTIVE,
-                        evidence=evidence,
-                        confidence=avg_conf,
-                    )
+            return self._multi_edge_answer(
+                subject, RelationType.PART_OF, "is part of", "part_of",
+            )
 
         elif question_type == "what_emerges_from":
             for edge in self.network.get_edges(subject, "in"):
@@ -1199,6 +1173,42 @@ class Reasoner:
                     )
 
         return None
+
+    def _multi_edge_answer(
+        self,
+        subject: str,
+        relation: RelationType,
+        phrase: str,
+        evidence_rel: str | None = None,
+    ) -> ReasoningResult | None:
+        """Compose a conjunctive answer from up to 4 outgoing edges of
+        one relation ("X causes A, B, and C")."""
+        rel = evidence_rel if evidence_rel is not None else phrase
+        hits: list[tuple[str, float]] = []
+        for edge in self.network.get_edges(subject, "out"):
+            if edge.relation == relation:
+                hits.append((edge.target, edge.weight))
+                if len(hits) >= 4:
+                    break
+        if not hits:
+            return None
+        if len(hits) == 1:
+            return ReasoningResult(
+                conclusion=f"{subject} {phrase} {hits[0][0]}",
+                reasoning_type=ReasoningType.DEDUCTIVE,
+                evidence=[f"{subject} {rel} {hits[0][0]}"],
+                confidence=hits[0][1],
+            )
+        targets = [h[0] for h in hits]
+        return ReasoningResult(
+            conclusion=(
+                f"{subject} {phrase} "
+                f"{', '.join(targets[:-1])}, and {targets[-1]}"
+            ),
+            reasoning_type=ReasoningType.DEDUCTIVE,
+            evidence=[f"{subject} {rel} {t}" for t in targets],
+            confidence=sum(h[1] for h in hits) / len(hits),
+        )
 
     def _collect_direct_facts(
         self, ca: str, cb: str, concept_a: str, concept_b: str

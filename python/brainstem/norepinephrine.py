@@ -98,7 +98,16 @@ Hard clamp:
     emotional regulator fails or coupling forces push beyond safe
     limits.
 
-No other special dynamics — NE follows the standard homeostatic
+Network-driven release (sleep):
+    When the sleep-wake network is running, NE is driven toward the
+    release target NE_FROM_LC * lc - NE_FROM_REM * rem — it tracks
+    LC firing and is suppressed by the REM-on population, giving the
+    measured profile: wake 0.30, NREM 0.05, REM ~0 (the LC is the
+    canonical REM-off aminergic nucleus; Aston-Jones & Bloom 1981).
+    While network-driven, the standard homeostatic/coupling update
+    is skipped for NE.
+
+Without the network, NE follows the standard homeostatic
 and coupling force equations.
 
 
@@ -147,17 +156,19 @@ Valence equation:
     (NE weight = 0.10 — noradrenergic arousal affects mood)
 
 Stress phase:
-    CORT > 0.65 + NE > 0.60 + SRT < 0.35
-    (high NE is a stress indicator)
+    CORT > 0.06 + NE > 0.45 + SRT < 0.35
+    (high NE is a stress indicator; the gates sit inside the
+    substrate's measured envelope — cortisol peaks ~0.084)
 
 Overwhelmed phase:
-    CORT > 0.75 + NE > 0.75 + global_tone > 0.7
+    CORT > 0.069 + NE > 0.509  (1.15x/1.13x the Stress gates)
 
 Alert phase:
-    NE > 0.55 + HIST > 0.55 + GABA < 0.40 + MEL < 0.30 + OX > 0.20
+    NE > 0.50 + HIST > 0.34 + GABA < 0.40 + MEL < 0.30 + OX > 0.20
+    (orexin lowers the NE/HIST thresholds — wake stabilizer)
 
 Flow phase:
-    DA > 0.65 + ACh > 0.50 + NE > 0.40 + CORT < 0.30
+    DA > 0.40 + ACh > 0.44 + NE > 0.40 + CORT < 0.30
 
 
 ════════════════════════════════════════════════════════════════════════

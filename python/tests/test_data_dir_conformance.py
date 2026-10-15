@@ -110,6 +110,13 @@ def resolve_migrate_edges(env: dict[str, str]) -> str:
     )
 
 
+def resolve_abstraction_gradient(env: dict[str, str]) -> str:
+    """eval/abstraction_gradient.py — reads the canonical edge log."""
+    return _python_default(
+        REPO / "eval/abstraction_gradient.py", env, "_default_data_dir",
+    )
+
+
 def resolve_config_py(env: dict[str, str]) -> str:
     """infrastructure/config.py — the in-process default."""
     out = _run(
@@ -173,6 +180,7 @@ DIR_RESOLVERS = {
     "migrate_edges_to_log.py": resolve_migrate_edges,
     "config.py": resolve_config_py,
     "setup_embeddings.py": resolve_setup_embeddings,
+    "abstraction_gradient.py": resolve_abstraction_gradient,
 }
 
 # Asset resolvers legitimately answer "which directory holds <asset>?",
@@ -325,6 +333,7 @@ def test_every_resolver_in_the_repo_is_covered() -> None:
         "test_data_dir_conformance.py",
         "genesis_cli.py",
         "ltm_index.py",
+        "abstraction_gradient.py",
     }
     # Files that reference the location without resolving it: this test,
     # the Rust resolver (mirrored test suite), and a client docstring

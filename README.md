@@ -178,6 +178,16 @@ visual entities, self identification from action contingency, learned action
 effects, map/passability evidence, outcome-driven affordances, and competing
 internal drives. The adapter in `world/arc.py` only translates frames and legal
 actions, enforces game mode/readiness, and preserves scorecard boundaries.
+The same holds on the public web-page substrate (`world/arc_web.py`):
+controls arrive with structural labels only — `"simple"` or `"coordinate"`,
+never what a key does — so mechanics are learned from consequences on both
+transports. Results report the step cost of each completed level
+(`ArcResult.level_steps`): the within-game learning curve is the evidence.
+Each result also discloses how much experience it carried in
+(`prior_learning`) and which bid channels won its moves
+(`decision_sources`); `/arc --baseline uniform|first` measures the
+random and first-action floors through the same loop, and
+`/arc --fresh` runs a cold start with prior learning suppressed.
 
 Local `/arc` runs are diagnostics; an authorized competition run is a separate
 transport and evidence standard. See

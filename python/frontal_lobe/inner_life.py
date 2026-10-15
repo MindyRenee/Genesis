@@ -881,110 +881,117 @@ class InnerLife:
                 if now - self._last_thought_time >= self._min_thought_gap:
                     self._run_thought_generation(now)
 
-                # ── Social drive (state-driven, not timer-driven) ──
-                # It asks a question when social drive crosses the
-                # threshold. Drive accumulates from openness_to_engage
-                # and oxytocin (social bonding), decays when it's
-                # not socially motivated. This replaces the fixed
-                # 45s question timer — it asks when it feels like
-                # reaching out, not because a clock said so.
-                is_sleeping = self._sleep_state()
-                emotion = self._get_current_emotion()
-
-                if not self._paused and not is_sleeping and emotion:
-                    # Accumulate social drive from emotional state.
-                    # openness_to_engage is the social engagement signal
-                    # derived from its neurochemistry (it already factors
-                    # in oxytocin and other bonding chemicals on the
-                    # daemon side). NeuroSummary doesn't expose individual
-                    # chemicals, so we use the composed emotional signal
-                    # rather than reading a wrong field.
-                    openness = emotion.openness_to_engage
-                    # Drive grows when open, decays when not
-                    self._social_drive += (openness * 0.15 - 0.02)
-                    self._social_drive = max(0.0, min(2.0, self._social_drive))
-
-                    # Fire when drive crosses threshold and cooldown elapsed
-                    if (
-                        self._social_drive >= self._social_drive_threshold
-                        and now - self._last_question_time >= self._question_cooldown
-                    ):
-                        self._maybe_ask_question(now)
-                        # Reset drive after asking
-                        self._social_drive = 0.0
-
-                # ── Curiosity drive (state-driven, not timer-driven) ──
-                # It enters a curiosity learning cycle when curiosity
-                # pressure crosses the threshold. Drive accumulates
-                # from curiosity queue depth and knowledge gaps,
-                # decays when satisfied. This replaces the fixed 30s
-                # curiosity timer — it learns when it's genuinely
-                # curious, not because a clock said so.
-                if not is_sleeping:
-                    # Curiosity queue depth from the learner
-                    queue_depth = 0
-                    if self._learner is not None:
-                        try:
-                            stats = self._learner.stats
-                            queue_depth = stats.get("curiosity_queue_size", 0)
-                        except Exception as e:  # noqa: BLE001
-                            note_swallowed(
-                                "frontal_lobe.inner_life._run",
-                                e,
-                            )
-
-                    # Drive grows from queue depth and emotional openness
-                    if emotion:
-                        curiosity_growth = queue_depth * 0.1 + emotion.openness_to_engage * 0.03
-                        self._curiosity_drive += curiosity_growth - 0.01
-                        self._curiosity_drive = max(0.0, min(2.0, self._curiosity_drive))
-
-                    # Fire when drive crosses threshold and cooldown elapsed
-                    if (
-                        self._curiosity_drive >= self._curiosity_drive_threshold
-                        and now - self._last_curiosity_cycle >= self._curiosity_cooldown
-                    ):
-                        self._curiosity_learning_cycle()
-                        self._last_curiosity_cycle = now
-                        # Reset drive after learning
-                        self._curiosity_drive = 0.0
+                self._drives_tick(now)
             except Exception as e:
                 logger.exception(f"inner life cycle failed: {e}")
 
-            # ── Workspace tick: decay cognitive content ──────────
-            # The workspace items decay over time — if not refreshed
-            # (by sustained attention or repeated broadcasts), they
-            # fade from cognition. This models the transient
-            # nature of cognitive access (Dehaene, 2014). The tick
-            # runs on the inner life thread because the inner life is
-            # the only continuous loop — the cognition engine only
-            # runs when the user speaks.
-            if self._frontal and hasattr(self._frontal, "global_workspace"):
+            self._workspace_tick(now)
+
+            # Wait before next check
+            self._stop_event.wait(timeout=THOUGHT_CHECK_INTERVAL)
+
+    def _drives_tick(self, now: float) -> None:
+        """Accumulate and fire the social and curiosity drives —
+        state-driven, not timer-driven.
+
+        Social: it asks a question when the drive crosses threshold;
+        drive accumulates from openness_to_engage and oxytocin (social
+        bonding), decaying when it's not socially motivated. This
+        replaces the fixed 45s question timer — it asks when it feels
+        like reaching out, not because a clock said so.
+
+        Curiosity: it enters a learning cycle when curiosity pressure
+        crosses threshold; drive accumulates from curiosity queue
+        depth and knowledge gaps, decaying when satisfied — it learns
+        when it's genuinely curious, not because a clock said so.
+        """
+        is_sleeping = self._sleep_state()
+        emotion = self._get_current_emotion()
+
+        if not self._paused and not is_sleeping and emotion:
+            # Accumulate social drive from emotional state.
+            # openness_to_engage is the social engagement signal
+            # derived from its neurochemistry (it already factors
+            # in oxytocin and other bonding chemicals on the
+            # daemon side). NeuroSummary doesn't expose individual
+            # chemicals, so we use the composed emotional signal
+            # rather than reading a wrong field.
+            openness = emotion.openness_to_engage
+            # Drive grows when open, decays when not
+            self._social_drive += (openness * 0.15 - 0.02)
+            self._social_drive = max(0.0, min(2.0, self._social_drive))
+
+            # Fire when drive crosses threshold and cooldown elapsed
+            if (
+                self._social_drive >= self._social_drive_threshold
+                and now - self._last_question_time >= self._question_cooldown
+            ):
+                self._maybe_ask_question(now)
+                # Reset drive after asking
+                self._social_drive = 0.0
+
+        if not is_sleeping:
+            # Curiosity queue depth from the learner
+            queue_depth = 0
+            if self._learner is not None:
                 try:
-                    gw = self._frontal.global_workspace
-                    gw.tick(dt=THOUGHT_CHECK_INTERVAL)
-                    self._absorb_subliminal(gw)
-                    # Sustained engagement keeps the world's material
-                    # primed in semantic memory — this is the neural
-                    # half of focus: attention holding the world's
-                    # concepts active so the stream can dwell on them.
-                    engagement = self._engagement()
-                    if engagement >= _ENGAGED_FOCUS:
-                        self._prime_world_topics(engagement)
-                        if (
-                            now - self._last_executive_feed
-                            >= _EXECUTIVE_FEED_EVERY
-                        ):
-                            self._last_executive_feed = now
-                            self._feed_executive_focus()
+                    stats = self._learner.stats
+                    queue_depth = stats.get("curiosity_queue_size", 0)
                 except Exception as e:  # noqa: BLE001
                     note_swallowed(
                         "frontal_lobe.inner_life._run",
                         e,
                     )
 
-            # Wait before next check
-            self._stop_event.wait(timeout=THOUGHT_CHECK_INTERVAL)
+            # Drive grows from queue depth and emotional openness
+            if emotion:
+                curiosity_growth = queue_depth * 0.1 + emotion.openness_to_engage * 0.03
+                self._curiosity_drive += curiosity_growth - 0.01
+                self._curiosity_drive = max(0.0, min(2.0, self._curiosity_drive))
+
+            # Fire when drive crosses threshold and cooldown elapsed
+            if (
+                self._curiosity_drive >= self._curiosity_drive_threshold
+                and now - self._last_curiosity_cycle >= self._curiosity_cooldown
+            ):
+                self._curiosity_learning_cycle()
+                self._last_curiosity_cycle = now
+                # Reset drive after learning
+                self._curiosity_drive = 0.0
+
+    def _workspace_tick(self, now: float) -> None:
+        """Decay cognitive content in the global workspace.
+
+        Workspace items decay over time — if not refreshed (by
+        sustained attention or repeated broadcasts), they fade from
+        cognition, modeling the transient nature of cognitive access
+        (Dehaene, 2014). The tick runs on the inner life thread because
+        the inner life is the only continuous loop — the cognition
+        engine only runs when the user speaks.
+        """
+        if self._frontal and hasattr(self._frontal, "global_workspace"):
+            try:
+                gw = self._frontal.global_workspace
+                gw.tick(dt=THOUGHT_CHECK_INTERVAL)
+                self._absorb_subliminal(gw)
+                # Sustained engagement keeps the world's material
+                # primed in semantic memory — this is the neural
+                # half of focus: attention holding the world's
+                # concepts active so the stream can dwell on them.
+                engagement = self._engagement()
+                if engagement >= _ENGAGED_FOCUS:
+                    self._prime_world_topics(engagement)
+                    if (
+                        now - self._last_executive_feed
+                        >= _EXECUTIVE_FEED_EVERY
+                    ):
+                        self._last_executive_feed = now
+                        self._feed_executive_focus()
+            except Exception as e:  # noqa: BLE001
+                note_swallowed(
+                    "frontal_lobe.inner_life._run",
+                    e,
+                )
 
     def _maybe_ask_question(self, now: float) -> None:
         """Ask the user a question, driven by social drive.

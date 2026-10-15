@@ -632,16 +632,21 @@ impl TickLoop {
                 impulse_offset_to_rate(&neuro_params),
             );
 
-            // The dyadic model's proposals are deliberately NOT applied
-            // here. The user's affect is a perception Genesis can
-            // attend to or not; applying it to her chemistry made her
-            // a passive recipient of the other, unable to appraise or
-            // decline, which is the social form of the same defect
-            // `tests/cognition_sole_author.rs` guards against for body
-            // state. The model's estimates of the user are still
-            // published through `InferenceSignals` and still read by
-            // her cognition, which decides for itself what to feel.
-            let _ = &dyadic_impulses;
+            // Apply dyadic model impulses (oxytocin bonding, empathic
+            // cortisol). This is the co-regulation channel: the present
+            // person's state moves her chemistry directly, the way a
+            // caregiver's moves a child's. The model tracks whoever is
+            // speaking — the mind publishes an affect observation every
+            // turn — so coupling is ordinary social perception, not a
+            // privileged bond. Authority lives on the steward channel
+            // (a held credential), never on this one; kinship is felt,
+            // custody is enforced elsewhere.
+            for &(chem_id, magnitude) in &dyadic_impulses {
+                let id = crate::state::neurochemical::NeurochemicalId::from_u8(chem_id);
+                state
+                    .neurochemicals
+                    .apply_impulse_capped(id, magnitude, now_ms);
+            }
 
             // Recompute derived state after all impulses
             state.neurochemicals.recompute_derived();
@@ -1089,7 +1094,11 @@ impl TickLoop {
     /// mutually exclusive, so setting one clears the other. The push decays
     /// on each physics step (see [`VOLITION_TAU_SECS`]).
     pub fn set_volition(&mut self, sleep: bool, magnitude: f32) {
-        let m = f64::from(crate::state::sanitize::finite_clamp(magnitude, 0.0, VOLITION_MAX));
+        let m = f64::from(crate::state::sanitize::finite_clamp(
+            magnitude,
+            0.0,
+            VOLITION_MAX,
+        ));
         self.volition = if sleep {
             crate::state::sleep_network::Drive { vlpo: m, lc: 0.0 }
         } else {
@@ -1312,10 +1321,19 @@ impl TickLoop {
                 zone_sleeping,
                 impulse_offset_to_rate(&neuro_params),
             );
-            // Proposals, not instructions — see the same reasoning at
-            // the other call site. Genesis appraises the user's affect
-            // herself and decides whether to attune.
-            let _ = &dyadic_impulses;
+            // Dyadic coupling — applied, not proposed. The channel
+            // models whoever is present: every speaker's affect is
+            // published to it, so applying it is co-regulation with
+            // the current interlocutor, not a privileged bond. The
+            // custodial authority channel (stewardship) is enforced
+            // in the cognitive layer and never rides on this one.
+            // See the other call site.
+            for &(chem_id, magnitude) in &dyadic_impulses {
+                let id = crate::state::neurochemical::NeurochemicalId::from_u8(chem_id);
+                state
+                    .neurochemicals
+                    .apply_impulse_capped(id, magnitude, now_ms);
+            }
             state.neurochemicals.recompute_derived();
             state.sync_neurochemistry_to_state();
             self.inference_engine.update_signals(

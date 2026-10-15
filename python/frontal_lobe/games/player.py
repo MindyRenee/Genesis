@@ -27,6 +27,8 @@ import random
 from dataclasses import dataclass, field
 from typing import Any
 
+from genesis_client.swallow import note_swallowed
+
 from .environment import GameEnvironment, GameObservation
 
 
@@ -215,37 +217,17 @@ class GamePlayer:
                 learned += 1
 
             if on_step is not None:
-                threat = float(outcome.info.get("threat", 0.0))
-                events: list[str] = []
-                if outcome.info.get("death") or (
-                    outcome.terminal and outcome.reward < 0
-                ):
-                    events.append("death")
-                elif prev_threat >= 0.55 and threat <= 0.25:
-                    # The danger was closing in and passed — averted
-                    # punishment, which the brain rewards as relief.
-                    events.append("escaped")
-                if outcome.reward >= 0.2:
-                    events.append("scored")
-                if outcome.terminal:
-                    events.append("won" if outcome.info.get("won")
-                                  else "over")
-                try:
-                    on_step(PlayStep(
-                        step=steps,
-                        action=action,
-                        why=why,
-                        state=state,
-                        reward=outcome.reward,
-                        td_error=td_error,
-                        score=env.score(),
-                        threat=threat,
-                        terminal=outcome.terminal,
-                        events=tuple(events),
-                    ))
-                except Exception:  # noqa: BLE001 — a listener must
-                    pass              # never kill her game
-                prev_threat = threat
+                prev_threat = self._notify_step(
+                    on_step,
+                    step=steps,
+                    action=action,
+                    why=why,
+                    state=state,
+                    outcome=outcome,
+                    td_error=td_error,
+                    score=env.score(),
+                    prev_threat=prev_threat,
+                )
 
         won = outcome.info.get("won", False) if steps else False
         if env.done() and cause == "finished":
@@ -259,6 +241,55 @@ class GamePlayer:
             cause=cause,
             learned=learned,
         )
+
+    def _notify_step(
+        self,
+        on_step,
+        *,
+        step: int,
+        action,
+        why: str,
+        state,
+        outcome,
+        td_error: float,
+        score: float,
+        prev_threat: float,
+    ) -> float:
+        """Emit the PlayStep for the move just taken; returns the
+        threat to carry into the next step."""
+        threat = float(outcome.info.get("threat", 0.0))
+        events: list[str] = []
+        if outcome.info.get("death") or (
+            outcome.terminal and outcome.reward < 0
+        ):
+            events.append("death")
+        elif prev_threat >= 0.55 and threat <= 0.25:
+            # The danger was closing in and passed — averted
+            # punishment, which the brain rewards as relief.
+            events.append("escaped")
+        if outcome.reward >= 0.2:
+            events.append("scored")
+        if outcome.terminal:
+            events.append("won" if outcome.info.get("won")
+                          else "over")
+        try:
+            on_step(PlayStep(
+                step=step,
+                action=action,
+                why=why,
+                state=state,
+                reward=outcome.reward,
+                td_error=td_error,
+                score=score,
+                threat=threat,
+                terminal=outcome.terminal,
+                events=tuple(events),
+            ))
+        except Exception as e:  # noqa: BLE001 — a listener must
+            note_swallowed(   # never kill her game
+                "frontal_lobe.games.player.listener", e
+            )
+        return threat
 
     def skills(self, game: str) -> int:
         """How many situations she has valued for this game."""

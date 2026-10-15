@@ -191,29 +191,7 @@ class ProjectsMixin:
             # Add what it learned to its concept network. The project
             # concept already exists (added by _add_project_concept);
             # link the feedback to it.
-            try:
-                from temporal_lobe.concepts import RelationType
-
-                feedback_concept = f"feedback_on_{pname}"
-                self.brain.frontal.network.add_concept(
-                    feedback_concept,
-                    confidence=0.85,
-                    properties={
-                        "definition": f"mentor feedback on project {pname}",
-                        "type": "feedback",
-                    },
-                )
-                self.brain.frontal.network.add_edge(
-                    pname, feedback_concept, RelationType.RELATED_TO, 0.8,
-                )
-                self.brain.frontal.network.add_edge(
-                    "genesis", feedback_concept, RelationType.RELATED_TO, 0.7,
-                )
-            except Exception as e:  # noqa: BLE001
-                note_swallowed(
-                    "mind.projects.absorb_project_notes",
-                    e,
-                )
+            self._link_notes_feedback(pname)
 
             # Clear the notes so it doesn't re-absorb them
             clear_project_notes(self.data_dir, pname)
@@ -237,3 +215,29 @@ class ProjectsMixin:
                 "projects": summaries,
             },
         )
+
+    def _link_notes_feedback(self, pname: str) -> None:
+        """Link absorbed mentor feedback to the project concept."""
+        try:
+            from temporal_lobe.concepts import RelationType
+
+            feedback_concept = f"feedback_on_{pname}"
+            self.brain.frontal.network.add_concept(
+                feedback_concept,
+                confidence=0.85,
+                properties={
+                    "definition": f"mentor feedback on project {pname}",
+                    "type": "feedback",
+                },
+            )
+            self.brain.frontal.network.add_edge(
+                pname, feedback_concept, RelationType.RELATED_TO, 0.8,
+            )
+            self.brain.frontal.network.add_edge(
+                "genesis", feedback_concept, RelationType.RELATED_TO, 0.7,
+            )
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.projects.absorb_project_notes",
+                e,
+            )

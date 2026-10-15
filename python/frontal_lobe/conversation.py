@@ -852,29 +852,9 @@ class ConversationMixin:
                 e,
             )
 
-        with self._think_worker_lock:
-            active_worker = self._active_think_worker
-            recovery_active = self._think_recovery_active
-            wedged_since = self._think_wedged_since
-        if active_worker is not None:
-            if active_worker.is_alive() or recovery_active:
-                # Distinguish a wedged thinker from ordinary slowness.
-                # Both return the same fallback text, but the operator
-                # is told which they are looking at — otherwise a
-                # permanently-gated conversation layer is
-                # indistinguishable from a slow one.
-                if wedged_since is not None:
-                    stuck = time.monotonic() - wedged_since
-                    logger.error(
-                        "conversation is still gated by a wedged think() "
-                        "worker (%.0fs). Messages will not be processed "
-                        "until it exits; restart with ./run.sh --stop if "
-                        "it does not.", stuck,
-                    )
-                return self._said(self._respond_timeout(user_input, timeout))
-            with self._think_worker_lock:
-                if self._active_think_worker is active_worker:
-                    self._active_think_worker = None
+        gated = self._respond_while_busy(user_input, timeout)
+        if gated is not None:
+            return gated
 
         self._interaction_count += 1
         # Pause autonomous learning, inner life, expensive self-directed
@@ -904,20 +884,59 @@ class ConversationMixin:
 
         response, state = think_result
         self.brain.frontal.self_learner.resume()
-        # Record developmental evidence from this interaction
+        self._after_thought(user_input, response, state)
+        return self._said(response)
+
+    def _respond_while_busy(
+        self, user_input: str, timeout: float
+    ) -> str | None:
+        """The active-worker gate: a think worker or think-recovery
+        already in flight means this turn gets the fallback text.
+
+        Distinguishes a wedged thinker from ordinary slowness — both
+        return the same fallback text, but the operator is told which
+        they are looking at; otherwise a permanently-gated conversation
+        layer is indistinguishable from a slow one. Returns None when
+        the turn may proceed (the dead worker's slot is cleared)."""
+        with self._think_worker_lock:
+            active_worker = self._active_think_worker
+            recovery_active = self._think_recovery_active
+            wedged_since = self._think_wedged_since
+        if active_worker is None:
+            return None
+        if active_worker.is_alive() or recovery_active:
+            if wedged_since is not None:
+                stuck = time.monotonic() - wedged_since
+                logger.error(
+                    "conversation is still gated by a wedged think() "
+                    "worker (%.0fs). Messages will not be processed "
+                    "until it exits; restart with ./run.sh --stop if "
+                    "it does not.", stuck,
+                )
+            return self._said(self._respond_timeout(user_input, timeout))
+        with self._think_worker_lock:
+            if self._active_think_worker is active_worker:
+                self._active_think_worker = None
+        return None
+
+    def _after_thought(
+        self, user_input: str, response: str, state
+    ) -> None:
+        """Post-response bookkeeping: developmental evidence, the
+        delayed background resume, and the post-conversation
+        self-invoke check (background thread so it doesn't delay
+        the reply)."""
         self._record_developmental_evidence(user_input, response, state)
         self._last_interaction_time = time.time()
         # Resume after a short delay (give conversation breathing room)
         self._defer(10.0, self._resume_background)
         # Check if it should self-invoke a command based on its
-        # post-conversation state. Run in a background thread so it
-        # doesn't delay the response.
+        # post-conversation state.
         threading.Thread(
             target=self._check_post_conversation_self_invoke,
             daemon=True,
             name="post-conv-self-invoke",
         ).start()
-        return self._said(response)
 
     def _said(self, text: str) -> str:
         """Record an outbound utterance in its external world.

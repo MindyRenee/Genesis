@@ -96,7 +96,7 @@ impl MotorTarget {
 fn f32_at(t: &Tensor, i: usize) -> Option<f32> {
     t.data
         .get(i * 4..i * 4 + 4)
-        .map(|b| f32::from_le_bytes(b.try_into().unwrap()))
+        .and_then(|b| b.try_into().ok().map(f32::from_le_bytes))
 }
 
 /// Scan a 2-D `f32` field for its strongest live cell and project the

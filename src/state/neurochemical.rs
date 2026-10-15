@@ -167,9 +167,9 @@ pub const AROUSAL_GAIN: f32 = 3.0;
 /// condition requires the loop gain above ~4, which is exactly what
 /// saturates the readout. Sleep-wake switching does not depend on
 /// this term: it is carried by the `MentalPhase` thresholds and by
-/// the hard NREM/REM arousal clamps below, which are a much stronger
-/// and better-placed source of hysteresis (once NREM is entered,
-/// arousal is pinned to 0.10-0.25 regardless of chemistry).
+/// the sleep-wake network's stage hysteresis — a much stronger and
+/// better-placed source (the network's flip-flop decides the stage
+/// and the chemistry follows, rather than an arousal clamp forcing it).
 pub const WC_SELF_EXCITATION: f32 = 0.15;
 
 /// How sharply the bounded self-excitation engages around mid-arousal.
@@ -208,28 +208,193 @@ pub const ACH_DEGRADATION_RATE: f32 = 0.03;
 /// has a half-life of ~60–90 minutes with first-order kinetics
 /// (Basic & Clinical Pharmacology, 13th Ed.).
 ///
-/// Genesis operates at 10 Hz (DT=0.1s), so modeling biological timescales
-/// directly would require thousands of ticks for a single cortisol decay.
-/// Instead, the clearance is nonlinear and timescale-compressed:
+/// The clearance here is nonlinear and phenomenological — proportional
+/// to the excess above baseline, applied in the exact exponential form
+/// `level *= exp(-rate * excess * dt / DT)`:
 ///
 /// ```text
-/// effective_clearance = CORTISOL_CLEARANCE_RATE * max(0, level - baseline)
-/// level *= (1 - effective_clearance)
+/// effective_rate = CORTISOL_CLEARANCE_RATE * max(0, level - baseline) / DT
 /// ```
 ///
-/// At 0.08 per tick, the effective decay is fast when cortisol is elevated
-/// above baseline, but zero at baseline. This captures the biological
-/// upregulation of 11β-HSD2 under sustained high cortisol while remaining
-/// computationally tractable.
-///
-/// The measured equilibrium at realistic ACTH levels:
-///   ACTH 0.02 -> cortisol 0.275
-///   ACTH 0.05 -> cortisol 0.458
-///   ACTH 0.10 -> cortisol 0.665   (the Stress gate)
-///   ACTH 0.16 -> cortisol 0.852
+/// At 0.08 per tick-scale the effective decay is fast when cortisol is
+/// elevated but vanishes at baseline. This captures the upregulation of
+/// 11β-HSD2 under sustained high cortisol and holds the equilibrium at
+/// the measured reachable envelope (~0.06 under sustained drive, well
+/// below the 0.80 hard clamp), without the level ever pinning at the
+/// clamp. The linear metabolic term ([`CORTISOL_METABOLIC_RATE`])
+/// dominates near baseline, where this term vanishes, and sets the
+/// biologically measured low-level tail.
 ///
 /// (Tomlinson et al., 2004; Hellhammer et al., 2009; Nature Communications 2024 on 11β-HSD)
 pub const CORTISOL_CLEARANCE_RATE: f32 = 0.08;
+
+/// First-order metabolic leak for cortisol, per second.
+///
+/// Cortisol's measured plasma half-life is ~66 min at normal hormone
+/// levels, 57–64 min directly measured and up to ~120 min under large
+/// loads (Bancos, Endocr Connect 2017; Keenan et al. 2004; PMC9815201).
+/// ln(2) / 3960 s ≈ 1.75e-4/s. This term is the dominant decay only near
+/// baseline, where the nonlinear clearance vanishes; it makes the
+/// post-stress tail persist on the measured hour-scale instead of the
+/// ~2.3 min the shared stress-hormone leak used to give.
+pub const CORTISOL_METABOLIC_RATE: f32 = 1.75e-4;
+
+/// First-order metabolic leak for CRH, per second.
+///
+/// CRH is a hypothalamic releasing hormone with a plasma half-life of
+/// only a few minutes; 0.005/s is a ~2.3 min half-life, so a stress
+/// signal clears once its cause is gone.
+pub const CRH_METABOLIC_RATE: f32 = 0.005;
+
+// ─── Circulating endocrine pools ─────────────────────────────
+//
+// Epinephrine, oxytocin, β-endorphin, and vasopressin circulate in
+// plasma and CSF on minute-scale turnover — not the synaptic
+// timescale the generic neural spring encodes (~seconds). Each is
+// modeled as a first-order secretion/clearance pool,
+//
+//     dL/dt = k·(L_basal − L) + release drives + coupling modulators
+//
+// which is the exact reduced form of a pool with secretion rate S and
+// first-order clearance k (equilibrium L_basal = S/k). The neural
+// spring is skipped for them: it would restore a released bolus in
+// ~seconds, ~100× faster than their measured plasma half-lives, so
+// endocrine signals would carry no memory. Coupling inputs and
+// impulses still act — they are the release modulators — attenuated
+// onto the slow pool by HORMONE_COUPLING_GAIN so a persistent neural
+// push settles at a bounded deviation rather than pinning the clamp.
+
+/// Epinephrine plasma clearance, per second.
+///
+/// IV epinephrine disappears from plasma with an effective half-life
+/// under 5 min (FDA label); directly measured during cardiac-arrest
+/// infusion it is 2.6 min, 95% CI 1.9–4.4 (Resuscitation 2023 pilot
+/// PK study). Clearance is hepatic COMT plus MAO deamination with
+/// renal and skeletal-muscle extraction (liver ~32%, kidney ~25%,
+/// muscle ~20%). ln(2)/150 s ≈ 4.6e-3/s — fast for a hormone, so
+/// adrenaline elevations outlast their cause by only a few minutes.
+pub const EPINEPHRINE_METABOLIC_RATE: f32 = 4.6e-3;
+
+/// Oxytocin plasma clearance, per second.
+///
+/// Circulating oxytocin turns over with a half-life of 5–15 min
+/// (Endotext, "The Neurohypophysis"); the central pool this variable
+/// stands for persists longer than plasma. The mid-range of the
+/// plasma figure is used: ln(2)/600 s ≈ 1.2e-3/s.
+pub const OXYTOCIN_METABOLIC_RATE: f32 = 1.2e-3;
+
+/// β-endorphin plasma clearance, per second.
+///
+/// After an IV bolus in humans, β-endorphin disappears triple-
+/// exponentially — components at 4.1, 13.1, and 46.2 min — with a
+/// mean terminal half-life of ~37 min (Reid et al. 1981; Foley et
+/// al. 1979). The dominant functional pool turns over near the
+/// mid-range component: ln(2)/1200 s ≈ 5.8e-4/s.
+pub const ENDORPHIN_METABOLIC_RATE: f32 = 5.8e-4;
+
+/// Vasopressin plasma clearance, per second.
+///
+/// AVP circulates unbound and is degraded by hepatic and renal
+/// vasopressinases with a half-life of 10–35 min (synthetic
+/// argipressin ~24 min; Endotext gives 5–15 min for AVP and OT).
+/// ln(2)/900 s ≈ 7.7e-4/s.
+pub const VASOPRESSIN_METABOLIC_RATE: f32 = 7.7e-4;
+
+/// β-endorphin co-release rate with ACTH, per second.
+///
+/// β-endorphin is cleaved from proopiomelanocortin (POMC) in anterior
+/// pituitary corticotrophs and released concomitantly with ACTH in
+/// equimolar amounts under every secretagogue tested — acute stress,
+/// CRH, dexamethasone withdrawal (Guillemin et al., Science 1977;
+/// Allen & Herbert, PNAS 1978). The pituitary's ACTH level is
+/// therefore the release drive. 1e-3·acth against the 5.8e-4
+/// clearance gives a stress deviation of ~0.2–0.5 above baseline at
+/// ACTH ~0.3–0.5 — a few-fold rise, matching the preferential
+/// β-endorphin release measured under acute stress (Young et al.,
+/// J Clin Endocrinol Metab 1993).
+pub const ENDORPHIN_POMC_DRIVE: f32 = 1.0e-3;
+
+/// Parvocellular CRH co-secretion drive for vasopressin, per second.
+///
+/// Parvocellular PVN neurons projecting to the median eminence
+/// co-release AVP with CRH into the hypophyseal portal blood during
+/// stress (Endotext; Antoni 1993). 5e-4·crh against the 7.7e-4
+/// clearance gives a stress deviation of ~0.3 at CRH ~0.5.
+pub const VASOPRESSIN_CRH_DRIVE: f32 = 5.0e-4;
+
+/// Coupling-force gain onto the endocrine pools.
+///
+/// The coupling matrix encodes neural release modulators (e.g.
+/// preganglionic ACh → adrenal medulla for epinephrine, cortisol →
+/// PNMT induction). Scaled small because the slow pools integrate
+/// persistent pushes against minute-scale clearance — unscaled,
+/// ordinary coupling deviations would saturate them at the clamp.
+pub const HORMONE_COUPLING_GAIN: f32 = 0.06;
+
+/// V1b potentiation of CRH-evoked ACTH release.
+///
+/// Vasopressin alone is a weak ACTH secretagogue but synergizes
+/// strongly with CRH at corticotroph V1b (V3) receptors; V1b−/− mice
+/// lose the AVP-driven ACTH rise entirely (Tanoue et al., JCI 2002;
+/// Endotext). Modeled multiplicatively on pituitary CRH sensitivity:
+/// `1 + k·(AVP excess above baseline)`, bounded.
+pub const VASOPRESSIN_ACTH_POTENTIATION: f32 = 1.0;
+
+/// Oxytocin attenuation of HPA reactivity.
+///
+/// Central oxytocin inhibits HPA-axis reactivity — the endocrine arm
+/// of social buffering: intranasal oxytocin plus social support gave
+/// the lowest cortisol response to the Trier stress test (Heinrichs
+/// et al., Biol Psychiatry 2003); brain oxytocin inhibits HPA
+/// reactivity in rats (Neumann et al., J Neuroendocrinol 2000).
+/// Modeled as `1 − k·(OT excess)`, bounded so the axis is attenuated,
+/// never abolished.
+pub const OXYTOCIN_HPA_ATTENUATION: f32 = 0.5;
+
+/// EAAT uptake of excess ambient glutamate (per-tick convention, as
+/// ACH_DEGRADATION_RATE).
+///
+/// Astrocytic EAAT1/2 transport clears >90% of released glutamate
+/// from the extracellular space (Danbolt 2001), keeping ambient
+/// concentrations tightly clamped (~25 nM–1 µM). Applied to the
+/// excess above baseline only: the homeostatic pull already encodes
+/// the glutamate–glutamine cycle's resynthesis at rest, so degrading
+/// the absolute level would double-count clearance (same argument as
+/// the AChE term).
+pub const GLUTAMATE_EAAT_RATE: f32 = 0.02;
+
+/// Glutamate consumed as the GABA precursor, per second.
+///
+/// GABA is synthesized stoichiometrically from glutamate by glutamic
+/// acid decarboxylase — GAD67 constitutively (~90% of basal
+/// synthesis), GAD65 activity-dependently at terminals (Nature
+/// Struct Mol Biol; Soghomonian & Martin 1998). A GABA pool driven
+/// above baseline (VLPO in NREM, inhibitory impulses) therefore
+/// draws ambient glutamate down. The rate is small in absolute
+/// terms — GABA synthesis consumes a minor fraction of the large
+/// ambient glutamate pool — but visible against the spring: a
+/// sustained GABA elevation of ~0.3 (VLPO in NREM) settles
+/// glutamate a few hundredths below baseline, matching the lowered
+/// extracellular glutamate measured in NREM.
+pub const GLUTAMATE_GAD_RATE: f32 = 0.10;
+
+/// Measured plasma clearance for the circulating endocrine chemicals,
+/// or `None` for everything else (neural transmitters keep the generic
+/// spring; adenosine, cortisol, CRH, melatonin, and the network-driven
+/// monoamines have their own mechanisms).
+const fn circulating_hormone_clearance(idx: usize) -> Option<f32> {
+    if idx == NeurochemicalId::Epinephrine as usize {
+        Some(EPINEPHRINE_METABOLIC_RATE)
+    } else if idx == NeurochemicalId::Oxytocin as usize {
+        Some(OXYTOCIN_METABOLIC_RATE)
+    } else if idx == NeurochemicalId::Endorphin as usize {
+        Some(ENDORPHIN_METABOLIC_RATE)
+    } else if idx == NeurochemicalId::Vasopressin as usize {
+        Some(VASOPRESSIN_METABOLIC_RATE)
+    } else {
+        None
+    }
+}
 
 /// Cortisol level at which the stress phase engages.
 ///
@@ -239,6 +404,36 @@ pub const CORTISOL_CLEARANCE_RATE: f32 = 0.08;
 /// 0.060: three times resting, so ordinary variation cannot trigger
 /// it, and 71% of the measured maximum, so a genuine drive can.
 pub const STRESS_CORTISOL_GATE: f32 = 0.06;
+
+/// Cortisol's measured resting level — the floor the effective level
+/// relaxes to with no stressor.
+pub const CORTISOL_RESTING_LEVEL: f32 = 0.02;
+
+/// Cortisol's measured reachable peak under sustained HPA drive.
+///
+/// The production/clearance equilibrium sits far below the 0.80 hard
+/// clamp, so effects that were written for a full [0, 1] cortisol
+/// scale (valence drag, plasticity suppression) must be expressed
+/// against this envelope or they are inert: against the raw level,
+/// `cort * 0.35` can move valence by at most ~0.03 and `cort * 0.5`
+/// can suppress plasticity by at most ~4%.
+pub const CORTISOL_PEAK_LEVEL: f32 = 0.08;
+
+/// Cortisol's effect strength as a fraction of its physiological
+/// range: 0 at the resting floor (basal glucocorticoid tone is not
+/// aversive and does not suppress plasticity), 1 at the reachable
+/// peak. Basal levels are required for normal function — the aversive
+/// and anti-plastic effects belong to *elevated* cortisol, so the
+/// excess above rest is what counts.
+///
+/// `pub(crate)` because `daemon::consolidation::compute_compact_tag`
+/// re-derives valence from stored emotional tags and must use the same
+/// scaling.
+#[inline]
+pub(crate) fn cortisol_stress_fraction(cort: f32) -> f32 {
+    ((cort - CORTISOL_RESTING_LEVEL) / (CORTISOL_PEAK_LEVEL - CORTISOL_RESTING_LEVEL))
+        .clamp(0.0, 1.0)
+}
 
 /// Norepinephrine level at which the stress phase engages.
 ///
@@ -283,39 +478,16 @@ pub const ALERT_HISTAMINE_GATE: f32 = 0.34;
 /// drive does not flip her back out of the state.
 pub const ALERT_STAY_FACTOR: f32 = 0.94;
 
-/// Acetylcholine raw level at which REM is entered.
-///
-/// This gate compares RAW levels, not effective levels: the flip-flop
-/// describes REM-on neuronal firing rather than receptor occupancy.
-/// Raw acetylcholine rests at 0.333 and reaches 0.569 during sleep
-/// (effective level saturates lower, near 0.33-0.48, because higher
-/// concentration drives its own receptor desensitization).
-///
-/// The gate at 0.45 sits above resting raw level with margin and
-/// below the sleep maximum, so it discriminates the sleep state from
-/// the resting state. A previous value of 0.32 sat *below* the
-/// resting raw level of 0.333, so the conjunct was true on default
-/// chemistry and REM fired in tests that expected NREM.
-pub const REM_ACETYLCHOLINE_GATE: f32 = 0.45;
-
-/// Multiplier applied to the REM acetylcholine gate once REM is
-/// entered, so the state is stickier than it is to enter.
-pub const REM_STAY_FACTOR: f32 = 0.94;
-
-/// Norepinephrine effective level below which REM is held.
-///
-/// REM is the noradrenergic-silent state (Jadot et al., 1995), so low
-/// norepinephrine is the defining condition. The stay-threshold
-/// matches the enter-threshold rather than exceeding it, so REM
-/// releases as sleep pressure rises instead of persisting across the
-/// whole descent into sleep.
-pub const REM_NOREPI_GATE: f32 = 0.30;
+// REM staging is owned by the sleep-wake network (REM-on firing above
+// `sleep_network::REM_THRESHOLD`), not by chemistry gates. The retired
+// chemistry-side gates — REM_ACETYLCHOLINE_GATE, REM_STAY_FACTOR and
+// REM_NOREPI_GATE — were removed rather than left as dead constants.
 
 /// Adenosine level at which drowsiness begins.
 ///
-/// Sits below the exhaustion-hold release threshold (0.75) so that
-/// Drowsy occupies the band between waking and sleep rather than
-/// being swallowed by the sleep hold.
+/// Sits below the auto-sleep pressure level (0.75) so that Drowsy
+/// occupies the band between waking and sleep rather than being
+/// swallowed by it.
 pub const DROWSY_ADENOSINE_GATE: f32 = 0.50;
 
 /// Hysteresis factor for the drowsiness adenosine gate.
@@ -657,7 +829,7 @@ impl NeurochemicalId {
             // not literal biological concentrations. Zero is the
             // modeled resting stress increment.
             Self::Cortisol => 0.0,
-            Self::CRH => 0.0
+            Self::CRH => 0.0,
         }
     }
 
@@ -1890,10 +2062,11 @@ impl NeurochemicalVector {
         // self-centering tendency — deviations from mid-arousal are
         // damped rather than amplified — while leaving the response
         // monotone and graded in chemistry. Sleep-wake switching is
-        // handled by the `MentalPhase` thresholds and the hard
-        // NREM/REM arousal clamps further down, which pin arousal
-        // outright once a sleep phase is entered and so provide far
-        // stronger hysteresis than a soft feedback term ever did.
+        // handled by the `MentalPhase` thresholds and by the
+        // network-driven arousal target below, which follows the
+        // sleep-wake network's populations once a sleep stage is
+        // entered and so provides far stronger hysteresis than a soft
+        // feedback term ever did.
         //
         // (Wilson & Cowan, 1972; Saper, Chou & Scammell, 2005)
         let current_arousal = self.arousal;
@@ -1976,9 +2149,14 @@ impl NeurochemicalVector {
 
         let glu_excess = (glu - 0.70).max(0.0);
         let da_srt_synergy = da * srt * 0.10;
+        // Cortisol's valence drag and plasticity suppression are written
+        // for a hormone on its full [0, 1] range; the substrate's
+        // reachable envelope is ~0.02–0.08, so the effects are scaled by
+        // the fraction of that envelope in use (see CORTISOL_PEAK_LEVEL).
+        let cort_stress = cortisol_stress_fraction(cort);
 
         self.valence = da * 0.25 + srt * 0.25 + oxy * 0.10 + end * 0.15 + ne * 0.10
-            - cort * 0.35
+            - cort_stress * 0.35
             - glu_excess * 0.15
             + da_srt_synergy;
         self.valence = crate::state::sanitize::finite_clamp(self.valence, -1.0, 1.0);
@@ -1991,7 +2169,7 @@ impl NeurochemicalVector {
         // Plasticity gate: BDNF promotes, cortisol suppresses
         let bdnf = eff(NeurochemicalId::BDNF);
         self.plasticity_gate =
-            crate::state::sanitize::finite_clamp(bdnf * (1.0 - cort * 0.5), 0.0, 1.0);
+            crate::state::sanitize::finite_clamp(bdnf * (1.0 - cort_stress * 0.5), 0.0, 1.0);
 
         // Emergent phase
         self.emergent_phase = self.compute_phase() as u8;
@@ -2017,8 +2195,10 @@ impl NeurochemicalVector {
     /// stressor.
     pub fn wake_recovery(&mut self) {
         let cort = self.chemicals[NeurochemicalId::Cortisol as usize].level;
-        // Only recover if there is no ongoing stress.
-        if cort > 0.3 {
+        // Only recover if there is no ongoing stress. The gate is the
+        // stress-phase boundary — cortisol's reachable envelope tops
+        // out around ~0.08, so the previous 0.3 could never block.
+        if cort > STRESS_CORTISOL_GATE {
             return;
         }
         // Boost depleted neurotransmitters toward baseline and
@@ -2117,25 +2297,22 @@ impl NeurochemicalVector {
         // partly receptor-independent — it directly inhibits excitatory
         // neurons via volume transmission and extrasynaptic A1 receptors
         // that are not subject to the same downregulation as synaptic
-        // receptors (Porkka-Heiskanen & Kalinchuk, 2011). When A1/A2A
-        // receptors are downregulated from sustained arousal, the raw
-        // metabolic pressure (ATP byproduct accumulation) still drives
-        // sleep. Using a 50/50 blend ensures that extreme sleep pressure
-        // (raw adenosine > 0.90) can still trigger sleep even when
-        // receptor sensitivity is at floor (0.50), preventing the
-        // feedback trap where receptor burnout makes sleep impossible
-        // and sleep is needed for receptor recovery.
+        // receptors (Porkka-Heiskanen & Kalinchuk, 2011). Using a 50/50
+        // blend ensures that high metabolic pressure still gates
+        // Drowsy — and feeds the mind's sleep-pressure signal — even
+        // when receptor sensitivity is at floor (0.50). Sleep onset
+        // itself is owned by the sleep-wake network, not by this
+        // classifier.
         let adn = adn_eff * 0.5 + adn_raw * 0.5;
 
         // Hysteresis margins: easier to stay than to enter
         // Enter threshold requires stricter conditions; stay threshold relaxes by margin
         let h = 0.08; // hysteresis margin
 
-        // Sleep phase: adenosine very high, histamine very low, with
-        // melatonin and orexin gating the threshold. High melatonin
-        // (circadian night) lowers the adenosine/histamine barrier; high
-        // orexin (wake stabilizer) raises it. This makes sleep a
-        // multi-system decision, not adenosine alone.
+        // The sleep stages (NREM, REM) are not classified here: the
+        // sleep-wake network owns them and injects them via
+        // `apply_network_phase`. This classifier names only the waking
+        // phases.
         //
         // Overwhelmed: cortisol and NE both at their ceiling.
         //
@@ -2223,6 +2400,15 @@ impl NeurochemicalVector {
         // this substrate does not produce. Resting dopamine is 0.384
         // and it peaks at 0.416, so 0.55/0.45 is 1.4x resting with
         // headroom for a genuine engagement state.
+        //
+        // The cortisol exclusion had the same scale problem: 0.30 sat
+        // above the entire reachable envelope (~0.08 peak), so flow
+        // could fire during active stress. The gate is now the
+        // stress-phase boundary itself — flow requires cortisol out of
+        // stress territory, matching the biology (glucocorticoid tone
+        // dissolves flow). No `+h` margin: the hysteresis term is
+        // wider than the whole cortisol range and would push the
+        // bound above the peak again.
         let flow_da = if current == MentalPhase::Flow {
             FLOW_DOPAMINE_GATE * 0.88
         } else {
@@ -2233,7 +2419,7 @@ impl NeurochemicalVector {
         } else {
             FLOW_ACETYLCHOLINE_GATE
         };
-        if da > flow_da && ach > flow_ach && ne > 0.40 && cort < 0.30 + h {
+        if da > flow_da && ach > flow_ach && ne > 0.40 && cort < STRESS_CORTISOL_GATE {
             return MentalPhase::Flow;
         }
 
@@ -2335,9 +2521,10 @@ impl NeurochemicalVector {
     /// - **GABA disinhibition**: when GABA is very high (>0.8) AND ACh is
     ///   high (>0.6), GABA interneurons inhibit other GABA interneurons,
     ///   disinhibiting glutamate (a small positive coupling to GLU).
-    /// - **BDNF recovery after stress**: when cortisol drops below 0.3
-    ///   and BDNF is below baseline, BDNF gets a recovery boost
-    ///   proportional to serotonin level (serotonin drives BDNF expression).
+    /// - **BDNF recovery after stress**: when cortisol clears below the
+    ///   stress-phase gate (`STRESS_CORTISOL_GATE`) and BDNF is below
+    ///   baseline, BDNF gets a recovery boost proportional to serotonin
+    ///   level (serotonin drives BDNF expression).
     /// - **Hard clamps**: cortisol is clamped to [0, cortisol_max] and NE
     ///   to [0, ne_max] to prevent runaway stress/arousal.
     /// - **Split receptor adaptation**: desensitization (fast,
@@ -2576,6 +2763,18 @@ impl NeurochemicalVector {
         // coupling forces, eCB synthesis, and the HPA cascade drive.
         self.recompute_derived_with_dt(dt_scale, params.network_levels);
 
+        // Whether the sleep-wake network itself is in a sleep state
+        // (LC below the source's 4 Hz threshold). Sleep handling must
+        // follow the body's actual state, not only the mind's zone:
+        // `zone_sleeping` is set from a snapshot taken before this call,
+        // so when the network crosses into sleep while the zone still
+        // reads awake — the idle-deferral window, a stalled mind, any
+        // desync — Process S must still clear. Without this, adenosine
+        // accumulates during actual sleep.
+        let network_asleep = params
+            .network_levels
+            .is_some_and(crate::state::sleep_network::levels_asleep);
+
         // Snapshot current effective levels for the coupling computation
         // (avoid in-place feedback during the step). Baselines are read
         // directly from self.chemicals[i].baseline inside the loop — no
@@ -2623,6 +2822,7 @@ impl NeurochemicalVector {
         let srt_idx = NeurochemicalId::Serotonin as usize;
         let glu_idx = NeurochemicalId::Glutamate as usize;
         let gaba_idx = NeurochemicalId::GABA as usize;
+        let crh_idx = NeurochemicalId::CRH as usize;
 
         // Update each chemical's velocity and level
         #[allow(clippy::needless_range_loop, reason = "i indexes multiple arrays")]
@@ -2649,16 +2849,22 @@ impl NeurochemicalVector {
             // cascade push them up when stressors are present.
             let is_stress_hormone =
                 i == NeurochemicalId::Cortisol as usize || i == NeurochemicalId::CRH as usize;
+            // The circulating endocrine chemicals (epinephrine,
+            // oxytocin, β-endorphin, vasopressin) integrate as
+            // first-order secretion/clearance pools at their measured
+            // plasma half-lives — see the constants block and the
+            // branch below, which skips the generic neural update for
+            // them entirely.
+            let hormone_clearance = circulating_hormone_clearance(i);
             // Adenosine has its own dedicated sleep-pressure mechanism
             // (saturating exponential accumulation during wakefulness,
             // glymphatic clearance during sleep) that directly manages
             // its level. During WAKEFULNESS, the homeostatic force
             // pulls adenosine toward its baseline (0.20), which is
             // ~34× stronger than the accumulation rate (0.055/hour).
-            // This prevents adenosine from ever reaching the sleep
-            // threshold (0.75), trapping the system in a "receptor
-            // burnout" state where sleep can't be triggered and
-            // receptors can't resensitize.
+            // This prevents adenosine from ever building sleep
+            // pressure, trapping the system in a "receptor burnout"
+            // state where receptors can't resensitize.
             //
             // During SLEEP, the homeostatic force is even more
             // destructive: it pulls the level (at ~0.75 from
@@ -2666,23 +2872,32 @@ impl NeurochemicalVector {
             // (0.20) at a rate amplified by the autoreceptor
             // nonlinear factor (up to 33× for large deviations).
             // This crashes the level from 0.75 to 0.20 in seconds,
-            // triggering auto-wake almost immediately and preventing
-            // any meaningful sleep. The glymphatic clearance is
-            // designed to take ~7.6 hours (0.000002/tick), but the
-            // homeostatic force overrides it entirely.
+            // while the exponential glymphatic clearance is designed
+            // to run on a ~4.2 h time constant (chi_s, Daan, Beersma
+            // & Borbély 1984).
             //
             // Fix: skip the main loop entirely for adenosine during
             // sleep. The glymphatic clearance mechanism (below)
-            // directly reduces the level at the configured clearance
-            // rate, giving the correct hours-timescale sleep duration.
+            // directly reduces the level exponentially, giving the
+            // correct hours-timescale sleep duration.
             let is_adenosine = i == NeurochemicalId::Adenosine as usize;
+            let is_glutamate = i == NeurochemicalId::Glutamate as usize;
             let current_phase = MentalPhase::from_u8(self.emergent_phase);
-            // The zone is the cognitive layer's authority on sleep
-            // state: when it says Sleeping, sleep-mode handling applies
-            // even if the emergent phase hasn't crossed the thresholds.
+            // The sleep-wake network is the body's authority on sleep
+            // state: when its LC firing is below the source's 4 Hz
+            // sleep-onset threshold, sleep-mode handling applies even
+            // if the mind's zone still reads awake. `emergent_phase`
+            // cannot be relied on here — it is recomputed every tick by
+            // `recompute_derived` and the waking-phase classifier it
+            // runs never produces NREM/REM (the network injects those
+            // stages only at the end of the tick, via
+            // `apply_network_phase`). The zone is the cognitive layer's
+            // authority: when it says Sleeping, sleep-mode handling
+            // applies even if the network has not crossed the threshold.
             let is_sleeping = current_phase == MentalPhase::NREM
                 || current_phase == MentalPhase::REM
-                || params.zone_sleeping;
+                || params.zone_sleeping
+                || network_asleep;
             if is_adenosine && is_sleeping {
                 // Zero residual velocity from the last wakeful tick
                 // so it doesn't push the level back up on the next
@@ -2691,53 +2906,20 @@ impl NeurochemicalVector {
                 self.chemicals[i].velocity = 0.0;
                 continue;
             }
-            // The trigger is 0.80, not 0.65: the two thresholds were keyed
-            // to different signals and so could never both be met inside
-            // one bout. The bout ends when *blended* adenosine
-            // (0.5*effective + 0.5*raw) falls below its stay threshold,
-            // while the rebound tested *raw* against 0.65. Effective
-            // trails raw while receptors recover, so raw is always the
-            // larger and the raw threshold was only reached after the bout
-            // had already ended -- measured at 0.0% of NREM ticks, with
-            // REM occupancy exactly 0%.
-            //
-            // The rule is that REM propensity builds as homeostatic
-            // pressure relaxes *back toward the level at which sleep was
-            // initiated*, not as it nearly bottoms out. Borbely &
-            // Achermann (1999) note REM is inhibited by Process S, so
-            // falling pressure matters, not exhausted pressure;
-            // Benington & Heller (1994) likewise found REM propensity
-            // increasing across NREM rather than at its end. 0.80 is the
-            // model's own sleep-onset neighbourhood, so the rebound runs
-            // on a timescale set by the existing architecture rather than
-            // a threshold no bout could satisfy.
-            // Cholinergic rebound: during sustained NREM (adenosine
-            // has cleared below 0.65, ~83 min into sleep) or during
-            // REM, ACh is managed by the dedicated cholinergic rebound
-            // mechanism below — not by the homeostatic/coupling forces.
-            // The homeostatic force (pulling toward 0.35) and the
-            // coupling forces (GABA, melatonin suppressing ACh) would
-            // prevent ACh from ever reaching the 0.50 REM threshold.
-            // See the cholinergic rebound section after the adenosine
-            // sleep pressure mechanism.
-            // Serotonin: dorsal raphe 5-HT neurons are a REM-off
-            // population, so their firing — and therefore the
-            // serotonergic tone the phase gate reads — is state
-            // dependent: high in wake, reduced through NREM, and
-            // near-silent in REM (Monti & Jantos 2008; Sakai &
-            // Crochet 2001). The dedicated mechanism below owns that
-            // profile, so the homeostatic pull toward baseline (0.40)
-            // and the coupling forces are skipped during sleep exactly
-            // as they are for acetylcholine and adenosine. Left to
-            // them, serotonin measured identically in wake and NREM
-            // (0.3917 vs 0.3918 over 24 h, range 0.358-0.398), so the
-            // REM-off population was not represented at all.
-            // When the sleep-wake network drives these chemicals, their level is
-            // set by the network's release target (see the network block after
-            // this loop). They have no fixed setpoint to be restored to, so the
-            // generic update — homeostatic pull, autoreceptor, coupling — is
-            // skipped for them, as it already is for adenosine and the stress
-            // hormones.
+            // When the sleep-wake network drives these chemicals, their
+            // level is set by the network's release target (see the
+            // network block after this loop), following each
+            // population's measured state profile: ACh high in waking
+            // and REM and lowest in NREM (Vazquez & Baghdoyan 2001);
+            // serotonin a REM-off dorsal raphe profile, high in wake,
+            // reduced in NREM, near-silent in REM (Monti & Jantos 2008;
+            // Sakai & Crochet 2001). They have no fixed setpoint to be
+            // restored to, so the generic update — homeostatic pull,
+            // autoreceptor, coupling — is skipped for them, as it
+            // already is for adenosine and the stress hormones. The
+            // scripted cholinergic rebound and the dedicated serotonin
+            // mechanism that used to live here are retired: the network
+            // owns REM staging now.
             let network_driven = params.network_levels.is_some()
                 && [
                     NeurochemicalId::Acetylcholine,
@@ -2777,6 +2959,14 @@ impl NeurochemicalVector {
                 // would fight both — preventing accumulation during
                 // wakefulness (receptor burnout trap) and crashing
                 // the level during sleep (see the continue above).
+                0.0
+            } else if hormone_clearance.is_some() {
+                // Circulating hormones bypass the generic update
+                // below; their restoring channel is the measured
+                // first-order clearance, applied directly to level.
+                // (Value unused — the branch `continue`s before the
+                // velocity update — but kept explicit so a reorder
+                // cannot silently reactivate the neural spring.)
                 0.0
             } else {
                 let deviation = homeostatic_baseline - self.chemicals[i].level;
@@ -2970,6 +3160,47 @@ impl NeurochemicalVector {
                 0.0
             };
 
+            // Circulating endocrine pools: first-order secretion/
+            // clearance at the measured plasma half-life instead of
+            // the neural spring. The spring restores a released bolus
+            // in ~seconds; these hormones turn over in 2.6–46 min, so
+            // under the spring an endocrine signal would carry almost
+            // no memory.
+            //
+            //     dL/dt = k·(L_basal − L) + drives + coupling modulators
+            //
+            // — the exact reduced form of a pool with secretion rate S
+            // and first-order clearance k (equilibrium L_basal = S/k).
+            // Coupling inputs and impulses still act as release
+            // modulators, attenuated by HORMONE_COUPLING_GAIN so a
+            // persistent neural push settles at a bounded deviation
+            // instead of pinning at the clamp. Velocity is forced to
+            // zero: these pools have no neural-timescale momentum.
+            if let Some(metabolic_rate) = hormone_clearance {
+                let drive = if i == NeurochemicalId::Endorphin as usize {
+                    // β-endorphin is co-released equimolarly with ACTH
+                    // from POMC in the anterior pituitary (Guillemin
+                    // et al., Science 1977; Allen & Herbert, PNAS
+                    // 1978) — the pituitary's ACTH level is the drive,
+                    // so SHRP gating propagates for free.
+                    ENDORPHIN_POMC_DRIVE * self.acth_level
+                } else if i == NeurochemicalId::Vasopressin as usize {
+                    // Parvocellular PVN neurons co-secrete AVP with CRH
+                    // into the hypophyseal portal blood during stress
+                    // (Endotext; Antoni 1993).
+                    VASOPRESSIN_CRH_DRIVE * eff_snapshot[crh_idx]
+                } else {
+                    0.0
+                };
+                let restore = metabolic_rate * (homeostatic_baseline - self.chemicals[i].level);
+                self.chemicals[i].level +=
+                    (restore + coupling_force * HORMONE_COUPLING_GAIN + drive + noise) * dt;
+                self.chemicals[i].level =
+                    crate::state::sanitize::finite_clamp(self.chemicals[i].level, 0.0, 1.0);
+                self.chemicals[i].velocity = 0.0;
+                continue;
+            }
+
             self.chemicals[i].velocity += (homeostatic_force + coupling_force) * dt + noise;
             self.chemicals[i].velocity *= damping.powf(dt_scale);
             self.chemicals[i].level += self.chemicals[i].velocity * dt;
@@ -3001,43 +3232,68 @@ impl NeurochemicalVector {
                 self.chemicals[i].level -= ach_excess * (1.0 - decay_factor);
             }
 
-            // Stress hormone metabolic decay (leaky integrator).
+            if is_glutamate {
+                // EAAT uptake: astrocytic EAAT1/2 clear >90% of
+                // released glutamate from the extracellular space
+                // (Danbolt 2001), the dominant glutamate-clearance
+                // pathway in brain. Excess-only, same convention as
+                // AChE: the homeostatic pull already encodes the
+                // glutamate–glutamine cycle's resynthesis at
+                // baseline, so only the elevation above the ambient
+                // set-point is removed.
+                let glu_excess = (self.chemicals[i].level - homeostatic_baseline).max(0.0);
+                let uptake_factor = (1.0_f32 - GLUTAMATE_EAAT_RATE).powf(dt_scale);
+                self.chemicals[i].level -= glu_excess * (1.0 - uptake_factor);
+
+                // GAD drain: GABA is synthesized stoichiometrically
+                // from glutamate by glutamic acid decarboxylase
+                // (GAD67 constitutive, ~90% of basal synthesis;
+                // GAD65 activity-dependent at terminals — Soghomonian
+                // & Martin 1998; Före et al. 2020). Synthesis demand
+                // scales with GABAergic *release activity*, so the
+                // gate is the effective level — not the raw pool.
+                // Raw GABA can sit above baseline under receptor
+                // desensitization without elevated signaling, and
+                // draining glutamate for that would punish excitation
+                // for what is actually compensatory overproduction.
+                let gaba_excess =
+                    (eff_snapshot[gaba_idx] - self.chemicals[gaba_idx].baseline).max(0.0);
+                self.chemicals[i].level -= GLUTAMATE_GAD_RATE * gaba_excess * dt;
+            }
+
+            // Stress hormone metabolic decay (leaky integrator),
+            // with the rate set from each hormone's measured plasma
+            // half-life — they differ by orders of magnitude.
             //
-            // Cortisol and CRH have no homeostatic set-point — their
-            // resting level is zero. They decay via a first-order
-            // exponential process (half-life ~138 seconds at rate
-            // 0.005/sec). This is applied directly to level (not through
-            // velocity) so the decay is truly first-order: Δlevel ≈
-            // -level × rate × dt. The cortisol-specific
-            // CORTISOL_CLEARANCE_RATE (applied later in the HPA cascade
-            // section) provides additional nonlinear clearance
-            // proportional to level above baseline. Together they give
-            // cortisol a half-life of ~5-7 seconds at moderate levels
-            // when no stressor is active.
+            // Cortisol's half-life is 66 min at normal hormone levels,
+            // rising to 120 min under large loads, and a directly
+            // measured slow half-life is 57-64 min (Bancos, Endocr
+            // Connect 2017; Keenan et al. 2004; PMC9815201), giving a
+            // first-order rate of ln(2)/3960 ≈ 1.75e-4/s. Cortisol also
+            // gets the nonlinear CORTISOL_CLEARANCE_RATE term (applied
+            // later in the HPA cascade section), proportional to the
+            // excess above baseline. That term dominates at moderate
+            // and high levels — the measured half-life governs the
+            // low-level tail, so a stress elevation outlasts its cause
+            // by tens of minutes rather than collapsing in ~2 min.
             //
-            // Uses the exact exponential form exp(-rate×dt) rather than
-            // the linear approximation 1-rate×dt, for time-invariance
-            // and stability at large dt values.
+            // CRH is a hypothalamic releasing hormone with a plasma
+            // half-life of only a few minutes; it keeps the fast leak
+            // (0.005/s ≈ 2.3 min) so a stress signal does not persist
+            // after its cause is gone.
+            //
+            // This is applied directly to level (not through velocity)
+            // so the decay is truly first-order: Δlevel ≈ -level × rate
+            // × dt. The exponential form exp(-rate×dt) is used rather
+            // than the linear approximation 1-rate×dt, for
+            // time-invariance and stability at large dt values.
             if is_stress_hormone {
-                // Decay rate set from the measured plasma half-life of
-                // each hormone, which differ by orders of magnitude.
-                //
-                // Cortisol's half-life is 66 min at normal hormone levels,
-                // rising to 120 min under large loads, and a directly
-                // measured slow half-life is 57-64 min (Bancos, Endocr
-                // Connect 2017; Keenan et al. 2004; PMC9815201). At the
-                // reference dt of 0.1 s that is ~40,000 ticks.
-                //
-                // The previous 0.005/sec gave a half-life of 2.3 minutes
-                // — roughly 30x too fast. Together with the clearance
-                // term below it capped cortisol at 0.109 even with ACTH
-                // pinned at 1.0, against a Stress-phase gate of 0.65, so
-                // the stress phase was unreachable under any drive.
-                //
-                // CRH is a releasing hormone with a short effective
-                // lifetime; it keeps the fast leak so a stress signal
-                // does not persist after its cause is gone.
-                self.chemicals[i].level *= (-0.005 * dt).exp();
+                let rate = if i == NeurochemicalId::Cortisol as usize {
+                    CORTISOL_METABOLIC_RATE
+                } else {
+                    CRH_METABOLIC_RATE
+                };
+                self.chemicals[i].level *= (-rate * dt).exp();
             }
 
             // Endocannabinoid activity-dependent synthesis: postsynaptic
@@ -3090,20 +3346,20 @@ impl NeurochemicalVector {
         // neurobiological basis of sleep homeostasis (Basely et al.,
         // 2014; Porkka-Heiskanen et al., 2011).
         //
-        // Without this mechanism, adenosine can never reach the sleep
-        // threshold (0.75) naturally — the homeostatic force pulls it
-        // back to baseline and all waking-state couplings push it down.
-        // Sleep would only be triggerable by external impulses, defeating
-        // the emergent phase transition design.
+        // Without this mechanism, adenosine can never build up the sleep
+        // pressure the mind reads for voluntary sleep — the homeostatic
+        // force pulls it back to baseline and all waking-state couplings
+        // push it down.
         //
-        // The accumulation/clearance is gated by the emergent phase,
+        // The accumulation/clearance is gated by the sleep state —
+        // the sleep-wake network's stage and the mind's Sleeping zone —
         // not just histamine level. This prevents the feedback loop
         // where temporary histamine dips trigger premature clearance:
         // adenosine rises → suppresses histamine → histamine dips →
         // triggers clearance → adenosine crashes → histamine rebounds.
-        // By using the phase (which requires sustained adenosine > 0.75
-        // AND histamine < 0.25), we ensure clearance only happens during
-        // actual sleep, not transient histamine fluctuations.
+        // Gating on committed sleep state rather than instantaneous
+        // histamine ensures clearance only happens during actual sleep,
+        // not transient histamine fluctuations.
         //
         // Implementation: during wakefulness, the adenosine LEVEL rises
         // as a saturating exponential (Process S). During sleep, the
@@ -3133,14 +3389,16 @@ impl NeurochemicalVector {
         self.recompute_derived_with_dt(dt_scale, params.network_levels);
         let adn_idx = NeurochemicalId::Adenosine as usize;
         let current_phase = self.compute_phase();
-        // The zone is the cognitive layer's authority on sleep state:
-        // zone Sleeping means glymphatic clearance runs even when the
-        // emergent phase hasn't crossed the sleep thresholds — e.g.
-        // /sleep entered at low pressure, where the phase would stay
-        // Active and adenosine would wrongly accumulate for ~days.
+        // Sleep state follows the body, not just the mind: the network
+        // (`network_asleep`) reports actual sleep even while the zone
+        // reads awake, and the zone reports cognitive sleep even when
+        // the network hasn't crossed the threshold — e.g. /sleep
+        // entered at low pressure, where the phase would stay Active
+        // and adenosine would wrongly accumulate for ~days.
         if current_phase == MentalPhase::NREM
             || current_phase == MentalPhase::REM
             || params.zone_sleeping
+            || network_asleep
         {
             // Sleep: Process S decays exponentially toward its lower
             // asymptote, with time constant chi_s.
@@ -3158,21 +3416,23 @@ impl NeurochemicalVector {
             // 0.75 down to 0.20 over ~7.6 h. That made the two
             // directions asymmetric — exponential up, linear down — and
             // it set a clearance speed the model could never actually
-            // complete. The cholinergic rebound that produces REM needs
-            // adenosine below 0.65, which from a 0.90 start took ~3.5 h of
-            // *uninterrupted* sleep, and Genesis never sleeps that long
-            // in one bout. Adenosine therefore stayed pinned near its
-            // asymptote, ACh stayed held at the 0.20 suppression floor,
-            // and REM was unreachable: measured over 48 simulated hours,
-            // adenosine was below 0.65 in 0.0% of NREM ticks, ACh above
-            // 0.50 in 0.0%, and REM occupancy was exactly 0%.
+            // complete. At the time it was fixed, the reason it mattered
+            // was the (now retired) cholinergic rebound that needed
+            // adenosine below 0.65 to produce REM — a walk from a 0.90
+            // start took ~3.5 h of *uninterrupted* sleep, and Genesis
+            // never slept that long in one bout. Measured over 48
+            // simulated hours, adenosine was below 0.65 in 0.0% of NREM
+            // ticks, ACh above 0.50 in 0.0%, and REM occupancy was
+            // exactly 0%. REM entry no longer depends on adenosine at
+            // all — the network's REM-on population owns it — but the
+            // measurement is still the demonstration that the linear
+            // rate could not discharge pressure over a night.
             //
             // Exponential decay is both what the two-process model
-            // specifies and what repairs it. Being proportional to the
-            // distance above the asymptote, it clears the 0.90 -> 0.65
-            // gap in ~1.9 h, which lands inside the first or second NREM
-            // bout, so the rebound can engage on an ordinary sleep
-            // episode rather than never.
+            // specifies and what repairs it: being proportional to the
+            // distance above the asymptote, it clears 0.90 -> 0.65 in
+            // ~1.9 h — inside the first or second NREM bout — so sleep
+            // pressure discharges across an ordinary night.
             //
             // The glymphatic system is what physically removes
             // extracellular adenosine during sleep (Porkka-Heiskanen et
@@ -3253,12 +3513,13 @@ impl NeurochemicalVector {
         // 0.58 in waking, and 0.77 in REM (Vazquez & Baghdoyan, 2001; cortical
         // ACh follows the same order, Marrosu et al., 1995). The target is a
         // linear map of the two network populations that drive it, LC (wake)
-        // and REM-on. The constants are calibrated so NREM, waking, and REM
-        // reach levels 0.20, 0.42, and 0.60, which keep the measured ratios.
+        // and REM-on, calibrated so NREM, waking, and REM sit at the
+        // measured 0.34, 0.58, and 0.77.
         //
         // Serotonin (dorsal raphe) is steady in waking, reduced in NREM, and
         // near silent in REM (Monti & Jantos, 2008; Sakai & Crochet, 2001).
-        // Its target tracks LC: 0.10 at rest, 0.40 in full waking.
+        // Its target tracks LC and is suppressed by the REM-on population:
+        // steady states 0.39 waking, 0.22 NREM, 0.07 REM.
         if let Some(net) = params.network_levels {
             let rate = 0.001_f64 * f64::from(dt_scale);
             let relax = |chem: &mut Neurochemical, target: f32| {
@@ -3297,8 +3558,10 @@ impl NeurochemicalVector {
             );
         }
 
-        // BDNF recovery after stress: when cortisol has dropped below
-        // 0.3 (stress is over) and BDNF is still below its baseline
+        // BDNF recovery after stress: once cortisol has cleared below
+        // the stress-phase gate (stress is over — cortisol's reachable
+        // envelope tops out around ~0.08, so a 0.3 threshold could
+        // never gate anything) and BDNF is still below its baseline
         // (depleted by chronic stress), BDNF gets a recovery boost
         // proportional to the serotonin level. Serotonin drives BDNF
         // expression — this is why SSRIs help depression (increasing
@@ -3312,7 +3575,7 @@ impl NeurochemicalVector {
         let srt_level = self.chemicals[NeurochemicalId::Serotonin as usize].level;
         let bdnf_baseline = self.chemicals[NeurochemicalId::BDNF as usize].baseline;
         let bdnf_level = self.chemicals[NeurochemicalId::BDNF as usize].level;
-        if cort_level < 0.3 && bdnf_level < bdnf_baseline {
+        if cort_level < STRESS_CORTISOL_GATE && bdnf_level < bdnf_baseline {
             let recovery = srt_level * params.bdnf_recovery_rate * dt_scale;
             self.chemicals[NeurochemicalId::BDNF as usize].level += recovery;
             self.chemicals[NeurochemicalId::BDNF as usize].level =
@@ -3363,7 +3626,30 @@ impl NeurochemicalVector {
         // → time constant ~5 seconds. The previous `* 0.02 * dt_scale`
         // was a per-tick rate scaled by dt_scale, which is only
         // correct at the reference tick rate.
-        let acth_target = crh_eff * 0.8 * maturation;
+        //
+        // Pituitary responsivity is modulated by two circulating
+        // peptides, both acting on the corticotroph rather than on
+        // CRH itself:
+        // - Vasopressin potentiates CRH-evoked ACTH release through
+        //   V1b (V3) receptors — AVP alone is a weak secretagogue but
+        //   synergizes strongly with CRH, and V1b−/− mice lose the
+        //   AVP-driven ACTH rise entirely (Tanoue et al., JCI 2002;
+        //   Endotext). This is how stress co-secretion of AVP
+        //   amplifies the axis.
+        // - Oxytocin attenuates the axis — the endocrine arm of
+        //   social buffering (Heinrichs et al., Biol Psychiatry
+        //   2003; Neumann et al., J Neuroendocrinol 2000). Bounded
+        //   below at 0.5 so the axis can be damped, never abolished.
+        let vp_dev = (self.effective_levels[NeurochemicalId::Vasopressin as usize]
+            - self.chemicals[NeurochemicalId::Vasopressin as usize].baseline)
+            .max(0.0);
+        let oxy_dev = (self.effective_levels[NeurochemicalId::Oxytocin as usize]
+            - self.chemicals[NeurochemicalId::Oxytocin as usize].baseline)
+            .max(0.0);
+        let pituitary_gain = (1.0 + VASOPRESSIN_ACTH_POTENTIATION * vp_dev
+            - OXYTOCIN_HPA_ATTENUATION * oxy_dev)
+            .clamp(0.5, 1.8);
+        let acth_target = crh_eff * 0.8 * maturation * pituitary_gain;
         let acth_alpha = 1.0 - (-0.2 * dt).exp();
         self.acth_level += (acth_target - self.acth_level) * acth_alpha;
         self.acth_level = crate::state::sanitize::finite_clamp(self.acth_level, 0.0, 1.0);
@@ -3383,11 +3669,12 @@ impl NeurochemicalVector {
         //
         // Runaway is prevented by the nonlinear CORTISOL_CLEARANCE_RATE
         // (applied below, proportional to level above baseline) and the
-        // first-order metabolic decay (0.005/sec, applied in the main
-        // loop). At equilibrium: production = decay + clearance, which
-        // for ACTH ~0.3 gives cortisol ~0.06 — elevated but well below
-        // the 0.80 hard clamp. When the stressor ends and ACTH drops,
-        // both decay mechanisms pull cortisol back to zero.
+        // first-order metabolic decay (CORTISOL_METABOLIC_RATE, applied
+        // in the main loop). At equilibrium: production = decay +
+        // clearance, which for ACTH ~0.3 gives cortisol ~0.06 —
+        // elevated but well below the 0.80 hard clamp. When the
+        // stressor ends and ACTH drops, both decay mechanisms pull
+        // cortisol back to zero.
         let cort_idx = NeurochemicalId::Cortisol as usize;
         let acth_drive_per_tick = self.acth_level * 0.001 * maturation;
         self.chemicals[cort_idx].level += acth_drive_per_tick * dt_scale;

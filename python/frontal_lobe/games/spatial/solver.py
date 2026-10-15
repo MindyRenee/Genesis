@@ -802,48 +802,13 @@ class SpatialReasoner:
         def evaluate(transforms: list[Transform]) -> tuple[float, int]:
             return self._evaluate(transforms, examples)
 
-        frontier: list[SpatialHypothesis] = [SpatialHypothesis([], 0.0)]
-        solved_hyps: list[SpatialHypothesis] = []
-        explored = 0
-        deadline = time.monotonic() + time_budget
-
-        for _depth in range(max_depth):
-            candidates: list[SpatialHypothesis] = []
-            stop = False
-            # Two passes: transforms from families that have solved
-            # tasks before are tried first (recognition is cheaper
-            # than exploration); the full proposal set runs only if
-            # nothing familiar explains the data.
-            for preferred_only in (True, False):
-                for hyp in frontier:
-                    new_cands, explored, stop = self._expand_hypothesis(
-                        hyp, examples, preferred_only,
-                        evaluate, explored, deadline, max_nodes,
-                    )
-                    candidates.extend(new_cands)
-                    if stop:
-                        break
-                if (
-                    any(h.exact == len(examples) for h in candidates)
-                    or stop
-                ):
-                    break
-
-            # Keep the most accurate candidates; prefer shorter
-            # sequences on ties (Occam prior over explanations).
-            candidates.sort(key=lambda h: (-h.score, len(h.transforms)))
-            exact_hits = []
-            for h in candidates:
-                if h.exact != len(examples) or h.describe() in excluded:
-                    continue
-                predictions = self._predict_all(h, tests)
-                if self.prediction_key(predictions) in excluded_predictions:
-                    continue
-                exact_hits.append(h)
-            if exact_hits:
-                solved_hyps = self._select_exact(exact_hits, num_guesses)
-                break
-            frontier = candidates[:beam_width]
+        solved_hyps, frontier, explored = self._search(
+            examples, tests, evaluate,
+            excluded, excluded_predictions,
+            max_depth=max_depth, beam_width=beam_width,
+            max_nodes=max_nodes, num_guesses=num_guesses,
+            deadline=time.monotonic() + time_budget,
+        )
 
         hypotheses = [
             h
@@ -889,6 +854,68 @@ class SpatialReasoner:
             task_context=task_context,
             retrieved_skills=retrieved_skills,
         )
+
+    def _search(
+        self,
+        examples: list[Example],
+        tests: list[Grid],
+        evaluate,
+        excluded: set[str],
+        excluded_predictions: set[str],
+        *,
+        max_depth: int,
+        beam_width: int,
+        max_nodes: int,
+        num_guesses: int,
+        deadline: float,
+    ) -> tuple[list[SpatialHypothesis], list[SpatialHypothesis], int]:
+        """The beam search itself: expand hypotheses depth by depth,
+        verify exact matches against the exclusion sets, and keep the
+        most accurate frontier. Returns (verified hypotheses, final
+        frontier, nodes explored)."""
+        frontier: list[SpatialHypothesis] = [SpatialHypothesis([], 0.0)]
+        solved_hyps: list[SpatialHypothesis] = []
+        explored = 0
+
+        for _depth in range(max_depth):
+            candidates: list[SpatialHypothesis] = []
+            stop = False
+            # Two passes: transforms from families that have solved
+            # tasks before are tried first (recognition is cheaper
+            # than exploration); the full proposal set runs only if
+            # nothing familiar explains the data.
+            for preferred_only in (True, False):
+                for hyp in frontier:
+                    new_cands, explored, stop = self._expand_hypothesis(
+                        hyp, examples, preferred_only,
+                        evaluate, explored, deadline, max_nodes,
+                    )
+                    candidates.extend(new_cands)
+                    if stop:
+                        break
+                if (
+                    any(h.exact == len(examples) for h in candidates)
+                    or stop
+                ):
+                    break
+
+            # Keep the most accurate candidates; prefer shorter
+            # sequences on ties (Occam prior over explanations).
+            candidates.sort(key=lambda h: (-h.score, len(h.transforms)))
+            exact_hits = []
+            for h in candidates:
+                if h.exact != len(examples) or h.describe() in excluded:
+                    continue
+                predictions = self._predict_all(h, tests)
+                if self.prediction_key(predictions) in excluded_predictions:
+                    continue
+                exact_hits.append(h)
+            if exact_hits:
+                solved_hyps = self._select_exact(exact_hits, num_guesses)
+                break
+            frontier = candidates[:beam_width]
+
+        return solved_hyps, frontier, explored
 
     @staticmethod
     def _analyze_failure(

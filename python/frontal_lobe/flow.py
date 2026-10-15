@@ -62,6 +62,7 @@ from temporal_lobe.morphology import (
     copula,
     is_plural_np,
     person_pronoun,
+    property_verb_phrase,
 )
 
 if TYPE_CHECKING:
@@ -883,7 +884,9 @@ class FlowGenerator:
                     if e.target == seed:
                         rel = (e.relation.value, e.weight)
                         # Reverse the clause: "memory enables it"
-                        verb = self._verb_for_relation(e.relation.value)
+                        verb = self._verb_for_relation(
+                            e.relation.value, seed_obj
+                        )
                         if verb:
                             verb = agree_verb_phrase(
                                 verb, is_plural_np(display)
@@ -896,15 +899,17 @@ class FlowGenerator:
                 continue
 
             rel_type, _weight = rel
-            verb = self._verb_for_relation(rel_type)
-            if not verb:
-                continue
 
             # Determine direction: does seed → cid or cid → seed?
             edges_out = self._network.get_edges(seed, "out")
             seed_is_source = any(
                 e.target == cid for e in edges_out
             )
+            verb = self._verb_for_relation(
+                rel_type, display if seed_is_source else seed_obj
+            )
+            if not verb:
+                continue
             if seed_is_source:
                 clauses.append(
                     (f"{seed_pron} "
@@ -1097,12 +1102,18 @@ class FlowGenerator:
             return first.lower() + (" " + words[1] if len(words) > 1 else "")
         return clause
 
-    def _verb_for_relation(self, rel_type: str) -> str | None:
+    def _verb_for_relation(
+        self, rel_type: str, object_display: str = ""
+    ) -> str | None:
         """Map a relation type to a verb phrase.
 
         Uses the same seed verbs as the graph walk, but without
-        hardcoded fallback phrases — just the relation verbs.
+        hardcoded fallback phrases — just the relation verbs. For
+        has_property the object's form decides the frame ("is clear"
+        vs "has fur").
         """
+        if rel_type == "has_property":
+            return property_verb_phrase(object_display)
         verbs = {
             "is_a": "is a kind of",
             "part_of": "is part of",

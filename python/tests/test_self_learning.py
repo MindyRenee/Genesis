@@ -3144,3 +3144,55 @@ def run_all_inference():
 if __name__ == "__main__":
     success = run_all_inference()
     sys.exit(0 if success else 1)
+
+
+class TestImproveConsumesOpenReports:
+    """The improve urge fixes what the felt audit found — it never
+    rescans the tree itself. With an empty open list, buggy source
+    on disk must produce no autonomous fixes and no bug proposals."""
+
+    def _engine_with_unscanned_bug(self) -> tuple:
+        """A buggy allowlisted file exists on disk, but the reporter's
+        open list is empty — no audit has run."""
+        from infrastructure.bug_reporter import BugReporter
+
+        root = _make_importable_pkg(tempfile.mkdtemp())
+        mod = os.path.join(root, "python", "mypkg")
+        os.makedirs(mod)
+        with open(os.path.join(mod, "__init__.py"), "w"):
+            pass
+        with open(os.path.join(mod, "mod.py"), "w", encoding="utf-8") as f:
+            f.write(
+                "import logging\nlogger = logging.getLogger(__name__)\n"
+                "def f():\n    try:\n        x = 1\n"
+                "    except Exception:\n        pass\n"
+            )
+        rep = BugReporter(
+            project_root=root,
+            log_path=os.path.join(root, "bug_reports.jsonl"),
+        )
+        engine = SelfImprovement(project_root=root, bug_reporter=rep)
+        return engine, rep
+
+    def test_no_fix_without_open_report(self):
+        """apply_autonomous_fixes reads the open list — a bug nobody
+        scanned for is nobody's business yet."""
+        engine, _rep = self._engine_with_unscanned_bug()
+        assert engine.apply_autonomous_fixes() == []
+
+    def test_no_bug_proposals_without_open_report(self):
+        """generate_proposals consumes audit findings; an empty open
+        list yields no bug-sourced proposals even with buggy source."""
+        engine, _rep = self._engine_with_unscanned_bug()
+        engine._last_generation_time = 0.0
+        proposals = engine.generate_proposals(max_proposals=5)
+        assert not any(p.source.startswith("bug:") for p in proposals)
+
+    def test_open_report_is_consumed(self):
+        """When the audit did run, the open report becomes proposal
+        material — findings flow scan → log → improve."""
+        engine, rep = self._engine_with_unscanned_bug()
+        rep.scan(max_files=50)
+        engine._last_generation_time = 0.0
+        proposals = engine.generate_proposals(max_proposals=5)
+        assert any(p.source.startswith("bug:") for p in proposals)

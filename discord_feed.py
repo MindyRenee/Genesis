@@ -37,6 +37,8 @@ import urllib.request
 from collections import deque
 from collections.abc import Iterator
 
+from genesis_client.swallow import note_swallowed
+
 logger = logging.getLogger(__name__)
 
 _WEBHOOK_ENV = "GENESIS_DISCORD_WEBHOOK"
@@ -404,8 +406,8 @@ class DiscordFeed:
         if status and resp:
             try:
                 self._live_id = json.loads(resp).get("id")
-            except ValueError:
-                pass
+            except ValueError as e:
+                note_swallowed("discord_feed.live_status_parse", e)
         return status, retry_after, permanent
 
     def _send(

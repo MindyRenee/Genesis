@@ -1119,11 +1119,15 @@ class MemorySystem:
         # tracks valence. Only condition when the tag indicates
         # negative valence — sending positive memories through fear
         # conditioning would create spurious aversive associations.
+        # Cortisol's envelope tops out around ~0.08 (resting ~0.02,
+        # stress-phase gate 0.06), so 0.05 is the "stress load" boundary
+        # that lets a stressed memory condition even when dopamine is
+        # still high.
         cortisol_idx = 6
         dopamine_idx = 0
         cortisol = tag[cortisol_idx] if len(tag) > cortisol_idx else 0.0
         dopamine = tag[dopamine_idx] if len(tag) > dopamine_idx else 0.5
-        if cortisol <= 0.5 and dopamine >= 0.5:
+        if cortisol <= 0.05 and dopamine >= 0.5:
             return
         self.emotional_memory.fear_conditioning(
             neutral_stimulus=stimulus,

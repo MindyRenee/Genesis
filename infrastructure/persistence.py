@@ -198,8 +198,7 @@ def save_state(
     dream_synthesis: Any = None,
     inner_life_state: dict[str, Any] | None = None,
     world_state: dict[str, Any] | None = None,
-    executive: ExecutiveFunction | None = None,
-    curiosity: Curiosity | None = None,
+    executive: ExecutiveFunction | None = None, curiosity: Curiosity | None = None,
 ) -> None:
     """Save Genesis's cognitive state to disk.
 
@@ -209,34 +208,27 @@ def save_state(
         reflection: The reflection engine state to save.
         narrative: The narrative engine state to save.
         self_model: The self-model (for personality drift).
-        predictive_coding: The predictive coding layer (Bayesian models).
-        theory_of_mind: The user model.
-        procedural_memory: Learned skills and habits.
-        task_competence: Learned task schemas, affordances, and skills.
-        spaced_repetition: The review schedule for concepts.
-        td_learner: The value function and reward history.
-        emotional_memory: Emotional tags associated with memories.
         semantic_memory: The neocortical fact/schema store. Omitting it
             loses every consolidated fact, because those edges are
             rejected by the canonical edge log (see
-            `_serialize_semantic_memory`).
-        attractor: The stored patterns in the attractor network.
-        error_monitor: The error history and adjusted thresholds.
-        emergent_identity: The synthesized emergent identity.
-        emergent_identity_sources: Accumulated experience identity sources.
-        hpa_axis: The HPA axis cascade state.
-        allostatic_load: The cumulative allostatic load tracker.
-        self_directed_learner: The self-directed learning engine state.
+            ``_serialize_semantic_memory``).
         sleep_state: Sleep state (is_sleeping, user_initiated, cycle
             tracker position) so sleep survives restarts.
-        memory_records: Python-side memory metadata (consolidation
-            state, forgetting, source tags) from
-            :meth:`MemorySystem.serialize_records`.
+        memory_records: Python-side memory metadata (consolidation,
+            forgetting, source tags) from ``MemorySystem.serialize_records``.
         world_state: Its external world (presences, recent events,
-            social clock) from :meth:`OuterWorld.to_dict`.
-        executive: Persistent executive intentions and their outcomes.
+            social clock) from ``OuterWorld.to_dict``.
         curiosity: Asked/resolved question history and gap habituation —
             the novelty window that stops questions re-firing on restart.
+        remaining kwargs: Optional subsystem states, each serialized iff
+            present — predictive coding, theory of mind, procedural
+            memory, task competence, spaced repetition, TD learning,
+            synapses, emotional memory, attractor, error monitor,
+            emergent identity (+ sources), HPA axis, allostatic load,
+            self-directed/autonomous learners, self-improvement, growth
+            ledger, plasticity, developmental tracker, bug reporter,
+            cognitive trajectory, dream synthesis, inner life, executive
+            intentions.
     """
     state: dict[str, Any] = {
         "version": 2,

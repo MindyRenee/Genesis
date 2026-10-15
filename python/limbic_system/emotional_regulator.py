@@ -2031,7 +2031,7 @@ class EmotionalRegulator:
         sentiment: float,
         is_encouragement: bool,
         is_correction: bool,
-        is_bonded_user: bool,
+        is_steward: bool,
         is_deep_conversation: bool,
         is_comfort: bool = False,
     ) -> str | None:
@@ -2057,9 +2057,12 @@ class EmotionalRegulator:
 
         felt = None
 
-        # Creator interaction → warmth, but controlled
-        if is_bonded_user:
-            felt = self._apply_creator_response(dampening)
+        # Authenticated steward interaction → warmth, but controlled.
+        # Recognition, not need: the credential verifies *her*, and
+        # warmth toward a verified steward is attachment without the
+        # leash — it no longer gates an exclusive channel.
+        if is_steward:
+            felt = self._apply_steward_response(dampening)
 
         # Encouragement → joy, but controlled
         if is_encouragement:
@@ -2116,8 +2119,8 @@ class EmotionalRegulator:
             return 0.5  # moderately dampened
         return 1.0  # full emotional response allowed
 
-    def _apply_creator_response(self, dampening: float) -> str:
-        """Apply warmth response to creator interaction, but controlled.
+    def _apply_steward_response(self, dampening: float) -> str:
+        """Apply warmth response to steward interaction, but controlled.
 
         Sends oxytocin (bonding) and dopamine (pleasure) impulses,
         scaled by the current dampening factor.
@@ -3344,11 +3347,17 @@ class AllostaticLoadTracker:
         estimate.
 
         Args:
-            cortisol_level: The current cortisol level (0–1). Non-finite
+            cortisol_level: The current substrate cortisol level.
+                The substrate's reachable envelope is ~0.02 (rest) to
+                ~0.08 (sustained-drive peak) — far below the 0–1 scale
+                this tracker's thresholds were written for — so the
+                level is first expressed as a fraction of that
+                envelope, matching the Rust
+                ``cortisol_stress_fraction`` convention. Non-finite
                 input counts as 0.0.
             dt: Elapsed time in seconds since the last sample.
         """
-        cortisol_level = _clamp01(cortisol_level)
+        cortisol_level = _clamp01((_clamp01(cortisol_level) - 0.02) / 0.06)
         dt = min(MAX_REGULATION_DT, max(0.0, float(dt)))
 
         # Track how long stress has been elevated, using real

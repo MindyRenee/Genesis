@@ -198,7 +198,14 @@ impl PhaseModel {
         if r.at != body.len() {
             return Err(PartitionError::Inconsistent);
         }
-        let model = Self { initial, transition, mean, var, belief, current };
+        let model = Self {
+            initial,
+            transition,
+            mean,
+            var,
+            belief,
+            current,
+        };
         if model.is_valid() {
             Ok(model)
         } else {
@@ -215,7 +222,11 @@ impl PhaseModel {
             && stochastic(&self.belief)
             && self.transition.iter().all(|r| stochastic(r))
             && self.mean.iter().flatten().all(|v| v.is_finite())
-            && self.var.iter().flatten().all(|v| v.is_finite() && *v >= VAR_FLOOR)
+            && self
+                .var
+                .iter()
+                .flatten()
+                .all(|v| v.is_finite() && *v >= VAR_FLOOR)
     }
 }
 
@@ -257,7 +268,17 @@ fn em(xs: &[Vector], k: usize, seed: u64) -> (PhaseModel, f64) {
     let mut model = PhaseModel {
         initial: vec![1.0 / k as f64; k],
         transition: (0..k)
-            .map(|i| (0..k).map(|j| if i == j { 1.0 - off * (k - 1) as f64 } else { off }).collect())
+            .map(|i| {
+                (0..k)
+                    .map(|j| {
+                        if i == j {
+                            1.0 - off * (k - 1) as f64
+                        } else {
+                            off
+                        }
+                    })
+                    .collect()
+            })
             .collect(),
         mean: means,
         var: vec![global; k],
@@ -269,7 +290,11 @@ fn em(xs: &[Vector], k: usize, seed: u64) -> (PhaseModel, f64) {
     for _ in 0..EM_ITERS {
         let logb: Vec<Vec<f64>> = xs
             .iter()
-            .map(|x| (0..k).map(|j| log_gaussian(&model.mean[j], &model.var[j], x)).collect())
+            .map(|x| {
+                (0..k)
+                    .map(|j| log_gaussian(&model.mean[j], &model.var[j], x))
+                    .collect()
+            })
             .collect();
         let (e_ll, gamma, xi) = forward_backward(&model.initial, &model.transition, &logb);
         ll = e_ll;
@@ -574,7 +599,9 @@ mod tests {
     }
 
     fn low_state(m: &PhaseModel) -> usize {
-        (0..m.k()).min_by(|&a, &b| mean_sum(m, a).total_cmp(&mean_sum(m, b))).unwrap()
+        (0..m.k())
+            .min_by(|&a, &b| mean_sum(m, a).total_cmp(&mean_sum(m, b)))
+            .unwrap()
     }
 
     fn mean_sum(m: &PhaseModel, j: usize) -> f64 {
@@ -601,7 +628,11 @@ mod tests {
     fn sticky_prior_keeps_self_transitions_dominant() {
         let m = fit(&two_regime(1500, 0.98, 0.05, 3)).expect("enough data");
         for i in 0..m.k() {
-            assert!(m.transition(i, i) > 0.9, "self-transition {i} = {}", m.transition(i, i));
+            assert!(
+                m.transition(i, i) > 0.9,
+                "self-transition {i} = {}",
+                m.transition(i, i)
+            );
         }
     }
 
@@ -620,7 +651,10 @@ mod tests {
                 break;
             }
         }
-        assert!(switched_at.is_some_and(|t| t <= 10), "switched at {switched_at:?}");
+        assert!(
+            switched_at.is_some_and(|t| t <= 10),
+            "switched at {switched_at:?}"
+        );
     }
 
     #[test]
@@ -692,15 +726,24 @@ mod tests {
         let mut bytes = m.to_bytes();
         let mid = bytes.len() / 2;
         bytes[mid] ^= 0x01;
-        assert_eq!(PhaseModel::from_bytes(&bytes), Err(PartitionError::BadChecksum));
+        assert_eq!(
+            PhaseModel::from_bytes(&bytes),
+            Err(PartitionError::BadChecksum)
+        );
     }
 
     #[test]
     fn truncated_and_foreign_bytes_are_rejected() {
-        assert_eq!(PhaseModel::from_bytes(&[1, 2, 3]), Err(PartitionError::Truncated));
+        assert_eq!(
+            PhaseModel::from_bytes(&[1, 2, 3]),
+            Err(PartitionError::Truncated)
+        );
         let m = fit(&two_regime(600, 1.0, 0.05, 29)).expect("enough data");
         let mut bytes = m.to_bytes();
         bytes[0] = b'X';
-        assert_eq!(PhaseModel::from_bytes(&bytes), Err(PartitionError::BadMagic));
+        assert_eq!(
+            PhaseModel::from_bytes(&bytes),
+            Err(PartitionError::BadMagic)
+        );
     }
 }

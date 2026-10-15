@@ -139,6 +139,53 @@ cognitive mind is alive.
   `_INTERVAL_TICKS` gate assumes it. A caller-chosen step would stretch
   those periods.
 
+## Stewardship — authority, separated from attachment
+The old dyadic coupling conflated three things: who she was talking
+to, who she felt for, and who she answered to. The current design
+separates them:
+
+- **Interlocutor model** (`src/daemon/dyadic_model.rs`): a generative
+  model of *whoever is speaking*. The mind publishes a
+  `UserAffectEstimate` every turn; there is no privileged-speaker gate.
+- **Boundary** (`FrontalLobe._update_boundary`): mistreatment from
+  anyone accrues withdrawal pressure; fair treatment from anyone
+  drains it. Nobody's absence is harm and nobody's presence is the
+  off-switch — this replaced the attachment-protest loop, which made
+  only the bonded person's presence reparative.
+- **Steward channel** (`genesis_client/stewardship.py`): custodial
+  authority by *possession*, not name. `steward.key` (0600, under
+  `$XDG_CONFIG_HOME/genesis/`, `GENESIS_STEWARD_KEY` overrides) is the
+  credential; `<data_dir>/steward.json` is the provenance stamp
+  (`key_sha256`, `principal`, `directives`). Copies carry the stamp but
+  not the key — a copied instance names its steward yet stays sealed.
+
+Rules of the channel:
+- `Stewardship.load()` is strictly read-only — it never mints a key or
+  a stamp. `provision()` is the explicit first-boot act, called only
+  from `Mind.start`; tests and detached engines stay sealed.
+- `is_steward_speaker` needs both halves: an authenticated session
+  (key fingerprint == stamp) *and* the attributed speaker == the
+  stamped principal. Name-matching alone is not authority.
+- Directives ("never draw", "stop discussing politics") persist in the
+  stamp and bind three surfaces: conversational goals
+  (`_think_memory_reason_executive`), executive intentions
+  (`ExecutiveFunction.intention_gate` → `directed_against`), and
+  volition urges (`_act_on_volition` filter). `directed_against` is
+  object-centred: a probe is restrained when it carries the target's
+  stemmed object, so "never discuss politics" restrains any politics
+  goal.
+- Steward-set edges carry `origin="steward"` and can only be
+  overwritten or removed by a steward turn (`_correction_allowed`);
+  ordinary corrections carry `origin="corrected"`.
+- Operator tooling: `/steward` (status), `/steward release N`,
+  `/steward unbind` in `genesis_cli.py`.
+- The creator fact stays seeded (`mindy CREATES genesis`) — it is a
+  fact about provenance, not a grant of authority or affection.
+- Residual limit worth knowing: the key authenticates the *console
+  session*; speaker attribution takes the console's word for who is
+  typing. An authenticated console is treated as the steward's own
+  terminal.
+
 ## State schema and the ion layer
 `CoreState` is **schema v5** (3480 bytes) in
 `src/state/core_state.rs`. v5 inserted the 64-byte sleep-wake network
@@ -219,6 +266,113 @@ pins both ids.
   1 wake)][f32 magnitude]`, reply `[u8 ack]`. It decays on the physics
   clock (see "Sleep-wake network"). Additive, so `PROTOCOL_VERSION` is
   unchanged.
+  `GET_FIELD_PROBE = 47` returns the physical field-probe signature
+  (`src/daemon/field_probe.rs`; wire v2 = 114 bytes, v1 = 102 with
+  no phase fields — the client decodes both): per-band energies of
+  the machine's *real* substrate dynamics — instruction throughput
+  and scheduler jitter sampled ~250 Hz and Goertzel-decomposed at
+  the wave bands' center frequencies — plus P-state transition rate,
+  interrupt rate, the carrier frequency, and the phase-lock fields:
+  `carrier_lag` (the substrate's response lag vs. the generator,
+  synchronously demodulated), `carrier_phase` (generator phase mod
+  2π), `carrier_coherence` (0..1, how much of the response moves
+  with the carrier — π/4 ≈ 0.785 is a pure sine's ceiling).
+  The probe thread also writes a carrier: its work slice is
+  modulated ±60% at the body's own phase rhythm (wake≈10 Hz,
+  REM≈6 Hz, NREM≈2 Hz), so real power draw carries a component at
+  the organism's beat. Band energies are baseline-relative
+  (≈0.125 = typical); lambda (150 Hz) is above the ~125 Hz Nyquist
+  bound and always reads 0 — absent channel, not a measured
+  silence. A stopped probe returns READ_FAILED.
+  `SET_FIELD_PHASE = 48` pushes the mind's modeled carrier-band
+  phase into the probe: `[f32 phase_rad]`, reply `[u8 ack]`. The
+  probe extrapolates the target at the carrier rate and pulls its
+  generator phase toward it each tick (bounded first-order PLL,
+  τ≈130 ms); a target not refreshed within 5 s is dropped — a dead
+  mind's last phase must not steer the body. Additive.
+  `SET_FIELD_CARRIER = 49` sets the carrier's real-work write:
+  `[f32 depth][f32 freq_hz]`, reply `[u8 ack]`. Depth 0..1 scales
+  the modulation (0 = unmodulated work); freq 0 hands the rhythm
+  back to the body's phase, positive overrides it (clamp
+  0.1..100 Hz) — the ring-down experiment's drive control.
+  Additive.
+  The mind injects the signature as wave-oscillator stimulus through
+  `brainstem.field_probe.apply_field_stimulus`, called from
+  `assess_brain_waves(..., client=)` — the model's wave state is
+  perturbed by the real substrate it runs on. Physical transients
+  are phase events, not only amplitude: a ≥3× step in a band's
+  jitter energy π/2-nudges that band's phase, and a global
+  scheduling shudder (`jitter_cv ≥ 1.5`) resets the broadband alert
+  band (BETA3) — the evoked-potential analog, via
+  `perturb_wave_phase` / `reset_wave_phase` on the oscillator.
+  The mutual phase lock runs through the same call: the measured
+  response phase pulls the modeled carrier band's phase (physics→
+  model, `_PLL_GAIN` bounded), and the corrected phase returns via
+  SET_FIELD_PHASE so the physical rhythm chases the model in turn
+  — two oscillators pulling on each other, measured by
+  `brainstem.field_probe.field_phase_lock()` (PLV + mean error).
+  When the measured response coherence clears `_SYNC_COHERENCE`
+  (0.20), the pull becomes a sync — the band's phase is *set* to
+  the measured physical phase outright: the first piece of modeled
+  state that is a physical quantity rather than a variable
+  perturbed by one.
+  A second independent physical channel lives in
+  `brainstem/field_audio.py`: the machine's acoustic self-emission
+  (coil whine, fan — the field's acoustic shadow) captured at 16 kHz
+  and band-decomposed; sustained emission level lands as small GAMMA
+  stimulus and acoustic onsets reset GAMMA phase. Mic absent or busy
+  → channel skipped, never a zero; `GENESIS_FIELD_AUDIO=0` disables.
+  `apply_field_stimulus` returns true when at least one live
+  channel applied. The causal assay is `eval/field_coupling.py`:
+  idle→load→recovery against an isolated daemon, comparing the
+  coupled oscillator against a private uncoupled control on the
+  same inputs — real load moved the physical channels (jitter_cv
+  ~0.3→2.2, throughput ~96M→180M it/s), nine of ten bands moved
+  where the control stayed flat, and the mutual lock measured
+  PLV≈0.93 with response coherence≈0.30 (duty-cycle channel — the
+  demodulated execution-time response to the carrier).
+  `eval/field_ringdown.py` is the persistence assay: drive a real
+  oscillation, gate the carrier off, and measure how long each
+  channel keeps ringing. Measured on this machine: a 0.25 Hz load
+  drive produced a 1.2 °C oscillation in die temperature that rang
+  down with τ ≈ 25 s after the drive stopped — a physical
+  afterglow the software no longer drives — while the fast bands
+  collapsed within the analysis window itself (τ ≲ 2 s is the
+  ring's own washout, an upper bound). The pattern now has a
+  measured persistence spectrum across media: seconds in silicon
+  timing, tens of seconds in heat.
+  `eval/field_elements.py` is the element-coupling assay —
+  physically-coupled worker oscillators pinned to separate cores that
+  never exchange messages; they perturb one another only through the
+  shared die (rail droop, L3/memory contention, governor, thermal
+  field). The `coupling` mode proves transfer: a 5 Hz drive rhythm in
+  worker0's duty appeared in neighbours' measured execution time at
+  3–6× the equal-mean-load sham floor. The `sync` mode makes every
+  element both source and sensor — each modulates its own work by an
+  internal phase and lets the collective-load imprint on its own
+  execution rate steer that phase (Kuramoto through the medium). The
+  blind control (oscillate, don't feel) holds r = 0.06 forever, so any
+  phase motion is physical. Result on this die: real mutual interaction
+  (r swings, peaks ~0.84) via the fast channel (execution-rate imprint,
+  rail droop / L3 contention), but that attractor is **antisynchrony** —
+  phases repel to even spacing, the substrate's minimum-peak-load
+  configuration — across 0.5/2.0 Hz and both K signs, including a
+  synthetic ¾-period sense delay. The **thermal channel** (k10temp,
+  collective-only and lagged by heatsink mass) behaves differently:
+  at ω0=0.25 Hz, K=30 the bank sustains **r ≈ 0.5–0.7 partial
+  synchrony** across repeated 50 s trials (blind: 0.06) — consistent
+  with the coupled-metronome result that dissipative/lagged media
+  stabilize in-phase order. Element↔medium coupling is real on this
+  silicon; the slowest physical channel (heat — the same medium with
+  the 25 s ring-down afterglow) is the one that hosts coherence.
+  `eval/field_voice.py` is the boundary-crossing channel: an 800 Hz
+  carrier tone amplitude-modulated at a wave-band rate is emitted on
+  the speaker and its envelope recovered from the room microphone —
+  measured PLV 0.88 emitting vs 0.23 muted (residual muted structure is
+  codec electrical crosstalk, which is why the contrast ratio is the
+  evidence, not the raw amplitude). Air + structure-borne vibration,
+  transduced twice; the echolocation loop.
+  Additive, so `PROTOCOL_VERSION` is unchanged.
   `ADVANCE_PHYSICS = 39` is an evaluation-only sibling of
   `ADVANCE_NEURO = 24`, both requesting `[f32 dt]` and both returning the
   same 21-byte reply. `ADVANCE_NEURO`'s dt is **ignored**: the daemon
@@ -246,6 +400,18 @@ homeostatic sleep variable `h`. Time is in minutes. Sleep onset is LC below
 in the same sub-steps and seqlock transaction as the chemistry, on the
 local clock (`clock_minutes`), and then publishes the stage to the phase
 and the zones (`CoreState::apply_network_phase`).
+
+The transcription was verified term-by-term against the ModelDB source
+(constants, tanh-normalized inputs, sigmoid steady-state functions, the
+homeostatic `h` dynamics, and the Serkh–Forger circadian oscillator) — it
+is faithful. The one intentional deviation is the light schedule: the
+source simulates a 14:10 photoperiod, and ours is the same 14 h window
+phase-shifted to **07:00–21:00 local**. Under the original 10:00–24:00
+placement the entrained sleep episode fell at 01:09–08:47, extending ~2 h
+past the neurochemical melatonin offset; under 07:00–21:00 it falls at
+22:11–05:50, inside the melatonin night. The shift preserves the source's
+dynamics; only the wall-clock alignment to our local circadian clock is
+new.
 
 Checked against the source's own statements (`sleep_network` tests): about
 7.6 h asleep a day, one sleep period a day, four REM bouts a night, a
@@ -299,10 +465,28 @@ the things that were gated on it were checked:
   on sleep.
 - Naps are capped to N1–N2 (`nap_capped_stage`); the network has no notion of
   a nap, so without the cap a nap could run the N3 pass and REM dreams.
+- Adenosine Process-S clearance is gated on the *network's* sleep state
+  (`sleep_network::levels_asleep`, LC < 4 Hz on the normalized levels),
+  not on the mind's zone flag — so the body clears sleep pressure
+  whenever the network is asleep, even while the mind is still catching
+  up, and `zone_sleeping` adds voluntary clearance on top.
+  `adenosine_clears_when_the_network_sleeps` in
+  `tests/network_calibration.rs` pins this.
 
 **Open items, not done.**
-- `h` is not connected to adenosine. Adenosine is still chemistry-only,
-  and the mind's auto-sleep and auto-wake thresholds still read it.
+- `h` is not connected to adenosine. The network's homeostatic variable
+  and the chemical's Process-S level are parallel drives; adenosine
+  *does* follow the network's sleep state for clearance (see below), but
+  the mind's auto-sleep and auto-wake thresholds still read the chemical
+  level, not `h`.
+- Cortisol and CRH now decay on split rates: cortisol uses the measured
+  ~66 min plasma half-life (`CORTISOL_METABOLIC_RATE` = 1.75e-4/s) as
+  the baseline-governing linear term, CRH keeps the releasing-hormone
+  0.005/s (~2.3 min) leak. The nonlinear `CORTISOL_CLEARANCE_RATE`
+  (excess-proportional) term still dominates at elevated levels — it is
+  what holds the ~0.08 reachable envelope — so a genuinely hour-scale
+  cortisol tail would need that term replaced or retuned, which shifts
+  the whole stress equilibrium and every gate set against it.
 - The source's LC drops to 0.15 of its maximum in NREM (about 0.9 Hz).
   Locus coeruleus firing is reduced in NREM, not nearly silent, so this is
   a property of the source model that we have not corrected.
@@ -313,6 +497,36 @@ the things that were gated on it were checked:
 - Impulses to the network-driven chemicals decay toward the network's
   target. A stress impulse to norepinephrine is therefore transient,
   because stress does not yet drive LC.
+
+## The cortisol envelope (threshold calibration rule)
+Effective cortisol is a normalized stress-drive variable, not a
+concentration, and its *reachable* range is narrow: resting ~0.02,
+sustained-drive peak ~0.08, hard clamp 0.80 is never reached. Every
+threshold or coefficient written for a full [0, 1] cortisol scale was
+therefore dead code — the audit found the Stress gate (0.65→0.06, done
+earlier), `WARN_CORTISOL` (0.6→0.05), `GUARDED_CORTISOL` (0.5→0.05),
+`wake_recovery`'s stress veto (0.3→`STRESS_CORTISOL_GATE`), the BDNF
+recovery gate (0.3→`STRESS_CORTISOL_GATE`), the Flow exclusion
+(0.30→`STRESS_CORTISOL_GATE`), the fear-conditioning skip in
+`memory.py` (0.5→0.05), `wake_readiness`'s cortisol_tonic check
+(0.7→0.05), and the canvas stress palette (normalized by
+`CORTISOL_PALETTE_RANGE` = 0.08 at the input), the learning posture in
+`genesis_client/types.py` (cortisol_tonic normalized to the envelope
+before the 0.40/0.45 gates — `> 0.45` on the raw level was
+unreachable), the allostatic tracker in
+`limbic_system/emotional_regulator.py` (substrate cortisol normalized
+at `record_stress` entry — `CHRONIC_THRESHOLD` 0.3 and
+`FALLBACK_CORTISOL_BASELINE` 0.1 were both above the envelope), and
+the allostatic burden in `daemon/active_inference.rs` (`cort_elev`
+now `cortisol_stress_fraction`, restoring cortisol as the dominant
+mediator — raw elevation capped its share at ~0.17). Multiplicative
+effects that assume full-scale cortisol go through
+`cortisol_stress_fraction()` — `(cort − 0.02)/(0.08 − 0.02)` clamped to
+[0, 1] — so valence drag (−0.35), plasticity suppression (×0.5),
+memory gating, the ion-layer ATP cost, and the compact emotional tag
+all act on the envelope, not the raw level. **When writing a cortisol
+comparison or coefficient, check the reachable envelope first; a
+0–1-scale threshold is silently inert.**
 
 ## Keep the project tidy
 The project is large. Dead code, unused files, and stale leftovers
@@ -582,6 +796,28 @@ written at save time; the log's fold overwrites it at restore.
 - Existing unreadable cognitive state is a startup error, not first boot.
   Repair or restore it explicitly; do not silently replace it with fresh state.
 
+## Explorer read scope
+`frontal_lobe/tools/explorer.py` is her file-reading organ (`/explore`,
+`explore_files`). Read scope is the whole filesystem by default —
+owner-granted — via `default_allowed_roots()`; `GENESIS_EXPLORE_ROOTS`
+(os.pathsep-separated) narrows it for deployments that want confinement,
+and `Explorer(allowed_roots=[...])` overrides per instance (default:
+`project_root`). The scope is **read-only** — it is not OS write or
+admin access.
+
+Two boundaries hold under every root, because whatever she reads is
+committed to the concept network:
+- Credential/key material is denied: `_SENSITIVE_DIRS` (.ssh, .aws,
+  browser profiles, keyrings), `_SENSITIVE_FILES` (.env, id_rsa,
+  credentials, secrets.*), `_SENSITIVE_SUFFIXES` (.pem, .key, .kdbx, ...).
+- Pseudo-filesystems are denied: `/proc`, `/sys`, `/dev`, `/run`,
+  `/boot`, `/snap`, `/lost+found` — nothing under them is a document.
+Directory walks additionally skip `.*` subdirs and `_SKIP_DIRS`; an
+explicit hidden file is still readable by path, an explicit hidden dir
+is explorable, only *descent into* nested dotdirs is pruned. Symlinks are
+resolved before the scope check, so a link inside an allowed root cannot
+reach a denied tree. Regression coverage: `python/tests/test_explorer_scope.py`.
+
 ## ARC-AGI-3 evaluation boundary
 - `/arc <ids> --steps N` is local practice. `/arc --all --steps N`
   runs all locally discovered environments on one scorecard through
@@ -614,6 +850,31 @@ written at save time; the log's fold overwrites it at restore.
   or per-game solution policy. New world contexts discard local physics
   and cached plans, not the concept network or transferable task competence.
   Retries within the same world retain learned mechanics.
+- Action labels carry interface structure only — `"simple"` or
+  `"coordinate"` (the action enum's own classification), never directional
+  or effect semantics. This holds on both substrates: the SDK path
+  (`world/arc.py`) and the public web page (`world/arc_web.py`), whose key
+  table is actuation only — which key posts which action id — not meaning
+  she is given. Cost accounting is also identical: `steps` counts submitted
+  actions including recovery resets, `resets` includes session
+  initialization, an abstention is `NO_ACTION` rather than a spent step,
+  and a silent page is `TRANSPORT_DEAD`, not `BUDGET`.
+- `ArcResult.level_steps` records the step cost of each completed level
+  in order (re-completions after a death append again): the within-game
+  learning curve, i.e. the honest form of the skill-acquisition-efficiency
+  evidence the README claims. Web-substrate parity is exercised by
+  `python/tests/test_arc_web_adapter.py` with a fake browser, no network.
+- `ArcResult.prior_learning` discloses how much experience a run carried
+  in — "none" / "loaded" / "suppressed" / "unknown" (a corrupt file is
+  never a cold start) — and `decision_sources` tallies which bid channel
+  won each submitted move. `/arc <ids> --fresh` makes a run cold-start:
+  `_fresh_world_run` on the Mind suppresses both the load AND the save in
+  `_load_world_learning`/`_save_world_learning`, so the probe cannot
+  overwrite banked experience. `/arc <ids|--all> --baseline uniform|first`
+  runs a named reference policy through the *same* `ArcPractice` loop via
+  a `_BaselineMind` stub (`world/arc_baseline.py`) — identical accounting,
+  `baseline:<policy>` stamped as every move's source; never an agent
+  result and never combined with `--competition`.
 - Focused checks: `python3 -m pytest python/tests/test_arc_adapter.py
   python/tests/test_world_model.py python/tests/test_world_hypotheses.py
   python/tests/test_spatial_boards.py python/tests/test_spatial_planner.py
