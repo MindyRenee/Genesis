@@ -5,6 +5,45 @@ evidence behind them, not just the claims. Entries are dated, newest
 first. Code references are commit SHAs; runtime artifacts live in the
 instance's data dir (`~/.local/share/genesis*`).
 
+## 2026-10-15 — Bounded growth audit: seven structures found and capped
+
+A growth audit found seven structures accumulating without a ceiling
+while the docs claimed everything was bounded. All now have enforced,
+tested bounds:
+
+- `forget()` was O(N²) — two full list copies per record, holding the
+  GIL on the autosave/think threads. Now sorted + bisect-windowed,
+  O(N log N); forgotten records evicted after a 1 h grace.
+- Attractor patterns grew unbounded. Capped at 512
+  (`_DEFAULT_MAX_PATTERNS`), least-recently-retrieved first —
+  deliberately *not* ~0.138·N Hopfield capacity, which is 8 at the
+  production size of 64 and would exhaust within a morning. Past
+  capacity, `over_capacity` marks returned ids as suggestions.
+- Executive suppression was permanent — every topic ever focused
+  became un-attendable, since nothing released suppressions outside
+  tests. Now 64 entries max, each auto-releasing on a 120 s deadline.
+- Conversation threads → 50 retained; topic history → 200;
+  learning results → 500 (oldest evicted); curiosity queue →
+  50-entry FIFO (also `pop(0)` → `popleft()`, O(N) → O(1)).
+- Spaced-repetition records → 5,000 (evicting highest retention),
+  `stability` capped at 7 days so a well-reviewed concept cannot
+  become permanently undecayable.
+- Ad-hoc embedding cache → 4,096 dense vectors, LRU.
+
+Two findings were investigated and deliberately left unbounded,
+because the fix is a design decision rather than a patch:
+`semantic.py` labels consolidated edges `origin="semantic"`, which
+`DERIVABLE_ORIGINS` rejects — extracted propositions have no durable
+representation and want a non-listed origin; and the embeddings
+rebuild computes a dense 5000² SVD (~100 MB, O(n³)) — correct, but
+the dominant memory spike on a ~5 GB machine.
+
+Also retired an unsupported README claim: "months-to-years" disk
+growth is an extrapolation from record size — there is no benchmark
+harness to re-run — and the README's own bounds table now matches the
+code (it had claimed 60%-of-capacity attractor trimming and a
+200-entry curiosity queue; the code says 512 and 50).
+
 ## 2026-10-11 — Regional wiring audit: every function in its region
 
 Full audit of all 34 `__init__.py` files against current
@@ -127,7 +166,7 @@ actually perceived: recognized concept-name equality when the MTL
 bridge has learned the names, VTC cosine otherwise. ``teach()`` lets
 the world name what it showed — the parent pointing and saying
 "that's a square" — bound through ``learn_from_image``, so "square"
-stops being a string and becomes a silhouette she recognizes. The
+stops being a string and becomes a silhouette it recognizes. The
 heard-task path emits ``perceptual: true``: a described sorter is
 worked by sight when a cortex is wired, symbolic otherwise.
 
@@ -148,8 +187,8 @@ detection and proposition extraction consulted different verb lists.
 "sort the shapes into the holes" was flagged COMMAND, then parsed as
 `subject='sort the shapes into the holes', predicate='is'` — the
 imperative slot only consulted `_COMMON_VERBS`, a mostly-inflected
-list missing ordinary base verbs. Her hearing said "do this"; what
-landed in her mind was a false statement. Three repairs, each at its
+list missing ordinary base verbs. Its hearing said "do this"; what
+landed in its mind was a false statement. Three repairs, each at its
 own layer:
 
 - `_find_main_verb` now takes the imperative fast path from

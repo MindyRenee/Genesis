@@ -1,9 +1,9 @@
 # ARC-AGI-3 boundary
 
 Genesis approaches ARC-AGI-3 as an embodied agent, not as a text solver. The
-adapter gives her a grid observation, the available controls, and progress
+adapter gives it a grid observation, the available controls, and progress
 metadata. Mechanics, identity, goals, movement effects, blockers, hazards, and
-plans are learned by her own world model and action policy.
+plans are learned by its own world model and action policy.
 
 There is no external LLM, no textual game-specific reasoning layer, no solver
 keyed to a game ID, and no access to internal engine state in the playing path.
@@ -30,14 +30,14 @@ arcengine / public page
 ```
 
 The adapter may enforce honest-run contracts — game mode, readiness, action
-legality, scorecard lifetime — but it must not choose moves for her.
+legality, scorecard lifetime — but it must not choose moves for it.
 
 The observation contract is identical on both substrates (the local engine
 via `world/arc.py`, the public human page via `world/arc_web.py`): action
 ids plus *structural* labels only — `"simple"` or `"coordinate"`, read from
 the interface's own action enum. Directional or effect semantics are never
 crossed. What a control does is learned from consequences; nothing keyed to
-a game id, a key convention, or a played-before map is handed to her.
+a game id, a key convention, or a played-before map is handed to it.
 
 Costs are counted identically on both substrates: every submitted action is
 a step, the session's initialization is a reset, and each death recovery
@@ -70,8 +70,8 @@ inflated.
 Every `ArcResult` carries the fields an honest claim needs:
 
 - `level_steps` — the step cost of each completed level, in order. The
-  within-game learning curve: if she is really acquiring skill inside an
-  episode, later levels should cost less than the ones that taught her.
+  within-game learning curve: if it is really acquiring skill inside an
+  episode, later levels should cost less than the ones that taught it.
 - `prior_learning` — how much experience the run carried in: `none` (no
   persisted file), `loaded` (past sessions' lessons restored),
   `suppressed` (a `--fresh` run refused them), `unknown` (a file existed

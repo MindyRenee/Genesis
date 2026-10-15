@@ -16,6 +16,8 @@ machine-native cognition with an external model or fixed responses.
 From a checkout with the documented system dependencies installed:
 
 ```bash
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
 cargo test
 ruff check
 python3 -m pyflakes python/ genesis_client/ infrastructure/ world/ eval/ *.py scripts/*.py

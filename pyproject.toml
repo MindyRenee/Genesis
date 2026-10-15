@@ -17,6 +17,18 @@ keywords = [
     "neuromodulation",
 ]
 license = { text = "AGPL-3.0-only, with Ethical Use restrictions (see LICENSE)" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     # Pinned mirrors of requirements.txt — update both together.
     "numpy==2.5.3",
@@ -41,6 +53,8 @@ voice = [
 [project.urls]
 Repository = "https://github.com/MindyRenee/Genesis"
 Issues = "https://github.com/MindyRenee/Genesis/issues"
+Documentation = "https://github.com/MindyRenee/Genesis/tree/main/docs"
+Changelog = "https://github.com/MindyRenee/Genesis/blob/main/CHANGELOG.md"
 DOI = "https://doi.org/10.5281/zenodo.22817337"
 
 [project.scripts]

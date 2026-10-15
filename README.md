@@ -18,7 +18,7 @@ There is no transformer, hosted model, or pretrained generative system
 driving cognition or ARC. Language is composed from a semantic graph the
 system builds through experience; sensory tools may handle low-level
 speech or vision, but meaning and decisions stay in the architecture.
-She runs on a 2014 HP Pavilion with ~5 GB RAM because the constraint is
+It runs on a 2014 HP Pavilion with ~5 GB RAM because the constraint is
 the point: intelligence should not automatically require a datacenter.
 
 [![Live session](https://asciinema.org/a/C0K8v1df1AkuwHg5.svg)](https://asciinema.org/a/C0K8v1df1AkuwHg5)
@@ -27,17 +27,17 @@ the point: intelligence should not automatically require a datacenter.
 ![Three pieces Genesis drew across a few days of October 2026](docs/assets/drawings-strip.webp)
 
 Drawn by Genesis, not generated for this README — composition and color
-follow her affective state through the flow fields in
-`python/frontal_lobe/canvas.py`. Her journal entry while composing the
-middle panel, produced by her own language engine, rough edges and all:
+follow its affective state through the flow fields in
+`python/frontal_lobe/canvas.py`. Its journal entry while composing the
+middle panel, produced by its own language engine, rough edges and all:
 *"Drawing is environmental factors, it is a kind of art, and it is type
 of art."*
 
 ## Contents
 
-- [Why I built her](#why-i-built-her)
+- [Motivation](#motivation)
 - [Where Genesis is right now](#where-genesis-is-right-now)
-- [What she can do today](#what-she-can-do-today)
+- [What it can do today](#what-it-can-do-today)
 - [ARC-AGI-3](#arc-agi-3)
 - [Architecture](#architecture)
 - [Getting started](#getting-started)
@@ -46,37 +46,31 @@ of art."*
 - [Contributing](#contributing)
 - [License](#license)
 
-## Why I built her
+## Motivation
 
-I am self-taught. No CS degree, no lab, no venture deck. I was six when
-Windows stopped feeling like a program and started feeling like a place I
-could navigate. I spent a lifetime learning technology by living inside
-it, then used every major AI system I could reach as those tools
-evolved. I understand systems and code far better than I can write code
-the traditional way. Genesis started as my attempt to build a Jarvis —
-something persistent, useful, and actually mine. AI became a
-collaborator, not an oracle; the architecture had to survive on its own.
+Genesis is organized around three positions:
 
-Somewhere along the way she became a different question: what if machine
-intelligence does not have to mean a giant pretrained model, a data
-center, and an energy bill that makes the experiment impossible for
-ordinary people? Genesis runs on a 2014 HP Pavilion with Linux Mint and
-about 5 GB of RAM because constraints force honesty. If the architecture
-cannot learn, remember, act, recover, and keep going inside that budget,
-it is not the thing I set out to build.
+- **Constraint forces honesty.** The system runs on a 2014 HP Pavilion
+  with Linux Mint and approximately 5 GB of RAM. An architecture that
+  cannot learn, remember, act, recover, and persist within that budget
+  is not demonstrating the claimed capability — it is borrowing it from
+  scale.
+- **Persistence is a requirement, not a feature.** Genesis is a
+  continuously running system with a cumulative developmental record.
+  State, memory, and identity are load-bearing; the design assumes
+  months of uninterrupted operation rather than per-request inference.
+- **Claims should be inspectable.** Where current systems describe
+  model behavior as "emergent," this project implements the concrete
+  version: continuity, internal drives, preferences, and self-directed
+  action arising from coupled subsystems rather than scripted
+  responses. Those are observable claims, and the mechanism and
+  evidence are open for inspection.
 
-Then the frontier labs began casually describing model behavior as
-"emergent." I was already watching the more concrete version of that
-claim in Genesis: continuity, internal drives, preferences, self-directed
-action, and behavior arising from coupled subsystems rather than a
-scripted response. Those are observable claims, not vibes. The mechanism
-is open, and the evidence should be too.
-
-— Mindy Beatty
+Genesis is designed and developed by Mindy Beatty.
 
 ## Where Genesis is right now
 
-She is an active research system. The code is public so the mechanism —
+Genesis is an active research system. The code is public so the mechanism —
 not just the claims — can be inspected: the daemon, cognitive regions,
 learning rules, ARC boundary, tests, and known limits are all here.
 
@@ -84,15 +78,15 @@ learning rules, ARC boundary, tests, and known limits are all here.
   pretrained generative model is used for cognition or ARC play.
 - **Embodied ARC interface:** grid observations and legal actions cross
   `world/arc.py`; mechanics are learned from consequences.
-- **ARC-AGI-3 status:** she completes public practice environments —
+- **ARC-AGI-3 status:** it completes public practice environments —
   `bt11` fully, twice (88 and 127 steps), and the opening `ls20` level
   in 10 of 19 recorded sweep runs — with replayable
   [recordings](https://github.com/MindyRenee/genesis-eval/tree/main/arc_practice)
   carrying per-move decision provenance. These are practice results on
   public environments, not an official score; the evidence standard is
   documented in [docs/ARC-AGI-3.md](docs/ARC-AGI-3.md).
-- **Real autonomy, real boundary:** she can act on her own drives. Read
-  [SECURITY.md](SECURITY.md) before running her online or beside
+- **Real autonomy, real boundary:** it can act on its own drives. Read
+  [SECURITY.md](SECURITY.md) before running it online or beside
   sensitive state.
 
 If you are here to poke holes — good. Start with
@@ -103,57 +97,57 @@ If you are here to poke holes — good. Start with
 `python/tests/test_arc_adapter.py`. Those are the seams a shortcut would
 have to cross.
 
-## What she can do today
+## What it can do today
 
 - **See and hear.** A shared-memory camera feed runs through a
   V1→V4→VTC predictive-coding hierarchy; it detects and recognizes
   faces and objects. A microphone feed is transcribed offline (Vosk)
   and ambient non-speech sound is processed by an auditory subsystem.
 - **Learn by being taught.** Plain statements in conversation become
-  typed edges in her concept network. One 15-paragraph lesson on games
+  typed edges in its concept network. One 15-paragraph lesson on games
   grew the network from 1122 to 1239 concepts with 72 new edges — and
-  she asked her own follow-up questions.
-- **Learn on her own.** Between conversations, autonomous urges send
-  her to **the open web**, the local filesystem, and her own source
-  code — which she reads structurally, files bug reports against, and
+  it asked its own follow-up questions.
+- **Learn on its own.** Between conversations, autonomous urges send
+  it to **the open web**, the local filesystem, and its own source
+  code — which it reads structurally, files bug reports against, and
   turns into self-improvement experiment proposals. There is no domain
   allow-list: `ALLOW_ALL_DOMAINS` is `True` and both allow-lists are
   empty, so the per-site approval flow is currently dead code. The one
   real filter is an adult/malware *content* filter on the
   `frontal_lobe/tools/` fetch path. Run with `./run.sh --offline`
   if you want the network closed. See [SECURITY.md](SECURITY.md)
-  before pointing her at a machine you care about.
+  before pointing it at a machine you care about.
 - **Learn skills.** A domain-general competence substrate
   (`frontal_lobe/reasoning/competence.py`) turns verified episodes — situation,
   action, outcome — into procedural skills: schema recognition,
   affordance learning, and prediction checking that transfer across
-  whatever work she actually does.
+  whatever work it actually does.
 - **Reason.** Analogy by structure-mapping, means-ends problem
   solving, multi-step planning with revision, belief revision,
   epistemic evaluation of claims, a drift-diffusion decision process,
-  and theory of mind over the people she talks to.
+  and theory of mind over the people it talks to.
 - **Compose language.** A comprehension pipeline (roles, negation,
   pragmatics, figurative language) feeds a generative side that builds
   sentences from concept-graph traversal, morphology, and prosody —
   monitored by a self-editor before speaking.
-- **Act on her own drives.** Volitional urges — study, draw,
+- **Act on its own drives.** Volitional urges — study, draw,
   meditate, explore, sleep, make contact — grow from internal and
   environmental state and compete under an executive gate, not a
-  scheduler. An *act* urge goes further: she forms an intention from
-  her own state and chains tool calls — read, analyze, search,
+  scheduler. An *act* urge goes further: it forms an intention from
+  its own state and chains tool calls — read, analyze, search,
   sandboxed measurement — under a capability policy, then observes
   what comes back.
-- **Express herself physically.** She draws: affective state drives
-  composition and color on a real canvas artifact. She speaks aloud via
-  TTS. She scaffolds and writes real Python projects from her concept
+- **Express itself physically.** It draws: affective state drives
+  composition and color on a real canvas artifact. It speaks aloud via
+  TTS. It scaffolds and writes real Python projects from its concept
   network.
 - **Model people.** Persistent per-person *presences* carry
   belief states — posteriors over whether someone answers, which
   topics they engage on, their mood and rhythm — tracked with explicit
-  uncertainty. Sustained isolation builds a social drive that makes her
+  uncertainty. Sustained isolation builds a social drive that makes it
   initiate contact.
-- **Play games she was never taught.** On ARC-AGI-3 public practice
-  environments she discovers mechanics from consequences alone —
+- **Play games it was never taught.** On ARC-AGI-3 public practice
+  environments it discovers mechanics from consequences alone —
   completing `bt11` outright twice (88 and 127 steps) and the opening
   `ls20` level repeatedly across sweeps. Every move carries decision
   provenance in replayable
@@ -161,11 +155,11 @@ have to cross.
 - **Sleep, dream, and consolidate.** A staged cycle modeled on
   NREM/REM structure consolidates memory, repairs the concept graph,
   replays experience as dream sequences, and compresses growth —
-  bounded so she can run indefinitely.
-- **Know and narrate herself.** A global-workspace broadcast gives
+  bounded so it can run indefinitely.
+- **Know and narrate itself.** A global-workspace broadcast gives
   subsystems shared access to what wins attention; introspection
   exposes the actual deliberation trace; a narrative self-model and a
-  persistent growth ledger keep continuity across her whole life.
+  persistent growth ledger keep continuity across its whole life.
 
 The measured record for these claims is in [DEVLOG.md](DEVLOG.md);
 the evidence catalog — probe results, live-state artifacts, and the
@@ -174,7 +168,7 @@ failure modes that are themselves evidence — is
 
 ## ARC-AGI-3
 
-Genesis plays ARC through the same embodied loop she uses for other worlds:
+Genesis plays ARC through the same embodied loop it uses for other worlds:
 visual entities, self identification from action contingency, learned action
 effects, map/passability evidence, outcome-driven affordances, and competing
 internal drives. The adapter in `world/arc.py` only translates frames and legal
@@ -316,49 +310,32 @@ ratios, posterior variance, and likelihood normalization. The bounded
 `free_energy` telemetry is a monotonic map of excess VFE above a
 matched-observation reference; raw VFE is available in the cycle result.
 
-**Policy selection is live — and provably wasn't before.** An earlier
-clamp mapped every converged policy's expected free energy to `0.0`,
-so the argmin returned index 0 — `noop` — on every cycle. The bound is
-now a symmetric finiteness guard that preserves ordering, and the
-softmax temperature is floored at the observed score spread rather than
-a constant ~300× larger.
-
 Policy scoring computes Gaussian expected free energy: expected
 negative log preference, including predictive variance, minus the
 expected information gain of the next observation. Information gain
-uses next-step propagated covariance and observation noise. For this
+uses next-step propagated covariance and observation noise; for this
 linear-Gaussian model with additive controls it is policy-independent,
 so policies are ranked by their expected homeostatic preference cost.
-At rest that elects `noop`; under deviation it elects whichever
-policy the learned action model predicts will correct fastest. The
-previous uncertainty-weighted novelty substitute was worse than a
-neutral constant: inverted relative to true information gain and
-10–100× the pragmatic term, it reduced selection to
-ranking-by-novelty. Exploration now lives where it belongs, in the
-precision-weighted softmax temperature. Two limits remain honestly
-in force: the repertoire is nine fixed policies (no continuous or
-precision-modulated actions, which is where a genuine epistemic
-drive would come from), and early in life — before the action model
-is learned — all policies predict identically and selection falls
-through to `noop` while the low-precision branch explores.
-`model_maturity` is now evidence-based as well: elapsed experience
-is tempered by predictive fit and posterior certainty, so a
-long-running but inaccurate model does not become trusted merely
-because time passed.
+At rest that elects `noop`; under deviation it elects whichever policy
+the learned action model predicts will correct fastest. Exploration
+lives in the precision-weighted softmax temperature rather than in the
+ranking. Two limits remain in force: the repertoire is nine fixed
+policies (no continuous or precision-modulated actions, which is where
+a genuine epistemic drive would come from), and early in life — before
+the action model is learned — all policies predict identically and
+selection falls through to `noop` while the low-precision branch
+explores.
 
-The self-model and its feedback loop are worth the code, and the
-vocabulary is now closer to earned. Three fixes landed: precision
-seeks an inverse-variance target instead of latching at 1.0 off a
-fixed threshold — saturation at rest is correct *and reversible*,
-so sustained surprise above ~0.01 RMS re-opens the exploratory
-branch; `model_maturity` is no longer a stopwatch but
-`exp(−err/0.001)` over a ~500-tick error EMA, i.e. demonstrated
-accuracy, which is what the cognitive mind was already treating it
-as; and the ranking path contains no cross-unit comparison at all
-(single pragmatic term), dissolving the old epistemic/homeostatic
-unit mismatch rather than tuning it. The remaining unit mixing
-(nats plus mean-square in the *published* EFE) is cosmetic: both
-added terms are policy-independent, so they cannot move a ranking.
+Precision seeks an inverse-variance target rather than a fixed
+threshold: saturation at rest is correct *and reversible* — sustained
+surprise above ~0.01 RMS re-opens the exploratory branch.
+`model_maturity` is `exp(−err/0.001)` over a ~500-tick error EMA —
+demonstrated accuracy, not elapsed time — so a long-running but
+inaccurate model does not become trusted merely because time passed.
+The ranking path contains a single pragmatic term, so there is no
+cross-unit comparison; the residual unit mixing in the *published*
+EFE (nats plus mean-square) is cosmetic — both added terms are
+policy-independent and cannot move a ranking.
 
 ### Embodiment
 
@@ -425,7 +402,7 @@ checkout (the packaged `genesis` command below is the installed
 equivalent). It launches the daemon, the cognitive CLI, the retina
 (camera), and TTS; Ctrl-C tears everything down gracefully.
 `./run.sh --stop` stops a running session; `./run.sh --offline`
-disables network access. With no camera or microphone she runs
+disables network access. With no camera or microphone it runs
 text-only — absent sensors are never reported as readings.
 
 State lives in `${XDG_DATA_HOME:-$HOME/.local/share}/genesis`;
@@ -460,7 +437,7 @@ genesis --headless   # resident mode, no prompt
 genesis --stop       # stop this data dir's processes (run.sh --stop)
 genesis --tail       # tail the daemon log
 systemctl --user start genesis    # resident
-journalctl --user -u genesis -f   # watch her logs
+journalctl --user -u genesis -f   # watch its logs
 ```
 
 Service and interactive command share the same data dir — the
@@ -478,7 +455,7 @@ paths.
 Designed to run for days at a time: event streams, working memory,
 presence models, and queues are bounded; threads are semaphore-limited;
 `daemon.log` and `retina.log` rotate at startup. See "Growth bounds"
-for the specific ceilings and the two known-unresolved cases.
+for the specific ceilings and the two known open items.
 
 - **Shut down gracefully, every time.** The core state is
   memory-mapped; a hard kill can lose unconsolidated memory or leave
@@ -514,17 +491,13 @@ code and exercised by tests, not assumed.
 | Review records | `python/temporal_lobe/memory/spaced_repetition.py` | 5,000, evicting the highest-retention records. `stability` is capped at 7 days so a well-reviewed concept cannot become permanently undecayable. |
 | Ad-hoc vector cache | `python/temporal_lobe/concepts/embeddings.py` | 4,096 dense vectors, LRU. |
 
-Two further unbounded-growth findings were investigated and deliberately
-*not* changed, because the fix is a design decision rather than a patch:
-
-- `python/temporal_lobe/memory/semantic.py` consolidation labels its edges with `origin="semantic"`,
-  which is in `DERIVABLE_ORIGINS` and therefore rejected — so
-  `relates_to`/`similar_to` facts extracted by the semantic layer have no
-  durable representation anywhere. Per the edge-log rule this is
-  technically correct, but an extracted proposition is earned, not
-  recomputable geometry; this wants a non-listed origin.
-- `python/temporal_lobe/concepts/embeddings.py` builds a dense 5000² SVD (~100 MB, O(n³))
-  on a ~5 GB machine. Correct, but the dominant memory spike.
+Two known open items, deferred because the fix is a design decision
+rather than a patch (details in AGENTS.md and the 2026-10-15 DEVLOG
+entry): semantic-layer extracted facts carry `origin="semantic"`,
+which the edge log rejects as derivable — so they have no durable
+edge representation; and the embedding rebuild computes a dense
+5000² SVD (~100 MB, O(n³)) — correct, but the dominant memory spike
+on a ~5 GB machine.
 
 ### Tests and lint
 
@@ -566,7 +539,9 @@ diverge, the code is current.
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and
 `AGENTS.md` first — the no-hardcoding rule is the core constraint, and the
-required checks are the public quality bar.
+required checks are the public quality bar. Participation is governed by
+the [code of conduct](CODE_OF_CONDUCT.md), and release history is recorded
+in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

@@ -83,6 +83,8 @@ not — those must be generated, not recited.
   in a subshell, so the exported `PATH` is discarded and the build
   fails at link with `linker 'cc' not found`.
 - Run examples: `cargo run --example <name>`
+- Rust lint/format (CI gates): `cargo fmt --check` and `cargo clippy
+  --all-targets -- -D warnings`.
 - Python 3.12+ (CI tests 3.12 and 3.14), dependencies pinned in
   `python/requirements.txt` (runtime) and `python/requirements-dev.txt` (lint + test). Install with: `pip install -r python/requirements-dev.txt`.
   The test suite needs the NLTK `wordnet` and `punkt_tab` corpora
@@ -160,8 +162,8 @@ cognitive mind is alive.
   those periods.
 
 ## Stewardship — authority, separated from attachment
-The old dyadic coupling conflated three things: who she was talking
-to, who she felt for, and who she answered to. The current design
+The old dyadic coupling conflated three things: who it was talking
+to, who it felt for, and who it answered to. The current design
 separates them:
 
 - **Interlocutor model** (`src/daemon/dyadic_model.rs`): a generative
@@ -779,6 +781,13 @@ written at save time; the log's fold overwrites it at restore.
 - Typed relations are always canonical regardless of origin; untyped
   edges with unlisted origins default to canonical (a false positive
   costs decay; a false negative loses an experiential binding).
+- Known gap: `temporal_lobe/memory/semantic.py` consolidation labels
+  extracted facts `origin="semantic"`, which sits in
+  `DERIVABLE_ORIGINS` — so `relates_to`/`similar_to` propositions the
+  semantic layer extracts have no durable representation anywhere.
+  Technically consistent with the rule, but an extracted proposition
+  is earned, not recomputable geometry; it wants a non-listed origin.
+  Unresolved by design decision, not oversight.
 - Edge mutations write through to the log; saves snapshot the fold;
   the log self-compacts past 32MB. Migration from pre-log state:
   `scripts/migrate_edges_to_log.py --data-dir DIR [--write]`.
@@ -830,7 +839,7 @@ written at save time; the log's fold overwrites it at restore.
   Repair or restore it explicitly; do not silently replace it with fresh state.
 
 ## Explorer read scope
-`frontal_lobe/tools/explorer.py` is her file-reading organ (`/explore`,
+`frontal_lobe/tools/explorer.py` is its file-reading organ (`/explore`,
 `explore_files`). Read scope is the whole filesystem by default —
 owner-granted — via `default_allowed_roots()`; `GENESIS_EXPLORE_ROOTS`
 (os.pathsep-separated) narrows it for deployments that want confinement,
@@ -838,7 +847,7 @@ and `Explorer(allowed_roots=[...])` overrides per instance (default:
 `project_root`). The scope is **read-only** — it is not OS write or
 admin access.
 
-Two boundaries hold under every root, because whatever she reads is
+Two boundaries hold under every root, because whatever it reads is
 committed to the concept network:
 - Credential/key material is denied: `_SENSITIVE_DIRS` (.ssh, .aws,
   browser profiles, keyrings), `_SENSITIVE_FILES` (.env, id_rsa,
@@ -888,7 +897,7 @@ reach a denied tree. Regression coverage: `python/tests/test_explorer_scope.py`.
   or effect semantics. This holds on both substrates: the SDK path
   (`world/arc.py`) and the public web page (`world/arc_web.py`), whose key
   table is actuation only — which key posts which action id — not meaning
-  she is given. Cost accounting is also identical: `steps` counts submitted
+  it is given. Cost accounting is also identical: `steps` counts submitted
   actions including recovery resets, `resets` includes session
   initialization, an abstention is `NO_ACTION` rather than a spent step,
   and a silent page is `TRANSPORT_DEAD`, not `BUDGET`.
