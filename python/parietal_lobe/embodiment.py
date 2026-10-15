@@ -587,6 +587,15 @@ class EmbodimentMixin:
         safe = re.sub(r"[^A-Za-z0-9_.-]", "_", game)
         return default_data_dir() / "world_learning" / f"{safe}.json"
 
+    @staticmethod
+    def _competence_learning_file() -> Path:
+        # Domain-general, not per-game: the TaskCompetence ledger is
+        # deliberately shared across worlds — its schemas, lifted
+        # operators, and skills are the part of game learning that is
+        # meant to carry. It gets its own file so cross-game evidence
+        # isn't stranded inside one world's physics snapshot.
+        return default_data_dir() / "world_learning" / "_competence.json"
+
     def _save_world_learning(self) -> None:
         """Persist this world's learned physics and verdicts.
 
@@ -607,6 +616,15 @@ class EmbodimentMixin:
             path.write_text(json.dumps(self.world_model.export_learning()))
         except Exception:
             logger.debug("world learning save failed", exc_info=True)
+        # Checkpoint the domain-general competence ledger at the same
+        # boundary. The main state save only runs on shutdown or
+        # sleep — a crash mid-run would otherwise take every operator
+        # and skill the episode just earned with it.
+        try:
+            competence = self.brain.frontal.task_competence
+        except AttributeError:
+            return
+        competence.save_checkpoint(self._competence_learning_file())
 
     def _load_world_learning(self) -> None:
         """Restore what past sessions learned about this world.
@@ -620,12 +638,14 @@ class EmbodimentMixin:
         """
         if not self._world_context:
             self._world_learning_loaded = "none"
+            self._world_competence_loaded = "none"
             return
         if getattr(self, "_fresh_world_run", False):
             # Cold-start evidence: the banked file is neither read
             # now nor overwritten later — the run is isolated both
             # directions.
             self._world_learning_loaded = "suppressed"
+            self._world_competence_loaded = "suppressed"
             return
         loaded = "none"
         try:
@@ -639,6 +659,32 @@ class EmbodimentMixin:
             logger.debug("world learning load failed", exc_info=True)
             loaded = "unknown"
         self._world_learning_loaded = loaded
+        self._restore_competence_checkpoint()
+
+    def _restore_competence_checkpoint(self) -> None:
+        """One-time recovery of the domain-general competence ledger.
+
+        The shutdown save already restores ``task_competence`` — this
+        file only matters when the process died mid-run, leaving the
+        episode-end checkpoints newer than the last clean save.
+        ``transition_count`` is cumulative evidence, so the checkpoint
+        wins only when it strictly carries more; restoring an older
+        file would erase learning the live mind already has. Runs once
+        per session so a mid-session game switch can never clobber
+        live schemas with a stale file. Status mirrors the
+        ``_world_learning_loaded`` vocabulary for honest disclosure.
+        """
+        if getattr(self, "_world_competence_checked", False):
+            return
+        self._world_competence_checked = True
+        self._world_competence_loaded = "none"
+        try:
+            competence = self.brain.frontal.task_competence
+        except AttributeError:
+            return
+        self._world_competence_loaded = competence.restore_checkpoint(
+            self._competence_learning_file()
+        )
 
     def save_world_learning(self) -> None:
         """Public checkpoint for run ends that never switch games."""

@@ -48,6 +48,7 @@ entrypoint::
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass, field
 from inspect import signature
 from pathlib import Path
@@ -108,6 +109,12 @@ class ArcResult:
     # "suppressed" a fresh run refused it, "unknown" it failed to
     # read. A result that doesn't say is not evidence.
     prior_learning: str = "none"
+    # The domain-general competence carried into this game —
+    # {"schemas", "skills", "transitions", "loaded"} snapshotted
+    # before the first step. prior_learning covers the per-game
+    # physics file; this covers the cross-game abstraction layer,
+    # which grows *within* a suite as earlier games bank schemas.
+    prior_competence: dict = field(default_factory=dict)
     # Which bid source won each submitted move — the priors-vs-learning
     # question ("was it the plan or the babbling?") answered from the
     # recording, not argued about it.
@@ -139,6 +146,7 @@ class ArcPractice:
         instructions: str = "",
         require_live: bool = True,
         record: bool = True,
+        step_delay_s: float = 0.0,
     ) -> None:
         if (
             self.operation_mode == "offline"
@@ -174,6 +182,13 @@ class ArcPractice:
         # the readiness gate still applies its in-process checks.
         self._require_live = require_live
         self._record = record
+        # Optional pacing between decisions. A benchmark loop runs at
+        # CPU cadence; her arousal regulation runs on a biological
+        # one — unrestrained play overstimulates the body within
+        # ~50 steps and the readiness gate ends the run. A delay
+        # gives the regulator time to work, the same slack a human
+        # gets between moves. Default 0 keeps the production cadence.
+        self._step_delay = max(0.0, float(step_delay_s))
 
     # ── Action translation ────────────────────────────────────
 
@@ -196,6 +211,30 @@ class ArcPractice:
         return action, None
 
     # ── Health gate ───────────────────────────────────────────
+
+    def _competence_snapshot(self) -> dict[str, Any]:
+        """The cross-game learning she carries into this game.
+
+        Evidence, not bookkeeping: a suite where game N starts with
+        more schemas than game N-1 banked is carry-through made
+        visible. ``loaded`` reports the checkpoint restore status so
+        a crash-recovered run is distinguishable from a clean one.
+        """
+        competence = getattr(
+            getattr(getattr(self._mind, "brain", None), "frontal", None),
+            "task_competence",
+            None,
+        )
+        snap: dict[str, Any] = {
+            "loaded": getattr(self._mind, "_world_competence_loaded", "none"),
+        }
+        if competence is not None:
+            snap.update(
+                schemas=len(getattr(competence, "schemas", {})),
+                skills=len(getattr(competence, "skills", {})),
+                transitions=getattr(competence, "transition_count", 0),
+            )
+        return snap
 
     def _check_readiness(self) -> tuple[str, ...] | None:
         """Refusal reasons when she isn't fit to play, else None."""
@@ -226,6 +265,7 @@ class ArcPractice:
             result.reasons = reasons
             return result
 
+        result.prior_competence = self._competence_snapshot()
         scorecard = self._arcade.create_scorecard()
         result.scorecard_id = scorecard
         try:
@@ -267,6 +307,7 @@ class ArcPractice:
                     result.reasons = reasons
                     break
                 result.state = "NOT_FINISHED"
+                result.prior_competence = self._competence_snapshot()
                 self._play(result, max_steps)
                 if result.state == "UNWELL":
                     break
@@ -357,6 +398,9 @@ class ArcPractice:
                 frame = env.step(action, data=data)
             else:
                 frame = env.step(action, data=data, reasoning=reasoning)
+            delay = getattr(self, "_step_delay", 0.0)
+            if delay > 0.0:
+                time.sleep(delay)
         if frame is None:
             result.state = "NO_OBSERVATION"
         result.prior_learning = getattr(

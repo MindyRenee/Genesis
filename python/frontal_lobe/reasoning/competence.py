@@ -31,6 +31,7 @@ import re
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from genesis_client.swallow import note_swallowed
@@ -1468,3 +1469,45 @@ class TaskCompetence:
     @property
     def schema_count(self) -> int:
         return len(self.schemas)
+
+    def save_checkpoint(self, path: Path) -> bool:
+        """Episode-boundary checkpoint of the whole competence ledger.
+
+        The main state save runs on shutdown or sleep; a crash mid-run
+        would otherwise take every operator and skill the episode just
+        earned. Advisory — a failed write never interrupts play.
+        """
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(self.to_dict()))
+            return True
+        except (OSError, TypeError, ValueError):
+            logger.debug("competence checkpoint save failed", exc_info=True)
+            return False
+
+    def restore_checkpoint(self, path: Path) -> str:
+        """Adopt a checkpoint only when it carries more evidence.
+
+        ``transition_count`` is cumulative, so the file wins strictly
+        when it knows more than this ledger — a crash-recovery file
+        newer than the last clean save. An older or equal file would
+        erase live learning and is refused. Returns ``"loaded"``,
+        ``"none"`` (nothing newer to take), or ``"unknown"`` (a file
+        existed but could not be read — never masquerades as cold
+        start).
+        """
+        if not path.exists():
+            return "none"
+        try:
+            data = json.loads(path.read_text())
+            if int(data.get("transition_count", 0)) <= self.transition_count:
+                return "none"
+            restored = type(self).from_dict(data)
+        except (OSError, TypeError, ValueError, KeyError, AttributeError):
+            logger.debug("competence checkpoint load failed", exc_info=True)
+            return "unknown"
+        self.schemas = restored.schemas
+        self.skills = restored.skills
+        self.transition_count = restored.transition_count
+        self.match_threshold = restored.match_threshold
+        return "loaded"
