@@ -536,6 +536,11 @@ python3 -m mypy python/ genesis_client/ infrastructure/ world/ eval/ --ignore-mi
 PYTHONPATH=python:. python3 -m pytest python/tests/ -q -o addopts=''
 ```
 
+The Python suite is ~3,700 tests and the Rust suite ~650. Both need
+the NLTK `wordnet`/`punkt_tab` corpora (the `nltk.download` step in
+Getting started) and the dev requirements in
+`python/requirements-dev.txt`.
+
 ## Citing this work
 
 The architecture preprint is archived on Zenodo:
