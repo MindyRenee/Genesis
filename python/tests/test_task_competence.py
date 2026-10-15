@@ -293,7 +293,15 @@ class TestTaskCompetence:
         similar = _context(competence, position=5, distance=2)
         assert similar.skills
         assert similar.skills[0].skill is skill
-        assert similar.skills[0].skill.steps == (step,)
+        # Steps keep their caller-supplied content but gain the
+        # action's ordinal in the schema's affordance list — the
+        # positional metadata positional rebinding uses when a
+        # foreign-domain skill is recalled under different action
+        # names.
+        stored = similar.skills[0].skill.steps[0]
+        assert stored.action == step.action
+        assert stored.parameters == step.parameters
+        assert stored.position == 0
 
     def test_competence_state_round_trips(self):
         competence = TaskCompetence()
@@ -539,3 +547,241 @@ class TestPlanningCompetenceAdapter:
         schema = plan.task_context.schema
         assert schema.episodes == 1
         assert schema.failures == 1
+
+
+def _rule_context(
+    competence: TaskCompetence,
+    *,
+    domain: str,
+    feature_key: str,
+    feature_value: bool,
+    actions: tuple[str, ...],
+) -> TaskContext:
+    """A one-feature, two-action task — the probe family shape."""
+    return competence.recognize(
+        domain=domain,
+        state={feature_key: feature_value},
+        actions=actions,
+        goal_conditions=[GoalCondition("solved", "eq", True)],
+        roles=("inspect", "select", "support"),
+    )
+
+
+def _observe_rule_trial(
+    competence: TaskCompetence,
+    *,
+    domain: str,
+    feature_key: str,
+    target: str,
+    feature_value: bool,
+    prefix: str,
+    record_skill: bool = False,
+) -> None:
+    """Run one hidden-rule trial the way the probe harness does.
+
+    The environment's rule: ``<prefix>`` role solves when the flag is
+    set, ``<prefix>_false_`` role solves otherwise. The competence
+    substrate sees only state transitions and success — no hint.
+    """
+    actions = (f"{prefix}_{target}", f"{prefix}_false_{target}")
+    expected_role = prefix if feature_value else "false"
+    context = _rule_context(
+        competence,
+        domain=domain,
+        feature_key=feature_key,
+        feature_value=feature_value,
+        actions=actions,
+    )
+    for action in actions:
+        observed_role = "false" if "_false_" in action else prefix
+        after = {
+            feature_key: feature_value,
+            "solved": observed_role == expected_role,
+        }
+        competence.record_transition(
+            context,
+            action,
+            {feature_key: feature_value},
+            after,
+            success=after["solved"],
+        )
+        if after["solved"]:
+            if record_skill:
+                competence.record_episode(
+                    context,
+                    steps=(
+                        ProcedureStep(
+                            action=action,
+                            parameters={"support": 1.0},
+                        ),
+                    ),
+                    success=True,
+                    verification_score=1.0,
+                    goal_conditions=[GoalCondition("solved", "eq", True)],
+                    verification="external",
+                )
+            break
+
+
+class TestTaskCompetenceGeneralization:
+    """Abstraction and rebinding — the induced-rule layer."""
+
+    def test_lifted_pattern_predicts_held_out_binding(self):
+        """Training on align_ravel/align_tavi under flag-true yields a
+        prediction for never-seen align_merek — the rule, not the name."""
+        competence = TaskCompetence()
+        _observe_rule_trial(
+            competence, domain="lattice", feature_key="amber",
+            target="ravel", feature_value=True, prefix="align",
+        )
+        _observe_rule_trial(
+            competence, domain="lattice", feature_key="amber",
+            target="sorn", feature_value=False, prefix="align",
+        )
+        _observe_rule_trial(
+            competence, domain="lattice", feature_key="amber",
+            target="tavi", feature_value=True, prefix="align",
+        )
+
+        held_out = _rule_context(
+            competence, domain="lattice", feature_key="amber",
+            feature_value=True, actions=("align_merek", "align_false_merek"),
+        )
+        predicted = competence.predict(
+            held_out, "align_merek", {"amber": True}
+        )
+        assert any(
+            p.key == "solved" and p.expected is True for p in predicted
+        )
+
+    def test_conditional_model_abstains_on_unseen_shape(self):
+        """An action only ever observed under flag-true yields no
+        prediction under flag-false — abstention instead of averaging
+        over the condition that decides the outcome."""
+        competence = TaskCompetence()
+        _observe_rule_trial(
+            competence, domain="lattice", feature_key="amber",
+            target="ravel", feature_value=True, prefix="align",
+        )
+        other_shape = _rule_context(
+            competence, domain="lattice", feature_key="amber",
+            feature_value=False, actions=("align_sorn", "align_false_sorn"),
+        )
+        # The schema merged (same signature shape modulo the flag
+        # value); align_ravel was never observed under flag-false.
+        predicted = competence.predict(
+            other_shape, "align_ravel", {"amber": False}
+        )
+        assert all(p.expected is not True for p in predicted)
+
+    def test_foreign_skill_rebinds_by_step_position(self):
+        """A lattice skill recalled in the archive domain maps its
+        step position onto the target action order — 'the action at
+        this position solved the analogous task'."""
+        competence = TaskCompetence()
+        _observe_rule_trial(
+            competence, domain="lattice", feature_key="amber",
+            target="ravel", feature_value=True, prefix="align",
+            record_skill=True,
+        )
+
+        archive = _rule_context(
+            competence, domain="archive", feature_key="ochre",
+            feature_value=True, actions=("index", "discard"),
+        )
+        # The retrieval must actually surface the foreign skill.
+        assert any(
+            m.skill.signature.domain == "lattice" for m in archive.skills
+        )
+        predicted = competence.predict(
+            archive, "index", {"ochre": True}
+        )
+        assert any(
+            p.key == "solved" and p.expected is True for p in predicted
+        )
+        # And the wrong position must not be predicted.
+        wrong = competence.predict(archive, "discard", {"ochre": True})
+        assert all(p.expected is not True for p in wrong)
+
+    def test_rebinding_requires_matching_state_shape(self):
+        """A foreign skill learned under flag-true says nothing about
+        a flag-false situation — the condition is part of the rule."""
+        competence = TaskCompetence()
+        _observe_rule_trial(
+            competence, domain="lattice", feature_key="amber",
+            target="ravel", feature_value=True, prefix="align",
+            record_skill=True,
+        )
+        archive_false = _rule_context(
+            competence, domain="archive", feature_key="ochre",
+            feature_value=False, actions=("index", "discard"),
+        )
+        for action in ("index", "discard"):
+            predicted = competence.predict(
+                archive_false, action, {"ochre": False}
+            )
+            assert all(p.expected is not True for p in predicted)
+
+    def test_abstraction_state_round_trips(self):
+        """action_order, lifted models, conditional effects, and step
+        positions all survive serialization."""
+        competence = TaskCompetence()
+        _observe_rule_trial(
+            competence, domain="lattice", feature_key="amber",
+            target="ravel", feature_value=True, prefix="align",
+        )
+        _observe_rule_trial(
+            competence, domain="lattice", feature_key="amber",
+            target="tavi", feature_value=True, prefix="align",
+            record_skill=True,
+        )
+
+        restored = TaskCompetence.from_dict(competence.to_dict())
+        held_out = _rule_context(
+            restored, domain="lattice", feature_key="amber",
+            feature_value=True, actions=("align_nema", "align_false_nema"),
+        )
+        predicted = restored.predict(
+            held_out, "align_nema", {"amber": True}
+        )
+        assert any(
+            p.key == "solved" and p.expected is True for p in predicted
+        )
+        archive = _rule_context(
+            restored, domain="archive", feature_key="ochre",
+            feature_value=True, actions=("index", "discard"),
+        )
+        rebound = restored.predict(archive, "index", {"ochre": True})
+        assert any(
+            p.key == "solved" and p.expected is True for p in rebound
+        )
+
+    def test_exact_model_beats_foreign_rebinding(self):
+        """Observed evidence for this action under this condition
+        outranks an analogous foreign skill."""
+        competence = TaskCompetence()
+        _observe_rule_trial(
+            competence, domain="lattice", feature_key="amber",
+            target="ravel", feature_value=True, prefix="align",
+            record_skill=True,
+        )
+        # Same domain, direct observation of the queried action under
+        # the same shape — the foreign skill must not override it.
+        context = _rule_context(
+            competence, domain="lattice", feature_key="amber",
+            feature_value=True, actions=("align_sorn", "align_false_sorn"),
+        )
+        # Two direct observations — the concrete model's reliability
+        # (observations/3) then exceeds any rebound's halved match score.
+        for _ in range(2):
+            competence.record_transition(
+                context, "align_sorn", {"amber": True},
+                {"amber": True, "solved": True}, success=True,
+            )
+        predicted = competence.predict(
+            context, "align_sorn", {"amber": True}
+        )
+        assert predicted[0].key == "solved"
+        assert predicted[0].expected is True
+        # Concrete evidence — not the weaker rebound confidence.
+        assert predicted[0].confidence > 0.5

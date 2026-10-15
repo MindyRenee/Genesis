@@ -5348,6 +5348,32 @@ class FrontalLobe:
             user_input,
         )
 
+        # Structured-evidence thoughts — relation/situation traversal,
+        # tool knowledge, reasoning output — were composed from actual
+        # network edges or instrument readings this turn, so the answer
+        # is grounded by construction. The string-level grounding check
+        # in assess_answer cannot see that: it looks for definitional
+        # vocabulary overlap, and a topic like "nib" (one edge, no
+        # definition) scores ~0 even though the question was answered
+        # BY that edge. Without this correction the hedge below would
+        # replace a correct graph-traversed answer with an honest-
+        # sounding "I'm not sure" — misreporting what it knows.
+        if any(
+            thought.metadata.get(key)
+            for key in (
+                "relation_answer",
+                "situation_answer",
+                "knowledge",
+                "problem_result",
+                "test_result",
+                "web_summary",
+            )
+        ):
+            answer_assessment.grounded = True
+            answer_assessment.confidence = max(
+                answer_assessment.confidence, thought.confidence
+            )
+
         # If it should hedge but didn't, add a note.
         should_hedge = self.self_assessment.should_hedge(perception.topics)
         meta_hedge_threshold = self._compute_meta_hedge_threshold()

@@ -199,3 +199,73 @@ def test_non_routed_input_still_falls_through(engine):
     # Nothing recorded — the main pipeline's store/track stage owns it.
     assert len(memory.conversation) == 0
     assert eng.working_memory.get_last_turn() is None
+
+
+def test_relation_answer_is_not_hedged_away(engine):
+    """An answer composed from real edges is grounded by construction.
+
+    "nib" has one edge and no definition — the topic-level assessment
+    scores it near zero — but the question was answered *by* that
+    edge. The hedging stage must not replace a graph-traversed answer
+    with an honest-sounding "I'm not sure".
+    """
+    from limbic_system.emotion import EmotionalState
+    from temporal_lobe.base import Thought
+
+    eng, network, _memory = engine
+    network.add_concept("nib", confidence=0.8)
+    network.add_concept("vesh", confidence=0.8)
+    network.add_edge("nib", "vesh", RelationType.CAUSES, 0.9)
+
+    thought = Thought(
+        content="relation_answer",
+        intent="inform",
+        emotion="calm",
+        topics=["nib", "vesh"],
+        confidence=0.84,
+        metadata={
+            "relation_answer": {
+                "subject": "nib",
+                "subject_is_self": False,
+                "question_word": "what",
+                "direction": "outgoing",
+                "relation": "causes",
+                "verb": "causes",
+                "objects": ["vesh"],
+            }
+        },
+    )
+    emotion = EmotionalState(label="calm", cognitive_style="reflective")
+    response = eng.language.render(thought, emotion)
+    assert "vesh" in response
+
+    perception = perceive("what does nib cause?")
+    out, assessment = eng._think_assess_and_hedge(
+        response, perception, "what does nib cause?", thought
+    )
+    assert out == response
+    assert assessment.grounded
+
+
+def test_genuine_unknown_question_still_hedges(engine):
+    """The honesty boundary holds: no structured evidence → the gap
+    response still replaces the unsupported answer."""
+    from temporal_lobe.base import Thought
+
+    eng, _network, _memory = engine
+
+    thought = Thought(
+        content="zorblax",
+        intent="inform",
+        emotion="calm",
+        topics=["zorblax"],
+        confidence=0.2,
+        metadata={},
+    )
+    perception = perceive("what does zorblax cause?")
+    out, assessment = eng._think_assess_and_hedge(
+        "Zorblax.", perception, "what does zorblax cause?", thought
+    )
+    assert not assessment.grounded or assessment.confidence < 0.3
+    # Low-confidence, ungrounded answers are hedged or replaced.
+    assert out != "Zorblax." or not assessment.grounded

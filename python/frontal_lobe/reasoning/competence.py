@@ -27,9 +27,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any
 
 from genesis_client.swallow import note_swallowed
@@ -180,6 +181,56 @@ def _as_float(value: Any) -> float | None:
     if isinstance(value, int | float):
         return float(value)
     return None
+
+
+_ACTION_TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
+
+
+def _action_tokens(action: str) -> tuple[str, ...]:
+    """Decompose an action name into its lexical tokens.
+
+    Adapters name operators with surface structure — ``align_ravel``,
+    ``move_north_2`` — and the shared spans between names are the only
+    evidence that two actions play the same role. Opaque single-token
+    names simply yield no patterns and are unaffected.
+    """
+    return tuple(_ACTION_TOKEN_RE.findall(action.lower()))
+
+
+def _pattern_matches(tokens: tuple[str, ...], pattern: tuple[str, ...]) -> bool:
+    return len(tokens) == len(pattern) and all(
+        p == "*" or p == t for p, t in zip(pattern, tokens, strict=True)
+    )
+
+
+def _state_shape(features: frozenset[str]) -> frozenset[str]:
+    """The nameless qualitative shape of a signature's state features.
+
+    Signatures carry concrete names (``amber``, ``amber:true``) that can
+    never overlap across domains. The shape drops the names and keeps
+    the qualitative structure — "one variable present", "one variable
+    true", "one variable positive" — so ``{amber, amber:true}`` and
+    ``{ochre, ochre:true}`` collapse to the same shape. This is what
+    lets a learned conditional transfer at all: "the flag was set" is
+    a property of the situation's form, not its vocabulary.
+    """
+    shape: set[str] = set()
+    for feature in features:
+        if ":" in feature:
+            _, bucket = feature.rsplit(":", 1)
+            if bucket == "true":
+                shape.add("var:true")
+            elif bucket in ("zero", "positive", "negative"):
+                shape.add(f"var:num:{bucket}")
+            else:
+                shape.add("var:value")
+        else:
+            shape.add("var")
+    return frozenset(shape)
+
+
+def _shape_key(features: frozenset[str]) -> str:
+    return _canonical(sorted(features))
 
 
 @dataclass(frozen=True, slots=True)
@@ -465,13 +516,24 @@ class EffectModel:
 
 @dataclass(slots=True)
 class OperatorModel:
-    """Learned affordance model for one named action/operator."""
+    """Learned affordance model for one named action/operator.
+
+    ``effects`` is the unconditional record; ``conditional`` holds the
+    same evidence split by the qualitative state shape it was observed
+    under. The split is what separates "this action changes this
+    variable" from "this action changes this variable *when the flag
+    is set*" — a model that averaged over the deciding condition would
+    predict wrongly half the time while looking confident.
+    """
 
     action: str
     uses: int = 0
     successes: int = 0
     failures: int = 0
     effects: dict[str, EffectModel] = field(default_factory=dict)
+    conditional: dict[str, dict[str, EffectModel]] = field(
+        default_factory=dict
+    )
 
     @property
     def confidence(self) -> float:
@@ -484,6 +546,10 @@ class OperatorModel:
             "successes": self.successes,
             "failures": self.failures,
             "effects": [e.to_dict() for e in self.effects.values()],
+            "conditional": {
+                shape: [e.to_dict() for e in effects.values()]
+                for shape, effects in self.conditional.items()
+            },
         }
 
     @classmethod
@@ -497,6 +563,12 @@ class OperatorModel:
         for effect in data.get("effects", []):
             model = EffectModel.from_dict(effect)
             op.effects[model.key] = model
+        for shape, effects in dict(data.get("conditional", {})).items():
+            bucket: dict[str, EffectModel] = {}
+            for effect in effects:
+                model = EffectModel.from_dict(effect)
+                bucket[model.key] = model
+            op.conditional[str(shape)] = bucket
         return op
 
 
@@ -512,6 +584,18 @@ class TaskSchema:
     operators: dict[str, OperatorModel] = field(default_factory=dict)
     skill_ids: list[str] = field(default_factory=list)
     last_score: float = 0.0
+    # Affordance order as the adapter presented it — the positional
+    # vocabulary that lets foreign skills rebind by structure when no
+    # action names are shared.
+    action_order: list[str] = field(default_factory=list)
+    # Lifted operator models: (token-pattern, state-shape) → aggregate
+    # evidence across every concrete action matching the pattern under
+    # that state shape. This is the induction layer — "align_* solves
+    # when the flag is true" learned from outcomes, so held-out
+    # bindings like ``align_merek`` inherit a prediction.
+    lifted: dict[tuple[str, str], OperatorModel] = field(
+        default_factory=dict
+    )
     # Which proposal families solved tasks of this schema — the
     # learned search prior. "Learning to search": the solver's
     # proposal ordering adapts per task family, not just globally.
@@ -537,6 +621,15 @@ class TaskSchema:
             "operators": [op.to_dict() for op in self.operators.values()],
             "skill_ids": list(self.skill_ids),
             "last_score": self.last_score,
+            "action_order": list(self.action_order),
+            "lifted": [
+                {
+                    "pattern": pattern,
+                    "shape": shape,
+                    "model": model.to_dict(),
+                }
+                for (pattern, shape), model in self.lifted.items()
+            ],
             "family_priors": dict(self.family_priors),
             "hypotheses": (
                 self.hypotheses.to_dict() if self.hypotheses is not None else None
@@ -561,6 +654,17 @@ class TaskSchema:
         for op_data in data.get("operators", []):
             op = OperatorModel.from_dict(op_data)
             schema.operators[op.action] = op
+        schema.action_order = [
+            str(a) for a in data.get("action_order", [])
+        ]
+        for lifted_data in data.get("lifted", []):
+            model = OperatorModel.from_dict(lifted_data.get("model", {}))
+            schema.lifted[
+                (
+                    str(lifted_data.get("pattern", "")),
+                    str(lifted_data.get("shape", "")),
+                )
+            ] = model
         hyp_data = data.get("hypotheses")
         if hyp_data:
             from .hypotheses import HypothesisLedger
@@ -571,12 +675,20 @@ class TaskSchema:
 
 @dataclass(frozen=True, slots=True)
 class ProcedureStep:
-    """One serializable step in a reusable procedure."""
+    """One serializable step in a reusable procedure.
+
+    ``position`` is the action's ordinal in the affordance list the
+    adapter presented at learning time — the step's *structural*
+    identity, independent of its name. It is what lets a foreign
+    domain rebind the step: when two domains share no vocabulary,
+    "the action that was second in the list" is still meaningful.
+    """
 
     action: str
     parameters: dict[str, Any] = field(default_factory=dict)
     family: str = ""
     description: str = ""
+    position: int | None = None
 
     @property
     def label(self) -> str:
@@ -588,20 +700,25 @@ class ProcedureStep:
         return f"{self.action}({args})"
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data: dict[str, Any] = {
             "action": self.action,
             "parameters": self.parameters,
             "family": self.family,
             "description": self.description or self.label,
         }
+        if self.position is not None:
+            data["position"] = self.position
+        return data
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> ProcedureStep:
+        position = data.get("position")
         return cls(
             action=str(data["action"]),
             parameters=dict(data.get("parameters", {})),
             family=str(data.get("family", "")),
             description=str(data.get("description", "")),
+            position=int(position) if position is not None else None,
         )
 
 
@@ -683,13 +800,20 @@ class SkillMatch:
 
 @dataclass(slots=True)
 class TaskContext:
-    """The result of recognizing a task instance."""
+    """The result of recognizing a task instance.
+
+    ``action_order`` is the affordance order the adapter presented
+    for *this* instance — the per-episode positional index skills are
+    bound to. (``schema.action_order`` accumulates a family's whole
+    vocabulary across merged trials, so it cannot index an episode.)
+    """
 
     signature: TaskSignature
     schema: TaskSchema
     similarity: float
     novel: bool
     skills: tuple[SkillMatch, ...] = ()
+    action_order: tuple[str, ...] = ()
 
 
 class TaskCompetence:
@@ -768,10 +892,11 @@ class TaskCompetence:
         roles: Iterable[str] = (),
     ) -> TaskContext:
         """Recognize a situation as an existing schema or a novel one."""
+        ordered_actions = tuple(str(a) for a in actions)
         signature = self.make_signature(
             domain=domain,
             state=state,
-            actions=actions,
+            actions=ordered_actions,
             goal_conditions=goal_conditions,
             entities=entities,
             roles=roles,
@@ -792,12 +917,19 @@ class TaskCompetence:
             schema = TaskSchema(schema_id=schema_id, signature=signature)
             self.schemas[schema_id] = schema
             similarity, novel = 0.0, True
+        # Remember the affordance order the adapter presented — it is
+        # the positional vocabulary skills are rebound through when a
+        # foreign domain shares no action names.
+        for name in ordered_actions:
+            if name not in schema.action_order:
+                schema.action_order.append(name)
         return TaskContext(
             signature=signature,
             schema=schema,
             similarity=similarity,
             novel=novel,
             skills=tuple(self.skill_matches(signature)),
+            action_order=ordered_actions,
         )
 
     def skill_matches(
@@ -851,18 +983,112 @@ class TaskCompetence:
         action: str,
         state: State,
     ) -> tuple[EffectPrediction, ...]:
-        """Predict the state variables an action is likely to change."""
+        """Predict the state variables an action is likely to change.
+
+        Evidence resolves most-specific first: the concrete operator
+        model for this exact action, then the lifted pattern induced
+        from siblings under the same qualitative state shape, then a
+        foreign skill rebound positionally onto this schema's
+        affordance order. Each layer is weaker evidence than the last
+        and each is real — an action never carried a prediction it
+        could not have earned.
+        """
         op = context.schema.operators.get(action)
+        effects: dict[str, EffectModel] | None = None
+        if op is not None:
+            effects = op.effects
+            if op.conditional:
+                # Condition-scoped evidence exists. Under a shape that
+                # was never observed the honest answer is abstention,
+                # not an average over a condition that may decide the
+                # outcome — the lifted and rebinding layers get their
+                # say next.
+                shape = _shape_key(_state_shape(context.signature.state))
+                effects = op.conditional.get(shape, {})
         if op is None:
-            return ()
+            op = self._lifted_operator(context, action)
+            if op is not None:
+                # Lifted models are already shape-keyed — their
+                # effects are conditional evidence by construction.
+                effects = op.effects
         before = _flatten_state(state)
         predictions: list[EffectPrediction] = []
-        for key, effect in op.effects.items():
-            prediction = effect.predict(before.get(key))
-            if prediction is not None and prediction.kind != "unchanged":
-                predictions.append(prediction)
-        predictions.sort(key=lambda p: (-p.confidence, p.key))
+        if effects:
+            for key, effect in effects.items():
+                prediction = effect.predict(before.get(key))
+                if prediction is not None and prediction.kind != "unchanged":
+                    predictions.append(prediction)
+            predictions.sort(key=lambda p: (-p.confidence, p.key))
+        if not predictions:
+            predictions = self._rebound_predictions(context, action)
         return tuple(predictions)
+
+    def _lifted_operator(
+        self, context: TaskContext, action: str
+    ) -> OperatorModel | None:
+        """The induced pattern model for an unobserved action name.
+
+        A lifted model exists only where ≥2 concrete actions share a
+        token frame (e.g. ``align_ravel``/``align_tavi`` → ``align_*``)
+        and is keyed by the qualitative state shape it was learned
+        under — so the induced rule is conditional: "this action role
+        works when the flag is set", not merely "it worked once".
+        """
+        tokens = _action_tokens(action)
+        if len(tokens) < 2:
+            return None
+        shape = _shape_key(_state_shape(context.signature.state))
+        best: OperatorModel | None = None
+        for (pattern, pattern_shape), model in context.schema.lifted.items():
+            if pattern_shape != shape:
+                continue
+            if not _pattern_matches(tokens, tuple(pattern.split("_"))):
+                continue
+            if best is None or model.uses > best.uses:
+                best = model
+        return best
+
+    def _rebound_predictions(
+        self, context: TaskContext, action: str
+    ) -> list[EffectPrediction]:
+        """Predictions from a foreign skill rebound by position.
+
+        A retrieved cross-domain skill is weaker evidence than learned
+        affordances — it says "in an analogous situation, the action
+        at this position reached the goal" — but under a matching
+        state shape it is real, falsifiable evidence rather than
+        silence. Restricted to foreign skills: same-domain transfer
+        already flows through operator and lifted models.
+        """
+        order = context.action_order or tuple(context.schema.action_order)
+        if not order:
+            return []
+        shape = _state_shape(context.signature.state)
+        predictions: list[EffectPrediction] = []
+        for match in context.skills:
+            skill = match.skill
+            if skill.signature.domain == context.signature.domain:
+                continue
+            if _state_shape(skill.signature.state) != shape:
+                continue
+            for step in skill.steps:
+                if step.position is None or step.position >= len(order):
+                    continue
+                if order[step.position] != action:
+                    continue
+                for goal in skill.success_conditions:
+                    if goal.op not in ("eq", "truthy", "exists"):
+                        continue
+                    expected = True if goal.op != "eq" else goal.value
+                    predictions.append(
+                        EffectPrediction(
+                            goal.key,
+                            "set",
+                            expected,
+                            match.score * 0.5,
+                        )
+                    )
+        return predictions
 
     def record_transition(
         self,
@@ -910,10 +1136,43 @@ class TaskCompetence:
             op.successes += 1
         elif success is False:
             op.failures += 1
+        shape = _shape_key(_state_shape(context.signature.state))
+        conditional = op.conditional.setdefault(shape, {})
         for key in before_flat.keys() | after_flat.keys():
             effect = op.effects.setdefault(key, EffectModel(key))
             effect.observe(before_flat.get(key), after_flat.get(key))
+            cond_effect = conditional.setdefault(key, EffectModel(key))
+            cond_effect.observe(before_flat.get(key), after_flat.get(key))
         self.transition_count += 1
+
+        # Induction layer: once a second action shares this one's
+        # token frame ("align_ravel" beside "align_tavi"), the pattern
+        # is real — record the transition into the lifted model for
+        # that pattern under the current qualitative state shape, so
+        # the learned rule stays conditional ("align_* solves when the
+        # flag is set") rather than a context-free average.
+        tokens = _action_tokens(action)
+        if len(tokens) >= 2:
+            for i in range(len(tokens)):
+                pattern = (*tokens[:i], "*", *tokens[i + 1 :])
+                if not any(
+                    name != action
+                    and _pattern_matches(_action_tokens(name), pattern)
+                    for name in context.schema.operators
+                ):
+                    continue
+                lifted = context.schema.lifted.setdefault(
+                    ("_".join(pattern), shape),
+                    OperatorModel("_".join(pattern)),
+                )
+                lifted.uses += 1
+                if success is True:
+                    lifted.successes += 1
+                elif success is False:
+                    lifted.failures += 1
+                for key in before_flat.keys() | after_flat.keys():
+                    effect = lifted.effects.setdefault(key, EffectModel(key))
+                    effect.observe(before_flat.get(key), after_flat.get(key))
 
         # Hypothesis layer: the transition is a trial for every
         # mechanic rule whose context held, and the *before* state is
@@ -1067,7 +1326,19 @@ class TaskCompetence:
 
         if verification not in _VERIFICATION_RANK:
             verification = "reported"
-        step_tuple = tuple(steps)
+        # Bind each step to its ordinal in the affordance order this
+        # episode was recognized under — the structural identity a
+        # foreign domain can rebind when no action names are shared.
+        # The schema's accumulated order cannot be used here: merged
+        # trials interleave their vocabularies into it, so it no
+        # longer reflects any single episode's affordance positions.
+        order = context.action_order or tuple(schema.action_order)
+        step_tuple = tuple(
+            replace(step, position=order.index(step.action))
+            if step.position is None and step.action in order
+            else step
+            for step in steps
+        )
         goals = tuple(goal_conditions)
         skill_id = _hash(
             {
