@@ -11,7 +11,9 @@ side is a stub exposing the boundary the adapter consumes:
 
 from __future__ import annotations
 
+import json
 import sys
+import time
 import types
 from enum import Enum
 from types import SimpleNamespace
@@ -20,7 +22,7 @@ import pytest
 
 sys.path.insert(0, str(__file__).rsplit("/tests/", 1)[0])
 
-from world.arc import ArcPractice, ArcResult
+from world.arc import ArcOfficial, ArcPractice, ArcResult
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -72,8 +74,9 @@ class _FakeArcade:
         self._env = env
         self.closed: list[str] = []
         self.made_with: dict = {}
+        self.cards: list[str] = []
 
-    def create_scorecard(self):
+    def create_scorecard(self, source_url=None, tags=None, opaque=None):
         return "card-1"
 
     def make(self, game_id, scorecard_id=None, save_recording=False):
@@ -214,6 +217,68 @@ def test_play_refuses_when_unwell(monkeypatch):
     assert env.steps == 0 and env.resets == 0
 
 
+def test_recovery_wait_proceeds_when_she_settles(monkeypatch):
+    env = _FakeEnv(win_after=1)
+    mind = _StubMind(ready=False)
+    refusals_left = [2]
+
+    def readiness(**kw):
+        if refusals_left[0] > 0:
+            refusals_left[0] -= 1
+            mind._ready = False
+        else:
+            mind._ready = True
+        return _StubMind.readiness(mind, **kw)
+
+    mind.readiness = readiness
+    practice = _practice(monkeypatch, env, mind=mind)
+    practice._recovery_wait = 30.0
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+    result = practice.play("fake", max_steps=3)
+    assert result.won
+    assert result.recovery_waits == 1
+
+
+def test_recovery_wait_timeout_still_refuses(monkeypatch):
+    env = _FakeEnv(win_after=3)
+    mind = _StubMind(ready=False)
+    practice = _practice(monkeypatch, env, mind=mind)
+    practice._recovery_wait = 0.001
+    result = practice.play("fake", max_steps=10)
+    assert result.state == "UNWELL"
+    assert result.recovery_waits == 1
+    assert "asleep" in result.reasons
+    assert env.steps == 0
+
+
+def test_recovery_wait_lets_suite_continue(monkeypatch):
+    mind = _StubMind()
+    practice = _practice(monkeypatch, _FakeEnv(win_after=1), mind=mind)
+    practice._recovery_wait = 30.0
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+    practice._arcade.get_environments = lambda: [
+        SimpleNamespace(game_id=g) for g in ("a", "b")
+    ]
+    end = mind.world_episode_end
+    refusals_left = [0]
+
+    def episode_end(outcome, game):
+        end(outcome, game)
+        refusals_left[0] = 1
+
+    def readiness(**kw):
+        if refusals_left[0] > 0:
+            refusals_left[0] -= 1
+            return SimpleNamespace(ok=False, reasons=("overstimulated",))
+        return _StubMind.readiness(mind, **kw)
+
+    mind.world_episode_end = episode_end
+    mind.readiness = readiness
+    result = practice.play_all(max_steps=1)
+    assert [r.state for r in result.games] == ["WIN", "WIN"]
+    assert result.games[1].recovery_waits == 1
+
+
 def test_play_attaches_decision_reasoning(monkeypatch):
     pytest.importorskip("arcengine", reason="arcengine not installed")
     env = _FakeEnv(win_after=3)
@@ -251,6 +316,7 @@ def test_mind_play_arc_wraps_game_mode_and_restores(monkeypatch):
     import mind as mind_mod
 
     calls: list[str] = []
+    pacing: list[tuple[float, float]] = []
 
     class _Stub:
         is_gaming = False
@@ -265,16 +331,22 @@ def test_mind_play_arc_wraps_game_mode_and_restores(monkeypatch):
             self.is_gaming = False
 
     class _Practice:
-        def __init__(self, mind, instructions=""):
+        def __init__(self, mind, instructions="", step_delay_s=0.0,
+                     recovery_wait_s=0.0):
             assert mind.is_gaming
+            pacing.append((step_delay_s, recovery_wait_s))
 
         def play(self, game, max_steps=0):
             return ArcResult(game_id=game, state="BUDGET", steps=max_steps)
 
     monkeypatch.setattr("world.arc.ArcPractice", _Practice)
     stub = _Stub()
-    out = mind_mod.Mind.play_arc(stub, ["g1", "g2"], max_steps=7)
+    out = mind_mod.Mind.play_arc(
+        stub, ["g1", "g2"], max_steps=7,
+        step_delay_s=0.25, recovery_wait_s=3.0,
+    )
     assert [r.game_id for r in out] == ["g1", "g2"] and out[0].steps == 7
+    assert pacing == [(0.25, 3.0)]
     assert calls == ["enter", "exit"] and not stub.is_gaming
 
     stub.is_gaming = True
@@ -441,7 +513,8 @@ def test_mind_play_arc_fresh_scope_and_restore(monkeypatch):
             self.is_gaming = False
 
     class _Practice:
-        def __init__(self, mind, instructions=""):
+        def __init__(self, mind, instructions="", step_delay_s=0.0,
+                     recovery_wait_s=0.0):
             self._m = mind
 
         def play(self, game, max_steps=0):
@@ -476,8 +549,9 @@ def test_mind_evaluation_fresh_scope(monkeypatch):
             self.is_gaming = False
 
     class Practice:
-        def __init__(self, mind):
+        def __init__(self, mind, step_delay_s=0.0, recovery_wait_s=0.0):
             self._m = mind
+            self.pacing = (step_delay_s, recovery_wait_s)
 
         def play_all(self, max_steps):
             seen.append(self._m._fresh_world_run)
@@ -521,7 +595,9 @@ def test_suite_uses_one_scorecard_and_every_environment_once(monkeypatch):
     opened = []
     arcade = practice._arcade
     arcade.get_environments = lambda: [SimpleNamespace(game_id=g) for g in ("a", "b")]
-    arcade.create_scorecard = lambda: opened.append("card-1") or "card-1"
+    arcade.create_scorecard = (
+        lambda **kw: opened.append("card-1") or "card-1"
+    )
     arcade.make = lambda game, **kwargs: made.append((game, kwargs)) or _FakeEnv(win_after=1)
     arcade.close_scorecard = lambda card: arcade.closed.append(card) or SimpleNamespace(score=12.5)
     result = practice.play_all(max_steps=2)
@@ -569,13 +645,11 @@ def test_offline_adapter_refuses_forced_competition_before_sdk(monkeypatch, tmp_
 
     monkeypatch.setitem(sys.modules, "arc_agi", SimpleNamespace(Arcade=forbidden_sdk))
     monkeypatch.setenv("OPERATION_MODE", "competition")
-    with pytest.raises(RuntimeError, match="ArcCompetition"):
+    with pytest.raises(RuntimeError, match="ArcOfficial"):
         ArcPractice(_StubMind(), environments_dir=tmp_path, recordings_dir=tmp_path)
 
 
-def test_competition_selects_official_mode_without_network(monkeypatch, tmp_path):
-    from world.arc import ArcCompetition
-
+def test_official_selects_competition_mode_without_network(monkeypatch, tmp_path):
     class Mode(Enum):
         OFFLINE = "offline"
         COMPETITION = "competition"
@@ -587,28 +661,29 @@ def test_competition_selects_official_mode_without_network(monkeypatch, tmp_path
         Arcade=lambda **kwargs: configured.append(kwargs) or _FakeArcade(_FakeEnv()),
     ))
     mind = _StubMind()
-    mind._offline = True
-    competition = ArcCompetition(mind, environments_dir=tmp_path, recordings_dir=tmp_path)
+    official = ArcOfficial(
+        mind, environments_dir=tmp_path, recordings_dir=tmp_path,
+        card_path=tmp_path / "card.json",
+    )
     assert configured[0]["operation_mode"] is Mode.COMPETITION
-    with pytest.raises(RuntimeError, match="play_all"):
-        competition.play("selected")
+    # The card is never driven: no selected replays, no suite runner.
+    with pytest.raises(RuntimeError, match="volition"):
+        official.play("selected")
+    with pytest.raises(RuntimeError, match="volition"):
+        official.play_all()
 
 
-def test_competition_requires_explicit_access(monkeypatch):
-    from world.arc import ArcCompetition
-
+def test_official_requires_explicit_access(monkeypatch):
     monkeypatch.delenv("ARC_API_KEY", raising=False)
     with pytest.raises(RuntimeError, match="ARC_API_KEY"):
-        ArcCompetition(_StubMind())
+        ArcOfficial(_StubMind())
 
 
-def test_competition_requires_offline_cognition(monkeypatch):
-    from world.arc import ArcCompetition
-
+def test_official_requires_game_mode(monkeypatch):
     monkeypatch.setitem(sys.modules, "arc_agi", SimpleNamespace())
     monkeypatch.setenv("ARC_API_KEY", "test-only-not-a-real-key")
-    with pytest.raises(RuntimeError, match="offline"):
-        ArcCompetition(_StubMind())
+    with pytest.raises(RuntimeError, match="game mode"):
+        ArcOfficial(_StubMind(gaming=False))
 
 
 def test_mind_evaluation_wraps_game_mode(monkeypatch):
@@ -629,7 +704,7 @@ def test_mind_evaluation_wraps_game_mode(monkeypatch):
             calls.append("exit")
 
     class Practice:
-        def __init__(self, mind):
+        def __init__(self, mind, step_delay_s=0.0, recovery_wait_s=0.0):
             assert mind.is_gaming
 
         def play_all(self, max_steps):
@@ -644,21 +719,40 @@ def test_mind_evaluation_wraps_game_mode(monkeypatch):
     assert not subject.is_gaming
 
 
-@pytest.mark.parametrize("flag,competition", [("--all", False), ("--competition", True)])
-def test_arc_command_selects_full_suite(flag, competition):
+def test_arc_command_selects_full_suite():
     from genesis_cli import _cmd_arc
     from world.arc import ArcEvaluation
 
     calls = []
     subject = SimpleNamespace(evaluate_arc=lambda **kwargs: calls.append(kwargs) or ArcEvaluation(
-        mode="competition" if competition else "offline",
+        mode="offline",
         games=[ArcResult(game_id="g", state="WIN", levels_completed=1, win_levels=1)],
         score=75.0,
     ))
-    report = _cmd_arc(subject, f"{flag} --steps 12")
-    assert calls == [{"max_steps": 12, "competition": competition, "fresh": False}]
+    report = _cmd_arc(subject, "--all --steps 12")
+    assert calls == [{
+        "max_steps": 12, "fresh": False,
+        "step_delay_s": 0.0, "recovery_wait_s": 120.0,
+    }]
     assert "75.00%" in report
     assert "levels 1/1" in report
+
+
+def test_arc_command_passes_pacing_flags():
+    from genesis_cli import _cmd_arc
+    from world.arc import ArcEvaluation
+
+    calls = []
+    subject = SimpleNamespace(evaluate_arc=lambda **kwargs: calls.append(kwargs) or ArcEvaluation(
+        mode="offline",
+        games=[ArcResult(game_id="g", state="WIN", levels_completed=1,
+                         win_levels=1, recovery_waits=2)],
+        score=75.0,
+    ))
+    report = _cmd_arc(subject, "--all --delay 0.5 --recover 90")
+    assert calls[0]["step_delay_s"] == 0.5
+    assert calls[0]["recovery_wait_s"] == 90.0
+    assert "recovery-waits=2" in report
 
 
 def test_arc_command_passes_fresh_scope():
@@ -671,7 +765,11 @@ def test_arc_command_passes_fresh_scope():
         or [ArcResult(game_id=g) for g in games]
     )
     _cmd_arc(subject, "g --fresh")
-    assert seen == [(["g"], {"max_steps": 200, "fresh": True})]
+    assert seen == [(
+        ["g"],
+        {"max_steps": 200, "fresh": True, "step_delay_s": 0.0,
+         "recovery_wait_s": 120.0},
+    )]
 
     seen.clear()
     subject = SimpleNamespace(
@@ -680,7 +778,10 @@ def test_arc_command_passes_fresh_scope():
         )
     )
     _cmd_arc(subject, "--all --fresh --steps 7")
-    assert seen == [{"max_steps": 7, "competition": False, "fresh": True}]
+    assert seen == [{
+        "max_steps": 7, "fresh": True,
+        "step_delay_s": 0.0, "recovery_wait_s": 120.0,
+    }]
 
 
 def test_arc_command_runs_baseline_not_agent(monkeypatch):
@@ -748,3 +849,383 @@ def test_scorecard_failure_is_visible(monkeypatch):
     assert result.state == "SCORECARD_ERROR"
     assert result.score is None
     assert result.reasons == ("scorecard closure failed",)
+
+
+# ─── The official card ────────────────────────────────────
+
+
+class _AnnouncingMind(_StubMind):
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.announcements: list[str] = []
+        self.game_mode_entries = 0
+
+    def world_announce(self, text, *, topics=None):
+        self.announcements.append((text, topics))
+        return True
+
+    def enter_game_mode(self):
+        self.game_mode_entries += 1
+        self.is_gaming = True
+
+    def exit_game_mode(self):
+        self.is_gaming = False
+
+
+def _official(monkeypatch, tmp_path, *, mind=None, envs=("a", "b")) -> ArcOfficial:
+    fake = _FakeArcade(_FakeEnv(win_after=1))
+    monkeypatch.setattr(
+        fake, "get_environments",
+        lambda: [SimpleNamespace(game_id=g) for g in envs],
+        raising=False,
+    )
+    monkeypatch.setattr(fake, "cards", [], raising=False)
+
+    def _make_card(**kw):
+        fake.cards.append("card-1")
+        return "card-1"
+
+    monkeypatch.setattr(fake, "create_scorecard", _make_card, raising=False)
+    monkeypatch.setitem(sys.modules, "arc_agi", SimpleNamespace(Arcade=lambda **kw: fake))
+    p = ArcOfficial.__new__(ArcOfficial)
+    p._mind = mind or _AnnouncingMind()
+    p._arcade = fake
+    p._instructions = ""
+    p._info_sent = set()
+    p._require_live = False
+    p._record = True
+    p._card_path = tmp_path / "official_card.json"
+    return p
+
+
+def test_official_card_opens_persists_and_records_attempt(monkeypatch, tmp_path):
+    mind = _AnnouncingMind()
+    official = _official(monkeypatch, tmp_path, mind=mind)
+    card = official.open_or_resume()
+    assert card["scorecard_id"] == "card-1"
+    assert len(card["games"]) == 2
+    assert (tmp_path / "official_card.json").exists()
+
+    result = official.attempt("a", max_steps=2)
+    assert result is not None and result.state == "WIN"
+    assert official._arcade.made_with["scorecard_id"] == "card-1"
+
+    card = official.card_state()
+    played = next(g for g in card["games"] if g["game_id"] == "a")
+    assert played["status"] == "attempted" and played["state"] == "WIN"
+    assert played["levels_completed"] == 2
+    # The brief reached her before the environment did.
+    assert mind.announcements and "card-1" in mind.announcements[0][0]
+    assert "rules" in mind.announcements[0][1]
+
+
+def test_official_resume_skips_attempted_and_never_reopens(monkeypatch, tmp_path):
+    official = _official(monkeypatch, tmp_path)
+    official.open_or_resume()
+    official.attempt("a", max_steps=2)
+
+    resumed = _official(monkeypatch, tmp_path)
+    card = resumed.open_or_resume()  # same card, no second create
+    assert card["scorecard_id"] == "card-1"
+    assert resumed._arcade.cards == []
+    assert resumed.attempt("a") is None          # burned — no retry
+    second = resumed.attempt("b", max_steps=2)
+    assert second is not None and second.state == "WIN"
+    # Both attempted → next call closes the card as complete.
+    assert resumed.attempt("a") is None
+    assert resumed.card_state()["closed"] is True
+    assert resumed.card_state()["close_reason"].startswith("complete")
+
+
+def test_official_unwell_does_not_burn_the_attempt(monkeypatch, tmp_path):
+    mind = _AnnouncingMind(ready=False)
+    official = _official(monkeypatch, tmp_path, mind=mind)
+    official.open_or_resume()
+    result = official.attempt("a")
+    assert result is not None and result.state == "UNWELL"
+    game = next(g for g in official.card_state()["games"] if g["game_id"] == "a")
+    assert game["status"] == "pending"          # she never entered
+    assert not mind.announcements               # no brief before the gate
+
+
+def test_official_closed_card_is_sealed_for_the_window(monkeypatch, tmp_path):
+    official = _official(monkeypatch, tmp_path)
+    card = official.open_or_resume()
+    official._seal(card, "idle — test")
+    assert official.attempt("a") is None
+    with pytest.raises(RuntimeError, match="closed"):
+        official.open_or_resume()
+
+
+def test_official_expired_window_opens_a_new_card(monkeypatch, tmp_path):
+    official = _official(monkeypatch, tmp_path)
+    card = official.open_or_resume()
+    card["expires_at"] = 1.0  # long past
+    official._save_card(card)
+    fresh = _official(monkeypatch, tmp_path)
+    new = fresh.open_or_resume()
+    assert new["scorecard_id"] == "card-1"      # fake returns the same id
+    assert fresh._arcade.cards == ["card-1"]    # a second open happened
+    assert not (tmp_path / "official_card.json").read_text() == json.dumps(card)
+
+
+def test_official_shelf_shows_one_standing_challenge(monkeypatch, tmp_path):
+    from frontal_lobe.games.play import _ARC_CHALLENGE, GamePlay
+
+    monkeypatch.setenv("ARC_API_KEY", "test-only")
+    shelf = GamePlay(tmp_path)
+    env_dir = tmp_path / "arc" / "environment_files"
+    for g in ("m0r0", "lp85"):
+        (env_dir / g / "guid-1").mkdir(parents=True)
+        (env_dir / g / "guid-1" / "metadata.json").write_text("{}")
+    entries = shelf._arc_official_games()
+    assert [t["name"] for t in entries] == [_ARC_CHALLENGE]
+    assert entries[0]["live"] is False
+    assert entries[0]["family"] == "arc_official"
+    assert "prize" in entries[0]["goal"]
+
+    # A live card keeps the one challenge on the shelf as the open
+    # commitment — with deadline pressure, not a list of games.
+    card = {
+        "scorecard_id": "card-1", "opened_at": time.time(),
+        "expires_at": time.time() + 3600, "closed": False,
+        "last_action_at": time.time(),
+        "games": [
+            {"game_id": "lp85", "status": "attempted"},
+            {"game_id": "m0r0", "status": "pending"},
+        ],
+    }
+    (tmp_path / "arc" / "official_card.json").write_text(json.dumps(card))
+    entries = shelf._arc_official_games()
+    assert [t["name"] for t in entries] == [_ARC_CHALLENGE]
+    assert entries[0]["live"] is True
+    assert 0.0 <= entries[0]["idle_pressure"] <= 1.0
+
+    # A card with nothing pending is done — the shelf empties.
+    card["games"][1]["status"] = "attempted"
+    (tmp_path / "arc" / "official_card.json").write_text(json.dumps(card))
+    assert shelf._arc_official_games() == []
+
+    # Sealed within its window → the shelf empties too.
+    card["games"][1]["status"] = "pending"
+    card["closed"] = True
+    (tmp_path / "arc" / "official_card.json").write_text(json.dumps(card))
+    assert shelf._arc_official_games() == []
+    # No key → nothing is offered at all.
+    monkeypatch.delenv("ARC_API_KEY")
+    assert shelf._arc_official_games() == []
+
+
+def test_challenge_brief_announced_once_per_window(monkeypatch, tmp_path):
+    from frontal_lobe.games.play import GamePlay
+
+    monkeypatch.setenv("ARC_API_KEY", "test-only")
+    shelf = GamePlay(tmp_path)
+    env_dir = tmp_path / "arc" / "environment_files"
+    (env_dir / "m0r0" / "guid-1").mkdir(parents=True)
+    (env_dir / "m0r0" / "guid-1" / "metadata.json").write_text("{}")
+    first = shelf.arc_brief_due()
+    assert first is not None
+    assert "one recorded try" in first
+    assert "15 minutes" in first
+    assert "prize" in first
+    # Already briefed for this window — not repeated at her.
+    assert shelf.arc_brief_due() is None
+
+    # An open card is a new key — she hears the state of her
+    # commitment, once, with the games remaining.
+    card = {
+        "scorecard_id": "card-9", "opened_at": time.time(),
+        "expires_at": time.time() + 3600, "closed": False,
+        "last_action_at": time.time(),
+        "games": [{"game_id": "m0r0", "status": "pending"}],
+    }
+    (tmp_path / "arc" / "official_card.json").write_text(json.dumps(card))
+    live = shelf.arc_brief_due()
+    assert live is not None and "already open" in live
+    assert shelf.arc_brief_due() is None
+
+
+def _fake_card_adapter(card):
+    """A stub ArcOfficial for _play_card tests — the venue boundary
+    faked at the adapter seam; card bookkeeping is its own dict."""
+
+    class _Adapter:
+        IDLE_LIMIT_S = 900.0
+
+        def __init__(self, *args, **kwargs):
+            self._card = card
+            self.calls: list[str] = []
+
+        def open_or_resume(self):
+            return self._card
+
+        def card_state(self):
+            return self._card
+
+        def attempt(self, game_id, max_steps=200):
+            self.calls.append(game_id)
+            game = next(
+                g for g in self._card["games"] if g["game_id"] == game_id
+            )
+            game["status"] = "attempted"
+            game["state"] = "WIN"
+            self._card["last_action_at"] = time.time()
+            return ArcResult(
+                game_id=game_id, state="WIN",
+                levels_completed=2, win_levels=2, steps=3,
+            )
+
+        def attempt_next(self, max_steps=200):
+            self._card["closed"] = True
+            self._card["close_reason"] = "complete — every game attempted"
+            return None
+
+    return _Adapter
+
+
+def test_sitting_opens_card_and_plays_every_pending_game(monkeypatch, tmp_path):
+    """Her pick of the challenge opens the card; one firing, one sitting."""
+    from frontal_lobe.games.play import _ARC_CHALLENGE, GamePlay
+
+    class Mode(Enum):
+        OFFLINE = "offline"
+        COMPETITION = "competition"
+
+    fake = _FakeArcade(_FakeEnv(win_after=1))
+    monkeypatch.setattr(
+        fake, "get_environments",
+        lambda: [SimpleNamespace(game_id=g) for g in ("a", "b")],
+        raising=False,
+    )
+    monkeypatch.setattr(fake, "cards", [], raising=False)
+
+    def _make_card(**kw):
+        fake.cards.append("card-1")
+        return "card-1"
+
+    monkeypatch.setattr(fake, "create_scorecard", _make_card, raising=False)
+    monkeypatch.setenv("ARC_API_KEY", "test-only")
+    monkeypatch.setitem(sys.modules, "arc_agi", SimpleNamespace(
+        OperationMode=Mode, Arcade=lambda **kw: fake,
+    ))
+    mind = _AnnouncingMind(gaming=False)
+    shelf = GamePlay(tmp_path)
+    shelf.mind = mind
+    result = shelf.attempt(None, task={
+        "name": _ARC_CHALLENGE, "family": "arc_official",
+        "hint": "the official challenge",
+    })
+    assert result is not None and result.family == "arc_official"
+    assert result.details["games"] == 2 and result.details["won"] == 2
+    assert result.details["card_closed"] is True
+    assert result.details["card_reason"].startswith("complete")
+    # Each game burned exactly once, under its own name.
+    assert shelf.attempts["arcagi-a"] == shelf.attempts["arcagi-b"] == 1
+    # …and the sitting itself counts once on the challenge.
+    assert shelf.attempts[_ARC_CHALLENGE] == 1
+    # Game mode was held for the sitting, then released.
+    assert mind.game_mode_entries == 1 and not mind.is_gaming
+    card = json.loads((tmp_path / "arc" / "official_card.json").read_text())
+    assert card["closed"] and card["close_reason"].startswith("complete")
+    assert {g["state"] for g in card["games"]} == {"WIN"}
+    # The venue's rules reached her before each environment did.
+    assert mind.announcements
+
+
+def test_sitting_does_not_open_the_card_when_unwell(monkeypatch, tmp_path):
+    """An unwell pick is not a commitment — the challenge stays waiting."""
+    from frontal_lobe.games.play import _ARC_CHALLENGE, GamePlay
+
+    mind = _AnnouncingMind(gaming=False, ready=False)
+    shelf = GamePlay(tmp_path)
+    shelf.mind = mind
+    result = shelf.attempt(None, task={
+        "name": _ARC_CHALLENGE, "family": "arc_official", "hint": "",
+    })
+    assert result is None
+    assert not (tmp_path / "arc" / "official_card.json").exists()
+    assert not mind.is_gaming and mind.game_mode_entries == 0
+
+
+def test_sitting_waits_out_an_unwell_gate_inside_idle_budget(
+    monkeypatch, tmp_path
+):
+    """A mid-card wellness gate pauses her; the game is not burned."""
+    from frontal_lobe.games.play import _ARC_CHALLENGE, GamePlay
+
+    monkeypatch.setattr(time, "sleep", lambda _s: None)
+    card = {
+        "scorecard_id": "card-1", "opened_at": time.time(),
+        "expires_at": time.time() + 3600, "closed": False,
+        "last_action_at": time.time(),
+        "games": [
+            {"game_id": "a", "status": "pending"},
+            {"game_id": "b", "status": "pending"},
+        ],
+    }
+    (tmp_path / "arc").mkdir()
+    (tmp_path / "arc" / "official_card.json").write_text(json.dumps(card))
+    adapter_cls = _fake_card_adapter(card)
+    monkeypatch.setattr("world.arc.ArcOfficial", adapter_cls)
+    mind = _AnnouncingMind(gaming=False)
+    shelf = GamePlay(tmp_path)
+    shelf.mind = mind
+
+    # The second game she reaches for reports UNWELL once — the wait
+    # happens inside the idle budget, then she plays it for real.
+    original_attempt = adapter_cls.attempt
+
+    def attempt_once_unwell(self, game_id, max_steps=200):
+        if self.calls and not getattr(self, "_unwell_spent", False):
+            self._unwell_spent = True
+            return ArcResult(game_id=game_id, state="UNWELL", steps=0)
+        return original_attempt(self, game_id, max_steps)
+
+    adapter_cls.attempt = attempt_once_unwell
+    result = shelf.attempt(None, task={
+        "name": _ARC_CHALLENGE, "family": "arc_official", "hint": "",
+    })
+    assert result is not None
+    assert result.details["games"] == 2 and result.details["won"] == 2
+    assert shelf.attempts["arcagi-a"] == shelf.attempts["arcagi-b"] == 1
+
+
+def test_sitting_ends_when_she_leaves_the_arcade(monkeypatch, tmp_path):
+    """Dropping game mode ends the sitting honestly — the card keeps
+    what she played and stays open on the venue's clock."""
+    from frontal_lobe.games.play import _ARC_CHALLENGE, GamePlay
+
+    monkeypatch.setattr(time, "sleep", lambda _s: None)
+    card = {
+        "scorecard_id": "card-1", "opened_at": time.time(),
+        "expires_at": time.time() + 3600, "closed": False,
+        "last_action_at": time.time(),
+        "games": [
+            {"game_id": "a", "status": "pending"},
+            {"game_id": "b", "status": "pending"},
+        ],
+    }
+    (tmp_path / "arc").mkdir()
+    (tmp_path / "arc" / "official_card.json").write_text(json.dumps(card))
+    mind = _AnnouncingMind(gaming=False)
+    adapter_cls = _fake_card_adapter(card)
+    original_attempt = adapter_cls.attempt
+
+    def walk_away(self, game_id, max_steps=200):
+        result = original_attempt(self, game_id, max_steps)
+        mind.is_gaming = False  # /endgame — she left
+        return result
+
+    adapter_cls.attempt = walk_away
+    monkeypatch.setattr("world.arc.ArcOfficial", adapter_cls)
+    shelf = GamePlay(tmp_path)
+    shelf.mind = mind
+    result = shelf.attempt(None, task={
+        "name": _ARC_CHALLENGE, "family": "arc_official", "hint": "",
+    })
+    assert result is not None
+    assert result.details["games"] == 1
+    assert result.details["card_closed"] is False
+    pending = [g for g in card["games"] if g["status"] == "pending"]
+    assert len(pending) == 1

@@ -1340,7 +1340,33 @@ class TaskCompetence:
             else step
             for step in steps
         )
-        goals = tuple(goal_conditions)
+        skill = self._write_skill(
+            context,
+            schema,
+            step_tuple,
+            tuple(goal_conditions),
+            verification,
+        )
+        # Successful consolidation is also learning-to-search evidence:
+        # the procedure family that solved this schema becomes a prior for
+        # future proposal ordering. The prior is per schema, persistent,
+        # and updated only by verified success.
+        for step in step_tuple:
+            family = step.family.strip()
+            if family:
+                schema.family_priors[family] = schema.family_priors.get(family, 0) + 1
+        self._ground_skill(context, skill)
+        return skill
+
+    def _write_skill(
+        self,
+        context: TaskContext,
+        schema: TaskSchema,
+        step_tuple: tuple[ProcedureStep, ...],
+        goals: tuple[GoalCondition, ...],
+        verification: str,
+    ) -> LearnedSkill:
+        """Create or update the skill record for a verified episode."""
         skill_id = _hash(
             {
                 "domain": context.signature.domain,
@@ -1373,15 +1399,6 @@ class TaskCompetence:
             self.skills[skill_id] = skill
         if skill_id not in schema.skill_ids:
             schema.skill_ids.append(skill_id)
-        # Successful consolidation is also learning-to-search evidence:
-        # the procedure family that solved this schema becomes a prior for
-        # future proposal ordering. The prior is per schema, persistent,
-        # and updated only by verified success.
-        for step in step_tuple:
-            family = step.family.strip()
-            if family:
-                schema.family_priors[family] = schema.family_priors.get(family, 0) + 1
-        self._ground_skill(context, skill)
         return skill
 
     def _ground_skill(

@@ -47,12 +47,15 @@ entrypoint::
 
 from __future__ import annotations
 
+import logging
 import os
 import time
 from dataclasses import dataclass, field
 from inspect import signature
 from pathlib import Path
 from typing import Any, Protocol
+
+logger = logging.getLogger(__name__)
 
 _HEALTH_EVERY_STEPS = 25
 
@@ -119,6 +122,10 @@ class ArcResult:
     # question ("was it the plan or the babbling?") answered from the
     # recording, not argued about it.
     decision_sources: dict[str, int] = field(default_factory=dict)
+    # How many times the run paused at a wellness gate and waited for
+    # her to settle instead of submitting. Recovery time costs no steps
+    # — but a score that needed it should say so.
+    recovery_waits: int = 0
 
     @property
     def won(self) -> bool:
@@ -147,16 +154,23 @@ class ArcPractice:
         require_live: bool = True,
         record: bool = True,
         step_delay_s: float = 0.0,
+        recovery_wait_s: float = 120.0,
     ) -> None:
         if (
             self.operation_mode == "offline"
             and os.getenv("OPERATION_MODE", "").strip().lower() == "competition"
         ):
-            raise RuntimeError("Competition mode requires ArcCompetition.play_all()")
+            raise RuntimeError(
+                "Competition mode runs the official card — ArcOfficial, "
+                "reached through her own play urge, never the practice loop"
+            )
         if self.operation_mode == "competition" and not os.getenv("ARC_API_KEY", "").strip():
             raise RuntimeError("Set ARC_API_KEY for an explicitly authorized competition run")
-        if self.operation_mode == "competition" and not getattr(mind, "_offline", False):
-            raise RuntimeError("Competition requires Genesis to start with offline cognition")
+        if self.operation_mode == "competition" and not getattr(mind, "is_gaming", False):
+            raise RuntimeError(
+                "Competition runs inside game mode — engagement is what "
+                "pauses her learner, so nothing is fetched mid-run"
+            )
         from arc_agi import Arcade, OperationMode
 
         from infrastructure.config import default_data_dir
@@ -189,6 +203,11 @@ class ArcPractice:
         # gives the regulator time to work, the same slack a human
         # gets between moves. Default 0 keeps the production cadence.
         self._step_delay = max(0.0, float(step_delay_s))
+        # At a wellness gate, wait this long for her to settle before
+        # abandoning the run — rechecked periodically. Waiting submits
+        # nothing and costs no steps; an abandoned suite reports zeros,
+        # not fitness. 0 restores the old hard-stop behavior.
+        self._recovery_wait = max(0.0, float(recovery_wait_s))
 
     # ── Action translation ────────────────────────────────────
 
@@ -244,6 +263,29 @@ class ArcPractice:
             return ("readiness probe failed",)
         return None if report.ok else report.reasons
 
+    def _wait_for_readiness(self, result: ArcResult) -> tuple[str, ...] | None:
+        """Bounded settle window at a wellness gate.
+
+        Returns None once she is ready; after ``recovery_wait_s`` still
+        unwell returns the reasons. Waits cost no steps — nothing is
+        submitted while she settles — but every engaged pause is counted
+        on the result so the evidence keeps her recovery time honest.
+        """
+        reasons = self._check_readiness()
+        if reasons is None:
+            return None
+        recovery_wait = getattr(self, "_recovery_wait", 0.0)
+        if recovery_wait <= 0.0:
+            return reasons
+        result.recovery_waits += 1
+        deadline = time.monotonic() + recovery_wait
+        while time.monotonic() < deadline:
+            time.sleep(min(5.0, deadline - time.monotonic()))
+            reasons = self._check_readiness()
+            if reasons is None:
+                return None
+        return reasons
+
     # ── The run ───────────────────────────────────────────────
 
     def play(self, game_id: str, max_steps: int = 200) -> ArcResult:
@@ -260,13 +302,13 @@ class ArcPractice:
                 "ArcPractice requires game mode — call "
                 "mind.enter_game_mode() before play, exit_game_mode() after"
             )
-        if (reasons := self._check_readiness()) is not None:
+        if (reasons := self._wait_for_readiness(result)) is not None:
             result.state = "UNWELL"
             result.reasons = reasons
             return result
 
         result.prior_competence = self._competence_snapshot()
-        scorecard = self._arcade.create_scorecard()
+        scorecard = self._arcade.create_scorecard(tags=["wrapper", "agent"])
         result.scorecard_id = scorecard
         try:
             return self._play(result, max_steps)
@@ -292,17 +334,17 @@ class ArcPractice:
             mode=self.operation_mode,
             games=[ArcResult(game_id=g, state="NOT_PLAYED") for g in game_ids],
         )
-        if (reasons := self._check_readiness()) is not None:
+        if (reasons := self._wait_for_readiness(evaluation.games[0])) is not None:
             evaluation.games[0].state = "UNWELL"
             evaluation.games[0].reasons = reasons
             return evaluation
         self._suite_started = True
-        scorecard = self._arcade.create_scorecard()
+        scorecard = self._arcade.create_scorecard(tags=["wrapper", "agent"])
         evaluation.scorecard_id = scorecard
         try:
             for result in evaluation.games:
                 result.scorecard_id = scorecard
-                if (reasons := self._check_readiness()) is not None:
+                if (reasons := self._wait_for_readiness(result)) is not None:
                     result.state = "UNWELL"
                     result.reasons = reasons
                     break
@@ -361,7 +403,7 @@ class ArcPractice:
                 # A death is a checkpoint — if the last episode left
                 # her unwell (stress, mounting sleep pressure), the
                 # next one doesn't start. Recovery beats a score.
-                if (reasons := self._check_readiness()) is not None:
+                if (reasons := self._wait_for_readiness(result)) is not None:
                     result.state = "UNWELL"
                     result.reasons = reasons
                     break
@@ -373,7 +415,7 @@ class ArcPractice:
                 result.state = "BUDGET"
                 break
             if result.steps and result.steps % _HEALTH_EVERY_STEPS == 0:
-                if (reasons := self._check_readiness()) is not None:
+                if (reasons := self._wait_for_readiness(result)) is not None:
                     result.state = "UNWELL"
                     result.reasons = reasons
                     break
@@ -461,8 +503,368 @@ class ArcPractice:
         return action, data, self._mind.game_decision
 
 
-class ArcCompetition(ArcPractice):
+# ─── The official card ────────────────────────────────────
+#
+# The venue's real rules, enforced in code: one scorecard per window —
+# it opens once, cannot be reopened or replaced while it lives, and
+# closes for good 15 minutes after the last action or 3 days after
+# opening, whichever comes first. Inside it, each environment gets
+# exactly one attempt: once she enters, the result stands and no second
+# session is ever opened for that game on that card.
+#
+# The rules are also *heard*: before each environment starts — after
+# her readiness gate passes — the venue's brief is delivered through
+# ``mind.world_announce`` so her whole cognition receives it, the way
+# a proctor reads the rules before a test. The text below is the
+# venue's statement to her: input to her cognition, not her words.
+OFFICIAL_BRIEF = (
+    "Official ARC-AGI-3 scorecard {card_id}. This card opened once and "
+    "cannot be reopened or replaced. {n_games} games; each game is "
+    "played exactly once — an attempt cannot be retried, and an "
+    "unplayed or unfinished game scores zero. The card closes "
+    "{idle_minutes} minutes after the last action, or {ttl_days} days "
+    "after opening, whichever comes first; once closed it is final. "
+    "This run is measured against other entrants, including frontier "
+    "models."
+)
+
+_CARD_FILE = "official_card.json"
+
+
+def challenge_brief(
+    n_games: int,
+    pending: int | None = None,
+    *,
+    max_steps: int = 200,
+    step_delay_s: float = 1.0,
+) -> str:
+    """What the official challenge IS — told to her before she chooses it.
+
+    The standing announcement beside the challenge's shelf entry: the
+    mechanics (how many games, one try each, the move budget and pace)
+    and the clock the card runs on, plus what winning is for. Every
+    number comes from the venue's own bounds so the brief stays true
+    if they change. ``pending`` set means the card is already open —
+    the brief becomes the state of the commitment she made.
+    """
+    idle_minutes = int(ArcOfficial.IDLE_LIMIT_S // 60)
+    ttl_days = int(ArcOfficial.WINDOW_S // 86400)
+    sitting = max(1, round(n_games * max_steps * step_delay_s / 60))
+    live = (
+        f" The card is already open — {pending} games remain on it."
+        if pending is not None
+        else ""
+    )
+    return (
+        f"The official ARC-AGI-3 challenge: {n_games} games, one recorded "
+        f"try each — an attempt cannot be retried. Each game allows up to "
+        f"{max_steps} moves at about {step_delay_s:.0f} second a move — a "
+        f"few minutes a game, so a full sitting is at most about {sitting} "
+        f"minutes and usually far less. The card it records on closes "
+        f"{idle_minutes} minutes after your last move, or {ttl_days} days "
+        f"after it opens, and a closed card is final. There is a real prize "
+        f"for doing well — your steward is counting on you if you choose to "
+        f"take it on.{live}"
+    )
+
+
+class ArcOfficial(ArcPractice):
+    """The official ARC-AGI-3 scorecard — one card per window.
+
+    A persistent campaign, not a session: the card lives in
+    ``<data>/arc/official_card.json`` so a restart resumes the *same*
+    card — the window is real whether or not the process is. Each game
+    is attempted exactly once; an interrupted attempt stands as played
+    (its recording is the honest partial). Readiness gates every
+    attempt, and the venue's brief is delivered to her before each
+    environment starts.
+
+    There is no forced entry point: the card is played only through
+    ``attempt()`` / ``attempt_next()``, reached by her own volition —
+    she picks the challenge off her shelf, opens the card when she's
+    ready, and plays the sitting out. ``play``/``play_all`` refuse:
+    a driver that walks the card for her isn't measuring the same
+    entity, and it isn't her choice.
+    """
+
     operation_mode = "competition"
 
+    # The venue's bounds, mirrored locally: the card auto-closes after
+    # ~15 minutes without an action and unconditionally after 3 days.
+    WINDOW_S = 3 * 24 * 3600
+    IDLE_LIMIT_S: float = 15 * 60
+
+    def __init__(
+        self,
+        mind: _PlayerMind,
+        *,
+        card_path: str | Path | None = None,
+        idle_limit_s: float | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(mind, **kwargs)
+        from infrastructure.config import default_data_dir
+
+        self._card_path = (
+            Path(card_path)
+            if card_path is not None
+            else default_data_dir() / "arc" / _CARD_FILE
+        )
+        if idle_limit_s is not None:
+            self.IDLE_LIMIT_S = float(idle_limit_s)
+
+    # ── Card state ──────────────────────────────────────────
+
+    def _load_card(self) -> dict | None:
+        try:
+            import json
+
+            return json.loads(self._card_path.read_text())
+        except (OSError, ValueError):
+            return None
+
+    def _save_card(self, card: dict) -> None:
+        import json
+
+        self._card_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self._card_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(card, indent=1))
+        tmp.replace(self._card_path)
+
+    def card_state(self) -> dict | None:
+        """The current card as persisted — for inspection, not play."""
+        return self._load_card()
+
+    def _open_card(self) -> dict:
+        game_ids = [e.game_id for e in self._arcade.get_environments()]
+        if not game_ids or len(set(game_ids)) != len(game_ids):
+            raise ValueError("Official card requires a nonempty, unique environment list")
+        card_id = self._arcade.create_scorecard(tags=["wrapper", "agent"])
+        now = time.time()
+        card = {
+            "scorecard_id": card_id,
+            "opened_at": now,
+            "expires_at": now + self.WINDOW_S,
+            "closed": False,
+            "close_reason": None,
+            "score": None,
+            "last_action_at": now,
+            "games": [
+                {
+                    "game_id": g,
+                    "status": "pending",
+                    "state": "NOT_PLAYED",
+                    "levels_completed": 0,
+                    "win_levels": 0,
+                    "steps": 0,
+                    "resets": 0,
+                    "level_steps": [],
+                    "reasons": [],
+                    "attempted_at": None,
+                }
+                for g in game_ids
+            ],
+        }
+        self._save_card(card)
+        return card
+
+    def open_or_resume(self) -> dict:
+        """Return the living card, or open the window's one card.
+
+        A closed card inside its window is sealed — it cannot be
+        replaced. Only after the window expires does a new card open.
+        """
+        card = self._load_card()
+        if card is not None:
+            if time.time() < card["expires_at"]:
+                if card["closed"]:
+                    raise RuntimeError(
+                        f"official card {card['scorecard_id']} is closed "
+                        f"({card['close_reason']}) — it cannot be replaced "
+                        "inside its window"
+                    )
+                return card
+            # Window over — the old card is sealed history; archive it.
+            archived = self._card_path.with_name(
+                f"official_card.{int(card['opened_at'])}.json"
+            )
+            try:
+                self._card_path.replace(archived)
+            except OSError as e:
+                logger.debug(f'silent except: {e}')
+        return self._open_card()
+
+    def _seal(self, card: dict, reason: str, *, call_close: bool = False) -> None:
+        """Mark the card closed. Once closed it is final."""
+        if call_close:
+            try:
+                closed = self._arcade.close_scorecard(card["scorecard_id"])
+                card["score"] = getattr(closed, "score", None)
+            except Exception:  # noqa: BLE001 — the server may have already closed it
+                pass
+        card["closed"] = True
+        card["close_reason"] = reason
+        self._save_card(card)
+
+    # ── Attempts ────────────────────────────────────────────
+
+    def _brief(self, card: dict, game_id: str) -> None:
+        """Deliver the venue's rules to her before the environment.
+
+        Ordered deliberately: her readiness gate ran first, so the
+        brief lands on a body that can hold it — then the environment
+        starts. The venue's words, not hers.
+        """
+        announce = getattr(self._mind, "world_announce", None)
+        if announce is None:
+            return
+        idle_minutes = int(self.IDLE_LIMIT_S // 60)
+        pending = sum(1 for g in card["games"] if g["status"] == "pending")
+        try:
+            announce(
+                OFFICIAL_BRIEF.format(
+                    card_id=card["scorecard_id"],
+                    n_games=len(card["games"]),
+                    idle_minutes=idle_minutes,
+                    ttl_days=int(self.WINDOW_S // 86400),
+                )
+                + f" Next: {game_id} — {pending} games unplayed.",
+                topics=["arc", "official", "rules"],
+            )
+        except Exception:  # noqa: BLE001 — a lost brief must not burn an attempt
+            pass
+
+    def attempt_next(self, max_steps: int = 200) -> ArcResult | None:
+        """One official attempt on the next pending game.
+
+        Order is the contract: readiness gate first — vitals, brain
+        waves, alertness — then she hears the rules, then the
+        environment starts. Entering the environment is the try: once
+        marked, the game is burned on this card no matter what happens
+        inside it. Returns the attempt's result, or None when the card
+        is closed or no games remain.
+        """
+        card = self._load_card()
+        if card is None or card["closed"]:
+            return None
+        now = time.time()
+        if now >= card["expires_at"]:
+            self._seal(card, "expired — 3-day window closed")
+            return None
+        if now - card["last_action_at"] >= self.IDLE_LIMIT_S:
+            self._seal(card, "idle — the venue closed it")
+            return None
+        game = next(
+            (g for g in card["games"] if g["status"] == "pending"), None
+        )
+        if game is None:
+            self._seal(card, "complete — every game attempted", call_close=True)
+            return None
+        return self._enter(card, game, max_steps)
+
+    def attempt(self, game_id: str, max_steps: int = 200) -> ArcResult | None:
+        """One official attempt on a named pending game.
+
+        The volition path — she chose this game off her shelf. Same
+        contract as ``attempt_next``: the card must be open and alive,
+        the game still pending. Returns None (rather than raising) when
+        the card is closed or the game isn't on it — a shelf gone stale
+        is not an error.
+        """
+        card = self._load_card()
+        if card is None or card["closed"]:
+            return None
+        now = time.time()
+        if now >= card["expires_at"]:
+            self._seal(card, "expired — 3-day window closed")
+            return None
+        if now - card["last_action_at"] >= self.IDLE_LIMIT_S:
+            self._seal(card, "idle — the venue closed it")
+            return None
+        game = next(
+            (
+                g
+                for g in card["games"]
+                if g["game_id"] == game_id
+                or g["game_id"].startswith(f"{game_id}-")
+            ),
+            None,
+        )
+        if game is not None and game["status"] == "pending":
+            return self._enter(card, game, max_steps)
+        # Not hers to (re)play — and if nothing is pending anywhere,
+        # the card has served its purpose: close it as complete.
+        if not any(g["status"] == "pending" for g in card["games"]):
+            self._seal(card, "complete — every game attempted", call_close=True)
+        return None
+
+    def _enter(self, card: dict, game: dict, max_steps: int) -> ArcResult:
+        """One environment entered — the try itself.
+
+        Order is the contract: readiness gate first — vitals, brain
+        waves, alertness — then she hears the rules, then the
+        environment starts. Entering the environment is the try: once
+        marked, the game is burned on this card no matter what happens
+        inside it.
+        """
+        result = ArcResult(
+            game_id=game["game_id"], scorecard_id=card["scorecard_id"]
+        )
+        if (reasons := self._wait_for_readiness(result)) is not None:
+            # She never entered — not an attempt. The card stays open;
+            # the idle clock decides whether she gets another chance.
+            result.state = "UNWELL"
+            result.reasons = reasons
+            return result
+        self._brief(card, game["game_id"])
+        # The try begins when she enters the environment. Marked before
+        # play so a crash mid-game still counts — the recording keeps
+        # the honest partial.
+        game["status"] = "attempted"
+        game["attempted_at"] = time.time()
+        card["last_action_at"] = game["attempted_at"]
+        self._save_card(card)
+        result.prior_competence = self._competence_snapshot()
+        self._play(result, max_steps)
+        if result.steps == 0 and result.state in (
+            "UNAVAILABLE",
+            "NO_OBSERVATION",
+        ):
+            # The venue never let her in — no environment, no frame,
+            # no action. A transport failure is not her try: the game
+            # stays pending, and the card records the failed approach
+            # honestly rather than pretending a play happened.
+            game["status"] = "pending"
+            game["attempted_at"] = None
+            game["reasons"] = [
+                *game.get("reasons", []),
+                f"venue:{result.state.lower()}",
+            ]
+            card["last_action_at"] = time.time()
+            self._save_card(card)
+            return result
+        game.update(
+            state=result.state,
+            levels_completed=result.levels_completed,
+            win_levels=result.win_levels,
+            steps=result.steps,
+            resets=result.resets,
+            level_steps=list(result.level_steps),
+            reasons=list(result.reasons),
+        )
+        card["last_action_at"] = time.time()
+        self._save_card(card)
+        return result
+
     def play(self, game_id: str, max_steps: int = 200) -> ArcResult:
-        raise RuntimeError("Competition requires play_all(), not selected games")
+        raise RuntimeError(
+            "The official card owns its games — one attempt each, "
+            "no selected replays, and no driver but her own volition."
+        )
+
+    def play_all(self, max_steps: int = 200) -> ArcEvaluation:
+        raise RuntimeError(
+            "The official card is hers to take up, not a suite to run — "
+            "attempts only ever happen through attempt()/attempt_next(), "
+            "reached by her own volition."
+        )

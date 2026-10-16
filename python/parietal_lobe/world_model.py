@@ -43,6 +43,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from parietal_lobe.boards import ConstraintSession
+from parietal_lobe.math.number_sense import NumberSense
 from parietal_lobe.scene import Scene
 
 from genesis_client.swallow import note_swallowed
@@ -343,6 +344,16 @@ class WorldModel:
         # world ends without a body to credit, this is the cause to
         # attribute — the thing she just acted on.
         self._last_clicked: tuple[Cell, int | None] | None = None
+        # Distal physics of *simple* actions — a control can move
+        # things that are not her: mirrored twins, pushed blocks,
+        # the piece a pointer selected. ``entity_effects[(action,
+        # color)][delta]`` accrues a kind's answer just as
+        # ``action_effects`` accrues the body's, and for the same
+        # reason it is keyed on kind: "presses move color-10 things"
+        # transfers to every color-10 thing. Without this a control
+        # whose effect lives on other entities reads as inert —
+        # honest (0,0) self-measures masking a working lever.
+        self.entity_effects: dict[tuple[str, int], Counter[Cell]] = {}
         # What contact does to her body: kind → the part state it
         # rewrote → what it rewrote it to. ``transforms[5][part_a]
         # [part_b] += 1`` means "the color-5 thing changed my part
@@ -562,6 +573,14 @@ class WorldModel:
         # rest of the model does: what the screen shows, induced
         # from demonstrated states, never assumed.
         self.boards = ConstraintSession()
+
+        # The parietal number faculty. Quantity is perceived, not
+        # computed: small counts are subitized exactly, larger ones
+        # blurred on the log-compressed line. Every count the model
+        # reports — entities, parts, kinds — passes through it so
+        # the schema layer and her speech inherit its precision:
+        # three things are exactly three; nine things are "many".
+        self.number = NumberSense()
 
     def _resolve_collections(self, events: list[WorldEvent]) -> None:
         """Settle vanished-contact records into honest outcomes.
@@ -783,6 +802,29 @@ class WorldModel:
                 entity.steps_after_action += 1
                 if rigid_move:
                     entity.action_moves += 1
+                    if not entity.is_self:
+                        # A control can answer distally — mirrored
+                        # twins, pushed blocks, the piece a pointer
+                        # selected. The ledger takes every contingent
+                        # rigid move (ambient movers separate out
+                        # downstream: a free mover answers all
+                        # actions identically, a real lever answers
+                        # only its own). The *event* is gated harder:
+                        # a thing already in motion keeps its own
+                        # course and cannot be claimed by the press.
+                        self.entity_effects.setdefault(
+                            (pending, entity.color), Counter()
+                        )[delta] += 1
+                        if incoming_velocity == (0, 0):
+                            events.append(
+                                WorldEvent(
+                                    "pushed",
+                                    f"action {pending} moved the "
+                                    f"color-{entity.color} thing {delta}",
+                                    salience=0.55,
+                                    entity_id=entity.id,
+                                )
+                            )
                     expected = self.effect_of(pending)
                     if expected is None or delta == expected:
                         entity.action_effect_moves += 1
@@ -2423,6 +2465,20 @@ class WorldModel:
             return max(nonzero.items(), key=lambda kv: kv[1])[0]
         return (0, 0)
 
+    def distal_effects(self, action: str) -> dict[int, Counter[Cell]]:
+        """What an action does to things that aren't her.
+
+        The other half of "what does this control do": the modal
+        displacement it produced on each kind that answered — a
+        pointer's selection, a mirrored twin, a pushed block. Empty
+        when the world's answer only ever landed on her body.
+        """
+        return {
+            color: counter
+            for (a, color), counter in self.entity_effects.items()
+            if a == action
+        }
+
     def learn_action_label(self, action: str, label: str) -> None:
         """Record the canonical label an interface gives an action.
 
@@ -2479,11 +2535,36 @@ class WorldModel:
         and no evidence the entry has gone stale."""
         if self.action_tries[action] < _SELF_MIN_CONTINGENT:
             return False
+        if action in self.coordinate_actions:
+            # A distal act never moves the body — its (0,0) body
+            # effect is correct, not refusal. The context-diversity
+            # bar below exists so one wall can't teach her a limb is
+            # dead, but no diversity of stance changes "pointing does
+            # not displace me": two tries is honest comprehension of
+            # the bodily half. What pointing *does* is distal and
+            # lives in the click ledger, not here.
+            return not self.action_miscalibrated(action)
+        # A control that never moves her but moves other things is
+        # not inert — its answer is distal, the way a pointer's is.
+        # It is understood the same way: the bodily half is settled
+        # ((0,0) is what it does to her), and staleness re-opens it.
+        if self.effect_of(action) == (0, 0) and self.distal_effects(action):
+            return not self.action_miscalibrated(action)
         # An all-refusal record is context-bound until the world has
         # rejected it from distinct states. Otherwise the first wall
         # she meets teaches her that the limb itself does nothing.
         if self.effect_of(action) == (0, 0):
-            return len(self.action_noop_contexts.get(action, set())) >= _NOOP_CONTEXTS
+            contexts = self.action_noop_contexts.get(action, set())
+            if len(contexts) >= _NOOP_CONTEXTS:
+                return True
+            # But the diversity bar can be unmeetable: the babble
+            # loop that would diversify her stance is the same loop
+            # this verdict gates, so an inert button freezes her at
+            # one context forever (m0r0: ACTION5 pressed 82 times and
+            # never graduated). Past enough refusals the honest learned
+            # answer is "does nothing from anywhere I have stood" —
+            # and surprise can still re-open the entry later.
+            return self.action_tries[action] >= _NOOP_CONTEXTS * _SELF_MIN_CONTINGENT
         return not self.action_miscalibrated(action)
 
     def action_miscalibrated(self, action: str) -> bool:
@@ -2963,6 +3044,7 @@ class WorldModel:
             self.affordances.clear()
             self.click_tries.clear()
             self.click_changes.clear()
+            self.entity_effects.clear()
             self.transforms.clear()
             self.contact_ticks.clear()
             self.death_suspects.clear()
@@ -3033,6 +3115,11 @@ class WorldModel:
             "coordinate_actions": sorted(self.coordinate_actions),
             "click_tries": [[a, c, n] for (a, c), n in self.click_tries.items()],
             "click_changes": [[a, c, n] for (a, c), n in self.click_changes.items()],
+            "entity_effects": [
+                [a, c, int(d[0]), int(d[1]), n]
+                for (a, c), counter in self.entity_effects.items()
+                for d, n in counter.items()
+            ],
             "blocked_kinds": {
                 str(color): [_sig_json(s) for s in sigs]
                 for color, sigs in self.blocked_kinds.items()
@@ -3126,6 +3213,10 @@ class WorldModel:
         self.coordinate_actions.update(data.get("coordinate_actions", []))
         self.click_tries.update({(a, c): n for a, c, n in data.get("click_tries", [])})
         self.click_changes.update({(a, c): n for a, c, n in data.get("click_changes", [])})
+        for a, c, dr, dc, n in data.get("entity_effects", []):
+            self.entity_effects.setdefault((a, int(c)), Counter())[
+                (int(dr), int(dc))
+            ] += n
         self._import_verdict_fields(data)
         self._self_state_votes.update(
             {frozenset(_cells(seat)): n for seat, n in data.get("self_state_votes", [])}
@@ -3241,6 +3332,43 @@ class WorldModel:
             # its bookkeeping only counts a click it proposed.
             self.boards.note_click((int(target[0]), int(target[1])))
 
+    def count_others(self) -> int:
+        """How many live, separate things the scene holds.
+
+        Excludes herself and her parts — the count of *objects* a
+        task is played over, which is what her number sense and the
+        schema layer both ask about.
+        """
+        return sum(
+            1
+            for e in self.entities.values()
+            if not e.gone
+            and not e.is_self
+            and not e.part_of_self
+            and not e.state_of_self
+        )
+
+    def _magnitude(self, n: int) -> str:
+        """The ANS bucket a count *feels* like — what a schema can
+        match on without caring about the exact value.
+
+        Subitizable counts stay individuated — a board with two
+        things is a different task than a board with four, and the
+        number sense resolves both exactly. Past the limit the
+        mental number line compresses, so the bands widen
+        multiplicatively: quantities inside a band are the ones a
+        glance cannot reliably tell apart.
+        """
+        if n <= 0:
+            return "none"
+        if self.number.subitizes(n):
+            return ("one", "pair", "three", "four")[int(n) - 1]
+        if n <= 8:
+            return "several"
+        if n <= 16:
+            return "many"
+        return "crowd"
+
     def transition_state(self) -> dict[str, Any]:
         """The model flattened to named scalar variables.
 
@@ -3258,25 +3386,45 @@ class WorldModel:
             if not e.gone and not e.part_of_self and not e.state_of_self
         ]
         aff_kind: dict[str, int] = {}
+        color_kind: dict[int, int] = {}
         for e in live:
             if e.is_self:
                 continue
+            color_kind[e.color] = color_kind.get(e.color, 0) + 1
             for outcome, n in self.affordance_of(e.color).items():
                 if n > 0:
                     aff_kind[f"kinds.{outcome}"] = aff_kind.get(f"kinds.{outcome}", 0) + 1
+        live_count = self.count_others()
+        gone_count = sum(1 for e in self.entities.values() if e.gone)
+        parts_count = sum(
+            1 for e in self.entities.values() if e.part_of_self and not e.gone
+        )
         return {
             "self.r": me.centroid[0] if me is not None else None,
             "self.c": me.centroid[1] if me is not None else None,
             "self.color": me.color if me is not None else None,
-            "self.parts": sum(1 for e in self.entities.values() if e.part_of_self and not e.gone),
+            "self.parts": parts_count,
+            "self.parts.mag": self._magnitude(parts_count),
             "self.state_parts": sum(
                 1 for e in self.entities.values() if e.state_of_self and not e.gone
             ),
             "embodied": me is not None and not me.gone,
-            "entities.live": sum(1 for e in live if not e.is_self),
-            "entities.gone": sum(1 for e in self.entities.values() if e.gone),
+            "entities.live": live_count,
+            "entities.live.mag": self._magnitude(live_count),
+            "entities.gone": gone_count,
+            "entities.gone.mag": self._magnitude(gone_count),
             "map.free": len(self.known_free),
             "map.blocked": len(self.known_blocked),
+            # How many kinds any control moves distally — the
+            # signature of a pointer/pusher world versus a
+            # walk-around world.
+            "kinds.movable": len(
+                {color for (_a, color) in self.entity_effects}
+            ),
+            # How many separate things share each color — a "4
+            # same-colored objects" puzzle binds on this structure,
+            # not on the color index (signatures drop names anyway).
+            **{f"entities.kind.{color}": n for color, n in color_kind.items()},
             **aff_kind,
         }
 
@@ -3286,9 +3434,15 @@ class WorldModel:
         me = self.self_entity
         if me is not None:
             parts.append(f"I am the color-{me.color} thing")
-        live = [e for e in self.entities.values() if not e.gone]
-        if live:
-            parts.append(f"{len(live)} thing{'s' if len(live) != 1 else ''} around me")
+        n = self.count_others()
+        if n:
+            # The number sense only perceives small counts exactly —
+            # a crowd is an estimate and is reported as one.
+            parts.append(
+                f"{n} thing{'s' if n != 1 else ''} around me"
+                if self.number.subitizes(n)
+                else f"about {n} things around me"
+            )
         for color, aff in sorted(self.affordances.items()):
             if not aff:
                 continue
@@ -3298,4 +3452,12 @@ class WorldModel:
                 if out != OUT_COLLECT
                 else f"color-{color} things can be collected"
             )
+        # Distal levers are knowledge too: "this press moves that
+        # kind" is what a pointer/pusher world is made of.
+        pushed: dict[int, str] = {}
+        for (action, color), counter in self.entity_effects.items():
+            if sum(counter.values()) >= 2:
+                pushed.setdefault(color, action)
+        for color, action in sorted(pushed.items()):
+            parts.append(f"{action} moves the color-{color} things")
         return "; ".join(parts) if parts else "an unfamiliar place"

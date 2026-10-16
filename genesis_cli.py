@@ -57,7 +57,7 @@ Commands (typed during conversation):
     /endteach    — exit teaching mode, resume normal operation
     /game        — put it into game mode (focused play)
     /endgame     — exit game mode, resume normal operation
-    /arc <ids|--all|--competition> [--steps N] [--fresh|--baseline P] — play or baseline
+    /arc <ids|--all> [--steps N] [--fresh|--baseline P] — practice play or baseline
     /teach-questions — answer its queued questions one at a time
     /sleep-aid   — emergency sleep aid for stress-induced insomnia
     /web-history [N] — see what it's been looking at online (last N, default 20)
@@ -139,6 +139,17 @@ LIVE_THOUGHT_POLL_INTERVAL = 2.0
 # only delays the rest of the teardown. The mind has already saved
 # state by this point, so continuing is the safer failure mode.
 _KILL_GRACE_S = 5.0
+
+# Maximum seconds the process may linger after teardown completes —
+# i.e. after _shutdown returns: everything user-visible is done (state
+# saved, children stopped, "Goodnight" printed). What remains is
+# interpreter finalization — non-daemon thread joins, atexit handlers,
+# native library teardown — inside code this project does not control.
+# A wedged library thread once held a fully-teardown process for over a
+# minute until systemd escalated to SIGKILL. The watchdog bounds that:
+# if the process is still alive when it fires, os._exit ends it. There
+# is nothing left to save by then, so the hard exit cannot corrupt her.
+_EXIT_WATCHDOG_S = 30.0
 
 # Default data directory (XDG-compliant, persists across reboots).
 # Resolved via GENESIS_DATA_DIR → $XDG_DATA_HOME/genesis —
@@ -2174,8 +2185,12 @@ def _cmd_arc(mind: Mind, rest: str) -> str:
       /arc ls20-9607627b ft09-0d8bbf25   — several, in order
       /arc ls20-9607627b --steps 400     — step budget per game (default 200)
       /arc --all --steps 400             — every discovered environment, one scorecard
+      (the official card is hers alone — she takes up the challenge
+       from her own shelf when she feels ready; there is no forced run)
       /arc ls20-9607627b --fresh         — cold start: prior learning neither read nor written
       /arc ls20-9607627b --baseline uniform — a reference policy, not her
+      /arc --all --delay 0.5 --recover 180 — pace steps; wait up to 180s for
+        her to settle at a wellness gate instead of abandoning the suite
 
     Game mode wraps the run; her readiness gate can refuse or stop it.
     Baselines are denominators: what uniform-random or first-action
@@ -2183,14 +2198,31 @@ def _cmd_arc(mind: Mind, rest: str) -> str:
     """
     parts = rest.split()
     usage = (
-        "  Usage: /arc (<game-id> [more ids] | --all | --competition)"
-        " [--steps N] [--fresh] [--baseline (uniform|first)]\n"
+        "  Usage: /arc (<game-id> [more ids] | --all)"
+        " [--steps N] [--fresh] [--baseline (uniform|first)]"
+        " [--delay S] [--recover S]\n"
     )
     steps = 200
     if "--steps" in parts:
         i = parts.index("--steps")
         try:
             steps = int(parts[i + 1])
+        except (IndexError, ValueError):
+            return usage
+        del parts[i:i + 2]
+    delay = 0.0
+    if "--delay" in parts:
+        i = parts.index("--delay")
+        try:
+            delay = float(parts[i + 1])
+        except (IndexError, ValueError):
+            return usage
+        del parts[i:i + 2]
+    recover = 120.0
+    if "--recover" in parts:
+        i = parts.index("--recover")
+        try:
+            recover = float(parts[i + 1])
         except (IndexError, ValueError):
             return usage
         del parts[i:i + 2]
@@ -2206,15 +2238,10 @@ def _cmd_arc(mind: Mind, rest: str) -> str:
     parts = [p for p in parts if p != "--fresh"]
     if not parts or steps <= 0:
         return usage
-    competition = "--competition" in parts
-    whole_suite = competition or "--all" in parts
+    whole_suite = "--all" in parts
     if any(p.startswith("--") for p in parts) and not (
         len(parts) == 1 and whole_suite
     ):
-        return usage
-    if baseline is not None and competition:
-        # Baselines are local contrast only — the official transport
-        # runs her or nothing.
         return usage
     lines = []
     if baseline is not None:
@@ -2237,13 +2264,17 @@ def _cmd_arc(mind: Mind, rest: str) -> str:
         lines[0:0] = [f"  baseline '{baseline}' — reference policy, not the agent:"]
     elif whole_suite:
         evaluation = mind.evaluate_arc(
-            max_steps=steps, competition=competition, fresh=fresh
+            max_steps=steps, fresh=fresh,
+            step_delay_s=delay, recovery_wait_s=recover,
         )
         results = evaluation.games
         score = "unavailable" if evaluation.score is None else f"{evaluation.score:.2f}%"
         lines.append(f"  ARC {evaluation.mode}: score {score}")
     else:
-        results = mind.play_arc(parts, max_steps=steps, fresh=fresh)
+        results = mind.play_arc(
+            parts, max_steps=steps, fresh=fresh,
+            step_delay_s=delay, recovery_wait_s=recover,
+        )
     prior_names = {
         "none": "cold start",
         "loaded": "prior learning",
@@ -2264,6 +2295,11 @@ def _cmd_arc(mind: Mind, rest: str) -> str:
                 else ""
             )
             + f" ({prior_names.get(r.prior_learning, r.prior_learning)})"
+            + (
+                f" recovery-waits={r.recovery_waits}"
+                if r.recovery_waits
+                else ""
+            )
             + (f" [{sources}]" if sources else "")
             + (f" (scorecard {r.scorecard_id})" if r.scorecard_id else "")
             + (f" — {'; '.join(r.reasons)}" if r.reasons else "")
@@ -2679,7 +2715,7 @@ def _print_help() -> None:
     logger.info("    /endteach    — exit teaching mode, resume normal operation")
     logger.info("    /game        — put it into game mode (focused play)")
     logger.info("    /endgame     — exit game mode, resume normal operation")
-    logger.info("    /arc <ids|--all|--competition> [--steps N] [--fresh|--baseline P]")
+    logger.info("    /arc <ids|--all> [--steps N] [--fresh|--baseline P]")
     logger.info("    /teach-questions — answer its queued questions one at a time")
     logger.info("    /sleep-aid    — emergency sleep aid for stress-induced insomnia")
     logger.info("    /steward [release N|unbind] — custodial authority: "
@@ -3742,6 +3778,37 @@ def _shutdown(
     return clean_shutdown
 
 
+def _exit_watchdog(exit_code: int) -> None:
+    """os._exit fallback when interpreter finalization outlives its budget.
+
+    Runs on a daemon timer armed once teardown is done. Prints the
+    surviving thread names with a raw os.write — buffered logging is
+    unreliable this late in finalization — then hard-exits so a wedged
+    library thread can never keep the process (and her systemd unit)
+    alive past teardown. See _EXIT_WATCHDOG_S.
+    """
+    names = ",".join(t.name for t in threading.enumerate())
+    os.write(
+        2,
+        f"[genesis] exit watchdog fired — force-exiting; "
+        f"threads still alive: {names}\n".encode(),
+    )
+    os._exit(exit_code)
+
+
+def _arm_exit_watchdog(exit_code: int) -> None:
+    """Arm the post-teardown force-exit timer.
+
+    Must run on a *daemon* Timer: Timer inherits the creating thread's
+    daemon flag, and a non-daemon watchdog would itself hold the
+    interpreter open for its full delay. As a daemon it dies silently
+    with a normal exit and only matters when finalization has hung.
+    """
+    watchdog = threading.Timer(_EXIT_WATCHDOG_S, _exit_watchdog, args=(exit_code,))
+    watchdog.daemon = True
+    watchdog.start()
+
+
 def _load_agent_env() -> None:
     """Load KEY=VALUE lines from the installed agent's env file.
 
@@ -3921,6 +3988,10 @@ def main() -> int:
             data_dir, auditory_cortex,
         ):
             exit_code = 1
+        # From here on, every remaining step is best-effort tail work
+        # (feed drain, stderr restore) plus interpreter finalization —
+        # none of which may hold the process past _EXIT_WATCHDOG_S.
+        _arm_exit_watchdog(exit_code)
         if feed_handler is not None:
             logging.getLogger().removeHandler(feed_handler)
         if real_stderr is not None:

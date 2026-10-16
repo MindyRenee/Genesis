@@ -826,9 +826,20 @@ class EmbodimentMixin:
             )
             else None
         )
+        # The quantity channel rides the observation: how many
+        # separate things the board holds is perceptual content her
+        # cognition can reason about — subitized counts are exact,
+        # larger ones arrive as the estimates they are.
+        n_others = self.world_model.count_others()
+        count_text = (
+            str(n_others)
+            if self.world_model.number.subitizes(n_others)
+            else f"about {n_others}"
+        )
         self._world_bridge.broadcast_observation(
             f"game {game}: level {level}/{info.get('win_levels', '?')}, "
-            f"frame changed {change:.0%}",
+            f"frame changed {change:.0%}, {count_text} "
+            f"thing{'s' if n_others != 1 else ''} on the board",
             topics=["game", "spatial", game],
             salience=min(1.0, change * 3.0 + (0.5 if level > 0 else 0.0)),
             metadata={
@@ -1176,6 +1187,29 @@ class EmbodimentMixin:
                 salience=0.6,
             )
         ]
+
+    def world_announce(self, text: str, *, topics: list[str] | None = None) -> bool:
+        """The world's voice reaches her before the world does.
+
+        A venue announcement — rules read by a proctor, a referee's
+        call — is world content like the game's own instructions:
+        broadcast to the workspace so every subscribed module hears it,
+        and its words grounded into her concept network so they are
+        things she can think about rather than sound that ignites
+        nothing. What she does with a rule is hers; the channel only
+        guarantees it arrived.
+        """
+        try:
+            ok = self._world_bridge.broadcast_observation(
+                text,
+                topics=["announce", *(topics or [])],
+                salience=0.95,
+            )
+        except Exception as e:  # noqa: BLE001 — a voice hiccup is not a crash
+            note_swallowed("parietal_lobe.embodiment.world_announce", e)
+            ok = False
+        self._ground_world_words(text)
+        return ok
 
     def _ground_world_words(self, text: str) -> None:
         """Words the world speaks to her become concepts.

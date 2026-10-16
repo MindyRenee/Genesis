@@ -257,7 +257,7 @@ def apply_field_stimulus(client: GenesisClient) -> bool:
     skips that channel without stimulating: absent never reads as a
     healthy zero.
     """
-    from thalamus.brain_waves import add_stimulus
+    from thalamus.brain_waves import hold_stimulus
 
     applied = False
     try:
@@ -265,8 +265,16 @@ def apply_field_stimulus(client: GenesisClient) -> bool:
     except Exception:  # noqa: BLE001 — absent channel, any cause
         sig = None
     if sig is not None and sig.samples_ok:
+        # The signature reports the current level of a continuous
+        # channel — hold it, don't integrate it. The same band can
+        # appear twice (throughput and jitter lines); combine into
+        # one held level per band so the reading is the sum, not
+        # whichever line wrote last.
+        levels: dict[BrainWave, float] = {}
         for band, strength in _signature_stimulus(sig):
-            add_stimulus(band, strength)
+            levels[band] = levels.get(band, 0.0) + strength
+        for band, level in levels.items():
+            hold_stimulus(band, level)
         _apply_evoked_resets(sig)
         _apply_phase_lock(sig, client)
         applied = True

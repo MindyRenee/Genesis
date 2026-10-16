@@ -1619,6 +1619,12 @@ class SourceRegistry:
         self._github = GitHubSource()
         self._force_offline = force_offline
         self._last_query_offline = force_offline
+        # Remote hold — a closed-book state, not a connectivity
+        # reading. While held, remote tiers (Wikipedia, DuckDuckGo)
+        # are skipped but is_offline stays honest: she still feels
+        # connected, the book is just closed. Used by game-mode
+        # competition so nothing is fetched mid-run.
+        self._remote_held = False
 
         # ── Proactive offline detection state ──────────────────
         # _offline_until: timestamp until which we consider ourselves
@@ -1674,7 +1680,7 @@ class SourceRegistry:
                 if self._cache:
                     self._cache.put(wn_result, topic)
 
-        if not self._force_offline and not self.is_offline:
+        if not self._force_offline and not self._remote_held and not self.is_offline:
             # 1. Wikipedia API — primary online source (structured content,
             #    broad coverage, no API key required)
             if len(results) < max_results and WIKIPEDIA_ENABLED:

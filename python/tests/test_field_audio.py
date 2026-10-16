@@ -39,8 +39,8 @@ def test_absent_device_injects_nothing(monkeypatch) -> None:
     seen = []
     monkeypatch.setattr(
         brain_waves,
-        "add_stimulus",
-        lambda b, s, decay=0.95: seen.append((b, s)),
+        "hold_stimulus",
+        lambda b, s: seen.append((b, s)),
     )
     assert field_audio.apply_audio_stimulus() is False
     assert seen == []
@@ -58,8 +58,8 @@ def test_unwarmed_listener_injects_nothing(monkeypatch) -> None:
     seen = []
     monkeypatch.setattr(
         brain_waves,
-        "add_stimulus",
-        lambda b, s, decay=0.95: seen.append((b, s)),
+        "hold_stimulus",
+        lambda b, s: seen.append((b, s)),
     )
     assert field_audio.apply_audio_stimulus() is False
     assert seen == []
@@ -82,8 +82,8 @@ def test_live_signature_stimulates_gamma(monkeypatch) -> None:
     seen = []
     monkeypatch.setattr(
         brain_waves,
-        "add_stimulus",
-        lambda b, s, decay=0.95: seen.append((b, s)),
+        "hold_stimulus",
+        lambda b, s: seen.append((b, s)),
     )
     assert field_audio.apply_audio_stimulus() is True
     assert seen == [(BrainWave.GAMMA, pytest.approx(0.16))]

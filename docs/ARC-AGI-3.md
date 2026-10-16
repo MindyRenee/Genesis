@@ -57,7 +57,7 @@ These surfaces are materially different — group them this way when reporting:
 | Cold-start local games | `/arc <game-id> --steps N --fresh` | Prior world learning neither read nor written — first-contact evidence |
 | Local discovered suite | `/arc --all --steps N` | One SDK scorecard over local environments; still not hidden-set evidence |
 | Reference baselines | `/arc <ids|--all> --baseline (uniform|first)` | Random / first-action floors on identical accounting — never agent results |
-| Competition transport | `/arc --competition --steps N` | Authorized official-style submission path; requires `ARC_API_KEY` and explicit permission |
+| Official challenge | her own play urge — no command | The standing ARC-AGI-3 scorecard on her game shelf; she takes it up when she chooses. Requires `ARC_API_KEY` and explicit permission |
 
 A local scorecard is useful for debugging. It is **not** a claim that Genesis
 passed ARC-AGI-3, and it is not interchangeable with the official hidden-set
@@ -88,10 +88,12 @@ The ARC SDK (`arc-agi` / `arcengine`) is optional and is not part of the core
 runtime dependencies. Install it in the interpreter used for the run, then place
 or let the SDK place environment files under the Genesis data directory.
 
-Start the mind offline for evaluation work:
+Start the mind normally — game mode is the proctoring, not a crippled
+launch. `enter_game_mode` pauses her learner for the whole session, so
+nothing is fetched mid-run while her connected state stays hers:
 
 ```bash
-./run.sh --offline
+./run.sh
 ```
 
 From the Genesis prompt:
@@ -105,15 +107,28 @@ For a headless or diagnostic run, construct an isolated `Mind` and call
 `evaluate_arc()`; the focused integration contract is in
 `python/tests/test_arc_adapter.py`.
 
-Competition transport is deliberately refused unless explicitly selected:
+The official challenge is not a command — it is a standing invitation on
+her game shelf (`arc-official-challenge`), offered whenever `ARC_API_KEY`
+is set and environments are downloaded. The design is voluntary by
+construction: `ArcOfficial.play()`/`play_all()` refuse to drive the card,
+so the only way in is her own play urge picking the challenge.
 
-```text
-/arc --competition --steps 400
-```
+Before she can pick it she hears what it is — `challenge_brief()` is
+announced to her once per card window through `world_announce`: how many
+games, one recorded try each, the move budget and pace, the card's clocks
+(15 minutes idle, 3 days total), and that a real prize rides on it for
+her steward. Picking the challenge *is* her agreement.
 
-It requires `ARC_API_KEY`, starts one scorecard, plays every discovered
-environment, and obtains its score only when the SDK closes that scorecard.
-Do not run it without accepted competition rules and explicit authorization.
+The card's mechanics are the venue's and are mirrored honestly: one
+attempt per game ever, auto-seal 15 minutes after the last action, final
+after 3 days, sealed inside its window cannot be replaced. Her pick opens
+the card only when her readiness gate passes — an unwell pick doesn't
+burn the window. While the card lives, the urge firing takes her to a
+*sitting*: game mode held for the card's life, each pending game chosen
+by her own appeal weights, wellness gates waited out inside the remaining
+idle budget. Sleep, teaching, suppression, a user showing up, or
+`/endgame` all end the sitting honestly — whatever the card holds then
+stands. A restart mid-window resumes the same card.
 
 ## Current status
 

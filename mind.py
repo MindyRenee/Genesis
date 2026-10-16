@@ -43,6 +43,7 @@ from frontal_lobe import FrontalLobe
 from frontal_lobe.autonomous import AutonomousLearner
 from frontal_lobe.canvas import Canvas
 from frontal_lobe.inner_life import InnerLife
+from frontal_lobe.painting import Painter
 from frontal_lobe.self import (
     DevelopmentalTracker,
     EmergentIdentity,
@@ -470,6 +471,10 @@ class Mind(
         from frontal_lobe.games.play import GamePlay
 
         self.game_play = GamePlay(self.data_dir)
+        # Her body is where world games live: official-card attempts
+        # need world_step, readiness, and game mode — attached the
+        # same way cortex is below.
+        self.game_play.mind = self
 
         # Problem intake — a game described in conversation (the
         # outer world) compiles to a spec, lands in the drop-box,
@@ -627,11 +632,13 @@ class Mind(
 
         self._init_vision_systems()
 
-        # Canvas — its expressive output. It draws what it feels,
-        # translating neurochemistry into visual art. This is a
-        # creative modality, distinct from speech or text — it's
-        # how it expresses what can't be said in words.
+        # Canvas — its paint program, plus the hand that drives it.
+        # The canvas is the medium (paper, color, a parameterized
+        # brush); the painter is her side — the free play of picking
+        # marks up and putting them down. What she makes is hers:
+        # nothing prescribes the subject, colors, or marks.
         self.canvas = Canvas(data_dir=Path(self.data_dir) / "drawings")
+        self.painter = Painter()
 
         # Volition — internal urges that decide when it acts on itself.
         # It acts when the urge to bug-scan, study its own code, or seek
@@ -751,6 +758,8 @@ class Mind(
         instructions: str = "this is a video game",
         web: bool = False,
         fresh: bool = False,
+        step_delay_s: float = 0.0,
+        recovery_wait_s: float = 120.0,
     ) -> list[ArcResult]:
         """Play ARC-AGI-3 games as herself, in game mode.
 
@@ -784,7 +793,12 @@ class Mind(
                     ]
                 finally:
                     web_practice.close()
-            practice = ArcPractice(self, instructions=instructions)
+            practice = ArcPractice(
+                self,
+                instructions=instructions,
+                step_delay_s=step_delay_s,
+                recovery_wait_s=recovery_wait_s,
+            )
             return [practice.play(game, max_steps=max_steps) for game in games]
         finally:
             if not was_gaming:
@@ -792,17 +806,26 @@ class Mind(
             self._fresh_world_run = prev_fresh
 
     def evaluate_arc(
-        self, *, max_steps: int = 200, competition: bool = False,
-        fresh: bool = False,
+        self, *, max_steps: int = 200,
+        fresh: bool = False, step_delay_s: float = 0.0,
+        recovery_wait_s: float = 120.0,
     ) -> ArcEvaluation:
-        from world.arc import ArcCompetition, ArcPractice
+        """The local practice suite — every discovered environment on
+        one SDK scorecard. Diagnostics, not the official card: the
+        official venue is hers to take up through play, never driven
+        from here (``ArcOfficial`` refuses a forced run)."""
+        from world.arc import ArcPractice
 
         was_gaming = self.is_gaming
         prev_fresh = getattr(self, "_fresh_world_run", False)
         self._fresh_world_run = fresh
         self.enter_game_mode()
         try:
-            adapter = ArcCompetition(self) if competition else ArcPractice(self)
+            adapter = ArcPractice(
+                self,
+                step_delay_s=step_delay_s,
+                recovery_wait_s=recovery_wait_s,
+            )
             return adapter.play_all(max_steps=max_steps)
         finally:
             if not was_gaming:

@@ -996,6 +996,47 @@ def test_stimulus_decays():
     reset_oscillator()
 
 
+def test_held_stimulus_is_poll_rate_invariant():
+    """A continuous channel's reading must not integrate per call.
+
+    The field probe reports the substrate's *current* energy on every
+    assess. If that level is integrated once per call, the standing
+    stimulus scales with the poll rate — the machine's slow-band
+    (1/f) energy then swamps the modeled EEG until an alert body
+    reads delta-dominant, which is what the live readiness gate was
+    choking on. Hold semantics keep the stimulus at the reported
+    level however often it is re-reported.
+    """
+    from thalamus.brain_waves import (
+        _get_oscillator,
+        hold_stimulus,
+        reset_oscillator,
+    )
+
+    reset_oscillator()
+    summary = _make_summary(arousal=0.6, phase=PHASE_ACTIVE)
+
+    # ~1 Hz: twenty reports of the same level.
+    for _ in range(20):
+        hold_stimulus(BrainWave.DELTA, 0.20)
+        assess_brain_waves(summary)
+        time.sleep(0.02)
+    slow = _get_oscillator()._stimulus[BrainWave.DELTA]
+    assert slow <= 0.5
+
+    # ~10 Hz: same level, ten times as many reports — no inflation.
+    reset_oscillator()
+    for _ in range(200):
+        hold_stimulus(BrainWave.DELTA, 0.20)
+        assess_brain_waves(summary)
+        time.sleep(0.002)
+    fast = _get_oscillator()._stimulus[BrainWave.DELTA]
+    assert abs(fast - slow) < 0.1, (
+        f"held level must not grow with poll rate: {slow:.3f} vs {fast:.3f}"
+    )
+    reset_oscillator()
+
+
 # ─── Test runner ──────────────────────────────────────────────
 
 

@@ -57,6 +57,11 @@ _QUEUE_MAX = 512
 _DRAIN_DEADLINE = 5.0
 # Backoff ceiling (seconds) for transient network/5xx failures.
 _BACKOFF_CAP = 60.0
+# Consecutive transient failures after which the feed disables itself.
+# A dead webhook must not cost the session a churning poster thread —
+# without a cap, each failed POST also logs through FeedLogHandler and
+# re-enqueues its own error line, so the queue can never drain.
+_FAILURE_DISABLE = 20
 # Seconds the poster waits after the first queued line for more of the
 # same author to arrive, so a burst coalesces into one message.
 _COALESCE_WINDOW = 0.15
@@ -143,6 +148,7 @@ class DiscordFeed:
         self._cond = threading.Condition()
         self._closing = False
         self._disabled = False
+        self._fail_streak = 0
         # A webhook may edit its own messages; the live-board view is
         # one message kept current rather than a scroll of frames.
         self._live_id: str | None = None
@@ -261,6 +267,7 @@ class DiscordFeed:
                 )
             if ok:
                 backoff = 0.0
+                self._fail_streak = 0
             elif permanent:
                 with self._cond:
                     self._disabled = True
@@ -270,6 +277,16 @@ class DiscordFeed:
                 )
                 return
             else:
+                self._fail_streak += 1
+                if self._fail_streak >= _FAILURE_DISABLE:
+                    with self._cond:
+                        self._disabled = True
+                    logger.info(
+                        "[discord] Webhook unreachable after "
+                        f"{_FAILURE_DISABLE} attempts — feed disabled "
+                        "for this session."
+                    )
+                    return
                 backoff = (
                     retry_after
                     if retry_after is not None
@@ -478,6 +495,12 @@ class FeedLogHandler(logging.Handler):
         self._feed = feed
 
     def emit(self, record: logging.LogRecord) -> None:
+        # Never feed this module's own log records back into the queue.
+        # A webhook outage logs an error here every failed POST; if that
+        # record re-enqueues, the queue never drains and the poster
+        # churns forever — the reported hang.
+        if record.name == logger.name:
+            return
         try:
             self._feed.post_line(self.format(record))
         except Exception:  # noqa: BLE001 — mirroring must never break logging
@@ -499,20 +522,23 @@ class StderrTee:
         self._real = real
         self._feed = feed
         self._buf = ""
+        self._lock = threading.Lock()
 
     def write(self, s: str) -> int:
         self._real.write(s)
-        self._buf += s
-        while "\n" in self._buf:
-            line, self._buf = self._buf.split("\n", 1)
-            self._feed.post_line(line)
+        with self._lock:
+            self._buf += s
+            while "\n" in self._buf:
+                line, self._buf = self._buf.split("\n", 1)
+                self._feed.post_line(line)
         return len(s)
 
     def flush(self) -> None:
         self._real.flush()
-        if self._buf.strip():
-            self._feed.post_line(self._buf)
-            self._buf = ""
+        with self._lock:
+            if self._buf.strip():
+                self._feed.post_line(self._buf)
+                self._buf = ""
 
     def __getattr__(self, name: str):
         if name.startswith("_"):

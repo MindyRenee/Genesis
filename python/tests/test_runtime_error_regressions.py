@@ -115,6 +115,105 @@ def test_identity_curiosity_source_actually_produces_observations() -> None:
     )
 
 
+def test_curiosity_shared_state_is_thread_safe() -> None:
+    """'deque mutated during iteration' crashed her inner-life cycle.
+
+    The Curiosity engine is shared: the inner-life thread, the
+    autonomous learner, the conversation path, and the workspace
+    broadcast all reach it concurrently. Before the lock, one thread
+    iterating `_concept_history` inside `_generate_cooccurrence_question`
+    raced another thread's append in `generate_questions`, and CPython's
+    deque mutation check raised RuntimeError mid-loop (journal,
+    2026-10-16). `to_dict` had the same exposure against
+    `_apply_habituation` (dict changed size during iteration) from the
+    autosave thread.
+
+    A large seeded history makes the combinations() scan the dominant
+    cost of each call, so a racing append is all but guaranteed to land
+    mid-iteration on an unfixed build.
+    """
+    import threading
+    import types
+
+    from frontal_lobe.reasoning import Reasoner
+    from limbic_system.curiosity import Curiosity
+    from limbic_system.emotion import EmotionalState
+    from temporal_lobe.concepts import ConceptNetwork, RelationType
+
+    net = ConceptNetwork()
+    focus_names = ["apple", "river", "stone", "cloud", "bird"]
+    for name in focus_names:
+        net.add_concept(name, confidence=0.5)
+    net.add_edge("apple", "river", RelationType.RELATED_TO, 0.1)
+    curiosity = Curiosity(net, Reasoner(net))
+
+    # Seed a wide co-occurrence history — letter-only names pass
+    # is_world_concept, and ~31k pairs per window makes the deque
+    # iteration the dominant cost, maximizing the race window.
+    big_window = {
+        f"seededconcept{chr(97 + i % 26)}{chr(97 + i // 26)}{chr(97 + i // 676)}"
+        for i in range(250)
+    }
+    curiosity._concept_history.extend([set(big_window) for _ in range(4)])
+
+    emotion = EmotionalState(
+        label="curious",
+        nuance="test",
+        cognitive_style="test",
+        alertness=0.5,
+        valence=0.3,
+        plasticity=0.9,
+        creativity=0.5,
+        caution=0.3,
+        verbosity=1.0,
+        formality=0.5,
+        openness_to_engage=0.7,
+    )
+
+    errors: list[BaseException] = []
+
+    def churn_questions() -> None:
+        try:
+            for _ in range(25):
+                curiosity.generate_questions(
+                    emotion, active_concepts=focus_names, max_questions=2
+                )
+        except BaseException as e:  # noqa: BLE001 — collect, assert below
+            errors.append(e)
+
+    def churn_snapshot() -> None:
+        try:
+            for _ in range(25):
+                curiosity.to_dict()
+        except BaseException as e:  # noqa: BLE001
+            errors.append(e)
+
+    def churn_broadcast() -> None:
+        item = types.SimpleNamespace(metadata={"topics": ["ocean", "whale"]})
+        try:
+            for _ in range(50):
+                curiosity.receive_broadcast(item)
+        except BaseException as e:  # noqa: BLE001
+            errors.append(e)
+
+    threads = [
+        threading.Thread(target=churn_questions),
+        threading.Thread(target=churn_questions),
+        threading.Thread(target=churn_snapshot),
+        threading.Thread(target=churn_broadcast),
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=60)
+
+    assert all(not t.is_alive() for t in threads), "churn threads wedged"
+    assert not errors, (
+        f"concurrent curiosity access raised {errors!r} — shared state "
+        "must be serialized"
+    )
+
+
 def test_missing_camera_is_not_tallied_as_an_error() -> None:
     """A capability probe answering "absent" must not pollute the tally.
 

@@ -1084,6 +1084,26 @@ class BrainWaveOscillator:
             self._stimulus[band] * decay + strength
         )
 
+    def hold_stimulus(self, band: BrainWave, level: float) -> None:
+        """Set the standing stimulus level for a continuous channel.
+
+        The counterpart of :meth:`add_stimulus` for channels that
+        report a *current level* each assessment — substrate energy,
+        acoustic emission — rather than discrete events. The level
+        is assigned, not integrated: re-reporting the same reading
+        holds the stimulus where it is, so the readout is
+        independent of how often callers poll. A channel that stops
+        reporting simply stops refreshing; the τ≈5 s decay in
+        :meth:`_relax_once` fades what remains.
+
+        ``add_stimulus``'s per-call leaky sum is correct for pulse
+        injections; applied to a level channel it integrates the
+        reading once per call — the standing stimulus then scales
+        with the assess rate and machine slow-band energy swamps
+        the modeled EEG (a vigilant body reading delta-dominant).
+        """
+        self._stimulus[band] = max(-0.5, min(0.5, level))
+
     def add_top_down_drive(
         self, band: BrainWave, strength: float
     ) -> None:
@@ -1698,6 +1718,17 @@ def add_stimulus(band: BrainWave, strength: float, decay: float = 0.95) -> None:
         decay: Per-tick decay factor (0-1). Higher = slower decay.
     """
     _get_oscillator().add_stimulus(band, strength, decay)
+
+
+def hold_stimulus(band: BrainWave, level: float) -> None:
+    """Hold a continuous channel's standing stimulus level.
+
+    For channels reporting a current level each assessment —
+    physical substrate energy, acoustic emission — where the
+    reading *is* the stimulus, not an event to integrate. See
+    :meth:`BrainWaveOscillator.hold_stimulus`.
+    """
+    _get_oscillator().hold_stimulus(band, level)
 
 
 def perturb_wave_phase(band: BrainWave, delta: float) -> None:

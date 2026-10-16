@@ -2761,6 +2761,55 @@ def test_calibration_babbles_the_least_measured_action():
     assert bid["source"] == "calibrate"
 
 
+def test_coordinate_action_graduates_without_noop_contexts():
+    """A click can never satisfy the refusal bar — and shouldn't.
+
+    Pointing at a cell never displaces the body, so a coordinate
+    action's action_effects record is (0,0) forever and it can never
+    collect the four distinct refusal contexts a *limb* needs before
+    "always fails" is believed. Left in the uncomprehended pool it
+    holds motor babbling open for the whole game — on m0r0 she spent
+    165 of 175 steps re-pressing ACTION5/ACTION6 instead of playing.
+    Two honest tries is comprehension of the bodily half; what the
+    pointing does is the click ledger's question, not this one's.
+    """
+    from basal_ganglia.world_policy import WorldPolicy
+
+    model = _world_with_self()
+    model.learn_action_label("press", "coordinate")
+    model.action_effects["press"] = Counter({(0, 0): 30})
+    model.action_tries["press"] = 30
+    # One stance, thirty clicks — context diversity is unreachable
+    # for an act that does not move her.
+    model.action_noop_contexts["press"] = {frozenset(_ME_CELLS)}
+    assert model.action_understood("press")
+
+    bid = WorldPolicy(model, seed=0)._bid_calibrate(["press"])
+    assert bid is None
+
+
+def test_inert_action_graduates_on_tries_when_contexts_cannot_diversify():
+    """The refusal-diversity bar cannot gate what gates the bar.
+
+    An all-noop *simple* action graduates at four distinct refusal
+    contexts — but the babble loop that would move her into new
+    contexts is the same loop this verdict holds open, so an inert
+    control freezes her on one stance and the count never grows
+    (m0r0: ACTION5 pressed 82 times, one context, still "not
+    understood"). Past a bounded number of tries the empirical answer
+    stands — inert from everywhere she has stood.
+    """
+    model = _world_with_self()
+    model.action_effects["use"] = Counter({(0, 0): 7})
+    model.action_tries["use"] = 7
+    model.action_noop_contexts["use"] = {frozenset(_ME_CELLS)}
+    assert not model.action_understood("use")
+
+    model.action_effects["use"][(0, 0)] += 1
+    model.action_tries["use"] = 8
+    assert model.action_understood("use")
+
+
 def test_unembodied_policy_cycles_actions_to_recover_self():
     """A lost body is found by balanced motor probing, not habit.
 
@@ -2903,6 +2952,224 @@ def test_world_transition_clears_policy_episode_state(tmp_path):
     assert policy._persist is None
     assert policy._retrial_entity is None
     assert not policy._reembody_tries
+
+
+def test_click_dead_entity_stops_being_informative(tmp_path):
+    """A kind that never answers the pointer stops holding it.
+
+    On a pointer world her body may never reach what she aims at,
+    so contact affordances can never retire the question — the
+    click ledger has to. Enough dead presses and the entity stops
+    being the least-understood thing on the board.
+    """
+    from mind import Mind
+
+    subject = Mind(str(tmp_path / "genesis.sock"), offline=True)
+    policy = subject._world_policy
+    dead = [(5, {(0, 0)})]
+    live = [(9, {(12, 10)})]
+    subject.observe(_scene(dead + live))
+    # Both start unprobed — the dead one wins only while its color
+    # stays a question.
+    subject.world_model.learn_action_label("6", "coordinate")
+    policy._model._last_grid = {(0, 0): 5, (12, 10): 9, (7, 7): 0}
+    assert policy._most_informative_cell() in {(0, 0), (12, 10)}
+    # Press the color-5 corner enough times with no answer — the
+    # click ledger calls it inert, and the pointer moves on.
+    subject.world_model.click_tries[("6", 5)] = 9
+    subject.world_model.click_changes[("6", 5)] = 0
+    assert policy._most_informative_cell() == (12, 10)
+
+
+def test_coordinate_bid_without_target_is_never_shipped(tmp_path):
+    """An unaimed distal act is abstention, not a malformed step.
+
+    Forage aiming a coordinate action with no cell crashed the
+    interface contract (x,y required) — the bid is dropped before
+    the competition so the run ends as NO_ACTION, not an exception.
+    """
+    from mind import Mind
+
+    subject = Mind(str(tmp_path / "genesis.sock"), offline=True)
+    policy = subject._world_policy
+    subject.observe(_scene([(_ME, set(_ME_CELLS))]))
+    policy._model._last_grid = None
+    subject.world_model.learn_action_label("6", "coordinate")
+    choice = policy.choose(["6"])
+    assert choice is None or choice.get("cell") is not None
+
+
+# ─── number sense in the world path ─────────────────────────
+
+
+def test_transition_state_carries_quantity_features():
+    """The schema layer sees counts through the number faculty.
+
+    Per-color object counts are the structure a "four same-colored
+    pieces" puzzle binds on; the magnitude buckets give a schema the
+    qualitative difference between a sparse board and a crowd —
+    subitized counts stay exact, larger ones compress.
+    """
+    model = _world_with_self()
+    state = model.transition_state()
+
+    # color-5 block + color-9 pair, plus her — two separate objects.
+    assert state["entities.live"] == 2
+    assert state["entities.live.mag"] == "pair"
+    assert state["entities.kind.5"] == 1
+    assert state["entities.kind.9"] == 1
+    assert state["self.parts.mag"] == "none"
+    assert state["entities.gone.mag"] == "none"
+
+
+def test_magnitude_buckets_compress_past_subitizing():
+    """Counts beyond four are perceived as bands, not integers."""
+    model = WorldModel()
+    others = [
+        (5, {(0, 0)}),
+        (7, {(0, 2)}),
+        (9, {(0, 4)}),
+        (11, {(0, 6)}),
+        (12, {(0, 8)}),
+        (13, {(0, 10)}),
+    ]
+    model.observe(_scene([(_ME, set(_ME_CELLS)), *others]))
+    state = model.transition_state()
+    # No self identified yet — every live thing counts, her included.
+    assert state["entities.live"] == 7
+    assert state["entities.live.mag"] == "several"
+
+
+def test_summary_speaks_counts_with_number_sense_honesty():
+    """Small counts are claimed exactly; a crowd is an estimate."""
+    model = _world_with_self()
+    assert "2 things around me" in model.summary()
+
+    crowded = WorldModel()
+    others = [(5, {(0, c)}) for c in range(0, 15, 2)]
+    crowded.observe(_scene([(_ME, set(_ME_CELLS)), *others]))
+    # No self identified — 9 perceived objects, all estimated.
+    assert "about 9 things around me" in crowded.summary()
+
+
+def test_count_others_excludes_self_and_parts():
+    """The object count is about the world, not the body."""
+    model = _world_with_self()
+    assert model.count_others() == 2
+    # Annexing the color-9 pair as a part must shrink the count.
+    for e in model.entities.values():
+        if e.color == 9:
+            e.part_of_self = True
+    assert model.count_others() == 1
+
+
+def test_blind_probe_aims_at_things_not_floor(tmp_path):
+    """A blind coordinate probe spends its question on an object.
+
+    The least-pressed *color* over the raw grid is dominated by
+    background — pressing floor teaches that empty space is inert.
+    Probing a perceived thing is the only press that can answer.
+    """
+    from mind import Mind
+
+    subject = Mind(str(tmp_path / "genesis.sock"), offline=True)
+    policy = subject._world_policy
+    obj = {(12, 10), (12, 11)}
+    subject.observe(_scene([(_ME, set(_ME_CELLS)), (9, obj)]))
+    policy._model._last_grid = {
+        (r, c): (9 if (r, c) in obj else 0)
+        for r in range(16) for c in range(16)
+    }
+    # Every probe lands on a perceived thing — either object; the
+    # one invariant is that no press is wasted on bare floor.
+    for _ in range(20):
+        cell = policy._blind_probe_cell("6")
+        assert cell in obj | _ME_CELLS
+
+
+# ─── distal action effects ──────────────────────────────────
+
+
+def test_distal_action_effects_are_learned_on_kinds():
+    """A control that moves other things is learned physics.
+
+    The press does nothing to her body — (0,0) is honest — but the
+    color-9 thing translates rigidly under it. That is a working
+    lever, not a dead button: the kind ledger records it, the
+    verdict calls the action understood without noop contexts, and
+    the schema layer sees a movable kind.
+    """
+    model = _world_with_self()
+    b = {(12, 10), (12, 11)}
+    pushed_events = []
+    for dr in (1, 2):
+        model.note_action("pull")
+        events = model.observe(
+            _scene(
+                [
+                    (_ME, set(_ME_CELLS)),
+                    (5, {(0, 0), (0, 1), (1, 0), (1, 1)}),
+                    (9, {(r + dr, c) for r, c in b}),
+                ]
+            )
+        )
+        pushed_events.extend(e for e in events if e.kind == "pushed")
+
+    assert model.entity_effects[("pull", 9)][(1, 0)] == 2
+    assert pushed_events  # at least one attributed push reported
+    assert model.distal_effects("pull")
+    # The bodily half is settled at (0,0) and the answer is distal —
+    # no noop-context diversity is owed.
+    assert model.action_understood("pull")
+    # Two kinds respond distally: color-9 under "pull", and her own
+    # color-3 — recorded during the pre-adoption presses, when her
+    # body was just another thing that moved under "up".
+    assert model.transition_state()["kinds.movable"] == 2
+    assert "pull moves the color-9 things" in model.summary()
+
+
+def test_inert_control_without_distal_answer_still_needs_contexts():
+    """A truly dead control does not launder through the distal path."""
+    model = _world_with_self()
+    for _ in range(2):
+        model.note_action("push")
+        model.observe(
+            _scene(
+                [
+                    (_ME, set(_ME_CELLS)),
+                    (5, {(0, 0), (0, 1), (1, 0), (1, 1)}),
+                    (9, {(12, 10), (12, 11)}),
+                ]
+            )
+        )
+    # Nothing moved under it — still on the context-diversity path.
+    assert not model.distal_effects("push")
+    assert not model.action_understood("push")
+
+
+def test_distal_effects_survive_learning_export():
+    """Kind-level distal physics checkpoints like affordances do."""
+    import json
+
+    model = _world_with_self()
+    b = {(12, 10), (12, 11)}
+    for dr in (1, 2):
+        model.note_action("pull")
+        model.observe(
+            _scene(
+                [
+                    (_ME, set(_ME_CELLS)),
+                    (5, {(0, 0), (0, 1), (1, 0), (1, 1)}),
+                    (9, {(r + dr, c) for r, c in b}),
+                ]
+            )
+        )
+    restored = WorldModel()
+    assert restored.import_learning(
+        json.loads(json.dumps(model.export_learning()))
+    )
+    assert restored.entity_effects[("pull", 9)][(1, 0)] == 2
+    assert restored.action_understood("pull")
 
 
 if __name__ == "__main__":
