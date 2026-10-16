@@ -91,6 +91,14 @@ _LOW_RESERVE = 0.5
 # the whole episode asking a question that has been answered.
 _REEMBODY_SAMPLE_BOUND = 8
 
+# A distal press is a question too: this many clicks on a kind
+# answered by nothing is the answer "inert" — the pointer stops
+# asking it. Without the check a click-dead entity stays
+# "least understood" forever and foraging fixates on the one
+# target its probing can never teach it about.
+_CLICK_SATIETY = 8
+_CLICK_DEAD = 0.05
+
 
 class WorldPolicy:
     """Selects actions from the environment's per-step whitelist."""
@@ -236,6 +244,17 @@ class WorldPolicy:
                 self._bid_forage(available),
             )
             if b is not None
+        ]
+        # An unaimed distal act is a malformed pick, not an offer:
+        # a coordinate bid without a cell can only crash the
+        # interface contract downstream. Drop it before the
+        # competition; if nothing else bid, abstention is the
+        # honest answer.
+        bids = [
+            b
+            for b in bids
+            if b["action"] not in self._model.coordinate_actions
+            or b.get("cell") is not None
         ]
         if not bids:
             return None
@@ -774,12 +793,56 @@ class WorldPolicy:
         action = self._explore_action(
             self._model.self_entity, available
         )
+        cell = self._cell_for(action)
+        if cell is None and action in self._model.coordinate_actions:
+            cell = self._blind_probe_cell(action)
         return {
             "action": action,
-            "cell": self._cell_for(action),
+            "cell": cell,
             "source": "forage",
             "weight": 0.25,
         }
+
+    def _blind_probe_cell(self, action: str) -> Cell | None:
+        """Somewhere to point when nothing is worth pointing at.
+
+        Foraging with no informative entity still has a question a
+        pointer can ask: what does pressing *there* do. Aim at the
+        kind this control has pressed least — the click ledger grows
+        either way, so a dead color cedes the board to a live one.
+        ``None`` when the seen world is empty: with nothing on the
+        board there is nowhere honest to aim.
+        """
+        grid = self._model._last_grid
+        if not grid:
+            return None
+        # Prefer aiming at perceived things over raw colors: floor
+        # and background are colors too, and pressing them only
+        # teaches that *empty space* is inert — a dead answer the
+        # click ledger records as knowledge about a kind. A blind
+        # probe is still a probe; spend it on objects.
+        entity_cells = {
+            cell
+            for e in self._model.entities.values()
+            if not e.gone
+            and not e.is_self
+            and not e.part_of_self
+            and e.color not in self._model.terrain_kinds
+            and not self._model.is_display(e)
+            for cell in e.cells
+            if cell in grid
+        }
+        pool = {cell: grid[cell] for cell in entity_cells} or grid
+        least = min(
+            self._model.click_tries.get((action, color), 0)
+            for color in pool.values()
+        )
+        cells = [
+            cell
+            for cell, color in pool.items()
+            if self._model.click_tries.get((action, color), 0) == least
+        ]
+        return self._rng.choice(cells)
 
     def _cell_for(self, action: str) -> Cell | None:
         """Coordinate-typed actions need a target; simple ones don't.
@@ -1361,9 +1424,13 @@ class WorldPolicy:
                         if n in model.known_free and model.visits[n] == 0
                     )
                     frontier = min(1.0, unseen / len(dest_cells))
+            # A control the world has answered distally — presses
+            # that move things, select pieces — is a working lever,
+            # worth more than an equally-novel dead button.
             score = (
                 novelty + frontier + 1.0 / (1 + tries)
                 + self._rng.random() * 0.1
+                + (0.3 if model.distal_effects(action) else 0.0)
             )
             if self._field is not None:
                 # The action disposition the motor field carries —
@@ -1380,16 +1447,37 @@ class WorldPolicy:
         """A cell worth pointing at: the least-understood entity."""
         best: WorldEntity | None = None
         least = float("inf")
-        for entity in self._model.entities.values():
+        model = self._model
+        for entity in model.entities.values():
             if (
                 entity.gone
-                or entity.color in self._model.terrain_kinds
-                or self._model.is_display(entity)
+                or entity.color in model.terrain_kinds
+                or model.is_display(entity)
             ):
                 continue
-            known = sum(self._model.affordance_of(entity.color).values())
+            # Distal presses are evidence too. A kind that has
+            # answered enough clicks with nothing is understood
+            # inert, not least understood — contact affordances
+            # alone can never retire a thing her body may never
+            # reach, and without this the pointer fixates on the
+            # one target its probing cannot teach it about.
+            if (
+                self._click_tries(entity.color) >= _CLICK_SATIETY
+                and model.click_responsiveness(entity.color)
+                <= _CLICK_DEAD
+            ):
+                continue
+            known = sum(model.affordance_of(entity.color).values())
             if known < least:
                 best, least = entity, known
         if best is None:
             return None
         return (round(best.centroid[0]), round(best.centroid[1]))
+
+    def _click_tries(self, color: int | None) -> int:
+        """All the presses this kind has absorbed, across controls."""
+        return sum(
+            n
+            for (_action, c), n in self._model.click_tries.items()
+            if c == color
+        )

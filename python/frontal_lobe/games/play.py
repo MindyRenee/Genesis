@@ -202,6 +202,17 @@ _FAMILIES = (
 # launch helpers, not games themselves.
 _SYSTEM_GAME_DIRS = ("/usr/games", "/usr/local/games")
 
+# The official ARC-AGI-3 challenge. Not a pile of game entries — one
+# standing invitation on her shelf. The card behind it is the venue's:
+# it opens once per window, gives every game a single recorded try,
+# and closes fifteen minutes after her last move or three days after
+# opening. Taking the challenge is the choice; once she's in, the
+# sitting plays the card out.
+_ARC_OFFICIAL_FAMILY = "arc_official"
+_ARC_OFFICIAL_CARD = "official_card.json"
+_ARC_OFFICIAL_ENVS = "environment_files"
+_ARC_CHALLENGE = "arc-official-challenge"
+
 # What she was *told* about specific system games — the briefing a
 # person gives a new player: what the game is, the point of it, and
 # where the important things live on screen. This is instruction,
@@ -928,6 +939,9 @@ class GamePlay:
     # -inf = never played one, so the first session isn't gated by a
     # clock that started at boot.
     _system_last_end: float = float("-inf")
+    # The card-window key the stakes brief was last announced for —
+    # she hears what the challenge is once per window, not every firing.
+    _arc_briefed: str | None = None
 
     def __post_init__(self) -> None:
         self._progress_path = Path(self.data_dir) / _PROGRESS_FILE
@@ -1093,9 +1107,136 @@ class GamePlay:
         """
         return [
             *self.offered_games(),
+            *self._arc_official_games(),
             *COLLECTION,
             *self._system_games(),
         ]
+
+    def arc_challenge(self) -> dict | None:
+        """The official challenge's standing on her shelf, or None.
+
+        One standing invitation, not a pile of game entries: the card
+        is the venue's — it opens once, gives every game a single
+        recorded try, and closes on its own clock — so what she picks
+        is *the challenge itself*. Game-level choices happen inside
+        the sitting, when each one is actually in front of her.
+
+        A live card keeps the challenge on the shelf as the open
+        commitment it is; a card closed inside its window leaves the
+        shelf empty (it cannot be replaced); no card at all means the
+        downloaded environment list stands in for it — taking the
+        challenge then is what opens the card.
+        """
+        if not os.getenv("ARC_API_KEY", "").strip():
+            return None
+        arc_dir = Path(self.data_dir) / "arc"
+        try:
+            card = json.loads(
+                (arc_dir / _ARC_OFFICIAL_CARD).read_text()
+            )
+        except (OSError, ValueError):
+            card = None
+        now = time.time()
+        if isinstance(card, dict) and now < card.get("expires_at", 0):
+            if card.get("closed"):
+                return None
+            pending = [
+                g for g in card.get("games", [])
+                if g.get("status") == "pending"
+            ]
+            if not pending:
+                return None
+            try:
+                from world.arc import ArcOfficial
+
+                idle_limit = ArcOfficial.IDLE_LIMIT_S
+            except ImportError:
+                idle_limit = 900.0
+            # How far into the idle window the card already is — the
+            # deadline pressure the appeal of the open commitment
+            # scales with.
+            idle_used = max(
+                0.0,
+                min(1.0, (now - card.get("last_action_at", now)) / idle_limit),
+            )
+            return {
+                "key": card["scorecard_id"],
+                "card": card,
+                "pending": pending,
+                "n_games": len(card["games"]),
+                "live": True,
+                "idle_pressure": idle_used,
+            }
+        # No live card. The dedup key still distinguishes windows:
+        # an expired card's window id is its expiry, an absent card's
+        # is none.
+        key = (
+            f"pre:{card['expires_at']}"
+            if isinstance(card, dict)
+            else "pre:none"
+        )
+        try:
+            env_dir = arc_dir / _ARC_OFFICIAL_ENVS
+            ids = sorted(
+                d.name
+                for d in env_dir.iterdir()
+                if d.is_dir()
+                and any(d.glob("*/metadata.json"))
+            )
+        except OSError:
+            return None
+        if not ids:
+            return None
+        return {
+            "key": key,
+            "card": card if isinstance(card, dict) else None,
+            "pending_ids": ids,
+            "n_games": len(ids),
+            "live": False,
+            "idle_pressure": 0.0,
+        }
+
+    def _arc_official_games(self) -> list[dict]:
+        """The official ARC-AGI-3 challenge — one entry, when offered."""
+        ch = self.arc_challenge()
+        if ch is None:
+            return []
+        return [{
+            "name": _ARC_CHALLENGE,
+            "family": _ARC_OFFICIAL_FAMILY,
+            "hint": (
+                "The official ARC-AGI-3 challenge — one recorded try "
+                "per game, on a card with its own clock."
+            ),
+            # What she was told the point of it is — her settling-in
+            # moment composes the words from this.
+            "goal": "win the games — a real prize, for her steward",
+            "live": ch["live"],
+            "idle_pressure": ch["idle_pressure"],
+        }]
+
+    def arc_brief_due(self) -> str | None:
+        """The challenge's stakes, owed to her once per card window.
+
+        She can't choose what she doesn't know: before a pick that
+        could take the challenge she hears what it is — how many
+        games, the move budget and pace, the card's clock, and what
+        winning is for. Announced once per card or window — after
+        that the knowledge is hers (the announce grounds it into her
+        concept network), not something repeated at her.
+        """
+        ch = self.arc_challenge()
+        if ch is None or ch["key"] == self._arc_briefed:
+            return None
+        self._arc_briefed = ch["key"]
+        try:
+            from world.arc import challenge_brief
+        except ImportError:
+            return None
+        pending = len(ch["pending"]) if ch.get("pending") else None
+        return challenge_brief(
+            ch["n_games"], pending=pending if ch["live"] else None
+        )
 
     def _system_games(self) -> list[dict]:
         """The games installed on her computer — always playable.
@@ -1146,6 +1287,14 @@ class GamePlay:
         she sets it aside rather than grinding into frustration.
         """
         name = str(game["name"])
+        if (
+            game.get("family") == _ARC_OFFICIAL_FAMILY
+            and game.get("live")
+        ):
+            # An open card is a commitment on a clock — its pull rises
+            # as the idle window runs down, the way a deadline sharpens
+            # an unfinished task.
+            return 2.5 + 2.0 * float(game.get("idle_pressure", 0.0))
         mastery = self.mastery.get(name, 0.0)
         attempts = self.attempts.get(name, 0)
         if mastery >= 1.0:
@@ -1233,6 +1382,8 @@ class GamePlay:
             return self._attempt_system(
                 task, on_step=on_step, should_stop=should_stop
             )
+        if family == _ARC_OFFICIAL_FAMILY:
+            return self._attempt_arc(task)
 
         name = str(task["name"])
         tests = [i for i, _ in task["test"]]
@@ -1296,6 +1447,184 @@ class GamePlay:
             total_attempts=self.attempts[name],
             failure=failure,
         )
+
+    def _attempt_arc(self, task: dict) -> GameAttempt | None:
+        """The sitting — she takes up the official challenge and plays the card out.
+
+        One urge firing brings her here; everything after is the
+        sitting itself. If no card lives yet, the pick opens it — the
+        commitment is hers, but the venue's clocks start with the open,
+        so an unwell pick doesn't open it (the challenge simply stays
+        on the shelf for when she's ready). Inside the sitting she
+        picks each pending game herself and ``attempt()`` burns it for
+        real. Returns None when nothing was played.
+        """
+        mind = getattr(self, "mind", None)
+        if mind is None:
+            return None
+        from world.arc import ArcOfficial
+
+        arc_dir = Path(self.data_dir) / "arc"
+        card_path = arc_dir / _ARC_OFFICIAL_CARD
+        try:
+            card = json.loads(card_path.read_text())
+        except (OSError, ValueError):
+            card = None
+        now = time.time()
+        live = (
+            isinstance(card, dict)
+            and not card.get("closed")
+            and now < card.get("expires_at", 0)
+            and now - card.get("last_action_at", 0) < ArcOfficial.IDLE_LIMIT_S
+        )
+        if not live:
+            # Opening is the commitment — the idle clock starts with
+            # it, so the card only opens when she's fit to feed it.
+            try:
+                if not mind.readiness().ok:
+                    return None
+            except Exception:  # noqa: BLE001 — an unreachable gate is "not ready"
+                return None
+        was_gaming = getattr(mind, "is_gaming", False)
+        if not was_gaming:
+            # Game mode for the whole sitting: engagement pins her
+            # attention on the card so the venue's idle clock never
+            # outruns a wandering urge — she stays at the arcade until
+            # the card is done or sealed.
+            mind.enter_game_mode()
+        try:
+            adapter = ArcOfficial(
+                mind,
+                card_path=card_path,
+                environments_dir=arc_dir / _ARC_OFFICIAL_ENVS,
+                recordings_dir=arc_dir / "recordings",
+                instructions="this is a video game",
+                step_delay_s=1.0,
+            )
+            try:
+                adapter.open_or_resume()
+            except RuntimeError:
+                return None  # sealed inside its window — nothing to play
+            interaction_mark = getattr(mind, "_last_interaction_time", 0.0)
+            return self._play_card(adapter, task, interaction_mark)
+        finally:
+            if not was_gaming:
+                mind.exit_game_mode()
+
+    def _play_card(
+        self, adapter: Any, task: dict, interaction_mark: float = 0.0
+    ) -> GameAttempt | None:
+        """One sitting at the card — she stays until it's done or she walks away.
+
+        The card's clock, not her urge, bounds the sitting: between
+        games she picks what draws her next; an unwell gate waits
+        inside the idle budget rather than burning the game; leaving
+        game mode, sleeping, or being suppressed all end the sitting
+        honestly — whatever the card holds then is the result.
+        """
+        mind = getattr(self, "mind", None)
+        name = str(task["name"])
+        played: list[Any] = []
+        foreground = getattr(mind, "_foreground_active", None)
+        while True:
+            if mind is not None and (
+                getattr(mind, "_is_sleeping", False)
+                or getattr(mind, "_is_meditating", False)
+                or getattr(mind, "_is_teaching", False)
+                or getattr(mind, "_suppress_volition", False)
+                or not getattr(mind, "is_gaming", True)
+                or (foreground is not None and foreground.is_set())
+                or getattr(mind, "_last_interaction_time", 0.0) > interaction_mark
+            ):
+                break  # she left the arcade — the card decides what's left
+            card = adapter.card_state()
+            if card is None or card.get("closed"):
+                break
+            now = time.time()
+            if now >= card.get("expires_at", 0):
+                # Her noticing is what seals it — the same bookkeeping
+                # an attempt would have found.
+                adapter.attempt_next()
+                break
+            idle_left = adapter.IDLE_LIMIT_S - (
+                now - card.get("last_action_at", 0)
+            )
+            if idle_left <= 0:
+                adapter.attempt_next()
+                break
+            pending = [
+                g for g in card.get("games", [])
+                if g.get("status") == "pending"
+            ]
+            if not pending:
+                adapter.attempt_next()  # nothing to enter — seals it complete
+                break
+            result = adapter.attempt(str(self._pick_pending(pending)["game_id"]))
+            if result is None:
+                break  # the card closed under the sitting
+            if result.state == "UNWELL":
+                # She never entered — nothing was burned. Wait inside
+                # the remaining idle budget for her to settle; if it
+                # runs out, the card seals as it stands.
+                if idle_left <= 30.0:
+                    break
+                time.sleep(min(30.0, max(0.0, idle_left - 5.0)))
+                continue
+            played.append(result)
+            self._record_arc_result(result)
+        if not played:
+            return None
+        wins = sum(1 for r in played if r.state == "WIN")
+        score = sum(
+            r.levels_completed / r.win_levels if r.win_levels else 0.0
+            for r in played
+        ) / len(played)
+        self.attempts[name] = self.attempts.get(name, 0) + 1
+        self.mastery[name] = max(self.mastery.get(name, 0.0), score)
+        self._save()
+        card = adapter.card_state() or {}
+        return GameAttempt(
+            task=name,
+            hint=str(task.get("hint", "")),
+            score=score,
+            best=self.mastery[name],
+            solved=bool(played) and wins == len(played),
+            mastered=bool(played) and wins == len(played),
+            rule="none",
+            nodes=sum(r.steps for r in played),
+            total_attempts=self.attempts[name],
+            failure="" if wins == len(played) else played[-1].state.lower(),
+            family=_ARC_OFFICIAL_FAMILY,
+            details={
+                "scorecard_id": card.get("scorecard_id"),
+                "games": len(played),
+                "won": wins,
+                "card_closed": bool(card.get("closed")),
+                "card_reason": card.get("close_reason"),
+            },
+        )
+
+    def _pick_pending(self, pending: list[dict]) -> dict:
+        """Which pending card game she reaches for next — appeal over
+        the card's own list. Her history with a game (a prior window's
+        mastery or shelfings) still weighs in."""
+        weights = [
+            self._appeal({"name": f"arcagi-{g['game_id']}"})
+            for g in pending
+        ]
+        return random.choices(pending, weights=weights, k=1)[0]
+
+    def _record_arc_result(self, result: Any) -> None:
+        """Book a card attempt under the game's own name — one try, kept."""
+        name = f"arcagi-{result.game_id}"
+        score = (
+            result.levels_completed / result.win_levels
+            if result.win_levels
+            else 0.0
+        )
+        self.attempts[name] = self.attempts.get(name, 0) + 1
+        self.mastery[name] = max(self.mastery.get(name, 0.0), score)
+        self._save()
 
     def _record_miss(
         self, name: str, sol: Any, reasoner: SpatialReasoner

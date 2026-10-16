@@ -153,7 +153,7 @@ def apply_audio_stimulus() -> bool:
     """
     from thalamus.brain_waves import (
         BrainWave,
-        add_stimulus,
+        hold_stimulus,
         reset_wave_phase,
     )
 
@@ -163,7 +163,7 @@ def apply_audio_stimulus() -> bool:
     sig = listener.signature()
     if sig is None:
         return False
-    add_stimulus(
+    hold_stimulus(
         BrainWave.GAMMA,
         min(0.3, sig["emission_rel"] * _EMISSION_STIMULUS),
     )

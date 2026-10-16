@@ -154,9 +154,9 @@ def test_live_signature_applies_stimulus() -> None:
 
     brain_waves.reset_oscillator()
     seen: list[tuple[BrainWave, float]] = []
-    orig = brain_waves.add_stimulus
-    brain_waves.add_stimulus = lambda band, strength, decay=0.95: seen.append(
-        (band, strength)
+    orig = brain_waves.hold_stimulus
+    brain_waves.hold_stimulus = lambda band, level: seen.append(
+        (band, level)
     )
     try:
         t = [0.0] * 10
@@ -169,7 +169,7 @@ def test_live_signature_applies_stimulus() -> None:
             (b, pytest.approx(s)) for b, s in seen
         ]
     finally:
-        brain_waves.add_stimulus = orig
+        brain_waves.hold_stimulus = orig
         brain_waves.reset_oscillator()
 
 

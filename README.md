@@ -184,8 +184,8 @@ Each result also discloses how much experience it carried in
 random and first-action floors through the same loop, and
 `/arc --fresh` runs a cold start with prior learning suppressed.
 
-Local `/arc` runs are diagnostics; an authorized competition run is a separate
-transport and evidence standard. See
+Local `/arc` runs are diagnostics; the official scorecard is a separate
+transport and evidence standard, reached only by her own play urge. See
 [docs/ARC-AGI-3.md](docs/ARC-AGI-3.md) before interpreting any score.
 
 ## Architecture

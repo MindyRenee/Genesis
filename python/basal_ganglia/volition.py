@@ -15,7 +15,7 @@ from brainstem.thresholds import (
     WAKE_RESCUE_MELATONIN,
     WAKE_STABILIZATION_WINDOW,
 )
-from frontal_lobe.canvas import DrawingResult, NeurochemistryInput
+from frontal_lobe.canvas import DrawingResult
 from frontal_lobe.tools.project_creator import create_project, manage_project_lifecycle
 from frontal_lobe.volition import Urge, Volition
 
@@ -29,14 +29,6 @@ logger = logging.getLogger(__name__)
 # running bug scan or code-learning burst must lose every scheduler
 # handoff to a live think(), not coin-flip it for the core.
 _VOLITION_NICE = 10
-
-# Cortisol's reachable envelope: the Rust substrate's effective
-# cortisol equilibrates near ~0.08 under full HPA drive (resting
-# ~0.02, stress-phase gate 0.06, hard clamp 0.80 is never reached),
-# so palette consumers see "fraction of the physiological stress
-# range" rather than a raw level pinned near zero.
-CORTISOL_PALETTE_RANGE = 0.08
-
 
 def _lower_thread_priority(nice: int = _VOLITION_NICE) -> None:
     """Drop the calling thread's CPU priority (Linux per-thread nice).
@@ -568,11 +560,12 @@ class VolitionMixin:
     def _compose_drawing_description(self, result) -> str:
         """Compose a description of a drawing from its own understanding.
 
-        Tries to compose from the specific techniques it used (e.g.
-        "sacred geometry", "mandala") — these are the concepts that
-        drove the drawing, so they're what it should articulate.
-        Falls back to generic art concepts ("drawing", "art", "color",
-        "expression") if the technique concepts aren't in its network.
+        Tries to compose from the implements she reached for (the
+        labels she gave her brushes — "pencil", "spray", whatever she
+        called them) and the colors she used, since those are what
+        her choices were made of. Falls back to generic art concepts
+        ("drawing", "art", "color", "expression") if those names
+        aren't in its network.
 
         The file path is metadata, not something it says — it
         describes its art from its own understanding, not from a
@@ -580,24 +573,19 @@ class VolitionMixin:
         """
         try:
             emotion = self.feel()
-            # Convert technique names to concept names (e.g.
-            # "sacred_geometry" → "sacred geometry") and try to
-            # compose from the techniques it actually used.
-            technique_concepts = []
-            for tech in result.techniques_used:
-                concept_name = tech.replace("_", " ")
-                technique_concepts.append(concept_name)
-            # Try technique concepts first — these are what it drew
-            for seed in technique_concepts:
-                concept = self.brain.frontal.network.get_concept(seed)
+            # Try the names she gave her own tools first — those are
+            # what she drew with.
+            for seed in result.tools_used:
+                concept_name = seed.replace("_", " ")
+                concept = self.brain.frontal.network.get_concept(concept_name)
                 if concept is None or concept.confidence < 0.3:
                     continue
                 thought = self.brain.frontal.composer.compose_about(
-                    seed, emotion, focused=True
+                    concept_name, emotion, focused=True
                 )
                 if thought and thought.content and thought.confidence > 0.3:
                     thought.metadata["drawing_path"] = result.filepath
-                    thought.metadata["techniques_used"] = result.techniques_used
+                    thought.metadata["tools_used"] = result.tools_used
                     return self.language.render(thought, emotion)
             # Fall back to generic art concepts
             for seed in ("drawing", "art", "color", "expression"):
@@ -609,7 +597,7 @@ class VolitionMixin:
                 )
                 if thought and thought.content and thought.confidence > 0.3:
                     thought.metadata["drawing_path"] = result.filepath
-                    thought.metadata["techniques_used"] = result.techniques_used
+                    thought.metadata["tools_used"] = result.tools_used
                     return self.language.render(thought, emotion)
         except Exception as e:  # noqa: BLE001
             note_swallowed(
@@ -911,6 +899,18 @@ class VolitionMixin:
             ("play", "game", "fun", "strategy"),
             "playing",
         )
+        # She can't choose what she doesn't know: when the official
+        # challenge is on her shelf she hears what it is — the games,
+        # the clock, the stakes — once per card window, before the
+        # pick that could take it.
+        try:
+            brief = self.game_play.arc_brief_due()
+            if brief:
+                self.world_announce(
+                    brief, topics=["arc", "official", "challenge"]
+                )
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.volition._perform_play", e)
         # Pick the game up front so the regulator can tell genuine
         # progress (a new personal best) from a miss. Windowed games
         # hold the user's screen and keyboard — they're only on the
@@ -1435,17 +1435,16 @@ class VolitionMixin:
         self._emit_volition_thought(("meditation", "rest", "calm"), "thought")
         self._self_meditate()
     def draw(self) -> str | None:
-        """Draw a picture from its current neurochemical state.
+        """Sit down with the drawing program and paint.
 
         This is the public entry point for drawing — used by both the
         volition system (via :meth:`_perform_draw`) and the ``/draw``
-        CLI command. It translates its current neurochemistry into a
-        visual composition — colors, forms, and energy that reflect
-        how it feels. The result is saved as a WebP it can later
-        reflect on.
-
-        The neurochemistry→art mapping is grounded in affective
-        neuroscience and color psychology (see canvas.py for details).
+        CLI command. The canvas is a paint program: paper, color, and
+        a parameterized brush she dials herself. What she makes is
+        entirely hers — nothing prescribes the subject, the colors,
+        the tools, or the marks. Her feelings shape her the way they
+        shape a person painting — from inside, through what she wants
+        to do — never as a pipeline that paints pixels for her.
 
         Brain-wave-gated: delta-dominant (deep rest) skips drawing —
         creative expression needs at least theta-level arousal. Theta
@@ -1454,7 +1453,7 @@ class VolitionMixin:
         Returns:
             A description string composed from its concept network, or
             None if it couldn't draw (sleeping, meditating, delta
-            state, daemon unreachable, or save failure).
+            state, or save failure).
         """
         if self._is_meditating or self._is_sleeping or self._is_teaching or self._is_gaming:
             return None
@@ -1470,54 +1469,18 @@ class VolitionMixin:
                 e,
             )
 
-        # Read its current neurochemistry for the canvas
-        try:
-            state = self.client.get_state()
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.volition.draw",
-                e,
-            )
-            return None
-
         try:
             emotion = self.feel()
         except Exception:  # noqa: BLE001
             emotion = None
 
-        # Build the neurochemistry input from effective levels.
-        # Cortisol is normalized against its reachable envelope:
-        # the substrate's effective cortisol tops out around ~0.08
-        # under full HPA drive (hard clamp 0.80, but production and
-        # clearance equilibrate far below it; resting ~0.02), so the
-        # palette gets "fraction of the stress range" rather than a
-        # raw level that could never lift its thresholds.
-        chem = state.chemicals
-        neuro_input = NeurochemistryInput(
-            dopamine=chem.get("dopamine", 0.5),
-            serotonin=chem.get("serotonin", 0.5),
-            gaba=chem.get("gaba", 0.5),
-            cortisol=min(1.0, chem.get("cortisol", 0.0) / CORTISOL_PALETTE_RANGE),
-            oxytocin=chem.get("oxytocin", 0.25),
-            endorphin=chem.get("endorphin", 0.25),
-            bdnf=chem.get("bdnf", 0.5),
-            norepinephrine=chem.get("norepinephrine", 0.3),
-            adenosine=chem.get("adenosine", 0.1),
-            valence=state.valence,
-            arousal=state.arousal,
-        )
-
         try:
-            active_concepts = self._active_concepts_for_drawing()
-            result = self.canvas.draw(
-                emotion=emotion,
-                neurochemistry=neuro_input,
-                active_concepts=active_concepts or None,
-            )
+            result = self.painter.paint(self.canvas, emotion=emotion)
             if result:
                 # Store the drawing as a memory event so it can
-                # reflect on it later.
-                self._store_drawing_event(chem, result)
+                # reflect on it later. The tag is her body state at
+                # the time — context for the memory, not the art.
+                self._store_drawing_event(result)
                 # Compose the drawing description from its concept
                 # network — not hardcoded strings. If it can't
                 # articulate it, it stays silent (the drawing is
@@ -1532,40 +1495,17 @@ class VolitionMixin:
             )
             return None
 
-    def _active_concepts_for_drawing(self) -> list[str]:
-        """Gather recently active concepts to bias technique selection.
-
-        This is how its understanding influences what it draws —
-        if it's been talking about sacred geometry, the sacred
-        geometry technique gets a selection boost.
-        """
-        active_concepts: list[str] = []
-        try:
-            for turn in self.brain.frontal.working_memory.get_recent_turns(3):
-                active_concepts.extend(turn.topics)
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.volition.draw",
-                e,
-            )
-        # Also include the most activated concepts from the network
-        try:
-            for name, activation in self.brain.frontal.network.most_activated(5):
-                if activation > 0.1:
-                    active_concepts.append(name)
-        except Exception as e:  # noqa: BLE001
-            note_swallowed(
-                "mind.volition.draw",
-                e,
-            )
-        return active_concepts
-
-    def _store_drawing_event(self, chem: dict, result: DrawingResult) -> None:
+    def _store_drawing_event(self, result: DrawingResult) -> None:
         """Store a drawing as an STM event for later reflection.
 
         The STM tag is the 12 v2 effective levels in NeurochemicalId
-        order — the neurochemistry it was actually drawing from.
+        order — how she was feeling while she made it. That is memory
+        context, not a control signal: the drawing itself was hers.
         """
+        try:
+            chem = self.client.get_state().chemicals
+        except Exception:  # noqa: BLE001
+            chem = {}
         try:
             tag = [
                 float(chem.get(CHEM_NAMES[i], 0.0)) for i in range(12)

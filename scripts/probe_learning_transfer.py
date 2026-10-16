@@ -98,7 +98,7 @@ def wait_for_socket(socket_path: str, timeout: float = 10.0) -> None:
                     probe.connect(socket_path)
                 return
             except OSError:
-                pass
+                time.sleep(0.1)  # exists but not accepting yet — keep polling
         time.sleep(0.1)
     raise RuntimeError(f"daemon socket did not become ready: {socket_path}")
 

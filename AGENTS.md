@@ -866,13 +866,21 @@ reach a denied tree. Regression coverage: `python/tests/test_explorer_scope.py`.
   `Mind.evaluate_arc()`. The optional ARC SDK is installed in this host's
   system `python3` (arc-agi 0.9.9 / arcengine 0.9.3), not the checkout's
   `.venv`; use the interpreter that actually has these packages.
-- `/arc --competition --steps N` explicitly selects the SDK's competition
-  transport: one scorecard, all discovered environments, one `make` each,
-  score obtained only on closure. It requires `ARC_API_KEY` and a Mind
-  started with `--offline` so autonomous cognition does not use the web.
-  This is transport support, NOT a complete Kaggle submission package or
-  certification of prize eligibility. Do not run official submissions
-  without the user's accepted rules and explicit authorization.
+- The official ARC-AGI-3 card is voluntary, never driven. There is no CLI
+  flag for it: `ArcOfficial.play()`/`play_all()` raise, so the only way in
+  is `attempt()`/`attempt_next()` reached through her own play urge. The
+  challenge sits on her game shelf as a single `arc-official-challenge`
+  entry whenever `ARC_API_KEY` is set and environments are downloaded;
+  `challenge_brief()` (announced once per card window via
+  `world_announce`) tells her the game count, one-try rule, move budget,
+  pace, the 15-minute idle clock, the 3-day window, and that a real prize
+  rides on it for her steward. Picking it while well opens the card; a
+  sitting then holds game mode while she appeal-picks each pending game.
+  The card persists at `<data>/arc/official_card.json` — a restart
+  resumes the same card, and a sealed card inside its window cannot be
+  replaced. This is transport support, NOT a complete Kaggle submission
+  package or certification of prize eligibility; official play still
+  presumes the user's accepted rules and authorization.
 - The SDK lets `OPERATION_MODE=competition` override an OFFLINE constructor.
   `ArcPractice` rejects that override before constructing the SDK, which
   otherwise can request anonymous API access during initialization.
@@ -916,7 +924,7 @@ reach a denied tree. Regression coverage: `python/tests/test_explorer_scope.py`.
   runs a named reference policy through the *same* `ArcPractice` loop via
   a `_BaselineMind` stub (`world/arc_baseline.py`) — identical accounting,
   `baseline:<policy>` stamped as every move's source; never an agent
-  result and never combined with `--competition`.
+  result, and never on the official card.
 - Focused checks: `python3 -m pytest python/tests/test_arc_adapter.py
   python/tests/test_world_model.py python/tests/test_world_hypotheses.py
   python/tests/test_spatial_boards.py python/tests/test_spatial_planner.py
