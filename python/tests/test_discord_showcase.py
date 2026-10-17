@@ -1,4 +1,4 @@
-"""Tests for world.discord_showcase — the ARC channel layer.
+"""Tests for parietal_lobe.discord_showcase — the ARC channel layer.
 
 The DiscordFeed object is faked entirely; no webhook is contacted.
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 import io
 import time
 
-from world.discord_showcase import (
+from parietal_lobe.discord_showcase import (
     ArcShowcase,
     _digest_learning,
     _fuel_word,

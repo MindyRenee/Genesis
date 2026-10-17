@@ -135,19 +135,17 @@ fi
 if "$PY" -c "import cairo" >/dev/null 2>&1; then
     ok "pycairo present (drawing enabled)"
 elif [ "$VERIFY_ONLY" -eq 0 ]; then
-    # pycairo is source-only, so this also needs a C toolchain. Point
-    # pip at the Zig shim if the host has no cc (see scripts/cargo-env.sh).
-    if ! command -v cc >/dev/null && [ -x "${HOME}/tools/zig-x86_64-linux-0.16.0/zig" ]; then
+    # pycairo is source-only, so this also needs a C toolchain. On a
+    # host with no cc, scripts/cargo-env.sh shims one from Zig.
+    if ! command -v cc >/dev/null; then
         warn "no system C compiler; trying the Zig shim for pycairo"
-        mkdir -p /tmp/genesis-cc-shim
-        cat > /tmp/genesis-cc-shim/cc <<EOF
-#!/bin/sh
-exec ${HOME}/tools/zig-x86_64-linux-0.16.0/zig cc "\$@"
-EOF
-        chmod +x /tmp/genesis-cc-shim/cc
-        PATH="/tmp/genesis-cc-shim:${PATH}" "$PY" -m pip install pycairo \
-            && ok "pycairo built via Zig shim" \
-            || warn "pycairo build failed — drawing unavailable"
+        if . "${PROJECT_ROOT}/scripts/cargo-env.sh"; then
+            "$PY" -m pip install pycairo \
+                && ok "pycairo built via Zig shim" \
+                || warn "pycairo build failed — drawing unavailable"
+        else
+            warn "no C toolchain available — drawing unavailable"
+        fi
     elif install_pkgs libcairo2-dev; then
         "$PY" -m pip install pycairo \
             && ok "pycairo installed" \

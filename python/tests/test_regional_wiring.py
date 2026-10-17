@@ -204,7 +204,10 @@ _ALLOWLIST: dict[str, str] = {
     "genesis_client": "the daemon client — support layer beside the regions",
     "infrastructure": "support layer (persistence, config, journal)",
     "eval": "baseline/drift/assay harness",
-    "world": "the outer world — adapters, not a region",
+    "parietal_lobe.arc": "ARC-3 task-environment adapter, not a brain function",
+    "parietal_lobe.arc_web": "web task-environment adapter, not a brain function",
+    "parietal_lobe.arc_baseline": "ARC evidence script, not a brain function",
+    "parietal_lobe.discord_showcase": "platform adapter, not a brain function",
     "commitment": "top-level support module",
     "discord_feed": "platform adapter",
     "setup_embeddings": "one-off embedding setup script",
@@ -246,7 +249,7 @@ def _all_functional_modules() -> list[str]:
     # The support packages and loose modules sit beside python/ at the
     # repository root; they are candidates for the allowlist, never
     # for a regional claim.
-    for pkg in ("genesis_client", "infrastructure", "world", "eval"):
+    for pkg in ("genesis_client", "infrastructure", "eval"):
         pdir = os.path.join(REPO, pkg)
         if not os.path.isdir(pdir):
             continue

@@ -22,7 +22,7 @@ import pytest
 
 sys.path.insert(0, str(__file__).rsplit("/tests/", 1)[0])
 
-from world.arc import ArcOfficial, ArcPractice, ArcResult
+from parietal_lobe.arc import ArcOfficial, ArcPractice, ArcResult
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -339,7 +339,7 @@ def test_mind_play_arc_wraps_game_mode_and_restores(monkeypatch):
         def play(self, game, max_steps=0):
             return ArcResult(game_id=game, state="BUDGET", steps=max_steps)
 
-    monkeypatch.setattr("world.arc.ArcPractice", _Practice)
+    monkeypatch.setattr("parietal_lobe.arc.ArcPractice", _Practice)
     stub = _Stub()
     out = mind_mod.Mind.play_arc(
         stub, ["g1", "g2"], max_steps=7,
@@ -521,7 +521,7 @@ def test_mind_play_arc_fresh_scope_and_restore(monkeypatch):
             seen.append(self._m._fresh_world_run)
             return ArcResult(game_id=game, state="BUDGET")
 
-    monkeypatch.setattr("world.arc.ArcPractice", _Practice)
+    monkeypatch.setattr("parietal_lobe.arc.ArcPractice", _Practice)
     stub = _Stub()
     mind_mod.Mind.play_arc(stub, ["g"], fresh=True)
     assert seen == [True]
@@ -533,8 +533,9 @@ def test_mind_play_arc_fresh_scope_and_restore(monkeypatch):
 
 
 def test_mind_evaluation_fresh_scope(monkeypatch):
+    from parietal_lobe.arc import ArcEvaluation
+
     import mind as mind_mod
-    from world.arc import ArcEvaluation
 
     seen = []
 
@@ -557,7 +558,7 @@ def test_mind_evaluation_fresh_scope(monkeypatch):
             seen.append(self._m._fresh_world_run)
             return ArcEvaluation(mode="offline", games=[])
 
-    monkeypatch.setattr("world.arc.ArcPractice", Practice)
+    monkeypatch.setattr("parietal_lobe.arc.ArcPractice", Practice)
     subject = Subject()
     mind_mod.Mind.evaluate_arc(subject, max_steps=5, fresh=True)
     assert seen == [True]
@@ -687,8 +688,9 @@ def test_official_requires_game_mode(monkeypatch):
 
 
 def test_mind_evaluation_wraps_game_mode(monkeypatch):
+    from parietal_lobe.arc import ArcEvaluation
+
     import mind as mind_mod
-    from world.arc import ArcEvaluation
 
     calls = []
 
@@ -711,7 +713,7 @@ def test_mind_evaluation_wraps_game_mode(monkeypatch):
             calls.append(max_steps)
             return ArcEvaluation(mode="offline", games=[])
 
-    monkeypatch.setattr("world.arc.ArcPractice", Practice)
+    monkeypatch.setattr("parietal_lobe.arc.ArcPractice", Practice)
     subject = Subject()
     result = mind_mod.Mind.evaluate_arc(subject, max_steps=12)
     assert result.mode == "offline"
@@ -720,8 +722,9 @@ def test_mind_evaluation_wraps_game_mode(monkeypatch):
 
 
 def test_arc_command_selects_full_suite():
+    from parietal_lobe.arc import ArcEvaluation
+
     from genesis_cli import _cmd_arc
-    from world.arc import ArcEvaluation
 
     calls = []
     subject = SimpleNamespace(evaluate_arc=lambda **kwargs: calls.append(kwargs) or ArcEvaluation(
@@ -739,8 +742,9 @@ def test_arc_command_selects_full_suite():
 
 
 def test_arc_command_passes_pacing_flags():
+    from parietal_lobe.arc import ArcEvaluation
+
     from genesis_cli import _cmd_arc
-    from world.arc import ArcEvaluation
 
     calls = []
     subject = SimpleNamespace(evaluate_arc=lambda **kwargs: calls.append(kwargs) or ArcEvaluation(
@@ -756,8 +760,9 @@ def test_arc_command_passes_pacing_flags():
 
 
 def test_arc_command_passes_fresh_scope():
+    from parietal_lobe.arc import ArcEvaluation
+
     from genesis_cli import _cmd_arc
-    from world.arc import ArcEvaluation
 
     seen = []
     subject = SimpleNamespace(
@@ -785,7 +790,8 @@ def test_arc_command_passes_fresh_scope():
 
 
 def test_arc_command_runs_baseline_not_agent(monkeypatch):
-    import world.arc_baseline as baseline_mod
+    import parietal_lobe.arc_baseline as baseline_mod
+
     from genesis_cli import _cmd_arc
 
     calls = []
@@ -1167,7 +1173,7 @@ def test_sitting_waits_out_an_unwell_gate_inside_idle_budget(
     (tmp_path / "arc").mkdir()
     (tmp_path / "arc" / "official_card.json").write_text(json.dumps(card))
     adapter_cls = _fake_card_adapter(card)
-    monkeypatch.setattr("world.arc.ArcOfficial", adapter_cls)
+    monkeypatch.setattr("parietal_lobe.arc.ArcOfficial", adapter_cls)
     mind = _AnnouncingMind(gaming=False)
     shelf = GamePlay(tmp_path)
     shelf.mind = mind
@@ -1218,7 +1224,7 @@ def test_sitting_ends_when_she_leaves_the_arcade(monkeypatch, tmp_path):
         return result
 
     adapter_cls.attempt = walk_away
-    monkeypatch.setattr("world.arc.ArcOfficial", adapter_cls)
+    monkeypatch.setattr("parietal_lobe.arc.ArcOfficial", adapter_cls)
     shelf = GamePlay(tmp_path)
     shelf.mind = mind
     result = shelf.attempt(None, task={

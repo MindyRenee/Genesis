@@ -1,6 +1,6 @@
 """ARC web adapter tests — the public-page substrate boundary.
 
-No browser, no network: ``world.arc_web._Browser`` is replaced with a
+No browser, no network: ``parietal_lobe.arc_web._Browser`` is replaced with a
 fake that speaks the same surface — ``bodies`` of FrameDataRaw-shaped
 dicts, plus ``call``/``js``/``key``/``navigate``/``reconnect``/
 ``close`` — so the run loop is exercised exactly. What these tests
@@ -15,8 +15,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
-
-from world.arc_web import ArcWebPractice
+from parietal_lobe.arc_web import ArcWebPractice
 
 
 def _frame(actions=(1, 2, 3, 5), state="NOT_FINISHED", levels=0, win=2):
@@ -133,7 +132,7 @@ def _practice(mind, frames) -> ArcWebPractice:
 
 
 def test_play_never_labels_direction_semantics():
-    """The contract world.arc keeps: structure, never what a key does.
+    """The contract parietal_lobe.arc keeps: structure, never what a key does.
 
     Labels may mark interface structure ("simple"/"coordinate") but
     must never carry directional semantics — "up"/"down"/"left"/

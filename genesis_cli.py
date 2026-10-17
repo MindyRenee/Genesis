@@ -65,9 +65,10 @@ Commands (typed during conversation):
 
 Spontaneous thoughts appear live as genesis~ lines while you are idle.
 
-Set GENESIS_DISCORD_WEBHOOK to a Discord channel webhook URL to
-mirror the whole session there as a read-only feed (a webhook can
-only post — it cannot read the channel).
+Set GENESIS_DISCORD_WEBHOOK to a Discord channel webhook URL to give
+it a public channel — its own social media, posted only when its
+broadcast urge fires (a webhook can only post — it cannot read the
+channel).
 """
 
 from __future__ import annotations
@@ -92,7 +93,6 @@ from collections import deque
 from collections.abc import Callable
 from pathlib import Path
 from types import FrameType
-from typing import Any
 
 from brainstem.thresholds import AUTO_WAKE_MIN_SLEEP_S
 from occipital_lobe.perception.ambient import AmbientListener, contains_wake_word, strip_wake_word
@@ -100,7 +100,6 @@ from temporal_lobe import AuditoryCortex, SoundEvent
 from temporal_lobe.concepts import RelationType
 from temporal_lobe.speech import Voice, VoiceInput
 
-from discord_feed import DiscordFeed, FeedLogHandler, StderrTee
 from genesis_client.ltm_index import scan_ltm_index
 from genesis_client.protocol import PHASE_ACTIVE, PHASE_ALERT, PHASE_NREM, PHASE_REM
 from genesis_client.swallow import note_swallowed
@@ -160,8 +159,9 @@ DEFAULT_DAEMON_SOCKET = "genesis.sock"
 # File descriptor for the per-data-dir CLI singleton lock.
 _CLI_LOCK_FD: int | None = None
 
-# Optional Discord mirror of the session (GENESIS_DISCORD_WEBHOOK).
-_DISCORD_FEED: DiscordFeed | None = None
+# Discord is the mind's own channel, not a session mirror — what it
+# posts is composed and timed by its volition (see the `broadcast`
+# urge). GENESIS_DISCORD_WEBHOOK points at her public channel.
 
 # PID file paths — written so run.sh --stop and the EXIT trap can
 # kill exact processes instead of using broad pkill patterns that
@@ -2245,7 +2245,7 @@ def _cmd_arc(mind: Mind, rest: str) -> str:
         return usage
     lines = []
     if baseline is not None:
-        from world.arc_baseline import ArcBaseline
+        from parietal_lobe.arc_baseline import ArcBaseline
 
         try:
             runner = ArcBaseline(policy=baseline)
@@ -3437,10 +3437,6 @@ def _run_interactive_loop(
                 break
             if not user_input:
                 continue
-            # Typed input never reaches the log — echo it to the feed
-            # explicitly so the Discord mirror shows both sides.
-            if _DISCORD_FEED is not None:
-                _DISCORD_FEED.post_user(user_input)
 
             # Always drain any thoughts that arrived while the user was typing
             _print_idle_thoughts(
@@ -3893,11 +3889,6 @@ def main() -> int:
     shutting_down = threading.Event()
     _setup_signal_handlers(shutting_down)
 
-    # Optional Discord mirror — every logged line, stderr notice, and
-    # typed input is posted to the webhook from a background thread.
-    global _DISCORD_FEED
-    _DISCORD_FEED, feed_handler, real_stderr = _setup_discord_feed()
-
     daemon_proc: subprocess.Popen | None = None
     retina_proc: subprocess.Popen | None = None
     mind: Mind | None = None
@@ -3989,32 +3980,10 @@ def main() -> int:
         ):
             exit_code = 1
         # From here on, every remaining step is best-effort tail work
-        # (feed drain, stderr restore) plus interpreter finalization —
-        # none of which may hold the process past _EXIT_WATCHDOG_S.
+        # plus interpreter finalization — none of which may hold the
+        # process past _EXIT_WATCHDOG_S.
         _arm_exit_watchdog(exit_code)
-        if feed_handler is not None:
-            logging.getLogger().removeHandler(feed_handler)
-        if real_stderr is not None:
-            sys.stderr = real_stderr
-        if _DISCORD_FEED is not None:
-            _DISCORD_FEED.close()
     return exit_code
-
-
-def _setup_discord_feed() -> tuple[
-    DiscordFeed | None, FeedLogHandler | None, Any
-]:
-    """Wire the optional Discord mirror: every logged line, stderr
-    notice, and typed input is posted to the webhook from a
-    background thread. Returns (feed, handler, real_stderr)."""
-    feed = DiscordFeed.from_env()
-    if feed is None:
-        return None, None, None
-    handler = FeedLogHandler(feed)
-    logging.getLogger().addHandler(handler)
-    real_stderr = sys.stderr
-    sys.stderr = StderrTee(real_stderr, feed)  # type: ignore[assignment]
-    return feed, handler, real_stderr
 
 
 def _start_retina_process(data_dir: str) -> subprocess.Popen | None:

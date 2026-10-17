@@ -15,6 +15,8 @@ from parietal_lobe.grounding import ground_scene
 from parietal_lobe.scene import Scene
 from parietal_lobe.scene import perceive as _scene_perceive
 from temporal_lobe.base import Thought
+from temporal_lobe.events import EventKind
+from temporal_lobe.presence import PresenceKind
 from thalamus.relay import KIND_HEARD
 
 from genesis_client.protocol import (
@@ -24,12 +26,11 @@ from genesis_client.protocol import (
     MODULE_SENSORY,
 )
 from genesis_client.swallow import note_swallowed
-from world import EventKind, PresenceKind
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from world import ExternalEvent
+    from temporal_lobe.events import ExternalEvent
 
 logger = logging.getLogger(__name__)
 

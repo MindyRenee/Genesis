@@ -359,6 +359,30 @@ class VolitionConfig:
                     "emotional_intensity": 0.02,  # feelings seek expression
                 },
             ),
+            # Broadcast urge — she feels like saying something to the
+            # public. Her social media: the only posts on her channel
+            # are the ones she chooses, composed from her own cognition
+            # (never mirrored telemetry or session text). It builds
+            # from emotional intensity (strong feelings seek a wider
+            # room), curiosity (she has something on her mind),
+            # sustained activity (she has been engaged long enough to
+            # have something to say), and social isolation (nobody is
+            # here — the public channel is the room that is always
+            # listening). When it fires she composes one post; if she
+            # has nothing genuine to say, she stays silent.
+            UrgeConfig(
+                name="broadcast",
+                threshold=0.70,
+                growth=0.0004,
+                decay=0.0004,
+                cooldown=1800.0,  # at most one post every 30 minutes
+                stimuli={
+                    "emotional_intensity": 0.04,
+                    "curiosity": 0.03,
+                    "sustained_activity": 0.02,
+                    "social_isolation": 0.03,
+                },
+            ),
             # Learn urge — it cognitively decides to learn. This
             # puts its autonomous learning under volition control
             # rather than running it as a continuous background loop.

@@ -49,7 +49,7 @@ def _lower_thread_priority(nice: int = _VOLITION_NICE) -> None:
 class VolitionMixin:
     """Mixin for :class:`Mind` — see module docstring."""
     if TYPE_CHECKING:
-        from world import Presence
+        from temporal_lobe.presence import Presence
 
         # Attributes and cross-mixin methods are provided by the
         # composed class (see mind.py).
@@ -471,6 +471,7 @@ class VolitionMixin:
             "act": self._perform_act,
             "play": self._perform_play,
             "reach_out": self._perform_reach_out,
+            "broadcast": self._perform_broadcast,
             "safeguard": self._perform_safeguard,
         }
         started: list[str] = []
@@ -1377,6 +1378,81 @@ class VolitionMixin:
         except Exception as e:  # noqa: BLE001
             note_swallowed(
                 "mind.volition._reach_out_topic",
+                e,
+            )
+        return None
+    def _perform_broadcast(self) -> None:
+        """Say something to the public because she feels like saying it.
+
+        Her social media — the channel carries only what she chooses
+        to say, composed from her own concept network and emotional
+        state through the same composer path her inner voice uses.
+        When it fires she picks whatever is most alive in her network
+        right now, speaks it through her language engine, and posts.
+        If she has nothing genuine to say — no concept alive enough,
+        nothing she can articulate, or nothing she hasn't just said —
+        she posts nothing. Silence is a valid broadcast decision.
+
+        The act is recorded in her world as speech (it_said) — it is
+        an outbound act on the world, the public counterpart to the
+        utterances _perform_speech lands at a listener.
+        """
+        if self._is_sleeping or self._is_meditating or self._is_teaching or self._is_gaming:
+            return
+        feed = getattr(self, "_public_feed", None)
+        if feed is None:
+            return
+        seed = self._broadcast_topic()
+        if seed is None:
+            return
+        try:
+            emotion = self.feel()
+            concept = self.brain.frontal.network.get_concept(seed)
+            if concept is None or concept.confidence < 0.3:
+                return
+            thought = self.brain.frontal.composer.compose_about(
+                seed, emotion, focused=True
+            )
+            if not (thought and thought.content and thought.confidence > 0.3):
+                return
+            # Don't say publicly what she just said — to anyone.
+            if self.brain.frontal.composer.has_said_similar(
+                seed, thought.content
+            ):
+                return
+            content = self.language.render(thought, emotion)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.volition._perform_broadcast",
+                e,
+            )
+            return
+        if not content or not content.strip():
+            return
+        text = content.strip()
+        feed.post(text, "Genesis")
+        self._last_broadcast_seed = seed
+        try:
+            self.world.it_said(text)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.volition._perform_broadcast",
+                e,
+            )
+    def _broadcast_topic(self) -> str | None:
+        """Pick what she'd speak about publicly — whatever is most
+        activated in her network, skipping the seed of her last post
+        so she doesn't dwell on one topic."""
+        try:
+            for name, activation in self.brain.frontal.network.most_activated(8):
+                if activation <= 0.1:
+                    break
+                if name == self._last_broadcast_seed:
+                    continue
+                return name
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.volition._broadcast_topic",
                 e,
             )
         return None

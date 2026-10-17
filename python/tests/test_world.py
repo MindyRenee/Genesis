@@ -10,25 +10,23 @@ from frontal_lobe.inner_life import InnerLife
 from frontal_lobe.reasoning import Reasoner
 from frontal_lobe.self import Reflection
 from limbic_system.curiosity import Curiosity
+from parietal_lobe.belief import BID_WINDOW, Beta, PresenceBelief
 from temporal_lobe.concepts import ConceptNetwork
-
-from genesis_client.protocol import CHEM_OXYTOCIN
-from world import (
-    Beta,
+from temporal_lobe.events import (
     EventKind,
     EventStream,
     ExternalEvent,
-    OuterWorld,
-    Presence,
-    PresenceBelief,
-    PresenceKind,
+    ground_topics,
 )
-from world.belief import BID_WINDOW
-from world.events import ground_topics
-from world.presence import (
+from temporal_lobe.presence import (
     AMBIENT_PRESENCE_TIMEOUT,
     USER_PRESENCE_TIMEOUT,
+    Presence,
+    PresenceKind,
 )
+from temporal_lobe.world import OuterWorld
+
+from genesis_client.protocol import CHEM_OXYTOCIN
 
 
 def _make_world(**kwargs) -> OuterWorld:

@@ -17,8 +17,7 @@ from enum import Enum
 from types import SimpleNamespace
 
 import pytest
-
-from world.arc_baseline import ArcBaseline
+from parietal_lobe.arc_baseline import ArcBaseline
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -68,7 +67,7 @@ class _FakeArcade:
         self._env = env
         self.closed: list[str] = []
 
-    def create_scorecard(self):
+    def create_scorecard(self, source_url=None, tags=None, opaque=None):
         return "card-1"
 
     def make(self, game_id, scorecard_id=None, save_recording=False):

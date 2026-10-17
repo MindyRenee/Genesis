@@ -584,7 +584,7 @@ Modules claimed by this subsystem:
         already knows (reasoning, inference, conversation) instead of
         fetching from external sources. Semantic learning, temporal.
 
-    (world/) world.py, events.py, presence.py
+    world.py, events.py, presence.py (the former world/ package)
         OuterWorld — the external world as a remembered, relational
         structure: the people it knows, the events between them, and
         its own acts recorded in the same stream. The neuroanatomical
@@ -798,18 +798,18 @@ _EXPORTS: dict[str, str] = {
     "MapEvent": "temporal_lobe.cognitive_map",
     # Social perception — the superior temporal sulcus detects people,
     # their presence, and the events they produce (speech, arrival, departure)
-    "Presence": "world.presence",
-    "PresenceKind": "world.presence",
-    "EventKind": "world.events",
-    "EventStream": "world.events",
-    "ExternalEvent": "world.events",
-    "INBOUND_KINDS": "world.events",
-    "OUTBOUND_KINDS": "world.events",
+    "Presence": "temporal_lobe.presence",
+    "PresenceKind": "temporal_lobe.presence",
+    "EventKind": "temporal_lobe.events",
+    "EventStream": "temporal_lobe.events",
+    "ExternalEvent": "temporal_lobe.events",
+    "INBOUND_KINDS": "temporal_lobe.events",
+    "OUTBOUND_KINDS": "temporal_lobe.events",
     # The external world model — the hippocampal–entorhinal cognitive
     # map and its episodic event stream: the people, the events, and
     # its own acts held as one relational structure (successor-
     # representation predictive map; MEC structure/HPC content split)
-    "OuterWorld": "world.world",
+    "OuterWorld": "temporal_lobe.world",
     # The autobiographical self — identity built on hippocampal
     # autobiographical memory (co-claimed with limbic_system, which
     # owns the Damasio hierarchy)

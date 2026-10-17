@@ -71,7 +71,7 @@ py-modules = [
 
 [tool.setuptools.packages.find]
 # Two package containers: the repository root (genesis_client,
-# infrastructure, world, eval) and python/ (the brain-region tree).
+# infrastructure, eval) and python/ (the brain-region tree).
 where = [".", "python"]
 namespaces = false
 exclude = ["tests*", "python*", "voices*", "__pycache__*", "scripts*"]

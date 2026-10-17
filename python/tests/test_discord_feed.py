@@ -1,4 +1,4 @@
-"""Tests for discord_feed — the read-only Discord mirror.
+"""Tests for discord_feed — the webhook transport behind her channels.
 
 Network is faked throughout: ``urllib.request.urlopen`` is patched so
 no real webhook is ever contacted.
@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import io
 import json
-import logging
 import sys
 import time
 import urllib.error
@@ -17,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import discord_feed
-from discord_feed import DiscordFeed, FeedLogHandler, StderrTee
+from discord_feed import DiscordFeed
 
 URL = "https://discord.invalid/api/webhooks/1/token"
 
@@ -56,27 +55,27 @@ def test_from_env_disabled_without_var(monkeypatch):
     assert DiscordFeed.from_env() is None
 
 
-def test_posts_genesis_and_you_lines(monkeypatch):
+def test_post_with_and_without_author(monkeypatch):
     posts: list[dict] = []
     feed = _make_feed(posts, monkeypatch)
     try:
-        feed.post_line("  genesis> hello there")
-        feed.post_line("  you> hi genesis")
+        feed.post("hello there", "Genesis")
+        feed.post("ops metric")
         assert _wait_for(lambda: len(posts) >= 2)
     finally:
         feed.close()
-    authors = {p.get("username"): p["content"] for p in posts}
-    assert authors["Genesis"] == "hello there"
-    assert authors["you"] == "hi genesis"
+    assert posts[0]["username"] == "Genesis"
+    assert posts[0]["content"] == "hello there"
+    assert "username" not in posts[1]
 
 
 def test_coalesces_same_author_burst(monkeypatch):
     posts: list[dict] = []
     feed = _make_feed(posts, monkeypatch)
     try:
-        feed.post_line("genesis~ [thought] one")
-        feed.post_line("genesis~ [thought] two")
-        feed.post_line("genesis~ [thought] three")
+        feed.post("[thought] one", "Genesis")
+        feed.post("[thought] two", "Genesis")
+        feed.post("[thought] three", "Genesis")
         assert _wait_for(lambda: len(posts) >= 1)
     finally:
         feed.close()
@@ -86,18 +85,6 @@ def test_coalesces_same_author_burst(monkeypatch):
     assert posts[0]["content"] == (
         "[thought] one\n[thought] two\n[thought] three"
     )
-
-
-def test_unprefixed_lines_use_webhook_default(monkeypatch):
-    posts: list[dict] = []
-    feed = _make_feed(posts, monkeypatch)
-    try:
-        feed.post_line("[genesis] Daemon started.")
-        assert _wait_for(lambda: len(posts) >= 1)
-    finally:
-        feed.close()
-    assert "username" not in posts[0]
-    assert posts[0]["content"] == "[genesis] Daemon started."
 
 
 def test_chunks_long_content(monkeypatch):
@@ -140,45 +127,11 @@ def test_permanent_http_error_disables_feed(monkeypatch):
     assert posts == []
 
 
-def test_log_handler_mirrors_records(monkeypatch):
-    posts: list[dict] = []
-    feed = _make_feed(posts, monkeypatch)
-    handler = FeedLogHandler(feed)
-    test_logger = logging.getLogger("test_discord_feed")
-    test_logger.setLevel(logging.INFO)
-    test_logger.addHandler(handler)
-    try:
-        test_logger.info("  genesis> composed words")
-        assert _wait_for(lambda: len(posts) >= 1)
-    finally:
-        test_logger.removeHandler(handler)
-        feed.close()
-    assert posts[0]["username"] == "Genesis"
-    assert posts[0]["content"] == "composed words"
-
-
-def test_stderr_tee_mirrors_and_forwards(monkeypatch):
-    posts: list[dict] = []
-    feed = _make_feed(posts, monkeypatch)
-    real = io.StringIO()
-    tee = StderrTee(real, feed)
-    try:
-        tee.write("[genesis] Daemon started.\npartial")
-        tee.write(" line\n")
-        tee.flush()
-        assert _wait_for(lambda: len(posts) >= 1)
-    finally:
-        feed.close()
-    assert real.getvalue() == "[genesis] Daemon started.\npartial line\n"
-    assert posts[0]["content"] == "[genesis] Daemon started.\npartial line"
-
-
 def test_blank_lines_skipped(monkeypatch):
     posts: list[dict] = []
     feed = _make_feed(posts, monkeypatch)
     try:
-        feed.post_line("")
-        feed.post_line("   \n  ")
+        feed.post("")
         feed.post("   ")
         time.sleep(0.2)
     finally:

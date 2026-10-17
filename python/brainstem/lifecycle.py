@@ -613,6 +613,17 @@ class LifecycleMixin:
         clean_shutdown &= self._persist_shutdown_state()
         clean_shutdown &= self._release_daemon()
 
+        # Drain her public channel last of the outbound writers —
+        # pending posts get their flush window, then the poster
+        # thread stops. Failure to reach Discord is not a shutdown
+        # failure, so it does not count against clean_shutdown.
+        feed = getattr(self, "_public_feed", None)
+        if feed is not None:
+            try:
+                feed.close()
+            except Exception as e:  # noqa: BLE001
+                note_swallowed("mind.lifecycle.stop.public_feed", e)
+
         # Close the cognitive journal last of all writers — it is the
         # record of everything above. Clearing the active binding stops
         # stray record_error calls from a stale module touching it.
