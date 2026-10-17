@@ -94,6 +94,8 @@ _OWNERSHIP_PINS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
     ("AttentionSystem", ("parietal_lobe",), ("temporal_lobe",)),
     # Emotion is limbic.
     ("EmotionalState", ("limbic_system",), ("frontal_lobe",)),
+    # Conditioned value lives in the amygdala, not the striatum or cortex.
+    ("Amygdala", ("limbic_system",), ("basal_ganglia", "frontal_lobe")),
     ("FeelingReporter", ("limbic_system",), ("temporal_lobe",)),
     # Rhythm summaries are shared; staging spans brainstem and hypothalamus.
     ("BrainWave", ("thalamus",), ("frontal_lobe",)),
@@ -208,6 +210,7 @@ _ALLOWLIST: dict[str, str] = {
     "parietal_lobe.arc_web": "web task-environment adapter, not a brain function",
     "parietal_lobe.arc_baseline": "ARC evidence script, not a brain function",
     "parietal_lobe.discord_showcase": "platform adapter, not a brain function",
+    "frontal_lobe.krita_studio": "Krita plugin bridge — platform adapter, not a brain function",
     "commitment": "top-level support module",
     "discord_feed": "platform adapter",
     "setup_embeddings": "one-off embedding setup script",

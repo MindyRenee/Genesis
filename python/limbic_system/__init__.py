@@ -390,6 +390,9 @@ _EXPORTS: dict[str, str] = {
     "EmotionalState": "limbic_system.emotion",
     "EmotionCategory": "limbic_system.emotion",
     "assess_emotion": "limbic_system.emotion",
+    # The organ itself — conditioned appetitive/aversive value fields
+    # (BLA acquisition, ITC/vmPFC extinction, Pearce-Hall associability)
+    "Amygdala": "limbic_system.amygdala",
     # Prefrontal-limbic control loop — self-regulation, HPA axis,
     # allostatic load (hypothalamic homeostasis)
     "AllostaticLoadTracker": "limbic_system.emotional_regulator",
