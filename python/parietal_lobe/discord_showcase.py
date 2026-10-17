@@ -11,16 +11,17 @@ is unaffected.
 
 Privacy and disclosure:
 
-- Set ``GENESIS_DISCORD_ARC_WEBHOOK`` (falls back to
-  ``GENESIS_DISCORD_WEBHOOK``) to a webhook on a *private* channel.
-  Webhooks can only post, so the channel stays read-only for her.
+- Set ``GENESIS_DISCORD_ARC_WEBHOOK`` to a webhook on a *private*
+  channel. Webhooks can only post, so the channel stays read-only
+  for her. ``GENESIS_DISCORD_WEBHOOK`` is deliberately not a fallback
+  — that channel is her public voice, not a spectator feed.
 - Captions are deliberately coarse: level, turn, qualitative fuel.
   No coordinates, entity ids, routes, or score internals — the point
   is to show learning happening, not to publish the solution.
 - Raw traces, recordings, and scorecards stay local in the run dir.
 
 Dev notes — the engineer's voice — are posted through ``devnote`` or
-the CLI (``python -m world.discord_showcase note "text"``), short and
+the CLI (``python -m parietal_lobe.discord_showcase note "text"``), short and
 plain: "updated perception", "fixed color error", "improved spatial".
 """
 
@@ -59,7 +60,6 @@ PALETTE: tuple[tuple[int, int, int], ...] = (
 )
 
 _WEBHOOK_ENV = "GENESIS_DISCORD_ARC_WEBHOOK"
-_FALLBACK_ENV = "GENESIS_DISCORD_WEBHOOK"
 
 # Live-board redraw cadence in turns — a stride is 5 cells per turn, so
 # ~4 turns gives visible motion without outrunning Discord's limits.
@@ -177,11 +177,9 @@ class ArcShowcase:
 
     @classmethod
     def from_env(cls, game: str, **kw) -> ArcShowcase:
-        """Build from ``GENESIS_DISCORD_ARC_WEBHOOK`` (or the shared
-        ``GENESIS_DISCORD_WEBHOOK``); no webhook → inert showcase."""
-        url = os.environ.get(_WEBHOOK_ENV, "").strip() or os.environ.get(
-            _FALLBACK_ENV, ""
-        ).strip()
+        """Build from ``GENESIS_DISCORD_ARC_WEBHOOK``; no webhook →
+        inert showcase. Her public channel is never a fallback."""
+        url = os.environ.get(_WEBHOOK_ENV, "").strip()
         feed = DiscordFeed(url) if url else None
         return cls(feed, game, **kw)
 
@@ -304,11 +302,9 @@ class ArcShowcase:
 
 
 def main(argv: list[str]) -> int:
-    """``python -m world.discord_showcase note "text"`` — one devnote."""
+    """``python -m parietal_lobe.discord_showcase note "text"`` — one devnote."""
     if len(argv) >= 2 and argv[0] == "note":
-        url = os.environ.get(_WEBHOOK_ENV, "").strip() or os.environ.get(
-            _FALLBACK_ENV, ""
-        ).strip()
+        url = os.environ.get(_WEBHOOK_ENV, "").strip()
         if not url:
             sys.stderr.write("no webhook set (GENESIS_DISCORD_ARC_WEBHOOK)\n")
             return 1

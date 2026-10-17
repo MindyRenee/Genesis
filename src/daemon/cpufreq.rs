@@ -63,15 +63,23 @@ fn reported_failures() -> &'static Mutex<std::collections::HashSet<String>> {
     SEEN.get_or_init(|| Mutex::new(std::collections::HashSet::new()))
 }
 
-/// Report a body-control failure exactly once per distinct cause.
+/// Report a body-control failure at most once per cause per process.
 ///
 /// The mind requests body control on every heartbeat (~10 s) and
 /// `apply_body_control` uses change detection, so a machine that
 /// cannot be controlled would otherwise emit the same line forever and
 /// bury the daemon log. Keying on the cause string means a *new*
 /// failure still surfaces immediately while a persistent one is
-/// reported once. [`clear_failure`] drops the key, so a fault that is
-/// fixed and then recurs is reported again.
+/// reported once.
+///
+/// Reporting is deliberately *not* re-armed by a later success.
+/// Every capability gate in this module (`SUDO_AVAILABLE`,
+/// `HELPER_PATH`, `EPP_AVAILABLE`, `BOOST_AVAILABLE`) is a
+/// `OnceLock` — capability state is fixed for the process lifetime,
+/// so a transient success (e.g. an unprivileged `renice` lowering
+/// priority, which always works) is not a repair. The previous
+/// clear-on-success behaviour oscillated report → clear → report on
+/// exactly that pattern and was itself the spam.
 fn report_failure(cause: &str, detail: &str) {
     let mut guard = match reported_failures().lock() {
         Ok(g) => g,
@@ -79,13 +87,6 @@ fn report_failure(cause: &str, detail: &str) {
     };
     if guard.insert(cause.to_string()) {
         eprintln!("[body-control] {cause}: {detail}");
-    }
-}
-
-/// Clear a previously reported failure so a recurrence is reported again.
-fn clear_failure(cause: &str) {
-    if let Ok(mut guard) = reported_failures().lock() {
-        guard.remove(cause);
     }
 }
 
@@ -287,12 +288,7 @@ fn run_helper(cmd: &str, value: &str) -> bool {
         .args(["-n", helper, cmd, value])
         .output()
     {
-        Ok(out) if out.status.success() => {
-            clear_failure("helper-missing");
-            clear_failure("sudo-unavailable");
-            clear_failure(&failure_cause(cmd));
-            true
-        }
+        Ok(out) if out.status.success() => true,
         Ok(out) => {
             let stderr = String::from_utf8_lossy(&out.stderr);
             let detail = if stderr.trim().is_empty() {
@@ -325,11 +321,10 @@ fn failure_cause(cmd: &str) -> String {
 /// unconditionally buried the daemon log on a machine that simply
 /// cannot be controlled. Each specific cause is already reported by
 /// its own setter, so this states the outcome once and then stays
-/// quiet until a request succeeds.
+/// quiet — see [`report_failure`] for why a later success does not
+/// re-arm reporting.
 pub fn report_body_control_outcome(applied: bool) {
-    if applied {
-        clear_failure("body-control-outcome");
-    } else {
+    if !applied {
         report_failure(
             "body-control-outcome",
             "one or more hardware writes did not land (specific cause reported above)",
@@ -700,7 +695,6 @@ pub fn set_priority(pid: u32, nice: i32) -> bool {
         .output()
     {
         Ok(out) if out.status.success() => {
-            clear_failure("renice");
             return true;
         }
         Ok(out) => {
@@ -914,10 +908,7 @@ pub fn set_io_priority(pid: u32, class: IoClass) -> bool {
     };
     let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
     match Command::new("ionice").args(&arg_refs).output() {
-        Ok(out) if out.status.success() => {
-            clear_failure("ionice");
-            true
-        }
+        Ok(out) if out.status.success() => true,
         Ok(out) => {
             let stderr = String::from_utf8_lossy(&out.stderr);
             let detail = if stderr.trim().is_empty() {
@@ -1056,11 +1047,7 @@ pub fn set_epp(epp: &str) -> bool {
         );
         return false;
     }
-    let ok = run_helper("set_epp", epp);
-    if ok {
-        clear_failure("epp-unsupported");
-    }
-    ok
+    run_helper("set_epp", epp)
 }
 
 /// Derive the desired EPP profile from neurochemical levels.
@@ -1279,11 +1266,7 @@ pub fn set_boost(enabled: bool) -> bool {
         );
         return false;
     }
-    let ok = run_helper("set_boost", if enabled { "1" } else { "0" });
-    if ok {
-        clear_failure("boost-unsupported");
-    }
-    ok
+    run_helper("set_boost", if enabled { "1" } else { "0" })
 }
 
 /// Derive the turbo gate from the frequency policy that is being

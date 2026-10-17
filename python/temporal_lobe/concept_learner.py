@@ -284,7 +284,7 @@ class ConceptLearner:
             self._network.add_concept(
                 hub_id, confidence=0.8, origin="structural"
             )
-        existing = self._network.get_neighbors(w, RelationType.EXPRESSES)
+        existing = self._network.get_exact_neighbors(w, RelationType.EXPRESSES)
         if not any(n[0] == hub_id for n in existing):
             self._network.add_edge(
                 w, hub_id, RelationType.EXPRESSES,
@@ -295,7 +295,7 @@ class ConceptLearner:
             existing_words = self._network.find_valence_words(valence_state)
         except AttributeError:
             existing_words = []
-        similar_neighbors = self._network.get_neighbors(
+        similar_neighbors = self._network.get_exact_neighbors(
             w, RelationType.SIMILAR_TO
         )
         similar_targets = {n[0] for n in similar_neighbors}
@@ -335,7 +335,7 @@ class ConceptLearner:
             self._network.add_concept(
                 hub_id, confidence=0.8, origin="structural"
             )
-        existing = self._network.get_neighbors(b, RelationType.EXPRESSES)
+        existing = self._network.get_exact_neighbors(b, RelationType.EXPRESSES)
         if not any(n[0] == hub_id for n in existing):
             self._network.add_edge(
                 b, hub_id, RelationType.EXPRESSES,
@@ -376,7 +376,7 @@ class ConceptLearner:
         hub_id = f"_cat:{kind}:{category_value}"
         if self._network.get_concept(hub_id) is None:
             self._network.add_concept(hub_id, confidence=0.8, origin="structural")
-        existing = self._network.get_neighbors(word, RelationType.EXPRESSES)
+        existing = self._network.get_exact_neighbors(word, RelationType.EXPRESSES)
         if not any(n[0] == hub_id for n in existing):
             self._network.add_edge(
                 word, hub_id, RelationType.EXPRESSES,
@@ -392,7 +392,7 @@ class ConceptLearner:
         else:
             existing_words = self._network.find_plasticity_words(category_value)
 
-        similar_neighbors = self._network.get_neighbors(word, RelationType.SIMILAR_TO)
+        similar_neighbors = self._network.get_exact_neighbors(word, RelationType.SIMILAR_TO)
         similar_targets = {n[0] for n in similar_neighbors}
         for other_word in existing_words:
             if other_word == word:

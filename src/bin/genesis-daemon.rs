@@ -261,11 +261,45 @@ fn main() {
     let mmap = match MmapState::open(&state_path) {
         Ok(m) => m,
         Err(genesis::store::StateFileError::NotFound) => {
-            match MmapState::create(&state_path, 1, now_ms) {
+            match MmapState::create(&state_path, now_ms, now_ms) {
                 Ok(m) => m,
                 Err(e) => {
                     eprintln!(
                         "[genesis] FATAL: failed to create core state {}: {e}",
+                        state_path.display()
+                    );
+                    std::process::exit(1);
+                }
+            }
+        }
+        // An unreadable state file (truncated, foreign, or checksum-
+        // corrupt) would otherwise FATAL-loop forever: every restart
+        // hits the same verification failure. Rename it aside — it is
+        // preserved for forensics, never silently destroyed — and
+        // rebuild a fresh state. I/O, lock, and mmap failures are
+        // environmental and still fatal: recreating cannot fix them.
+        Err(
+            e @ (genesis::store::StateFileError::VerificationFailed(_)
+            | genesis::store::StateFileError::FileTooSmall { .. }),
+        ) => {
+            let quarantine = state_path.with_extension(format!("corrupt.{now_ms}"));
+            eprintln!(
+                "[genesis] core state {} is unrecoverable ({e}); archiving to {}",
+                state_path.display(),
+                quarantine.display()
+            );
+            if let Err(rename_err) = std::fs::rename(&state_path, &quarantine) {
+                eprintln!(
+                    "[genesis] FATAL: could not archive unrecoverable state {}: {rename_err}",
+                    state_path.display()
+                );
+                std::process::exit(1);
+            }
+            match MmapState::create(&state_path, now_ms, now_ms) {
+                Ok(m) => m,
+                Err(e) => {
+                    eprintln!(
+                        "[genesis] FATAL: failed to rebuild core state {}: {e}",
                         state_path.display()
                     );
                     std::process::exit(1);

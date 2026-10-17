@@ -82,6 +82,7 @@ from limbic_system.emotional_regulator import (
     HPAState,
     _clamp01,
 )
+from temporal_lobe.cognitive_map import CognitiveMap
 from temporal_lobe.concepts import (
     Concept,
     ConceptCategory,
@@ -199,6 +200,7 @@ def save_state(
     inner_life_state: dict[str, Any] | None = None,
     world_state: dict[str, Any] | None = None,
     executive: ExecutiveFunction | None = None, curiosity: Curiosity | None = None,
+    cognitive_map: CognitiveMap | None = None,
 ) -> None:
     """Save Genesis's cognitive state to disk.
 
@@ -270,6 +272,7 @@ def save_state(
         world_state=world_state,
         executive=executive,
         curiosity=curiosity,
+        cognitive_map=cognitive_map,
     )
 
     _atomic_write_state(data_dir, state)
@@ -388,6 +391,7 @@ def _add_optional_state(
     world_state: dict[str, Any] | None = None,
     executive: ExecutiveFunction | None = None,
     curiosity: Curiosity | None = None,
+    cognitive_map: CognitiveMap | None = None,
 ) -> None:
     """Add optional state fields to the state dict."""
     if predictive_coding is not None:
@@ -450,6 +454,8 @@ def _add_optional_state(
         state["executive"] = executive.to_dict()
     if curiosity is not None:
         state["curiosity"] = curiosity.to_dict()
+    if cognitive_map is not None:
+        state["cognitive_map"] = cognitive_map.save_state()
 
 
 def load_state(data_dir: str) -> dict[str, Any] | None:

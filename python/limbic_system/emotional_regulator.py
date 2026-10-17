@@ -559,13 +559,15 @@ class InteroceptionSystem:
         self._last_response_latency_ms: float | None = None
 
     def _own_pids(self) -> list[int]:
-        """PIDs of Genesis's own process tree: mind, daemon, retina.
+        """PIDs of Genesis's own process tree: mind, daemon, retina,
+        plus anything they spawn.
 
         Single source of truth for both :meth:`_sense_cpu_usage` and
         :meth:`_sense_memory_usage`, so the two layers agree on what
         "its own body" is. Matches the daemon's ``genesis_subsystems``
-        set: the mind (this process), the daemon pidfile, and the
-        retina pidfile.
+        set — the mind (this process), the daemon pidfile, and the
+        retina pidfile — extended with each member's live child
+        processes (voice, speech recognition, spawned helpers).
 
         PIDs <= 0 are never valid (PID 0 is the kernel scheduler, and
         a failed pidfile parse must not slip through) and are
@@ -626,6 +628,18 @@ class InteroceptionSystem:
             cached = getattr(self, attr)
             if cached is not None and cached > 0 and cached not in own_pids:
                 own_pids.append(cached)
+
+        # Spawned helpers are part of the body too — piper doing TTS
+        # or vosk listening is work she does, even though the labor is
+        # outsourced to a child process. Otherwise that exertion only
+        # leaks into shared channels (heat, load) with no attribution.
+        for pid in list(own_pids):
+            try:
+                for child in psutil.Process(pid).children(recursive=True):
+                    if child.pid > 0 and child.pid not in own_pids:
+                        own_pids.append(child.pid)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
         return own_pids
 
     def _sense_cpu_usage(self) -> float:
@@ -1427,10 +1441,52 @@ class EmotionalRegulator:
         self._body_attempts: list[
             tuple[ActionAttempt, str, float, float, bool]
         ] = []
+        self._amygdala: Any = None
 
     def set_action_feedback(self, engine: ActionFeedback | None) -> None:
         """Wire the reusable action-feedback learner."""
         self._action_feedback = engine
+
+    def set_amygdala(self, amygdala: Any) -> None:
+        """Wire the conditioned-value organ (grown by the limbic region)."""
+        self._amygdala = amygdala
+
+    def condition_cues(
+        self, cues: list[str], us: float, ctx: str
+    ) -> float:
+        """Condition cues against an unconditioned stimulus; fire the low road.
+
+        The low road (LeDoux, 1996) runs before cortical appraisal:
+        cues are associated to the signed US value, then the strongest
+        aversive net decides whether a startle impulse reaches the
+        body. A sub-threshold conditioned cue only biases encoding
+        (small ACh); past the floor it startles (NE + cortisol).
+
+        Returns the strongest aversive net across the cues.
+        """
+        if self._amygdala is None or not cues or us == 0.0:
+            return 0.0
+        for cue in cues:
+            self._amygdala.condition(cue, us, ctx)
+        net_a = max(
+            (self._amygdala.net_aversive(c, ctx) for c in cues),
+            default=0.0,
+        )
+        if not self._neuro_impulse:
+            return net_a
+        from limbic_system.amygdala import (
+            _CHEM_ACETYLCHOLINE,
+            _CHEM_CORTISOL,
+            _CHEM_NOREPINEPHRINE,
+            _IMPULSE_THRESHOLD,
+        )
+
+        if net_a >= _IMPULSE_THRESHOLD:
+            self._neuro_impulse(_CHEM_NOREPINEPHRINE, 0.02 * net_a)
+            self._neuro_impulse(_CHEM_CORTISOL, 0.01 * net_a)
+        else:
+            self._neuro_impulse(_CHEM_ACETYLCHOLINE, 0.005 * net_a)
+        return net_a
 
     def start(self) -> None:
         """Start background self-regulation."""
@@ -1938,6 +1994,16 @@ class EmotionalRegulator:
             self._last_cause = "interoception_memory"
         elif state.response_latency > 500:
             self._last_cause = "interoception_latency"
+        elif (
+            state.psi_cpu > self.config.psi_stall_threshold
+            or state.psi_mem > self.config.psi_stall_threshold
+        ):
+            # Work is stalling on contended resources while her own
+            # usage is below the effort gate — the machine is crowded,
+            # not her. Throttling her learner wouldn't thin anyone
+            # else's air; tag the cause as environmental so the felt
+            # state attributes correctly ("starved", not "exerting").
+            self._last_cause = CauseCategory.INTEROCEPTION_ENVIRONMENT.value
         elif state.stress_level > self.config.mild_stress_level:
             self._last_cause = "interoception_stress"
 

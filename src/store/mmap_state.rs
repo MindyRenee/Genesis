@@ -59,9 +59,10 @@
 //! - `read_volatile` in the readers remains load-bearing: it stops
 //!   the compiler eliding or merging the seqlock-guarded loads, it is
 //!   not (and never was) what made concurrent access defined.
-//! - [`MmapState::state_mut`] still exists, but only single-threaded
-//!   test code calls it; grep the tree to confirm before trusting
-//!   this.
+//! - `MmapState::state_mut` was removed: it formed `&mut` references
+//!   into `MAP_SHARED` memory with exclusivity left to the caller,
+//!   and the only callers were tests that now use `modify`'s stack
+//!   copy. No API may vend references into the mapping.
 //!
 //! ## File layout
 //!
@@ -1086,20 +1087,6 @@ impl MmapState {
                 dst.add(i).write_volatile(byte);
             }
         }
-    }
-
-    /// Get a mutable reference to the core state.
-    ///
-    /// # Safety
-    ///
-    /// The caller must ensure that no other thread in this process is
-    /// reading or writing the state simultaneously.
-    #[allow(clippy::mut_from_ref)]
-    pub unsafe fn state_mut(&self) -> &mut GenesisCoreState {
-        // SAFETY: `self.ptr` is the live mapping of a
-        // `GenesisCoreState`; exclusive access is the caller's
-        // obligation per this function's # Safety contract.
-        unsafe { &mut *(self.ptr as *mut GenesisCoreState) }
     }
 
     fn do_mmap(fd: i32) -> Result<*mut u8, StateFileError> {

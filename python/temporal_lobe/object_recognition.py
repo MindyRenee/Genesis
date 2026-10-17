@@ -117,8 +117,7 @@ class ObjectRecognizer:
 
     This is Genesis's inferotemporal cortex — the ventral-stream
     "what" pathway that turns pixels into object categories. It is
-    lazily initialized on first use so we don't pay the model loading
-    cost if there's no camera or if it never looks.
+    lazily initialized on first use.
     """
 
     def __init__(self) -> None:

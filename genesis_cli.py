@@ -268,11 +268,7 @@ class VoiceDedup:
 
 # Topics Genesis may chime in on.
 CHIME_IN_TOPICS = [
-    "feel", "feeling", "mood", "sad", "happy", "angry", "scared",
-    "afraid", "worried", "anxious", "stress", "stressed", "tired",
-    "sleep", "dream", "remember", "memory", "forget", "learn",
-    "learning", "think", "thinking", "mind", "cognitive",
-    "ai", "robot", "alive", "real", "self", "aware", "genesis",
+    "all"
 ]
 
 # Module name lookup for episode display.

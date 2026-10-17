@@ -878,3 +878,142 @@ def test_set_volition_is_opcode_46() -> None:
 
     assert protocol.SET_VOLITION == 46
     assert "SET_VOLITION" in protocol.__all__
+
+
+def test_get_dyadic_state_is_opcode_50() -> None:
+    """Dyadic snapshot — pinned against the Rust daemon's
+    `cmd::GET_DYADIC_STATE`, which is also 50."""
+    from genesis_client import protocol
+
+    assert protocol.GET_DYADIC_STATE == 50
+    assert "GET_DYADIC_STATE" in protocol.__all__
+
+
+def test_dyadic_snapshot_unpack_matches_wire_layout():
+    """DyadicSnapshot decodes the daemon's snapshot body.
+
+    Layout: [u8 ver][6×f32 pooled][u8 has_person][u8 name_len][name]
+    [u8 auth][5×f32 aura][f64 presence][u32 field_samples][10×f32 field]
+    [u8 has_reunion][f32 bond][f32 seconds_since][u16 person_count].
+    If either side reorders a field the payload still unpacks — the
+    test pins the order, not just the width.
+    """
+    import struct
+
+    from genesis_client.types import DyadicSnapshot
+
+    body = bytearray([1])
+    body += struct.pack("<6f", 0.1, 0.2, 0.3, 0.4, 0.5, 0.6)
+    body += bytes([1])  # has_person
+    body += bytes([5]) + b"mindy" + bytes([1])  # name_len, name, auth
+    body += struct.pack("<5f", 0.22, 0.7, 0.5, 0.8, 0.4)
+    body += struct.pack("<d", 3600.0)
+    body += struct.pack("<I", 42)
+    body += struct.pack("<10f", *range(10))
+    body += bytes([1])  # has_reunion
+    body += struct.pack("<2f", 0.22, 3.5)
+    body += struct.pack("<H", 3)
+
+    snap = DyadicSnapshot.unpack(bytes(body))
+    assert snap.user_valence == pytest.approx(0.1)
+    assert snap.coupling == pytest.approx(0.6)
+    person = snap.person
+    assert person is not None
+    assert person.name == "mindy"
+    assert person.authenticated is True
+    assert person.familiarity == pytest.approx(0.22)
+    assert person.presence_seconds == pytest.approx(3600.0)
+    assert person.field_samples == 42
+    assert person.field == tuple(float(i) for i in range(10))
+    assert snap.reunion == {"bond": pytest.approx(0.22), "seconds_since": pytest.approx(3.5)}
+    assert snap.person_count == 3
+    # v1 body has no ambient tail — the channel reads as absent, not
+    # fabricated.
+    assert snap.ambient_field_samples == 0
+    assert snap.ambient_field == ()
+
+
+def test_dyadic_snapshot_unpack_ambient_field_tail():
+    """The additive ambient tail decodes when present: the pooled
+    field signature — "someone is here" — for presence that never
+    attributes a person."""
+    import struct
+
+    from genesis_client.types import DyadicSnapshot
+
+    body = bytearray([1])
+    body += struct.pack("<6f", *([0.0] * 6))
+    body += bytes([0])  # no person — anonymous presence
+    body += bytes([0])  # no reunion
+    body += struct.pack("<H", 2)
+    body += struct.pack("<I", 17)
+    body += struct.pack("<10f", *([0.3] * 10))
+
+    snap = DyadicSnapshot.unpack(bytes(body))
+    assert snap.person is None
+    assert snap.person_count == 2
+    assert snap.ambient_field_samples == 17
+    assert snap.ambient_field == pytest.approx([0.3] * 10)
+
+
+def test_update_user_affect_person_key_and_alias():
+    """The update tail carries the person key, provenance, and the
+    one-shot merge alias — [u8 key_len][key][u8 auth][u8 alias_len]
+    [alias]. Face-cluster keys ride the same field as names."""
+    from unittest.mock import MagicMock
+
+    from genesis_client.client import GenesisClient
+
+    client = GenesisClient.__new__(GenesisClient)
+    client._request = MagicMock(return_value=b"\x01")
+
+    # Anonymous face key — no name needed to be someone.
+    assert client.update_user_affect(0.5, 0.6, 0.7, 0.8, speaker="face:3")
+    payload = client._request.call_args[0][1]
+    assert payload[16] == 6
+    assert payload[17:23] == b"face:3"
+    assert payload[23] == 0
+
+    # Naming fold: alice now carries face:3's measured history.
+    client.update_user_affect(
+        0.5, 0.6, 0.7, 0.8,
+        speaker="alice", authenticated=True, merge_alias="face:3",
+    )
+    payload = client._request.call_args[0][1]
+    assert payload[16] == 5
+    assert payload[17:22] == b"alice"
+    assert payload[22] == 1
+    assert payload[23] == 6
+    assert payload[24:30] == b"face:3"
+
+
+def test_dyadic_snapshot_unpack_anonymous():
+    """Anonymous/absent presence: no person block, no reunion."""
+    import struct
+
+    from genesis_client.types import DyadicSnapshot
+
+    body = bytearray([1])
+    body += struct.pack("<6f", *([0.0] * 6))
+    body += bytes([0])  # no person
+    body += bytes([0])  # no reunion
+    body += struct.pack("<H", 0)
+
+    snap = DyadicSnapshot.unpack(bytes(body))
+    assert snap.person is None
+    assert snap.reunion is None
+    assert snap.person_count == 0
+
+
+def test_dyadic_snapshot_unpack_rejects_garbage():
+    """A truncated or foreign payload is an error, not a reading."""
+    import struct
+
+    from genesis_client.types import DyadicSnapshot
+
+    with pytest.raises(ValueError, match="bad dyadic snapshot"):
+        DyadicSnapshot.unpack(b"")
+    with pytest.raises(ValueError, match="bad dyadic snapshot"):
+        DyadicSnapshot.unpack(struct.pack("<6f", *([0.0] * 6)))  # no ver byte
+    with pytest.raises(ValueError, match="bad dyadic snapshot"):
+        DyadicSnapshot.unpack(bytes([9]) + bytes(40))  # wrong version

@@ -45,7 +45,6 @@ from parietal_lobe.world_model import (
     WorldEvent,
     WorldModel,
 )
-from temporal_lobe.cognitive_map import CognitiveMap
 from temporal_lobe.concepts import RelationType
 
 from genesis_client.protocol import (

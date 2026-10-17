@@ -505,7 +505,7 @@ class EmergentIdentity:
         # What are its most connected concepts? (high-degree nodes
         # are central to its understanding)
         if genesis_concept:
-            neighbors = network.get_neighbors("genesis")
+            neighbors = network.get_exact_neighbors("genesis")
             high_weight = [t for t, r, w in neighbors if w > 0.7]
             if high_weight:
                 # What domains is it connected to?

@@ -178,14 +178,14 @@ def test_curiosity_shared_state_is_thread_safe() -> None:
                 curiosity.generate_questions(
                     emotion, active_concepts=focus_names, max_questions=2
                 )
-        except BaseException as e:  # noqa: BLE001 — collect, assert below
+        except Exception as e:  # noqa: BLE001 — collect, assert below
             errors.append(e)
 
     def churn_snapshot() -> None:
         try:
             for _ in range(25):
                 curiosity.to_dict()
-        except BaseException as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             errors.append(e)
 
     def churn_broadcast() -> None:
@@ -193,7 +193,7 @@ def test_curiosity_shared_state_is_thread_safe() -> None:
         try:
             for _ in range(50):
                 curiosity.receive_broadcast(item)
-        except BaseException as e:  # noqa: BLE001
+        except Exception as e:  # noqa: BLE001
             errors.append(e)
 
     threads = [

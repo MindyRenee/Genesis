@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from .belief import PresenceBelief
+from parietal_lobe.belief import PresenceBelief
 
 #: How much a single addressed interaction grows familiarity. The
 #: update is asymptotic (``f += (1-f) * rate``), so early exchanges

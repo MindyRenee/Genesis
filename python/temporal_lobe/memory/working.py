@@ -359,7 +359,16 @@ class PhonologicalLoop:
         """Drop the weakest (lowest-activation) item from the loop."""
         if not self._items:
             return
-        weakest_key = min(self._items, key=lambda k: self._items[k].activation)
+        # Ties break on last_rehearsed: an item refreshed more recently
+        # is the stronger one — recency is the loop's own bookkeeping
+        # for which trace still has a live rehearsal thread.
+        weakest_key = min(
+            self._items,
+            key=lambda k: (
+                self._items[k].activation,
+                self._items[k].last_rehearsed,
+            ),
+        )
         del self._items[weakest_key]
         self._order.remove(weakest_key)
 

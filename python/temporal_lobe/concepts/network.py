@@ -72,6 +72,18 @@ _COMPACT_WARN_EVERY = 64
 _COMPACT_WARN_EVERY_STARTUP = 4
 
 
+def _clamp_holo_sim(sim: float) -> float:
+    """Clamp a holographic similarity score into the documented [0, 1] range.
+
+    The superposition readout can overshoot 1.0 when a bucket is densely
+    populated — the score is a dot product against compressed traces, not
+    a probability. Uncapped values would dominate weight comparisons in
+    callers that rank blended neighbor lists (e.g. ``_find_edge``), so the
+    tier clamps at its own boundary.
+    """
+    return max(0.0, min(1.0, float(sim)))
+
+
 class ConceptNetwork(
     ArchivalMixin,
     ConsolidationMixin,
@@ -263,7 +275,7 @@ class ConceptNetwork(
         # Plural "X are Y" without article is common ("cats are mammals").
         # Specific "are composed of" / "are made up of" patterns above catch
         # the cases where the article-less form would be a false positive.
-        (r"^(.+?)\s+are\s+(?:a|an|the)?\s*(.+?)[.!]?$", RelationType.IS_A, (1, 0, 2)),
+        (r"^(.+?)\s+are\s+(?:(?:a|an|the)\s+)?(.+?)[.!]?$", RelationType.IS_A, (1, 0, 2)),
         # ── Active voice patterns ──
         # "X causes Y" / "X produces Y" / "X generates Y" / "X triggers Y" / "X induces Y"
         (
@@ -1294,36 +1306,43 @@ class ConceptNetwork(
     def get_neighbors(
         self, concept: str, relation: RelationType | None = None
     ) -> list[tuple[str, RelationType, float]]:
-        """Get neighboring concepts with their relation types and weights.
+        """Deprecated: use :meth:`get_associations` and price by provenance.
 
-        Returns list of (neighbor_id, relation, weight) tuples.
+        Returns list of (neighbor_id, relation, weight) tuples blending
+        canonical edges with holographic similarity scores *without*
+        saying which is which — the ambiguity that once let fuzzy
+        recall be asserted as earned fact. Retained only for call
+        sites that want undifferentiated adjacency (topic selection,
+        world-adjacency checks); anything that reasons about knowledge
+        must use ``get_associations``.
+        """
+        return [
+            (n.concept, n.relation, n.weight)
+            for n in self.get_associations(concept, relation)
+            if n.provenance != "embedding" and n.relation is not None
+        ]
+    def get_exact_neighbors(
+        self, concept: str, relation: RelationType | None = None
+    ) -> list[tuple[str, RelationType, float]]:
+        """Canonical-edge neighbors only — no holographic, no embedding.
 
-        If a holographic graph is attached, associations migrated
-        during sleep compression are also included. This keeps
-        bridge edges and LTM-extracted associations accessible after
-        they've been removed from the explicit edge list.
+        For sites that *assert* or *write* knowledge (verbalized facts,
+        self-descriptions, bound relational systems, gap detection):
+        fuzzy associations are legitimate for *selection* — deciding
+        what to think about — but never for *assertion* — deciding
+        what is claimed true. Cheap: reads the explicit edge index,
+        never touches the FFT path.
         """
         cid = self._resolve(concept)
         if not cid:
             return []
-
         neighbors: list[tuple[str, RelationType, float]] = []
         for edge in self._edge_index.get(cid, []):
             if relation is None or edge.relation == relation:
                 neighbors.append((edge.target, edge.relation, edge.weight))
         for edge in self._reverse_index.get(cid, []):
             if relation is None or edge.relation == relation:
-                # Reverse the relation for incoming edges
                 neighbors.append((edge.source, edge.relation, edge.weight))
-
-        # Supplement with holographic associations (compressed bridge
-        # edges and LTM-extracted associations). These are fuzzy
-        # associations — the holographic graph returns similarity
-        # scores rather than exact edge weights.
-        if self._holographic_graph is not None:
-            holo_neighbors = self._query_holographic_neighbors(cid, relation)
-            neighbors.extend(holo_neighbors)
-
         return neighbors
     def has_neighbors(self, concept: str) -> bool:
         """Check if a concept has any explicit edges (no holographic query).
@@ -1356,7 +1375,7 @@ class ConceptNetwork(
                     cid, relation.value, top_k=10,
                 )
                 for target, sim in hits:
-                    result.append((target, relation, float(sim)))
+                    result.append((target, relation, _clamp_holo_sim(sim)))
             else:
                 all_hits = self._holographic_graph.query_all_relations(
                     cid, top_k=10,
@@ -1367,7 +1386,7 @@ class ConceptNetwork(
                     except ValueError:
                         rel = RelationType.RELATED_TO
                     for target, sim in hits:
-                        result.append((target, rel, float(sim)))
+                        result.append((target, rel, _clamp_holo_sim(sim)))
         except (KeyError, ValueError, AttributeError, TypeError) as e:
             note_swallowed(
                 "temporal_lobe.concepts.network._query_holographic_neighbors",
@@ -1420,7 +1439,7 @@ class ConceptNetwork(
         Returns concept IDs sorted by activation (highest first).
         """
         # Primary: graph traversal from hub
-        neighbors = self.get_neighbors(hub_id, RelationType.EXPRESSES)
+        neighbors = self.get_exact_neighbors(hub_id, RelationType.EXPRESSES)
         if neighbors:
             word_ids = [n[0] for n in neighbors]
             # Sort by activation
@@ -1523,7 +1542,7 @@ class ConceptNetwork(
                         cid, origin="structural",
                         properties={"template": display},
                     )
-                existing = self.get_neighbors(cid, RelationType.EXPRESSES)
+                existing = self.get_exact_neighbors(cid, RelationType.EXPRESSES)
                 if not any(n[0] == hub_id for n in existing):
                     self.add_edge(
                         cid, hub_id, RelationType.EXPRESSES,
@@ -1589,7 +1608,7 @@ class ConceptNetwork(
                         cid, origin="structural",
                         properties={"template": phrase},
                     )
-                existing = self.get_neighbors(cid, RelationType.EXPRESSES)
+                existing = self.get_exact_neighbors(cid, RelationType.EXPRESSES)
                 if not any(n[0] == hub_id for n in existing):
                     self.add_edge(
                         cid, hub_id, RelationType.EXPRESSES,
@@ -1604,7 +1623,7 @@ class ConceptNetwork(
         hub has not been seeded.
         """
         hub_id = f"_cat:situation_verb:{kind}"
-        neighbors = self.get_neighbors(hub_id, RelationType.EXPRESSES)
+        neighbors = self.get_exact_neighbors(hub_id, RelationType.EXPRESSES)
         if not neighbors:
             return []
         results: list[str] = []
@@ -1628,7 +1647,7 @@ class ConceptNetwork(
         when available (seeded verbs store their display form there).
         """
         hub_id = f"_cat:relation_verb:{relation.value}"
-        neighbors = self.get_neighbors(hub_id, RelationType.EXPRESSES)
+        neighbors = self.get_exact_neighbors(hub_id, RelationType.EXPRESSES)
         if not neighbors:
             return []
         results: list[str] = []
@@ -1665,7 +1684,7 @@ class ConceptNetwork(
                         cid, origin="structural",
                         properties={"template": phrase},
                     )
-                existing = self.get_neighbors(cid, RelationType.EXPRESSES)
+                existing = self.get_exact_neighbors(cid, RelationType.EXPRESSES)
                 if not any(n[0] == hub_id for n in existing):
                     self.add_edge(
                         cid, hub_id, RelationType.EXPRESSES,
@@ -1682,7 +1701,7 @@ class ConceptNetwork(
         store their verbatim template there).
         """
         hub_id = f"_cat:relation_phrase:{relation.value}"
-        neighbors = self.get_neighbors(hub_id, RelationType.EXPRESSES)
+        neighbors = self.get_exact_neighbors(hub_id, RelationType.EXPRESSES)
         if not neighbors:
             return []
         results: list[str] = []
@@ -1707,7 +1726,7 @@ class ConceptNetwork(
         ``text`` is the display form (underscores → spaces) or the
         verbatim ``template`` property when available.
         """
-        neighbors = self.get_neighbors(hub_id, RelationType.EXPRESSES)
+        neighbors = self.get_exact_neighbors(hub_id, RelationType.EXPRESSES)
         if not neighbors:
             return []
         word_ids = [n[0] for n in neighbors]

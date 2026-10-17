@@ -38,6 +38,10 @@ class LimbicSystem:
             config=config,
             socket_path=socket_path,
         )
+        from limbic_system.amygdala import Amygdala
+
+        self.amygdala = Amygdala()
+        self.regulator.set_amygdala(self.amygdala)
         self.feeling_reporter = None
 
     def grow_feeling_reporter(self, **deps: Any):

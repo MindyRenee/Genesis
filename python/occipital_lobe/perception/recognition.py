@@ -41,7 +41,7 @@ import logging
 import os
 import tempfile
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -105,6 +105,16 @@ _RECOGNITION_THRESHOLD = 0.4
 # so without a bound the JSON grows on every re-registration.
 _MAX_EMBEDDINGS_PER_NAME = 20
 
+# Anonymous cluster matching — looser than the named threshold because
+# a cluster accumulates embeddings from every sighting (more chances to
+# hit), and a false merge pollutes a stranger's signature. Keep it
+# stricter instead: "familiar" must mean *the same* face.
+_CLUSTER_THRESHOLD = 0.45
+
+# Cap on live anonymous clusters — crowd scenes must not grow the
+# registry without bound. Least-recently-seen evicts.
+_MAX_CLUSTERS = 64
+
 
 @dataclass
 class DetectedFace:
@@ -114,6 +124,31 @@ class DetectedFace:
     name: str | None = None  # recognized name, or None if unknown
     confidence: float = 0.0  # recognition confidence (0-1)
     embedding: np.ndarray | None = None  # 128-d SFace embedding
+    # Person key for the dyadic signature: the name when recognized,
+    # else the stable anonymous cluster id ("face:3"). An unnamed face
+    # is still *someone* — the key lets a familiar stranger accumulate
+    # a signature before any introduction.
+    person_key: str | None = None
+    # "named" | "familiar" (seen cluster, no name) | "new" (first sighting)
+    tier: str = "new"
+
+
+@dataclass
+class FaceCluster:
+    """An anonymous-but-recognized face — a person without a name.
+
+    Unknown faces are not noise: a recurring stranger should become
+    *familiar*. Unmatched embeddings cluster here under stable
+    "face:N" keys so presence, aura, and field accrue to them in the
+    dyadic model exactly as they do for named people. Naming a
+    cluster folds its history into the named signature.
+    """
+
+    cluster_id: str          # "face:3"
+    embeddings: list[list[float]] = field(default_factory=list)
+    sightings: int = 0
+    first_seen: float = field(default_factory=time.time)
+    last_seen: float = field(default_factory=time.time)
 
 
 @dataclass
@@ -140,12 +175,20 @@ class FaceRecognizer:
         self._recognizer: object | None = None
         self._available: bool | None = None
         self._known_faces: dict[str, list[KnownFace]] = {}
+        # Anonymous face clusters — stable "face:N" identities for
+        # people seen but never named. Persisted beside known_faces so
+        # a familiar stranger survives restarts.
+        self._clusters: dict[str, FaceCluster] = {}
+        self._next_cluster_id = 1
         self._data_dir = Path(data_dir) if data_dir else None
         self._faces_file: Path | None = None
+        self._clusters_file: Path | None = None
 
         if self._data_dir:
             self._faces_file = self._data_dir / "known_faces.json"
+            self._clusters_file = self._data_dir / "face_clusters.json"
             self._load_known_faces()
+            self._load_clusters()
 
     def is_available(self) -> bool:
         """Check if face detection models are loaded."""
@@ -262,14 +305,21 @@ class FaceRecognizer:
             aligned = recognizer.alignCrop(bgr, face[None])
             embedding = recognizer.feature(aligned).flatten()
 
-            # Try to recognize
+            # Try to recognize — named first, then anonymous clusters.
+            # Either way the face leaves with a stable person key.
             name, confidence = self._match_face(embedding)
+            if name is not None:
+                person_key, tier = name, "named"
+            else:
+                person_key, tier = self._match_or_cluster(embedding)
 
             results.append(DetectedFace(
                 bbox=(x, y, w, h),
                 name=name,
                 confidence=confidence,
                 embedding=embedding,
+                person_key=person_key,
+                tier=tier,
             ))
 
         return results
@@ -311,6 +361,89 @@ class FaceRecognizer:
             return best_name, confidence
         return None, 0.0
 
+    def _match_or_cluster(self, embedding: np.ndarray) -> tuple[str, str]:
+        """Match an unnamed face against the anonymous clusters.
+
+        Returns (person_key, tier): "familiar" when the face matches a
+        known cluster — the stranger is recognized though unnamed —
+        else "new": a fresh "face:N" cluster is minted for them so
+        their signature can start accumulating now.
+        """
+        norm = float(np.linalg.norm(embedding))
+        best_id: str | None = None
+        best_sim = -1.0
+        if norm >= 1e-8:
+            for cid, cluster in self._clusters.items():
+                for emb in cluster.embeddings:
+                    e = np.array(emb, dtype=np.float32)
+                    en = float(np.linalg.norm(e))
+                    if en < 1e-8:
+                        continue
+                    sim = float(np.dot(embedding, e) / (norm * en))
+                    if sim > best_sim:
+                        best_sim = sim
+                        best_id = cid
+
+        now = time.time()
+        if best_id is not None and best_sim >= _CLUSTER_THRESHOLD:
+            cluster = self._clusters[best_id]
+            cluster.sightings += 1
+            cluster.last_seen = now
+            cluster.embeddings.append(embedding.tolist())
+            if len(cluster.embeddings) > _MAX_EMBEDDINGS_PER_NAME:
+                cluster.embeddings = cluster.embeddings[
+                    -_MAX_EMBEDDINGS_PER_NAME:
+                ]
+            self._save_clusters()
+            return best_id, "familiar"
+
+        # First sighting — mint a cluster. Bounded: beyond the cap the
+        # least-recently-seen cluster is evicted rather than letting
+        # crowd scenes grow the registry without limit.
+        if len(self._clusters) >= _MAX_CLUSTERS:
+            stale = min(self._clusters, key=lambda c: self._clusters[c].last_seen)
+            del self._clusters[stale]
+        cid = f"face:{self._next_cluster_id}"
+        self._next_cluster_id += 1
+        self._clusters[cid] = FaceCluster(
+            cluster_id=cid,
+            embeddings=[embedding.tolist()],
+            sightings=1,
+            first_seen=now,
+            last_seen=now,
+        )
+        self._save_clusters()
+        return cid, "new"
+
+    def name_face(self, cluster_id: str, name: str) -> str | None:
+        """Give a name to an anonymous face cluster.
+
+        The cluster's sightings become the named person's embeddings —
+        the familiar stranger was *them* all along. Returns the folded
+        cluster id so the caller can report the merge on the dyadic
+        wire (the alias field), or None if the cluster is unknown.
+        """
+        name = name.lower().strip()
+        cluster = self._clusters.pop(cluster_id, None)
+        if cluster is None or not name:
+            return None
+        entries = self._known_faces.setdefault(name, [])
+        for emb in cluster.embeddings:
+            entries.append(KnownFace(
+                name=name, embedding=emb, registered_at=cluster.first_seen
+            ))
+        if len(entries) > _MAX_EMBEDDINGS_PER_NAME:
+            self._known_faces[name] = entries[-_MAX_EMBEDDINGS_PER_NAME:]
+        self._save_known_faces()
+        self._save_clusters()
+        logger.info("Face cluster %s named '%s'", cluster_id, name)
+        return cluster_id
+
+    def cluster_sightings(self, cluster_id: str) -> int:
+        """How many times this anonymous face has been seen."""
+        cluster = self._clusters.get(cluster_id)
+        return cluster.sightings if cluster else 0
+
     def register_face(
         self, name: str, rgb_frame: np.ndarray
     ) -> bool:
@@ -333,6 +466,13 @@ class FaceRecognizer:
         largest = max(faces, key=lambda f: f.bbox[2] * f.bbox[3])
         if largest.embedding is None:
             return False
+
+        # If the subject was already an anonymous cluster, naming it
+        # folds its sightings into the named person rather than
+        # starting them over.
+        if largest.person_key and largest.person_key.startswith("face:"):
+            if self.name_face(largest.person_key, name):
+                return True
 
         known = KnownFace(
             name=name.lower().strip(),
@@ -395,3 +535,50 @@ class FaceRecognizer:
             _write_json_atomically(self._faces_file, data)
         except Exception as e:  # noqa: BLE001
             logger.warning(f"Failed to save known faces: {e}")
+
+    def _load_clusters(self) -> None:
+        """Load anonymous face clusters — the familiar strangers."""
+        if self._clusters_file is None or not self._clusters_file.exists():
+            return
+        try:
+            with open(self._clusters_file) as f:
+                data = json.load(f)
+            self._next_cluster_id = int(data.get("next_id", 1))
+            self._clusters = {
+                c["cluster_id"]: FaceCluster(
+                    cluster_id=c["cluster_id"],
+                    embeddings=c.get("embeddings", []),
+                    sightings=c.get("sightings", 0),
+                    first_seen=c.get("first_seen", time.time()),
+                    last_seen=c.get("last_seen", time.time()),
+                )
+                for c in data.get("clusters", [])
+            }
+            logger.info(
+                "Loaded %d anonymous face cluster(s)", len(self._clusters)
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Failed to load face clusters: {e}")
+
+    def _save_clusters(self) -> None:
+        """Persist anonymous clusters so a familiar stranger survives
+        a restart — an unnamed person is still a person."""
+        if self._clusters_file is None:
+            return
+        try:
+            data = {
+                "next_id": self._next_cluster_id,
+                "clusters": [
+                    {
+                        "cluster_id": c.cluster_id,
+                        "embeddings": c.embeddings,
+                        "sightings": c.sightings,
+                        "first_seen": c.first_seen,
+                        "last_seen": c.last_seen,
+                    }
+                    for c in self._clusters.values()
+                ],
+            }
+            _write_json_atomically(self._clusters_file, data)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"Failed to save face clusters: {e}")

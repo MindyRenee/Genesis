@@ -1392,6 +1392,62 @@ def test_own_pids_filters_zero_and_dead(tmp_path) -> None:
     assert 99999999 not in pids
 
 
+def test_crowded_machine_tags_environment_not_effort() -> None:
+    """Resource stalls with low own-CPU are environmental, not exertion.
+
+    When the box is crowded by other tenants, PSI rises while her own
+    process CPU stays low. The felt cause must attribute that as
+    ``interoception_environment`` — she is being starved, not
+    exerting — so she doesn't throttle her own learner over load she
+    didn't create.
+    """
+    from limbic_system.emotional_regulator import InternalState
+
+    regulator = EmotionalRegulator()
+    crowded = InternalState(
+        cpu_usage=10.0,
+        memory_usage=0.0,
+        daemon_connected=True,
+        response_latency=0.0,
+        stress_level=0.0,
+        psi_cpu=0.5,
+    )
+    regulator._interoception.sense_internal_state = lambda: crowded  # type: ignore[method-assign]
+
+    actions: list[str] = []
+    regulator._regulate_interoception(actions)
+
+    assert regulator.last_cause == "interoception_environment", (
+        f"stalls without own-CPU must attribute to the environment, "
+        f"got {regulator.last_cause!r}"
+    )
+
+
+def test_own_effort_still_tags_cpu_not_environment() -> None:
+    """High own-CPU keeps the effort attribution even under PSI stalls.
+
+    If she is burning her own cores, crowding must not relabel the
+    cause — the cpu branch wins first and the self-throttle path
+    stays reachable.
+    """
+    from limbic_system.emotional_regulator import InternalState
+
+    regulator = EmotionalRegulator()
+    working = InternalState(
+        cpu_usage=90.0,
+        memory_usage=0.0,
+        daemon_connected=True,
+        response_latency=0.0,
+        stress_level=0.0,
+        psi_cpu=0.5,
+    )
+    regulator._interoception.sense_internal_state = lambda: working  # type: ignore[method-assign]
+
+    regulator._regulate_interoception([])
+
+    assert regulator.last_cause == "interoception_cpu"
+
+
 # ======================================================================
 # Disconnected sensors
 #

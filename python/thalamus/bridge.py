@@ -79,7 +79,7 @@ class WorldBridge:
                 self._tensor_disabled = True
                 logger.debug(f"tensor slab unreachable — publishing off: {e}")
             else:
-                note_swallowed("world.bridge.publish_tensor", e)
+                note_swallowed("thalamus.bridge.publish_tensor", e)
             return False
         self._tensor_failures = 0
         return ok
@@ -174,7 +174,7 @@ class WorldBridge:
                 metadata=meta,
             )
         except Exception as e:  # noqa: BLE001 — broadcast must never break the loop
-            note_swallowed("world.bridge.broadcast", e)
+            note_swallowed("thalamus.bridge.broadcast", e)
             return False
 
     def broadcast_observation(
@@ -264,7 +264,7 @@ class WorldBroadcastSink:
         try:
             self._on_world_broadcast(item)
         except Exception as e:  # noqa: BLE001
-            note_swallowed("world.bridge.sink", e)
+            note_swallowed("thalamus.bridge.sink", e)
 
 
 def _f32(v: float) -> bytes:

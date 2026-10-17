@@ -24,9 +24,6 @@ Run offline when that is not acceptable:
 ./run.sh --offline
 ```
 
-A Discord session mirror is optional. Put the webhook in `.genesis-discord` or
-`GENESIS_DISCORD_WEBHOOK`; both are local secrets and must never be committed.
-
 ## Persistence and shutdown
 
 The developmental record is cumulative and load-bearing. Stop Genesis with

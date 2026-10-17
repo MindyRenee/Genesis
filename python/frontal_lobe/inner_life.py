@@ -64,6 +64,7 @@ from limbic_system.emotion import (
     EmotionCategory,
 )
 from temporal_lobe.concepts import ConceptNetwork, RelationType, strip_sense_suffix
+from temporal_lobe.concepts.types import Neighbor
 from temporal_lobe.dream_synthesis import DreamSynthesis
 from thalamus.brain_waves import (  # canonical definition — avoids threshold drift
     SleepStage,
@@ -131,13 +132,11 @@ RUMINATION_MIN_LENGTH = 3
 # If novelty drops below this threshold across the chain, it's repetitive
 RUMINATION_NOVELTY_THRESHOLD = 0.3
 
-# Insight write-back weights. A waking insight records the noticed
+# Insight write-back weight. A waking insight records the noticed
 # connection just above detect_insight's weak-edge rediscovery
 # threshold (0.2), so the noticing closes its own loop. Dream-derived
-# insights use dream-synthesis's hypothetical weight (0.15) — a single
-# dream pairing stays tentative and only recurrence corroborates it.
+# insights never write back — see _record_insight_edge.
 _INSIGHT_EDGE_WEIGHT = 0.25
-_INSIGHT_DREAM_EDGE_WEIGHT = 0.15
 
 
 class _LiveEvent:
@@ -1672,15 +1671,32 @@ class InnerLife:
         return max(0.2, min(0.95, prob))
 
     def _neighbor_knowledge(
-        self, neighbors: list[tuple[str, RelationType, float]]
+        self, neighbors: list[Neighbor]
     ) -> tuple[str, str, list[tuple[str, str, float]]]:
         """Pick a neighbor and return (id, display, knowledge triples)
         preserving the edge's true relation so the language engine can
-        verbalize the actual link rather than a bare concept pair."""
-        name, rel, weight = self._rng.choice(neighbors)
+        verbalize the actual link rather than a bare concept pair.
+
+        Provenance gate: only ``exact`` neighbors (canonical logged
+        edges) may carry their typed relation into speech. Holographic
+        hits are fuzzy recall — the source concept is not bound in the
+        bucket, so an association belonging to a bucket-mate can surface
+        here (a real ``vision --causes--> see`` edge once surfaced as
+        ``tool --causes--> see`` and produced the dream utterance "Tool
+        causes the see."). Embedding neighbors are similarity matches
+        with no relation at all. Both tiers are legitimate things to
+        *follow* — association is what dreams are for — but not to
+        *assert a kind of*, so they verbalize as ``related_to``.
+        """
+        chosen = self._rng.choice(neighbors)
+        name = chosen.concept
         display = name.replace("_", " ")
-        rel_val = rel.value if isinstance(rel, RelationType) else str(rel or "related_to")
-        return name, display, [(rel_val, display, float(weight or 0.4))]
+        weight = min(1.0, max(0.0, float(chosen.weight or 0.4)))
+        if chosen.provenance == "exact" and chosen.relation is not None:
+            rel_val = chosen.relation.value
+        else:
+            rel_val = RelationType.RELATED_TO.value
+        return name, display, [(rel_val, display, weight)]
 
     def _dream_thought(self, emotion: EmotionalState) -> SpontaneousThought | None:
         """Generate a non-lucid dream thought.
@@ -1719,7 +1735,7 @@ class InnerLife:
             )
         else:
             c1 = chosen[0]
-            neighbors = self.network.get_neighbors(c1)
+            neighbors = self.network.get_associations(c1)
             if neighbors:
                 _, _neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
                 display = c1.replace('_', ' ')
@@ -2243,7 +2259,7 @@ class InnerLife:
             return self._dream_thought(emotion)
 
         c1 = seed_concepts[0]
-        neighbors = self.network.get_neighbors(c1)
+        neighbors = self.network.get_associations(c1)
         display = c1.replace("_", " ")
 
         # PGO visual content is stored as a semantic label in metadata.
@@ -2321,7 +2337,7 @@ class InnerLife:
         else:
             c1 = self._rng.choice(concept_ids)
 
-        neighbors = self.network.get_neighbors(c1)
+        neighbors = self.network.get_associations(c1)
         display = c1.replace("_", " ")
         if neighbors:
             _, _neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
@@ -2362,7 +2378,7 @@ class InnerLife:
             return self._nrem_dream_thought(emotion)
 
         c1 = seed_concepts[0]
-        neighbors = self.network.get_neighbors(c1)
+        neighbors = self.network.get_associations(c1)
         display = c1.replace("_", " ")
 
         if neighbors and self._rng.random() < 0.7:
@@ -2449,7 +2465,7 @@ class InnerLife:
 
         # It chooses which concept to follow (lucid agency)
         target = self._rng.choice(seed_concepts)
-        neighbors = self.network.get_neighbors(target)
+        neighbors = self.network.get_associations(target)
         display = target.replace("_", " ")
 
         if not neighbors:
@@ -2997,8 +3013,7 @@ class InnerLife:
         may spontaneously form the link. Otherwise it just wonders
         about it. Returns None if they're already connected.
         """
-        neighbors = self.network.get_neighbors(c1)
-        if any(n[0] == c2 for n in neighbors):
+        if self._find_edge(self.network, c1, c2) is not None:
             return None  # already connected — nothing to wonder about
 
         formed = False
@@ -3032,7 +3047,7 @@ class InnerLife:
 
         Returns None if the concept has no neighbors.
         """
-        neighbors = self.network.get_neighbors(c1)
+        neighbors = self.network.get_associations(c1)
         if not neighbors:
             return None
         _, _neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
@@ -3055,7 +3070,7 @@ class InnerLife:
     ) -> SpontaneousThought | None:
         """A memory thought seeded by previous concepts — thinking deeper."""
         topic = seed_concepts[0]
-        neighbors = self.network.get_neighbors(topic)
+        neighbors = self.network.get_associations(topic)
 
         # Try to compose from its actual knowledge first — this is
         # the generative path that uses the ThoughtComposer.
@@ -3081,7 +3096,7 @@ class InnerLife:
         )
 
     def _render_memory_fallback(
-        self, topic: str, neighbors: list[tuple[str, RelationType, float]]
+        self, topic: str, neighbors: list[Neighbor]
     ) -> tuple[str, list[tuple[str, str, float]]]:
         """Render a memory thought from semantic data.
 
@@ -3096,7 +3111,7 @@ class InnerLife:
             return display, []
 
         neighbor, neighbor_display, knowledge = self._neighbor_knowledge(neighbors)
-        second_neighbors = self.network.get_neighbors(neighbor)
+        second_neighbors = self.network.get_associations(neighbor)
         if second_neighbors and self._rng.random() < 0.4:
             _, second_display, second_knowledge = self._neighbor_knowledge(second_neighbors)
             knowledge.append((second_knowledge[0][0], second_display, 0.3))
@@ -4644,9 +4659,10 @@ class InnerLife:
         # Pick two random concepts and wonder if they're connected
         c1, c2 = self._rng.sample(concept_ids, min(2, len(concept_ids)))
 
-        # Check if they're already connected
-        neighbors = self.network.get_neighbors(c1)
-        connected = any(n[0] == c2 for n in neighbors)
+        # Check if they're already connected — canonical edges only; a
+        # fuzzy holographic/embedding hit is not "already connected" and
+        # must not suppress forming the real edge.
+        connected = self._find_edge(self.network, c1, c2) is not None
 
         if not connected:
             # High creativity → it forms the connection itself
@@ -5019,7 +5035,7 @@ class InnerLife:
         ]:
             if not self.network.get_concept(concept_name):
                 continue
-            neighbors = self.network.get_neighbors(concept_name)
+            neighbors = self.network.get_associations(concept_name)
             if not neighbors:
                 continue
             return self._compose_facts_from_neighbors(
@@ -5030,7 +5046,7 @@ class InnerLife:
 
     @staticmethod
     def _compose_facts_from_neighbors(
-        neighbors: list[tuple[str, RelationType, float]],
+        neighbors: list[Neighbor],
         prefix: str,
         hedge: bool,
     ) -> tuple[str, list[tuple[str, str, float]]]:
@@ -5039,17 +5055,29 @@ class InnerLife:
         Returns (content, knowledge) where content is a semantic
         fragment string and knowledge is a list of (relation, target,
         weight) triples for language-engine composition.
+
+        Provenance gate: only ``exact`` neighbors may carry a typed
+        relation ("causes", "is_a", ...) into a stated fact. Fuzzy
+        holographic/embedding recall is verbalized as ``related_to`` —
+        the association is real enough to mention, not to assert a
+        kind of.
         """
         facts: list[str] = []
         knowledge: list[tuple[str, str, float]] = []
-        for target, relation, weight in neighbors:
-            rel_str = relation.value.replace("_", " ")
+        for neighbor in neighbors:
+            target = neighbor.concept
+            weight = min(1.0, max(0.0, float(neighbor.weight)))
+            if neighbor.provenance == "exact" and neighbor.relation is not None:
+                rel_key = neighbor.relation.value
+            else:
+                rel_key = RelationType.RELATED_TO.value
+            rel_str = rel_key.replace("_", " ")
             target_display = target.replace("_", " ")
             knowledge.append((rel_str, target_display, weight))
             if hedge and weight <= 0.6:
                 from frontal_lobe.graph_walk import _RELATION_VERB_SEEDS
                 from temporal_lobe.morphology import hedge_verb_phrase
-                seeds = _RELATION_VERB_SEEDS.get(relation.value) or []
+                seeds = _RELATION_VERB_SEEDS.get(rel_key) or []
                 verb_phrase = seeds[0] if seeds else rel_str
                 facts.append(
                     f"{prefix} {hedge_verb_phrase(verb_phrase)} {target_display}"
@@ -5721,17 +5749,22 @@ class InnerLife:
     def _find_edge(
         network: ConceptNetwork, c1: str, c2: str
     ) -> tuple[RelationType, float] | None:
-        """Find the strongest edge between two concepts, if any exists.
+        """Find the strongest canonical edge between two concepts.
 
-        Returns (relation, weight) of the highest-weight edge, or None
-        if no edge exists. The strongest edge decides novelty — a pair
-        linked weakly through one relation and firmly through another
-        is already known.
+        Returns (relation, weight) of the highest-weight *explicit* edge,
+        or None if no canonical edge exists. Only the logged edge index
+        counts: holographic bucket hits and embedding neighbors are
+        candidate associations, not edges — a fuzzy hit mislabeled this
+        as a "weak connection" when the pair was in fact unlinked (and
+        an out-of-range similarity score could dominate the max). The
+        strongest edge decides novelty — a pair linked weakly through
+        one relation and firmly through another is already known.
         """
         best: tuple[RelationType, float] | None = None
-        for target, relation, weight in network.get_neighbors(c1):
-            if target == c2 and (best is None or weight > best[1]):
-                best = (relation, weight)
+        for edge in network.get_edges(c1, "both"):
+            other = edge.target if edge.source == c1 else edge.source
+            if other == c2 and (best is None or edge.weight > best[1]):
+                best = (edge.relation, edge.weight)
         return best
 
     def _record_insight_edge(
@@ -5750,17 +5783,19 @@ class InnerLife:
         a tentative ``related_to`` edge carrying its own provenance.
 
         Waking insights land just above the rediscovery threshold, so
-        the noticing closes its own loop. Dream-derived pairs land at
-        the hypothetical weight dream-synthesis proposals use: a single
-        dream sighting stays tentative, and only recurrence ratchets it
-        past the threshold (each ``add_edge`` on an existing edge
-        strengthens it).
+        the noticing closes its own loop.
+
+        Dream sightings do **not** write canonical edges. Dream chains
+        random-walk blended recall — including holographic bucket
+        collisions, which deterministically re-surface the same false
+        pair on every dream — so "recurrence" cannot ratchet a dream
+        hypothesis toward fact; it would ratchet noise. Dream edges
+        stay hypothetical: ``dream_synthesis`` is the path that
+        promotes them, and only after corroborating-path validation.
         """
-        weight = (
-            _INSIGHT_DREAM_EDGE_WEIGHT
-            if getattr(thought, "is_dream", False)
-            else _INSIGHT_EDGE_WEIGHT
-        )
+        if getattr(thought, "is_dream", False):
+            return
+        weight = _INSIGHT_EDGE_WEIGHT
         try:
             network.add_edge(
                 c1, c2, RelationType.RELATED_TO, weight, origin="insight"

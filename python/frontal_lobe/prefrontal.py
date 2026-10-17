@@ -54,6 +54,7 @@ import heapq
 import logging
 import random
 import re
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -169,6 +170,15 @@ __all__ = ["CognitiveState", "FrontalLobe", "Goal"]
 # These catch grammar issues introduced AFTER the initial render —
 # e.g. curiosity questions appended to the response that bypass the
 # generator's grammar safety net and the self-monitor.
+# The affective circumplex (valence × arousal, each [-1,1]) scaled
+# into map units — grid-module lattice periods are 3–12 units, so
+# affective motion must span that range for phases to differentiate.
+_AFFECT_MAP_SCALE = 16.0
+# Context bounds sentinel for the general (non-world) coordinate
+# domain — distinct from any real grid dimension so affective-space
+# places never collide with a world map.
+_GENERAL_MAP_BOUNDS = (-1, -1)
+
 _FINAL_REPEATED_PUNCT_RE = re.compile(r"([.!?])\1+")
 _FINAL_DOUBLE_SPACE_RE = re.compile(r"  +")
 _FINAL_SPACE_BEFORE_PUNCT_RE = re.compile(r"\s+([.,;!?])")
@@ -490,7 +500,17 @@ class FrontalLobe:
         if kind != KIND_HEARD or payload is None:
             return
         turn_id, text = payload
-        response, state = self.think(text)
+        # This handler runs on the heartbeat thread. think() already
+        # serializes on _think_mutex, but waiting unboundedly would
+        # stall the body clock behind a long console turn — bound the
+        # wait and let the utterance go unheard if she's mid-thought.
+        if not self._think_mutex.acquire(timeout=5.0):
+            logger.debug("heard turn dropped: think() busy")
+            return
+        try:
+            response, state = self.think(text)
+        finally:
+            self._think_mutex.release()
         if self._thalamus is not None:
             self._thalamus.post(
                 MODULE_LANGUAGE, KIND_SPOKE, (turn_id, (response, state))
@@ -559,6 +579,12 @@ class FrontalLobe:
         # answer them in a dedicated /teach-questions session, where
         # it has the same focus and limitations as teaching mode.
         self._question_queue: list[dict[str, str]] = []
+
+        # Single-thinker mutex. A turn mutates shared cognitive state
+        # (spreading-activation maps, episodic stores, the concept
+        # network), so think() serializes on it — the console worker
+        # and heartbeat-delivered heard turns must never overlap.
+        self._think_mutex = threading.RLock()
 
     def _init_intelligence(
         self,
@@ -1105,6 +1131,20 @@ class FrontalLobe:
         # resolved in the curiosity engine so it doesn't repeat it.
         # Maps: target_concept → question_text
         self._pending_question_concepts: dict[str, str] = {}
+
+        # Person-key resolution for the dyadic signature. The mind
+        # injects these after construction (vision lives on Mind, not
+        # in this lobe):
+        #   face_person_keys — Callable[[], list[str]]: person keys of
+        #     faces currently in view (names or anonymous "face:N").
+        #   face_namer — Callable[[cluster_id, name], str | None]: gives
+        #     a name to an anonymous cluster, returning the folded id.
+        self.face_person_keys: Callable[[], list[str]] | None = None
+        self.face_namer: Callable[[str, str], str | None] | None = None
+        # One-shot merge alias queued when an anonymous face key gets
+        # named — carried on the next dyadic update so the daemon folds
+        # the stranger's signature into the named person's.
+        self._pending_person_merge: str | None = None
 
         # ─── Self-directed goal stack ────────────────────────────────
         # Active goals let Genesis explain *why* it is asking or thinking
@@ -3543,7 +3583,8 @@ class FrontalLobe:
         """
         from frontal_lobe.turn import Turn
 
-        return Turn(self, user_input).run()
+        with self._think_mutex:
+            return Turn(self, user_input).run()
 
     def _think_run_pipeline(
         self,
@@ -4419,6 +4460,32 @@ class FrontalLobe:
         # 2.5 Apply brain wave modulation to emotional state
         emotion = self._modulate_by_brain_waves(emotion, brain_waves)
 
+        # 2.5a Orientation — position on the general coordinate map.
+        # The hippocampal-entorhinal organ is domain-agnostic: the
+        # world channel feeds it grid coordinates; here the general
+        # channel feeds it her position in the affective circumplex
+        # (valence × arousal — the canonical 2D state space she
+        # occupies every turn). Places that form in this context are
+        # recurring states; transition edges record which actions
+        # carried her between them. Orientation is a general function.
+        try:
+            cmap = self._temporal.cognitive_map if self._temporal is not None else None
+            if cmap is not None:
+                intent_name = getattr(perception.intent, "name", None) or str(
+                    perception.intent
+                )
+                cmap.observe(
+                    position=(
+                        emotion.valence * _AFFECT_MAP_SCALE,
+                        emotion.arousal * _AFFECT_MAP_SCALE,
+                    ),
+                    entities=[],
+                    action=intent_name,
+                    bounds=_GENERAL_MAP_BOUNDS,
+                )
+        except Exception as e:  # noqa: BLE001 — orientation must not break the turn
+            note_swallowed("frontal_lobe.prefrontal._think_emotion_tom_attention", e)
+
         # ── 2.5b Active inference — read the generative self-model ──
         # Read inference signals (surprise, free energy, allostatic
         # load, dyadic coupling) from the daemon and interpret them.
@@ -4439,7 +4506,12 @@ class FrontalLobe:
                 user_input,
                 is_question=user_input.strip().endswith("?"),
             )
-            self.active_inference.update_user_affect(user_affect)
+            self.active_inference.update_user_affect(
+                user_affect,
+                speaker=self._current_person_key(),
+                authenticated=self._is_steward_speaker(),
+                merge_alias=self._take_person_merge(),
+            )
 
         # Boundary — mistreatment from whoever is speaking accrues as
         # withdrawal pressure; fair treatment drains it. May withdraw
@@ -6436,6 +6508,54 @@ class FrontalLobe:
             or self.memory.get_user_facts().get("creator_name", "")
         )
 
+    def _current_person_key(self) -> str | None:
+        """The dyadic person key for who is present.
+
+        The attributed speaker wins — the person typing is the person
+        in the dyad. Failing that, exactly one visible face is them:
+        a named face yields the name, an unnamed one its anonymous
+        "face:N" key — a familiar stranger counts too. Multiple faces
+        are ambiguous — better anonymous than misattributed.
+        """
+        speaker = self._current_speaker()
+        if speaker:
+            return speaker
+        if self.face_person_keys is None:
+            return None
+        try:
+            keys = self.face_person_keys()
+        except Exception:  # noqa: BLE001
+            return None
+        return keys[0] if len(keys) == 1 else None
+
+    def _take_person_merge(self) -> str | None:
+        """Consume the queued merge alias, if any — sent once."""
+        merge = self._pending_person_merge
+        self._pending_person_merge = None
+        return merge
+
+    def _bind_face_to_speaker(self, name: str) -> None:
+        """Bind an anonymous face to a just-introduced name.
+
+        Exactly one face in view and it is unnamed — the stranger who
+        was "face:N" is them. Naming the cluster folds its sightings
+        into the named person at the recognizer; the queued alias lets
+        the daemon fold the dyadic signature the same way.
+        """
+        if self.face_person_keys is None or self.face_namer is None:
+            return
+        try:
+            keys = self.face_person_keys()
+        except Exception:  # noqa: BLE001
+            return
+        if len(keys) != 1 or not keys[0].startswith("face:"):
+            return
+        try:
+            if self.face_namer(keys[0], name):
+                self._pending_person_merge = keys[0]
+        except Exception:  # noqa: BLE001
+            return
+
     def _is_steward_speaker(self) -> bool:
         """Whether the current speaker is the authenticated steward.
 
@@ -6555,6 +6675,7 @@ class FrontalLobe:
                 self.network.add_edge("genesis", name, RelationType.RELATED_TO, 0.8)
                 # Whoever just introduced themselves is speaking now.
                 self.self_model.self_knowledge["current_speaker"] = display
+                self._bind_face_to_speaker(display)
                 if self.steward.is_steward_speaker(display):
                     # The credential is held and the speaker is the
                     # principal it names — creator and steward agree.

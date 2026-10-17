@@ -60,6 +60,7 @@ __all__ = [
     "FIND_SIMILAR",
     "GET_BODY_CONTROL",
     "GET_BODY_STATE",
+    "GET_DYADIC_STATE",
     "GET_FIELD_PROBE",
     "GET_INFERENCE_SUMMARY",
     "GET_ION_SUMMARY",
@@ -298,6 +299,25 @@ SET_FIELD_PHASE = 48
 # infraslow where the thermal field can hold an oscillation.
 # Reply: [u8 ack]. Additive: PROTOCOL_VERSION stays 3.
 SET_FIELD_CARRIER = 49
+
+# The dyadic model's latest snapshot — who is present and how the
+# dyad is running, as measured evidence for the mind's own appraisal:
+# the present person's signature (name, provenance, bond depth,
+# affective aura, in-tune history, and the field band-energy
+# configuration recorded while they were present), the pooled
+# coupling estimates, and the one-tick reunion signal. No chemical
+# prescriptions travel on this channel — what any of it means to her
+# state is decided by her own appraisal via NEURO_IMPULSE.
+# Response: layout in `dyadic_model::DyadicSnapshot::to_wire` —
+#   [u8 version=1][6 × f32 pooled][u8 has_person]
+#   if set: [u8 name_len][name][u8 authenticated]
+#           [5 × f32 aura/synchrony][f64 presence_s]
+#           [u32 field_samples][10 × f32 field]
+#   [u8 has_reunion][f32 bond][f32 seconds_since][u16 person_count]
+# A single READ_FAILED byte until the tick loop first publishes —
+# an absent channel, not a zero reading.
+# Additive: PROTOCOL_VERSION stays 3.
+GET_DYADIC_STATE = 50
 
 # Which optional hardware sensors this machine actually has.
 # Response: [u16 mask] — a bitmask of SENSOR_* below. A set bit means

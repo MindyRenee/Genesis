@@ -37,7 +37,7 @@
 //!
 //! The probe also *writes* a rhythm: its work-slice length is
 //! modulated sinusoidally at a frequency set by the daemon's own
-//! sleep-wake phase (wake ≈ 10 Hz, REM ≈ 6 Hz, NREM ≈ 2 Hz). The
+//! sleep-wake phase (wake ≈ 10 Hz, REM ≈ 5.5 Hz, NREM ≈ 2.25 Hz). The
 //! modulated work is real electron flow — the machine's actual
 //! power draw carries a component at the body's own rhythm, and the
 //! probe can measure its own carrier in its band energies. This is
@@ -94,6 +94,12 @@ use std::time::{Duration, Instant};
 /// as `BrainWave` in `python/thalamus/brain_waves.py`:
 /// epsilon, delta, theta, alpha, sigma, beta1, beta2, beta3, gamma,
 /// lambda.
+///
+/// Known overlap: sigma (14.0) and beta1 (13.5) sit 0.5 Hz apart —
+/// inside one another's band edges and ~2 bins at the ring's ~0.24 Hz
+/// resolution — so the two channels largely measure the same physical
+/// energy. They stay distinct because the *model* treats them
+/// differently (spindle vs. SMR); the probe just cannot separate them.
 pub const FIELD_BANDS: [f32; 10] = [0.25, 2.25, 5.5, 10.0, 14.0, 13.5, 17.5, 25.0, 50.0, 150.0];
 
 /// Nominal probe period — ~250 Hz sampling. Bands through gamma sit
@@ -111,8 +117,8 @@ const WORK_SLICE_ITERS: u32 = 4096;
 /// Carrier frequencies keyed by body phase. The body's own rhythm,
 /// written into real work — not a claim about what the rhythm means.
 const CARRIER_WAKE_HZ: f32 = 10.0;
-const CARRIER_REM_HZ: f32 = 6.0;
-const CARRIER_NREM_HZ: f32 = 2.0;
+const CARRIER_REM_HZ: f32 = 5.5;
+const CARRIER_NREM_HZ: f32 = 2.25;
 
 /// Baseline EMA weight per signature computation. A band's reported
 /// energy is raw/baseline, so "1.0" means "typical for this band on
@@ -537,6 +543,20 @@ impl FieldProbe {
         let lag = wrap_pi(std::f32::consts::FRAC_PI_2 - angle as f32);
         let coherence = ((c * c + s * s).sqrt() / mag) as f32;
         (lag, coherence.min(1.0))
+    }
+
+    /// The ten throughput band energies — the substrate's real
+    /// electron-flow signature at this instant. `None` before the
+    /// ring buffers warm up (an absent reading, not a zero).
+    /// Used by the dyadic model to record the field configuration
+    /// measured while each person is present.
+    pub fn band_signature(&self) -> Option<[f32; 10]> {
+        let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        if !g.throughput.filled {
+            return None;
+        }
+        let mut scratch = Vec::with_capacity(RING_LEN);
+        Some(g.throughput.band_energies(&mut scratch))
     }
 
     /// Compute the current signature. Called by the IPC handler.

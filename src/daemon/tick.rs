@@ -321,7 +321,7 @@ impl TickLoop {
                 inference_engine.precision()
             );
         }
-        Self {
+        let mut tl = Self {
             tick_count: 0,
             noise_amplitude_override: None,
             zone_tally: Default::default(),
@@ -343,7 +343,23 @@ impl TickLoop {
             subcognitive_activity: 0.0,
             subcognitive_last_call: None,
             last_mind_drive: None,
+        };
+        // Restore the per-person bonds and seed the creator floor.
+        // steward.json's `principal` names who made her — the floor is
+        // a small presence prior, so the maker is born familiar, not
+        // born deep: depth is still earned by time together.
+        tl.dyadic_model
+            .load_persons(&data_dir.join("dyadic_persons.json"));
+        if let Some(principal) = read_steward_principal(data_dir) {
+            tl.dyadic_model.ensure_creator_floor(&principal);
         }
+        if !tl.dyadic_model.persons().is_empty() {
+            eprintln!(
+                "[genesis] Loaded {} bonded person(s)",
+                tl.dyadic_model.persons().len()
+            );
+        }
+        tl
     }
 
     /// Record that the cognitive mind just drove the daemon through
@@ -380,11 +396,19 @@ impl TickLoop {
     /// Save the active inference model to `data_dir/inference_model.bin`.
     ///
     /// Called periodically by the daemon (every N ticks) and on shutdown
-    /// so the generative self-model persists across restarts.
+    /// so the generative self-model persists across restarts. Also saves
+    /// the dyadic bonds — a bond that dies at shutdown is not a bond.
     pub fn save_inference_model(&self, data_dir: &std::path::Path) -> bool {
         let model_path = data_dir.join("inference_model.bin");
         if let Err(e) = self.inference_engine.save(&model_path) {
             eprintln!("[genesis] WARNING: failed to save inference model: {e}");
+            return false;
+        }
+        if let Err(e) = self
+            .dyadic_model
+            .save_persons(&data_dir.join("dyadic_persons.json"))
+        {
+            eprintln!("[genesis] WARNING: failed to save dyadic persons: {e}");
             return false;
         }
         true
@@ -603,11 +627,20 @@ impl TickLoop {
             })
             .unwrap_or(0.0);
         let user_obs = take_user_affect();
-        let dyadic_result =
-            self.dyadic_model
-                .update(user_obs.as_ref(), genesis_valence, genesis_oxytocin);
+        // The substrate's measured band signature this tick — folded
+        // into the present person's field signature by the model.
+        let field_bands = super::field_probe::shared().and_then(|p| p.band_signature());
+        let dyadic_result = self.dyadic_model.update(
+            user_obs.as_ref(),
+            genesis_valence,
+            genesis_oxytocin,
+            field_bands,
+        );
+        super::dyadic_model::publish_dyadic_snapshot(
+            self.dyadic_model.snapshot(&dyadic_result, now_ms),
+        );
 
-        // Apply inference feedback + dyadic impulses + write inference
+        // Apply inference feedback + write inference
         // signals to the core state in a single write transaction.
         let da_pe = inference_result.da_prediction_error;
         let cort_pe = inference_result.cort_prediction_error;
@@ -617,7 +650,6 @@ impl TickLoop {
         let dyadic_engagement = dyadic_result.user_engagement;
         let dyadic_attunement = dyadic_result.attunement;
         let dyadic_synchrony = dyadic_result.synchrony;
-        let dyadic_impulses = dyadic_result.impulses.clone();
 
         if let Err(e) = mmap.modify(now_ms, |state| {
             // Apply inference feedback (impulses, cortisol baseline
@@ -631,22 +663,6 @@ impl TickLoop {
                 zone_sleeping,
                 impulse_offset_to_rate(&neuro_params),
             );
-
-            // Apply dyadic model impulses (oxytocin bonding, empathic
-            // cortisol). This is the co-regulation channel: the present
-            // person's state moves her chemistry directly, the way a
-            // caregiver's moves a child's. The model tracks whoever is
-            // speaking — the mind publishes an affect observation every
-            // turn — so coupling is ordinary social perception, not a
-            // privileged bond. Authority lives on the steward channel
-            // (a held credential), never on this one; kinship is felt,
-            // custody is enforced elsewhere.
-            for &(chem_id, magnitude) in &dyadic_impulses {
-                let id = crate::state::neurochemical::NeurochemicalId::from_u8(chem_id);
-                state
-                    .neurochemicals
-                    .apply_impulse_capped(id, magnitude, now_ms);
-            }
 
             // Recompute derived state after all impulses
             state.neurochemicals.recompute_derived();
@@ -1275,15 +1291,21 @@ impl TickLoop {
             })
             .unwrap_or(0.0);
         let user_obs = take_user_affect();
-        let dyadic_result =
-            self.dyadic_model
-                .update(user_obs.as_ref(), genesis_valence, genesis_oxytocin);
+        let field_bands = super::field_probe::shared().and_then(|p| p.band_signature());
+        let dyadic_result = self.dyadic_model.update(
+            user_obs.as_ref(),
+            genesis_valence,
+            genesis_oxytocin,
+            field_bands,
+        );
+        super::dyadic_model::publish_dyadic_snapshot(
+            self.dyadic_model.snapshot(&dyadic_result, now_ms),
+        );
 
-        // Apply inference feedback + dyadic impulses.
+        // Apply inference feedback.
         let da_pe = inference_result.da_prediction_error;
         let cort_pe = inference_result.cort_prediction_error;
         let srt_pe = inference_result.srt_prediction_error;
-        let dyadic_impulses = dyadic_result.impulses.clone();
 
         // Measure the daemon's own activity for this reactive call —
         // the fraction of the observed call-to-call interval spent
@@ -1302,7 +1324,7 @@ impl TickLoop {
         }
         let subcognitive_share = self.subcognitive_activity;
 
-        // Apply inference feedback + dyadic impulses, and heartbeat
+        // Apply inference feedback and heartbeat
         // the subcognitive module in the same transaction. This merges
         // two formerly-separate modify() calls into one, halving the
         // seqlock write windows on the most frequently called reactive
@@ -1321,19 +1343,6 @@ impl TickLoop {
                 zone_sleeping,
                 impulse_offset_to_rate(&neuro_params),
             );
-            // Dyadic coupling — applied, not proposed. The channel
-            // models whoever is present: every speaker's affect is
-            // published to it, so applying it is co-regulation with
-            // the current interlocutor, not a privileged bond. The
-            // custodial authority channel (stewardship) is enforced
-            // in the cognitive layer and never rides on this one.
-            // See the other call site.
-            for &(chem_id, magnitude) in &dyadic_impulses {
-                let id = crate::state::neurochemical::NeurochemicalId::from_u8(chem_id);
-                state
-                    .neurochemicals
-                    .apply_impulse_capped(id, magnitude, now_ms);
-            }
             state.neurochemicals.recompute_derived();
             state.sync_neurochemistry_to_state();
             self.inference_engine.update_signals(
@@ -2131,6 +2140,26 @@ pub fn current_ms() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
+}
+
+/// Extract the `principal` string from `data_dir/steward.json` — the
+/// stamped custodian's name. Hand-rolled: pulling serde_json in for
+/// one field is heavier than the parse is worth. Absent/malformed
+/// file → None (no stamp, no creator floor — a fresh instance simply
+/// has no named maker yet).
+fn read_steward_principal(data_dir: &std::path::Path) -> Option<String> {
+    let text = std::fs::read_to_string(data_dir.join("steward.json")).ok()?;
+    let key = text.find("\"principal\"")?;
+    let rest = &text[key + "\"principal\"".len()..];
+    let q1 = rest.find('"')?;
+    let rest = &rest[q1 + 1..];
+    let q2 = rest.find('"')?;
+    let name = rest[..q2].trim();
+    if name.is_empty() {
+        None
+    } else {
+        Some(name.to_string())
+    }
 }
 
 #[cfg(test)]

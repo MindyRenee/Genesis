@@ -27,7 +27,7 @@ from collections.abc import Callable
 from types import SimpleNamespace
 from typing import Any
 
-from world.arc import ArcEvaluation, ArcPractice, ArcResult
+from .arc import ArcEvaluation, ArcPractice, ArcResult
 
 POLICIES = ("uniform", "first")
 

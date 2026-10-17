@@ -1,6 +1,6 @@
 """ARC-AGI-3 on the human site — the live webpage as her world.
 
-This is the web sibling of ``world.arc``: same contract, different
+This is the web sibling of ``parietal_lobe.arc``: same contract, different
 substrate. Where ``ArcPractice`` runs the downloaded engine, this
 adapter puts her on the public task page — the same interface every
 human player gets — and translates only I/O:
@@ -22,7 +22,7 @@ Protocol supplies both halves — ``Input.dispatch*`` for acts,
 ``Network.getResponseBody`` for percepts — over a websocket that is
 the only transport on the box.
 
-Two contracts keep a run honest, inherited from ``world.arc``:
+Two contracts keep a run honest, inherited from ``parietal_lobe.arc``:
 
 - **Game mode.** ``play()`` refuses unless she is engaged —
   ``enter_game_mode()`` first. A run that doesn't engage her isn't
@@ -48,7 +48,8 @@ import time
 from typing import TYPE_CHECKING, Any, cast
 
 from genesis_client.swallow import note_swallowed
-from world.arc import ArcResult
+
+from .arc import ArcResult
 
 if TYPE_CHECKING:
     from mind import Mind
@@ -151,7 +152,7 @@ class _Browser:
             try:
                 await self._ws.close()
             except Exception as e:  # noqa: BLE001 — already gone
-                note_swallowed("world.arc_web.ws_close", e)
+                note_swallowed("parietal_lobe.arc_web.ws_close", e)
         self.responses.clear()
         self.bodies.clear()
         await self._connect()
@@ -177,7 +178,7 @@ class _Browser:
                     ws_url = pages[0]["webSocketDebuggerUrl"]
                     break
             except Exception as e:  # noqa: BLE001 — startup race only
-                note_swallowed("world.arc_web.ws_probe", e)
+                note_swallowed("parietal_lobe.arc_web.ws_probe", e)
             await asyncio.sleep(0.3)
         if ws_url is None:
             raise RuntimeError("chromium never opened a debug page")
@@ -189,7 +190,7 @@ class _Browser:
             async for raw in self._ws:
                 self._dispatch(json.loads(raw))
         except Exception as e:  # noqa: BLE001 — socket dies on close
-            note_swallowed("world.arc_web.reader", e)
+            note_swallowed("parietal_lobe.arc_web.reader", e)
         # The socket is gone: every outstanding command is
         # undeliverable. Fail its future so callers see a dead
         # transport instead of waiting forever.
@@ -223,7 +224,7 @@ class _Browser:
                 self.bodies[rid] = json.loads(body["body"])
             except (KeyError, ValueError) as e:
                 # Non-JSON response body — nothing to record.
-                note_swallowed("world.arc_web.body_json", e)
+                note_swallowed("parietal_lobe.arc_web.body_json", e)
 
     async def _cmd(self, method: str, **params) -> dict:
         self._mid += 1
@@ -266,7 +267,7 @@ class _Browser:
         try:
             self._proc.terminate()
         except Exception as e:  # noqa: BLE001
-            note_swallowed("world.arc_web.proc_terminate", e)
+            note_swallowed("parietal_lobe.arc_web.proc_terminate", e)
 
 
 class ArcWebPractice:
@@ -343,7 +344,7 @@ class ArcWebPractice:
 
     @staticmethod
     def _action_label(action_id: int) -> str:
-        """The same structural contract ``world.arc`` keeps.
+        """The same structural contract ``parietal_lobe.arc`` keeps.
 
         ``"coordinate"`` when the action takes a target cell — public
         interface structure, read from the action enum the page's own
@@ -438,7 +439,7 @@ class ArcWebPractice:
         obs = self._latest_frame()
         if obs is not None:
             # Starting the session is the initialization reset — the
-            # same count ``world.arc`` keeps, so the substrates' costs
+            # same count ``parietal_lobe.arc`` keeps, so the substrates' costs
             # read identically.
             result.resets = 1
         prev_levels = (obs or {}).get("levels_completed", 0)
@@ -561,7 +562,7 @@ class ArcWebPractice:
             self._browser.call("Page.enable")
             self._browser.call("Network.enable")
         except Exception as e:  # noqa: BLE001
-            note_swallowed("world.arc_web.reconnect", e)
+            note_swallowed("parietal_lobe.arc_web.reconnect", e)
         else:
             next_obs = self._wait_frame(len(self._browser.bodies))
         if next_obs is None:

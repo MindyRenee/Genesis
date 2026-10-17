@@ -589,7 +589,8 @@ def test_reader_update_user_affect_success():
 
     assert result is True
     client.update_user_affect.assert_called_once_with(
-        valence=0.5, arousal=0.6, engagement=0.7, confidence=0.8
+        valence=0.5, arousal=0.6, engagement=0.7, confidence=0.8,
+        speaker=None, authenticated=False, merge_alias=None,
     )
 
 

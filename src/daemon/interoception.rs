@@ -1577,10 +1577,19 @@ impl Interoceptor {
     /// file exists in the data directory, it's included too.
     /// Dead/stale PIDs are silently skipped.
     fn genesis_subsystems(&self) -> Vec<(Subsystem, u32)> {
+        self.genesis_subsystems_with(super::cpufreq::cognitive_pid())
+    }
+
+    /// `genesis_subsystems` with the cognitive PID injected rather
+    /// than read from the environment. Keeping the env read at the
+    /// outer edge lets tests exercise the filtering logic without
+    /// mutating process-global state — `std::env::set_var` in a test
+    /// races with parallel test threads reading the environment.
+    fn genesis_subsystems_with(&self, cognitive_pid: Option<u32>) -> Vec<(Subsystem, u32)> {
         let mut subsystems: Vec<(Subsystem, u32)> = vec![(Subsystem::Daemon, std::process::id())];
 
         // The cognitive mind (passed via env var by the CLI).
-        if let Some(pid) = super::cpufreq::cognitive_pid() {
+        if let Some(pid) = cognitive_pid {
             subsystems.push((Subsystem::Cognitive, pid));
         }
 
@@ -4097,18 +4106,18 @@ mod tests {
 
     #[test]
     fn test_genesis_pids_empty_for_dead_cognitive_pid() {
-        // If GENESIS_COGNITIVE_PID points to a dead process, it
-        // should be filtered out.
-        // SAFETY: This test is single-threaded; no other thread is
-        // reading the environment while we modify it.
-        unsafe {
-            std::env::set_var("GENESIS_COGNITIVE_PID", "4000000");
-        }
+        // A cognitive PID pointing at a dead process should be
+        // filtered out. The PID is injected via
+        // `genesis_subsystems_with` rather than mutated through
+        // GENESIS_COGNITIVE_PID: `cargo test` runs tests on parallel
+        // threads in one process, so `env::set_var` here would race
+        // with concurrent environment reads elsewhere.
         let intero = Interoceptor::new();
-        let pids = intero.genesis_pids();
-        unsafe {
-            std::env::remove_var("GENESIS_COGNITIVE_PID");
-        }
+        let pids: Vec<u32> = intero
+            .genesis_subsystems_with(Some(4_000_000))
+            .into_iter()
+            .map(|(_, pid)| pid)
+            .collect();
         // The dead PID should not be in the list.
         assert!(
             !pids.contains(&4_000_000),

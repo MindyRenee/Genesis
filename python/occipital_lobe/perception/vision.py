@@ -159,6 +159,10 @@ class Vision:
         # Lazily created on first use. Detects and identifies people.
         self._face_recognizer: FaceRecognizer | None = None
         self._last_faces: list[str] = []  # names of people last seen
+        # Person keys of last seen faces — names for recognized people,
+        # "face:N" cluster ids for familiar strangers. This is what the
+        # dyadic signature keys on; a name is optional, a person is not.
+        self._last_person_keys: list[str] = []
 
     def set_gamma_callback(self, callback: Callable[[float], None]) -> None:
         """Register a callback for V1 gamma power updates.
@@ -240,6 +244,12 @@ class Vision:
         """Return the names of people it last saw (empty if none)."""
         return list(self._last_faces)
 
+    def last_persons_seen(self) -> list[str]:
+        """Person keys of the faces it last saw — names where
+        recognized, anonymous "face:N" cluster ids for familiar
+        strangers. Every seen person has a key; a name is optional."""
+        return list(self._last_person_keys)
+
     def last_objects_seen(self) -> list[str]:
         """Return the names of objects it last saw (empty if none)."""
         return list(self._last_objects)
@@ -276,6 +286,7 @@ class Vision:
         """
         face_names: list[str] = []
         n_unknown_faces = 0
+        person_keys: list[str] = []
         recognizer = self._get_face_recognizer()
         if recognizer is not None:
             try:
@@ -285,12 +296,18 @@ class Vision:
                         face_names.append(f.name)
                     else:
                         n_unknown_faces += 1
+                    # Every face carries a person key — named or the
+                    # anonymous "face:N" cluster — so a familiar
+                    # stranger's presence registers like anyone's.
+                    if f.person_key:
+                        person_keys.append(f.person_key)
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "occipital_lobe.perception.vision._recognize_faces",
                     e,
                 )
         self._last_faces = face_names
+        self._last_person_keys = person_keys
         return face_names, n_unknown_faces
 
     def _run_v1_sparse_coding(self, rgb, objects: list[DetectedObject]):

@@ -23,3 +23,4 @@ environment_files_heldout/
 # Local-only artifacts
 recordings/
 My Notes
+.vscode/

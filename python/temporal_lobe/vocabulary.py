@@ -341,7 +341,7 @@ class Vocabulary:
         member_ids: set[str] = set()
         for slot in hubs:
             hub_id = f"_cat:utterance:{slot}"
-            for neighbor in self._network.get_neighbors(
+            for neighbor in self._network.get_exact_neighbors(
                 hub_id, RelationType.EXPRESSES
             ):
                 word_id, weight = neighbor[0], neighbor[2]
@@ -430,7 +430,7 @@ class Vocabulary:
         """True if the concept links to any utterance-function hub."""
         if self._network is None:
             return False
-        for n in self._network.get_neighbors(
+        for n in self._network.get_exact_neighbors(
             concept_id, RelationType.EXPRESSES
         ):
             if n[0].startswith("_cat:utterance:"):
@@ -1611,7 +1611,7 @@ class Vocabulary:
         ):
             hub_id = f"_cat:utterance:{slot}"
             cid = word.lower().strip()
-            for n in self._network.get_neighbors(cid, RelationType.EXPRESSES):
+            for n in self._network.get_exact_neighbors(cid, RelationType.EXPRESSES):
                 if n[0] == hub_id:
                     self._network.set_edge_weight(
                         cid, hub_id, RelationType.EXPRESSES,
@@ -4518,7 +4518,7 @@ class Vocabulary:
     def _q_isolation(self, net, target, subject, detail, pron_subj, pron_obj):
         # Concept has few connections — ask what else connects
         if net and target:
-            neighbors = net.get_neighbors(target)[:2]
+            neighbors = net.get_exact_neighbors(target)[:2]
             if neighbors:
                 known = ", ".join(
                     n[0].replace("_", " ") for n in neighbors
