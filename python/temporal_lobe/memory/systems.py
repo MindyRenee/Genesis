@@ -774,7 +774,9 @@ class SpreadingActivation:
         self._last_decay = now
         factor = math.exp(-self._decay_rate * elapsed)
         to_remove: list[str] = []
-        for cid, (level, ts) in self._activation.items():
+        # Snapshot the items: activate() on another thread may add keys
+        # while this iterates (get_all already guards the same way).
+        for cid, (level, ts) in list(self._activation.items()):
             new_level = level * factor
             if new_level < 0.005:
                 to_remove.append(cid)
@@ -787,4 +789,4 @@ class SpreadingActivation:
     def active_count(self) -> int:
         """Number of concepts currently above the activation threshold."""
         self._decay_now()
-        return sum(1 for level, _ in self._activation.values() if level > 0.005)
+        return sum(1 for level, _ in list(self._activation.values()) if level > 0.005)

@@ -127,15 +127,21 @@ fn test_consolidation_promotes_high_salience() {
         })
         .expect("modify");
 
-    // Run consolidation
-    let result = ConsolidationEngine::consolidate(
-        // SAFETY: single-threaded test — no concurrent access.
-        unsafe { sys.mmap.state_mut() },
-        &sys.stm,
-        &mut sys.ltm,
-        3000,
-        0.15,
-    );
+    // Run consolidation through the real write path: `modify` hands
+    // the closure a stack copy of the state and publishes it back.
+    let mut result = None;
+    sys.mmap
+        .modify(3000, |state| {
+            result = Some(ConsolidationEngine::consolidate(
+                state,
+                &sys.stm,
+                &mut sys.ltm,
+                3000,
+                0.15,
+            ));
+        })
+        .expect("modify");
+    let result = result.expect("consolidation ran inside modify");
 
     assert!(
         result.promoted > 0,
@@ -176,14 +182,19 @@ fn test_consolidation_skips_low_salience() {
         })
         .expect("modify");
 
-    let result = ConsolidationEngine::consolidate(
-        // SAFETY: single-threaded test — no concurrent access.
-        unsafe { sys.mmap.state_mut() },
-        &sys.stm,
-        &mut sys.ltm,
-        2000,
-        0.15,
-    );
+    let mut result = None;
+    sys.mmap
+        .modify(2000, |state| {
+            result = Some(ConsolidationEngine::consolidate(
+                state,
+                &sys.stm,
+                &mut sys.ltm,
+                2000,
+                0.15,
+            ));
+        })
+        .expect("modify");
+    let result = result.expect("consolidation ran inside modify");
 
     assert_eq!(result.promoted, 0, "low-salience entries should be skipped");
     assert!(result.skipped > 0);
@@ -231,14 +242,19 @@ fn test_consolidation_blocked_by_chronic_stress() {
         })
         .expect("modify");
 
-    let result = ConsolidationEngine::consolidate(
-        // SAFETY: single-threaded test — no concurrent access.
-        unsafe { sys.mmap.state_mut() },
-        &sys.stm,
-        &mut sys.ltm,
-        2000,
-        0.15,
-    );
+    let mut result = None;
+    sys.mmap
+        .modify(2000, |state| {
+            result = Some(ConsolidationEngine::consolidate(
+                state,
+                &sys.stm,
+                &mut sys.ltm,
+                2000,
+                0.15,
+            ));
+        })
+        .expect("modify");
+    let result = result.expect("consolidation ran inside modify");
 
     assert_eq!(
         result.promoted, 0,
@@ -282,14 +298,11 @@ fn test_consolidation_preserves_emotional_tags() {
         })
         .expect("modify");
 
-    ConsolidationEngine::consolidate(
-        // SAFETY: single-threaded test — no concurrent access.
-        unsafe { sys.mmap.state_mut() },
-        &sys.stm,
-        &mut sys.ltm,
-        2000,
-        0.15,
-    );
+    sys.mmap
+        .modify(2000, |state| {
+            ConsolidationEngine::consolidate(state, &sys.stm, &mut sys.ltm, 2000, 0.15);
+        })
+        .expect("modify");
 
     // Retrieve the consolidated episode and verify tags
     let ep = sys.ltm.retrieve(1).expect("retrieve");

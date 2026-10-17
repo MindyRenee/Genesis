@@ -395,6 +395,21 @@ pub mod cmd {
     /// Reply: [u8 ack]. Additive: PROTOCOL_VERSION unaffected.
     pub const SET_FIELD_CARRIER: u8 = 49;
 
+    /// The dyadic model's latest snapshot — who is present and how
+    /// the dyad is running, as measured evidence for the mind's own
+    /// appraisal: the present person's signature (name, provenance,
+    /// bond depth, affective aura, in-tune history, and the field
+    /// band-energy configuration recorded during their presence), the
+    /// pooled coupling estimates, and the one-tick reunion signal.
+    /// No chemical prescriptions travel on this channel — what any of
+    /// it does to her state is decided by her own appraisal via the
+    /// ordinary NEURO_IMPULSE path.
+    /// Response: layout in `dyadic_model::DyadicSnapshot::to_wire`.
+    /// When the tick loop has not yet published, the reply is a single
+    /// `READ_FAILED` byte — an absent channel, not a zero reading.
+    /// Additive: PROTOCOL_VERSION is unaffected.
+    pub const GET_DYADIC_STATE: u8 = 50;
+
     // ─── Tensor slab ──────────────────────────────────────────
     // Named multidimensional tensors shared between the daemon and
     // the cognitive mind — world frames, salience fields, embeddings,
@@ -3257,6 +3272,16 @@ pub fn default_handler(
             }
         }
 
+        cmd::GET_DYADIC_STATE => {
+            // Who is present and how the dyad runs — evidence for her
+            // own appraisal, no prescriptions. READ_FAILED until the
+            // tick loop publishes its first snapshot.
+            match super::dyadic_model::dyadic_snapshot() {
+                Some(s) => s.to_wire(),
+                None => vec![error::READ_FAILED],
+            }
+        }
+
         cmd::SET_FIELD_PHASE => {
             // The mind pushes its modeled carrier-band phase; the
             // probe's generator chases it — physics follows model.
@@ -3407,11 +3432,49 @@ pub fn default_handler(
                 0.0,
                 1.0,
             );
+            // Optional tail (additive, v3-compatible): attributed
+            // person key so the dyadic model keeps per-person
+            // signatures — [u8 key_len][utf8 key ≤ 31B][u8 authenticated]
+            // and optionally [u8 alias_len][utf8 alias ≤ 31B] when an
+            // anonymous key ("face:3") just resolved to a name. Old
+            // clients send 16 bytes exactly → unattributed.
+            let mut speaker = None;
+            let mut authenticated = false;
+            let mut merge_alias = None;
+            if payload.len() >= 18 {
+                let name_len = (payload[16] as usize).min(31);
+                if payload.len() > 17 + name_len {
+                    let name = String::from_utf8_lossy(&payload[17..17 + name_len])
+                        .trim()
+                        .to_string();
+                    if !name.is_empty() {
+                        speaker = Some(name);
+                        authenticated = payload[17 + name_len] != 0;
+                        let alias_at = 18 + name_len;
+                        if payload.len() > alias_at {
+                            let alias_len = (payload[alias_at] as usize).min(31);
+                            if payload.len() >= alias_at + 1 + alias_len {
+                                let alias = String::from_utf8_lossy(
+                                    &payload[alias_at + 1..alias_at + 1 + alias_len],
+                                )
+                                .trim()
+                                .to_string();
+                                if !alias.is_empty() {
+                                    merge_alias = Some(alias);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             let obs = super::dyadic_model::UserAffectObservation {
                 valence,
                 arousal,
                 engagement,
                 confidence,
+                speaker,
+                merge_alias,
+                authenticated,
             };
             super::dyadic_model::publish_user_affect(obs);
             vec![1] // ack

@@ -105,9 +105,9 @@ Acetylcholinesterase (AChE) degradation:
     intent — high ACh bursts decay rapidly — while allowing the
     homeostatic force to maintain ACh near baseline at rest.
 
-    ACH_DEGRADATION_RATE = 0.03 per tick (at 10 Hz = 0.3/sec)
-    An excess of 0.10 above baseline decays by 3% per tick, reaching
-    baseline in ~3.5 ticks (~0.35 seconds) without homeostatic help.
+    ACH_DEGRADATION_RATE = 0.03 per 100 ms step (0.3/sec)
+    An excess of 0.10 above baseline decays by 3% per step, reaching
+    baseline in ~3.5 steps (~0.35 seconds) without homeostatic help.
 
     decay_factor = (1 - ACH_DEGRADATION_RATE)^dt_scale
     level -= ach_excess * (1 - decay_factor)

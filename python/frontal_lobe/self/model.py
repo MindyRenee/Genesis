@@ -962,7 +962,7 @@ class SelfModel:
             # What does it know about itself?
             genesis_concept = network.get_concept(self.name.lower())
             if genesis_concept:
-                neighbors = network.get_neighbors(self.name.lower())
+                neighbors = network.get_exact_neighbors(self.name.lower())
                 if neighbors:
                     # It exists in its own concept network — compose
                     # its nature from its IS_A self-classifications

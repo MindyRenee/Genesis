@@ -94,7 +94,8 @@ fn neuro_noise_hash(seed: u64, index: u64) -> u32 {
 
 /// Time step for the dynamics integration (seconds).
 ///
-/// 0.1 = 100ms, matching the 10 Hz tick loop. The rate parameters
+/// 0.1 = 100 ms integration step (10 Hz); the outer tick calls it
+/// twice per 200 ms beat. The rate parameters
 /// (`homeostatic_rate`, `adaptation_rate`, etc.) are tuned for this
 /// specific time step. Changing DT without re-tuning those rates
 /// will change the system's dynamics.
@@ -193,9 +194,9 @@ pub const WC_SELF_EXCITATION_SLOPE: f32 = 2.0;
 /// homeostatic force to maintain ACh near baseline at rest. See the
 /// application site in `tick_with_params` for the full rationale.
 ///
-/// Value 0.03 per tick (at 10 Hz = 0.3/sec): an excess of 0.10 above
-/// baseline decays by 3% per tick, reaching baseline in ~3.5 ticks
-/// (~0.35 seconds) without homeostatic help. This is compressed from
+/// Value 0.03 per 100 ms integration step (0.3/sec): an excess of
+/// 0.10 above baseline decays by 3% per step, reaching baseline in
+/// ~3.5 steps (~0.35 seconds) without homeostatic help. This is compressed from
 /// the biological millisecond timescale but preserves the key
 /// property: ACh is the fastest-degrading neurotransmitter in the
 /// model.
@@ -1558,10 +1559,11 @@ pub struct NeurochemicalVector {
     /// suprachiasmatic nucleus (SCN) oscillator. 0.0 = midnight,
     /// 0.25 = 6am, 0.5 = noon, 0.75 = 6pm. This drives melatonin
     /// secretion and circadian modulation of all chemical baselines.
-    /// The phase advances by `circadian_dt` each tick, wrapping at 1.0.
+    /// The phase advances by `circadian_dt` each integration step, wrapping at 1.0.
     pub circadian_phase: f32,
-    /// Rate of circadian phase advance per tick. At 10 Hz with a 24h
-    /// period, this is 1.0 / (24 * 3600 * 10) ≈ 0.00000116. For
+    /// Rate of circadian phase advance per 100 ms integration step. At
+    /// the 10 Hz step rate with a 24h period, this is
+    /// 1.0 / (24 * 3600 * 10) ≈ 0.00000116. For
     /// compressed-time testing, a larger value can be used.
     pub circadian_dt: f32,
     /// The emergent mental phase, derived from the neurochemical state.
@@ -1618,7 +1620,7 @@ impl NeurochemicalVector {
             // (`MmapState::create`) anchors this to the wall clock via
             // `set_circadian_phase` — see `local_phase_of_day` there.
             circadian_phase: 0.3,
-            circadian_dt: 1.0 / (24.0 * 3600.0 * 10.0), // 24h at 10 Hz
+            circadian_dt: 1.0 / (24.0 * 3600.0 * 10.0), // 24h in 100 ms steps
             emergent_phase: MentalPhase::Active as u8,
             active_region: 0, // default
             _pad: [0; 2],
@@ -2622,7 +2624,7 @@ impl NeurochemicalVector {
             self.circadian_phase = 0.0;
         }
         if !self.circadian_dt.is_finite() {
-            self.circadian_dt = 1.0 / (24.0 * 3600.0 * 10.0); // 24h at 10Hz
+            self.circadian_dt = 1.0 / (24.0 * 3600.0 * 10.0); // 24h in 100 ms steps
         }
         if !self.arousal.is_finite() {
             self.arousal = 0.5;
@@ -2713,7 +2715,7 @@ impl NeurochemicalVector {
         let mel_idx = NeurochemicalId::Melatonin as usize;
         let mel_target = mel_factor * 0.80; // peak ~0.80 at midnight
         // Exponential approach for time-invariance and large-dt stability:
-        // 0.5/sec matches the old 0.05/tick at 10 Hz (1-exp(-0.05) ~= 0.0488)
+        // 0.5/sec matches the old 0.05/step at 10 Hz (1-exp(-0.05) ~= 0.0488)
         // while clamping alpha to [0,1] so a 1-10 s heartbeat dt after a
         // stall cannot overshoot (linear 0.05*dt_scale reaches 5.0 at dt=10).
         let mel_alpha = 1.0 - (-0.5 * dt).exp();
@@ -3661,7 +3663,7 @@ impl NeurochemicalVector {
         //
         // Applied directly to level (first-order). Convention in this
         // file is `rate_per_tick * dt_scale` for direct level updates
-        // (dt_scale = dt/DT, time-invariant). 0.001/tick at the 10 Hz
+        // (dt_scale = dt/DT, time-invariant). 0.001/step at the 10 Hz
         // reference rate equals the documented 0.01/sec production
         // rate (0.01 * DT = 0.001), integrated once (not through
         // velocity, which would integrate twice and make the rate
@@ -3754,13 +3756,13 @@ impl NeurochemicalVector {
         // excitatory).
         for chem in &mut self.chemicals {
             // Phasic decay: fast exponential decay (seconds timescale).
-            // At 10Hz with 0.80 decay rate, phasic halves in ~3 ticks
-            // (~0.3 seconds), reaching near-zero in ~10 ticks (~1 second).
+            // At the 10 Hz integration step with 0.80 decay, phasic halves in
+            // ~3 steps (~0.3 seconds), reaching near-zero in ~10 steps (~1 s).
             chem.phasic_level *= 0.80f32.powf(dt_scale);
             chem.phasic_level = crate::state::sanitize::finite_clamp(chem.phasic_level, 0.0, 1.0);
 
             // Tonic approach: slowly tracks the current level.
-            // Rate 0.002/tick at 10Hz = 0.02/sec → time constant ~50
+            // Rate 0.002/step at 10 Hz = 0.02/sec → time constant ~50
             // seconds. This is the slow background level that changes
             // over minutes, distinct from the fast phasic bursts.
             // Use f64 arithmetic for the slow tonic accumulator.
@@ -4295,8 +4297,8 @@ impl NeurochemicalVector {
 ///
 /// This struct encapsulates all tunable parameters for the tick
 /// dynamics, allowing different configurations without changing the
-/// core algorithm. The default values are tuned for a 10 Hz tick loop
-/// (DT = 0.1 seconds).
+/// core algorithm. The default values are tuned for the 100 ms
+/// integration step (DT = 0.1 seconds).
 /// Firing of the sleep-wake network's populations, each normalized to its
 /// saturating maximum: `lc` (wake-promoting locus coeruleus), `vlpo`
 /// (sleep-promoting ventrolateral preoptic area), and `rem` (REM-on). All
@@ -4360,7 +4362,7 @@ pub struct NeuroTickParams {
     /// How fast baselines shift toward sustained levels
     /// (typically 0.00001–0.0001 — emotional development over hours/days).
     pub baseline_adaptation_rate: f32,
-    /// Time step in seconds (0.1 = 100ms, matching the 10 Hz tick loop).
+    /// Time step in seconds (0.1 = 100 ms integration step).
     pub dt: f32,
     /// Global scaling factor for coupling forces (typically 0.15).
     /// Brings coupling forces into balance with homeostatic forces.

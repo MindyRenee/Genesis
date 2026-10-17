@@ -38,8 +38,8 @@ use std::os::unix::io::AsRawFd;
 use std::path::Path;
 
 use libc::{
-    EEXIST, MAP_FAILED, MAP_SHARED, MS_SYNC, PROT_READ, PROT_WRITE, c_void, close, fdatasync,
-    ftruncate, mmap, msync, munmap,
+    EEXIST, LOCK_EX, LOCK_NB, MAP_FAILED, MAP_SHARED, MS_SYNC, PROT_READ, PROT_WRITE, c_void,
+    close, fdatasync, flock, ftruncate, mmap, msync, munmap,
 };
 
 // ─────────────────────────────────────────────────────────────────
@@ -361,6 +361,11 @@ pub enum RingBufferError {
         /// The capacity the other fields were checked against.
         capacity: u32,
     },
+    /// The sole-mapper flock could not be acquired: another process
+    /// holds a live mapping of this file. Returned instead of blocking
+    /// so the caller can retry or degrade rather than silently racing
+    /// a second writer into the same `MAP_SHARED` pages.
+    LockBusy,
 }
 
 impl std::fmt::Display for RingBufferError {
@@ -397,6 +402,10 @@ impl std::fmt::Display for RingBufferError {
                      outside capacity {capacity}"
                 )
             }
+            Self::LockBusy => write!(
+                f,
+                "STM file is locked by another process (sole-mapper invariant)"
+            ),
         }
     }
 }
@@ -450,6 +459,12 @@ pub struct RingBuffer {
     access_lock: std::sync::Mutex<()>,
 }
 
+// SAFETY (Send/Sync): all access to the mapped region goes through
+// `access_lock`, and every public method returns owned copies rather
+// than references into `MAP_SHARED` memory. Cross-process exclusion
+// is enforced at open/create time by the sole-mapper `flock` — the
+// lock is held for the life of the fd and released when Drop closes
+// it, so no second process can map the file while a RingBuffer lives.
 unsafe impl Send for RingBuffer {}
 unsafe impl Sync for RingBuffer {}
 
@@ -502,16 +517,21 @@ impl RingBuffer {
         let path = path.as_ref();
         let mmap_len = mmap_size(capacity);
 
+        // No `truncate` on open: the sole-mapper flock must be held
+        // *before* the file is resized, or a racing create would
+        // truncate the file under another process's live mapping.
+        // `ftruncate(mmap_len)` below performs the sizing once the
+        // lock is held.
         let file = std::fs::OpenOptions::new()
             .read(true)
             .write(true)
             .create(!exclusive)
             .create_new(exclusive)
-            .truncate(!exclusive)
             .open(path)
             .map_err(RingBufferError::Io)?;
 
         let fd = file.as_raw_fd();
+        Self::acquire_sole_mapper_lock(fd)?;
 
         // Set the file size to the page-aligned mmap length so the
         // entire mapping is backed by the file. Without this, the tail
@@ -589,6 +609,7 @@ impl RingBuffer {
             .map_err(RingBufferError::Io)?;
 
         let fd = file.as_raw_fd();
+        Self::acquire_sole_mapper_lock(fd)?;
         let metadata = file.metadata().map_err(RingBufferError::Io)?;
 
         // Read the header to get capacity
@@ -794,36 +815,6 @@ impl RingBuffer {
         Some(unsafe { *self.entry_ptr(index) })
     }
 
-    /// Mark the entry at `index` as consolidated to LTM.
-    ///
-    /// **Warning:** This marks whatever entry *currently* occupies the
-    /// slot, not necessarily the entry that was there when you snapshotted
-    /// it. If a concurrent `push()` wrapped the ring buffer and overwrote
-    /// the slot between your snapshot and this call, you would mark the
-    /// *new* (unconsolidated) entry as consolidated, permanently preventing
-    /// it from being promoted. Use [`mark_consolidated_if_match`] instead
-    /// when the snapshot and the mark are separated by lock-releasing
-    /// work (e.g. LTM store I/O).
-    pub fn mark_consolidated(&self, index: u64) -> bool {
-        let _guard = self
-            .access_lock
-            .lock()
-            .expect("access_lock poisoned: mmap may be inconsistent");
-        // SAFETY: `self.ptr` is a valid mmap'd region of at least
-        // `size_of::<RingBufferHeader>()` bytes, validated on open/create.
-        let header = unsafe { &*self.header_ptr() };
-        if index >= header.capacity as u64 {
-            return false;
-        }
-        // SAFETY: `index` < `header.capacity` (checked above), so
-        // `entry_ptr(index)` points within the mmap'd entry slot array.
-        unsafe {
-            let entry = &mut *self.entry_ptr(index);
-            entry.flags |= RingBufferEntry::CONSOLIDATED;
-        }
-        true
-    }
-
     /// Mark the entry at `index` as consolidated, but only if the entry
     /// currently occupying that slot is the same one we consolidated.
     ///
@@ -967,7 +958,7 @@ impl RingBuffer {
     /// This is the atomic variant of `iter()` for callers that need
     /// slot indices (e.g. consolidation, which marks entries
     /// consolidated by slot). Without this, calling `count()`,
-    /// `header()`, `peek()`, and `mark_consolidated()` separately
+    /// `header()`, `peek()`, and `mark_consolidated_if_match()` separately
     /// would acquire and release `access_lock` for each operation,
     /// allowing a concurrent `push()` to change `head`/`tail` and
     /// overwrite slots mid-scan.
@@ -1068,6 +1059,28 @@ impl RingBuffer {
     }
 
     // ─── Internal ────────────────────────────────────────────────
+
+    /// Take the sole-mapper advisory lock on the backing file.
+    ///
+    /// `RingBuffer` forms `&`/`&mut` references into `MAP_SHARED`
+    /// memory, which is only sound when no second process can map and
+    /// write the same file concurrently. `flock(LOCK_EX | LOCK_NB)` is
+    /// held for the life of the file descriptor — released implicitly
+    /// when `Drop` closes `fd` — so any other `open`/`create` (in this
+    /// process or another) fails fast with [`RingBufferError::LockBusy`]
+    /// instead of silently violating the aliasing contract.
+    ///
+    /// Callers must hold the lock *before* resizing or mapping the
+    /// file; that is why `create_inner` does not pass `.truncate()` to
+    /// `OpenOptions`.
+    fn acquire_sole_mapper_lock(fd: i32) -> Result<(), RingBufferError> {
+        // SAFETY: `fd` is a valid open file descriptor. flock is
+        // advisory and a failed call changes no state.
+        if unsafe { flock(fd, LOCK_EX | LOCK_NB) } != 0 {
+            return Err(RingBufferError::LockBusy);
+        }
+        Ok(())
+    }
 
     fn do_mmap(fd: i32, len: usize) -> Result<*mut u8, RingBufferError> {
         // SAFETY: `fd` is a valid open file descriptor with read+write

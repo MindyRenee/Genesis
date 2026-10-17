@@ -2214,7 +2214,7 @@ class AutonomousLearner:
         candidates = []
         for cid in concepts:
             topic = strip_sense_suffix(cid)
-            neighbors = self.network.get_neighbors(cid)
+            neighbors = self.network.get_exact_neighbors(cid)
             if len(neighbors) < 2 and topic not in searched:
                 candidates.append(topic)
 
@@ -3587,18 +3587,18 @@ class AutonomousLearner:
         Only the mapped target role is reinforced; source concepts are not
         copied into the target graph.
         """
-        source_neighbors = self.network.get_neighbors(source_domain)
-        target_neighbors = self.network.get_neighbors(target_domain)
+        source_neighbors = self.network.get_exact_neighbors(source_domain)
+        target_neighbors = self.network.get_exact_neighbors(target_domain)
         similarity = self._transfer_similarity(source_neighbors, target_neighbors)
 
         target_by_rel: dict[str, list[str]] = {}
         target_degrees: dict[str, int] = {}
         for tgt, rel, _ in target_neighbors:
             target_by_rel.setdefault(rel.value, []).append(tgt)
-            target_degrees[tgt] = len(self.network.get_neighbors(tgt))
+            target_degrees[tgt] = len(self.network.get_exact_neighbors(tgt))
 
         source_degrees = {
-            src: len(self.network.get_neighbors(src))
+            src: len(self.network.get_exact_neighbors(src))
             for src, _, _ in source_neighbors
         }
 
@@ -3941,7 +3941,7 @@ class AutonomousLearner:
             concept = self.network.get_concept(cid)
             if concept is None:
                 continue
-            degree = len(self.network.get_neighbors(cid))
+            degree = len(self.network.get_exact_neighbors(cid))
             # Important = well-connected (degree >= 3) AND confident.
             if degree >= 3 and concept.confidence >= 0.7:
                 self._protected_concepts.add(cid)

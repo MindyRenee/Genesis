@@ -55,7 +55,7 @@ __all__ = ["FigurativeLanguageProcessor", "IronyDetection", "Metaphor"]
 
 # ─── Pre-compiled regex patterns ──────────────────────────────────
 _IS_A_RE = re.compile(
-    r"(\w[\w\s]*?)\s+(?:is|are|was|were)\s+(?:a|an|the)?\s*(\w[\w\s]*?)(?:[.,;!?]|$)",
+    r"(\w[\w\s]*?)\s+(?:is|are|was|were)\s+(?:(?:a|an|the)\s+)?(\w[\w\s]*?)(?:[.,;!?]|$)",
     re.IGNORECASE,
 )
 

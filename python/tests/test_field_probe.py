@@ -245,9 +245,11 @@ def test_global_shudder_resets_alert_band(monkeypatch, _no_audio) -> None:
 def test_carrier_band_mapping() -> None:
     from brainstem.field_probe import _carrier_band
 
+    # The real carrier setpoints: wake alpha, REM theta, NREM delta —
+    # each sitting exactly on its Goertzel bin center.
     assert _carrier_band(10.0) is BrainWave.ALPHA
-    assert _carrier_band(6.0) is BrainWave.THETA
-    assert _carrier_band(2.0) is BrainWave.DELTA
+    assert _carrier_band(5.5) is BrainWave.THETA
+    assert _carrier_band(2.25) is BrainWave.DELTA
     assert _carrier_band(0.0) is None  # carrier off → no band
     assert _carrier_band(45.0) is None  # far from any band
 

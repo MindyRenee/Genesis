@@ -553,7 +553,7 @@ class SelfComposer:
         discovered: list[str] = []
         if network is not None:
             from temporal_lobe.concepts import is_seed_origin
-            ability_edges = network.get_neighbors(
+            ability_edges = network.get_exact_neighbors(
                 "genesis", RelationType.RELATED_TO
             )
             for target, _rel, _weight in ability_edges:
@@ -694,7 +694,7 @@ class SelfComposer:
         building blocks), rather than hardcoded sentences.
         """
         parts: list[tuple[str, str, float]] = []
-        neighbors = network.get_neighbors(creator_name.lower())
+        neighbors = network.get_exact_neighbors(creator_name.lower())
         for target, relation, _weight in neighbors:
             display = target.replace("_", " ")
             if relation == RelationType.IS_A:
@@ -740,7 +740,7 @@ class SelfComposer:
         the subject and framing.
         """
         parts: list[tuple[str, str, float]] = []
-        genesis_neighbors = network.get_neighbors("genesis")
+        genesis_neighbors = network.get_exact_neighbors("genesis")
         for target, relation, _weight in genesis_neighbors:
             if target == creator_name.lower() and relation == RelationType.RELATED_TO:
                 verbs = network.find_relation_verbs(RelationType.RELATED_TO)
@@ -1145,7 +1145,7 @@ class SelfComposer:
             # It doesn't have a dream concept yet — minimal seed
             return [("pred", "dream")]
 
-        neighbors = network.get_neighbors("dream")
+        neighbors = network.get_exact_neighbors("dream")
         if not neighbors:
             return [("pred", "dream")]
 
@@ -1173,7 +1173,7 @@ class SelfComposer:
 
         # What does it know about cognition?
         cognitive_concept = network.get_concept("cognition")
-        neighbors = network.get_neighbors("cognition") if cognitive_concept else []
+        neighbors = network.get_exact_neighbors("cognition") if cognitive_concept else []
         known_facts = []
         for target, relation, weight in neighbors[:3]:
             rel_str = relation.value.replace("_", " ")

@@ -497,6 +497,10 @@ class EmotionalConfig:
     latency_stress_threshold: float = 500.0  # ms response latency above which stress begins
     latency_stress_range: float = 1000.0     # ms over which stress ramps to 1.0
     daemon_disconnect_stress: float = 0.3    # stress level when daemon is disconnected
+    # PSI "some" average above which the machine counts as crowded —
+    # work stalling on CPU/memory while her own usage stays low is
+    # environmental starvation, not her own exertion.
+    psi_stall_threshold: float = 0.25
 
     # Cortisol and neurochemical gate thresholds.
     cortisol_output_gate: float = 0.01

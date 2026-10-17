@@ -882,6 +882,13 @@ fn test_rebuild_failure_preserves_existing_bundle() {
 
 #[test]
 fn test_rebuild_does_not_truncate_existing_mappings() {
+    // The sole-mapper flock makes a second live mapping of the same
+    // file impossible, so rebuild's safety can no longer be observed
+    // through a stale mapping. The invariant it encodes still holds
+    // structurally: rebuild writes a private `bundles.rebuild-*` file
+    // and installs it by rename, so the old inode is never truncated
+    // under a live mapping — and any process holding the old mapping
+    // keeps the old inode by construction.
     let base = temp_base("rebuild_mapping");
     let mut store = LtmStore::create(&base, 64).unwrap();
     let first = store
@@ -891,11 +898,14 @@ fn test_rebuild_does_not_truncate_existing_mappings() {
         .store(0, 0.5, make_full_tag(), make_compact_tag(), 0, 4, "second")
         .unwrap();
     store.delete(first).unwrap();
-    let old = BundleStore::open(base.with_extension("bundles")).unwrap();
-    assert_eq!(old.episode_count(), 2);
+    // A second live mapping of the same file is refused: EWOULDBLOCK.
+    match BundleStore::open(base.with_extension("bundles")) {
+        Err(err) => assert_eq!(err.raw_os_error(), Some(libc::EWOULDBLOCK)),
+        Ok(_) => panic!("second live mapping of a locked file must fail"),
+    }
     assert_eq!(store.rebuild_bundles().unwrap(), 1);
-    assert_eq!(old.episode_count(), 2);
-    drop(old);
+    // The rebuilt store contains only the surviving episode.
+    assert_eq!(store.count(), 1);
     drop(store);
     cleanup(&base);
 }

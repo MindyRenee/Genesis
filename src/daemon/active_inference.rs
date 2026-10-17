@@ -81,7 +81,7 @@
 //!   decomposition, and let ranking fall back to the pragmatic cost
 //!   with exploration carried by the precision-weighted temperature.
 //!
-//! These simplifications make the implementation tractable at 10 Hz
+//! These simplifications make the implementation tractable at the 5 Hz body tick
 //! on a single machine while preserving the core mathematical
 //! motifs of active inference: approximate state estimation, bounded
 //! regulatory demand, and homeostatic policy selection.
@@ -326,7 +326,7 @@ const MODEL_LEARNING_RATE: f32 = 0.02;
 /// Per-cycle multiplicative decay of learned weights.
 ///
 /// 0.02 means a weight retains 98% of its value per cycle and half-life
-/// of about 34 cycles (~3.4 s at 10 Hz). Chosen to be slow relative to
+/// of about 34 cycles (~6.8 s at the 5 Hz tick). Chosen to be slow relative to
 /// the learning rate so that a well-supported weight is not washed
 /// away by decay before evidence accumulates, while still letting a
 /// weight the data no longer supports relax back toward zero within a
@@ -438,8 +438,8 @@ const REST_DEADBAND_FRACTION: f32 = 0.25;
 /// the resting organism then measured a load of 0.69. A reference that
 /// runs away from its signal defeats the measure in either direction.
 ///
-/// Rate 0.00002 gives a time constant of 50,000 ticks — about 83
-/// minutes at 10 Hz. Long enough that no single excursion moves it,
+/// Rate 0.00002 gives a time constant of 50,000 ticks — about 167
+/// minutes at the 5 Hz tick. Long enough that no single excursion moves it,
 /// short enough to follow a genuine change in her resting physiology
 /// over the timescale of a session. A sustained stressor at burden
 /// 0.105 shifts the reference only after tens of thousands of ticks,
@@ -472,7 +472,7 @@ const REST_BURDEN_INITIAL: f32 = 0.04;
 /// continuous stress — the measure saturating inside a single work
 /// session, which is not a measure of cumulative wear. For a
 /// meaningful elevation over roughly one day of sustained stress
-/// (864,000 ticks at 10 Hz), the rate must satisfy
+/// (864,000 integration steps at the 100 ms step rate), the rate must satisfy
 ///
 /// ```text
 /// rate ≈ 0.5 / (864_000 * 0.06) ≈ 1e-5
@@ -3787,9 +3787,9 @@ mod tests {
 
     #[test]
     fn test_rest_baseline_is_a_slow_symmetric_average() {
-        // The reference is a long-run average with an ~83 minute time
+        // The reference is a long-run average with an ~167 minute time
         // constant (rate 2e-5 at dt_scale 1, so 1/rate = 50,000 ticks
-        // = 5,000 s at 10 Hz). It must be slow enough that a burst
+        // = 10,000 s at the 5 Hz tick). It must be slow enough that a burst
         // cannot move it and fast enough to follow a genuine change
         // in resting physiology within a session.
         let mut base = RestBaseline::new(0.04);

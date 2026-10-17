@@ -448,7 +448,10 @@ removes the venv, launcher, and unit — never the data dir. For the
 privileged body levers (CPU governor, RTC wake alarm):
 `sudo bash scripts/install_sudoers.sh` installs root-owned helpers to
 `/usr/local/libexec/genesis` and a sudoers rule for exactly those
-paths.
+paths. It also installs `/etc/security/limits.d/genesis-public.conf`,
+an RLIMIT_NICE rule (nice floor −5) covering the daemon's and mind's
+self-renice — bounded priority headroom with no sudo grant, effective
+for sessions opened after install.
 
 ### Operational notes
 
@@ -539,8 +542,7 @@ diverge, the code is current.
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and
 `AGENTS.md` first — the no-hardcoding rule is the core constraint, and the
-required checks are the public quality bar. Participation is governed by
-the [code of conduct](CODE_OF_CONDUCT.md), and release history is recorded
+required checks are the public quality bar. Release history is recorded
 in [CHANGELOG.md](CHANGELOG.md).
 
 ## License

@@ -56,6 +56,7 @@ import logging
 import math
 from collections import Counter, deque
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 
@@ -253,9 +254,14 @@ class CognitiveMap:
         dead reckoning when no allocentric fix is available.
         """
         events: list[MapEvent] = []
-        if self._context is None:
+        if self._context is None or (
+            bounds is not None and self._context.bounds != bounds
+        ):
             if bounds is None:
                 return events
+            # Context follows the domain of the observation — bounds
+            # identify the arena (or the general state-space domain),
+            # the entity signature pattern-completes within it.
             self._context = self._resolve_context(entities, bounds)
             events.append(
                 MapEvent(
@@ -569,3 +575,109 @@ class CognitiveMap:
         if ctx.n_episodes > 1:
             parts.append(f"visited {ctx.n_episodes} times")
         return "; ".join(parts)
+
+    # ─── Persistence ────────────────────────────────────────────
+
+    def save_state(self) -> dict[str, Any]:
+        """Serialize every context's structure — the learned maps.
+
+        Places, transitions, anchors, and boundaries are the
+        accumulations; the egocentric fix (_pos/_code/_place) is saved
+        so a mid-episode save resumes where it stood rather than
+        re-anchoring cold. The grid itself is deterministic (fixed
+        scales/orientations) and is not stored.
+        """
+        return {
+            "episode": self._episode,
+            "pos": list(self._pos) if self._pos is not None else None,
+            "context_index": (
+                self.contexts.index(self._context)
+                if self._context in self.contexts
+                else None
+            ),
+            "place_id": self._place.id if self._place is not None else None,
+            "contexts": [self._save_context(c) for c in self.contexts],
+        }
+
+    @staticmethod
+    def _save_context(ctx: ContextMap) -> dict[str, Any]:
+        return {
+            "signature": sorted(sorted(t) for t in ctx.signature),
+            "bounds": list(ctx.bounds),
+            "next_place_id": ctx.next_place_id,
+            "n_episodes": ctx.n_episodes,
+            "places": [
+                {
+                    "id": p.id,
+                    "pos": list(p.pos),
+                    "visits": p.visits,
+                    "code": p.code.tolist(),
+                }
+                for p in ctx.places.values()
+            ],
+            "transitions": [
+                {"from": src, "action": act, "to": dict(dst)}
+                for (src, act), dst in ctx.transitions.items()
+            ],
+            "contents": {
+                str(pid): dict(cnt) for pid, cnt in ctx.contents.items()
+            },
+            "anchors": [
+                {"color": a.color, "cell": list(a.cell), "episodes": sorted(a.episodes)}
+                for a in ctx.anchors.values()
+            ],
+            "boundary": sorted(sorted(c) for c in ctx.boundary),
+        }
+
+    def load_state(self, data: dict[str, Any]) -> None:
+        """Restore a saved map. Unknown/missing keys reset to a fresh
+        map — a corrupt payload must not leave a half-built context."""
+        contexts = []
+        for cd in data.get("contexts", []):
+            ctx = ContextMap(
+                signature=frozenset(tuple(t) for t in cd["signature"]),
+                bounds=tuple(cd["bounds"]),
+                next_place_id=cd.get("next_place_id", 1),
+                n_episodes=cd.get("n_episodes", 1),
+            )
+            for pd in cd.get("places", []):
+                ctx.places[pd["id"]] = Place(
+                    id=pd["id"],
+                    pos=tuple(pd["pos"]),
+                    visits=pd.get("visits", 0),
+                    code=np.asarray(pd.get("code", []), dtype=float),
+                )
+            for td in cd.get("transitions", []):
+                ctx.transitions[(td["from"], td["action"])] = Counter(
+                    {int(k): v for k, v in td["to"].items()}
+                )
+            ctx.contents = {
+                int(pid): Counter({int(k): v for k, v in cnt.items()})
+                for pid, cnt in cd.get("contents", {}).items()
+            }
+            for ad in cd.get("anchors", []):
+                key = (ad["color"], tuple(ad["cell"]))
+                ctx.anchors[key] = Anchor(
+                    color=ad["color"],
+                    cell=tuple(ad["cell"]),
+                    episodes=set(ad.get("episodes", [])),
+                )
+            ctx.boundary = {tuple(c) for c in cd.get("boundary", [])}
+            contexts.append(ctx)
+        self.contexts = contexts
+        self._episode = int(data.get("episode", 0))
+        idx = data.get("context_index")
+        self._context = (
+            self.contexts[idx]
+            if idx is not None and 0 <= idx < len(self.contexts)
+            else None
+        )
+        pos = data.get("pos")
+        self._pos = tuple(pos) if pos is not None else None
+        self._code = self.grid.encode(self._pos) if self._pos else None
+        pid = data.get("place_id")
+        self._place = (
+            self._context.places.get(pid)
+            if self._context is not None and pid is not None
+            else None
+        )

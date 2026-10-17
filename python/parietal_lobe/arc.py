@@ -55,6 +55,8 @@ from inspect import signature
 from pathlib import Path
 from typing import Any, Protocol
 
+from genesis_client.swallow import note_swallowed
+
 logger = logging.getLogger(__name__)
 
 _HEALTH_EVERY_STEPS = 25
@@ -700,8 +702,8 @@ class ArcOfficial(ArcPractice):
             try:
                 closed = self._arcade.close_scorecard(card["scorecard_id"])
                 card["score"] = getattr(closed, "score", None)
-            except Exception:  # noqa: BLE001 — the server may have already closed it
-                pass
+            except Exception as e:  # noqa: BLE001 — the server may have already closed it
+                note_swallowed("parietal_lobe.arc._seal", e)
         card["closed"] = True
         card["close_reason"] = reason
         self._save_card(card)
@@ -731,8 +733,8 @@ class ArcOfficial(ArcPractice):
                 + f" Next: {game_id} — {pending} games unplayed.",
                 topics=["arc", "official", "rules"],
             )
-        except Exception:  # noqa: BLE001 — a lost brief must not burn an attempt
-            pass
+        except Exception as e:  # noqa: BLE001 — a lost brief must not burn an attempt
+            note_swallowed("parietal_lobe.arc._brief", e)
 
     def attempt_next(self, max_steps: int = 200) -> ArcResult | None:
         """One official attempt on the next pending game.

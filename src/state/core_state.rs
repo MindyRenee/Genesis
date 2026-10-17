@@ -96,7 +96,7 @@ use super::inference::InferenceSignals;
 use super::ions::IonState;
 use super::manifest::RuntimeManifest;
 use super::memory::MemoryPointers;
-use super::neurochemical::{NeuroTickParams, NeurochemicalId, NeurochemicalVector};
+use super::neurochemical::{ActiveRegion, NeuroTickParams, NeurochemicalId, NeurochemicalVector};
 use super::sleep_network::{INITIAL as SLEEP_INITIAL, State as SleepState};
 use super::zones::{ActiveZones, CognitiveZone, MentalPhase};
 
@@ -306,6 +306,17 @@ impl GenesisCoreState {
     /// Advance the neurochemical system with full custom params and
     /// propagate the derived state.
     pub fn neuro_tick_with_params(&mut self, params: &NeuroTickParams) {
+        // Region-specific SRT→DA coupling follows the cognitive zone:
+        // deliberative zones drive the PFC (5-HT1A facilitatory) path,
+        // idle/sleep fall back to the averaged default. Striatum
+        // remains reachable for direct callers (e.g. a future
+        // action-execution channel via set_active_region).
+        self.neurochemicals
+            .set_active_region(if self.zones.zone().is_cognitive() {
+                ActiveRegion::Pfc
+            } else {
+                ActiveRegion::Default
+            });
         self.neurochemicals.tick_with_params(params);
         self.ions.tick(&self.neurochemicals, params.dt);
         self.sync_neurochemistry_to_state();

@@ -34,12 +34,14 @@ __all__ = [
     "BodyControlState",
     "BodyState",
     "CoreState",
+    "DyadicSnapshot",
     "Episode",
     "InferenceSummary",
     "IonSummary",
     "MemoryStats",
     "ModuleTelemetry",
     "NeuroSummary",
+    "PersonSignature",
     "PhaseInfo",
     "PingResponse",
     "PlasticityProfile",
@@ -1947,4 +1949,150 @@ class FieldProbeSignature:
             carrier_lag=lag,
             carrier_phase=phase,
             carrier_coherence=coherence,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class PersonSignature:
+    """The measured signature of one person the dyadic model knows.
+
+    What the body recorded while this person was present: the
+    affective *aura* (valence/arousal/engagement EMAs), the *bond*
+    (measured co-presence folded into ``familiarity``), how in-tune
+    the dyad runs, and the *field* — the substrate's real band-energy
+    configuration EMA'd during their presence, the primary channel.
+    ``field_samples`` is the honest evidence count so a thin signature
+    reads differently from a deep one. ``authenticated`` is
+    provenance, never authority.
+
+    ``name`` is the person key: an attributed name ("mindy") or an
+    anonymous presence key ("face:3") — a familiar stranger's
+    signature persists until a naming merges it into the named one.
+    """
+
+    name: str  # person key — a name, or anonymous "face:N"
+    authenticated: bool
+    familiarity: float           # bond depth [0, 1)
+    valence: float               # aura — affective signature
+    arousal: float
+    engagement: float
+    synchrony_ema: float         # per-person in-tune history
+    presence_seconds: float      # total measured co-presence
+    field_samples: int           # evidence count behind `field`
+    field: tuple[float, ...]     # 10 band energies EMA'd in presence
+
+
+@dataclass(frozen=True, slots=True)
+class DyadicSnapshot:
+    """The dyadic model's latest measured state — evidence, never
+    prescription.
+
+    ``person`` is the present attributed person's signature (None for
+    an anonymous or absent speaker). ``reunion`` reports the most
+    recent return of a known person while it is still fresh — a dict
+    ``{"bond": …, "seconds_since": …}`` so recency is evidence she
+    can weigh herself. ``coupling`` is attunement deepened by the
+    present bond — how strongly this dyad is currently running.
+
+    ``ambient_field`` is the pooled field signature — the substrate's
+    band energies while *anyone* is present, attributed or not. It is
+    the primary channel: a person needs no name and no camera for her
+    substrate to take their shape. ``ambient_field_samples`` is its
+    evidence count. Both are zero on v1 bodies lacking the tail.
+
+    What any of this does to her neurochemistry is her own call
+    through ``neuro_impulse``; the model measures, she decides.
+    """
+
+    user_valence: float
+    user_arousal: float
+    user_engagement: float
+    attunement: float
+    synchrony: float
+    coupling: float
+    person: PersonSignature | None
+    reunion: dict | None
+    person_count: int
+    ambient_field_samples: int = 0
+    ambient_field: tuple[float, ...] = ()
+
+    @classmethod
+    def unpack(cls, data: bytes) -> DyadicSnapshot:
+        """Unpack the GET_DYADIC_STATE body (layout in
+        `dyadic_model::DyadicSnapshot::to_wire`)."""
+        if len(data) < 26 or data[0] != 1:
+            raise ValueError(f"bad dyadic snapshot ({len(data)} bytes)")
+        try:
+            (
+                user_valence,
+                user_arousal,
+                user_engagement,
+                attunement,
+                synchrony,
+                coupling,
+            ) = struct.unpack_from("<6f", data, 1)
+            off = 25
+            person = None
+            if data[off]:
+                off += 1
+                n = data[off]
+                off += 1
+                name = data[off : off + n].decode("utf-8", "replace")
+                off += n
+                authenticated = bool(data[off])
+                off += 1
+                familiarity, valence, arousal, engagement, sync = struct.unpack_from(
+                    "<5f", data, off
+                )
+                off += 20
+                (presence,) = struct.unpack_from("<d", data, off)
+                off += 8
+                (field_samples,) = struct.unpack_from("<I", data, off)
+                off += 4
+                field = struct.unpack_from("<10f", data, off)
+                off += 40
+                person = PersonSignature(
+                    name=name,
+                    authenticated=authenticated,
+                    familiarity=familiarity,
+                    valence=valence,
+                    arousal=arousal,
+                    engagement=engagement,
+                    synchrony_ema=sync,
+                    presence_seconds=presence,
+                    field_samples=field_samples,
+                    field=field,
+                )
+            else:
+                off += 1
+            reunion = None
+            if data[off]:
+                bond, seconds_since = struct.unpack_from("<2f", data, off + 1)
+                reunion = {"bond": bond, "seconds_since": seconds_since}
+                off += 9
+            else:
+                off += 1
+            (person_count,) = struct.unpack_from("<H", data, off)
+            off += 2
+            ambient_samples = 0
+            ambient_field: tuple[float, ...] = ()
+            # Additive tail: [u32 ambient_samples][10 × f32 ambient]
+            if len(data) - off >= 44:
+                (ambient_samples,) = struct.unpack_from("<I", data, off)
+                off += 4
+                ambient_field = struct.unpack_from("<10f", data, off)
+        except (IndexError, struct.error) as e:
+            raise ValueError(f"bad dyadic snapshot ({len(data)} bytes)") from e
+        return cls(
+            user_valence=user_valence,
+            user_arousal=user_arousal,
+            user_engagement=user_engagement,
+            attunement=attunement,
+            synchrony=synchrony,
+            coupling=coupling,
+            person=person,
+            reunion=reunion,
+            person_count=person_count,
+            ambient_field_samples=ambient_samples,
+            ambient_field=ambient_field,
         )

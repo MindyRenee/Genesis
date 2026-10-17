@@ -139,7 +139,7 @@ class CodeToolHandler:
         # the actual words — no hardcoded poetic statements.
         code_concept = self._network.get_concept("code")
         if code_concept:
-            neighbors = self._network.get_neighbors("code")
+            neighbors = self._network.get_exact_neighbors("code")
             if neighbors:
                 knowledge = [
                     (relation.value.replace("_", " "), target, weight)

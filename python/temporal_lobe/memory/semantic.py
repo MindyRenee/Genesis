@@ -88,7 +88,7 @@ _IS_A_RE = re.compile(
 # pruned unless reinforced.
 _IS_A_PLURAL_RE = re.compile(
     r"\b([A-Za-z][\w]*(?:\s+[A-Za-z][\w]*)*)\s+"
-    r"(?:are|were)\s+(?:a|an)?\s*"
+    r"(?:are|were)\s+(?:(?:a|an)\s+)?"
     r"([A-Za-z][\w]*(?:\s+[A-Za-z][\w]*)*)\b",
     re.IGNORECASE,
 )
@@ -118,7 +118,7 @@ _IS_RE = re.compile(
 # Has-property: "X has Z", "X has a Z", "X have Z".
 _HAS_RE = re.compile(
     r"\b([A-Za-z][\w]*(?:\s+[A-Za-z][\w]*)*)\s+"
-    r"(?:has|have|had)\s+(?:a|an|the\s+)?"
+    r"(?:has|have|had)\s+(?:(?:a|an|the)\s+)?"
     r"([A-Za-z][\w]*(?:\s+[A-Za-z][\w]*)*)\b",
     re.IGNORECASE,
 )

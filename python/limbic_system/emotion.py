@@ -94,6 +94,7 @@ class CauseCategory(Enum):
     INTEROCEPTION_MEMORY = "interoception_memory"
     INTEROCEPTION_LATENCY = "interoception_latency"
     INTEROCEPTION_STRESS = "interoception_stress"
+    INTEROCEPTION_ENVIRONMENT = "interoception_environment"
     COGNITIVE_LOAD_BUGS = "cognitive_load_bugs"
     COGNITIVE_LOAD_PROPOSALS = "cognitive_load_proposals"
     COGNITIVE_LOAD_BUGS_AND_PROPOSALS = "cognitive_load_bugs_and_proposals"

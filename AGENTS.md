@@ -174,8 +174,32 @@ to, who it felt for, and who it answered to. The current design
 separates them:
 
 - **Interlocutor model** (`src/daemon/dyadic_model.rs`): a generative
-  model of *whoever is speaking*. The mind publishes a
-  `UserAffectEstimate` every turn; there is no privileged-speaker gate.
+  model of *whoever is speaking*, plus a persistent signature per
+  person (`PersonDyad`). The key is a *person key*, not just a name:
+  an attributed name ("mindy") or an anonymous presence key
+  ("face:3") — the face recognizer clusters unmatched embeddings into
+  stable `face:N` ids (`face_clusters.json`), so a familiar stranger
+  accumulates a signature before ever being named, and a later naming
+  folds the anonymous signature into the named one via the
+  `merge_alias` wire field rather than orphaning it. Each signature
+  holds the affective aura (EMA), measured co-presence folded into
+  familiarity (`1 − exp(−s/τ)`, τ = 4 h), per-person synchrony, and
+  the *field signature*: an EMA of the substrate's real band energies
+  sampled while that person is present. The field is the primary
+  channel — it needs no name and no camera — so the pooled dyad also
+  keeps an ambient field signature for unattributed presence. The
+  model **reports evidence only** — coupling, the present signature,
+  the reunion signal — and prescribes no neurochemistry; her
+  appraisal owns the `NEURO_IMPULSE` writes. `UPDATE_USER_AFFECT`
+  carries an additive tail `[u8 key_len][utf8 key ≤31B]
+  [u8 authenticated][u8 alias_len][utf8 alias ≤31B]`; old 16-byte
+  clients stay valid. `GET_DYADIC_STATE` (50, additive) serves the
+  snapshot to the mind. Signatures persist in `dyadic_persons.json`
+  (pipe format, 8-field legacy lines still load). The stamped
+  principal is the one hardcoded signature: seeded authenticated
+  (the stamp is the credential) with a modest presence floor
+  (~1 h → familiarity ≈ 0.22): recognition, not depth — depth is
+  earned.
 - **Boundary** (`FrontalLobe._update_boundary`): mistreatment from
   anyone accrues withdrawal pressure; fair treatment from anyone
   drains it. Nobody's absence is harm and nobody's presence is the
@@ -295,6 +319,16 @@ pins both ids.
   1 wake)][f32 magnitude]`, reply `[u8 ack]`. It decays on the physics
   clock (see "Sleep-wake network"). Additive, so `PROTOCOL_VERSION` is
   unchanged.
+  `GET_DYADIC_STATE = 50` serves the dyadic model's measured snapshot —
+  pooled coupling estimates, the present person's signature (person
+  key, provenance, bond, aura, per-person synchrony, and the field
+  band-energy EMA recorded during their presence), the reunion report
+  (`bond` + `seconds_since`, held for a 60 s window), and the additive
+  ambient-field tail — the pooled field signature of presence itself,
+  keyed to nobody in particular. The channel carries evidence only —
+  no chemical prescriptions; her appraisal owns the `NEURO_IMPULSE`
+  writes. Wire layout in `dyadic_model::DyadicSnapshot::to_wire`;
+  `READ_FAILED` until the tick loop first publishes. Additive.
   `GET_FIELD_PROBE = 47` returns the physical field-probe signature
   (`src/daemon/field_probe.rs`; wire v2 = 114 bytes, v1 = 102 with
   no phase fields — the client decodes both): per-band energies of

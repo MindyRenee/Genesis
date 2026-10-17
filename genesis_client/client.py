@@ -91,6 +91,7 @@ from .protocol import (
     FIND_SIMILAR,
     GET_BODY_CONTROL,
     GET_BODY_STATE,
+    GET_DYADIC_STATE,
     GET_FIELD_PROBE,
     GET_INFERENCE_SUMMARY,
     GET_ION_SUMMARY,
@@ -159,6 +160,7 @@ from .types import (
     BodyControlState,
     BodyState,
     CoreState,
+    DyadicSnapshot,
     Episode,
     FieldProbeSignature,
     InferenceSummary,
@@ -532,6 +534,32 @@ class GenesisClient:
             return None
         return FieldProbeSignature.unpack(resp)
 
+    def get_dyadic_state(self, *, timeout: float | None = None) -> DyadicSnapshot | None:
+        """Who is present and how the dyad is running — evidence, not
+        prescription.
+
+        The daemon's dyadic model measures the social field: the
+        present person's signature (attributed name, provenance, bond
+        depth, affective aura, in-tune history, and the field
+        band-energy configuration recorded during their presence),
+        the pooled coupling estimates, and a one-tick reunion signal
+        when a known person returns after a real absence.
+
+        What any of this means chemically is the caller's appraisal —
+        the model reports measurements only.
+
+        Returns ``None`` until the tick loop publishes its first
+        snapshot or when the daemon predates the command — an absent
+        channel is no reading, never a zero reading.
+        """
+        try:
+            resp = self._request(GET_DYADIC_STATE, timeout=timeout)
+        except (ConnectionError, OSError, ProtocolError):
+            return None
+        if not resp or resp[0] >= 0x80:
+            return None
+        return DyadicSnapshot.unpack(resp)
+
     def set_field_phase(
         self, phase: float, *, timeout: float | None = None
     ) -> bool:
@@ -789,6 +817,9 @@ class GenesisClient:
         arousal: float,
         engagement: float,
         confidence: float = 0.7,
+        speaker: str | None = None,
+        authenticated: bool = False,
+        merge_alias: str | None = None,
         *,
         timeout: float | None = None,
     ) -> bool:
@@ -796,9 +827,9 @@ class GenesisClient:
         inference of the user's affective state from conversation
         features.
 
-        This feeds the dyadic affective model, which couples Genesis's
-        neurochemistry to the inferred user state via oxytocin-mediated
-        attunement.
+        This feeds the dyadic affective model, which measures the
+        dyadic coupling and keeps a persistent signature per person —
+        evidence her own appraisal acts on, not prescribed chemistry.
 
         Args:
             valence: User's affective valence [-1, 1].
@@ -806,6 +837,17 @@ class GenesisClient:
             engagement: User's engagement level [0, 1].
             confidence: Confidence in the observation [0, 1]. Lower
                 confidence = the observation is noisy and weighted less.
+            speaker: Person key for who is present — an attributed
+                name ("mindy") or an anonymous presence key ("face:3")
+                from the face recognizer's unknown-face clusters. Omit
+                for unattributed speech.
+            authenticated: True when the speaker is the authenticated
+                steward (key possession + stamped principal). Provenance
+                on the signature, not authority.
+            merge_alias: An earlier person key this speaker supersedes —
+                sent once when an anonymous key resolves to a name, so
+                the daemon folds the anonymous signature's history into
+                the named one instead of orphaning it.
         """
         if not (-1.0 <= valence <= 1.0):
             raise ValueError(f"valence must be [-1, 1], got {valence}")
@@ -817,6 +859,12 @@ class GenesisClient:
             raise ValueError(f"confidence must be [0, 1], got {confidence}")
         payload = _F32.pack(valence) + _F32.pack(arousal)
         payload += _F32.pack(engagement) + _F32.pack(confidence)
+        if speaker:
+            name = speaker.encode("utf-8")[:31]
+            payload += bytes([len(name)]) + name + bytes([1 if authenticated else 0])
+            if merge_alias:
+                alias = merge_alias.encode("utf-8")[:31]
+                payload += bytes([len(alias)]) + alias
         resp = self._request(UPDATE_USER_AFFECT, payload, timeout=timeout)
         return bool(resp and resp[0] == 1)
 

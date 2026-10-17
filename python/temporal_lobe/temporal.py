@@ -41,6 +41,14 @@ class TemporalLobe:
         # Medial temporal — grown as projections arrive
         self.concept_learner: ConceptLearner | None = None
         self.memory_store: MemoryStore | None = None
+        # The hippocampal-entorhinal organ — grid phases, place nodes,
+        # anchors, transition graph. It is domain-agnostic: the world
+        # channel feeds it grid coordinates, and the general channel
+        # feeds it state-space position (see prefrontal). Orientation
+        # is a general function, not a game function.
+        from temporal_lobe.cognitive_map import CognitiveMap
+
+        self.cognitive_map = CognitiveMap()
 
     def grow_concept_learner(self, synapses) -> ConceptLearner:
         """Grow the label-acquisition machinery on the synaptic substrate."""

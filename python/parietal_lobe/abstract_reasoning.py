@@ -408,7 +408,7 @@ class AbstractReasoner:
         system must be chunked before frontal reasoning can hold it.
         """
         neighbors = {
-            n for n, rel, _w in self.network.get_neighbors(concept)
+            n for n, rel, _w in self.network.get_exact_neighbors(concept)
             if rel in self._STRUCTURAL
         }
         bound = 1 + len(neighbors)  # self plus each bound entity
@@ -492,7 +492,7 @@ class AbstractReasoner:
                     # Potential mediator: check whether it touches
                     # another member.
                     other_neighbors = {
-                        n for n, rel, _w in self.network.get_neighbors(e.target)
+                        n for n, rel, _w in self.network.get_exact_neighbors(e.target)
                         if rel in self._STRUCTURAL
                     }
                     if other_neighbors & (member_set - {m}):
@@ -505,7 +505,7 @@ class AbstractReasoner:
                 if e.relation not in self._STRUCTURAL or e.source in member_set:
                     continue
                 neighbors = {
-                    n for n, rel, _w in self.network.get_neighbors(e.source)
+                    n for n, rel, _w in self.network.get_exact_neighbors(e.source)
                     if rel in self._STRUCTURAL
                 }
                 if neighbors & (member_set - {m}):

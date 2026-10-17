@@ -377,7 +377,6 @@ class MemorySystem:
         # Optional callback: called when a high-emotion memory is stored
         # so the sleep system can queue it for REM emotional processing.
         self.emotional_memory_callback: Callable[[str, float], Any] | None = None
-
         # ── Wired-in memory subsystems ───────────────────────────
         # These were built as standalone modules but never connected
         # to the memory lifecycle. Here they are wired into storing
@@ -1199,6 +1198,13 @@ class MemorySystem:
                 f"no match"
             )
             return results
+        # The documented over_capacity contract: past Hopfield capacity
+        # the update rule can converge to a spurious attractor, so a
+        # match is a suggestion rather than a confident recall — it
+        # neither boosts an existing result nor synthesizes a head
+        # entry; it is surfaced at the tail where ranking keeps the
+        # semantic evidence in charge.
+        suggestive = self.attractor.over_capacity
         try:
             eid = int(match_id)
         except (TypeError, ValueError):
@@ -1206,8 +1212,9 @@ class MemorySystem:
         # Already present — boost it to the front.
         for r in results:
             if r.episode_id == eid:
-                results.remove(r)
-                results.insert(0, r)
+                if not suggestive:
+                    results.remove(r)
+                    results.insert(0, r)
                 return results[:limit]
         # Not in results — try to fetch the episode and synthesize a
         # result entry for it.
@@ -1236,7 +1243,10 @@ class MemorySystem:
             timestamp=ep.timestamp,
             salience=ep.salience,
         )
-        results.insert(0, completed)
+        if suggestive:
+            results.append(completed)
+        else:
+            results.insert(0, completed)
         # CA3 auto-association: find other stored patterns similar
         # to the completed pattern. These are related memories that
         # should also be surfaced — the hippocampal CA3 region

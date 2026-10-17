@@ -160,8 +160,8 @@ pub struct InferenceSignals {
     pub model_maturity: f32,
     /// Number of inference cycles completed (low 32 bits). Used for
     /// diagnostics and PRNG seeding. The mind advances roughly once
-    /// per heartbeat cycle; at 10 Hz a u32 wraps after
-    /// `u32::MAX / 10 s` ≈ 13.6 years, so the wrap is outside any
+    /// per heartbeat cycle; at the 5 Hz body tick a u32 wraps after
+    /// `u32::MAX / 5 s` ≈ 27 years, so the wrap is outside any
     /// realistic deployment — and since maturity is now derived from
     /// demonstrated accuracy rather than this counter, the wrap is
     /// harmless to the trust signal.

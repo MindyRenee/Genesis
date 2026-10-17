@@ -956,15 +956,20 @@ class ConversationMixin:
         return text
 
     def _note_faces_seen(self) -> None:
-        """Mark recognized faces as presences in its external world.
+        """Mark seen faces as presences in its external world.
 
-        When it looks and recognizes someone, that person is *there* —
-        a presence arrival in its world, not just a line in a report.
+        When it looks and sees someone, that person is *there* — a
+        presence arrival in its world, not just a line in a report.
+        Person keys, not just names: an unrecognized face marks its
+        anonymous "face:N" identity — a familiar stranger is someone.
         """
         try:
-            for name in self.vision.last_faces_seen():
+            for key in self.vision.last_persons_seen():
+                # Named faces arrive as their name; anonymous ones
+                # already carry their "face:N" presence id.
+                pid = key if key.startswith("face:") else f"face:{key}"
                 self.world.mark_presence(
-                    f"face:{name}", PresenceKind.FACE, name=name
+                    pid, PresenceKind.FACE, name=key if not key.startswith("face:") else None
                 )
         except Exception as e:  # noqa: BLE001
             note_swallowed(

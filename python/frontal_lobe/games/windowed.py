@@ -258,6 +258,13 @@ class X11Game:
             self.command,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            # Detached session: the game is designed to stay on the
+            # desktop between sessions (reset() re-attaches to the
+            # window it left up). Without setsid it stays in the
+            # service cgroup and systemd's shutdown kill reaps it —
+            # the "persists between sessions" contract only held
+            # while nothing restarted the unit.
+            start_new_session=True,
         )
         self._wid = self._find_window(timeout=10.0)
         if self._wid is None:

@@ -95,6 +95,17 @@ class MemoryStore:
         is_comfort = perception.intent == Intent.COMFORT
         is_deep = perception.intent in (Intent.PHILOSOPHY, Intent.CODE_DISCUSSION)
 
+        # Low road first (LeDoux, 1996): conditioned cues associate to
+        # the turn's signed US and any supra-threshold aversive net
+        # startles the body *before* the cortical appraisal below
+        # decides how much of the response she allows.
+        if perception.topics:
+            self._regulator.condition_cues(
+                perception.topics,
+                us=perception.sentiment,
+                ctx=perception.intent.name,
+            )
+
         self._regulator.respond_to_interaction(
             emotion=emotion,
             sentiment=perception.sentiment,
