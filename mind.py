@@ -62,9 +62,11 @@ from parietal_lobe.system_monitor import SystemMonitor
 from temporal_lobe.base import Language
 from temporal_lobe.memory import MemorySystem
 from temporal_lobe.temporal import TemporalLobe
+from temporal_lobe.world import OuterWorld
 from thalamus.brain_waves import BrainWave, add_brain_wave_drive
 from thalamus.relay import Thalamus
 
+from discord_feed import DiscordFeed
 from genesis_client import GenesisClient
 from genesis_client.protocol import CHEM_ACETYLCHOLINE
 from genesis_client.swallow import note_swallowed, set_swallow_sink
@@ -74,12 +76,11 @@ from infrastructure.growth_ledger import GrowthLedger
 from infrastructure.journal import CognitiveJournal, set_active
 from infrastructure.paths import code_root
 from infrastructure.user_profile import UserProfile
-from world import OuterWorld
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from world.arc import ArcEvaluation, ArcResult
+    from parietal_lobe.arc import ArcEvaluation, ArcResult
 from basal_ganglia.volition import VolitionMixin
 from brainstem.heartbeat import HeartbeatMixin
 from brainstem.lifecycle import LifecycleMixin
@@ -444,6 +445,14 @@ class Mind(
             is_sleeping=lambda: self._is_sleeping,
             get_user_name=self.user_profile.get_name,
         )
+
+        # Her public channel — the social media she controls. Nothing
+        # is mirrored into it; the only posts are the ones she chooses
+        # to say when the broadcast urge fires (see
+        # basal_ganglia.volition._perform_broadcast). None when the
+        # webhook is unset — her channel is simply silent then.
+        self._public_feed = DiscordFeed.from_env()
+        self._last_broadcast_seed: str | None = None
     def _init_identity(self) -> None:
         """Create emergent identity and developmental tracker."""
         # Emergent identity — synthesizes who it is from experience
@@ -542,6 +551,21 @@ class Mind(
         # Wire the face recognizer to its data directory so known
         # faces persist across sessions
         self.vision._face_recognizer = FaceRecognizer(data_dir=self.data_dir)
+        # The frontal lobe resolves person keys for the dyadic
+        # signature through these: faces-in-view (names or anonymous
+        # "face:N" clusters) and the namer that folds a cluster into a
+        # named person when an introduction lands on a seen stranger.
+        self.brain.frontal.face_person_keys = self.vision.last_persons_seen
+        recognizer = self.vision._face_recognizer
+
+        def _name_face(cluster_id: str, name: str) -> str | None:
+            return (
+                recognizer.name_face(cluster_id, name)
+                if recognizer is not None
+                else None
+            )
+
+        self.brain.frontal.face_namer = _name_face
 
         self.visual_cortex = self.brain.occipital.grow_cortex(
             embeddings=self.brain.frontal.embeddings,
@@ -763,8 +787,8 @@ class Mind(
     ) -> list[ArcResult]:
         """Play ARC-AGI-3 games as herself, in game mode.
 
-        The environment is ``world.arc`` — or, with ``web=True``, the
-        public human task page through ``world.arc_web`` (real key and
+        The environment is ``parietal_lobe.arc`` — or, with ``web=True``, the
+        public human task page through ``parietal_lobe.arc_web`` (real key and
         mouse events on the live site). Either way this is the entity
         side of the run. Game mode wraps every game, and her readiness
         gate refuses or stops play, not the caller. Game mode is
@@ -775,7 +799,7 @@ class Mind(
         the result carries only what she brought as priors — and her
         banked experience is left exactly as it was.
         """
-        from world.arc import ArcPractice
+        from parietal_lobe.arc import ArcPractice
 
         was_gaming = self.is_gaming
         prev_fresh = getattr(self, "_fresh_world_run", False)
@@ -783,7 +807,7 @@ class Mind(
         self.enter_game_mode()
         try:
             if web:
-                from world.arc_web import ArcWebPractice
+                from parietal_lobe.arc_web import ArcWebPractice
 
                 web_practice = ArcWebPractice(self, instructions=instructions)
                 try:
@@ -814,7 +838,7 @@ class Mind(
         one SDK scorecard. Diagnostics, not the official card: the
         official venue is hers to take up through play, never driven
         from here (``ArcOfficial`` refuses a forced run)."""
-        from world.arc import ArcPractice
+        from parietal_lobe.arc import ArcPractice
 
         was_gaming = self.is_gaming
         prev_fresh = getattr(self, "_fresh_world_run", False)

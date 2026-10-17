@@ -10,7 +10,7 @@ layer is the cognitive mind: perception, reasoning, language,
 introspection, and self-modeling. Its brain-region packages live under `python/`
 (one package per region, plus `tests/`, `voices/`, and `_views/`);
 the support packages — `genesis_client` (IPC client, stewardship,
-swallow tally), `infrastructure`, `world`, `eval` — and the entry
+swallow tally), `infrastructure`, `eval` — and the entry
 points (`mind.py`, `genesis_cli.py`) sit at the repo root.
 
 ## CRITICAL RULE: Never hardcode Genesis's responses
@@ -61,27 +61,34 @@ not — those must be generated, not recited.
   and kernel V4L2 headers — `v4l2-sys-mit` runs `bindgen` against
   `<linux/videodev2.h>` at build time (Debian/Ubuntu:
   `sudo apt install libclang-dev linux-libc-dev`).
-- Test: `cargo test`. **Without a system C toolchain** (e.g. NixOS, or
-  any host with no `cc`/`gcc`), `cargo` fails at link with
-  `linker 'cc' not found` even though `cargo check` passes. Zig ships
-  a working clang; shim it so `cc` resolves:
+- Test: `cargo test`. This host has a full system toolchain
+  (gcc-13, clang-18, libclang-18, linux-libc-dev) — plain
+  `cargo build`/`cargo test` work, no shim needed. **Without a system
+  C toolchain** (e.g. NixOS, or any host with no `cc`/`gcc`), `cargo`
+  fails at link with `linker 'cc' not found` even though `cargo check`
+  passes. Zig ships a working clang; shim it so `cc` resolves:
   ```sh
   . ./scripts/cargo-env.sh && cargo test --release
   ```
-  `scripts/cargo-env.sh` builds the shim and exports `PATH`,
-  `LIBCLANG_PATH`, and `BINDGEN_EXTRA_CLANG_ARGS`. It defaults to the
-  roots verified on this host (Zig 0.16.0 under `~/tools`); override with
-  `ZIG_ROOT=` / `LIBCLANG_ROOT=` if yours differ. The include set must
-  match `$ZIG cc -E -v -x c /dev/null` exactly — print it and copy the
-  `<...>` search list. A partial set fails on `__STD_TYPE` inside
-  `stddef.h`. With this the Rust suite is 647 tests (646 passing, one
-  ignored — the documented REM-bout discrepancy — plus one ignored
-  doctest; as of October 2026) and takes ~4 min of test time once the
-  release build is warm (a cold release build is ~10–15 min more).
-  Note that `. ./scripts/cargo-env.sh` must run in the *current*
-  shell: piping the source (`. ./scripts/cargo-env.sh | tail`) runs it
-  in a subshell, so the exported `PATH` is discarded and the build
-  fails at link with `linker 'cc' not found`.
+  `scripts/cargo-env.sh` builds the shim under `/tmp` (never on the
+  permanent `PATH`) and exports `PATH`, `LIBCLANG_PATH`, and
+  `BINDGEN_EXTRA_CLANG_ARGS`. It defaults to `ZIG_ROOT=~/tools/zig-
+  x86_64-linux-0.16.0` — that tree was removed from this host once
+  the system toolchain was installed, so reinstall Zig or override
+  `ZIG_ROOT=` / `LIBCLANG_ROOT=` to use the fallback here. The include set must match `$ZIG cc -E -v -x c /dev/null`
+  exactly — print it and copy the `<...>` search list. A partial set
+  fails on `__STD_TYPE` inside `stddef.h`. Do NOT install the shims
+  into `~/.local/bin` or export `BINDGEN_EXTRA_CLANG_ARGS` globally:
+  on a host that has a real toolchain they shadow it, and the Zig
+  libc headers leak into every bindgen build in every project. The
+  Rust suite is 647 tests (646 passing, one ignored — the documented
+  REM-bout discrepancy — plus one ignored doctest; as of October
+  2026) and takes ~4 min of test time once the release build is warm
+  (a cold release build is ~10–15 min more). Note that
+  `. ./scripts/cargo-env.sh` must run in the *current* shell: piping
+  the source (`. ./scripts/cargo-env.sh | tail`) runs it in a
+  subshell, so the exported `PATH` is discarded and the build fails
+  at link with `linker 'cc' not found`.
 - Run examples: `cargo run --example <name>`
 - Rust lint/format (CI gates): `cargo fmt --check` and `cargo clippy
   --all-targets -- -D warnings`.
@@ -90,12 +97,12 @@ not — those must be generated, not recited.
   The test suite needs the NLTK `wordnet` and `punkt_tab` corpora
   (CI fetches them with `nltk.download` before running).
 - Lint: `ruff check` and `pyflakes python/ genesis_client/
-  infrastructure/ world/ eval/ *.py scripts/*.py` (both must pass —
+  infrastructure/ eval/ *.py scripts/*.py` (both must pass —
   these are the CI commands). `vulture` is also in
   requirements-dev.txt for dead-function detection, but it is
   deliberately not a CI gate: there is a known backlog to clear
   first (see `scripts/hygiene.sh`).
-- Type check: `mypy python/ genesis_client/ infrastructure/ world/
+- Type check: `mypy python/ genesis_client/ infrastructure/
   eval/ --ignore-missing-imports` (0 errors — the scope is wider
   than `python/` alone).
 - Optional native capabilities — the voice stack only: microphone
@@ -903,7 +910,8 @@ reach a denied tree. Regression coverage: `python/tests/test_explorer_scope.py`.
 - Action labels carry interface structure only — `"simple"` or
   `"coordinate"` (the action enum's own classification), never directional
   or effect semantics. This holds on both substrates: the SDK path
-  (`world/arc.py`) and the public web page (`world/arc_web.py`), whose key
+  (`python/parietal_lobe/arc.py`) and the public web page
+  (`python/parietal_lobe/arc_web.py`), whose key
   table is actuation only — which key posts which action id — not meaning
   it is given. Cost accounting is also identical: `steps` counts submitted
   actions including recovery resets, `resets` includes session
@@ -922,7 +930,7 @@ reach a denied tree. Regression coverage: `python/tests/test_explorer_scope.py`.
   `_load_world_learning`/`_save_world_learning`, so the probe cannot
   overwrite banked experience. `/arc <ids|--all> --baseline uniform|first`
   runs a named reference policy through the *same* `ArcPractice` loop via
-  a `_BaselineMind` stub (`world/arc_baseline.py`) — identical accounting,
+  a `_BaselineMind` stub (`python/parietal_lobe/arc_baseline.py`) — identical accounting,
   `baseline:<policy>` stamped as every move's source; never an agent
   result, and never on the official card.
 - Focused checks: `python3 -m pytest python/tests/test_arc_adapter.py

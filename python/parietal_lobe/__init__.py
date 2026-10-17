@@ -365,7 +365,7 @@ Top-level modules newly claimed by this subsystem:
         al.; rTPJ TMS impairs self/other attribution). Co-claimed
         with limbic_system, which owns the Damasio stack.
 
-    (world/) belief.py — posteriors about who is out there
+    belief.py (formerly world/belief.py) — posteriors about who is out there
         PresenceBelief, Beta. Mentalizing over the social world:
         Beta posteriors on external presences' responsiveness and
         mood, updated by evidence. Right TPJ is the selective
@@ -495,8 +495,8 @@ _EXPORTS: dict[str, str] = {
     # Mentalizing over the social world — Beta posteriors on the
     # external presences' responsiveness and mood (rTPJ belief
     # attribution; co-claimed with frontal_lobe's medial PFC)
-    "PresenceBelief": "world.belief",
-    "Beta": "world.belief",
+    "PresenceBelief": "parietal_lobe.belief",
+    "Beta": "parietal_lobe.belief",
     # The posterior default-mode hub — posterior cingulate/precuneus
     # and the angular gyrus are the parietal half of the mind-
     # wandering loop InnerLife models (co-claimed with frontal_lobe)

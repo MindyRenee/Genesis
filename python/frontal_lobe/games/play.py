@@ -1147,7 +1147,7 @@ class GamePlay:
             if not pending:
                 return None
             try:
-                from world.arc import ArcOfficial
+                from parietal_lobe.arc import ArcOfficial
 
                 idle_limit = ArcOfficial.IDLE_LIMIT_S
             except ImportError:
@@ -1230,7 +1230,7 @@ class GamePlay:
             return None
         self._arc_briefed = ch["key"]
         try:
-            from world.arc import challenge_brief
+            from parietal_lobe.arc import challenge_brief
         except ImportError:
             return None
         pending = len(ch["pending"]) if ch.get("pending") else None
@@ -1462,7 +1462,7 @@ class GamePlay:
         mind = getattr(self, "mind", None)
         if mind is None:
             return None
-        from world.arc import ArcOfficial
+        from parietal_lobe.arc import ArcOfficial
 
         arc_dir = Path(self.data_dir) / "arc"
         card_path = arc_dir / _ARC_OFFICIAL_CARD

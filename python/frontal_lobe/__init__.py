@@ -819,8 +819,8 @@ _EXPORTS: dict[str, str] = {
     # belief attribution (Frith & Frith; Amodio & Frith meta-analyses);
     # co-claimed with parietal_lobe (rTPJ, the selective
     # belief-representation node)
-    "PresenceBelief": "world.belief",
-    "Beta": "world.belief",
+    "PresenceBelief": "parietal_lobe.belief",
+    "Beta": "parietal_lobe.belief",
     # Working memory — Baddeley model (DLPFC central executive)
     "CentralExecutive": "temporal_lobe.memory.working",
     "PhonologicalLoop": "temporal_lobe.memory.working",

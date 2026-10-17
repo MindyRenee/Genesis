@@ -10,8 +10,8 @@
 
 - [ ] `cargo test`
 - [ ] `ruff check`
-- [ ] `python3 -m pyflakes python/ genesis_client/ infrastructure/ world/ eval/ *.py scripts/*.py`
-- [ ] `python3 -m mypy python/ genesis_client/ infrastructure/ world/ eval/ --ignore-missing-imports`
+- [ ] `python3 -m pyflakes python/ genesis_client/ infrastructure/ eval/ *.py scripts/*.py`
+- [ ] `python3 -m mypy python/ genesis_client/ infrastructure/ eval/ --ignore-missing-imports`
 - [ ] `PYTHONPATH=python:. python3 -m pytest python/tests/ -q -o addopts=''`
 - [ ] Focused tests added or updated
 

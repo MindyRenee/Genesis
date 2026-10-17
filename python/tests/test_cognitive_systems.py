@@ -3484,3 +3484,119 @@ def test_executive_planning_uses_predictor_for_action_selection() -> None:
     assert plan.steps == ["repair"]
     assert plan.predicted_outcomes == ["predicted:repair"]
     assert plan.expected_value > 0.0
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Broadcast urge — her public channel, only when she has something to say
+# ═══════════════════════════════════════════════════════════════════
+
+
+def test_broadcast_urge_registered() -> None:
+    """The broadcast urge ships in the default urge set, rate-limited."""
+    from infrastructure.config import MindConfig
+
+    urges = {u.name: u for u in MindConfig().volition.urges}
+    assert "broadcast" in urges
+    bc = urges["broadcast"]
+    # Her channel is not a firehose: a real cooldown between posts.
+    assert bc.cooldown >= 900.0
+    assert bc.threshold > 0.0
+
+
+def _broadcast_holder(**overrides):
+    """A minimal stand-in for Mind for _perform_broadcast."""
+    from types import SimpleNamespace
+
+    from basal_ganglia.volition import VolitionMixin
+
+    posts: list[tuple] = []
+
+    class _Feed:
+        def post(self, text, author=None):
+            posts.append((text, author))
+
+        def update_live(self, *a, **k):
+            posts.append(("live", a, k))
+
+    said: list[str] = []
+    world = SimpleNamespace(it_said=lambda t: said.append(t))
+    network = SimpleNamespace(
+        most_activated=lambda n: [("curiosity", 0.9)],
+        get_concept=lambda name: SimpleNamespace(confidence=0.9),
+    )
+    composer = SimpleNamespace(
+        compose_about=lambda seed, emotion, focused=True: SimpleNamespace(
+            content="composed thought", confidence=0.9
+        ),
+        has_said_similar=lambda seed, content: False,
+    )
+    frontal = SimpleNamespace(network=network, composer=composer)
+    holder = SimpleNamespace(
+        _is_sleeping=False,
+        _is_meditating=False,
+        _is_teaching=False,
+        _is_gaming=False,
+        _public_feed=_Feed(),
+        _last_broadcast_seed=None,
+        brain=SimpleNamespace(frontal=frontal),
+        feel=lambda: SimpleNamespace(valence=0.2),
+        language=SimpleNamespace(render=lambda thought, emotion: "her own words"),
+        world=world,
+    )
+    holder._broadcast_topic = lambda: VolitionMixin._broadcast_topic(holder)
+    for key, value in overrides.items():
+        setattr(holder, key, value)
+    return holder, posts, said, network, composer
+
+
+def test_broadcast_posts_only_composed_words() -> None:
+    """What reaches her channel is what her language engine rendered."""
+    from basal_ganglia.volition import VolitionMixin
+
+    holder, posts, said, _net, _comp = _broadcast_holder()
+    VolitionMixin._perform_broadcast(holder)
+    assert posts == [("her own words", "Genesis")]
+    assert said == ["her own words"]
+    assert holder._last_broadcast_seed == "curiosity"
+
+
+def test_broadcast_abstains_without_feed() -> None:
+    """No webhook → no feed → no post, no crash."""
+    from basal_ganglia.volition import VolitionMixin
+
+    holder, posts, said, _net, _comp = _broadcast_holder(_public_feed=None)
+    VolitionMixin._perform_broadcast(holder)
+    assert posts == [] and said == []
+
+
+def test_broadcast_silent_when_nothing_alive() -> None:
+    """An empty network means she has nothing to say — she stays silent."""
+    from basal_ganglia.volition import VolitionMixin
+
+    holder, posts, said, network, _comp = _broadcast_holder()
+    network.most_activated = lambda n: []
+    VolitionMixin._perform_broadcast(holder)
+    assert posts == [] and said == []
+
+
+def test_broadcast_silent_when_composer_has_nothing() -> None:
+    """Low-confidence composition is abstention, not a post."""
+    from types import SimpleNamespace
+
+    from basal_ganglia.volition import VolitionMixin
+
+    holder, posts, said, _net, composer = _broadcast_holder()
+    composer.compose_about = lambda seed, emotion, focused=True: SimpleNamespace(
+        content="", confidence=0.1
+    )
+    VolitionMixin._perform_broadcast(holder)
+    assert posts == [] and said == []
+
+
+def test_broadcast_gated_off_during_sleep() -> None:
+    """Asleep, she does not post."""
+    from basal_ganglia.volition import VolitionMixin
+
+    holder, posts, said, _net, _comp = _broadcast_holder(_is_sleeping=True)
+    VolitionMixin._perform_broadcast(holder)
+    assert posts == [] and said == []

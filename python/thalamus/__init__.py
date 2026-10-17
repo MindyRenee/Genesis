@@ -194,7 +194,7 @@ Re-exported modules:
         frontal_lobe (the PFC is the primary broadcaster; the
         relay is the wire).
 
-    (world/) bridge.py — the world's channel into the broadcast
+    bridge.py (formerly world/bridge.py) — the world's channel into the broadcast
 
     WorldBridge, WorldBroadcastSink
         The push/pull pair that puts world content onto the
@@ -243,8 +243,8 @@ _EXPORTS: dict[str, str] = {
     # The world's channel into the broadcast — world content pushed
     # onto the workspace (source="world") and the tensor slab; the
     # sink fans world items back out to regions with no module
-    "WorldBridge": "world.bridge",
-    "WorldBroadcastSink": "world.bridge",
+    "WorldBridge": "thalamus.bridge",
+    "WorldBroadcastSink": "thalamus.bridge",
     # The inter-region relay itself — cortico-cortical messages ride
     # the module manifest the way drivers ride TC relay cells
     "Thalamus": "thalamus.relay",

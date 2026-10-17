@@ -1,13 +1,20 @@
-"""Discord feed — mirror the terminal session to a Discord channel.
+"""Discord feed — the webhook transport behind Genesis's channels.
 
-Set ``GENESIS_DISCORD_WEBHOOK`` to a Discord channel webhook URL and
-the CLI mirrors the whole session there: ``genesis>`` replies,
-``genesis~`` thoughts, slash-command output, system notices, and the
-user's typed input (which the terminal itself never writes to the
-log, so it is enqueued explicitly).
+Three channels exist, each on its own webhook:
 
-A webhook can only *post* — it cannot read the channel — so the feed
-is read-only by construction. Channel permissions decide who watches.
+- ``GENESIS_DISCORD_WEBHOOK`` — *her* channel. Her social media: the
+  only messages posted here are the ones she chooses to broadcast,
+  composed from her own cognition when the ``broadcast`` urge fires
+  (see ``basal_ganglia.volition``). Nothing mirrors to this channel —
+  no session log, no telemetry, no user input.
+- ``GENESIS_DISCORD_ARC_WEBHOOK`` — an opt-in spectator feed the ARC
+  showcase narrates practice runs to.
+- ``GENESIS_DISCORD_PULSE_WEBHOOK`` — an opt-in ops telemetry feed
+  driven by ``scripts/discord_pulse.py``.
+
+A webhook can only *post* — it cannot read the channel — so every
+feed is read-only by construction. Channel permissions decide who
+watches.
 
 Design notes:
 
@@ -16,13 +23,7 @@ Design notes:
   single messages (Discord caps content at 2000 chars), paces
   requests, and honors 429 ``retry_after``. Posting never blocks or
   raises into Genesis — a dead webhook costs a queue, nothing more.
-- ``FeedLogHandler`` attaches to the root logger so every line the
-  terminal shows is also enqueued. ``StderrTee`` wraps ``sys.stderr``
-  for the few direct prints that bypass logging.
-- ``allowed_mentions`` is empty — mirrored text can never ping anyone.
-- Line prefixes map to usernames: ``genesis>``/``genesis~`` post as
-  "Genesis", ``you>`` posts as "you", everything else uses the
-  webhook's configured name.
+- ``allowed_mentions`` is empty — posted text can never ping anyone.
 """
 
 from __future__ import annotations
@@ -59,31 +60,11 @@ _DRAIN_DEADLINE = 5.0
 _BACKOFF_CAP = 60.0
 # Consecutive transient failures after which the feed disables itself.
 # A dead webhook must not cost the session a churning poster thread —
-# without a cap, each failed POST also logs through FeedLogHandler and
-# re-enqueues its own error line, so the queue can never drain.
+# without a cap, the queue can never drain.
 _FAILURE_DISABLE = 20
 # Seconds the poster waits after the first queued line for more of the
 # same author to arrive, so a burst coalesces into one message.
 _COALESCE_WINDOW = 0.15
-
-# Line-prefix → Discord username overrides. The webhook's own name is
-# used for anything without a prefix (system notices, status dumps).
-_PREFIX_AUTHORS: tuple[tuple[str, str], ...] = (
-    ("genesis>", "Genesis"),
-    ("genesis~", "Genesis"),
-    ("you>", "you"),
-)
-
-
-def _classify(line: str) -> tuple[str | None, str]:
-    """Split a terminal line into (Discord username, content)."""
-    stripped = line.strip("\n")
-    lead = stripped.lstrip()
-    for marker, author in _PREFIX_AUTHORS:
-        if lead.startswith(marker):
-            return author, lead[len(marker):].lstrip()
-    return None, stripped
-
 
 def _chunks(text: str) -> Iterator[str]:
     """Yield ``text`` in pieces that fit Discord's content limit.
@@ -159,12 +140,19 @@ class DiscordFeed:
 
     @classmethod
     def from_env(cls) -> DiscordFeed | None:
-        """Create a feed from ``GENESIS_DISCORD_WEBHOOK``, or None."""
+        """Create her public channel feed from ``GENESIS_DISCORD_WEBHOOK``.
+
+        Returns None when the webhook is unset — her channel is simply
+        silent then; nothing she says is mirrored anywhere.
+        """
         url = os.environ.get(_WEBHOOK_ENV, "").strip()
         if not url:
             return None
         feed = cls(url)
-        logger.info(f"[discord] Mirroring this session to {_WEBHOOK_ENV}.")
+        logger.info(
+            f"[discord] Public channel enabled ({_WEBHOOK_ENV}) — "
+            "posts are composed by her volition only."
+        )
         return feed
 
     # ── Producer API ─────────────────────────────────────────────────
@@ -180,16 +168,6 @@ class DiscordFeed:
                 self._queue.popleft()
             self._queue.append(("text", author, text))
             self._cond.notify()
-
-    def post_line(self, line: str) -> None:
-        """Enqueue one terminal line, classifying genesis>/you> prefixes."""
-        author, content = _classify(line)
-        if content.strip():
-            self.post(content, author)
-
-    def post_user(self, text: str) -> None:
-        """Enqueue user input verbatim (typed input never reaches the log)."""
-        self.post(text, "you")
 
     def post_image(
         self,
@@ -480,67 +458,3 @@ def _parse_retry_after(error: urllib.error.HTTPError) -> float | None:
         return value if value > 0 else None
     except (ValueError, OSError, AttributeError):
         return None
-
-
-class FeedLogHandler(logging.Handler):
-    """Logging handler that mirrors every emitted record to a feed.
-
-    Attach to the root logger with the same ``%(message)s`` format the
-    console uses, so the feed sees exactly what the terminal shows.
-    """
-
-    def __init__(self, feed: DiscordFeed) -> None:
-        super().__init__()
-        self.setFormatter(logging.Formatter("%(message)s"))
-        self._feed = feed
-
-    def emit(self, record: logging.LogRecord) -> None:
-        # Never feed this module's own log records back into the queue.
-        # A webhook outage logs an error here every failed POST; if that
-        # record re-enqueues, the queue never drains and the poster
-        # churns forever — the reported hang.
-        if record.name == logger.name:
-            return
-        try:
-            self._feed.post_line(self.format(record))
-        except Exception:  # noqa: BLE001 — mirroring must never break logging
-            # NOTE: must not use logger here (it would recurse into this
-            # handler). Delegate to the standard logging error handling,
-            # which writes to stderr when raiseExceptions is enabled.
-            self.handleError(record)
-
-
-class StderrTee:
-    """File-like wrapper that mirrors stderr writes into the feed.
-
-    Forwards every write to the real stderr, then feeds complete lines
-    to ``post_line``. Assign over ``sys.stderr``; keep the return value
-    to restore it later.
-    """
-
-    def __init__(self, real, feed: DiscordFeed) -> None:
-        self._real = real
-        self._feed = feed
-        self._buf = ""
-        self._lock = threading.Lock()
-
-    def write(self, s: str) -> int:
-        self._real.write(s)
-        with self._lock:
-            self._buf += s
-            while "\n" in self._buf:
-                line, self._buf = self._buf.split("\n", 1)
-                self._feed.post_line(line)
-        return len(s)
-
-    def flush(self) -> None:
-        self._real.flush()
-        with self._lock:
-            if self._buf.strip():
-                self._feed.post_line(self._buf)
-                self._buf = ""
-
-    def __getattr__(self, name: str):
-        if name.startswith("_"):
-            raise AttributeError(name)
-        return getattr(self._real, name)

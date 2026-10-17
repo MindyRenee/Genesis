@@ -33,7 +33,7 @@ The adapter may enforce honest-run contracts — game mode, readiness, action
 legality, scorecard lifetime — but it must not choose moves for it.
 
 The observation contract is identical on both substrates (the local engine
-via `world/arc.py`, the public human page via `world/arc_web.py`): action
+via `python/parietal_lobe/arc.py`, the public human page via `python/parietal_lobe/arc_web.py`): action
 ids plus *structural* labels only — `"simple"` or `"coordinate"`, read from
 the interface's own action enum. Directional or effect semantics are never
 crossed. What a control does is learned from consequences; nothing keyed to
@@ -132,8 +132,8 @@ stands. A restart mid-window resumes the same card.
 
 ## Current status
 
-- The adapter and embodied loop are implemented in `world/arc.py`.
-- The public web-page substrate is implemented in `world/arc_web.py`; it
+- The adapter and embodied loop are implemented in `python/parietal_lobe/arc.py`.
+- The public web-page substrate is implemented in `python/parietal_lobe/arc_web.py`; it
   keeps the same observation contract and the same cost accounting —
   `python/tests/test_arc_web_adapter.py` exercises it without a browser.
 - Focused boundary and world-model tests cover action translation, scorecard

@@ -165,13 +165,16 @@ class EmbodimentMixin:
 
     def _init_embodiment(self, seed: int | None = None) -> None:
         """Create the world model and the policy that acts on it."""
-        from world.bridge import WorldBridge, WorldBroadcastSink
+        from thalamus.bridge import WorldBridge, WorldBroadcastSink
 
         self.world_model = WorldModel()
         self._world_policy = WorldPolicy(self.world_model, seed=seed)
         # Hippocampal-entorhinal allocentric map — the world-centered
-        # layer that persists where the egocentric model resets.
-        self.cognitive_map = CognitiveMap()
+        # layer that persists where the egocentric model resets. The
+        # organ lives in the temporal lobe (its anatomical region);
+        # the world channel is one consumer, feeding grid coordinates
+        # into the shared map's own context.
+        self.cognitive_map = self.brain.temporal.cognitive_map
         # (action, predicted self-displacement) awaiting its outcome —
         # the intention half of the agency comparator.
         self._pending_world_action: tuple[str, Any] | None = None

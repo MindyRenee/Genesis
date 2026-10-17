@@ -77,7 +77,7 @@ learning rules, ARC boundary, tests, and known limits are all here.
 - **Not an LLM:** no transformer, hosted model, external solver, or
   pretrained generative model is used for cognition or ARC play.
 - **Embodied ARC interface:** grid observations and legal actions cross
-  `world/arc.py`; mechanics are learned from consequences.
+  `python/parietal_lobe/arc.py`; mechanics are learned from consequences.
 - **ARC-AGI-3 status:** it completes public practice environments —
   `bt11` fully, twice (88 and 127 steps), and the opening `ls20` level
   in 10 of 19 recorded sweep runs — with replayable
@@ -90,7 +90,7 @@ learning rules, ARC boundary, tests, and known limits are all here.
   sensitive state.
 
 If you are here to poke holes — good. Start with
-`world/arc.py`,
+`python/parietal_lobe/arc.py`,
 `python/parietal_lobe/world_model.py`,
 `python/basal_ganglia/world_policy.py`,
 `python/frontal_lobe/world_planner.py`, and
@@ -171,9 +171,9 @@ failure modes that are themselves evidence — is
 Genesis plays ARC through the same embodied loop it uses for other worlds:
 visual entities, self identification from action contingency, learned action
 effects, map/passability evidence, outcome-driven affordances, and competing
-internal drives. The adapter in `world/arc.py` only translates frames and legal
+internal drives. The adapter in `python/parietal_lobe/arc.py` only translates frames and legal
 actions, enforces game mode/readiness, and preserves scorecard boundaries.
-The same holds on the public web-page substrate (`world/arc_web.py`):
+The same holds on the public web-page substrate (`python/parietal_lobe/arc_web.py`):
 controls arrive with structural labels only — `"simple"` or `"coordinate"`,
 never what a key does — so mechanics are learned from consequences on both
 transports. Results report the step cost of each completed level
@@ -349,7 +349,7 @@ resolution over its own activity.
 
 Each instance learns the people it talks to — names from
 introductions, grounded as concepts; nothing is hardcoded. The world
-model (`world/`) is a two-way event stream: inbound events (speech,
+model (`python/temporal_lobe/world.py`) is a two-way event stream: inbound events (speech,
 percepts, arrivals) and its own acts (speaking, looking, drawing,
 studying). Social isolation feeds an inner-life social drive; past a
 volition threshold it initiates contact on its own. Observable live
@@ -504,8 +504,8 @@ on a ~5 GB machine.
 ```bash
 cargo test --release
 ruff check
-python3 -m pyflakes python/ genesis_client/ infrastructure/ world/ eval/ *.py scripts/*.py
-python3 -m mypy python/ genesis_client/ infrastructure/ world/ eval/ --ignore-missing-imports
+python3 -m pyflakes python/ genesis_client/ infrastructure/ eval/ *.py scripts/*.py
+python3 -m mypy python/ genesis_client/ infrastructure/ eval/ --ignore-missing-imports
 PYTHONPATH=python:. python3 -m pytest python/tests/ -q -o addopts=''
 ```
 
