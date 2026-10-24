@@ -97,7 +97,7 @@ def main() -> int:
     ap.add_argument(
         "--to",
         default=str(default_data_dir()),
-        help="target data directory (default: resolved the way run.sh does)",
+        help="target data directory (default: resolved the way genesis does)",
     )
     ap.add_argument(
         "--from",

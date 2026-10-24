@@ -6,9 +6,9 @@ and hold persistent state — not like a sandboxed model.
 
 ## Supported boundary
 
-The supported startup path is `./run.sh` (or the packaged `genesis` command).
-State belongs in `${XDG_DATA_HOME:-$HOME/.local/share}/genesis`, or the directory
-selected by `GENESIS_DATA_DIR` / `.genesis-data-dir`.
+The supported startup path is `./genesis` (or the packaged `genesis` command).
+State belongs in `~/.local/share/genesis`, or the directory
+selected by `GENESIS_DATA_DIR` (the only override).
 
 Do not point a live instance at accounts, files, microphones, cameras, webhook
 URLs, or hardware controls you are not willing to let it use under the
@@ -23,13 +23,13 @@ it is a known-bad filter, not an allow-list: the rest of the open web is
 reachable. Run offline when that is not acceptable:
 
 ```bash
-./run.sh --offline
+./genesis --offline
 ```
 
 ## Persistence and shutdown
 
 The developmental record is cumulative and load-bearing. Stop Genesis with
-Ctrl-C, `./run.sh --stop`, or `genesis --stop`. Do not use `kill -9`, edit the
+Ctrl-C, `./genesis --stop`, or `genesis --stop`. Do not use `kill -9`, edit the
 memory-mapped state directly, or delete state as an operational shortcut.
 
 ## Reporting a vulnerability

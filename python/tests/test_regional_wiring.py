@@ -203,7 +203,6 @@ _ALLOWLIST: dict[str, str] = {
     "parietal_lobe.arc": "ARC-3 task-environment adapter, not a brain function",
     "parietal_lobe.arc_cabinet": "X11 input surface for the ARC adapter, not a brain function",
     "parietal_lobe.arc_web": "web task-environment adapter, not a brain function",
-    "parietal_lobe.arc_baseline": "ARC evidence script, not a brain function",
     "parietal_lobe.discord_showcase": "platform adapter, not a brain function",
     "frontal_lobe.krita_studio": "Krita plugin bridge — platform adapter, not a brain function",
     "commitment": "top-level support module",

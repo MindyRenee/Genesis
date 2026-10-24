@@ -64,7 +64,7 @@ from temporal_lobe.base import Language
 from temporal_lobe.memory import MemorySystem
 from temporal_lobe.temporal import TemporalLobe
 from temporal_lobe.world import OuterWorld
-from thalamus.brain_waves import BrainWave, add_brain_wave_drive
+from thalamus.brain_waves import BrainWave, add_brain_wave_drive, add_stimulus
 from thalamus.relay import Thalamus
 
 from discord_feed import DiscordFeed, DiscordListener
@@ -563,6 +563,19 @@ class Mind(
                 e,
             )
 
+    def _on_sight(self, visual_drive: float) -> None:
+        """Handle a completed look — alpha blocking (the Berger effect).
+
+        Retinal input reaching cortex desynchronises occipital alpha;
+        a look through an open thalamic gate is that input. This fires
+        on every analyzed frame — unlike the V1 gamma feed, which needs
+        features, alpha dropout needs only that light arrived. A
+        negative alpha pulse is the suppression: sustained seeing keeps
+        alpha down, and the register rings back up when nothing is
+        being looked at (eyes-closed alpha returns).
+        """
+        add_stimulus(BrainWave.ALPHA, -min(0.30, 0.12 + 0.18 * visual_drive))
+
     def _init_vision_systems(self) -> None:
         """Initialize vision, visual cortex, and wire them to the learner.
 
@@ -586,6 +599,7 @@ class Mind(
         self.brain.occipital = OccipitalLobe()
         self.vision = self.brain.occipital.vision
         self.vision.set_gamma_callback(self._on_v1_gamma)
+        self.vision.set_sight_callback(self._on_sight)
         # Wire the face recognizer to its data directory so known
         # faces persist across sessions
         self.vision._face_recognizer = FaceRecognizer(data_dir=self.data_dir)

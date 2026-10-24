@@ -47,6 +47,10 @@ const AGENCY_RELAX_TAU_S: f64 = 60.0;
 pub struct FieldIntegration {
     pub consensus: Vector,
     pub disagreement: f64,
+    /// The field's thermal state after this step — disagreement
+    /// plus the physical bath, cooling at its own rate. The
+    /// Langevin kick amplitude for the *next* step is set by it.
+    pub temperature: f64,
     pub fiber_count: usize,
 }
 
@@ -103,10 +107,17 @@ impl FieldRuntime {
     /// Predict → correct → integrate, transactionally on a clone:
     /// any failure leaves the live field untouched rather than
     /// half-observed.
+    ///
+    /// `bath` is the substrate's measured thermal level in latent²
+    /// units (the caller derives it from the physical probe — the
+    /// silicon's own timing fluctuation). It floors the field
+    /// temperature alongside internal disagreement: the reservoir
+    /// the Langevin kick samples is real, not only modeled.
     pub fn observe(
         &mut self,
         state: &GenesisCoreState,
         dt: f64,
+        bath: f64,
     ) -> Result<FieldIntegration, FieldError> {
         if !dt.is_finite() || dt < 0.0 {
             return Err(FieldError::InvalidTime);
@@ -152,13 +163,14 @@ impl FieldRuntime {
         // thermal bookkeeping either way; only the direction the
         // field moves changes with the phase its own carrier runs on.
         let consensus = if state.zones.phase() == MentalPhase::REM {
-            next.diverge(dt)?.ok_or(FieldError::EmptyState)?
+            next.diverge(dt, bath)?.ok_or(FieldError::EmptyState)?
         } else {
-            next.synchronize(dt)?.ok_or(FieldError::EmptyState)?
+            next.synchronize(dt, bath)?.ok_or(FieldError::EmptyState)?
         };
         let integration = FieldIntegration {
             consensus,
             disagreement: next.disagreement,
+            temperature: next.temperature,
             fiber_count: next.fibers.len(),
         };
         self.field = next;
@@ -298,7 +310,7 @@ mod tests {
         state.inference_signals.surprise_ema = 1.0;
         state.inference_signals.free_energy = 1.0;
 
-        runtime.observe(&state, 0.1).unwrap();
+        runtime.observe(&state, 0.1, 0.0).unwrap();
         let projection = prediction_projection(&state);
         let layer_state = &runtime.field().fibers[1].layers[0].state;
         let proj_norm: f64 = projection.iter().map(|v| v * v).sum::<f64>().sqrt();
@@ -320,13 +332,32 @@ mod tests {
         let state = GenesisCoreState::new(1, 1_000);
         let mut runtime = FieldRuntime::new().unwrap();
 
-        let result = runtime.observe(&state, 0.2).unwrap();
+        let result = runtime.observe(&state, 0.2, 0.0).unwrap();
 
         assert_eq!(result.fiber_count, 3);
         assert_eq!(result.consensus.len(), LATENT_DIMENSION);
         assert!(result.consensus.iter().all(|v| v.is_finite()));
         assert!(result.disagreement.is_finite());
         assert!(result.disagreement >= 0.0);
+        assert!(result.temperature.is_finite());
+        assert!(result.temperature >= 0.0);
+    }
+
+    #[test]
+    fn the_measured_bath_heats_the_field() {
+        // A quiet field (fresh, near-nominal projections) plus a hot
+        // physical reservoir: the integration must report the bath's
+        // temperature, not zero — the Langevin reservoir is the
+        // silicon's own measured noise.
+        let state = GenesisCoreState::new(1, 1_000);
+        let mut runtime = FieldRuntime::new().unwrap();
+
+        let cold = runtime.observe(&state, 0.2, 0.0).unwrap();
+        let mut runtime = FieldRuntime::new().unwrap();
+        let warm = runtime.observe(&state, 0.2, 0.4).unwrap();
+
+        assert!(warm.temperature > cold.temperature);
+        assert!(warm.temperature >= 0.4 - 1.0e-9);
     }
 
     #[test]
@@ -334,10 +365,10 @@ mod tests {
         let mut state = GenesisCoreState::new(1, 1_000);
         let mut runtime = FieldRuntime::new().unwrap();
 
-        let before = runtime.observe(&state, 0.2).unwrap();
+        let before = runtime.observe(&state, 0.2, 0.0).unwrap();
         state.inference_signals.surprise_ema = 0.9;
         state.inference_signals.free_energy = 0.8;
-        let after = runtime.observe(&state, 0.2).unwrap();
+        let after = runtime.observe(&state, 0.2, 0.0).unwrap();
 
         assert_ne!(before.consensus, after.consensus);
     }
@@ -382,13 +413,13 @@ mod tests {
 
         let mut wake = FieldRuntime::new().unwrap();
         for _ in 0..10 {
-            wake.observe(&state, 0.2).unwrap();
+            wake.observe(&state, 0.2, 0.0).unwrap();
         }
 
         state.zones.emergent_phase = MentalPhase::REM as u8;
         let mut rem = FieldRuntime::new().unwrap();
         for _ in 0..10 {
-            rem.observe(&state, 0.2).unwrap();
+            rem.observe(&state, 0.2, 0.0).unwrap();
         }
 
         // The same observations, integrated by descent vs ascent

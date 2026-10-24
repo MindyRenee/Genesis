@@ -53,6 +53,11 @@ class TaskRevision:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> TaskRevision:
+        """Rehydrate a revision from its serialized dict.
+
+        Absent fields decode to defaults rather than failing — an
+        older task file is a memory, not a schema.
+        """
         return cls(
             turn_ms=int(data.get("turn_ms", 0)),
             summary=str(data.get("summary", "")),
@@ -80,6 +85,8 @@ class Loophole:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Loophole:
+        """Rehydrate a loophole from its serialized dict; absent
+        fields default (empty kind/detail, unaddressed)."""
         return cls(
             kind=str(data.get("kind", "")),
             detail=str(data.get("detail", "")),
@@ -396,6 +403,13 @@ class HeldTask:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> HeldTask | None:
+        """Rebuild a held task from its serialized form.
+
+        Returns ``None`` when the payload carries no usable spec —
+        a specless task is nothing to resume, so absence is the
+        honest decode. The rolling ledgers clamp to
+        ``_MAX_LEDGER`` on the way in.
+        """
         spec = data.get("spec")
         if not isinstance(spec, dict) or not spec:
             return None

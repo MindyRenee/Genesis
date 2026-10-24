@@ -13,6 +13,20 @@ with the evidence behind it — see [DEVLOG.md](DEVLOG.md).
 
 ### Added
 
+- **The body can regrow a lost mind — the resurrection loop is
+  closed**: new `daemon::mind_shepherd` wired into genesis-daemon's
+  autonomous fallback. A mind that attached and then went silent
+  past the grace window is regrown by spawning the organism's own
+  entry point headless (`GENESIS_MIND_CMD` → the `.project_root`
+  checkout's `genesis_cli.py` → the `genesis` script beside the
+  daemon binary); the returning mind adopts the surviving body over
+  the socket it still holds. The shepherd fires only on *loss*
+  (`mind_idle_secs` is `Some` — never on from-boot absence), honors
+  the new `mind.suppress` sentinel that every graceful teardown and
+  `--stop` writes before signaling (a goodbye, not a death — cleared
+  by the next start, kept out of the spore), and is bounded: ~5
+  attempts over ~45 minutes then dormant solitude, reset by any
+  reattaching mind. Spawned-mind output lands in `mind.log`.
 - **The interoceptive afferent path now routes through the proper
   brain regions**: new `brainstem.interoceptive_relay.InteroceptiveRelay`
   — the NTS/parabrachial analog where body afferents land first —

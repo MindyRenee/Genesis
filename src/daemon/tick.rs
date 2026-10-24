@@ -437,7 +437,17 @@ impl TickLoop {
                     .sqrt();
                 let _ = writeln!(out, "field.fibers={}", integration.fiber_count);
                 let _ = writeln!(out, "field.disagreement={:.6}", integration.disagreement);
+                let _ = writeln!(out, "field.temperature={:.6}", integration.temperature);
                 let _ = writeln!(out, "field.consensus_norm={:.6}", consensus_norm);
+                // The center itself, not just its radius — where the
+                // organism's mass actually sits in the shared latent
+                // space, one component per coordinate.
+                let consensus_csv: Vec<String> = integration
+                    .consensus
+                    .iter()
+                    .map(|v| format!("{v:.6}"))
+                    .collect();
+                let _ = writeln!(out, "field.consensus={}", consensus_csv.join(","));
             }
             // An unwarmed field is an absent channel, not a zero.
             None => {
@@ -584,6 +594,15 @@ impl TickLoop {
         neuro_params.maturation_level =
             super::hpa_development::hpa_competence(elapsed_secs, ltm_count);
         neuro_params.noise_seed = self.tick_count;
+        // Retinal illuminance for acute melatonin suppression — the
+        // same retinohypothalamic channel that entrains the clock. An
+        // absent or dark eye is darkness: nothing suppressed.
+        self.optic.sample(now_ms);
+        neuro_params.light_lux = self
+            .optic
+            .retinal_lux(now_ms)
+            .map(|lux| lux as f32)
+            .unwrap_or(0.0);
         // Apply the metaplasticity boost from the last inference cycle.
         // High surprise → faster coupling-matrix learning (the system
         // learns how to learn faster when its predictions fail).
@@ -1307,6 +1326,13 @@ impl TickLoop {
         neuro_params.maturation_level =
             super::hpa_development::hpa_competence(elapsed_secs, ltm_count);
         neuro_params.noise_seed = self.tick_count;
+        // Acute melatonin suppression rides the same retinal sample
+        // the sleep network entrains on — the eye was sampled above.
+        neuro_params.light_lux = self
+            .optic
+            .retinal_lux(now_ms)
+            .map(|lux| lux as f32)
+            .unwrap_or(0.0);
 
         // Metaplasticity boost from last inference cycle.
         if self.metaplasticity_boost > 1.0 {
@@ -1567,8 +1593,16 @@ impl TickLoop {
         // topology. The core state remains authoritative; the field is the
         // shared substrate through which body, prediction, and agency can
         // disagree, converge, and later acquire learned transport laws.
+        // The bath is the substrate's own measured thermal level: the
+        // probe's RMS timing fluctuation, mapped onto the field's cap —
+        // the Langevin reservoir is real silicon noise, so a machine
+        // under physical stress literally heats her field.
         if let Some(snapshot) = mmap.read_consistent() {
-            match self.field_runtime.observe(&snapshot, dt as f64) {
+            let bath = super::field_probe::shared()
+                .and_then(|probe| probe.bath_fluctuation())
+                .map(|fraction| fraction.clamp(0.0, 1.0) * crate::field::TEMPERATURE_CAP)
+                .unwrap_or(0.0);
+            match self.field_runtime.observe(&snapshot, dt as f64, bath) {
                 Ok(integration) => self.last_field_integration = Some(integration),
                 Err(e) => eprintln!("[tick] field integration skipped: {e}"),
             }

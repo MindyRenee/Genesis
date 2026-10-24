@@ -112,6 +112,50 @@ class TestSleepCompressor:
             "cat"
         ) == 1
 
+    def test_periodic_rebuild_uses_journal_not_network_edges(self, tmp_path):
+        """The ~10th-cycle rebuild re-encodes the journaled set.
+
+        The live graph grew to ~1.9M raw bindings because nothing ever
+        rebuilt it: the old scan rebuilt only from materialized bridge
+        edges, which derivable origins never produce. Now the journal
+        is the rebuild source — after the cycle the edge count is the
+        deduplicated journal size, not the raw add count.
+        """
+        sc = SleepCompressor(data_dir=str(tmp_path))
+        net = ConceptNetwork()
+
+        # The same association bound 30 times (e.g. an LTM co-occurrence
+        # pair re-extracted every pass): raw adds flood, journal dedups.
+        for _ in range(30):
+            sc.holographic_graph.add("dog", "related_to", "cat", weight=0.3)
+        assert sc.holographic_graph.edge_count == 30
+
+        for _ in range(10):
+            sc._maybe_rebuild_holographic_graph(net)
+
+        assert sc.holographic_graph.edge_count == 1, (
+            "rebuild should re-encode the deduplicated journal"
+        )
+        assert sc.holographic_graph.distinct_edges == 1
+        assert [r[0] for r in sc.holographic_graph.query("dog", "related_to", top_k=5)].count(
+            "cat"
+        ) == 1
+
+    def test_rebuild_skipped_when_journal_empty(self, tmp_path):
+        """A journalless (legacy) graph is never wiped by the rebuild."""
+        sc = SleepCompressor(data_dir=str(tmp_path))
+        # Simulate a pre-journal load: edges in memory, journal empty.
+        sc.holographic_graph._bind("dog", "related_to", "cat", 0.9)
+        sc.holographic_graph._edge_count = 1
+        sc.holographic_graph._journal = {}
+
+        net = ConceptNetwork()
+        for _ in range(10):
+            sc._maybe_rebuild_holographic_graph(net)
+
+        assert sc.holographic_graph.edge_count == 1
+        assert sc.holographic_graph.distinct_edges == 0
+
     def test_holographize_migrates_bridges(self, tmp_path, small_network):
         """Holographize should migrate bridge edges and keep real edges."""
         sc = SleepCompressor(data_dir=str(tmp_path))

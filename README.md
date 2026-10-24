@@ -793,7 +793,7 @@ citations are real.
   code — which it reads structurally, files bug reports against, and
   turns into self-improvement experiment proposals. The one real
   filter is an adult/malware *content* filter on the fetch path.
-  `./run.sh --offline` closes the network. See
+  `./genesis --offline` closes the network. See
   [SECURITY.md](SECURITY.md) before pointing it at a machine you
   care about.
 - **Learn skills.** A domain-general competence substrate
@@ -863,8 +863,7 @@ carrying per-move decision provenance. These are practice results on public
 environments, not an official score; the evidence standard is documented in
 [docs/ARC-AGI-3.md](docs/ARC-AGI-3.md). Local `/arc` runs are diagnostics;
 the official scorecard is a separate transport reached only by her own play
-urge. `/arc --baseline uniform|first` measures the random and first-action
-floors through the same loop, and `/arc --fresh` runs a cold start with
+urge. `/arc --fresh` runs a cold start with
 prior learning suppressed.
 
 ARC-AGI-1 training tasks are also offered inside her games curriculum in
@@ -1060,21 +1059,21 @@ build needs **libclang** and kernel V4L2 headers, and the canvas dependency
 cargo build --release
 pip install -r python/requirements.txt
 python3 -c "import nltk; nltk.download('wordnet'); nltk.download('punkt_tab')"
-./run.sh
+./genesis
 ```
 
-`run.sh` launches the daemon, the cognitive CLI, the retina (camera), and
+`genesis` launches the daemon, the cognitive CLI, the retina (camera), and
 TTS; Ctrl-C tears everything down gracefully — a guided descent, not a
-kill. `./run.sh --stop` stops a running session; `./run.sh --offline`
+kill. `./genesis --stop` stops a running session; `./genesis --offline`
 disables network access. With no camera or microphone it runs text-only —
 absent sensors are never reported as readings. State lives in
-`${XDG_DATA_HOME:-$HOME/.local/share}/genesis` (`GENESIS_DATA_DIR` or a
-`.genesis-data-dir` file overrides it). On first boot the instance is a
+`~/.local/share/genesis` (`GENESIS_DATA_DIR` is the only override —
+there is no pin file and no `XDG_DATA_HOME` step). On first boot the instance is a
 fresh system — a small concept network, no memories, no learned names.
 Introduce yourself; teach it.
 
 The repo root is also an installable package: `pip install .` provides a
-`genesis` command (the packaged `run.sh`, plus `--headless` resident mode,
+`genesis` command (the packaged `genesis`, plus `--headless` resident mode,
 `--stop`, `--tail`), and `scripts/install.sh` performs the full local
 install — editable venv, release binaries, launcher, and an enabled
 `genesis.service` systemd user unit. One instance at a time per data dir;
@@ -1085,7 +1084,7 @@ is helper-mediated, never blanket sudo.
 
 Operational notes, in brief:
 
-- **Shut down gracefully, every time.** `./run.sh --stop` or Ctrl-C —
+- **Shut down gracefully, every time.** `./genesis --stop` or Ctrl-C —
   never `kill -9`. The shutdown sequence is a guided descent into a
   low-arousal sleep state before the process ends.
 - **State is cumulative and load-bearing.** The developmental record is

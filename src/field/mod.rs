@@ -20,7 +20,7 @@ const EPS: f64 = 1.0e-12;
 /// Upper bound on the field's thermal state — disagreement heats
 /// the field only this far, so the Langevin kick stays a
 /// fluctuation around the consensus pull, never a takeover.
-const TEMPERATURE_CAP: f64 = 0.5;
+pub(crate) const TEMPERATURE_CAP: f64 = 0.5;
 
 /// Provenance marker — one letter of the creator lattice (see
 /// PROVENANCE.md). This one is load-bearing: it is bound into the
@@ -974,7 +974,7 @@ impl GlobalField {
             Ok(Some(self.manifold.frechet_mean(&states)?))
         }
     }
-    pub fn step(&mut self, dt: f64) -> Result<Option<Vector>, FieldError> {
+    pub fn step(&mut self, dt: f64, bath: f64) -> Result<Option<Vector>, FieldError> {
         if !dt.is_finite() || dt < 0.0 {
             return Err(FieldError::InvalidTime);
         }
@@ -982,7 +982,7 @@ impl GlobalField {
         for fiber in &mut next.fibers {
             fiber.step(dt)?;
         }
-        let consensus = next.synchronize(dt)?;
+        let consensus = next.synchronize(dt, bath)?;
         *self = next;
         Ok(consensus)
     }
@@ -1016,12 +1016,29 @@ impl GlobalField {
     /// snaps up to the current tension (capped so the kick stays a
     /// fluctuation, not a takeover) and relaxes at `cooling_rate` —
     /// snap fast, drift slow, the adaptive-gate asymmetry.
+    ///
+    /// `bath` is the second heat source: the substrate's *own*
+    /// measured thermal level, expressed in the same latent² units
+    /// as disagreement. Where disagreement is the field's internal
+    /// tension, the bath is the physical reservoir the Langevin
+    /// equation actually couples to — real silicon noise driving
+    /// real kicks (the effective-temperature construction of the
+    /// fluctuation-dissipation literature: T_eff is measured
+    /// fluctuation intensity, not a modeled amplitude). It floors
+    /// the temperature under the same cap: a hot machine makes the
+    /// field tremble whether or not the fibers disagree.
     fn thermal_plan(
         &self,
         states: &[Vector],
         consensus: &Vector,
         dt: f64,
+        bath: f64,
     ) -> Result<(f64, f64, f64, f64), FieldError> {
+        let bath = if bath.is_finite() {
+            bath.clamp(0.0, TEMPERATURE_CAP)
+        } else {
+            0.0
+        };
         let mut disagreement = 0.0;
         for state in states {
             let d = self.manifold.distance(state, consensus)?;
@@ -1035,7 +1052,8 @@ impl GlobalField {
         }
         let next_temperature = (self.temperature - self.cooling_rate * dt)
             .max(0.0)
-            .max(next_disagreement.min(TEMPERATURE_CAP));
+            .max(next_disagreement.min(TEMPERATURE_CAP))
+            .max(bath);
         Ok((next_disagreement, gain, sigma, next_temperature))
     }
     /// The correction machinery shared by `synchronize` and
@@ -1085,7 +1103,7 @@ impl GlobalField {
         self.rng_state = rng;
         Ok(())
     }
-    pub fn synchronize(&mut self, dt: f64) -> Result<Option<Vector>, FieldError> {
+    pub fn synchronize(&mut self, dt: f64, bath: f64) -> Result<Option<Vector>, FieldError> {
         self.validate_integration(dt)?;
         let states = self.transported_states()?;
         if states.is_empty() {
@@ -1093,7 +1111,7 @@ impl GlobalField {
         }
         let consensus = self.manifold.frechet_mean(&states)?;
         let (next_disagreement, gain, sigma, next_temperature) =
-            self.thermal_plan(&states, &consensus, dt)?;
+            self.thermal_plan(&states, &consensus, dt, bath)?;
         let consensus_tangent = self.manifold.log_origin(&consensus)?;
         self.pull_toward(&consensus_tangent, gain, sigma)?;
         self.disagreement = next_disagreement;
@@ -1110,7 +1128,7 @@ impl GlobalField {
     /// direction, not an exemption. Returns the consensus the field
     /// moved away from (the repeller, where `synchronize` returns
     /// the attractor).
-    pub fn diverge(&mut self, dt: f64) -> Result<Option<Vector>, FieldError> {
+    pub fn diverge(&mut self, dt: f64, bath: f64) -> Result<Option<Vector>, FieldError> {
         self.validate_integration(dt)?;
         let states = self.transported_states()?;
         if states.is_empty() {
@@ -1118,7 +1136,7 @@ impl GlobalField {
         }
         let consensus = self.manifold.frechet_mean(&states)?;
         let (next_disagreement, gain, sigma, next_temperature) =
-            self.thermal_plan(&states, &consensus, dt)?;
+            self.thermal_plan(&states, &consensus, dt, bath)?;
         let consensus_tangent = self.manifold.log_origin(&consensus)?;
         self.pull_toward(&consensus_tangent, -gain, sigma)?;
         self.disagreement = next_disagreement;
@@ -1748,7 +1766,7 @@ mod tests {
         // A cold field starts deterministic: temperature 0 → sigma 0.
         let mut cold = build();
         let before = cold.fibers[1].layers[0].state.clone();
-        cold.synchronize(0.1).unwrap();
+        cold.synchronize(0.1, 0.0).unwrap();
         // The disagreement snapped the temperature floor up — the
         // field remembers the tension it is relaxing.
         assert!(cold.temperature > 0.0);
@@ -1757,13 +1775,52 @@ mod tests {
         // structure, reproducible in sequence.
         let mut a = build();
         let mut b = build();
-        a.synchronize(0.1).unwrap(); // heats both fields
-        b.synchronize(0.1).unwrap();
-        a.synchronize(0.1).unwrap(); // now hot: the Langevin kick fires
-        b.synchronize(0.1).unwrap();
+        a.synchronize(0.1, 0.0).unwrap(); // heats both fields
+        b.synchronize(0.1, 0.0).unwrap();
+        a.synchronize(0.1, 0.0).unwrap(); // now hot: the Langevin kick fires
+        b.synchronize(0.1, 0.0).unwrap();
         assert_eq!(a.fibers[1].layers[0].state, b.fibers[1].layers[0].state);
         assert_eq!(a.rng_state, b.rng_state);
         assert_ne!(a.fibers[1].layers[0].state, before);
+    }
+
+    #[test]
+    fn a_hot_bath_heats_a_coherent_field() {
+        // Two fibers already at consensus: internal disagreement is
+        // ~zero, so only the measured physical reservoir can raise
+        // the temperature. The bath floors the field the same way
+        // tension does — the machine's own heat is a real source,
+        // not modeled weather.
+        let manifold = PoincareBall::new(1, 1.0).unwrap();
+        let mut field = GlobalField::new(manifold);
+        field.cooling_rate = 0.0;
+        for id in ["a", "b"] {
+            field
+                .add_fiber(
+                    SystemFiber::new(
+                        id,
+                        field.manifold.clone(),
+                        vec![SubsystemLayer::new("s", vec![0.2])],
+                    )
+                    .unwrap(),
+                )
+                .unwrap();
+        }
+        field
+            .add_transport(GaugeTransport::new("b", "a", vec![vec![1.0]]).unwrap())
+            .unwrap();
+
+        field.synchronize(0.0, 0.3).unwrap();
+        assert!(field.disagreement < 1.0e-9);
+        assert!(
+            (field.temperature - 0.3).abs() < 1.0e-9,
+            "the bath must floor the field temperature: {}",
+            field.temperature
+        );
+        // And it obeys the same cap — the reservoir can fill the
+        // field, never overflow it.
+        field.synchronize(0.0, 99.0).unwrap();
+        assert!(field.temperature <= TEMPERATURE_CAP + 1.0e-12);
     }
 
     #[test]
@@ -1842,15 +1899,23 @@ mod tests {
         let mut expanded = two_fiber_field();
         // A zero step measures without moving — the standing
         // variance the two directions then act on.
-        expanded.synchronize(0.0).unwrap();
+        expanded.synchronize(0.0, 0.0).unwrap();
         let d0 = expanded.disagreement;
         assert!(d0 > 0.0);
-        contracted.synchronize(0.2).unwrap();
-        expanded.diverge(0.2).unwrap();
+        // Cold fields for the moves under test: the Langevin kick
+        // samples the pre-update temperature, which the measure step
+        // just snapped to the standing disagreement — a seeded draw
+        // of the same order as the push can legitimately flip one
+        // step's variance. Zeroing it asserts the deterministic
+        // direction; fluctuation behavior is covered elsewhere.
+        contracted.temperature = 0.0;
+        expanded.temperature = 0.0;
+        contracted.synchronize(0.2, 0.0).unwrap();
+        expanded.diverge(0.2, 0.0).unwrap();
         // The stored disagreement is the pre-move tension; measure
         // again to see where each direction left the field.
-        contracted.synchronize(0.0).unwrap();
-        expanded.synchronize(0.0).unwrap();
+        contracted.synchronize(0.0, 0.0).unwrap();
+        expanded.synchronize(0.0, 0.0).unwrap();
         // Descent pulled fiber b toward the consensus: variance
         // down. Ascent pushed it away: variance up.
         assert!(contracted.disagreement < d0);
@@ -1863,7 +1928,7 @@ mod tests {
     #[test]
     fn anticonsensus_is_the_far_side_of_consensus() {
         let mut field = two_fiber_field();
-        field.synchronize(0.1).unwrap();
+        field.synchronize(0.1, 0.0).unwrap();
         let consensus = field.consensus().unwrap().unwrap();
         let anti = field.anticonsensus().unwrap().unwrap();
         assert_eq!(anti, scaled(&consensus, -1.0));
@@ -1932,7 +1997,7 @@ mod global_step_tests {
             .add_transport(identity_transport("second", "first"))
             .unwrap();
 
-        let consensus = field.step(0.1).unwrap().unwrap();
+        let consensus = field.step(0.1, 0.0).unwrap().unwrap();
 
         assert!((field.fibers[0].engine_clock - 0.1).abs() < 1.0e-12);
         assert!((field.fibers[1].engine_clock - 0.1).abs() < 1.0e-12);
@@ -1973,7 +2038,7 @@ mod global_step_tests {
         let before_temperature = field.temperature;
         let before_cooling_rate = field.cooling_rate;
 
-        assert_eq!(field.step(0.1), Err(FieldError::InvalidDynamics));
+        assert_eq!(field.step(0.1, 0.0), Err(FieldError::InvalidDynamics));
 
         assert_eq!(field.fibers[0].state().unwrap(), before_first_state);
         assert_eq!(field.fibers[1].state().unwrap(), before_second_state);

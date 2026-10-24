@@ -56,14 +56,11 @@ These surfaces are materially different — group them this way when reporting:
 | Selected local games | `/arc <game-id> --steps N` | Development diagnostics only |
 | Cold-start local games | `/arc <game-id> --steps N --fresh` | Prior world learning neither read nor written — first-contact evidence |
 | Local discovered suite | `/arc --all --steps N` | One SDK scorecard over local environments; still not hidden-set evidence |
-| Reference baselines | `/arc <ids|--all> --baseline (uniform|first)` | Random / first-action floors on identical accounting — never agent results |
 | Official challenge | her own play urge — no command | The standing ARC-AGI-3 scorecard on her game shelf; she takes it up when she chooses. Requires `ARC_API_KEY` and explicit permission |
 
 A local scorecard is useful for debugging. It is **not** a claim that Genesis
 passed ARC-AGI-3, and it is not interchangeable with the official hidden-set
-methodology. Baselines are denominators — they exist so a practice number
-can be compared against a floor measured identically, not so it can be
-inflated.
+methodology.
 
 ## What a result says about itself
 
@@ -78,9 +75,9 @@ Every `ArcResult` carries the fields an honest claim needs:
   but could not be read — never reported as cold start). A number that
   doesn't disclose its starting point isn't evidence.
 - `decision_sources` — which bid channel won each submitted move (plan,
-  calibrate, explore, reembody, or `baseline:<policy>` for reference
-  runs). The priors-vs-learning question — "how much of this was already
-  built in?" — answered from the recording rather than argued.
+  calibrate, explore, or reembody). The priors-vs-learning question —
+  "how much of this was already built in?" — answered from the
+  recording rather than argued.
 
 ## Reproduction
 
@@ -93,7 +90,7 @@ launch. `enter_game_mode` pauses her learner for the whole session, so
 nothing is fetched mid-run while her connected state stays hers:
 
 ```bash
-./run.sh
+./genesis
 ```
 
 From the Genesis prompt:
@@ -159,8 +156,7 @@ A credible public claim should include all of:
 - the recording/log showing frames in and actions out,
 - the final SDK-reported score,
 - the per-game `prior_learning` disclosure (cold start vs. carried
-  experience) and, for practice claims, the matching `--baseline`
-  numbers on the same environments,
+  experience),
 - and a statement separating public practice results from hidden-set results.
 
 Repository status badges and tests are necessary supporting evidence, but they

@@ -1,7 +1,7 @@
 """Packaging and console-entry tests.
 
 The installed ``genesis`` command is the packaged equivalent of
-run.sh: it sets GENESIS_RUN itself, loads the deployed env file, and
+genesis: it sets GENESIS_WAKE itself, loads the deployed env file, and
 owns ``--headless``/``--stop``. These tests pin that contract plus the
 install-layout path resolution in infrastructure/paths.py.
 """
@@ -40,11 +40,11 @@ def test_parse_headless_and_stop(monkeypatch) -> None:
 
 
 def test_console_main_sets_genesis_run(monkeypatch, tmp_path) -> None:
-    monkeypatch.delenv("GENESIS_RUN", raising=False)
+    monkeypatch.delenv("GENESIS_WAKE", raising=False)
     monkeypatch.setenv("GENESIS_ENV_FILE", str(tmp_path / "absent.env"))
     monkeypatch.setattr(genesis_cli, "main", lambda: 7)
     assert genesis_cli._console_main() == 7
-    assert os.environ["GENESIS_RUN"] == "1"
+    assert os.environ["GENESIS_WAKE"] == "1"
 
 
 def test_agent_env_loads_and_real_env_wins(monkeypatch, tmp_path) -> None:
@@ -150,7 +150,7 @@ def test_stop_all_sigints_validated_cli_and_waits(tmp_path) -> None:
 def test_stop_all_timeout_preserves_files_and_never_kills(tmp_path, monkeypatch) -> None:
     """A CLI still saving at the deadline is a 'retry later', not a kill.
 
-    run.sh's contract, which the old 5s+SIGKILL path violated: files and
+    genesis's contract, which the old 5s+SIGKILL path violated: files and
     locks stay in place so the in-progress save can finish on its own,
     and the process is left running — interrupting a save is the one
     thing the teardown must never do.

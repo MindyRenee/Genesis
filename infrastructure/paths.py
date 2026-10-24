@@ -31,7 +31,7 @@ def code_root() -> Path:
     """The root of the agent's own source tree.
 
     This is what modules mean when they ask for ``project_root`` — the
-    directory containing ``python/``, ``src/``, ``run.sh``, and the
+    directory containing ``python/``, ``src/``, ``genesis``, and the
     helper scripts. With the packages split, the checkout's repo root
     and the package root are the same directory, so the resolution is:
 

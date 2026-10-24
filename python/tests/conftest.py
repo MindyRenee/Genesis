@@ -25,8 +25,8 @@ for _p in (_PYTHON_DIR, _PROJECT_ROOT):
         sys.path.insert(0, _p)
 
 # Some tests also need the scripts/ directory on the path (e.g.
-# test_concept_network imports from prune_dead_concepts.py). The
-# scripts/ directory lives at the project root, not under python/.
+# test_recovery_scripts loads the recovery tools). The scripts/
+# directory lives at the project root, not under python/.
 _SCRIPTS_DIR = os.path.join(_PROJECT_ROOT, "scripts")
 if os.path.isdir(_SCRIPTS_DIR) and _SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, _SCRIPTS_DIR)

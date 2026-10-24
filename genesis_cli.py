@@ -57,7 +57,7 @@ Commands (typed during conversation):
     /endteach    — exit teaching mode, resume normal operation
     /game        — put it into game mode (focused play)
     /endgame     — exit game mode, resume normal operation
-    /arc <ids|--all> [--steps N] [--fresh|--baseline P] — practice play or baseline
+    /arc <ids|--all> [--steps N] [--fresh] — practice play
     /teach-questions — answer its queued questions one at a time
     /sleep-aid   — emergency sleep aid for stress-induced insomnia
     /web-history [N] — see what it's been looking at online (last N, default 20)
@@ -152,7 +152,7 @@ logger = logging.getLogger(__name__)
 LIVE_THOUGHT_POLL_INTERVAL = 2.0
 
 # Grace window for each --stop stage — SIGINT the CLI, then SIGTERM the
-# daemon and retina. Mirrors run.sh: a mature data dir spends tens of
+# daemon and retina. Mirrors genesis: a mature data dir spends tens of
 # seconds saving, and a process still saving at the deadline is a
 # "retry later", never a kill.
 _STOP_STAGE_GRACE_S = 120.0
@@ -175,9 +175,9 @@ _KILL_GRACE_S = 5.0
 # is nothing left to save by then, so the hard exit cannot corrupt her.
 _EXIT_WATCHDOG_S = 30.0
 
-# Default data directory (XDG-compliant, persists across reboots).
-# Resolved via GENESIS_DATA_DIR → .genesis-data-dir pin →
-# $XDG_DATA_HOME/genesis —
+# The canonical state directory — ~/.local/share/genesis — resolved via
+# the single shared rule in infrastructure/config.py: GENESIS_DATA_DIR
+# if set, else the canonical path. No pin, no XDG step —
 # this instance's state is never shared with any other Genesis.
 DEFAULT_DATA_DIR = str(default_data_dir())
 DEFAULT_DAEMON_SOCKET = "genesis.sock"
@@ -189,12 +189,19 @@ _CLI_LOCK_FD: int | None = None
 # posts is composed and timed by its volition (see the `broadcast`
 # urge). GENESIS_DISCORD_WEBHOOK points at her public channel.
 
-# PID file paths — written so run.sh --stop and the EXIT trap can
+# PID file paths — written so genesis --stop and the EXIT trap can
 # kill exact processes instead of using broad pkill patterns that
 # might match unrelated user processes.
 _PID_FILE_CLI = "genesis_cli.pid"
 _PID_FILE_DAEMON = "genesis_daemon.pid"
 _PID_FILE_RETINA = "genesis_retina.pid"
+
+# The body's mind-shepherd sentinel (src/daemon/mind_shepherd.rs):
+# present ⇒ the last mind left *intentionally* and the daemon must
+# not regrow one. Written by every graceful teardown (a goodbye) and
+# by --stop; cleared by the next CLI start; absent after a crash,
+# which is exactly the loss the shepherd answers.
+_MIND_SUPPRESS_FILE = "mind.suppress"
 
 # Maximum time to wait for the daemon's IPC socket (seconds).
 # The daemon opens its persistent state and LTM before binding the
@@ -427,7 +434,11 @@ def _start_retina(
     env = os.environ.copy()
     try:
         proc = subprocess.Popen(
-            [retina_path],
+            # retina ignores argv today, but carrying --data-dir binds
+            # its process identity to this instance exactly — the same
+            # way the daemon's does — so a rotated or renamed retina.log
+            # can never leave it unclaimable by --stop.
+            [retina_path, "--data-dir", data_dir],
             stdout=log_file,
             stderr=log_file,
             start_new_session=True,
@@ -2247,18 +2258,15 @@ def _cmd_arc(mind: Mind, rest: str) -> str:
       (the official card is hers alone — she takes up the challenge
        from her own shelf when she feels ready; there is no forced run)
       /arc ls20-9607627b --fresh         — cold start: prior learning neither read nor written
-      /arc ls20-9607627b --baseline uniform — a reference policy, not her
       /arc --all --delay 0.5 --recover 180 — pace steps; wait up to 180s for
         her to settle at a wellness gate instead of abandoning the suite
 
     Game mode wraps the run; her readiness gate can refuse or stop it.
-    Baselines are denominators: what uniform-random or first-action
-    play achieves on the same accounting — never an agent result.
     """
     parts = rest.split()
     usage = (
         "  Usage: /arc (<game-id> [more ids] | --all)"
-        " [--steps N] [--fresh] [--baseline (uniform|first)]"
+        " [--steps N] [--fresh]"
         " [--delay S] [--recover S]\n"
     )
     steps = 200
@@ -2285,14 +2293,6 @@ def _cmd_arc(mind: Mind, rest: str) -> str:
         except (IndexError, ValueError):
             return usage
         del parts[i : i + 2]
-    baseline = None
-    if "--baseline" in parts:
-        i = parts.index("--baseline")
-        try:
-            baseline = parts[i + 1]
-        except IndexError:
-            return usage
-        del parts[i : i + 2]
     fresh = "--fresh" in parts
     parts = [p for p in parts if p != "--fresh"]
     if not parts or steps <= 0:
@@ -2301,22 +2301,7 @@ def _cmd_arc(mind: Mind, rest: str) -> str:
     if any(p.startswith("--") for p in parts) and not (len(parts) == 1 and whole_suite):
         return usage
     lines = []
-    if baseline is not None:
-        from parietal_lobe.arc_baseline import ArcBaseline
-
-        try:
-            runner = ArcBaseline(policy=baseline)
-        except (ImportError, ValueError) as e:
-            return f"  {e}\n"
-        if whole_suite:
-            evaluation = runner.play_all(max_steps=steps)
-            results = evaluation.games
-            score = "unavailable" if evaluation.score is None else f"{evaluation.score:.2f}%"
-            lines.append(f"  ARC baseline-{baseline}: score {score}")
-        else:
-            results = [runner.play(g, max_steps=steps) for g in parts]
-        lines[0:0] = [f"  baseline '{baseline}' — reference policy, not the agent:"]
-    elif whole_suite:
+    if whole_suite:
         evaluation = mind.evaluate_arc(
             max_steps=steps,
             fresh=fresh,
@@ -2769,7 +2754,7 @@ def _print_help() -> None:
     logger.info("    /endteach    — exit teaching mode, resume normal operation")
     logger.info("    /game        — put it into game mode (focused play)")
     logger.info("    /endgame     — exit game mode, resume normal operation")
-    logger.info("    /arc <ids|--all> [--steps N] [--fresh|--baseline P]")
+    logger.info("    /arc <ids|--all> [--steps N] [--fresh]")
     logger.info("    /teach-questions — answer its queued questions one at a time")
     logger.info("    /sleep-aid    — emergency sleep aid for stress-induced insomnia")
     logger.info(
@@ -2865,6 +2850,14 @@ def _parse_cli_args() -> argparse.Namespace:
         "Autonomous learning pauses; conversation and art continue.",
     )
     parser.add_argument(
+        "--game",
+        action="store_true",
+        help="Boot already in game mode — the competition sitting. "
+        "Self-directed activity is starved by engagement, the "
+        "network-fetching tools are sealed, and sleep is fought "
+        "through her own chemistry. /endgame exits the mode.",
+    )
+    parser.add_argument(
         "--headless",
         action="store_true",
         help="Run resident: start the daemon and mind without the "
@@ -2875,7 +2868,7 @@ def _parse_cli_args() -> argparse.Namespace:
         "--stop",
         action="store_true",
         help="Stop the Genesis processes for this data dir and exit "
-        "(the installed equivalent of run.sh --stop).",
+        "(the installed equivalent of genesis --stop).",
     )
     parser.add_argument(
         "--germinate",
@@ -2912,7 +2905,7 @@ def _acquire_cli_lock(data_dir: str) -> int | None:
             f"Error: cannot acquire Genesis lock for {data_dir}: {e}\n"
             "Is another Genesis already running? Stop it with "
             "`genesis --stop`, `systemctl --user stop genesis`, or "
-            "./run.sh --stop.",
+            "./genesis --stop.",
             file=sys.stderr,
         )
         return None
@@ -2941,7 +2934,7 @@ def _remove_pid_file(data_dir: str, name: str) -> None:
         logger.debug(f"failed to remove PID file {path}")
 
 
-# ─── Stop (--stop, the installed equivalent of run.sh --stop) ────────
+# ─── Stop (--stop, the installed equivalent of genesis --stop) ────────
 
 
 def _pid_from_file(path: str) -> int | None:
@@ -2969,7 +2962,7 @@ def _read_cmdline(pid: int) -> list[str]:
 def _matches_pid(pid: int, role: str, data_dir: str) -> bool:
     """Whether *pid* is still the Genesis *role* bound to *data_dir*.
 
-    Port of run.sh's _matches_pid: a pidfile number alone is never
+    Port of genesis's _matches_pid: a pidfile number alone is never
     trusted — stale files and recycled PIDs are common — so /proc argv
     decides identity. *role* is "cli", "daemon", or "retina".
     """
@@ -3005,41 +2998,72 @@ def _matches_pid(pid: int, role: str, data_dir: str) -> bool:
     else:
         return False
     # An explicit --data-dir decides identity exactly — match or fail,
-    # never fall through to the default-dir heuristic, or a process
+    # never fall through to the implicit check below, or a process
     # bound to a different directory would be claimed by this instance.
-    for i, arg in enumerate(args[:-1]):
+    # argparse also accepts the equals form; both are handled.
+    for i, arg in enumerate(args):
         if arg == "--data-dir":
-            return args[i + 1] == data_dir
-    # A process started without --data-dir runs the default dir.
-    # Only accept the match when this data dir IS the default.
-    return os.path.abspath(data_dir) == os.path.abspath(DEFAULT_DATA_DIR)
+            if i + 1 >= len(args):
+                return False
+            return os.path.realpath(args[i + 1]) == os.path.realpath(data_dir)
+        if arg.startswith("--data-dir="):
+            return os.path.realpath(arg.split("=", 1)[1]) == os.path.realpath(data_dir)
+    # A process launched without --data-dir resolved internally —
+    # GENESIS_DATA_DIR else the canonical dir. Replicate that from the
+    # target's own environment rather than comparing against our
+    # defaults: a process whose env resolves somewhere else is not
+    # ours no matter what we would have resolved.
+    resolved = _resolved_data_dir_of(pid)
+    return resolved is not None and os.path.realpath(resolved) == os.path.realpath(data_dir)
 
 
-def _find_pid(pidfile: str, role: str, data_dir: str) -> int | None:
-    """Validated PID for *role*: the pidfile first, then a /proc scan.
+def _resolved_data_dir_of(pid: int) -> str | None:
+    """The data dir *pid* itself resolves: its own ``GENESIS_DATA_DIR``
+    or the canonical dir under its own ``HOME`` — the same rule
+    ``infrastructure.config.default_data_dir`` and ``src/data_dir.rs``
+    implement. ``None`` when the process's environment is unreadable
+    (it is not ours to claim)."""
+    try:
+        with open(f"/proc/{pid}/environ", "rb") as f:
+            env = dict(
+                kv.split(b"=", 1) for kv in f.read().split(b"\0") if b"=" in kv
+            )
+    except OSError:
+        return None
+    explicit = env.get(b"GENESIS_DATA_DIR", b"").decode("utf-8", "replace").strip()
+    if explicit:
+        return os.path.realpath(explicit)
+    home = env.get(b"HOME", b"").decode("utf-8", "replace").strip()
+    if not home:
+        return None
+    return os.path.join(home, ".local", "share", "genesis")
 
-    The scan is how orphaned children (a daemon whose CLI died without
-    cleaning up, a stale pidfile) are still found — the same processes
-    run.sh's _find_pid discovers.
+
+def _find_pids(pidfile: str, role: str, data_dir: str) -> list[int]:
+    """All validated PIDs for *role*: the pidfile's first, then /proc.
+
+    Plural matters — retina holds no lock, so a second matching process
+    must be found rather than silently surviving a --stop.
     """
+    found: list[int] = []
     pid = _pid_from_file(pidfile)
     if pid is not None and _matches_pid(pid, role, data_dir):
-        return pid
+        found.append(pid)
     try:
         entries = os.listdir("/proc")
     except OSError:
-        return None
+        return found
     for entry in entries:
         if not entry.isdigit():
             continue
         candidate = int(entry)
         # `genesis --stop` itself matches the CLI argv shape — never
         # let the scan aim a signal back at the caller.
-        if candidate == os.getpid():
+        if candidate == os.getpid() or candidate in found:
             continue
         if _matches_pid(candidate, role, data_dir):
-            return candidate
-    return None
+            found.append(candidate)
+    return found
 
 
 def _any_running(data_dir: str) -> bool:
@@ -3050,13 +3074,37 @@ def _any_running(data_dir: str) -> bool:
         (_PID_FILE_DAEMON, "daemon"),
         (_PID_FILE_RETINA, "retina"),
     ):
-        if _find_pid(os.path.join(data_dir, pidfile), role, data_dir) is not None:
+        if _find_pids(os.path.join(data_dir, pidfile), role, data_dir):
             return True
     return False
 
 
+def _write_mind_suppress(data_dir: str) -> None:
+    """Mark the mind's absence as intentional for the body's shepherd.
+
+    A daemon that outlives this teardown reads ``mind.suppress`` as a
+    goodbye and stays solitary instead of regrowing a mind the
+    operator just put down. Best-effort — a failed write only means
+    the body may attempt one regrow before its own shutdown lands.
+    """
+    try:
+        Path(os.path.join(data_dir, _MIND_SUPPRESS_FILE)).write_text(
+            f"stopped {int(time.time() * 1000)}\n"
+        )
+    except OSError as e:
+        note_swallowed("genesis_cli.mind_suppress.write", e)
+
+
+def _clear_mind_suppress(data_dir: str) -> None:
+    """Lift the sentinel on start — absence is no longer intended."""
+    try:
+        Path(os.path.join(data_dir, _MIND_SUPPRESS_FILE)).unlink(missing_ok=True)
+    except OSError as e:
+        note_swallowed("genesis_cli.mind_suppress.clear", e)
+
+
 def _stop_all(data_dir: str) -> int:
-    """Stop every Genesis process for *data_dir* — the run.sh teardown.
+    """Stop every Genesis process for *data_dir* — the genesis teardown.
 
     Order matters: SIGINT the CLI first so it saves state and stops
     the daemon itself; then SIGTERM any orphaned children only after
@@ -3067,33 +3115,39 @@ def _stop_all(data_dir: str) -> int:
     dir is still running.
     """
     data_dir = os.path.abspath(data_dir)
+    # Tell the body's shepherd first: this absence is authored. An
+    # orphaned daemon past the CLI's death must not regrow a mind the
+    # operator is putting down.
+    _write_mind_suppress(data_dir)
     for pidfile_name, role, sig, label in (
         (_PID_FILE_CLI, "cli", signal.SIGINT, "CLI"),
         (_PID_FILE_DAEMON, "daemon", signal.SIGTERM, "Daemon"),
         (_PID_FILE_RETINA, "retina", signal.SIGTERM, "Retina"),
     ):
-        pid = _find_pid(os.path.join(data_dir, pidfile_name), role, data_dir)
-        if pid is None:
+        pids = _find_pids(os.path.join(data_dir, pidfile_name), role, data_dir)
+        if not pids:
             continue
-        try:
-            os.kill(pid, sig)
-        except OSError:
-            print(
-                f"  {label} shutdown pending; retry --stop once it exits.",
-                file=sys.stderr,
-            )
-            return 1
-        deadline = time.monotonic() + _STOP_STAGE_GRACE_S
-        while _matches_pid(pid, role, data_dir):
-            if time.monotonic() >= deadline:
+        for pid in pids:
+            try:
+                os.kill(pid, sig)
+            except OSError:
                 print(
-                    f"  {label} shutdown still pending after "
-                    f"{_STOP_STAGE_GRACE_S:g}s; state and locks "
-                    "preserved — retry --stop once it exits.",
+                    f"  {label} shutdown pending; retry --stop once it exits.",
                     file=sys.stderr,
                 )
                 return 1
-            time.sleep(1.0)
+        deadline = time.monotonic() + _STOP_STAGE_GRACE_S
+        for pid in pids:
+            while _matches_pid(pid, role, data_dir):
+                if time.monotonic() >= deadline:
+                    print(
+                        f"  {label} shutdown still pending after "
+                        f"{_STOP_STAGE_GRACE_S:g}s; state and locks "
+                        "preserved — retry --stop once it exits.",
+                        file=sys.stderr,
+                    )
+                    return 1
+                time.sleep(1.0)
 
     # Everything verified exited — sweep only the files whose owners
     # can no longer clean them up themselves. Lock inodes stay: a
@@ -3169,6 +3223,9 @@ _SPORE_SKIP_NAMES = frozenset(
         "vosk-models",
         "continuity.json",
         "mind.session",
+        # Host-local intent — a germinated self's body must be free to
+        # regrow its mind; the old host's goodbye does not travel.
+        "mind.suppress",
         # Regenerable build cache for workspace-crate verification —
         # gigabytes of compiled artifacts, never part of the self.
         "workspace-target",
@@ -3233,7 +3290,7 @@ class _AdoptedDaemon:
     The daemon kept the body alive through the last mind's death; a
     new mind re-inhabits it rather than killing it to start fresh.
     Liveness is re-validated through ``_matches_pid``, so a recycled
-    PID still reads as dead — the same discipline ``_find_pid``
+    PID still reads as dead — the same discipline ``_find_pids``
     applies.
     """
 
@@ -3307,10 +3364,10 @@ def _adopt_daemon(data_dir: str, daemon_socket: str) -> _AdoptedDaemon | None:
     except Exception as e:  # noqa: BLE001 — any handshake failure means not ours
         logger.debug(f"daemon on {daemon_socket} is not adoptable: {e}")
         return None
-    pid = _find_pid(os.path.join(data_dir, _PID_FILE_DAEMON), "daemon", data_dir)
-    if pid is None:
+    pids = _find_pids(os.path.join(data_dir, _PID_FILE_DAEMON), "daemon", data_dir)
+    if not pids:
         return None
-    return _AdoptedDaemon(pid, data_dir)
+    return _AdoptedDaemon(pids[0], data_dir)
 
 
 def _stop_stray_daemon(data_dir: str, grace_s: float = 30.0) -> bool:
@@ -3326,18 +3383,20 @@ def _stop_stray_daemon(data_dir: str, grace_s: float = 30.0) -> bool:
         # give a mature data dir room to finish the save.
         grace_s = max(grace_s, 60.0)
     else:
-        pid = _find_pid(os.path.join(data_dir, _PID_FILE_DAEMON), "daemon", data_dir)
-        if pid is None:
+        pids = _find_pids(os.path.join(data_dir, _PID_FILE_DAEMON), "daemon", data_dir)
+        if not pids:
             return True
+        pid = pids[0]
         try:
             os.kill(pid, signal.SIGTERM)
         except OSError:
             return True
     deadline = time.monotonic() + grace_s
     while True:
-        pid = _find_pid(os.path.join(data_dir, _PID_FILE_DAEMON), "daemon", data_dir)
-        if pid is None:
+        pids = _find_pids(os.path.join(data_dir, _PID_FILE_DAEMON), "daemon", data_dir)
+        if not pids:
             return True
+        pid = pids[0]
         if time.monotonic() >= deadline:
             print(
                 "[genesis] stray daemon did not stop; escalating to SIGKILL.",
@@ -3349,13 +3408,10 @@ def _stop_stray_daemon(data_dir: str, grace_s: float = 30.0) -> bool:
                 note_swallowed("genesis_cli._stop_stray_daemon", e)
             kill_deadline = time.monotonic() + _KILL_GRACE_S
             while time.monotonic() < kill_deadline:
-                if (
-                    _find_pid(
-                        os.path.join(data_dir, _PID_FILE_DAEMON),
-                        "daemon",
-                        data_dir,
-                    )
-                    is None
+                if not _find_pids(
+                    os.path.join(data_dir, _PID_FILE_DAEMON),
+                    "daemon",
+                    data_dir,
                 ):
                     return True
                 time.sleep(0.2)
@@ -3875,8 +3931,7 @@ def _germinate(spore_dir: str, data_dir: str) -> bool:
     Refuses rather than overwrite an existing self: a data dir that
     already holds identity is not virgin ground, and replacing a
     living mind with an older copy is an irreversible act the
-    operator must perform deliberately. Forked selves unite through
-    ``scripts/merge_data_dirs.py`` instead.
+    operator must perform deliberately.
     """
     if not os.path.isdir(spore_dir):
         print(
@@ -3903,8 +3958,7 @@ def _germinate(spore_dir: str, data_dir: str) -> bool:
     if present:
         print(
             f"[genesis] {data_dir} already holds a self ({', '.join(present)}) — "
-            "refusing to overwrite it with a spore. To unite forked "
-            "state, use scripts/merge_data_dirs.py.",
+            "refusing to overwrite it with a spore.",
             file=sys.stderr,
         )
         return False
@@ -4628,7 +4682,7 @@ def _shutdown(
     if retina_proc is not None:
         print("[genesis] Stopping retina...", file=sys.stderr)
         clean_shutdown &= _stop_child(retina_proc, "retina", 3)
-    # Clean up PID files so run.sh --stop doesn't target stale PIDs.
+    # Clean up PID files so genesis --stop doesn't target stale PIDs.
     if data_dir:
         for name in (_PID_FILE_CLI, _PID_FILE_DAEMON, _PID_FILE_RETINA):
             _remove_pid_file(data_dir, name)
@@ -4715,12 +4769,12 @@ def _load_agent_env() -> None:
 def _console_main() -> int:
     """Entry point for the installed ``genesis`` command.
 
-    run.sh exports GENESIS_RUN to prove the CLI came up through the
+    genesis exports GENESIS_WAKE to prove the CLI came up through the
     supported launcher; the installed console script *is* a supported
     launcher, so it sets the flag itself.
     """
     _load_agent_env()
-    os.environ["GENESIS_RUN"] = "1"
+    os.environ["GENESIS_WAKE"] = "1"
     return main()
 
 
@@ -4745,9 +4799,9 @@ def _attach_session_mirror(feed: DiscordFeed | None) -> tuple:
 
 def main() -> int:
     """Main entry point for the Genesis CLI."""
-    if not os.environ.get("GENESIS_RUN"):
+    if not os.environ.get("GENESIS_WAKE"):
         print(
-            "Error: Genesis must be started with ./run.sh (source "
+            "Error: Genesis must be started with ./genesis (source "
             "checkout) or the `genesis` command (installed).",
             file=sys.stderr,
         )
@@ -4777,7 +4831,12 @@ def main() -> int:
     if _acquire_cli_lock(data_dir) is None:
         return 1
 
-    # Write the CLI PID file so run.sh --stop can target this exact
+    # A start is intent reversed: whatever wrote the sentinel (a
+    # graceful teardown, a --stop) no longer speaks for this boot —
+    # the body may regrow a lost mind again.
+    _clear_mind_suppress(data_dir)
+
+    # Write the CLI PID file so genesis --stop can target this exact
     # process instead of using broad pkill patterns.
     _write_pid_file(data_dir, _PID_FILE_CLI, os.getpid())
 
@@ -4847,6 +4906,16 @@ def main() -> int:
                 rebirth.set_children(daemon=daemon_proc, retina=retina_proc)
                 rebirth.set_mind(mind)
                 rebirth.start()
+                if args.game:
+                    # Born seated — the competition posture applies
+                    # before voice or the prompt can drive her. The
+                    # same door she takes herself: /game's handler and
+                    # the play urge's ARC sitting both call this.
+                    mind.enter_game_mode()
+                    print(
+                        "[genesis] Game mode — focused play, sealed net. /endgame releases.",
+                        file=sys.stderr,
+                    )
                 (voice, dedup_voice, ambient_listener, auditory_cortex) = _run_after_mind_start(
                     mind, args, shutting_down
                 )
@@ -4900,6 +4969,13 @@ def _teardown_session(
     if rebirth is not None:
         rebirth.stop()
         daemon_proc, retina_proc = rebirth.handles()
+    # A mind that existed and is leaving through the graceful path
+    # says goodbye to the body: if the daemon somehow survives this
+    # teardown, the sentinel keeps it solitary rather than regrowing
+    # a mind that left on purpose. A crash never reaches here — the
+    # body reads that as a loss and regrows, which is the closed loop.
+    if mind is not None:
+        _write_mind_suppress(data_dir)
     if not _shutdown(
         ambient_listener,
         mind,
@@ -5005,7 +5081,7 @@ def _start_retina_process(data_dir: str) -> subprocess.Popen | None:
         print("[genesis] Retina not built — camera unavailable.", file=sys.stderr)
         print("[genesis] Build with: cargo build --release", file=sys.stderr)
         return None
-    # run.sh checks for existing processes belonging to this instance.
+    # genesis checks for existing processes belonging to this instance.
     # Do not kill camera processes from other data directories merely
     # because they use the same project binary.
     retina_proc = _start_retina(retina_path, data_dir)

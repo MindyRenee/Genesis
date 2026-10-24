@@ -246,6 +246,12 @@ class Vision:
         # dictionary construction cost if there's no camera.
         self._occipital: V1Model | None = occipital
         self._on_gamma: Callable[[float], None] | None = None
+        # Sight callback — fired on every analyzed look with the
+        # visual drive (salience × relay gain). The brain wave system
+        # uses it for alpha blocking (the Berger effect): retinal
+        # input reaching cortex suppresses occipital alpha whether
+        # or not the look produced V1 features.
+        self._on_sight: Callable[[float], None] | None = None
         # Object recognition — its "inferotemporal cortex" (IT).
         # Lazily created on first use. Detects and identifies objects.
         self._object_recognizer: ObjectRecognizer | None = None
@@ -280,6 +286,17 @@ class Vision:
         synchrony based on what it actually sees.
         """
         self._on_gamma = callback
+
+    def set_sight_callback(self, callback: Callable[[float], None]) -> None:
+        """Register a callback fired on every analyzed look.
+
+        Carries the visual drive — scene salience scaled by the
+        thalamic relay gain the body reported for that look. Unlike
+        the gamma feed (which needs V1 features), this fires whenever
+        light reached cortex: alpha dropout needs only that input
+        arrived.
+        """
+        self._on_sight = callback
 
     def is_available(self) -> bool:
         """Return whether a live retina feed can be read."""
@@ -463,16 +480,16 @@ class Vision:
         self._last_person_keys = person_keys
         return face_names, n_unknown_faces
 
-    def _run_v1_sparse_coding(self, rgb, objects: list[DetectedObject]):
-        """Run V1 sparse coding as a sublayer (edges, gamma).
+    def _run_v1_sparse_coding(self, rgb):
+        """Run V1 sparse coding as a sublayer (edges, contours, gamma).
 
-        Downsample for V1 — sparse coding is expensive. Skip V1 when
-        we already have rich object detections — the scene description
-        doesn't need edge analysis when we already know what's in the
-        frame.
+        V1 runs on every look — it is the ventral stream's own input,
+        processed in parallel with IT object recognition, not replaced
+        by it. Skipping it on object-rich frames starved the gamma
+        feed, chromatic features, and contour learning exactly when
+        the scene was busiest. Downsample only — sparse coding is
+        expensive.
         """
-        if objects:
-            return None
         h, _w = rgb.shape[:2]
         if h > 240:
             rgb_small = rgb[::4, ::4]
@@ -619,7 +636,7 @@ class Vision:
         face_names, n_unknown_faces = self._recognize_faces(rgb)
 
         # ── V1 sparse coding (sublayer: edges, gamma) ──────────
-        field = self._run_v1_sparse_coding(rgb, objects)
+        field = self._run_v1_sparse_coding(rgb)
 
         # ── MSTd (dorsal stream): two-view geometry of this look
         # against the last — self-motion, heading, parallax depth
@@ -711,6 +728,21 @@ class Vision:
             _learn_view_motion(network, two_view, objects, salience)
 
         scene.salience = salience
+
+        # ── Alpha blocking — visual input suppresses occipital alpha ──
+        # The Berger effect: input through the retinogeniculate path
+        # desynchronises posterior alpha. It fires on every analyzed
+        # look — features or not — scaled by the relay gain the body
+        # reported, since a half-open gate passes half the drive.
+        if self._on_sight is not None:
+            gate = scene.relay_gate if scene.relay_gate is not None else 1.0
+            try:
+                self._on_sight(salience * gate)
+            except Exception as e:  # noqa: BLE001
+                note_swallowed(
+                    "occipital_lobe.perception.vision.see",
+                    e,
+                )
 
         # Corticothalamic engagement — seeing that mattered raises the
         # gain cortex feeds back to the thalamic relay on the next

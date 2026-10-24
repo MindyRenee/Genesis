@@ -1872,6 +1872,23 @@ impl FieldProbe {
         (lag, coherence.min(1.0), amplitude)
     }
 
+    /// The substrate's own measured thermal level — RMS probe-loop
+    /// jitter as a fraction of the nominal period. This is the bath
+    /// the latent field's Langevin reservoir samples: the silicon's
+    /// real timing noise, not a modeled amplitude. `None` until the
+    /// jitter ring warms — an absent channel is no reading.
+    pub fn bath_fluctuation(&self) -> Option<f64> {
+        let g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        if !g.jitter.filled {
+            return None;
+        }
+        let jvar = (g.jitter_sq_mean - g.jitter_mean * g.jitter_mean).max(0.0);
+        if !jvar.is_finite() {
+            return None;
+        }
+        Some((jvar.sqrt() / PROBE_PERIOD.as_secs_f32()) as f64)
+    }
+
     /// Compute the current signature. Called by the IPC handler.
     /// Returns the 328-byte wire body (version byte included).
     ///

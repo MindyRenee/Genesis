@@ -33,10 +33,17 @@
 //! uptake of ambient excess (>90% of released glutamate, Danbolt
 //! 2001) and the GAD drain — GABA is synthesized stoichiometrically
 //! from glutamate, so an elevated GABA pool draws glutamate down.
+//!
+//! Melatonin joins the same pool shape — secretion/clearance — but its
+//! production term is the SCN-gated AANAT drive (`melatonin_factor`)
+//! attenuated by acute retinal-light suppression, and its clearance is
+//! the measured hepatic half-life (~30 min), not the old ~2 s chase of
+//! the circadian envelope.
 
 use genesis::state::neurochemical::{
-    ENDORPHIN_METABOLIC_RATE, EPINEPHRINE_METABOLIC_RATE, NeuroTickParams, NeurochemicalId,
-    NeurochemicalVector, OXYTOCIN_METABOLIC_RATE, VASOPRESSIN_METABOLIC_RATE,
+    ENDORPHIN_METABOLIC_RATE, EPINEPHRINE_METABOLIC_RATE, MELATONIN_METABOLIC_RATE,
+    NeuroTickParams, NeurochemicalId, NeurochemicalVector, OXYTOCIN_METABOLIC_RATE,
+    VASOPRESSIN_METABOLIC_RATE,
 };
 
 fn level(nv: &NeurochemicalVector, id: NeurochemicalId) -> f32 {
@@ -113,6 +120,64 @@ fn endorphin_half_life_is_measured_plasma_value() {
     assert!(
         half_life_ticks > expected / 2 && half_life_ticks < expected * 2,
         "endorphin half-life {half_life_ticks} ticks, expected ~{expected}"
+    );
+}
+
+/// With the circadian synthesis drive off (biological day), a melatonin
+/// bolus decays on the measured plasma half-life — ln2/k ≈ 1778 s ≈
+/// 17 800 ticks at dt = 0.1 — not the seconds-scale envelope chase the
+/// old 0.5 s⁻¹ approach produced.
+#[test]
+fn melatonin_half_life_is_measured_plasma_value() {
+    let params = NeuroTickParams {
+        coupling_scale: 0.0,
+        metaplasticity_rate: 0.0,
+        maturation_level: 0.0,
+        ..NeuroTickParams::DEFAULT
+    };
+    let mut nv = NeurochemicalVector::new(0);
+    nv.set_circadian_phase(0.5); // biological day — AANAT drive ~0
+    nv.apply_impulse_capped(NeurochemicalId::Melatonin, 0.4, 0);
+    let start = level(&nv, NeurochemicalId::Melatonin);
+    let half = start / 2.0;
+    let mut ticks = 0u32;
+    while level(&nv, NeurochemicalId::Melatonin) > half && ticks < 60_000 {
+        nv.tick_with_params(&params);
+        ticks += 1;
+    }
+    let expected = (0.5f32.ln() / -MELATONIN_METABOLIC_RATE / 0.1) as u32;
+    assert!(
+        ticks > expected / 2 && ticks < expected * 2,
+        "melatonin half-life {ticks} ticks, expected ~{expected}"
+    );
+}
+
+/// Retinal light suppresses the secretion drive acutely: at the same
+/// circadian phase, a lit eye holds melatonin far below the dark
+/// steady state — synthesis is throttled, not the clock.
+#[test]
+fn melatonin_light_suppresses_nocturnal_secretion() {
+    let run = |lux: f32| -> f32 {
+        let params = NeuroTickParams {
+            coupling_scale: 0.0,
+            metaplasticity_rate: 0.0,
+            maturation_level: 0.0,
+            light_lux: lux,
+            ..NeuroTickParams::DEFAULT
+        };
+        let mut nv = NeurochemicalVector::new(0);
+        nv.set_circadian_phase(0.0); // biological midnight — full AANAT drive
+        for _ in 0..20_000 {
+            nv.tick_with_params(&params);
+        }
+        level(&nv, NeurochemicalId::Melatonin)
+    };
+    let dark = run(0.0);
+    let lit = run(500.0);
+    assert!(dark > 0.4, "dark night melatonin should rise: {dark}");
+    assert!(
+        lit < 0.5 * dark,
+        "500 lux should hold melatonin far below dark: lit {lit} vs dark {dark}"
     );
 }
 

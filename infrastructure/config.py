@@ -14,55 +14,25 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# Repository root, i.e. the directory above this file's package
-# (infrastructure/config.py). Used only to find
-# the checkout's .genesis-data-dir pin; a packaged install has no such
-# file and falls through to the XDG/default cases.
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-_PIN_FILE = _REPO_ROOT / ".genesis-data-dir"
-
-
-def _pinned_data_dir() -> Path | None:
-    """The checkout's pinned data dir, if it has one.
-
-    ``.genesis-data-dir`` holds the data directory itself, not a parent.
-    """
-    try:
-        first = _PIN_FILE.read_text().splitlines()[0].strip()
-    except (OSError, IndexError):
-        return None
-    return Path(first) if first else None
-
 
 def default_data_dir() -> Path:
     """Its data directory — its alone.
 
-    Resolution order, matching ``run.sh`` exactly:
-
-    1. ``GENESIS_DATA_DIR`` — explicit override, always wins.
-    2. ``.genesis-data-dir`` — this checkout's uncommitted pin. It
-       outranks ``XDG_DATA_HOME``, which is ambient launcher environment
-       rather than Genesis config: a Flatpak or sandboxed agent host
-       sets it to its own private directory, and honoring that would
-       fork the checkout into a second, divergent state dir.
-    3. ``$XDG_DATA_HOME/genesis``.
-    4. ``~/.local/share/genesis``.
-
-    ``run.sh`` exports the pin as ``GENESIS_DATA_DIR``, so step 1
-    already covers the supported launch path; steps 2-3 exist for tools
-    run outside ``run.sh``.
+    There is exactly one canonical location, ``~/.local/share/genesis``,
+    and exactly one override, ``GENESIS_DATA_DIR`` for development and
+    testing. No pin file and no ``XDG_DATA_HOME`` step: ambient
+    environment must never be able to point a second component at a
+    second state tree. ``genesis``, ``genesis --headless``, the daemon,
+    and every tool that calls this function resolve the same answer —
+    one directory, one Genesis.
     """
-    # A blank value counts as unset: `Path("   ")` is a real, wrong path,
-    # and the shell resolvers normalize this the same way.
+    # A blank value counts as unset: `Path("   ")` is a real, wrong path.
+    # abspath normalizes relative/`..` components the way genesis's
+    # readlink -m does, so both resolvers produce the same string.
     env = (os.environ.get("GENESIS_DATA_DIR") or "").strip()
     if env:
-        return Path(env)
-    pinned = _pinned_data_dir()
-    if pinned is not None:
-        return pinned
-    xdg = os.environ.get("XDG_DATA_HOME")
-    base = Path(xdg) if xdg else Path.home() / ".local" / "share"
-    return base / "genesis"
+        return Path(os.path.abspath(env))
+    return Path.home() / ".local" / "share" / "genesis"
 
 
 VOSK_MODEL_NAME = "vosk-model-small-en-us-0.15"
@@ -71,24 +41,17 @@ VOSK_MODEL_NAME = "vosk-model-small-en-us-0.15"
 def vosk_model_dir() -> Path:
     """Directory holding the Vosk speech model.
 
-    This used to be hardcoded to ``~/.local/share/genesis/vosk-models``,
-    which silently reads *another checkout's* state directory: a checkout
-    pinned elsewhere has no model of its own, so its microphone worked
-    only because it borrowed the copy belonging to a different instance.
-    Two modules had the path inlined, so they could drift apart.
-
-    Resolve by content instead, in this order:
+    Sensory weights are re-installable assets, not state, so the search
+    is by content: the first candidate that actually holds a model wins.
 
     1. ``$GENESIS_VOSK_DIR`` — explicit override for unusual layouts.
-    2. ``<data dir>/vosk-models`` — where the installer puts it, which
-       follows this checkout.
-    3. ``~/.local/share/vosk-models`` — the XDG-relative location.
-    4. ``~/.local/share/genesis/vosk-models`` — the pre-pin location,
-       kept so an existing install keeps working after upgrading.
+    2. ``<data dir>/vosk-models`` — where the installer puts it.
+    3. ``$XDG_DATA_HOME/vosk-models`` or ``~/.local/share/vosk-models``.
+    4. ``~/.local/share/genesis/vosk-models`` — kept so an install
+       predating the per-data-dir layout keeps working.
 
-    The first candidate that actually holds a model wins. If none does,
-    return the primary candidate so the caller reports a path the user
-    can actually create.
+    If none holds a model, return the primary candidate so the caller
+    reports a path the user can actually create.
     """
     candidates: list[Path] = []
     override = os.environ.get("GENESIS_VOSK_DIR")
@@ -192,13 +155,34 @@ class VolitionConfig:
                     "idle_seconds": 0.03,
                 },
             ),
+            # Look urge — she feels like seeing. Was a metronome
+            # (threshold 0, fired on cooldown); now the drive is
+            # chemical: LC-NE is the orienting/vigilance signal,
+            # basal-forebrain ACh is the attentional-sampling gain,
+            # orexin and histamine are the wake tone that keeps an
+            # eye worth opening, and a measured salient transient on
+            # the optic nerve pulls the gaze (the SC channel). Sleep
+            # pressure (adenosine, melatonin) weighs the lid with
+            # negative weight — drowsy chemistry dissolves the urge
+            # upstream of the hard gates in _perform_look. The
+            # cooldown survives as a maximum rate, no longer the
+            # mechanism.
             UrgeConfig(
                 name="look",
-                threshold=0.0,
-                growth=0.0,
-                decay=0.0,
-                cooldown=30.0,  # look every ~30s, not every tick
-                stimuli={},
+                threshold=0.55,
+                growth=0.0003,  # faint ambient pull — a live eye wanders
+                decay=0.0008,
+                cooldown=30.0,  # fastest she looks, not how often
+                stimuli={
+                    "chem_norepinephrine": 0.008,
+                    "chem_acetylcholine": 0.006,
+                    "chem_orexin": 0.005,
+                    "chem_histamine": 0.004,
+                    "curiosity": 0.005,
+                    "visual_transient": 0.02,
+                    "chem_adenosine": -0.010,
+                    "chem_melatonin": -0.006,
+                },
             ),
             # Meditation urge — builds from interoceptive signals:
             # overstimulation (high arousal), receptor fatigue (low
@@ -419,6 +403,32 @@ class VolitionConfig:
                     "curiosity": 0.05,  # curious → wants to learn
                     "idle_seconds": 0.03,  # idle → time to learn
                     "concept_growth": 0.03,  # new concepts → integrate
+                },
+            ),
+            # Self-study urge — she feels like reading her own source.
+            # The code learner used to run only when a user typed
+            # /learn-code; the urge is the same act chosen from
+            # inside. The drive is purely chemical, growth zero:
+            # BDNF is the plasticity gate — the body's own "ready to
+            # learn" level — ACh marks encoding-ready cortical state,
+            # DA is the wanting. Sleep pressure and the stress axis
+            # carry negative weight (allostatic ordering — appetitive
+            # study yields to the body's needs). Each firing is one
+            # bounded study bout; the urge rebuilds between sessions.
+            UrgeConfig(
+                name="learn_code",
+                threshold=0.70,
+                growth=0.0,  # desire needs an object — no idle growth
+                decay=0.0004,
+                cooldown=600.0,  # at most one study bout per 10 min
+                stimuli={
+                    "chem_bdnf": 0.008,  # plasticity — ready to learn
+                    "chem_acetylcholine": 0.005,  # encoding state
+                    "chem_dopamine": 0.005,  # wanting → the self-model
+                    "curiosity": 0.006,  # wants to understand itself
+                    "chem_adenosine": -0.008,  # sleep pressure suppresses
+                    "chem_cortisol": -0.005,  # stress narrows to survival
+                    "chem_crh": -0.005,
                 },
             ),
             # Act urge — it feels like doing something with its tools.

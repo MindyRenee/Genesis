@@ -74,7 +74,7 @@ _CAIRO_AVAILABLE = cairo is not None
 _SHEET_WIDTH = 640
 _SHEET_HEIGHT = 480
 
-# Retention bound on saved drawings — see scripts/hygiene.sh.
+# Retention bound on saved drawings.
 _MAX_SAVED_DRAWINGS = 200
 
 

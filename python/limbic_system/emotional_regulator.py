@@ -74,9 +74,10 @@ from genesis_client.protocol import (
 )
 from genesis_client.swallow import note_swallowed
 from genesis_client.threads import named_thread
+from genesis_client.types import CoreState, NeuroSummary
 from infrastructure.config import EmotionalConfig, default_data_dir
 
-from .emotion import CauseCategory, EmotionalState
+from .emotion import CauseCategory, EmotionalState, EmotionField, assess_emotion
 
 logger = logging.getLogger(__name__)
 
@@ -1521,7 +1522,7 @@ class EmotionalRegulator:
         self,
         get_emotion: Callable[[], EmotionalState | None] | None = None,
         neuro_impulse: Callable[[int, float], bool | None] | None = None,
-        get_state: Callable[[], object | None] | None = None,
+        get_state: Callable[[], CoreState | None] | None = None,
         seed: int | None = None,
         *,
         config: EmotionalConfig | None = None,
@@ -1575,6 +1576,12 @@ class EmotionalRegulator:
         self._regulation_count = 0
         self._regulations_lock = threading.Lock()
         self._last_cause: str | None = None
+
+        # The continuous affective field — per-region OU relaxation
+        # of state memberships (the "moving scale" under the label).
+        # status.feel() advances it; assess_emotion() stays available
+        # as the pure instantaneous readout.
+        self.field = EmotionField()
 
         # Track per-chemical effective levels for tonic/phasic decomposition
         self._chemical_history: deque[dict[str, float]] = deque(maxlen=60)
@@ -2683,15 +2690,32 @@ class EmotionalRegulator:
         )
         self._impulse(CHEM_ACETYLCHOLINE, 0.012 * dampening * abs(delta))
 
-        # The label classifies the episode for her language — the
-        # felt thing is the impulse vector above, not this name.
-        if solved:
-            return "exhilarated" if escapes else "satisfied"
-        if score > prior_best:
-            return "encouraged"
-        if deaths >= 2:
-            return "frustrated"
-        return "determined"
+        # What she felt is what her chemistry now is: re-read the
+        # body after the impulses landed and let the emotion
+        # assessment name the state — the label emerges from the
+        # neurochemistry, not from which outcome occurred.
+        state = self._get_state() if self._get_state else None
+        if state is None:
+            return None
+        try:
+            summary = NeuroSummary(
+                arousal=float(state.arousal),
+                valence=float(state.valence),
+                global_tone=float(state.global_tone),
+                plasticity_gate=float(state.plasticity_gate),
+                encoding_weight=float(state.encoding_weight),
+                consolidation_weight=float(state.consolidation_weight),
+                retrieval_weight=float(state.retrieval_weight),
+                phase=int(getattr(state, "emergent_phase", 0) or 0),
+            )
+            felt = assess_emotion(summary, state.chemicals).label
+        except (AttributeError, TypeError, ValueError) as e:
+            note_swallowed(
+                "limbic_system.emotional_regulator.respond_to_play",
+                e,
+            )
+            return None
+        return felt or None
 
     def _impulse(self, chem: int, amount: float) -> None:
         """Send a regulatory neurochemical impulse, tolerating failures.

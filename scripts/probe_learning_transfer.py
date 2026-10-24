@@ -131,10 +131,10 @@ def stop_daemon(proc: subprocess.Popen[bytes], socket_path: str) -> None:
         return
     except Exception:  # noqa: BLE001
         # Do not SIGKILL a stateful Genesis daemon. Delegate shutdown to
-        # run.sh, which validates the per-instance PID/process identity and
+        # genesis, which validates the per-instance PID/process identity and
         # waits for the daemon to finish saving state.
         subprocess.run(
-            ["./run.sh", "--stop"],
+            ["./genesis", "--stop"],
             cwd=Path(__file__).resolve().parents[1],
             env={**os.environ, "GENESIS_DATA_DIR": data_dir},
             check=False,

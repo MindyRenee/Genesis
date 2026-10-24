@@ -7,6 +7,7 @@ daemon.
 
 from __future__ import annotations
 
+import math
 import struct
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
@@ -2266,4 +2267,61 @@ class OpticState:
             pupil_mm=pupil_mm,
             accommodation_dpt=accommodation_dpt,
             lid=lid,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class FieldState:
+    """The latent field's integration readout — where the organism's
+    center of mass sits and how far its major systems have spread
+    from it.
+
+    Parsed from the daemon's ``GET_INTERNALS`` map (``field.*``
+    keys). The body runs this field itself (src/field/): the fibers
+    — body, prediction, agency — each project their measured state
+    into a shared 6-D latent space on a Poincaré ball, and the
+    integration pulls them toward their Fréchet barycenter.
+
+    ``consensus`` is that barycenter — the "where the organism sits"
+    coordinate. ``disagreement`` is the Fréchet variance about it —
+    measured incoherence in latent² units (≈0.1 halves the body's
+    published precision). ``temperature`` is the field's thermal
+    state — disagreement plus the physical bath (the silicon's own
+    measured timing fluctuation), cooling at its own rate.
+    ``consensus_norm`` is ‖consensus‖ — how far the center has
+    drifted from nominal (the ball's origin).
+    """
+
+    consensus: tuple[float, ...]
+    disagreement: float
+    temperature: float
+    consensus_norm: float
+    fiber_count: int
+
+    @classmethod
+    def from_internals(cls, internals: dict[str, str]) -> FieldState | None:
+        """Parse the ``field.*`` keys out of a GET_INTERNALS map.
+
+        Returns ``None`` when the keys are absent or malformed — an
+        unwarmed field is an absent channel, not a zero reading.
+        """
+        try:
+            consensus = tuple(
+                float(x) for x in internals["field.consensus"].split(",")
+            )
+            disagreement = float(internals["field.disagreement"])
+            temperature = float(internals["field.temperature"])
+            consensus_norm = float(internals["field.consensus_norm"])
+            fiber_count = int(internals["field.fibers"])
+        except (KeyError, ValueError):
+            return None
+        values = (*consensus, disagreement, temperature, consensus_norm)
+        if not all(math.isfinite(v) for v in values):
+            return None
+        return cls(
+            consensus=consensus,
+            disagreement=disagreement,
+            temperature=temperature,
+            consensus_norm=consensus_norm,
+            fiber_count=fiber_count,
         )

@@ -434,7 +434,32 @@ class StatusMixin:
         )
         tonic_phasic = self.regulator.assess_tonic_phasic(core_state.chemicals)
         context = self._emotional_context(core_state, summary, tonic_phasic)
-        emotion = assess_emotion(summary, core_state.chemicals, context)
+        # The oscillatory state is part of the felt substrate — band
+        # powers corroborate field membership (e.g. high beta for
+        # vigilance). Unavailable early in boot → wave terms drop.
+        waves = None
+        try:
+            waves = self.brain_waves(core_state=core_state)
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.status.feel.waves", e)
+        # The body's own self-coherence is felt too — the latent
+        # field's measured disagreement and center displacement are
+        # evidence (mood-as-precision: incoherence reads unsettled).
+        # A daemon without the field.* keys → terms drop out.
+        field_state = None
+        try:
+            field_state = self.client.get_field_state()
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.status.feel.field_state", e)
+        field = getattr(self.regulator, "field", None)
+        if field is not None:
+            emotion = field.update(
+                summary, core_state.chemicals, context, waves, field_state
+            )
+        else:
+            emotion = assess_emotion(
+                summary, core_state.chemicals, context, waves, field_state
+            )
         emotion.chemicals = core_state.chemicals
         emotion.tonic_phasic = tonic_phasic
         if self.regulator.last_cause:
@@ -1237,7 +1262,19 @@ class StatusMixin:
             retrieval_weight=core_state.retrieval_weight,
             phase=self._effective_phase(core_state),
         )
-        emotion = assess_emotion(summary, core_state.chemicals)
+        # Report the integrated field — the same state feel() exposes.
+        # field.update is idempotent per elapsed time, so probing it
+        # here only advances the integrator by the real interval.
+        field_state = None
+        try:
+            field_state = self.client.get_field_state()
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.status.field_state", e)
+        field = getattr(self.regulator, "field", None)
+        if field is not None:
+            emotion = field.update(summary, core_state.chemicals, field_state=field_state)
+        else:
+            emotion = assess_emotion(summary, core_state.chemicals, field_state=field_state)
 
         status = {
             "running": self._running,

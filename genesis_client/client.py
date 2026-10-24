@@ -168,6 +168,7 @@ from .types import (
     CoreState,
     Episode,
     FieldProbeSignature,
+    FieldState,
     InferenceSummary,
     IonSummary,
     MemoryStats,
@@ -796,6 +797,27 @@ class GenesisClient:
         if not resp or resp[0] >= 0x80:
             return None
         return FieldProbeSignature.unpack(resp)
+
+    def get_field_state(self, *, timeout: float | None = None) -> FieldState | None:
+        """The latent field's integration readout — the organism's
+        center of mass and how far its major systems have spread
+        from it.
+
+        The body's own field (src/field/) pulls its fibers — body,
+        prediction, agency — toward their Fréchet barycenter on a
+        shared latent manifold; this returns that center, the
+        measured disagreement about it, and the field's thermal
+        state (internal tension plus the physical bath — the
+        silicon's measured timing noise).
+
+        Returns ``None`` on transport failure or when the daemon
+        predates the ``field.*`` internals keys — an absent channel,
+        never a zero reading.
+        """
+        internals = self.get_internals(timeout=timeout)
+        if internals is None:
+            return None
+        return FieldState.from_internals(internals)
 
     def get_internals(self, *, timeout: float | None = None) -> dict[str, str] | None:
         """The daemon's process-local internals — the gears no state

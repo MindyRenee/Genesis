@@ -15,7 +15,7 @@
 # The install is editable: the packages resolve to this checkout, so
 # the install is bound to the repo path — move the checkout and re-run
 # this script. Her state is never touched: the data dir resolves the
-# same way run.sh resolves it (~/.local/share/genesis).
+# same way genesis resolves it (~/.local/share/genesis).
 
 set -euo pipefail
 
@@ -64,7 +64,7 @@ if [ "$uninstall" -eq 1 ]; then
     fi
     rm -rf "$VENV"
     rmdir "$INSTALL_HOME" "$AGENT_CONF" 2>/dev/null || true
-    say "Done. Her state remains at \${XDG_DATA_HOME:-~/.local/share}/genesis."
+    say "Done. Her state remains at ${GENESIS_DATA_DIR:-$HOME/.local/share/genesis}."
     exit 0
 fi
 
@@ -123,7 +123,10 @@ fi
 # ~/.local/share/man ahead of /usr/local/man, so these shadow any
 # stale system copies without needing root.
 MAN_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/man"
-GENESIS_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/genesis"
+# Her state dir is the one canonical location — the existence check
+# below decides whether her manual is hers to review, so it must not
+# be redirectable by ambient XDG.
+GENESIS_DATA="${GENESIS_DATA_DIR:-$HOME/.local/share/genesis}"
 if [ -d "$REPO/docs/man" ]; then
     for page in "$REPO"/docs/man/*.[0-9]; do
         [ -e "$page" ] || continue
@@ -155,7 +158,7 @@ Type=simple
 ExecStart=$VENV/bin/genesis --headless
 Restart=on-failure
 RestartSec=10s
-# An external SIGTERM (genesis --stop, run.sh --stop, kill) is a
+# An external SIGTERM (genesis --stop, genesis --stop, kill) is a
 # deliberate graceful stop, not a failure — without this, systemd
 # would resurrect her every time she is put down from outside.
 SuccessExitStatus=SIGTERM

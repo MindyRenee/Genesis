@@ -861,10 +861,16 @@ class LifecycleMixin:
         try:
             network = self.brain.frontal.network
             if network._archive is not None:
-                # Archive mode: spill to disk instead of deleting
+                # Archive mode: spill to disk instead of deleting.
+                # The budget is hers — maintenance_policy.json is the
+                # knob she owns; the dormancy threshold is the
+                # definition of dormant, not a policy choice.
+                from infrastructure.maintenance_policy import load_policy
+
+                policy = load_policy(getattr(self.brain, "data_dir", None))
                 spilled = network.spill_dormant(
                     activation_threshold=0.01,
-                    max_in_memory=15000,
+                    max_in_memory=policy.max_in_memory,
                 )
                 if spilled > 0:
                     logger.info(f"Archived {spilled} dormant concepts")

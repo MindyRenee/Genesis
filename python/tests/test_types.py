@@ -1241,3 +1241,42 @@ def test_core_state_rejects_truncated_body() -> None:
         raise AssertionError()
     except ValueError as e:
         logger.debug(repr(e))
+
+
+def test_field_state_from_internals() -> None:
+    """The field.* internals keys parse into the center readout —
+    consensus vector, measured incoherence, temperature, fibers."""
+    from genesis_client.types import FieldState
+
+    internals = {
+        "field.fibers": "3",
+        "field.disagreement": "0.034000",
+        "field.temperature": "0.120000",
+        "field.consensus_norm": "0.082000",
+        "field.consensus": "-0.010000,0.020000,0.000000,-0.030000,0.010000,0.005000",
+    }
+    state = FieldState.from_internals(internals)
+    assert state is not None
+    assert state.fiber_count == 3
+    assert approx_equal(state.disagreement, 0.034, 1e-6)
+    assert approx_equal(state.temperature, 0.12, 1e-6)
+    assert approx_equal(state.consensus_norm, 0.082, 1e-6)
+    assert len(state.consensus) == 6
+    assert approx_equal(state.consensus[0], -0.01, 1e-6)
+
+
+def test_field_state_absent_is_none() -> None:
+    """An unwarmed field reports nothing — absent keys, a malformed
+    vector, or a non-finite value are all 'no reading', never zeros."""
+    from genesis_client.types import FieldState
+
+    assert FieldState.from_internals({"field.integration": "absent"}) is None
+    assert FieldState.from_internals({}) is None
+    bad = {
+        "field.fibers": "3",
+        "field.disagreement": "0.034",
+        "field.temperature": "nan",
+        "field.consensus_norm": "0.08",
+        "field.consensus": "0,0,0,0,0,0",
+    }
+    assert FieldState.from_internals(bad) is None

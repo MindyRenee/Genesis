@@ -10,9 +10,8 @@ for words it hasn't explicitly learned.
 Usage:
     python3 setup_embeddings.py [--data-dir DIR] [--dim 50]
 
-If no data dir is specified, it is resolved the way run.sh does:
-GENESIS_DATA_DIR, then the checkout's .genesis-data-dir pin, then
-XDG_DATA_HOME, then ~/.local/share.
+If no data dir is specified, it resolves to the canonical dir:
+GENESIS_DATA_DIR if set, else ~/.local/share/genesis.
 """
 
 from __future__ import annotations
@@ -38,10 +37,9 @@ GLOVE_DIM = 50  # 50d is compact and sufficient for semantic similarity
 def _parse_setup_args() -> tuple[str, int]:
     """Parse --data-dir and --dim from command-line arguments.
 
-    The default comes from ``default_data_dir()`` so it honors the
-    checkout's .genesis-data-dir pin rather than assuming
-    ~/.local/share/genesis — building an embedding index against another
-    checkout's concept set is silently wrong, not merely inconvenient.
+    The default comes from ``default_data_dir()`` — building an
+    embedding index against anything but the canonical concept set
+    is silently wrong, not merely inconvenient.
     """
     data_dir = (
         sys.argv[sys.argv.index("--data-dir") + 1]

@@ -905,7 +905,17 @@ impl LtmStore {
             })
             .count();
         let bundle_count = reconciled_store.bundles.episode_count() as usize;
-        let needs_rebuild = migrated_meta > 0 || bundle_count != real_count;
+        // archive/delete/store_meta subtract SDRs as episodes leave
+        // the bundled set, but crash-torn writes and pre-subtraction
+        // stores leave residual dead weight. A small excess of dead
+        // contributions is cheap noise in query_activation — rebuild
+        // only when the pollution is material (over ~25% of the real
+        // set, floor 64) or when real episodes are missing from the
+        // bundles entirely.
+        let drift = bundle_count.saturating_sub(real_count);
+        let drift_threshold = (real_count / 4).max(64);
+        let needs_rebuild =
+            migrated_meta > 0 || bundle_count < real_count || drift > drift_threshold;
         if needs_rebuild {
             eprintln!(
                 "[ltm] Bundle store has {bundle_count} episodes but only \
@@ -1434,6 +1444,15 @@ impl LtmStore {
             .map_err(LtmError::Io)?;
         self.meta_file.sync_all().map_err(LtmError::Io)?;
 
+        // `store()` bundled this SDR before the meta flag was
+        // applied — back the contribution out so bookkeeping does
+        // not linger in the superposition as dead weight. The encode
+        // uses the same inputs as the add, so the subtraction is
+        // the exact inverse.
+        let code = episode_id_to_code(episode_id);
+        let sdr = encode_episode(text, &emotional_tag, timestamp);
+        self.bundles.remove_episode(&code, &sdr);
+
         Ok(episode_id)
     }
 
@@ -1755,6 +1774,19 @@ impl LtmStore {
             .get(&episode_id)
             .ok_or(LtmError::EpisodeNotFound)?;
 
+        // Read the payload while the entry is still readable —
+        // `retrieve` rejects deleted entries — so its SDR
+        // contribution can be subtracted once the durable writes
+        // land. Skipped for meta-memories (never bundled) and
+        // already-archived entries (unbundled when they left the
+        // active set).
+        let unbundle_episode =
+            if !self.entries[idx].is_meta_memory() && !self.entries[idx].is_archived() {
+                self.retrieve(episode_id).ok()
+            } else {
+                None
+            };
+
         self.entries[idx].mark_deleted();
 
         // Only the flags byte changed — write just that byte instead
@@ -1783,6 +1815,9 @@ impl LtmStore {
         // marked deleted in `entries` but still present in
         // `id_to_idx`/`active_ids` — the next `open()` will see the
         // on-disk deleted flag and exclude it from `active_ids`.
+        if let Some(episode) = unbundle_episode {
+            self.unbundle(episode_id, &episode);
+        }
         self.id_to_idx.remove(&episode_id);
         self.active_ids.retain(|id| *id != episode_id);
 
@@ -1832,6 +1867,19 @@ impl LtmStore {
             return Err(error);
         }
         self.entries[idx].mark_archived();
+
+        // The SDR contribution stays in the bundle superposition
+        // after archival — subtract it so routine sleep-cycle
+        // churn does not accumulate as dead weight that the
+        // startup reconciliation has to rebuild away every boot.
+        // Meta-memories were never bundled. A failed read leaves
+        // bounded drift, which the open() tolerance absorbs.
+        if !self.entries[idx].is_meta_memory() {
+            match self.retrieve(episode_id) {
+                Ok(episode) => self.unbundle(episode_id, &episode),
+                Err(e) => eprintln!("[ltm] could not unbundle archived episode {episode_id}: {e}"),
+            }
+        }
 
         // Remove from active_ids but keep in id_to_idx.
         self.active_ids.retain(|id| *id != episode_id);
@@ -2045,6 +2093,27 @@ impl LtmStore {
         self.meta_file.sync_all().map_err(LtmError::Io)?;
         self.bundles.sync().map_err(LtmError::Io)?;
         Ok(())
+    }
+
+    /// Subtract a stored episode's SDR contribution from the
+    /// bundle superposition — the inverse of the `add_episode`
+    /// that `store()` performed.
+    ///
+    /// Called when an episode leaves the bundled set (archived,
+    /// deleted, or marked meta-memory after storage) so that
+    /// lifecycle churn does not accumulate dead SDR weight —
+    /// the pollution the startup rebuild was mopping up on every
+    /// boot. Not explicitly synced: a crash that loses the
+    /// subtraction leaves bounded drift, which the startup
+    /// reconciliation tolerates below the rebuild threshold.
+    fn unbundle(&mut self, episode_id: u64, episode: &Episode) {
+        let code = episode_id_to_code(episode_id);
+        let sdr = encode_episode(
+            &episode.text,
+            &episode.full_emotional_tag,
+            episode.timestamp,
+        );
+        self.bundles.remove_episode(&code, &sdr);
     }
 
     /// Rebuild the LogHD bundle store from only real (non-meta,

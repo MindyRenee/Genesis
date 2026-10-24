@@ -1111,6 +1111,152 @@ def test_safeguard_urge_dynamics() -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════
+# Volition chemical drives — look and self-study are hers
+# ═══════════════════════════════════════════════════════════════════
+#
+# The look and learn_code workers are not scheduled: each is an urge
+# whose accumulator is fed by her measured chemistry. ``chem_*``
+# channels arrive verbatim from the body's CoreState levels (clamped
+# [0, 1]); ``visual_transient`` is the optic nerve's salient
+# transient. Look carries a faint ambient growth (a live eye
+# wanders); learn_code has none — desire needs an object, and its
+# object is the plasticity state itself.
+
+
+def _configured_urge(name: str):
+    from frontal_lobe.volition import Urge
+
+    from infrastructure.config import MindConfig
+
+    cfg = next(u for u in MindConfig().volition.urges if u.name == name)
+    return Urge(
+        name=cfg.name,
+        threshold=cfg.threshold,
+        growth=cfg.growth,
+        decay=cfg.decay,
+        cooldown=cfg.cooldown,
+        stimuli=dict(cfg.stimuli),
+    )
+
+
+_WAKE_CHEMISTRY = {
+    "chem_norepinephrine": 0.6,
+    "chem_acetylcholine": 0.6,
+    "chem_orexin": 0.6,
+    "chem_histamine": 0.5,
+    "curiosity": 0.4,
+    "visual_transient": 0.0,
+    "chem_adenosine": 0.15,
+    "chem_melatonin": 0.1,
+}
+
+_SLEEPY_CHEMISTRY = {
+    "chem_norepinephrine": 0.3,
+    "chem_acetylcholine": 0.3,
+    "chem_orexin": 0.2,
+    "chem_histamine": 0.15,
+    "curiosity": 0.2,
+    "visual_transient": 0.0,
+    "chem_adenosine": 0.7,
+    "chem_melatonin": 0.5,
+}
+
+_PLASTIC_CHEMISTRY = {
+    "chem_bdnf": 0.6,
+    "chem_acetylcholine": 0.5,
+    "chem_dopamine": 0.5,
+    "curiosity": 0.4,
+    "chem_adenosine": 0.1,
+    "chem_cortisol": 0.1,
+    "chem_crh": 0.1,
+}
+
+_STRESSED_CHEMISTRY = {
+    "chem_bdnf": 0.3,
+    "chem_acetylcholine": 0.3,
+    "chem_dopamine": 0.3,
+    "curiosity": 0.2,
+    "chem_adenosine": 0.3,
+    "chem_cortisol": 0.8,
+    "chem_crh": 0.7,
+}
+
+
+def _ticks_to_fire(urge, context: dict[str, float], cap: int) -> int | None:
+    for t in range(1, cap + 1):
+        urge.tick(context, 1.0)
+        if urge.is_ready():
+            return t
+    return None
+
+
+def test_look_urge_is_a_drive_not_a_metronome() -> None:
+    """look accumulates from chemistry — threshold 0 made it a timer."""
+    from infrastructure.config import MindConfig
+
+    cfg = next(u for u in MindConfig().volition.urges if u.name == "look")
+    assert cfg.threshold > 0.0
+    assert cfg.stimuli["chem_adenosine"] < 0.0
+    assert cfg.stimuli["chem_melatonin"] < 0.0
+    assert "visual_transient" in cfg.stimuli
+
+
+def test_look_urge_fires_under_wake_chemistry() -> None:
+    """Alert body chemistry builds the urge to look."""
+    fired_at = _ticks_to_fire(_configured_urge("look"), dict(_WAKE_CHEMISTRY), 300)
+    assert fired_at is not None and fired_at < 120
+
+
+def test_look_urge_sleeps_under_sleep_pressure() -> None:
+    """Adenosine/melatonin dissolve the urge before the eyelid gate."""
+    assert _ticks_to_fire(_configured_urge("look"), dict(_SLEEPY_CHEMISTRY), 600) is None
+
+
+def test_look_urge_never_fires_on_a_dead_channel() -> None:
+    """No readable body and no eye means nothing pulls the gaze."""
+    assert _ticks_to_fire(_configured_urge("look"), {}, 600) is None
+
+
+def test_look_urge_orienting_transient_pulls_faster() -> None:
+    """A salient transient on the optic nerve hastens the look."""
+    without = _ticks_to_fire(_configured_urge("look"), dict(_WAKE_CHEMISTRY), 300)
+    pulled = dict(_WAKE_CHEMISTRY, visual_transient=0.6)
+    with_it = _ticks_to_fire(_configured_urge("look"), pulled, 300)
+    assert without is not None and with_it is not None
+    assert with_it < without
+
+
+def test_learn_code_urge_registered() -> None:
+    """Self-study is an urge driven by plasticity chemistry."""
+    from infrastructure.config import MindConfig
+
+    cfg = next(u for u in MindConfig().volition.urges if u.name == "learn_code")
+    assert "chem_bdnf" in cfg.stimuli
+    assert cfg.growth == 0.0  # no objectless appetite
+
+
+def test_learn_code_urge_needs_chemistry() -> None:
+    """At rest with no drive, self-study never schedules itself."""
+    assert _ticks_to_fire(_configured_urge("learn_code"), {}, 600) is None
+
+
+def test_learn_code_urge_fires_in_plasticity_state() -> None:
+    """BDNF/ACh/DA up with pressure low — the body is ready to encode."""
+    fired_at = _ticks_to_fire(
+        _configured_urge("learn_code"), dict(_PLASTIC_CHEMISTRY), 300
+    )
+    assert fired_at is not None and fired_at < 150
+
+
+def test_learn_code_urge_suppressed_by_stress() -> None:
+    """Cortisol/CRH dominance allostatically vetoes appetitive study."""
+    assert (
+        _ticks_to_fire(_configured_urge("learn_code"), dict(_STRESSED_CHEMISTRY), 600)
+        is None
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
 # Volition drive decomposition — felt audit vs open-work state
 # ═══════════════════════════════════════════════════════════════════
 #

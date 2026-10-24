@@ -22,6 +22,7 @@ from thalamus.relay import KIND_HEARD
 
 from genesis_client.protocol import (
     CHEM_DOPAMINE,
+    CHEM_EPINEPHRINE,
     CHEM_NOREPINEPHRINE,
     MODULE_LANGUAGE,
     MODULE_SENSORY,
@@ -832,6 +833,11 @@ class ConversationMixin:
         boundary and ends when that boundary returns. This includes normal
         cognition, errors, and bounded timeout fallbacks.
         """
+        # Conversation is off while she is gaming — terminal input,
+        # voice, and channel chatter all reach silence; the match is
+        # the only utterance she attends to.
+        if self._is_gaming:
+            return ""
         started = time.perf_counter()
         try:
             return self._respond_once(user_input, timeout)
@@ -946,7 +952,7 @@ class ConversationMixin:
                 logger.error(
                     "conversation is still gated by a wedged think() "
                     "worker (%.0fs). Messages will not be processed "
-                    "until it exits; restart with ./run.sh --stop if "
+                    "until it exits; restart with ./genesis --stop if "
                     "it does not.",
                     stuck,
                 )
@@ -1570,16 +1576,29 @@ class ConversationMixin:
         learner pauses — the world is the task; topic acquisition can
         wait for the same reason it waits during conversation. The
         inner life stays on — thinking about the game is the point.
-        Conversation is not removed — it can still answer if spoken
-        to — but it stops being the driver. A small norepinephrine
-        impulse marks the shift into alert, attentive posture.
+        Conversation is off — the match is the only utterance she is
+        attending to. A modest norepinephrine + epinephrine bump marks
+        the shift into alert, competitive posture — adrenaline up a
+        bit, nothing puppeteered.
+
+        The sitting's boundaries are venue rules, not steering: sleep
+        and meditation are paused while the flag stands, the
+        network-fetching tools refuse, and her hands, workstation,
+        and spawned processes stay hers.
         """
         if self._is_gaming:
             return
         self._is_gaming: bool = True
         self.brain.frontal.game_mode = True
         self.learner.pause()
+        try:
+            from frontal_lobe.tools.framework import get_tools
+
+            get_tools().net_sealed = True
+        except Exception as e:  # noqa: BLE001 — sealing must never block play
+            logger.debug(f"tool net-seal failed: {e}")
         self._learner_neuro_impulse(CHEM_NOREPINEPHRINE, 0.1)
+        self._learner_neuro_impulse(CHEM_EPINEPHRINE, 0.05)
         self.engage_world("games")
         # The executive formally takes the task set — engagement is
         # the strength of her focus; the task-set is its object. Any
@@ -1598,6 +1617,12 @@ class ConversationMixin:
         self._is_gaming = False
         self.brain.frontal.game_mode = False
         self.learner.resume()
+        try:
+            from frontal_lobe.tools.framework import get_tools
+
+            get_tools().net_sealed = False
+        except Exception as e:  # noqa: BLE001 — release is best-effort
+            logger.debug(f"tool net-unseal failed: {e}")
         self.disengage_world()
         self._resume_inner_life()
         try:
@@ -1611,8 +1636,8 @@ class ConversationMixin:
         In game mode a ``FRAME`` line is a scene to act on, not an
         utterance to answer — the session parses the wire format and
         ``world_step`` runs the turn through her faculties; the reply
-        is the action she chose. Any other input while gaming still
-        reaches conversation — she can still talk.
+        is the action she chose. Anything else is conversation, and
+        conversation is off for the sitting — silence.
         """
         if not self._is_gaming or not line.startswith("FRAME "):
             return self.respond(line)

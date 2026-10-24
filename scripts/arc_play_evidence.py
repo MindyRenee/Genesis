@@ -24,7 +24,6 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
-import os
 import re
 import subprocess
 import sys
@@ -37,27 +36,7 @@ sys.path.insert(0, str(ROOT_DIR / "python"))
 _SKILL_RE = re.compile(r"skill:([0-9a-f]{16})")
 
 
-def _default_data_dir() -> Path:
-    """Resolve the data dir the way run.sh does.
-
-    Precedence: GENESIS_DATA_DIR, then the checkout's .genesis-data-dir
-    pin, then XDG_DATA_HOME, then ~/.local/share. The pin outranks
-    XDG_DATA_HOME because the latter is ambient launcher environment,
-    not Genesis config — a sandboxed host sets it, which would
-    otherwise point the report at a sibling instance's gameplay.json.
-    """
-    # Blank counts as unset, matching run.sh and config.py.
-    explicit = (os.environ.get("GENESIS_DATA_DIR") or "").strip()
-    if explicit:
-        return Path(explicit)
-    pin = Path(__file__).resolve().parent.parent / ".genesis-data-dir"
-    if pin.is_file():
-        pinned = pin.read_text().splitlines()[0].strip()
-        if pinned:
-            return Path(pinned)
-    xdg = os.environ.get("XDG_DATA_HOME")
-    base = Path(xdg) if xdg else Path.home() / ".local" / "share"
-    return base / "genesis"
+from infrastructure.config import default_data_dir  # noqa: E402
 
 
 def _cell_match(pred: list[list[int]] | None, expected: list[list[int]]) -> float:
@@ -351,7 +330,7 @@ def render(data_dir: Path) -> str:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--data-dir", type=Path, default=_default_data_dir())
+    ap.add_argument("--data-dir", type=Path, default=default_data_dir())
     ap.add_argument("--out", type=Path, default=None)
     args = ap.parse_args()
     report = render(args.data_dir)

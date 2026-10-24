@@ -58,6 +58,11 @@ _REST_EYES_HOLD_S = 20.0
 # instant of a poised act, it cannot conjure one from rest.
 _URGE_FLUCTUATION = 0.03
 
+# Files per self-chosen study bout — a volitional study session is a
+# recurring act with the urge rebuilding between bouts, not the
+# full-corpus pass the /learn-code command performs.
+_LEARN_CODE_BOUT = 25
+
 
 def _lower_thread_priority(nice: int = _VOLITION_NICE) -> None:
     """Drop the calling thread's CPU priority (Linux per-thread nice).
@@ -204,6 +209,7 @@ class VolitionMixin:
         wave_data = self._read_wave_and_adenosine()
         self._shape_adenosine(wave_data)
         threat_data = self._read_threat_signals()
+        chemical = self._chemical_signals()
         concept_growth = self._concept_growth()
         social_isolation = self._social_isolation()
         boredom, games_available = self._play_signals(idle, emotional_intensity, concept_growth)
@@ -244,7 +250,49 @@ class VolitionMixin:
             **interoceptive,
             **wave_data,
             **threat_data,
+            # The body's own levels pass untouched like interoception
+            # — engagement attenuates appetites, never physiology.
+            **chemical,
+            "visual_transient": self._orienting_signal(),
         }
+
+    def _chemical_signals(self) -> dict[str, float]:
+        """The body's measured neurochemical levels as drive channels.
+
+        Each of the 18 effective levels lands in the context as
+        ``chem_<name>`` so an urge can be driven by her actual
+        chemistry rather than a proxy for it — LC-NE for orienting,
+        BDNF for plasticity, adenosine/melatonin as sleep pressure
+        with negative weight. A body that can't be read contributes
+        nothing: missing signals carry no drive in either direction,
+        and an absent channel is never a fabricated zero.
+        """
+        try:
+            chemicals = self.client.get_state().chemicals
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.volition._chemical_signals", e)
+            return {}
+        return {
+            f"chem_{name}": min(1.0, max(0.0, float(level)))
+            for name, level in chemicals.items()
+        }
+
+    def _orienting_signal(self) -> float:
+        """The salient-transient channel — the superior colliculus pull.
+
+        ``orienting`` is the optic nerve's unsmoothed salient
+        transient: motion or a flash on the retina pulls the urge to
+        look the way a real orienting reflex does — a measured
+        channel, not a schedule. No eye means no pull.
+        """
+        try:
+            optic = self.client.get_optic_state()
+            if optic is None or not optic.eye_present:
+                return 0.0
+            return min(1.0, max(0.0, float(optic.orienting)))
+        except Exception as e:  # noqa: BLE001
+            note_swallowed("mind.volition._orienting_signal", e)
+            return 0.0
 
     def _drive_signals(self) -> dict[str, float]:
         """The maintenance-channel drive inputs, normalized to [0, 1].
@@ -486,6 +534,7 @@ class VolitionMixin:
             "self_sleep": self._perform_self_sleep,
             "self_mission": self._perform_self_mission,
             "learn": self._perform_learn,
+            "learn_code": self._perform_learn_code,
             "act": self._perform_act,
             "play": self._perform_play,
             "reach_out": self._perform_reach_out,
@@ -550,6 +599,7 @@ class VolitionMixin:
             "bug_scan",
             "improve",
             "create",
+            "learn_code",
         }
         if posture == LEARNING_POSTURE_PROTECTIVE:
             ready = [r for r in ready if r not in heavy_cpu]
@@ -786,6 +836,44 @@ class VolitionMixin:
         )
         self.learner.volition_grant()
 
+    def _perform_learn_code(self) -> None:
+        """Study her own source because the urge crossed threshold.
+
+        The /learn-code command is the same act on request; the urge
+        is her choosing it. The drive is chemical — BDNF is the
+        plasticity gate itself, ACh marks encoding-ready cortex, DA
+        is the wanting — so she studies when her body is in a
+        learning state, and the stress axis (cortisol/CRH) and sleep
+        pressure (adenosine) suppress it before the urge can form.
+        Each firing is one bounded bout, not a bulk import — the urge
+        must rebuild between study sessions.
+        """
+        if self._is_sleeping or self._is_meditating or self._is_teaching or self._is_gaming:
+            return
+        try:
+            from thalamus.brain_waves import BrainWave
+
+            waves = self.brain_waves()
+            if waves.dominant in (BrainWave.DELTA, BrainWave.THETA):
+                return  # consolidation state — encoding waits
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.volition._perform_learn_code",
+                e,
+            )
+        self._emit_volition_thought(
+            ("code", "self", "learning", "introspection"),
+            "thinking",
+        )
+        try:
+            self.learn_code(max_files=_LEARN_CODE_BOUT)
+            self.world.it_acted("studied its own source")
+        except Exception as e:  # noqa: BLE001
+            note_swallowed(
+                "mind.volition._perform_learn_code",
+                e,
+            )
+
     def _perform_act(self) -> None:
         """Form an intention and act on it with tools because the urge fired.
 
@@ -988,8 +1076,8 @@ class VolitionMixin:
 
     def _perform_speech(self) -> None:
         """Speak a queued utterance because the urge crossed its threshold."""
-        if self._is_sleeping:
-            return
+        if self._is_sleeping or self._is_gaming:
+            return  # in game mode she thinks — speech waits
         with self._speech_queue_lock:
             if not self._speech_queue:
                 return
@@ -1659,13 +1747,24 @@ class VolitionMixin:
         return None
 
     def _perform_look(self) -> None:
-        """Look around because the camera is a continuous sense.
+        """Look around because the look urge crossed its threshold.
+
+        The urge itself is a chemical drive — LC-NE orienting tone,
+        basal-forebrain ACh attentional gain, orexin/histamine wake
+        tone, and salient transients on the optic nerve pull it up;
+        adenosine and melatonin weigh it down. The cooldown bounds
+        the rate, it no longer sets it. The gates below remain the
+        hard veto: a crossed urge with closed eyes still sees nothing.
 
         Sleep-gated: no visual input during sleep — eyes are closed.
         Brain-wave gating (delta) is a secondary defense — N1/N2 can
         be alpha/theta-dominant.
+
+        Game-gated: while she is playing, her visual channel is the
+        game feed — frames arrive through ``world_step``, not the
+        retina. Looking around the room is off-task gaze wandering.
         """
-        if self._is_sleeping:
+        if self._is_sleeping or self._is_gaming:
             return
         if not self.vision.is_available():
             return

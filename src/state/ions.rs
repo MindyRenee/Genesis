@@ -164,6 +164,20 @@ const PUMP_CURRENT_EQUIV_MV: f32 =
 /// Half-saturation constants for Na⁺i and K⁺o pump activation.
 const NAK_KM_NA_I_MM: f32 = 10.0;
 const NAK_KM_K_O_MM: f32 = 1.5;
+/// Hill exponent for cooperative Na⁺i activation. The pump binds three
+/// cytosolic Na⁺ per cycle; measured activation is sigmoidal with an
+/// effective exponent of ~2–3 (Gadsby & Nakao 1989). The canonical
+/// reduced form used by Luo & Rudy (1994) and most neural models is
+/// `1/(1 + (Km/Na_i)^1.5)`.
+const NAK_NA_HILL: f32 = 1.5;
+/// Extracellular Na⁺ scale (mM) inside the Luo–Rudy voltage factor —
+/// sets the σ(Na_o) term of `f_NaK` (Luo & Rudy 1994).
+const NAK_NA_O_SCALE_MM: f32 = 67.3;
+/// Half-saturation of the pump's ATP dependence as a fraction of the
+/// normalized ATP pool. Physiological ATP saturates the pump
+/// (Km ≈ 0.1–0.5 mM against ~5 mM cytosolic ATP), so availability
+/// gates hyperbolically, not linearly.
+const NAK_KM_ATP: f32 = 0.15;
 
 /// Baseline outward Cl⁻ transport at the resting intracellular level.
 const CL_TRANSPORT_BASE_MM_PER_S: f32 = 0.010;
@@ -363,14 +377,28 @@ impl IonState {
             self.conductance[i] = finite_clamp(self.conductance[i], 0.0, 4.0);
         }
 
-        // Na⁺/K⁺-ATPase: 3 Na⁺ out, 2 K⁺ in per ATP. Occupancy terms make
-        // the pump self-limiting and responsive to Na⁺ load / K⁺ availability.
-        let na_occupancy = self.intracellular_mm[IonId::Sodium as usize]
-            / (self.intracellular_mm[IonId::Sodium as usize] + NAK_KM_NA_I_MM);
-        let ko_occupancy = self.extracellular_mm[IonId::Potassium as usize]
-            / (self.extracellular_mm[IonId::Potassium as usize] + NAK_KM_K_O_MM);
+        // Na⁺/K⁺-ATPase — Luo & Rudy (1994) forward rate:
+        //   i_p = Ī · f_NaK(V, Na_o) · 1/(1 + (Km_Na/Na_i)^1.5)
+        //         · K_o/(K_o + Km_K) · ATP/(ATP + Km_ATP)
+        // Three cytosolic Na⁺ sites make the Na⁺i drive cooperative
+        // (Hill 1.5) rather than single-site Michaelis; the electrogenic
+        // forward cycle accelerates with depolarization and with
+        // extracellular Na⁺ load — the pump speeds up under exactly the
+        // ionic influx it exists to reverse. ATP gates through a
+        // saturating Michaelis term; the previous linear factor made
+        // the pump stall far earlier than its real Km allows.
+        let na_i_conc = self.intracellular_mm[na_i].max(0.01);
+        let k_o_conc = self.extracellular_mm[k_i];
+        let na_o_conc = self.extracellular_mm[na_i];
+        let na_drive = 1.0 / (1.0 + (NAK_KM_NA_I_MM / na_i_conc).powf(NAK_NA_HILL));
+        let ko_drive = k_o_conc / (k_o_conc + NAK_KM_K_O_MM);
+        let v_over_rt_f = self.membrane_potential_mv / NERNST_FACTOR_MV;
+        let sigma = ((na_o_conc / NAK_NA_O_SCALE_MM).exp() - 1.0) / 7.0;
+        let f_nak = 1.0
+            / (1.0 + 0.1245 * (-0.1 * v_over_rt_f).exp() + 0.0365 * sigma * (-v_over_rt_f).exp());
+        let atp_drive = self.atp_availability / (self.atp_availability + NAK_KM_ATP);
         self.nak_pump_rate = finite_clamp(
-            NAK_MAX_RATE_MM_PER_S * na_occupancy * ko_occupancy * self.atp_availability,
+            NAK_MAX_RATE_MM_PER_S * na_drive * ko_drive * f_nak * atp_drive,
             0.0,
             NAK_MAX_RATE_MM_PER_S,
         );
@@ -656,3 +684,104 @@ const _: () = {
     assert!(offset_of!(IonState, energy_load) == 116);
     assert!(offset_of!(IonState, net_membrane_current) == 120);
 };
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Pump rate after one tick from the given state overrides.
+    fn pump_rate_with(f: impl Fn(&mut IonState)) -> f32 {
+        pump_rate_with_dt(0.1, f)
+    }
+
+    /// Pump rate after a tick of `dt` seconds — short `dt` keeps an
+    /// imposed voltage from relaxing before the rate is read.
+    fn pump_rate_with_dt(dt: f32, f: impl Fn(&mut IonState)) -> f32 {
+        let neuro = NeurochemicalVector::new(0);
+        let mut state = IonState::new();
+        f(&mut state);
+        state.tick(&neuro, dt);
+        state.nak_pump_rate
+    }
+
+    /// Intracellular Na⁺ load accelerates the pump — the cooperative
+    /// Hill drive exists precisely to meet the influx it reverses.
+    #[test]
+    fn nak_pump_accelerates_with_sodium_load() {
+        let rest = pump_rate_with(|_| {});
+        let loaded = pump_rate_with(|s| {
+            s.intracellular_mm[IonId::Sodium as usize] = 40.0;
+        });
+        assert!(
+            loaded > rest * 1.2,
+            "Na_i 40 mM should speed the pump: rest {rest} vs loaded {loaded}"
+        );
+    }
+
+    /// Depolarization raises the electrogenic forward rate (Luo–Rudy
+    /// `f_NaK`), so the pump runs faster at −20 mV than at rest.
+    /// Measured at 1 ms: the 25 ms membrane time constant would relax
+    /// an imposed voltage back toward rest inside a full tick.
+    #[test]
+    fn nak_pump_accelerates_on_depolarization() {
+        let rest = pump_rate_with_dt(0.001, |_| {});
+        let depol = pump_rate_with_dt(0.001, |s| s.membrane_potential_mv = -20.0);
+        assert!(
+            depol > rest * 1.2,
+            "depolarized pump should run faster: rest {rest} vs depol {depol}"
+        );
+    }
+
+    /// The dynamic chain end-to-end: elevated glutamate opens Na⁺
+    /// conductance, the chord equation depolarizes the membrane, and
+    /// the voltage factor accelerates the pump — driven by the model's
+    /// own trajectory, not an imposed field.
+    #[test]
+    fn nak_pump_follows_glutamate_driven_depolarization() {
+        use crate::state::neurochemical::NeuroTickParams;
+
+        let neuro_rest = NeurochemicalVector::new(0);
+        let mut rest_state = IonState::new();
+        rest_state.tick(&neuro_rest, 0.1);
+        let rest = rest_state.nak_pump_rate;
+
+        let mut neuro_glu = NeurochemicalVector::new(0);
+        neuro_glu.apply_impulse_capped(NeurochemicalId::Glutamate, 2.0, 0);
+        // Impulses touch level/velocity directly; one neuro tick
+        // refreshes effective levels so the ion layer sees the drive.
+        neuro_glu.tick_with_params(&NeuroTickParams::DEFAULT);
+        let mut glu_state = IonState::new();
+        glu_state.tick(&neuro_glu, 0.3);
+
+        // The K⁺-bucket split of the synaptic cation conductance
+        // opposes part of the depolarization, so the achieved ΔV is
+        // modest — assert the chain, not an arbitrary magnitude:
+        // the membrane depolarized and the pump tracked its live
+        // voltage rather than a static resting factor.
+        assert!(
+            glu_state.membrane_potential_mv > rest_state.membrane_potential_mv + 1.0,
+            "glutamate drive should depolarize: rest {:.1} mV vs driven {:.1} mV",
+            rest_state.membrane_potential_mv,
+            glu_state.membrane_potential_mv
+        );
+        assert!(
+            glu_state.nak_pump_rate > rest,
+            "depolarized pump should outrun rest: {rest} vs {}",
+            glu_state.nak_pump_rate
+        );
+    }
+
+    /// ATP gates the pump hyperbolically: severe depletion slows but
+    /// does not stall it — a linear gate would zero the pump at low
+    /// ATP and erase the gradient outright.
+    #[test]
+    fn nak_pump_atp_gate_is_saturating_not_linear() {
+        let healthy = pump_rate_with(|_| {});
+        let depleted = pump_rate_with(|s| s.atp_availability = 0.1);
+        assert!(depleted > 0.0, "pump must not stall outright at ATP 0.1");
+        assert!(
+            depleted < healthy,
+            "depleted ATP should slow the pump: {depleted} vs {healthy}"
+        );
+    }
+}

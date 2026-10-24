@@ -312,9 +312,10 @@ class SleepCompressor:
             )
 
         def _save_step() -> dict[str, int | float]:
-            self._maybe_rebuild_holographic_graph(network)
+            hg_stats = self._maybe_rebuild_holographic_graph(network)
             self._save()
-            return {"saved": 1}
+            hg_stats["saved"] = 1
+            return hg_stats
 
         steps.append(("save", _save_step))
         return steps
@@ -374,65 +375,63 @@ class SleepCompressor:
         steps.append(("merge_candidates", _merge_count))
         return steps
 
-    def _maybe_rebuild_holographic_graph(self, network: ConceptNetwork) -> None:
-        """Periodically rebuild the holographic graph from current bridge
-        edges to clear accumulated additive-superposition noise.
+    def _maybe_rebuild_holographic_graph(self, network: ConceptNetwork) -> dict[str, float]:
+        """Periodically rebuild the holographic graph from its journal
+        to clear accumulated additive-superposition noise.
 
         The holographic graph uses circular convolution binding, and
-        repeated ``add_edges`` calls accumulate interference. Rebuilding
-        from a clean state every ~10 compression passes restores signal
-        clarity.
+        repeated ``add`` calls accumulate interference — duplicates
+        reinforce in memory and journal evictions leave ghost bindings.
+        Rebuilding from the journal every ~10 compression passes
+        re-encodes the clean, deduplicated association set and restores
+        SNR. The journal is the rebuild source because holographic
+        memory cannot enumerate its contents, and materialized bridge
+        edges in ``network.edges`` are nearly always absent — the old
+        scan rebuilt from an empty list every time, so the memory only
+        ever grew. ``network`` is retained for signature compatibility.
         """
+        stats: dict[str, float] = {}
         self._compress_cycle = getattr(self, "_compress_cycle", 0) + 1
-        if self._compress_cycle % 10 == 0 and self.holographic_graph.edge_count > 0:
+        journal_size = self.holographic_graph.distinct_edges
+        # Saturation trigger: raw adds beyond ~2× the journal's capacity
+        # are ghost/duplicate bindings — LTM compaction alone can add
+        # ~57K pairs a pass, so waiting 10 cycles lets the memory
+        # drown its journaled signal long before the cadence fires.
+        saturated = (
+            journal_size > 0
+            and self.holographic_graph.edge_count > self.holographic_graph.journal_cap * 2
+        )
+        if (self._compress_cycle % 10 == 0 or saturated) and self.holographic_graph.edge_count > 0:
             try:
-                # Rebuild from the current bridge edges in the network
-                from temporal_lobe.concepts import _BRIDGE_ORIGINS
-
-                all_bridge_edges: list[tuple[str, str, str, float]] = []
-                for edge in network.edges:
-                    if edge.origin in _BRIDGE_ORIGINS:
-                        rel = (
-                            edge.relation.value
-                            if hasattr(edge.relation, "value")
-                            else str(edge.relation)
-                        )
-                        all_bridge_edges.append((edge.source, rel, edge.target, edge.weight))
-                # Do NOT rebuild from an empty set. `rebuild_from_edges`
-                # starts with `clear()`, so an empty rebuild wipes the
-                # graph — and the outer guard checks the holographic
-                # graph's *pre-rebuild* edge count, not whether any
-                # bridge edges exist, so it passes and then destroys
-                # the store.
-                #
-                # Empty is the common case, not a corner case: most of
-                # _BRIDGE_ORIGINS ("semantic_bridge", "hub_attachment",
-                # "associative_bridge", "bridge") are also in
-                # DERIVABLE_ORIGINS, and derivable edges are never
-                # materialized — the edge log rejects them at add_edge
-                # and they are filtered on spill and recall. So
-                # network.edges rarely holds any of them, and every
-                # ~10th compression cycle was discarding the
-                # holographic memory it was meant to restore.
-                if not all_bridge_edges:
+                # Do NOT rebuild from an empty journal — the guard
+                # checks the holographic graph's *pre-rebuild* edge
+                # count, and a journalless legacy load would pass it
+                # and then clear() would destroy the store.
+                rebuilt = self.holographic_graph.rebuild_from_journal()
+                if rebuilt == 0:
                     logger.debug(
-                        "Skipping holographic rebuild at cycle %d: no "
-                        "materialized bridge edges (derivable origins are "
-                        "never stored). Graph left intact.",
+                        "Skipping holographic rebuild at cycle %d: "
+                        "journal is empty (pre-journal state or nothing "
+                        "bound yet). Graph left intact.",
                         self._compress_cycle,
                     )
-                    return
-                self.holographic_graph.rebuild_from_edges(all_bridge_edges)
+                    return stats
+                stats["hg_rebuilt"] = 1.0
+                stats["hg_distinct_edges"] = float(rebuilt)
+                stats["hg_snr_estimate"] = self.holographic_graph.snr_estimate
                 logger.info(
-                    "Rebuilt holographic graph from %d edges (cycle %d)",
-                    len(all_bridge_edges),
+                    "Rebuilt holographic graph from %d journaled edges "
+                    "(cycle %d, snr ~%.2f)",
+                    rebuilt,
                     self._compress_cycle,
+                    self.holographic_graph.snr_estimate,
                 )
             except Exception as e:  # noqa: BLE001
                 note_swallowed(
                     "temporal_lobe.compression._maybe_rebuild_holographic_graph",
                     e,
                 )
+        return stats
 
     # ─── Phase 2: Holographize ──────────────────────────────────
 

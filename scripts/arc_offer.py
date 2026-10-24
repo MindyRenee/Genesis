@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -47,28 +46,7 @@ HINT = "Find the rule the example grids share and apply it to the new grid."
 _SHELVE_AFTER = 8
 
 
-def _default_data_dir() -> Path:
-    """Resolve the data dir the way run.sh does.
-
-    Precedence: GENESIS_DATA_DIR, then the checkout's .genesis-data-dir
-    pin, then XDG_DATA_HOME, then ~/.local/share. The pin outranks
-    XDG_DATA_HOME because the latter is ambient launcher environment,
-    not Genesis config — a sandboxed host sets it, which would
-    otherwise point --stage/--topup at a sibling instance's
-    offered_games/.
-    """
-    # Blank counts as unset, matching run.sh and config.py.
-    explicit = (os.environ.get("GENESIS_DATA_DIR") or "").strip()
-    if explicit:
-        return Path(explicit)
-    pin = Path(__file__).resolve().parent.parent / ".genesis-data-dir"
-    if pin.is_file():
-        pinned = pin.read_text().splitlines()[0].strip()
-        if pinned:
-            return Path(pinned)
-    xdg = os.environ.get("XDG_DATA_HOME")
-    base = Path(xdg) if xdg else Path.home() / ".local" / "share"
-    return base / "genesis"
+from infrastructure.config import default_data_dir  # noqa: E402
 
 
 def _pairs(seq: object) -> list[list[list[list[int]]]]:
@@ -182,7 +160,7 @@ def main() -> int:
     ap.add_argument(
         "--data-dir",
         type=Path,
-        default=_default_data_dir(),
+        default=default_data_dir(),
         help="her data dir (default: GENESIS_DATA_DIR or XDG)",
     )
     ap.add_argument(

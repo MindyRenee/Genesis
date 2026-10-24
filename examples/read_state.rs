@@ -3,7 +3,7 @@ use genesis::state::neurochemical::NeurochemicalId;
 use genesis::store::mmap_state::MmapState;
 
 fn main() {
-    // Resolution lives in one place so it cannot drift from run.sh or
+    // Resolution lives in one place so it cannot drift from genesis or
     // the other tools; see genesis::data_dir.
     let path = genesis::data_dir().join("core_state.bin");
     let path = path.to_string_lossy().into_owned();

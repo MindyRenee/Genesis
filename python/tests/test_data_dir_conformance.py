@@ -1,33 +1,25 @@
-"""Every data-dir resolver must return the same answer.
+"""There is exactly one state directory, and every site lands on it.
 
-Genesis resolves its state directory in a dozen places: the launcher, the
-maintenance scripts, the installer, the Python side, and the Rust
-examples. Each was written independently, and they drifted. That drift is
-not cosmetic — when a launcher (Flatpak, a sandboxed agent host) sets
-``XDG_DATA_HOME`` to its own private directory, a resolver that honors it
-attaches the checkout to a *second*, empty state directory while the rest
-of the tooling reads the first. Two instances then accumulate divergent
-concepts, edges, and journals.
+The canonical location is ``~/.local/share/genesis``; the only override
+is ``GENESIS_DATA_DIR`` (development and testing). There is no pin file
+and no ``XDG_DATA_HOME`` step: ambient environment must never be able to
+point one component at a second state tree while the rest read the
+first — that is how this checkout once forked into two divergent
+directories for six days, ~8.7k concepts and 8 projects landing in a
+directory under ``~/.var/app/`` that nothing was monitoring.
 
-That is not hypothetical: this checkout forked for six days, ~8.7k
-concepts and 8 projects landing in a directory under ``~/.var/app/``
-that nothing was monitoring, while the original looked (and reported) as
-though it had simply never archived anything.
+This module asserts the invariant three ways:
 
-So the rule is one ordered list, and this module is what enforces it:
+1. Every resolution site — ``genesis``, ``config.py``, and every tool
+   that computes a default — returns the same answer under a
+   deliberately hostile environment (``XDG_DATA_HOME`` set to a foreign
+   path must be *ignored* by all of them, identically).
+2. A text-level sweep: nothing in the tree may read
+   ``.genesis-data-dir`` or use ``XDG_DATA_HOME`` for the state dir —
+   that is how a fork mechanism would be reintroduced.
+3. The pin file itself must not exist in this checkout.
 
-1. ``GENESIS_DATA_DIR`` — explicit override, always wins.
-2. ``.genesis-data-dir`` — the checkout's uncommitted pin. Its contents
-   are the data dir itself, not a parent of it.
-3. ``$XDG_DATA_HOME/genesis``.
-4. ``~/.local/share/genesis``.
-
-The pin outranks ``XDG_DATA_HOME`` precisely because ``XDG_DATA_HOME`` is
-ambient environment, not Genesis configuration.
-
-If this file starts failing after an unrelated change, a resolver drifted
-— fix the resolver, not this test. The Rust side has the mirrored test
-suite in ``src/data_dir.rs``.
+The Rust side has the mirrored unit tests in ``src/data_dir.rs``.
 """
 
 from __future__ import annotations
@@ -40,12 +32,8 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[2]
 PIN_NAME = ".genesis-data-dir"
-
-# A checkout that is not this one. Each case below combines a pin, an
-# explicit override, and a hostile ambient XDG so that any resolver which
-# honors the wrong input disagrees with the others.
-PIN_FALLBACK = "/state/pinned-checkout"
 HOSTILE_XDG = "/sandbox/private/data"
+CANONICAL = "/home/tester/.local/share/genesis"
 
 
 def _run(cmd: list[str], env: dict[str, str], cwd: Path | None = None) -> str:
@@ -82,9 +70,9 @@ def _base_env(**overrides: str | None) -> dict[str, str]:
 # Each returns the data directory it would use, given the environment.
 
 
-def resolve_run_sh(env: dict[str, str]) -> str:
-    """run.sh — the launcher, and the authority for the order."""
-    source = (REPO / "run.sh").read_text()
+def resolve_launcher(env: dict[str, str]) -> str:
+    """genesis — the interactive launcher."""
+    source = (REPO / "genesis").read_text()
     # The resolution lives before argument parsing; everything after it
     # starts or stops processes.
     header = source.split("# ─── Parse arguments", 1)[0]
@@ -93,58 +81,6 @@ def resolve_run_sh(env: dict[str, str]) -> str:
         env,
     )
     return out.strip()
-
-
-def resolve_hygiene_sh(env: dict[str, str]) -> str:
-    """scripts/hygiene.sh — decides what it cleans."""
-    out = _run([str(REPO / "scripts/hygiene.sh"), "--data-dir"], env)
-    return out.strip()
-
-
-def resolve_prune_dead_concepts(env: dict[str, str]) -> str:
-    """scripts/prune_dead_concepts.py — deletes concepts."""
-    return _python_default(REPO / "scripts/prune_dead_concepts.py", env, "_default_data_dir")
-
-
-def resolve_migrate_edges(env: dict[str, str]) -> str:
-    """scripts/migrate_edges_to_log.py — rewrites the canonical edge log."""
-    return _python_default(
-        REPO / "scripts/migrate_edges_to_log.py",
-        env,
-        "_default_data_dir",
-    )
-
-
-def resolve_abstraction_gradient(env: dict[str, str]) -> str:
-    """eval/abstraction_gradient.py — reads the canonical edge log."""
-    return _python_default(
-        REPO / "eval/abstraction_gradient.py",
-        env,
-        "_default_data_dir",
-    )
-
-
-def resolve_arc_offer(env: dict[str, str]) -> str:
-    """scripts/arc_offer.py — writes offered-game specs."""
-    return _python_default(REPO / "scripts/arc_offer.py", env, "_default_data_dir")
-
-
-def resolve_arc_play_evidence(env: dict[str, str]) -> str:
-    """scripts/arc_play_evidence.py — reads gameplay state."""
-    return _python_default(
-        REPO / "scripts/arc_play_evidence.py",
-        env,
-        "_default_data_dir",
-    )
-
-
-def resolve_discord_pulse(env: dict[str, str]) -> str:
-    """scripts/discord_pulse.py — reads journal/state for pulse posts."""
-    return _python_default(
-        REPO / "scripts/discord_pulse.py",
-        env,
-        "_default_data_dir",
-    )
 
 
 def resolve_config_py(env: dict[str, str]) -> str:
@@ -187,40 +123,29 @@ def resolve_vosk_dir_shell(env: dict[str, str]) -> str:
     return out.strip()
 
 
-def _python_default(script: Path, env: dict[str, str], attr: str) -> str:
-    """Read a module-level default resolver without running its main()."""
-    out = _run(
-        [
-            "python3",
-            "-c",
-            f"import importlib.util, sys;"
-            f"sys.path[:0] = ['python', '.'];"
-            f"spec = importlib.util.spec_from_file_location('m', {str(script)!r});"
-            f"m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m);"
-            f"print(getattr(m, {attr!r})())",
-        ],
-        env,
-    )
-    return out.strip()
-
-
-# The resolvers that answer "which data directory?", i.e. those that must
-# agree exactly with run.sh.
+# The two real implementations of the rule — the shell launcher and
+# the in-process Python resolver. Everything else must delegate to one
+# of these; it is checked for delegation below, not re-tested.
 DIR_RESOLVERS = {
-    "run.sh": resolve_run_sh,
-    "hygiene.sh": resolve_hygiene_sh,
-    "prune_dead_concepts.py": resolve_prune_dead_concepts,
-    "migrate_edges_to_log.py": resolve_migrate_edges,
+    "genesis": resolve_launcher,
     "config.py": resolve_config_py,
     "setup_embeddings.py": resolve_setup_embeddings,
-    "abstraction_gradient.py": resolve_abstraction_gradient,
-    "arc_offer.py": resolve_arc_offer,
-    "arc_play_evidence.py": resolve_arc_play_evidence,
-    "discord_pulse.py": resolve_discord_pulse,
 }
 
-# Asset resolvers legitimately answer "which directory holds <asset>?",
-# so they are the data dir plus a subpath — checked separately.
+# Tools that must reach the data dir through the shared resolver —
+# a private reimplementation is how forks start.
+DELEGATORS = {
+    "scripts/arc_offer.py": "default_data_dir",
+    "scripts/arc_play_evidence.py": "default_data_dir",
+    "scripts/discord_pulse.py": "default_data_dir",
+    "scripts/restore_archived_dreams.py": "default_data_dir",
+    "scripts/recover_pruned_concepts.py": "default_data_dir",
+    "eval/abstraction_gradient.py": "default_data_dir",
+    "setup_embeddings.py": "default_data_dir",
+}
+
+# Asset installers place content inside the resolved data dir — checked
+# as data dir plus subpath.
 ASSET_RESOLVERS = {
     "install_optional_deps.sh (vosk)": (resolve_vosk_dir_shell, "vosk-models"),
 }
@@ -232,64 +157,32 @@ ASSET_RESOLVERS = {
 def _cases() -> list[tuple[str, dict[str, str | None], str]]:
     """(name, env overrides, expected data dir).
 
-    Only pin-present configurations are exercised against the real
-    resolvers, because a pin cannot be relocated for them: the shell ones
-    resolve ``.genesis-data-dir`` against the repository root and the
-    Python ones against ``__file__``. That is also the configuration that
-    actually broke — the fork only ever happened to a pinned checkout.
-
-    The unpinned fallbacks are covered exhaustively by the pure-function
-    tests in ``src/data_dir.rs``, which need no repository at all.
+    The hostile ``XDG_DATA_HOME`` must be ignored identically by every
+    resolver — a process launched by a sandboxed host must land on the
+    canonical directory like everything else.
     """
     return [
         (
-            "hostile XDG_DATA_HOME must not beat the pin",
+            "hostile XDG_DATA_HOME is ignored — canonical wins",
             {"XDG_DATA_HOME": HOSTILE_XDG},
-            PINNED,
+            CANONICAL,
         ),
         (
-            "explicit GENESIS_DATA_DIR beats the pin",
+            "explicit GENESIS_DATA_DIR is the only override",
             {"GENESIS_DATA_DIR": "/state/explicit", "XDG_DATA_HOME": HOSTILE_XDG},
             "/state/explicit",
         ),
         (
-            "blank GENESIS_DATA_DIR is treated as unset, so the pin wins",
+            "blank GENESIS_DATA_DIR is treated as unset",
             {"GENESIS_DATA_DIR": "   ", "XDG_DATA_HOME": HOSTILE_XDG},
-            PINNED,
+            CANONICAL,
         ),
         (
-            "no XDG_DATA_HOME at all still resolves to the pin",
+            "no XDG_DATA_HOME at all still resolves canonical",
             {"XDG_DATA_HOME": None},
-            PINNED,
+            CANONICAL,
         ),
     ]
-
-
-def _real_pin() -> str:
-    """The pin this checkout holds, or the test pin a clean clone gets."""
-    try:
-        text = (REPO / PIN_NAME).read_text().splitlines()
-    except FileNotFoundError:
-        return PIN_FALLBACK
-    assert text, f"{PIN_NAME} is empty; it must name the data directory"
-    return text[0].strip()
-
-
-# Every case below assumes a pinned checkout. A development checkout may
-# carry its own ignored pin; a clean clone gets the same contract through
-# a temporary test pin that is removed afterward.
-PINNED = _real_pin()
-
-
-@pytest.fixture(scope="module", autouse=True)
-def _checkout_pin():
-    pin = REPO / PIN_NAME
-    existed = pin.exists()
-    if not existed:
-        pin.write_text(f"{PINNED}\n")
-    yield
-    if not existed:
-        pin.unlink(missing_ok=True)
 
 
 @pytest.mark.parametrize(
@@ -302,21 +195,19 @@ def test_resolvers_agree(
     overrides: dict[str, str | None],
     expected: str,
 ) -> None:
-    """Every resolver returns run.sh's answer, under every environment."""
+    """Every resolver returns the same answer under every environment."""
     env = _base_env(**dict(overrides))
 
-    results: dict[str, str] = {}
     for name, resolver in DIR_RESOLVERS.items():
-        results[name] = resolver(env)
-        assert results[name] == expected, (
+        got = resolver(env)
+        assert got == expected, (
             f"{name} disagrees under '{case}'.\n"
             f"  expected: {expected}\n"
-            f"  got:      {results[name]}\n"
+            f"  got:      {got}\n"
             f"  env:      GENESIS_DATA_DIR={env.get('GENESIS_DATA_DIR')!r} "
             f"XDG_DATA_HOME={env.get('XDG_DATA_HOME')!r}\n"
-            f"  Every resolver must implement run.sh's order; see the module "
-            f"docstring for what that order is and why the pin outranks "
-            f"XDG_DATA_HOME."
+            f"  There is one rule — GENESIS_DATA_DIR else "
+            f"~/.local/share/genesis — and every site implements it."
         )
 
 
@@ -330,7 +221,7 @@ def test_asset_resolvers_live_under_the_data_dir(
     overrides: dict[str, str | None],
     expected: str,
 ) -> None:
-    """Asset directories sit inside the resolved data dir, not beside it."""
+    """Asset install targets sit inside the resolved data dir."""
     env = _base_env(**dict(overrides))
 
     for name, (resolver, subdir) in ASSET_RESOLVERS.items():
@@ -338,53 +229,59 @@ def test_asset_resolvers_live_under_the_data_dir(
         assert got == f"{expected}/{subdir}", (
             f"{name} points outside the data dir under '{case}'.\n"
             f"  expected: {expected}/{subdir}\n"
-            f"  got:      {got}\n"
-            f"  An asset read from another instance's directory is the bug "
-            f"that made this checkout's microphone depend on a sibling "
-            f"instance having a model."
+            f"  got:      {got}"
         )
 
 
-def test_every_resolver_in_the_repo_is_covered() -> None:
-    """A new resolver must be added here, or this test is incomplete.
+def test_tools_delegate_rather_than_resolve() -> None:
+    """Every tool that needs the data dir imports the shared resolver.
 
-    Greps the tree for anything that mentions the state directory and
-    fails if it is not one of the resolvers exercised above. Without this,
-    someone could add a tenth resolver, get the precedence wrong, and
-    the other nine would still agree — so the suite would stay green
-    while the bug came back.
+    A private reimplementation — however small — is how the resolvers
+    drifted into a fork in the first place. Each delegator must import
+    ``default_data_dir`` and define no ``_default_data_dir`` of its own.
     """
-    known = {
-        "run.sh",
-        "hygiene.sh",
-        "prune_dead_concepts.py",
-        "migrate_edges_to_log.py",
-        "install_optional_deps.sh",
-        "config.py",
-        "setup_embeddings.py",
-        "read_state.rs",
-        "recover.rs",
-        "merge_data_dirs.py",
-        "data_dir.rs",
-        "test_data_dir_conformance.py",
-        "genesis_cli.py",
-        "ltm_index.py",
-        "abstraction_gradient.py",
-        "discord_pulse.py",  # GENESIS_DATA_DIR default resolution
-        "arc_play_evidence.py",
-        "arc_offer.py",
-    }
-    # Files that reference the location without resolving it: this test,
-    # the Rust resolver (mirrored test suite), and a client docstring
-    # whose example hardcodes a socket path in a usage example.
+    for rel, symbol in DELEGATORS.items():
+        text = (REPO / rel).read_text()
+        assert f"import {symbol}" in text or f"import {symbol} " in text, (
+            f"{rel} does not import {symbol} — it must delegate to the "
+            "shared resolver, not carry its own."
+        )
+        assert "def _default_data_dir" not in text, (
+            f"{rel} defines a private _default_data_dir — delegate to "
+            "infrastructure.config.default_data_dir instead."
+        )
+
+
+def test_no_pin_file_exists() -> None:
+    """The pin mechanism is gone — the file must not exist either.
+
+    A leftover or reintroduced `.genesis-data-dir` is dead configuration
+    that looks live; its absence is part of the one-directory invariant.
+    """
+    assert not (REPO / PIN_NAME).exists(), (
+        f"{PIN_NAME} exists — the pin mechanism was removed; delete the "
+        "file. State lives in the canonical directory, only overridable "
+        "by GENESIS_DATA_DIR."
+    )
+
+
+def test_nothing_reads_pin_or_xdg_for_state() -> None:
+    """No source file may reintroduce the fork mechanism.
+
+    Sweeps .py/.sh/.rs for the two things that split her state: the
+    pin-file name and XDG_DATA_HOME used for the *data dir*. XDG for
+    non-state assets (man pages, model candidates) is allowed and
+    allowlisted by file below.
+    """
+    # Files whose XDG_DATA_HOME use is for non-state assets only —
+    # each was verified by hand when added here.
     allowed = {
-        "test_data_dir_conformance.py",
-        "data_dir.rs",
-        "__init__.py",  # genesis_client usage example in the module docstring
-        "install.sh",  # names the default in user-facing output, never resolves it
-        "verify_change.sh",  # names the workspace path in a comment only
-        "learning.py",  # resolves $XDG_DATA_HOME/man for man pages, never the data dir
-        "man_review.py",  # same — resolves $XDG_DATA_HOME/man, not the data dir
+        "config.py",  # vosk_model_dir asset candidates, not the data dir
+        "man_review.py",  # resolves $XDG_DATA_HOME/man for man pages
+        "learning.py",  # same — man-page location, never the data dir
+        "install.sh",  # MAN_HOME only — the user man dir genuinely is XDG
+        "data_dir.rs",  # docstring documents the mechanism's absence
+        "test_data_dir_conformance.py",  # this file
     }
 
     suspicious: list[str] = []
@@ -395,32 +292,71 @@ def test_every_resolver_in_the_repo_is_covered() -> None:
         parts = rel.parts
         if parts[0] in {"target", "build", ".git", "tests"} or parts[0].startswith(".venv"):
             continue
-        if parts[0] == "python" and parts[1:2] == ("tests",):
+        if parts[0] == "python" and parts[1:2] == ("tests",) and rel.name in allowed:
             continue
-        if rel.name in allowed or rel.name in known:
+        if rel.name in allowed:
             continue
         try:
             text = path.read_text()
         except (UnicodeDecodeError, OSError):
             continue
-        if ".local/share/genesis" in text or "XDG_DATA_HOME" in text:
-            suspicious.append(str(rel))
+        if PIN_NAME in text:
+            suspicious.append(f"{rel} (reads {PIN_NAME})")
+        elif "XDG_DATA_HOME" in text:
+            suspicious.append(f"{rel} (uses XDG_DATA_HOME)")
 
     assert not suspicious, (
-        "These files reference the state directory but are not covered by "
-        "this conformance test. If one of them resolves the directory, add "
-        f"it to DIR_RESOLVERS or ASSET_RESOLVERS: {suspicious}"
+        "These files reference the pin file or XDG_DATA_HOME — the fork "
+        "mechanism must not be reintroduced. If the reference is for a "
+        "non-state asset, verify it by hand and allowlist the file: "
+        f"{suspicious}"
     )
 
 
-def test_pin_file_contents_are_the_dir_not_a_parent() -> None:
-    """A pin naming a parent directory is a config error worth catching.
+def test_only_one_inbound_listener() -> None:
+    """The daemon's Unix socket is the only outside entrance — ever.
 
-    run.sh assigns the pin straight to GENESIS_DATA_DIR, so a trailing
-    slash or a `.../share` value silently becomes the data dir. Cheap to
-    assert the shape the rest of the system assumes.
+    Everything that reaches the organism — mind, CLI, tools — connects
+    to the one UnixListener bound at <data_dir>/genesis.sock. A second
+    inbound listener (Unix or TCP, any layer) would be a second door
+    into the body and must never appear. Outbound sockets (the local
+    IP probe, websocket clients) are fine — they cannot accept a
+    connection. The retina's shared memory is afferent data, not an
+    entrance: no command can travel it, and the gate on it arrives
+    through the socket.
     """
-    value = _real_pin()
-    assert value == PINNED
-    assert not value.endswith("/"), "a trailing slash is a parent, not a dir"
-    assert os.path.isabs(value), "the pin must be an absolute path"
+    binds: list[str] = []
+    listens: list[str] = []
+    for path in REPO.rglob("*"):
+        if not path.is_file() or path.suffix not in {".rs", ".py"}:
+            continue
+        rel = path.relative_to(REPO)
+        parts = rel.parts
+        if (
+            parts[0] in {"target", "build", ".git", "tests"}
+            or parts[0].startswith(".venv")
+            or rel.name == "test_data_dir_conformance.py"
+        ):
+            continue
+        try:
+            text = path.read_text()
+        except (UnicodeDecodeError, OSError):
+            continue
+        # Any listener bind anywhere in the body crate or the mind —
+        # there may only ever be the one in daemon/ipc.rs.
+        for line_no, line in enumerate(text.splitlines(), 1):
+            if "UnixListener::bind" in line or "TcpListener" in line:
+                binds.append(str(rel))
+            # Python-side socket .listen( — a bare word followed by
+            # the call, so recognizer self.listen(...) can't match.
+            if ".listen(" in line and "socket" in line.lower():
+                listens.append(f"{rel}:{line_no}")
+
+    assert binds == ["src/daemon/ipc.rs"], (
+        "Inbound listener binds moved or multiplied — the organism has "
+        f"exactly one entrance, <data_dir>/genesis.sock: {binds}"
+    )
+    assert not listens, (
+        "A Python file opens a listening socket — inbound connections "
+        f"only ever arrive through the daemon's Unix socket: {listens}"
+    )

@@ -75,12 +75,11 @@ class _Readiness(Protocol):
 
 
 class _PlayerMind(Protocol):
-    """The mind contract this loop consumes.
+    """The mind contract this loop consumes — her, and only her.
 
-    ``Mind`` satisfies it; so does the named reference policy in
-    ``world/arc_baseline.py`` — the denominator runs through the
-    same loop by wearing the same face, which is what makes its
-    number comparable to hers.
+    ``Mind`` satisfies it. There is one mind; the loop is never
+    driven by a reference policy or a second entity wearing the
+    same face.
     """
 
     @property

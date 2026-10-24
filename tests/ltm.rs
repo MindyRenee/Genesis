@@ -1063,3 +1063,180 @@ fn test_meta_memory_episodes_stay_out_of_bundles() {
     assert_eq!(bundles.episode_count(), 1);
     cleanup(&base);
 }
+
+#[test]
+fn test_archive_unbundles_episode() {
+    // Archiving removes the episode from the active set — its SDR
+    // must leave the superposition with it. Before the unbundle
+    // path existed, every archive left dead weight that the next
+    // startup reconciliation rebuilt away on every boot.
+    let base = temp_base("archive_unbundle");
+    let mut store = LtmStore::create(&base, 64).unwrap();
+    let id = store
+        .store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "real episode about the Great Salt Lake",
+        )
+        .unwrap();
+    store
+        .store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            9,
+            "dream insight",
+        )
+        .unwrap();
+    drop(store);
+    let bundles = BundleStore::open(base.with_extension("bundles")).unwrap();
+    assert_eq!(bundles.episode_count(), 1);
+    drop(bundles);
+
+    let mut store = LtmStore::open(&base).unwrap();
+    store.archive(id).expect("archive");
+    drop(store);
+
+    // bundle_count tracks the bundled set, not every stored ID —
+    // archive is the moment this episode leaves it.
+    let bundles = BundleStore::open(base.with_extension("bundles")).unwrap();
+    assert_eq!(bundles.episode_count(), 0);
+    cleanup(&base);
+}
+
+#[test]
+fn test_delete_unbundles_episode() {
+    let base = temp_base("delete_unbundle");
+    let mut store = LtmStore::create(&base, 64).unwrap();
+    let id = store
+        .store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "real episode about the Great Salt Lake",
+        )
+        .unwrap();
+    store
+        .store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "another real episode",
+        )
+        .unwrap();
+    drop(store);
+    let bundles = BundleStore::open(base.with_extension("bundles")).unwrap();
+    assert_eq!(bundles.episode_count(), 2);
+    drop(bundles);
+
+    let mut store = LtmStore::open(&base).unwrap();
+    store.delete(id).expect("delete");
+    drop(store);
+
+    let bundles = BundleStore::open(base.with_extension("bundles")).unwrap();
+    assert_eq!(bundles.episode_count(), 1);
+    cleanup(&base);
+}
+
+#[test]
+fn test_delete_of_archived_does_not_double_unbundle() {
+    // An archived episode's SDR was already subtracted when it left
+    // the active set. Deleting it afterwards must not subtract
+    // again — a second subtraction would corrupt the shared
+    // superposition and under-count the bundled set.
+    let base = temp_base("archive_delete");
+    let mut store = LtmStore::create(&base, 64).unwrap();
+    let id = store
+        .store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "real episode about the Great Salt Lake",
+        )
+        .unwrap();
+    store
+        .store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "another real episode",
+        )
+        .unwrap();
+    store.archive(id).expect("archive");
+    drop(store);
+    let bundles = BundleStore::open(base.with_extension("bundles")).unwrap();
+    assert_eq!(bundles.episode_count(), 1);
+    drop(bundles);
+
+    let mut store = LtmStore::open(&base).unwrap();
+    store.delete(id).expect("delete archived");
+    drop(store);
+
+    let bundles = BundleStore::open(base.with_extension("bundles")).unwrap();
+    assert_eq!(
+        bundles.episode_count(),
+        1,
+        "deleting an archived episode must not double-subtract its SDR"
+    );
+    cleanup(&base);
+}
+
+#[test]
+fn test_store_meta_non_auto_module_unbundles() {
+    // store_meta with a non-auto module (e.g. 4, Language — not in
+    // the 0/5/8/9 auto set) goes through store(), which bundles the
+    // SDR before the meta flag is applied. The flag path must back
+    // the contribution out or every store_meta call leaves dead
+    // weight the startup reconciliation rebuilds away.
+    let base = temp_base("store_meta_unbundle");
+    let mut store = LtmStore::create(&base, 64).unwrap();
+    store
+        .store(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "real episode",
+        )
+        .unwrap();
+    store
+        .store_meta(
+            0,
+            0.5,
+            make_full_tag(),
+            make_compact_tag(),
+            0,
+            4,
+            "language-module bookkeeping trace",
+        )
+        .unwrap();
+    drop(store);
+
+    let bundles = BundleStore::open(base.with_extension("bundles")).unwrap();
+    assert_eq!(
+        bundles.episode_count(),
+        1,
+        "store_meta on a non-auto module must not leave its SDR bundled"
+    );
+    cleanup(&base);
+}

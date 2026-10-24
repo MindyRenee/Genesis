@@ -1326,11 +1326,8 @@ in replayable recordings published in the companion evaluation
 repository. Each result discloses how much experience it carried in
 (\code{prior\_learning}: none / loaded / suppressed / unknown) and the
 step cost of each completed level (\code{level\_steps}), the honest
-form of the within-game learning curve. Reference policies
-(\code{/arc --baseline uniform|first}) measure the random and
-first-action floors through the identical loop and accounting, stamped
-\code{baseline:<policy>} --- never agent results, never on the official
-card. \code{/arc --fresh} cold-starts a run by suppressing both load
+form of the within-game learning curve. \code{/arc --fresh}
+cold-starts a run by suppressing both load
 and save of world learning, so a probe cannot overwrite banked
 experience. These are practice results on public environments, not an
 official score; the evidence standard is documented separately.

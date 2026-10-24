@@ -331,6 +331,43 @@ pub const ENDORPHIN_METABOLIC_RATE: f32 = 5.8e-4;
 /// ln(2)/900 s ≈ 7.7e-4/s.
 pub const VASOPRESSIN_METABOLIC_RATE: f32 = 7.7e-4;
 
+/// Melatonin plasma clearance, per second.
+///
+/// Endogenous melatonin clears hepatically (CYP1A2 6-hydroxylation →
+/// urinary 6-sulfatoxymelatonin) with a measured half-life of ~24–54
+/// min: 23.7 min median (range 15–60) in the two-compartment
+/// synthesis/clearance fit of Brown et al. (Am J Physiol 1997), ~39
+/// min on IV pharmacokinetics (Andersen et al., BMC Pharmacol Toxicol
+/// 2016). ln(2)/1800 s ≈ 3.9e-4/s — roughly 1300× slower than the
+/// previous 0.5 s⁻¹ approach rate, which made the hormone chase the
+/// circadian envelope with a ~2 s time constant, compressing the real
+/// DLMO-to-peak rise and morning washout into seconds.
+pub const MELATONIN_METABOLIC_RATE: f32 = 3.9e-4;
+
+/// Peak pineal melatonin secretion rate, per second.
+///
+/// AANAT is the rate-limiting step and the pineal stores nothing, so
+/// the SCN-gated drive acts as a production term on the plasma pool
+/// (the two-compartment model of St Hilaire et al. 2007, collapsed to
+/// one pool). Calibrated so the unsuppressed nocturnal steady state
+/// reaches the model's 0.80 peak: R = 0.80 · k_clear.
+pub const MELATONIN_SECRETION_RATE: f32 = 0.80 * MELATONIN_METABOLIC_RATE;
+
+/// Retinal illuminance for half-maximal acute melatonin suppression
+/// (lux).
+///
+/// Light suppresses pineal AANAT within minutes via the
+/// ipRGC → SCN → sympathetic outflow path — acute suppression of the
+/// secretion drive itself, distinct from the slower phase-shift
+/// (entrainment) channel the sleep-wake network already owns.
+/// Ordinary room light suppresses substantially: Zeitzer et al.
+/// (2000) fit a steep dose–response over ~10–10,000 lux with ~50%
+/// suppression in the low hundreds of lux at hour-scale exposures.
+pub const MELATONIN_LIGHT_EC50_LUX: f32 = 200.0;
+
+/// Hill slope of the light-suppression dose response.
+pub const MELATONIN_LIGHT_HILL: f32 = 1.5;
+
 /// β-endorphin co-release rate with ACTH, per second.
 ///
 /// β-endorphin is cleaved from proopiomelanocortin (POMC) in anterior
@@ -2856,22 +2893,37 @@ impl NeurochemicalVector {
         // under SCN control. The melatonin_factor() gives a smooth [0,1]
         // envelope that is high at night and low during the day.
         //
-        // We model this as a direct level adjustment: melatonin level
-        // approaches a target set by the circadian factor. This is
-        // distinct from the homeostatic baseline mechanism — melatonin
-        // is not homeostatically regulated, it is rhythmically driven.
+        // We model this as a one-compartment secretion/clearance pool —
+        // the same production/clearance form as the circulating
+        // hormones, NOT a chase of the circadian envelope:
+        //
+        //   dM/dt = R·A(t)·S(light) − k·M
+        //
+        // A(t) is the SCN-gated AANAT drive (`melatonin_factor`), S is
+        // acute light suppression of that drive, and k is the measured
+        // plasma clearance (`MELATONIN_METABOLIC_RATE`, t½ ≈ 30 min).
+        // Integrated exactly over dt for constant-rate secretion:
+        // M ← M_ss + (M − M_ss)·e^{−k·dt} with M_ss = R·A·S/k — stable
+        // at any dt and time-invariant, like the hormone pools.
         let mel_factor = self.melatonin_factor();
         let mel_idx = NeurochemicalId::Melatonin as usize;
-        let mel_target = mel_factor * 0.80; // peak ~0.80 at midnight
-        // Exponential approach for time-invariance and large-dt stability:
-        // 0.5/sec matches the old 0.05/step at 10 Hz (1-exp(-0.05) ~= 0.0488)
-        // while clamping alpha to [0,1] so a 1-10 s heartbeat dt after a
-        // stall cannot overshoot (linear 0.05*dt_scale reaches 5.0 at dt=10).
-        let mel_alpha = 1.0 - (-0.5 * dt).exp();
-        let mel_delta = (mel_target - self.chemicals[mel_idx].level) * mel_alpha;
-        self.chemicals[mel_idx].level += mel_delta;
-        self.chemicals[mel_idx].level =
-            crate::state::sanitize::finite_clamp(self.chemicals[mel_idx].level, 0.0, 1.0);
+        let light_suppression = if params.light_lux > 0.0 {
+            1.0 / (1.0 + (params.light_lux / MELATONIN_LIGHT_EC50_LUX).powf(MELATONIN_LIGHT_HILL))
+        } else {
+            // No eye, or darkness: nothing suppresses synthesis.
+            1.0
+        };
+        let mel_ss =
+            (MELATONIN_SECRETION_RATE * mel_factor * light_suppression) / MELATONIN_METABOLIC_RATE;
+        // Exact decay e^{−k·dt} in f64: k·dt is ~1e-4 at the 200 ms
+        // heartbeat, where f32 exp loses precision.
+        let mel_decay = (-f64::from(MELATONIN_METABOLIC_RATE) * f64::from(dt)).exp() as f32;
+        let mel_level = self.chemicals[mel_idx].level;
+        self.chemicals[mel_idx].level = crate::state::sanitize::finite_clamp(
+            mel_ss + (mel_level - mel_ss) * mel_decay,
+            0.0,
+            1.0,
+        );
 
         // Circadian baseline modulation: apply diurnal rhythm modifiers
         // to the homeostatic baselines of cortisol, dopamine, serotonin,
@@ -4695,6 +4747,13 @@ pub struct NeuroTickParams {
     /// sensitivity; Raczkowski et al., 2018 — sleep restores
     /// adrenergic receptor sensitivity)
     pub receptor_resensitization_rate: f32,
+    /// Retinal illuminance in lux for acute melatonin suppression —
+    /// the optic nerve's lid-filtered melanopic channel. Light reaches
+    /// the pineal drive acutely (ipRGC → SCN → sympathetic AANAT
+    /// shutoff), separately from the phase-entrainment channel the
+    /// sleep-wake network owns. 0.0 = darkness or no eye: nothing
+    /// suppressed.
+    pub light_lux: f32,
 }
 
 impl NeuroTickParams {
@@ -4724,6 +4783,7 @@ impl NeuroTickParams {
         noise_seed: 0,                      // daemon increments each tick
         receptor_resensitization_rate: 0.0, // set by daemon during sleep
         network_levels: None,               // set per sub-step from the sleep-wake network
+        light_lux: 0.0,                     // set by daemon from the optic nerve each advance
     };
 
     /// Compressed-time parameters for testing and fast iteration.

@@ -42,18 +42,20 @@ We use **bucketed per-relation memory** to keep the signal-to-noise
 ratio healthy:
 
 - D = 2048 dimensions (fixed)
-- B = 16 buckets per relation type
+- B = 64 buckets per relation type
 - Each concept gets a deterministic random unit vector (its "address")
 - Each relation type gets a deterministic random unit vector (its "role")
 - Adding edge (A, R, B): ``memory_R[hash(A) % B] += bind(addr_A, addr_B)``
 - Querying (A, R): ``unbind(addr_A, memory_R[hash(A) % B])`` → compare
   to all concept addresses
 
-With 49K bridge edges across 15 relation types and 16 buckets, each
-bucket holds ~200 bindings. The SNR is sqrt(D/N) = sqrt(2048/200) ≈ 3.2,
-which is sufficient for candidate generation.
+With ~40K journaled edges across ~11 relation types and 64 buckets, each
+bucket holds ~50-200 bindings. The SNR is sqrt(D/N) ≈ 3-6, sufficient
+for candidate generation — with the proviso that a hub concept carries
+all its own bindings in one bucket, so the journal's weight-ordered
+capacity bound is what keeps hub buckets retrievable.
 
-Storage: 15 relations × 16 buckets × 2048 dims × 4 bytes = 1.9 MB **fixed**.
+Storage: 15 relations × 64 buckets × 2048 dims × 4 bytes = 7.9 MB **fixed**.
 
 # Neuroscience grounding
 
@@ -87,10 +89,36 @@ logger = logging.getLogger(__name__)
 # bucket, total storage ~1.9 MB.
 DEFAULT_DIM = 2048
 
-# Number of buckets per relation type. More buckets = fewer bindings
-# per bucket = better SNR, but more storage. 16 is sufficient for
-# up to ~100K bridge edges.
-DEFAULT_BUCKETS = 16
+# Number of buckets per relation type. More buckets = fewer sources
+# sharing each memory vector = better SNR for everyone but the hubs.
+# Storage is still trivial: ~8 MB for 15 relations × 64 × 2048.
+DEFAULT_BUCKETS = 64
+
+# Maximum distinct associations the journal tracks. Holographic
+# memory cannot enumerate its contents — superposition is one-way —
+# so the journal is the rebuild record: every (source, relation,
+# target) ever bound, deduplicated with accumulated weight. Its cap
+# is the capacity budget: at ~280 bindings per (relation, bucket)
+# vector the SNR is sqrt(D/N) ≈ 2.7, near the designed operating
+# point. When the journal is full the weakest entries are evicted —
+# their bindings remain in memory until the next rebuild, a slow
+# forgetting rather than a cliff.
+DEFAULT_JOURNAL_CAP = 49152
+
+# Trace encoding versions. Every write and query honors the graph's
+# own encoding, and every rebuild re-encodes at the newest version.
+#
+# v1 (legacy): ``bind(role, target)`` — the source concept only
+#   hashed to a bucket, so every source sharing that bucket returned
+#   its cohabitants' targets as signal. With ~400 sources per bucket
+#   at production scale, recall was cohabitation, not association.
+#
+# v2: ``bind(source_addr, target_addr)`` — the documented design.
+#   Unbinding by source address recovers only that source's targets;
+#   cohabitant bindings become true noise instead of rival signal.
+#   Relation separation was already structural (per-relation memory
+#   matrices), so the role binding was redundant anyway.
+ENCODING = 2
 
 
 # ─── Vector operations ──────────────────────────────────────────
@@ -171,10 +199,12 @@ class HolographicGraph:
         self,
         dim: int = DEFAULT_DIM,
         n_buckets: int = DEFAULT_BUCKETS,
+        journal_cap: int = DEFAULT_JOURNAL_CAP,
     ) -> None:
         """Initialize the holographic graph store."""
         self.dim = dim
         self.n_buckets = n_buckets
+        self.journal_cap = journal_cap
 
         # Per-relation bucketed memory: relation_name → (B, D) float32
         self._memory: dict[str, np.ndarray] = {}
@@ -188,6 +218,15 @@ class HolographicGraph:
         # Track which concepts and relations have been registered
         self._registered_concepts: set[str] = set()
         self._registered_relations: set[str] = set()
+
+        # Trace encoding version of the in-memory contents — see
+        # ENCODING. A v1 file loads as 1 and keeps v1 semantics (and
+        # v1 binds) until a rebuild re-encodes it as 2.
+        self._encoding = ENCODING
+
+        # Edge journal: (source, relation, target) → accumulated weight.
+        # Bounded at journal_cap — see DEFAULT_JOURNAL_CAP.
+        self._journal: dict[tuple[str, str, str], float] = {}
 
         # Edge count for statistics
         self._edge_count: int = 0
@@ -215,6 +254,26 @@ class HolographicGraph:
     def n_relations(self) -> int:
         """Number of registered relation types."""
         return len(self._roles)
+
+    @property
+    def distinct_edges(self) -> int:
+        """Number of distinct associations in the journal."""
+        return len(self._journal)
+
+    @property
+    def bindings_per_bucket(self) -> float:
+        """Mean raw bindings per (relation, bucket) memory vector.
+
+        The SNR driver: noise grows with the number of superposed
+        bindings per memory vector, not with the total edge count.
+        """
+        n_vecs = max(1, len(self._memory) * self.n_buckets)
+        return self._edge_count / n_vecs
+
+    @property
+    def snr_estimate(self) -> float:
+        """Expected signal-to-noise ratio sqrt(D/N) at current load."""
+        return float(np.sqrt(self.dim / max(1.0, self.bindings_per_bucket)))
 
     @property
     def storage_bytes(self) -> int:
@@ -282,12 +341,63 @@ class HolographicGraph:
 
     # ─── Core operations ────────────────────────────────────────
 
+    def _bind(self, source: str, relation: str, target: str, weight: float) -> None:
+        """Superpose one association into memory without bookkeeping.
+
+        The raw memory write shared by ``add`` (which also journals)
+        and rebuilds (which re-encode the journal verbatim).
+        """
+        # Register the source address (needed for querying)
+        addr_source = self._get_address(source)
+        addr_target = self._get_address(target)
+        role = self._get_role(relation)
+
+        # Bind the association trace. v2 binds source⊗target (the
+        # documented design); v1 files keep role⊗target until rebuilt.
+        if self._encoding >= 2:
+            bound = circular_convolve(addr_source, addr_target) * weight
+        else:
+            bound = circular_convolve(role, addr_target) * weight
+
+        # Superpose into the source's bucket
+        bucket = self._bucket_index(source)
+        self._memory[relation][bucket] += bound
+
+    def _journal_add(
+        self, source: str, relation: str, target: str, weight: float
+    ) -> None:
+        """Record an association in the bounded journal.
+
+        Repeated bindings accumulate weight (repetition strengthens,
+        saturating at 1.0). When the journal is over capacity the
+        weakest entries are evicted; their superposed bindings stay in
+        memory until the next rebuild — gradual forgetting, not a wipe.
+        """
+        key = (source, relation, target)
+        prev = self._journal.get(key)
+        self._journal[key] = weight if prev is None else min(1.0, prev + weight)
+        if len(self._journal) > self.journal_cap:
+            self._evict_journal()
+
+    def _evict_journal(self) -> None:
+        """Drop the weakest journal entries back under the cap.
+
+        Evicts down to 90% of the cap so eviction is an occasional
+        batch, not a per-add sort.
+        """
+        keep = int(self.journal_cap * 0.9)
+        ranked = sorted(
+            self._journal.items(), key=lambda kv: kv[1], reverse=True
+        )
+        self._journal = dict(ranked[:keep])
+
     def add(self, source: str, relation: str, target: str, weight: float = 1.0) -> None:
         """Add an association to the holographic graph.
 
         The association (source, relation, target) is stored via
         superposition of the bound role×target vector into the source's
-        bucket in the relation's memory.
+        bucket in the relation's memory, and journaled so periodic
+        rebuilds can re-encode the graph from a clean state.
 
         Args:
             source: Source concept ID.
@@ -296,17 +406,8 @@ class HolographicGraph:
             weight: Association strength (0-1). Scales the superposed
                 vector. Weaker associations contribute less signal.
         """
-        # Register the source address (needed for querying)
-        self._get_address(source)
-        addr_target = self._get_address(target)
-        role = self._get_role(relation)
-
-        # Bind role with target: this creates the "association signal"
-        bound = circular_convolve(role, addr_target) * weight
-
-        # Superpose into the source's bucket
-        bucket = self._bucket_index(source)
-        self._memory[relation][bucket] += bound
+        self._bind(source, relation, target, weight)
+        self._journal_add(source, relation, target, weight)
         self._edge_count += 1
         self._invalidate_cache()
 
@@ -352,13 +453,17 @@ class HolographicGraph:
         if source not in self._addresses:
             return []
 
-        role = self._get_role(relation)
         bucket = self._bucket_index(source)
 
         # Unbind: recover the target from the memory
-        # memory[bucket] ≈ bind(role, target) + noise
-        # unbind(role, memory[bucket]) ≈ target + noise
-        result = circular_correlate(self._memory[relation][bucket], role)
+        # v2: memory[bucket] ≈ bind(source, target) + noise
+        #     unbind(source, memory[bucket]) ≈ target + noise
+        # v1: memory[bucket] ≈ bind(role, target) + noise (pooled per bucket)
+        if self._encoding >= 2:
+            probe = self._addresses[source]
+        else:
+            probe = self._get_role(relation)
+        result = circular_correlate(self._memory[relation][bucket], probe)
 
         # Score against candidate addresses
         if candidate_ids is None:
@@ -460,10 +565,14 @@ class HolographicGraph:
             if target in result_ids:
                 target_similarities.append(next(score for cid, score in results if cid == target))
             else:
-                role = self._roles.get(relation)
-                if role is not None:
-                    bucket = self._bucket_index(source)
-                    recovered = circular_correlate(self._memory[relation][bucket], role)
+                bucket = self._bucket_index(source)
+                probe = (
+                    self._addresses[source]
+                    if self._encoding >= 2
+                    else self._roles.get(relation)
+                )
+                if probe is not None:
+                    recovered = circular_correlate(self._memory[relation][bucket], probe)
                     target_similarities.append(float(np.dot(recovered, self._addresses[target])))
 
         n = len(reciprocal_ranks)
@@ -486,20 +595,22 @@ class HolographicGraph:
     def extract_association_matrix(self) -> tuple[list[str], np.ndarray]:
         """Extract a feature matrix from the holographic graph.
 
-        For each (relation, bucket) pair, the unbound vector is
-        scored against all concept addresses in one matrix multiply.
-        This gives each concept a 32-dimensional feature vector
-        (2 relations × 16 buckets) representing its association
+        For each (relation, bucket) pair — or, under v2 encoding,
+        each (concept, relation) pair — the unbound vector is scored
+        into a compact feature representing the concept's association
         pattern across the holographic memory.
 
-        The resulting matrix is (N, n_relations * n_buckets) —
-        already low-dimensional, suitable for use as an experiential
-        embedding without further SVD.
+        The resulting matrix is (N, n_relations * n_buckets) for a
+        v1-encoded graph and (N, n_relations) for v2 — in v2 a bucket's
+        contents only unbind meaningfully per-source, so the feature is
+        each concept's own recovered-association strength per relation.
+        Either way it is already low-dimensional, suitable for use as an
+        experiential embedding without further SVD.
 
         Returns:
             (concept_ids, feature_matrix) where concept_ids is the
-            list of registered concepts and feature_matrix is a
-            (N, n_relations * n_buckets) float32 matrix.
+            list of registered concepts and feature_matrix is an
+            (N, n_features) float32 matrix.
         """
         concept_ids = sorted(self._addresses.keys())
         if not concept_ids:
@@ -511,17 +622,33 @@ class HolographicGraph:
 
         features: list[np.ndarray] = []
 
-        for relation in sorted(self._memory.keys()):
-            role = self._roles.get(relation)
-            if role is None:
-                continue
-            mem = self._memory[relation]
-            for bucket_idx in range(self.n_buckets):
-                # Unbind once for this (relation, bucket) pair
-                result = circular_correlate(mem[bucket_idx], role)
-                # Score against all concept addresses at once: (N,)
-                scores = addr_matrix @ result
-                features.append(scores.astype(np.float32))
+        if self._encoding >= 2:
+            # Per-source unbind: for each concept, recover its own
+            # association signal from its (relation, bucket) home and
+            # score that recovered vector against all addresses. The
+            # norm of the scored vector is the concept's association
+            # strength in that relation — a compact per-source feature.
+            for relation in sorted(self._memory.keys()):
+                mem = self._memory[relation]
+                col = np.zeros(n, dtype=np.float32)
+                for i, cid in enumerate(concept_ids):
+                    result = circular_correlate(
+                        mem[self._bucket_index(cid)], self._addresses[cid]
+                    )
+                    col[i] = float(np.linalg.norm(result))
+                features.append(col)
+        else:
+            for relation in sorted(self._memory.keys()):
+                role = self._roles.get(relation)
+                if role is None:
+                    continue
+                mem = self._memory[relation]
+                for bucket_idx in range(self.n_buckets):
+                    # Unbind once for this (relation, bucket) pair
+                    result = circular_correlate(mem[bucket_idx], role)
+                    # Score against all concept addresses at once: (N,)
+                    scores = addr_matrix @ result
+                    features.append(scores.astype(np.float32))
 
         if not features:
             return concept_ids, np.zeros((n, 0), dtype=np.float32)
@@ -573,6 +700,7 @@ class HolographicGraph:
         self._roles = {}
         self._registered_concepts = set()
         self._registered_relations = set()
+        self._journal = {}
         self._edge_count = 0
         self._invalidate_cache()
 
@@ -582,14 +710,52 @@ class HolographicGraph:
     ) -> int:
         """Clear and rebuild the graph from a list of edges.
 
+        The journal is replaced wholesale by the deduplicated input
+        (max weight per edge triple) — a rebuild declares the complete
+        content set, so input edges are not accumulated on top of the
+        old journal.
+
         Args:
             edges: List of (source, relation, target, weight) tuples.
 
         Returns:
             Number of edges stored.
         """
+        journal: dict[tuple[str, str, str], float] = {}
+        for source, relation, target, weight in edges:
+            key = (source, relation, target)
+            if weight > journal.get(key, 0.0):
+                journal[key] = weight
         self.clear()
-        return self.add_edges(edges)
+        self._encoding = ENCODING  # rebuilds always re-encode newest
+        self._journal = journal
+        if len(self._journal) > self.journal_cap:
+            self._evict_journal()
+        for (source, relation, target), weight in self._journal.items():
+            self._bind(source, relation, target, weight)
+        self._edge_count = len(self._journal)
+        self._invalidate_cache()
+        return self._edge_count
+
+    def journal_edges(self) -> list[tuple[str, str, str, float]]:
+        """The journaled association set: (source, relation, target, weight)."""
+        return [
+            (source, relation, target, weight)
+            for (source, relation, target), weight in self._journal.items()
+        ]
+
+    def rebuild_from_journal(self) -> int:
+        """Clear and re-encode the graph from its own journal.
+
+        This is the maintenance rebuild: the journal is the clean,
+        deduplicated record of what was bound, so re-binding it drops
+        the duplicate reinforcement and evicted-ghost bindings the
+        memory accumulated since the last rebuild. An empty journal
+        rebuilds nothing — the memory is left intact.
+        """
+        if not self._journal:
+            return 0
+        return self.rebuild_from_edges(self.journal_edges())
 
     # ─── Persistence ────────────────────────────────────────────
 
@@ -615,16 +781,27 @@ class HolographicGraph:
         else:
             role_matrix = np.zeros((0, self.dim), dtype=np.float32)
 
+        # Pack the journal — the rebuild record — as parallel arrays
+        j_sources = [k[0] for k in self._journal]
+        j_relations = [k[1] for k in self._journal]
+        j_targets = [k[2] for k in self._journal]
+        j_weights = np.array(list(self._journal.values()), dtype=np.float32)
+
         save_npz(
             path,
             dim=np.array(self.dim, dtype=np.int32),
             n_buckets=np.array(self.n_buckets, dtype=np.int32),
             edge_count=np.array(self._edge_count, dtype=np.int64),
+            encoding=np.array(self._encoding, dtype=np.int32),
             concept_ids=str_array(concept_ids),
             addr_matrix=addr_matrix,
             relation_names=str_array(relation_names),
             mem_matrix=mem_matrix,
             role_matrix=role_matrix,
+            j_source=str_array(j_sources),
+            j_relation=str_array(j_relations),
+            j_target=str_array(j_targets),
+            j_weight=j_weights,
         )
 
     def load(self, path: str) -> bool:
@@ -640,6 +817,9 @@ class HolographicGraph:
             self.dim = int(data["dim"])
             self.n_buckets = int(data["n_buckets"])
             self._edge_count = int(data["edge_count"])
+            # Files written before source-binding carry no encoding
+            # field — they are v1, and stay v1 until a rebuild.
+            self._encoding = int(data["encoding"]) if "encoding" in data else 1
 
             # Restore addresses
             concept_ids = list(data["concept_ids"])
@@ -660,6 +840,20 @@ class HolographicGraph:
                 self._roles[rname] = role_matrix[i].astype(np.float32)
             self._registered_relations = set(relation_names)
 
+            # Restore the journal. Older files predate it — an absent
+            # journal loads empty and the first rebuild after the cap
+            # fills it skips the wipe via rebuild_from_journal's guard.
+            self._journal = {}
+            if "j_source" in data:
+                js = list(data["j_source"])
+                jr = list(data["j_relation"])
+                jt = list(data["j_target"])
+                jw = data["j_weight"]
+                for i in range(len(js)):
+                    self._journal[(js[i], jr[i], jt[i])] = float(jw[i])
+                if len(self._journal) > self.journal_cap:
+                    self._evict_journal()
+
             self._invalidate_cache()
             return True
         except (KeyError, ValueError, OSError) as e:
@@ -674,7 +868,12 @@ class HolographicGraph:
             "dim": float(self.dim),
             "n_buckets": float(self.n_buckets),
             "edge_count": float(self._edge_count),
+            "distinct_edges": float(self.distinct_edges),
             "n_concepts": float(self.n_concepts),
             "n_relations": float(self.n_relations),
+            "bindings_per_bucket": self.bindings_per_bucket,
+            "snr_estimate": self.snr_estimate,
+            "journal_cap": float(self.journal_cap),
+            "encoding": float(self._encoding),
             "storage_mb": self.storage_bytes / 1e6,
         }

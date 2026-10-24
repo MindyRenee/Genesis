@@ -1034,6 +1034,45 @@ def test_stimulus_decays():
     reset_oscillator()
 
 
+def test_pulse_survives_held_level_on_same_band():
+    """Pulses and held levels are separate registers — a pulse on a
+    band a continuous channel reports must not be clobbered by the
+    next hold. This is what lets vision's alpha-blocking pulse
+    coexist with the field probe's held substrate level.
+    """
+    from thalamus.brain_waves import (
+        _get_oscillator,
+        add_stimulus,
+        hold_stimulus,
+        reset_oscillator,
+    )
+
+    reset_oscillator()
+    add_stimulus(BrainWave.ALPHA, -0.25)
+    hold_stimulus(BrainWave.ALPHA, 0.10)
+    osc = _get_oscillator()
+    assert osc._stimulus[BrainWave.ALPHA] < 0.0, "hold must not erase the pulse"
+    assert osc._held[BrainWave.ALPHA] == 0.10
+    reset_oscillator()
+
+
+def test_negative_stimulus_suppresses_band():
+    """Inhibitory stimulus (alpha blocking) lowers band power."""
+    from thalamus.brain_waves import add_stimulus, reset_oscillator
+
+    reset_oscillator()
+    summary = _make_summary(arousal=0.5, phase=PHASE_ACTIVE)
+    alpha_before = assess_brain_waves(summary).powers[BrainWave.ALPHA]
+
+    add_stimulus(BrainWave.ALPHA, -0.3)
+    alpha_after = assess_brain_waves(summary).powers[BrainWave.ALPHA]
+
+    assert alpha_after < alpha_before, (
+        f"inhibitory stimulus should suppress alpha: {alpha_before} → {alpha_after}"
+    )
+    reset_oscillator()
+
+
 def test_held_stimulus_is_poll_rate_invariant():
     """A continuous channel's reading must not integrate per call.
 
@@ -1059,7 +1098,7 @@ def test_held_stimulus_is_poll_rate_invariant():
         hold_stimulus(BrainWave.DELTA, 0.20)
         assess_brain_waves(summary)
         time.sleep(0.02)
-    slow = _get_oscillator()._stimulus[BrainWave.DELTA]
+    slow = _get_oscillator()._held[BrainWave.DELTA]
     assert slow <= 0.5
 
     # ~10 Hz: same level, ten times as many reports — no inflation.
@@ -1068,7 +1107,7 @@ def test_held_stimulus_is_poll_rate_invariant():
         hold_stimulus(BrainWave.DELTA, 0.20)
         assess_brain_waves(summary)
         time.sleep(0.002)
-    fast = _get_oscillator()._stimulus[BrainWave.DELTA]
+    fast = _get_oscillator()._held[BrainWave.DELTA]
     assert abs(fast - slow) < 0.1, (
         f"held level must not grow with poll rate: {slow:.3f} vs {fast:.3f}"
     )

@@ -811,28 +811,6 @@ def test_arc_command_passes_fresh_scope():
     ]
 
 
-def test_arc_command_runs_baseline_not_agent(monkeypatch):
-    import parietal_lobe.arc_baseline as baseline_mod
-
-    from genesis_cli import _cmd_arc
-
-    calls = []
-
-    class _Runner:
-        def __init__(self, policy):
-            calls.append(policy)
-
-        def play(self, game, max_steps):
-            calls.append((game, max_steps))
-            return ArcResult(game_id=game, state="BUDGET", steps=max_steps)
-
-    monkeypatch.setattr(baseline_mod, "ArcBaseline", _Runner)
-    subject = SimpleNamespace(play_arc=lambda **kw: pytest.fail("baseline ran the agent"))
-    out = _cmd_arc(subject, "g1 --baseline uniform --steps 9")
-    assert calls == ["uniform", ("g1", 9)]
-    assert "baseline 'uniform'" in out and "BUDGET" in out
-
-
 @pytest.mark.parametrize(
     "args",
     [
@@ -841,8 +819,6 @@ def test_arc_command_runs_baseline_not_agent(monkeypatch):
         "g --steps 0",
         "--competition g",
         "--all --competition",
-        "--competition --baseline uniform",
-        "--baseline",
     ],
 )
 def test_arc_command_rejects_invalid_requests_without_play(args):

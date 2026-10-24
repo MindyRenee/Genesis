@@ -149,14 +149,12 @@ def test_failed_restore_cannot_be_saved_during_shutdown():
 
 
 def _run_shell_helpers(code, data_dir):
-    source = (Path(__file__).resolve().parents[2] / "run.sh").read_text()
+    source = (Path(__file__).resolve().parents[2] / "genesis").read_text()
     helpers = source.split("# ─── Parse arguments", 1)[0]
     return subprocess.run(
         ["bash", "-c", helpers + "\n" + code],
-        # GENESIS_DATA_DIR, not XDG_DATA_HOME: run.sh's per-checkout
-        # .genesis-data-dir pin outranks XDG_DATA_HOME, so setting the
-        # latter would leave DATA_DIR pointing at the developer's real
-        # state directory and these tests would read its pid files.
+        # GENESIS_DATA_DIR is the only override — point the helpers at
+        # the test dir so they never touch the developer's real state.
         env={**os.environ, "GENESIS_DATA_DIR": str(Path(data_dir) / "genesis")},
         capture_output=True,
         text=True,
@@ -226,7 +224,7 @@ _matches_pid "$$" "$DATA_DIR/genesis_cli.pid"
 def test_shell_shutdown_orders_cli_before_children(tmp_path):
     result = _run_shell_helpers(
         """
-_find_pid() {
+_find_pids() {
     case "$1" in
         *cli.pid) echo 100 ;;
         *daemon.pid) echo 200 ;;
@@ -241,6 +239,65 @@ _stop_all
     )
     assert result.returncode == 0
     assert result.stdout.splitlines() == ["-INT 100", "-TERM 200", "-TERM 300"]
+
+
+def test_shell_stop_writes_mind_suppress(tmp_path):
+    """genesis --stop tells the body's shepherd the absence is authored.
+
+    The daemon's mind-shepherd (src/daemon/mind_shepherd.rs) regrows a
+    mind that dies without a goodbye; a daemon that outlives an
+    intentional stop must stay solitary instead. The sentinel has to
+    land before any signal so even a mid-teardown orphan sees it.
+    """
+    data_dir = tmp_path / "genesis"
+    data_dir.mkdir()
+    result = _run_shell_helpers("_find_pids() { return 1; }\n_stop_all", tmp_path)
+    assert result.returncode == 0
+    assert (data_dir / "mind.suppress").exists()
+
+
+def test_stop_all_writes_mind_suppress(tmp_path):
+    """`genesis --stop` writes the same sentinel the shell path does."""
+    data_dir = tmp_path / "genesis"
+    data_dir.mkdir()
+    assert genesis_cli._stop_all(str(data_dir)) == 0
+    assert (data_dir / "mind.suppress").exists()
+
+
+def test_graceful_teardown_says_goodbye_to_the_body(tmp_path):
+    """A mind that ran and exits gracefully marks its absence
+    intentional — an orphaned daemon must not regrow it. A crash
+    never reaches teardown, which is exactly the loss the shepherd
+    answers."""
+    shutting_down = threading.Event()
+    mind = Mock()
+    mind.stop.return_value = True
+    with patch.object(genesis_cli, "_arm_exit_watchdog"):
+        genesis_cli._teardown_session(
+            shutting_down, None, None, mind, None, None, str(tmp_path),
+            None, None, None, None, None, 0,
+        )
+    assert (tmp_path / "mind.suppress").exists()
+
+
+def test_teardown_without_mind_writes_no_suppress(tmp_path):
+    """A start that never built a mind is not a goodbye — a surviving
+    body may still shepherd a mind back."""
+    shutting_down = threading.Event()
+    with patch.object(genesis_cli, "_arm_exit_watchdog"):
+        genesis_cli._teardown_session(
+            shutting_down, None, None, None, None, None, str(tmp_path),
+            None, None, None, None, None, 0,
+        )
+    assert not (tmp_path / "mind.suppress").exists()
+
+
+def test_start_clears_mind_suppress(tmp_path):
+    """A new start lifts the sentinel — absence is no longer intended."""
+    genesis_cli._write_mind_suppress(str(tmp_path))
+    assert (tmp_path / "mind.suppress").exists()
+    genesis_cli._clear_mind_suppress(str(tmp_path))
+    assert not (tmp_path / "mind.suppress").exists()
 
 
 @pytest.mark.parametrize("raw", [b"{", b'{"version":2,"reflection":null}'])
@@ -280,7 +337,7 @@ def test_daemon_start_timeout_reaps_child(tmp_path):
 def test_interactive_failure_still_shuts_down(tmp_path):
     cleanup = Mock()
     with (
-        patch.dict(os.environ, {"GENESIS_RUN": "1"}),
+        patch.dict(os.environ, {"GENESIS_WAKE": "1"}),
         patch.multiple(
             genesis_cli,
             _parse_cli_args=Mock(
@@ -341,7 +398,7 @@ def test_startup_failure_still_shuts_down(tmp_path, failing_step):
     }
     patches[failing_step] = Mock(side_effect=RuntimeError("setup failed"))
     with (
-        patch.dict(os.environ, {"GENESIS_RUN": "1"}),
+        patch.dict(os.environ, {"GENESIS_WAKE": "1"}),
         patch.multiple(
             genesis_cli,
             _parse_cli_args=Mock(
@@ -534,7 +591,7 @@ def test_adopt_daemon_reinhabits_the_surviving_body(tmp_path):
     client = Mock()
     with (
         patch("genesis_client.GenesisClient", return_value=client),
-        patch.object(genesis_cli, "_find_pid", return_value=4242),
+        patch.object(genesis_cli, "_find_pids", return_value=[4242]),
         patch.object(genesis_cli.os, "getpid", return_value=7777),
     ):
         adopted = genesis_cli._adopt_daemon(str(tmp_path), str(tmp_path / "genesis.sock"))
@@ -548,7 +605,7 @@ def test_adopt_daemon_refuses_a_socket_that_is_not_genesis(tmp_path):
     """A socket that fails the handshake is a stray, not a body."""
     with (
         patch("genesis_client.GenesisClient") as client_cls,
-        patch.object(genesis_cli, "_find_pid", return_value=4242),
+        patch.object(genesis_cli, "_find_pids", return_value=[4242]),
     ):
         client_cls.return_value.connect.side_effect = ConnectionError("nope")
         assert genesis_cli._adopt_daemon(str(tmp_path), "sock") is None
@@ -558,7 +615,7 @@ def test_adopt_daemon_refuses_without_a_matching_pid(tmp_path):
     """A handshake with no /proc-confirmed daemon is not adopted."""
     with (
         patch("genesis_client.GenesisClient", return_value=Mock()),
-        patch.object(genesis_cli, "_find_pid", return_value=None),
+        patch.object(genesis_cli, "_find_pids", return_value=[]),
     ):
         assert genesis_cli._adopt_daemon(str(tmp_path), "sock") is None
 

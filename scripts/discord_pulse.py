@@ -46,17 +46,6 @@ logger = logging.getLogger("discord_pulse")
 _STATE_NAME = "discord_pulse_state.json"
 
 
-def _default_data_dir() -> Path:
-    """Resolve the data dir the way run.sh does.
-
-    Delegates to the canonical resolver: GENESIS_DATA_DIR, then the
-    checkout's .genesis-data-dir pin, then XDG_DATA_HOME, then
-    ~/.local/share. The pin outranks XDG_DATA_HOME because that is
-    ambient launcher environment, not Genesis config.
-    """
-    return default_data_dir()
-
-
 def _load_state(data_dir: Path) -> dict:
     try:
         return json.loads((data_dir / _STATE_NAME).read_text())
@@ -301,7 +290,7 @@ def main() -> int:
     parser.add_argument(
         "--interval", type=int, default=int(os.environ.get("GENESIS_PULSE_INTERVAL", "2700"))
     )
-    parser.add_argument("--data-dir", type=Path, default=_default_data_dir())
+    parser.add_argument("--data-dir", type=Path, default=default_data_dir())
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")

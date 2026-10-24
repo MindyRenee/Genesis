@@ -117,12 +117,15 @@ before the cortex has fully processed the input. This is the
 the cortex. The "high road" (relay -> cortex -> amygdala) provides
 a slower, more refined evaluation.
 
-In Genesis: emotion.py implements this. EmotionalState is computed
-from neurochemistry via assess_emotion(), which maps the
-neurochemical vector to EmotionCategory, CognitiveMode, and
-CauseCategory. The mapping uses threshold-based rules (not learned
-weights), but the functional logic is the same: neurochemistry
-determines emotional state.
+In Genesis: emotion.py implements this as a continuous membership
+field — each category's membership is a weighted geometric mean of
+smooth evidence factors over the measured substrate (the chemical
+vector, the arousal/valence/plasticity axes, felt-context drives,
+and the oscillator band powers), and EmotionField relaxes each
+membership toward its instantaneous value on its own time constant
+(Ornstein–Uhlenbeck / DynAffect dynamics). assess_emotion() is the
+instantaneous readout: EmotionCategory is an argmax over the
+effective memberships, not the state itself.
 
 
 Insula — Interoception and Proto-Self
@@ -409,7 +412,10 @@ _EXPORTS: dict[str, str] = {
     "EmotionalState": "limbic_system.emotion",
     "EmotionalContext": "limbic_system.emotion",
     "EmotionCategory": "limbic_system.emotion",
+    "EmotionField": "limbic_system.emotion",
     "assess_emotion": "limbic_system.emotion",
+    "membership_field": "limbic_system.emotion",
+    "effective_memberships": "limbic_system.emotion",
     # The organ itself — conditioned appetitive/aversive value fields
     # (BLA acquisition, ITC/vmPFC extinction, Pearce-Hall associability)
     "Amygdala": "limbic_system.amygdala",

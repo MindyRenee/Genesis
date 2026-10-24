@@ -7693,11 +7693,11 @@ class FrontalLobe:
         task = normalize_offered(spec, "heard_problem")
         if task is None:
             return Thought(
-                content="that problem doesn't hold together",
+                content=str(spec.get("name", "")) or perception.raw_text,
                 intent="inform",
                 emotion=emotion.label,
                 topics=perception.topics,
-                confidence=0.4,
+                confidence=1.0,
                 metadata={
                     "problem_result": {
                         "family": str(spec.get("family", "")),
@@ -7948,16 +7948,12 @@ class FrontalLobe:
             anchor = f"{len(md['placements'])} placed"
         if not anchor:
             anchor = result.task
-        # Confidence is the second-order signal — the posterior mass
-        # on the reading just played — not a fixed dial. Solved is
-        # verified certainty; unsolved reports how sure the current
-        # reading still is.
-        if result.solved:
-            confidence = 0.9
-        elif held is not None:
-            confidence = max(0.2, min(0.85, held.confidence()))
-        else:
-            confidence = 0.5
+        # Confidence is the posterior mass on the reading just
+        # played — the second-order signal itself, no dial. A
+        # verified solve has already absorbed the mass (≈1.0);
+        # an open task reports live uncertainty; with no held
+        # task the uninformative prior is 0.5.
+        confidence = held.confidence() if held is not None else 0.5
         return Thought(
             content=anchor,
             intent="inform",

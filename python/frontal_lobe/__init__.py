@@ -1035,6 +1035,14 @@ _EXPORTS: dict[str, str] = {
     # spec (prefrontal comprehension→action handoff)
     "compile_problem": "frontal_lobe.problem_intake",
     "interpret_problem": "frontal_lobe.problem_intake",
+    # Held task — the intake's memory: a problem kept in mind across
+    # turns with its revisions, evidence, and loopholes (PFC task
+    # maintenance / working-memory holding)
+    "HeldTask": "frontal_lobe.held_task",
+    "Loophole": "frontal_lobe.held_task",
+    "TaskRevision": "frontal_lobe.held_task",
+    "goal_of": "frontal_lobe.held_task",
+    "goal_text": "frontal_lobe.held_task",
     # Open-ended agency — intentions formed from cognitive state,
     # planned and executed through the tool layer (PFC agency)
     "ActingLoop": "parietal_lobe.agency",

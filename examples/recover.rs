@@ -12,7 +12,7 @@ use genesis::MmapState;
 use genesis::state::neurochemical::NeurochemicalId;
 
 fn main() {
-    // Resolution lives in one place so it cannot drift from run.sh or
+    // Resolution lives in one place so it cannot drift from genesis or
     // the other tools; see genesis::data_dir.
     let path = genesis::data_dir();
     let state_file = path.join("core_state.bin");

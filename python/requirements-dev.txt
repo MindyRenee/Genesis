@@ -11,7 +11,7 @@ mypy==2.3.1
 # unused *imports* (F401), so neither can see an unreferenced
 # function or method — the repo accumulated ~120 of them before this
 # was added. Not wired into CI as a blocking gate: there is a known
-# backlog to clear first. See scripts/hygiene.sh [3].
+# backlog to clear first.
 vulture==2.14
 
 # Optional-at-runtime deps kept in dev/CI so their code paths and

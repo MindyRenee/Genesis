@@ -6,7 +6,6 @@ worth pinning are therefore not "does it copy concepts" but: it never
 touches working memory, it never duplicates what is already resident, and
 running it twice changes nothing the second time.
 
-`scripts/merge_data_dirs.py` gets the same treatment for the same reason.
 """
 
 from __future__ import annotations
@@ -180,34 +179,9 @@ def test_recovered_concepts_are_recallable(recover, tmp_path: Path) -> None:
     assert net.size == 2, "recall pulls it back into working memory on demand"
 
 
-def test_merge_script_is_idempotent_on_rerun(tmp_path: Path, capsys) -> None:
-    """merge_data_dirs must not double-count when run against a merged tree."""
-    merge = _load_script("merge_data_dirs.py")
-    fork = tmp_path / "fork"
-    target = tmp_path / "target"
-    _write_state(fork, ["shared", "fork_only"])
-    _write_state(target, ["shared", "target_only"])
-
-    old = sys.argv
-    sys.argv = ["merge", "--to", str(target), "--from", str(fork), "--write"]
-    try:
-        assert merge.main() == 0
-    finally:
-        sys.argv = old
-    capsys.readouterr()
-
-    import gzip
-
-    state = json.loads(gzip.decompress((target / "cognitive_state.json").read_bytes()))
-    ids = [c["id"] for c in state["concept_network"]["concepts"]]
-    assert sorted(ids) == ["fork_only", "shared", "target_only"], ids
-    assert len(ids) == len(set(ids)), "no duplicate concept rows"
-
-
 def test_scripts_compile_and_have_help() -> None:
     """All repair scripts must at least be syntactically runnable."""
     for name in (
-        "merge_data_dirs.py",
         "recover_pruned_concepts.py",
         "restore_archived_dreams.py",
     ):

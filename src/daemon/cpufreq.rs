@@ -212,7 +212,7 @@ fn helper_path() -> Option<&'static str> {
         if std::path::Path::new(libexec_path).exists() {
             return Some(libexec_path.to_string());
         }
-        // 3. Relative to CWD (run.sh cds to project root)
+        // 3. Relative to CWD (genesis cds to project root)
         let cwd_path = "scripts/cpufreq_helper.sh";
         if std::path::Path::new(cwd_path).exists() {
             return Some(cwd_path.to_string());

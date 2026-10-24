@@ -791,6 +791,36 @@ impl BundleStore {
         h.next_episode_id = h.next_episode_id.saturating_add(1);
     }
 
+    /// Remove an episode's SDR contribution from the bundles.
+    ///
+    /// The exact inverse of `add_episode`: for each bundle `j`,
+    /// `M_j -= g(code[j]) * SDR`. The superposition is a linear
+    /// weighted sum, so subtracting the same contribution removes
+    /// it exactly (up to float accumulation noise).
+    ///
+    /// Called when an episode leaves the bundled set — archived,
+    /// deleted, or re-marked meta-memory after storage — so its
+    /// SDR does not linger as dead weight that would pollute
+    /// `query_activation` and force a startup rebuild.
+    pub fn remove_episode(&mut self, code: &[u8; LOGHD_N / 2], sdr: &Sdr) {
+        for j in 0..LOGHD_N {
+            let digit = code_digit(code, j) as f32;
+            let weight = digit / (LOGHD_K - 1) as f32;
+            if weight == 0.0 {
+                continue;
+            }
+            let bundle = self.bundle_mut(j);
+            for &pos in &sdr.active {
+                if let Some(cell) = bundle.get_mut(pos as usize) {
+                    *cell -= weight;
+                }
+            }
+        }
+
+        let h = self.header_mut();
+        h.episode_count = h.episode_count.saturating_sub(1);
+    }
+
     /// Compute the activation vector of a query SDR against all bundles.
     ///
     /// `A[j] = δ(M_j, query)` where δ is the dot product of the

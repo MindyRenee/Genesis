@@ -28,28 +28,25 @@ PY=${PYTHON:-python3}
 VERIFY_ONLY=0
 [ "${1:-}" = "--verify" ] && VERIFY_ONLY=1
 
-# Blank means unset, so this agrees with run.sh, config.py, and
+# Blank means unset, so this agrees with genesis, config.py, and
 # src/data_dir.rs instead of building a path out of whitespace.
 if [ -n "${GENESIS_DATA_DIR:-}" ] && [ -z "${GENESIS_DATA_DIR//[[:space:]]/}" ]; then
     unset GENESIS_DATA_DIR
 fi
 
 
-# Where the vosk model lives. Must match
-# infrastructure.config.vosk_model_dir(), which is the
-# single source of truth; this shell resolves the same order run.sh does
-# so the installer and the loader never disagree. An explicit
-# GENESIS_VOSK_DIR wins outright.
+# Where the vosk model goes. An explicit GENESIS_VOSK_DIR wins
+# outright; otherwise it installs beside her state — the data dir,
+# resolved by the one shared rule (GENESIS_DATA_DIR else the canonical
+# ~/.local/share/genesis). Legacy model locations elsewhere on disk
+# are still found at load time by vosk_model_dir(); the installer
+# only ever writes to the canonical spot.
 if [ -n "${GENESIS_VOSK_DIR:-}" ]; then
     VOSK_DIR="$GENESIS_VOSK_DIR"
 elif [ -n "${GENESIS_DATA_DIR:-}" ]; then
     VOSK_DIR="$GENESIS_DATA_DIR/vosk-models"
-elif [ -f .genesis-data-dir ]; then
-    VOSK_DIR="$(head -n1 .genesis-data-dir)/vosk-models"
-elif [ -n "${XDG_DATA_HOME:-}" ]; then
-    VOSK_DIR="$XDG_DATA_HOME/vosk-models"
 else
-    VOSK_DIR="$HOME/.local/share/vosk-models"
+    VOSK_DIR="$HOME/.local/share/genesis/vosk-models"
 fi
 VOSK_NAME="vosk-model-small-en-us-0.15"
 VOSK_URL="https://alphacephei.com/vosk/models/${VOSK_NAME}.zip"

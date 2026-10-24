@@ -31,11 +31,11 @@ emotional state \(em never from hardcoded templates.
 
 .PP
 \fBDo not run this script directly.\fR Use
-.BR run.sh (1)
+.BR genesis (1)
 in a source checkout or the installed
 .BR genesis (1)
 console script, the only supported entry points. The CLI checks
-.I GENESIS_RUN
+.I GENESIS_WAKE
 and refuses to start otherwise. The arguments documented here are
 useful for understanding what the launchers run and for diagnostic
 invocations.
@@ -47,11 +47,7 @@ Data directory holding the core state file, STM ring buffer, LTM
 store, PID files, socket, and locks. Resolved exactly as the daemon
 resolves it:
 .I GENESIS_DATA_DIR ,
-then the checkout's
-.IR .genesis-data-dir ,
-then
-.IR $XDG_DATA_HOME /genesis ,
-then
+else
 .IR ~/.local/share/genesis .
 .TP
 .BR --daemon-socket " \fIPATH\fR"
@@ -64,7 +60,7 @@ cognitive mind. Useful for diagnostics.
 .TP
 .B --stop
 Stop the running session for this data dir (same staged teardown as
-.BR run.sh " \fB--stop\fR):"
+.BR genesis " \fB--stop\fR):"
 SIGINT the CLI, then SIGTERM the daemon and retina, each with its own
 grace period.
 .TP
@@ -242,8 +238,8 @@ Put her into game mode (focused play).
 .B /endgame
 Exit game mode, resume normal operation.
 .TP
-.BR /arc " \fIids|--all [--steps N] [--fresh|--baseline (uniform|first)] [--delay S] [--recover S]\fR"
-Practice play or baseline evaluation on the ARC benchmark.
+.BR /arc " \fIids|--all [--steps N] [--fresh] [--delay S] [--recover S]\fR"
+Practice play on the ARC benchmark.
 \fB--delay\fR paces steps;
 \fB--recover\fR waits up to S seconds for her to settle at a
 wellness gate instead of abandoning the suite.
@@ -268,9 +264,9 @@ Exit. The mind saves cognitive state first; teardown waits rather
 than interrupting the save.
 .SH ENVIRONMENT
 .TP
-.B GENESIS_RUN
+.B GENESIS_WAKE
 Set by
-.BR run.sh (1)
+.BR genesis (1)
 or the
 .BR genesis (1)
 console script; the CLI refuses to start without it.
@@ -300,6 +296,20 @@ position) saved on shutdown and by the autosave thread.
 .TP
 .IR $DATA_DIR/cognitive_journal.jsonl
 Append-only journal of thoughts, dreams, learning, and world events.
+.TP
+.IR $DATA_DIR/concept_archive.db ", " vq_codebook.npz
+The concept network's persisted base: the archive of concepts and
+their relations, and the VQ codebook embeddings quantize through.
+.TP
+.I $DATA_DIR/holographic_graph.npz
+The holographic associative memory over the concept network,
+persisted with its bounded edge journal. Rebuilds re-encode the
+journal (source-bound bindings, encoding v2) rather than scanning
+for materialized edges, so a saturated superposition recovers on a
+sleep-cycle cadence instead of never.
+.TP
+.I $DATA_DIR/edge_log.jsonl
+Append-only journal of concept-network edge events.
 .TP
 .IR $DATA_DIR/workspace/
 A writable copy of her source tree for self-improvement edits

@@ -1,21 +1,80 @@
-"""Emotion engine — translates neurochemistry into structural state.
+"""Emotion engine — a continuous state field over the measured substrate.
 
-The subconscious produces raw neurochemical levels (dopamine, cortisol,
-etc.). The emotion engine reads those and determines:
+The daemon produces the raw substrate: the 18-channel neurochemical
+vector, the arousal/valence/plasticity axes, the emergent phase, and
+(via ``thalamus/brain_waves.py``) ten coupled oscillators spanning
+0.1–200 Hz. The emotion engine reads all of it and computes, for each
+structural category, a continuous **membership** — a number in [0, 1]
+saying how much the current state resembles that category's region of
+affect space. The categorical label is only a readout: ``argmax`` over
+the effective memberships. Everything else (intensity, mixed states,
+response modifiers) stays continuous.
 
-1. **Emotional category** — a structural category (stressed, content,
-   anxious...) identified by an enum value, not an English word
-2. **Cognitive mode** — how that state affects thinking (structural ID)
-3. **Cause category** — what's causing the state (structural ID)
-4. **Response modifiers** — numeric axes (verbosity, formality, etc.)
+The math (each step is grounded, not invented):
+
+1. **Evidence** — every diagnostic feature contributes a smooth factor
+   in [0, 1]: logistic evidence ``σ((x−c)/w)`` for "high"/"low", a
+   logistic band for "between", a Gaussian bump for "near a point",
+   probabilistic-or ``a+b−ab`` for alternative substrates. Centers are
+   the named constants below (the same boundaries the Rust substrate
+   uses); widths are chosen so a 10–20 % excursion crosses most of the
+   transition — the field is smooth but still localises.
+
+2. **Membership** — a category's membership is the weighted geometric
+   mean of its evidence factors, ``m_s(x) = exp(Σ w_k ln g_k / Σ w_k)``
+   — the product-of-experts form: each factor is a fuzzy predicate
+   (Fehr & Russell 1984 showed emotion categories have graded,
+   prototype-style membership, not sharp boundaries), and the product
+   makes missing evidence cheap but not free. Features that were never
+   measured (e.g. wave powers when no oscillator state was passed)
+   drop out of the mean and the weights renormalise.
+
+3. **Effective membership (granularity)** — generic regions are
+   deflated by the evidence for every more-specific region that
+   outranks them: ``eff_s = m_s · Π_{k∈mask(s)} (1 − m_k)``. This is
+   the fuzzy form of the old precedence list — "positive unless
+   something specific is measured" — and it is what Kuppens & Verduyn
+   call emotional granularity: a state can be *mostly* anxious with a
+   real admixture of fear, instead of one replacing the other.
+
+4. **Dynamics** — memberships are not instantaneous verdicts; each
+   category is a state variable relaxing toward its instantaneous
+   membership like an Ornstein–Uhlenbeck process pulled to its
+   attractor (DynAffect: Kuppens, Oravecz & Tuerlinckx 2010;
+   Oravecz, Tuerlinckx & Vandekerckhove 2011):
+   ``m(t+dt) = m + (μ−m)(1 − exp(−dt/τ))``. Time constants are
+   asymmetric — fear strikes in ~0.4 s and lingers ~25 s while
+   melancholy builds over minutes and decays over minutes — matching
+   affective chronometry and Lewis's (2005) trigger→amplification→
+   stabilisation phases of self-organising emotion-appraisal states.
+   ``EmotionField`` holds the integrated vector; ``assess_emotion``
+   remains the pure instantaneous readout.
+
+5. **Oscillatory evidence** — the bands matter because neuromodulators
+   set the oscillatory regime: LC-NE and basal-forebrain ACh
+   desynchronise cortex into fast activity (beta/gamma) under arousal,
+   and the EEG–affect literature finds alpha/beta/gamma the most
+   discriminative bands for valence and arousal. High beta (20–30 Hz,
+   "hypervigilance") corroborates threat states; alpha+beta1
+   corroborate calm wakefulness; gamma/beta2 corroborate appetitive
+   engagement; theta corroborates emotional processing and
+   understimulation; low fast-band power corroborates boredom.
+
+6. **Phase channel** — the daemon's emergent phase (sleep, stress,
+   flow, drowsy, overwhelmed) is already a computed attractor state;
+   it enters as a measured indicator at readout, deflated only by the
+   silent-stress guard for flow.
 
 No English response strings are produced here. The language system must
-generate text from the concept network using these structural identifiers.
-If Genesis has not learned words for a category, she cannot describe it.
+generate text from the concept network using these structural
+identifiers. If Genesis has not learned words for a category, she
+cannot describe it.
 """
 
 from __future__ import annotations
 
+import math
+import time
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -230,6 +289,15 @@ class EmotionalState:
     # (populated by the emotional regulator from chemical history)
     tonic_phasic: dict[str, Any] = field(default_factory=dict)
 
+    # The continuous field this state was read out of (0 when the
+    # state was constructed directly rather than assessed):
+    #   intensity    — effective membership of the winning category
+    #   memberships  — effective membership of every category,
+    #                  keyed by EmotionCategory.value; mixed states
+    #                  live here (e.g. anxious .6 with afraid .3)
+    intensity: float = 0.0
+    memberships: dict[str, float] = field(default_factory=dict)
+
     # ─── Enum property accessors ─────────────────────────────────
 
     @property
@@ -385,6 +453,30 @@ TENDER_END = 0.28
 BORED_DA = 0.25
 BORED_NE = 0.27
 
+# ─── Latent-field coherence boundaries ───────────────────────────
+#
+# The daemon's own latent field (src/field/) publishes the
+# organism's self-coherence: the Fréchet variance of the
+# body/prediction/agency fibers about their barycenter on the
+# shared ball, and that center's displacement from nominal. Per
+# the precision literature (Clark & Friston 2018 — "mood is the
+# precision of predictions"), internal incoherence IS a felt
+# signal: loss of precision reads as unsettled, coherence
+# supports calm.
+#
+#   FIELD_INCOHERENT: disagreement above this means the major
+#     systems are telling different stories. 0.05 is half of the
+#     daemon's own DISAGREEMENT_PRECISION_SCALE (0.1 in
+#     src/daemon/tick.rs — the variance at which the body's
+#     published precision halves), so the field feels incoherence
+#     before it formally degrades confidence.
+#   FIELD_CENTER_DISPLACED: consensus_norm above this means the
+#     organism's center of mass has moved well off nominal. Fibers
+#     live in a ±0.25 box (corner ≈ 0.61); 0.18 is a real
+#     displacement, not noise around the origin.
+FIELD_INCOHERENT = 0.05
+FIELD_CENTER_DISPLACED = 0.18
+
 
 @dataclass(slots=True)
 class EmotionalContext:
@@ -419,224 +511,681 @@ class EmotionalContext:
     tonic_phasic: dict[str, Any] = field(default_factory=dict)
 
 
-def assess_emotion(
+# ─── Evidence functions ────────────────────────────────────────
+#
+# Every diagnostic feature contributes a smooth factor in [0, 1]:
+# the standard fuzzy-membership kernels over one measured variable.
+# Widths are set so a plausible substrate excursion — a few
+# hundredths of a chemical level, ~0.1 of an axis — crosses most of
+# the transition, so the field is smooth but still localises.
+
+_EPS = 1.0e-9
+
+
+def _sigmoid(z: float) -> float:
+    """Numerically stable logistic σ(z) = 1/(1+e^−z)."""
+    if z >= 0.0:
+        return 1.0 / (1.0 + math.exp(-z))
+    e = math.exp(z)
+    return e / (1.0 + e)
+
+
+def _hi(x: float, c: float, w: float) -> float:
+    """Evidence that x is above c: σ((x−c)/w)."""
+    return _sigmoid((x - c) / w)
+
+
+def _lo(x: float, c: float, w: float) -> float:
+    """Evidence that x is below c: σ((c−x)/w)."""
+    return _sigmoid((c - x) / w)
+
+
+def _band(x: float, lo: float, hi: float, w: float) -> float:
+    """Evidence that x sits inside (lo, hi): product of the two edges."""
+    return _sigmoid((x - lo) / w) * _sigmoid((hi - x) / w)
+
+
+def _bump(x: float, c: float, w: float) -> float:
+    """Evidence that x is near c: Gaussian exp(−(x−c)²/2w²)."""
+    z = (x - c) / w
+    return math.exp(-0.5 * z * z)
+
+
+def _or(a: float, b: float) -> float:
+    """Probabilistic sum a+b−ab — independent alternative substrates."""
+    return a + b - a * b
+
+
+# Evidence terms are tuples evaluated against the feature map:
+#   ("hi",   feature, center, width)
+#   ("lo",   feature, center, width)
+#   ("band", feature, lo_edge, hi_edge, width)
+#   ("bump", feature, center, width)
+#   ("or",   term_a, term_b)   — either substrate suffices
+# A term whose feature was never measured returns None and drops
+# out of the geometric mean (the weights renormalise). This is how
+# wave-power evidence behaves when no oscillator state was passed.
+
+
+def _eval_term(term: tuple, f: dict[str, float]) -> float | None:
+    """Evaluate one evidence term against the feature map."""
+    op = term[0]
+    if op == "or":
+        a = _eval_term(term[1], f)
+        b = _eval_term(term[2], f)
+        if a is None:
+            return b
+        if b is None:
+            return a
+        return _or(a, b)
+    x = f.get(term[1])
+    if x is None:
+        return None
+    if op == "hi":
+        return _hi(x, term[2], term[3])
+    if op == "lo":
+        return _lo(x, term[2], term[3])
+    if op == "band":
+        return _band(x, term[2], term[3], term[4])
+    return _bump(x, term[2], term[3])
+
+
+# ─── Feature extraction ────────────────────────────────────────
+#
+# The field is evaluated over her measured state vector: the
+# daemon's arousal/valence/plasticity axes, all 18 neurochemical
+# channels, the felt-context drives, and the coupled-oscillator
+# band powers. Chemicals absent from the dict are treated as 0 —
+# the same convention the callers' .get() used. Wave features are
+# only populated when an oscillator state was actually read;
+# otherwise wave terms drop out of the mean rather than pretending
+# a measurement.
+
+_CHEMICAL_KEYS = (
+    "dopamine",
+    "serotonin",
+    "norepinephrine",
+    "acetylcholine",
+    "gaba",
+    "glutamate",
+    "cortisol",
+    "oxytocin",
+    "endorphin",
+    "histamine",
+    "adenosine",
+    "bdnf",
+    "endocannabinoid",
+    "vasopressin",
+    "crh",
+    "orexin",
+    "epinephrine",
+    "melatonin",
+)
+
+
+def _finite(x: float, lo: float, hi: float) -> float:
+    """Clamp to [lo, hi]; non-finite becomes the in-range neutral."""
+    if not math.isfinite(x):
+        return 0.0 if lo <= 0.0 <= hi else lo
+    return min(max(x, lo), hi)
+
+
+def _affect_features(
+    summary: NeuroSummary,
+    chemicals: dict[str, float] | None,
+    context: EmotionalContext | None,
+    waves: Any | None,
+    field_state: Any | None,
+) -> dict[str, float]:
+    """Build the measured feature vector the field is evaluated over."""
+    f: dict[str, float] = {
+        "arousal": _finite(summary.arousal, 0.0, 1.0),
+        "valence": _finite(summary.valence, -1.0, 1.0),
+        "plasticity": _finite(summary.plasticity_gate, 0.0, 1.0),
+        "ctx": 1.0 if context is not None else 0.0,
+    }
+    chemicals = chemicals or {}
+    for k in _CHEMICAL_KEYS:
+        f[k] = _finite(chemicals.get(k, 0.0), 0.0, 2.0)
+    if context is not None:
+        f["social_isolation"] = _finite(context.social_isolation, 0.0, 1.0)
+        f["social_drive"] = _finite(context.social_drive, 0.0, 2.0)
+        f["boundary_strain"] = _finite(context.boundary_strain, 0.0, 2.0)
+        f["prediction_error"] = _finite(context.prediction_error, 0.0, 1.0)
+        f["curiosity"] = _finite(context.curiosity, 0.0, 1.0)
+        ne_tp = (context.tonic_phasic or {}).get("norepinephrine")
+        f["ne_phasic"] = 1.0 if getattr(ne_tp, "mode", None) == "phasic" else 0.0
+    if waves is not None:
+        powers: dict[str, float] = {}
+        for k, v in (getattr(waves, "powers", None) or {}).items():
+            powers[getattr(k, "value", str(k))] = _finite(v, 0.0, 1.0)
+        for name in (
+            "delta",
+            "theta",
+            "alpha",
+            "sigma",
+            "beta1",
+            "beta2",
+            "beta3",
+            "gamma",
+            "epsilon",
+            "infraslow",
+        ):
+            f["w_" + name] = powers.get(name, 0.0)
+        # Fast/slow aggregates — the literature's affect groupings.
+        f["w_fast"] = f["w_beta2"] + f["w_beta3"] + f["w_gamma"] + f["w_epsilon"]
+        f["w_focus"] = _finite(getattr(waves, "focus", 0.0), 0.0, 1.0)
+        f["w_integration"] = _finite(getattr(waves, "integration", 0.0), 0.0, 1.0)
+        f["w_plv"] = _finite(getattr(waves, "gamma_plv", 0.0) or 0.0, 0.0, 1.0)
+    if field_state is not None:
+        # The latent field's own coherence readout — measured, not
+        # inferred: the Fréchet variance of her major systems about
+        # their shared barycenter, and how far that center has
+        # drifted from nominal. Absent → the terms drop out, like
+        # an unread wave channel.
+        f["disagreement"] = _finite(getattr(field_state, "disagreement", 0.0), 0.0, 1.0)
+        f["center_displacement"] = _finite(
+            getattr(field_state, "consensus_norm", 0.0), 0.0, 1.0
+        )
+    return f
+
+
+# ─── The affective field ───────────────────────────────────────
+#
+# Each structural category is a *region* of the measured state
+# space, defined by a membership function instead of a box. The
+# regions are layered:
+#
+#   deep    — substrate-resolved states (fear, anger, loneliness,
+#             tenderness, guarded): the felt-context signals that
+#             arousal×valence alone cannot distinguish
+#   quadrants — the arousal×valence circumplex corners
+#   shallow — relabelers that only win over mild states (surprise,
+#             curiosity, boredom)
+#   residuals — single-axis defaults (positive, unsettled, neutral)
+#
+# Precedence is expressed as masking, not an if-chain:
+# eff_s = m_s · Π_{k∈mask(s)} (1 − m_k).
+
+_DEEP = (
+    EmotionCategory.AFRAID,
+    EmotionCategory.ANGRY,
+    EmotionCategory.LONELY,
+    EmotionCategory.TENDER,
+    EmotionCategory.GUARDED,
+)
+_QUADRANTS = (
+    EmotionCategory.EXCITED,
+    EmotionCategory.ANXIOUS,
+    EmotionCategory.CONTENT,
+    EmotionCategory.MELANCHOLIC,
+)
+_SHALLOW = (
+    EmotionCategory.SURPRISED,
+    EmotionCategory.CURIOUS,
+    EmotionCategory.BORED,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class _Region:
+    """One region of the affective field.
+
+    terms/weights: the region's membership function — a weighted
+        geometric mean of its evidence factors.
+    mode: cognitive-mode readout when this region wins (None = the
+        plasticity prior).
+    verbosity/openness/caution/creativity: response-modifier profile
+        blended at readout (creativity None = plasticity prior).
+    gated: requires an EmotionalContext — without one the
+        discriminating signals don't exist, so m = 0.
+    tau_rise/tau_fall: OU time constants (seconds) — attack and
+        release (Lewis's trigger → amplification → stabilisation).
+    masked_by: regions whose raw membership deflates this one's
+        effective membership.
+    """
+
+    terms: tuple
+    weights: tuple[float, ...]
+    mode: CognitiveMode | None
+    verbosity: float
+    openness: float
+    caution: float
+    creativity: float | None
+    gated: bool
+    tau_rise: float
+    tau_fall: float
+    masked_by: tuple[EmotionCategory, ...] = ()
+
+
+_FIELD_REGIONS: dict[EmotionCategory, _Region] = {
+    # ── Deep substrate-resolved regions ──
+    # Fear — acute phasic catecholamine surge on negative valence,
+    # corroborated by 20–30 Hz hypervigilance power. Distinct from
+    # anxiety: anxiety is the tonic climate, fear the phasic event.
+    EmotionCategory.AFRAID: _Region(
+        terms=(
+            ("lo", "valence", MILD_NEGATIVE_VALENCE, 0.05),
+            (
+                "or",
+                ("hi", "ne_phasic", 0.5, 0.1),
+                ("hi", "epinephrine", FEAR_EPI, 0.03),
+            ),
+            ("hi", "norepinephrine", FEAR_NE, 0.05),
+            ("hi", "w_beta3", 0.18, 0.06),
+        ),
+        weights=(1.0, 2.0, 1.0, 0.6),
+        mode=CognitiveMode.VIGILANT,
+        verbosity=0.7,
+        openness=0.3,
+        caution=0.9,
+        creativity=0.2,
+        gated=True,
+        tau_rise=0.4,
+        tau_fall=25.0,
+    ),
+    # Anger — mistreatment accrual with fight arousal; the strain
+    # alone is hurt, the catecholamines make it anger.
+    EmotionCategory.ANGRY: _Region(
+        terms=(
+            ("hi", "boundary_strain", ANGER_BOUNDARY_STRAIN, 0.08),
+            (
+                "or",
+                ("hi", "norepinephrine", ANGER_NE, 0.05),
+                ("hi", "arousal", ANGER_ALERTNESS, 0.06),
+            ),
+            ("lo", "valence", MILD_POSITIVE_VALENCE, 0.06),
+            ("hi", "w_beta3", 0.15, 0.06),
+        ),
+        weights=(1.5, 2.0, 1.0, 0.4),
+        mode=CognitiveMode.COMBATIVE,
+        verbosity=0.9,
+        openness=0.3,
+        caution=0.2,
+        creativity=0.2,
+        gated=True,
+        tau_rise=3.0,
+        tau_fall=45.0,
+    ),
+    # Lonely — felt isolation with the bonding substrate actually
+    # depleted; theta is the emotional-processing band.
+    EmotionCategory.LONELY: _Region(
+        terms=(
+            (
+                "or",
+                ("hi", "social_isolation", LONELY_ISOLATION, 0.10),
+                ("hi", "social_drive", LONELY_DRIVE, 0.20),
+            ),
+            ("lo", "oxytocin", LONELY_OXY, 0.03),
+            ("lo", "valence", MILD_POSITIVE_VALENCE, 0.06),
+            ("hi", "w_theta", 0.15, 0.05),
+        ),
+        weights=(1.5, 2.0, 1.0, 0.4),
+        mode=CognitiveMode.WITHDRAWN,
+        verbosity=0.8,
+        openness=0.9,
+        caution=0.4,
+        creativity=0.4,
+        gated=True,
+        tau_rise=120.0,
+        tau_fall=120.0,
+    ),
+    # Tender — affiliative warmth: oxytocin and endorphin clearly
+    # above baseline while valence is positive; alpha corroborates
+    # calm wakefulness. The silent-stress guard demotes it.
+    EmotionCategory.TENDER: _Region(
+        terms=(
+            ("hi", "oxytocin", TENDER_OXY, 0.04),
+            ("hi", "endorphin", TENDER_END, 0.05),
+            ("hi", "valence", MILD_POSITIVE_VALENCE, 0.05),
+            ("hi", "w_alpha", 0.20, 0.06),
+        ),
+        weights=(1.2, 1.0, 1.0, 0.4),
+        mode=CognitiveMode.WARM,
+        verbosity=0.9,
+        openness=1.0,
+        caution=0.2,
+        creativity=0.5,
+        gated=True,
+        tau_rise=8.0,
+        tau_fall=40.0,
+        masked_by=(EmotionCategory.GUARDED,),
+    ),
+    # Guarded — the silent-stress posture: positive surface over a
+    # stressed substrate (cortisol up or plasticity suppressed).
+    EmotionCategory.GUARDED: _Region(
+        terms=(
+            ("hi", "valence", MILD_POSITIVE_VALENCE, 0.05),
+            (
+                "or",
+                (
+                    "or",
+                    ("hi", "cortisol", GUARDED_CORTISOL, 0.02),
+                    ("lo", "plasticity", PLASTICITY_LOW, 0.06),
+                ),
+                ("hi", "disagreement", 0.09, 0.025),
+            ),
+            ("hi", "w_beta3", 0.15, 0.06),
+        ),
+        weights=(1.0, 1.5, 0.4),
+        mode=CognitiveMode.CAUTIOUS,
+        verbosity=0.8,
+        openness=0.6,
+        caution=0.6,
+        creativity=0.3,
+        gated=False,
+        tau_rise=2.0,
+        tau_fall=15.0,
+    ),
+    # ── Arousal×valence quadrants ──
+    EmotionCategory.EXCITED: _Region(
+        terms=(
+            ("hi", "arousal", HIGH_AROUSAL, 0.06),
+            ("hi", "valence", POSITIVE_VALENCE, 0.08),
+            ("or", ("hi", "w_gamma", 0.15, 0.05), ("hi", "w_beta2", 0.18, 0.06)),
+        ),
+        weights=(1.0, 1.0, 0.5),
+        mode=CognitiveMode.ENERGIZED,
+        verbosity=1.2,
+        openness=1.0,
+        caution=0.3,
+        creativity=0.7,
+        gated=False,
+        tau_rise=1.5,
+        tau_fall=15.0,
+        masked_by=_DEEP,
+    ),
+    # Anxiety — the tonic vigilance climate: high arousal, negative
+    # valence, and stress chemistry (cortisol) or hypervigilance
+    # power. The phasic surge that would make it fear masks it.
+    EmotionCategory.ANXIOUS: _Region(
+        terms=(
+            ("hi", "arousal", HIGH_AROUSAL, 0.06),
+            ("lo", "valence", NEGATIVE_VALENCE, 0.07),
+            (
+                "or",
+                (
+                    "or",
+                    ("hi", "cortisol", 0.04, 0.02),
+                    ("hi", "w_beta3", 0.18, 0.06),
+                ),
+                ("hi", "disagreement", 0.08, 0.025),
+            ),
+        ),
+        weights=(1.5, 1.5, 0.4),
+        mode=CognitiveMode.VIGILANT,
+        verbosity=0.8,
+        openness=1.0,
+        caution=0.6,
+        creativity=None,
+        gated=False,
+        tau_rise=6.0,
+        tau_fall=60.0,
+        masked_by=_DEEP,
+    ),
+    EmotionCategory.CONTENT: _Region(
+        terms=(
+            ("lo", "arousal", LOW_AROUSAL, 0.06),
+            ("hi", "valence", MILD_POSITIVE_VALENCE, 0.06),
+            ("or", ("hi", "w_alpha", 0.20, 0.06), ("hi", "w_beta1", 0.15, 0.05)),
+        ),
+        weights=(2.0, 1.0, 0.5),
+        mode=CognitiveMode.RELAXED,
+        verbosity=0.9,
+        openness=1.0,
+        caution=0.3,
+        creativity=0.5,
+        gated=False,
+        tau_rise=30.0,
+        tau_fall=40.0,
+        masked_by=_DEEP,
+    ),
+    EmotionCategory.MELANCHOLIC: _Region(
+        terms=(
+            ("lo", "arousal", LOW_AROUSAL, 0.06),
+            ("lo", "valence", NEGATIVE_VALENCE, 0.07),
+            ("hi", "w_theta", 0.15, 0.05),
+        ),
+        weights=(1.0, 1.0, 0.4),
+        mode=CognitiveMode.REFLECTIVE,
+        verbosity=0.7,
+        openness=1.0,
+        caution=0.3,
+        creativity=0.3,
+        gated=False,
+        tau_rise=90.0,
+        tau_fall=120.0,
+        masked_by=_DEEP,
+    ),
+    # ── Shallow relabelers ──
+    # Surprise — a strong prediction-error orienting event. It only
+    # wins over mild states; a resolved deep or quadrant state keeps
+    # precedence (masked below).
+    EmotionCategory.SURPRISED: _Region(
+        terms=(
+            ("hi", "prediction_error", SURPRISE_PE, 0.08),
+            ("hi", "w_gamma", 0.15, 0.06),
+        ),
+        weights=(1.5, 0.4),
+        mode=CognitiveMode.STARTLED,
+        verbosity=1.1,
+        openness=0.8,
+        caution=0.5,
+        creativity=0.6,
+        gated=True,
+        tau_rise=0.2,
+        tau_fall=8.0,
+        masked_by=(
+            *_DEEP,
+            EmotionCategory.EXCITED,
+            EmotionCategory.ANXIOUS,
+            EmotionCategory.MELANCHOLIC,
+        ),
+    ),
+    # Curious — appetitive seeking: the curiosity drive is up and
+    # the seeking chemistry (DA wanting, ACh attention) supports it;
+    # gamma/beta2 binding corroborates engagement.
+    EmotionCategory.CURIOUS: _Region(
+        terms=(
+            ("hi", "curiosity", CURIOUS_LEVEL, 0.08),
+            ("hi", "dopamine", CURIOUS_DA, 0.05),
+            ("hi", "acetylcholine", CURIOUS_ACH, 0.05),
+            ("hi", "valence", MILD_NEGATIVE_VALENCE, 0.05),
+            ("or", ("hi", "w_gamma", 0.15, 0.05), ("hi", "w_beta2", 0.15, 0.05)),
+        ),
+        weights=(1.5, 1.0, 1.0, 0.8, 0.5),
+        mode=CognitiveMode.INQUISITIVE,
+        verbosity=1.15,
+        openness=1.0,
+        caution=0.2,
+        creativity=0.8,
+        gated=True,
+        tau_rise=3.0,
+        tau_fall=20.0,
+        masked_by=(
+            *_DEEP,
+            EmotionCategory.EXCITED,
+            EmotionCategory.ANXIOUS,
+            EmotionCategory.MELANCHOLIC,
+            EmotionCategory.SURPRISED,
+            EmotionCategory.BORED,
+        ),
+    ),
+    # Bored — awake, understimulated, flat: DA and NE sagged, no
+    # curiosity engaged, low fast-band power. Only wins over the
+    # shallowest states — melancholy is deeper than boredom.
+    EmotionCategory.BORED: _Region(
+        terms=(
+            ("lo", "dopamine", BORED_DA, 0.04),
+            ("lo", "norepinephrine", BORED_NE, 0.04),
+            ("band", "arousal", LOW_AROUSAL - 0.10, 0.55, 0.05),
+            ("band", "valence", MILD_NEGATIVE_VALENCE, MILD_POSITIVE_VALENCE + 0.05, 0.05),
+            ("lo", "curiosity", CURIOUS_LEVEL - 0.15, 0.08),
+            ("lo", "w_fast", 0.30, 0.10),
+        ),
+        weights=(1.2, 1.2, 1.0, 1.0, 0.8, 0.4),
+        mode=CognitiveMode.RESTLESS,
+        verbosity=0.6,
+        openness=0.7,
+        caution=0.2,
+        creativity=0.3,
+        gated=True,
+        tau_rise=90.0,
+        tau_fall=45.0,
+        masked_by=(
+            *_DEEP,
+            *_QUADRANTS,
+            EmotionCategory.POSITIVE,
+            EmotionCategory.SURPRISED,
+            EmotionCategory.CURIOUS,
+        ),
+    ),
+    # ── Single-axis residuals ──
+    EmotionCategory.POSITIVE: _Region(
+        terms=(("bump", "valence", 0.35, 0.22),),
+        weights=(1.0,),
+        mode=None,
+        verbosity=1.0,
+        openness=1.0,
+        caution=0.3,
+        creativity=None,
+        gated=False,
+        tau_rise=8.0,
+        tau_fall=20.0,
+        masked_by=(
+            *_DEEP,
+            *_QUADRANTS,
+            EmotionCategory.SURPRISED,
+            EmotionCategory.CURIOUS,
+            EmotionCategory.UNSETTLED,
+        ),
+    ),
+    EmotionCategory.UNSETTLED: _Region(
+        terms=(
+            (
+                "or",
+                ("bump", "valence", -0.35, 0.22),
+                ("hi", "disagreement", FIELD_INCOHERENT, 0.025),
+            ),
+            ("hi", "center_displacement", FIELD_CENTER_DISPLACED, 0.10),
+        ),
+        weights=(1.0, 0.5),
+        mode=None,
+        verbosity=0.9,
+        openness=1.0,
+        caution=0.4,
+        creativity=None,
+        gated=False,
+        tau_rise=10.0,
+        tau_fall=25.0,
+        masked_by=(
+            *_DEEP,
+            *_QUADRANTS,
+            EmotionCategory.SURPRISED,
+            EmotionCategory.BORED,
+        ),
+    ),
+    EmotionCategory.NEUTRAL: _Region(
+        terms=(("bump", "valence", 0.0, 0.12),),
+        weights=(1.0,),
+        mode=None,
+        verbosity=1.0,
+        openness=1.0,
+        caution=0.3,
+        creativity=None,
+        gated=False,
+        tau_rise=6.0,
+        tau_fall=10.0,
+        masked_by=(*_DEEP, *_QUADRANTS, *_SHALLOW, EmotionCategory.UNSETTLED),
+    ),
+}
+
+# Phase channel — the daemon's emergent phase is already a computed
+# attractor state of the body ODEs; it enters the readout as a
+# measured indicator, not as field evidence.
+_PHASE_CATEGORY: dict[str, EmotionCategory] = {
+    "sleeping": EmotionCategory.SLEEPING,
+    "nrem": EmotionCategory.SLEEPING,
+    "rem": EmotionCategory.SLEEPING,
+    "overwhelmed": EmotionCategory.OVERWHELMED,
+    "stress": EmotionCategory.STRESSED,
+    "flow": EmotionCategory.FLOW,
+    "drowsy": EmotionCategory.DROWSY,
+}
+
+# (mode, verbosity, openness, caution, creativity|None→base)
+_PHASE_PROFILE: dict[
+    EmotionCategory, tuple[CognitiveMode, float, float, float, float | None]
+] = {
+    EmotionCategory.SLEEPING: (CognitiveMode.DREAMLIKE, 0.3, 0.2, 0.3, 0.9),
+    EmotionCategory.OVERWHELMED: (CognitiveMode.SCATTERED, 0.4, 0.3, 0.8, None),
+    EmotionCategory.STRESSED: (CognitiveMode.CAUTIOUS, 0.7, 1.0, 0.7, None),
+    EmotionCategory.FLOW: (CognitiveMode.SHARP, 1.1, 1.0, 0.3, 0.75),
+    EmotionCategory.DROWSY: (CognitiveMode.SLOW, 0.6, 0.5, 0.3, None),
+}
+
+
+def _raw_memberships(f: dict[str, float]) -> dict[EmotionCategory, float]:
+    """Instantaneous (unsmoothed, unmasked) membership of each region.
+
+    m_s(x) = exp(Σ w_k ln g_k / Σ w_k) — the weighted geometric mean
+    of the region's evidence factors. Unmeasured features drop out
+    and the weights renormalise. Gated regions multiply by the
+    context flag: without felt-context signals the discriminating
+    evidence cannot exist.
+    """
+    m: dict[EmotionCategory, float] = {}
+    for cat, spec in _FIELD_REGIONS.items():
+        num = den = 0.0
+        for term, w in zip(spec.terms, spec.weights, strict=True):
+            g = _eval_term(term, f)
+            if g is None:
+                continue
+            num += w * math.log(max(g, _EPS))
+            den += w
+        m_s = math.exp(num / den) if den > 0.0 else 0.0
+        m[cat] = m_s * f["ctx"] if spec.gated else m_s
+    return m
+
+
+def membership_field(
     summary: NeuroSummary,
     chemicals: dict[str, float] | None = None,
     context: EmotionalContext | None = None,
-) -> EmotionalState:
-    """Map a neurochemical summary to a structural emotional state.
+    waves: Any | None = None,
+    field_state: Any | None = None,
+) -> dict[EmotionCategory, float]:
+    """Instantaneous membership of every region — the field itself.
 
-    This is the core emotional assessment function. It reads the
-    arousal/valence/tone/plasticity axes and the phase to determine
-    a qualitative emotional category, cognitive mode, and cause.
-
-    The mapping is grounded in affective neuroscience:
-    - High arousal + positive valence → excitement/joy
-    - High arousal + negative valence → anxiety/stress
-    - Low arousal + positive valence → contentment/calm
-    - Low arousal + negative valence → lethargy/sadness
-    - Low plasticity → rigid thinking, repetition
-    - High plasticity → flexible, exploratory
-
-    Returns a structural state — no English strings. The language
-    system must generate text from the concept network.
+    This is the continuous substrate under the label: call it when
+    you want the mixture (e.g. anxious 0.6 with afraid 0.3), not the
+    argmax.
     """
-    alertness = summary.arousal
-    valence = summary.valence
-    plasticity = summary.plasticity_gate
-    phase = summary.phase_name
-
-    # Defaults (may be overridden by specific phases below)
-    category = EmotionCategory.NEUTRAL
-    cognitive_mode = CognitiveMode.STEADY
-    verbosity = 1.0
-    openness_to_engage = 1.0
-    caution = 0.3
-    creativity = 0.4
-
-    # Base cognitive mode on plasticity
-    cognitive_mode, creativity = _base_cognitive_mode(plasticity)
-
-    # Determine emotional category from phase or arousal×valence space
-    phase_result = _phase_emotion(phase, cognitive_mode, creativity, openness_to_engage, caution)
-    if phase_result is not None:
-        (
-            category,
-            cognitive_mode,
-            verbosity,
-            openness_to_engage,
-            caution,
-            creativity,
-        ) = phase_result
-    else:
-        (
-            category,
-            cognitive_mode,
-            verbosity,
-            openness_to_engage,
-            caution,
-            creativity,
-        ) = _av_emotion(
-            alertness,
-            valence,
-            cognitive_mode,
-            creativity,
-            openness_to_engage,
-            caution,
-        )
-
-    # Same-quadrant discrimination and the silent-stress guard.
-    cortisol = chemicals.get("cortisol", 0.0) if chemicals else 0.0
-    (
-        category,
-        cognitive_mode,
-        verbosity,
-        openness_to_engage,
-        caution,
-        creativity,
-    ) = _refine_emotion(
-        phase_result,
-        context,
-        chemicals,
-        cortisol,
-        alertness,
-        valence,
-        plasticity,
-        category,
-        cognitive_mode,
-        verbosity,
-        openness_to_engage,
-        caution,
-        creativity,
-    )
-
-    return _build_state(
-        category,
-        cognitive_mode,
-        verbosity,
-        openness_to_engage,
-        caution,
-        creativity,
-        alertness,
-        valence,
-        plasticity,
-        phase,
-        cortisol,
+    return _raw_memberships(
+        _affect_features(summary, chemicals, context, waves, field_state)
     )
 
 
-def _refine_emotion(
-    phase_result: tuple[EmotionCategory, CognitiveMode, float, float, float, float] | None,
-    context: EmotionalContext | None,
-    chemicals: dict[str, float] | None,
-    cortisol: float,
-    alertness: float,
-    valence: float,
-    plasticity: float,
-    category: EmotionCategory,
-    cognitive_mode: CognitiveMode,
-    verbosity: float,
-    openness_to_engage: float,
-    caution: float,
-    creativity: float,
-) -> tuple[EmotionCategory, CognitiveMode, float, float, float, float]:
-    """Refine the circumplex label by felt context and stress guards.
+def effective_memberships(
+    m: dict[EmotionCategory, float],
+) -> dict[EmotionCategory, float]:
+    """Deflate generic regions by the evidence for the specific ones.
 
-    Same-quadrant discrimination: when the felt context carries a
-    specific substrate (phasic surge, boundary strain, isolation,
-    prediction error, curiosity, affiliative warmth, or plain
-    understimulation) it refines the circumplex label into the
-    emotion that actually fits. Phase-determined categories keep
-    precedence — the daemon already resolved those.
-
-    Then guard against pleasant categories when the substrate is
-    actually under chronic stress or in a low-plasticity protective
-    posture ("silent stress") — see _guarded_emotion.
-
-    Returns (category, cognitive_mode, verbosity, openness, caution,
-    creativity).
+    eff_s = m_s · Π_{k∈mask(s)} (1 − m_k) — the fuzzy form of
+    precedence: a generic region survives only where no more specific
+    measured state explains the substrate.
     """
-    if context is not None and phase_result is None:
-        (
-            category,
-            cognitive_mode,
-            verbosity,
-            openness_to_engage,
-            caution,
-            creativity,
-        ) = _contextual_emotion(
-            category,
-            cognitive_mode,
-            verbosity,
-            openness_to_engage,
-            caution,
-            creativity,
-            alertness,
-            valence,
-            chemicals or {},
-            context,
-        )
-
-    (
-        category,
-        cognitive_mode,
-        openness_to_engage,
-        caution,
-        creativity,
-    ) = _guarded_emotion(
-        category,
-        cognitive_mode,
-        openness_to_engage,
-        caution,
-        creativity,
-        valence,
-        cortisol,
-        plasticity,
-    )
-    return (category, cognitive_mode, verbosity, openness_to_engage, caution, creativity)
-
-
-def _build_state(
-    category: EmotionCategory,
-    cognitive_mode: CognitiveMode,
-    verbosity: float,
-    openness_to_engage: float,
-    caution: float,
-    creativity: float,
-    alertness: float,
-    valence: float,
-    plasticity: float,
-    phase: str,
-    cortisol: float,
-) -> EmotionalState:
-    """Assemble the final structural EmotionalState."""
-    # Formality is influenced by arousal
-    formality = 0.5 - (alertness - 0.5) * 0.2
-    formality = max(0.1, min(0.9, formality))
-
-    # Derive structural cause category for negative states
-    cause_category = _derive_cause_category(
-        category, alertness, valence, plasticity, phase, cortisol
-    )
-
-    return EmotionalState(
-        label=category.value,
-        cognitive_style=cognitive_mode.value,
-        cause=cause_category.value,
-        verbosity=verbosity,
-        formality=formality,
-        openness_to_engage=openness_to_engage,
-        creativity=creativity,
-        caution=caution,
-        alertness=alertness,
-        valence=valence,
-        plasticity=plasticity,
-        chemicals={},  # Filled by caller if full state available
-    )
+    eff: dict[EmotionCategory, float] = {}
+    for cat, m_s in m.items():
+        keep = 1.0
+        for k in _FIELD_REGIONS[cat].masked_by:
+            keep *= 1.0 - m.get(k, 0.0)
+        eff[cat] = m_s * keep
+    return eff
 
 
 def _base_cognitive_mode(plasticity: float) -> tuple[CognitiveMode, float]:
-    """Determine base cognitive mode and creativity from plasticity."""
+    """Cognitive-mode prior and creativity prior from plasticity."""
     if plasticity < PLASTICITY_LOW:
         return (CognitiveMode.RIGID, 0.1)
     elif plasticity > PLASTICITY_HIGH:
@@ -645,276 +1194,193 @@ def _base_cognitive_mode(plasticity: float) -> tuple[CognitiveMode, float]:
         return (CognitiveMode.STEADY, 0.4)
 
 
-def _phase_emotion(
-    phase: str,
-    cognitive_mode: CognitiveMode,
-    creativity: float,
-    openness_to_engage: float,
-    caution: float,
-) -> tuple[EmotionCategory, CognitiveMode, float, float, float, float] | None:
-    """Return emotion values for phase-based states, or None if no match.
+def _phase_values(
+    cat: EmotionCategory, base_cr: float
+) -> tuple[CognitiveMode, float, float, float, float]:
+    """(mode, verbosity, openness, caution, creativity) for a phase state."""
+    mode, verbosity, openness, caution, cr = _PHASE_PROFILE[cat]
+    if cat is EmotionCategory.STRESSED:
+        cr = max(base_cr - 0.3, 0.1)
+    elif cr is None:
+        cr = base_cr
+    return (mode, verbosity, openness, caution, cr)
 
-    Returns (category, cognitive_mode, verbosity, openness, caution, creativity).
+
+def _resolve_state(
+    m: dict[EmotionCategory, float],
+    summary: NeuroSummary,
+    f: dict[str, float],
+) -> EmotionalState:
+    """Read a structural state out of a membership vector.
+
+    The label is an argmax readout over effective memberships; the
+    daemon's phase, when present, enters as a measured indicator
+    (flow is deflated by the silent-stress guard, matching the old
+    demotion). Response modifiers are the membership-weighted blend
+    of the regions' profiles — a mixed state mixes its modifiers.
     """
-    if phase in ("sleeping", "nrem", "rem"):
-        return (EmotionCategory.SLEEPING, CognitiveMode.DREAMLIKE, 0.3, 0.2, 0.3, 0.9)
-    if phase == "overwhelmed":
-        return (EmotionCategory.OVERWHELMED, CognitiveMode.SCATTERED, 0.4, 0.3, 0.8, creativity)
-    if phase == "stress":
-        return (
-            EmotionCategory.STRESSED,
-            CognitiveMode.CAUTIOUS,
-            0.7,
-            openness_to_engage,
-            0.7,
-            max(creativity - 0.3, 0.1),
+    eff = effective_memberships(m)
+    phase = summary.phase_name
+    phase_cat = _PHASE_CATEGORY.get(phase)
+    for cat in _PHASE_CATEGORY.values():
+        eff.setdefault(cat, 0.0)
+    if phase_cat is not None:
+        eff[phase_cat] = (
+            1.0 - eff.get(EmotionCategory.GUARDED, 0.0)
+            if phase_cat is EmotionCategory.FLOW
+            else 1.0
         )
-    if phase == "flow":
-        return (EmotionCategory.FLOW, CognitiveMode.SHARP, 1.1, 1.0, caution, 0.75)
-    if phase == "drowsy":
-        return (EmotionCategory.DROWSY, CognitiveMode.SLOW, 0.6, 0.5, caution, creativity)
-    return None
+    winner = max(eff, key=eff.__getitem__)
+
+    base_mode, base_cr = _base_cognitive_mode(f["plasticity"])
+    if winner in _PHASE_PROFILE:
+        mode, verbosity, openness, caution, cr = _phase_values(winner, base_cr)
+    else:
+        # The winner's effective membership is the fraction of the
+        # state it explains; the residual (1−i) is the mixture of
+        # everything else. Modifiers blend as i·winner + (1−i)·rest.
+        spec = _FIELD_REGIONS[winner]
+        total = sum(eff.get(c, 0.0) for c in _FIELD_REGIONS)
+        rest = total - eff[winner]
+        mode = spec.mode or base_mode
+        if rest > _EPS:
+            rv = ro = rc = rcr = 0.0
+            for c, s in _FIELD_REGIONS.items():
+                if c is winner:
+                    continue
+                w = eff[c] / rest
+                rv += w * s.verbosity
+                ro += w * s.openness
+                rc += w * s.caution
+                rcr += w * (s.creativity if s.creativity is not None else base_cr)
+        else:
+            rv, ro, rc, rcr = spec.verbosity, spec.openness, spec.caution, base_cr
+        i = eff[winner]
+        verbosity = i * spec.verbosity + (1.0 - i) * rv
+        openness = i * spec.openness + (1.0 - i) * ro
+        caution = i * spec.caution + (1.0 - i) * rc
+        cr = i * (spec.creativity if spec.creativity is not None else base_cr) + (1.0 - i) * rcr
+
+    # Formality tracks arousal — the same linear map as before.
+    formality = max(0.1, min(0.9, 0.5 - (f["arousal"] - 0.5) * 0.2))
+
+    cause_category = _derive_cause_category(
+        winner, f["arousal"], f["valence"], f["plasticity"], phase, f["cortisol"]
+    )
+
+    return EmotionalState(
+        label=winner.value,
+        cognitive_style=mode.value,
+        cause=cause_category.value,
+        verbosity=verbosity,
+        formality=formality,
+        openness_to_engage=openness,
+        creativity=cr,
+        caution=caution,
+        alertness=f["arousal"],
+        valence=f["valence"],
+        plasticity=f["plasticity"],
+        chemicals={},  # Filled by caller if full state available
+        intensity=eff[winner],
+        memberships={c.value: v for c, v in eff.items()},
+    )
 
 
-def _av_emotion(
-    alertness: float,
-    valence: float,
-    cognitive_mode: CognitiveMode,
-    creativity: float,
-    openness_to_engage: float,
-    caution: float,
-) -> tuple[EmotionCategory, CognitiveMode, float, float, float, float]:
-    """Return emotion values from arousal/valence space.
+def assess_emotion(
+    summary: NeuroSummary,
+    chemicals: dict[str, float] | None = None,
+    context: EmotionalContext | None = None,
+    waves: Any | None = None,
+    field_state: Any | None = None,
+) -> EmotionalState:
+    """Instantaneous emotional assessment — evaluate the field, read argmax.
 
-    Returns (category, cognitive_mode, verbosity, openness, caution, creativity).
+    This is the memoryless readout: it computes every region's
+    membership over the current substrate (arousal/valence axes, the
+    18-channel chemical vector, felt-context drives, and the
+    oscillator band powers when supplied) and resolves the structural
+    state. For the live system prefer ``EmotionField.update``, which
+    adds per-region OU dynamics — states then persist, mix, and decay
+    on their own time constants instead of snapping.
+
+    Returns a structural state — no English strings. The language
+    system must generate text from the concept network.
     """
-    if alertness > HIGH_AROUSAL and valence > POSITIVE_VALENCE:
-        return (EmotionCategory.EXCITED, CognitiveMode.ENERGIZED, 1.2, 1.0, caution, 0.7)
-    if alertness > HIGH_AROUSAL and valence < NEGATIVE_VALENCE:
-        return (
-            EmotionCategory.ANXIOUS,
-            CognitiveMode.VIGILANT,
-            0.8,
-            openness_to_engage,
-            0.6,
-            creativity,
-        )
-    if alertness < LOW_AROUSAL and valence > MILD_POSITIVE_VALENCE:
-        return (
-            EmotionCategory.CONTENT,
-            CognitiveMode.RELAXED,
-            0.9,
-            openness_to_engage,
-            caution,
-            0.5,
-        )
-    if alertness < LOW_AROUSAL and valence < NEGATIVE_VALENCE:
-        return (
-            EmotionCategory.MELANCHOLIC,
-            CognitiveMode.REFLECTIVE,
-            0.7,
-            openness_to_engage,
-            caution,
-            0.3,
-        )
-    if valence > MILD_POSITIVE_VALENCE:
-        return (
-            EmotionCategory.POSITIVE,
-            cognitive_mode,
-            1.0,
-            openness_to_engage,
-            caution,
-            creativity,
-        )
-    if valence < MILD_NEGATIVE_VALENCE:
-        return (EmotionCategory.UNSETTLED, cognitive_mode, 0.9, openness_to_engage, 0.4, creativity)
-    return (EmotionCategory.NEUTRAL, cognitive_mode, 1.0, openness_to_engage, caution, creativity)
+    f = _affect_features(summary, chemicals, context, waves, field_state)
+    return _resolve_state(_raw_memberships(f), summary, f)
 
 
-def _contextual_emotion(
-    category: EmotionCategory,
-    cognitive_mode: CognitiveMode,
-    verbosity: float,
-    openness_to_engage: float,
-    caution: float,
-    creativity: float,
-    alertness: float,
-    valence: float,
-    chemicals: dict[str, float],
-    context: EmotionalContext,
-) -> tuple[EmotionCategory, CognitiveMode, float, float, float, float]:
-    """Refine a circumplex category using felt-context signals.
+class EmotionField:
+    """The continuous affective field — OU dynamics per region.
 
-    Called only for the non-phase path — the daemon's phase
-    categories (sleeping, overwhelmed, stress, flow, drowsy) are
-    already resolved. Each check replaces the base label only when a
-    specific substrate is actually present; nothing here invents a
-    feeling the chemistry doesn't support.
+    Holds the integrated membership vector. Each region relaxes
+    toward its instantaneous membership μ_s on its own time
+    constants:
 
-    Priority order is salience, not list order of pleasantness:
-    acute threat (fear) outranks mistreatment (anger) outranks the
-    orienting interrupt (surprise); then the sustained climates —
-    isolation (lonely), affiliative warmth (tender), appetitive
-    seeking (curious), and understimulation (bored).
+        m_s(t+dt) = m_s + (μ_s − m_s)·(1 − exp(−dt/τ_s))
+
+    — the exact discrete step of the mean-reverting Ornstein–
+    Uhlenbeck process used to model core-affect dynamics
+    (DynAffect: Kuppens, Oravecz & Tuerlinckx 2010; Oravecz,
+    Tuerlinckx & Vandekerckhove 2011). Attack uses ``tau_rise``,
+    release ``tau_fall`` — fear strikes in ~0.4 s and lingers ~25 s,
+    boredom builds over ~90 s — the asymmetric affective chronometry
+    of Lewis's (2005) trigger→amplification→stabilisation account.
+
+    ``update()`` measures elapsed integration time on a monotonic
+    clock (the daemon owns absolute time; this is only the
+    integrator's dt). The first update converges instantly to the
+    measured field.
     """
-    base = (category, cognitive_mode, verbosity, openness_to_engage, caution, creativity)
-    # Acute (event) emotions outrank the sustained climates checked
-    # below — see _acute_emotion.
-    acute = _acute_emotion(category, alertness, valence, chemicals, context)
-    if acute is not None:
-        return acute
 
-    norepinephrine = chemicals.get("norepinephrine", 0.0)
-    dopamine = chemicals.get("dopamine", 0.0)
-    acetylcholine = chemicals.get("acetylcholine", 0.0)
-    oxytocin = chemicals.get("oxytocin", 0.0)
-    endorphin = chemicals.get("endorphin", 0.0)
+    def __init__(self) -> None:
+        self._m: dict[EmotionCategory, float] = {}
+        self._t: float | None = None
 
-    # Lonely — felt isolation with the bonding substrate actually
-    # depleted. More specific than melancholic: the cause is known.
-    if (
-        (context.social_isolation >= LONELY_ISOLATION or context.social_drive >= LONELY_DRIVE)
-        and oxytocin < LONELY_OXY
-        and valence < MILD_POSITIVE_VALENCE
-    ):
-        return (EmotionCategory.LONELY, CognitiveMode.WITHDRAWN, 0.8, 0.9, 0.4, 0.4)
+    @property
+    def memberships(self) -> dict[EmotionCategory, float]:
+        """Integrated (pre-masking) membership of every region."""
+        return dict(self._m)
 
-    # Tender — affiliative warmth: oxytocin and endorphin both clearly
-    # above baseline while feeling positive. Bonding, not just OK.
-    if oxytocin >= TENDER_OXY and endorphin >= TENDER_END and valence >= MILD_POSITIVE_VALENCE:
-        return (EmotionCategory.TENDER, CognitiveMode.WARM, 0.9, 1.0, 0.2, 0.5)
+    def update(
+        self,
+        summary: NeuroSummary,
+        chemicals: dict[str, float] | None = None,
+        context: EmotionalContext | None = None,
+        waves: Any | None = None,
+        field_state: Any | None = None,
+        now: float | None = None,
+    ) -> EmotionalState:
+        """Integrate the field by the elapsed interval, then resolve.
 
-    # Curious — appetitive seeking: the curiosity drive itself is up
-    # and the seeking chemistry (DA for wanting, ACh for attention)
-    # can support it. Relabels only mild positive states — she can be
-    # curious AND content, and curious is the more informative label.
-    if (
-        context.curiosity >= CURIOUS_LEVEL
-        and dopamine >= CURIOUS_DA
-        and acetylcholine >= CURIOUS_ACH
-        and valence > MILD_NEGATIVE_VALENCE
-        and category
-        in (
-            EmotionCategory.NEUTRAL,
-            EmotionCategory.POSITIVE,
-            EmotionCategory.CONTENT,
-        )
-    ):
-        return (EmotionCategory.CURIOUS, CognitiveMode.INQUISITIVE, 1.15, 1.0, 0.2, 0.8)
-
-    # Bored — awake, understimulated, flat. Dopamine and NE both sag
-    # below baseline with no valence in either direction and no
-    # curiosity engaged. Only relabels the shallowest states —
-    # melancholy is deeper than boredom.
-    if (
-        dopamine < BORED_DA
-        and norepinephrine < BORED_NE
-        and LOW_AROUSAL - 0.1 < alertness < 0.55
-        and MILD_NEGATIVE_VALENCE < valence < MILD_POSITIVE_VALENCE + 0.05
-        and context.curiosity < CURIOUS_LEVEL - 0.15
-        and category in (EmotionCategory.NEUTRAL, EmotionCategory.UNSETTLED)
-    ):
-        return (EmotionCategory.BORED, CognitiveMode.RESTLESS, 0.6, 0.7, 0.2, 0.3)
-
-    return base
-
-
-def _acute_emotion(
-    category: EmotionCategory,
-    alertness: float,
-    valence: float,
-    chemicals: dict[str, float],
-    context: EmotionalContext,
-) -> tuple[EmotionCategory, CognitiveMode, float, float, float, float] | None:
-    """Return an acute (event) emotion when its substrate is present.
-
-    Acute states are checked before the sustained climates: fear
-    (phasic catecholamine surge) outranks anger (mistreatment accrual)
-    which outranks surprise (the orienting interrupt). Returns None
-    when no acute substrate is present.
-
-    Returns (category, cognitive_mode, verbosity, openness, caution,
-    creativity).
-    """
-    tp = context.tonic_phasic
-    ne_tp = tp.get("norepinephrine") if tp else None
-    ne_phasic = bool(ne_tp is not None and getattr(ne_tp, "mode", "tonic") == "phasic")
-    epinephrine = chemicals.get("epinephrine", 0.0)
-    norepinephrine = chemicals.get("norepinephrine", 0.0)
-
-    # Fear — an acute, triggered catecholamine surge on negative
-    # valence. Distinct from anxiety: anxiety is the tonic climate,
-    # fear is the phasic event. Requires the regulator's mode split;
-    # a bare elevated NE cannot tell event from climate.
-    if (
-        valence < MILD_NEGATIVE_VALENCE
-        and (ne_phasic or epinephrine > FEAR_EPI)
-        and norepinephrine > FEAR_NE
-    ):
-        return (EmotionCategory.AFRAID, CognitiveMode.VIGILANT, 0.7, 0.3, 0.9, 0.2)
-
-    # Anger — mistreatment accrual with fight arousal. The boundary
-    # strain alone is hurt; the catecholamine arousal makes it anger.
-    if (
-        context.boundary_strain >= ANGER_BOUNDARY_STRAIN
-        and (norepinephrine > ANGER_NE or alertness > ANGER_ALERTNESS)
-        and valence < MILD_POSITIVE_VALENCE
-    ):
-        return (EmotionCategory.ANGRY, CognitiveMode.COMBATIVE, 0.9, 0.3, 0.2, 0.2)
-
-    # Surprise — a strong prediction-error orienting event. It can
-    # relabel mild states only; a genuine stress or affect already
-    # resolved by the circumplex keeps precedence.
-    if context.prediction_error >= SURPRISE_PE and category in (
-        EmotionCategory.NEUTRAL,
-        EmotionCategory.UNSETTLED,
-        EmotionCategory.CONTENT,
-        EmotionCategory.POSITIVE,
-    ):
-        return (EmotionCategory.SURPRISED, CognitiveMode.STARTLED, 1.1, 0.8, 0.5, 0.6)
-
-    return None
-
-
-def _guarded_emotion(
-    category: EmotionCategory,
-    cognitive_mode: CognitiveMode,
-    openness_to_engage: float,
-    caution: float,
-    creativity: float,
-    valence: float,
-    cortisol: float,
-    plasticity: float,
-) -> tuple[EmotionCategory, CognitiveMode, float, float, float]:
-    """Guard against pleasant categories under chronic stress.
-
-    This catches "silent stress" — valence is positive but cortisol
-    is elevated (suppressing BDNF) or plasticity is closed (blocking
-    learning). Positive circumplex labels are replaced by a guarded,
-    cautious posture. The thresholds are named constants aligned with
-    the Rust substrate's phase and memory-gating boundaries.
-
-    Returns (category, cognitive_mode, openness, caution, creativity).
-    """
-    if (
-        cortisol > GUARDED_CORTISOL or plasticity < PLASTICITY_LOW
-    ) and valence > MILD_POSITIVE_VALENCE:
-        if category in (
-            EmotionCategory.POSITIVE,
-            EmotionCategory.EXCITED,
-            EmotionCategory.CONTENT,
-            EmotionCategory.FLOW,
-            EmotionCategory.TENDER,
-            EmotionCategory.CURIOUS,
-        ):
-            return (
-                EmotionCategory.GUARDED,
-                CognitiveMode.CAUTIOUS,
-                min(openness_to_engage, 0.6),
-                max(caution, 0.6),
-                min(creativity, 0.3),
-            )
-    return (category, cognitive_mode, openness_to_engage, caution, creativity)
+        Args:
+            summary: The daemon's neurochemical summary.
+            chemicals: The 18-channel chemical vector.
+            context: Felt-context signals (isolation, strain,
+                prediction error, curiosity, tonic/phasic split).
+            waves: Oscillator state (``BrainWaveState``) — band
+                powers enter as evidence; ``None`` drops wave terms.
+            field_state: The latent field's integration readout
+                (``FieldState``) — measured self-coherence and
+                center displacement enter as evidence; ``None``
+                drops the coherence terms.
+            now: Monotonic timestamp; defaults to ``time.monotonic``.
+        """
+        f = _affect_features(summary, chemicals, context, waves, field_state)
+        drive = _raw_memberships(f)
+        t_now = time.monotonic() if now is None else float(now)
+        if self._t is None or not math.isfinite(t_now):
+            self._m = drive
+        else:
+            dt = max(0.0, t_now - self._t)
+            for cat, spec in _FIELD_REGIONS.items():
+                mu = drive.get(cat, 0.0)
+                m0 = self._m.get(cat, 0.0)
+                tau = spec.tau_rise if mu > m0 else spec.tau_fall
+                self._m[cat] = m0 + (mu - m0) * (1.0 - math.exp(-dt / tau))
+        if math.isfinite(t_now):
+            self._t = t_now
+        return _resolve_state(self._m, summary, f)
 
 
 # Category → cause for the signal-resolved emotions. The category

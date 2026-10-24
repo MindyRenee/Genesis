@@ -62,6 +62,11 @@ pub mod interoception;
 pub mod ipc;
 /// Maxwell's equations applied to the measured carrier current.
 pub mod maxwell;
+/// The body regrowing a lost mind — the mirror of the mind's
+/// `_Rebirth`. Loss (a mind attached, then silent) is answered by
+/// spawning the organism's own entry point; absence and goodbye are
+/// left alone.
+pub mod mind_shepherd;
 /// Optic nerve — the retinal afferent's subcortical branches (SCN,
 /// superior colliculus, pretectum, TRN relay gate).
 pub mod optic_nerve;

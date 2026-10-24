@@ -1323,7 +1323,16 @@ class BrainWaveOscillator:
         self._rng = rng if rng is not None else random.Random()
         self._texture = max(0.0, texture)
         self._top_down: dict[BrainWave, float] = dict.fromkeys(BrainWave, 0.0)
+        # Two stimulus channels sharing one decay but writing separate
+        # registers: ``_stimulus`` leaky-integrates discrete events
+        # (pulses); ``_held`` carries a continuous channel's standing
+        # level, replaced outright on each report. Splitting them is
+        # what lets a pulse survive a held level on the same band —
+        # a shared register silently clobbered whichever wrote first
+        # (a Berger-effect alpha block from vision died on the field
+        # probe's next hold).
         self._stimulus: dict[BrainWave, float] = dict.fromkeys(BrainWave, 0.0)
+        self._held: dict[BrainWave, float] = dict.fromkeys(BrainWave, 0.0)
         self._last_target_dominant: BrainWave | None = None
         self._last_phase_name: str | None = None
         self._last_sleep_stage: SleepStage | None = None
@@ -1380,8 +1389,12 @@ class BrainWaveOscillator:
         reading once per call — the standing stimulus then scales
         with the assess rate and machine slow-band energy swamps
         the modeled EEG (a vigilant body reading delta-dominant).
+
+        The level lands in ``_held`` — a separate register from the
+        pulse channel — so re-reporting replaces only the standing
+        level and never erases a pulse still ringing on the band.
         """
-        self._stimulus[band] = max(-0.5, min(0.5, level))
+        self._held[band] = max(-0.5, min(0.5, level))
 
     def add_top_down_drive(self, band: BrainWave, strength: float) -> None:
         """Add top-down drive to a band.
@@ -1484,10 +1497,12 @@ class BrainWaveOscillator:
         # equilibrium amplitudes)
         targets, label, description = self._compute_targets(summary, sleep_stage)
 
-        # Apply continuous stimulus to targets
+        # Apply continuous stimulus to targets — held levels plus
+        # still-ringing pulses on the same band combine.
         for band in BrainWave:
-            if self._stimulus[band] != 0.0:
-                targets[band] = max(0.0, targets[band] + self._stimulus[band])
+            stimulus = self._held[band] + self._stimulus[band]
+            if stimulus != 0.0:
+                targets[band] = max(0.0, targets[band] + stimulus)
 
         # Determine the target dominant for snap detection
         target_dominant = max(targets, key=lambda b: targets[b])
@@ -1595,6 +1610,7 @@ class BrainWaveOscillator:
         stim_decay = math.exp(-dt / 5.0)
         for band in BrainWave:
             self._stimulus[band] *= stim_decay
+            self._held[band] *= stim_decay
 
     def _compute_targets(
         self,
@@ -1926,10 +1942,13 @@ class BrainWaveOscillator:
         for band in BrainWave:
             self._top_down[band] *= decay
 
-        # 4. Decay continuous stimulus (τ ≈ 5s for slow decay)
+        # 4. Decay continuous stimulus (τ ≈ 5s for slow decay) —
+        # both registers: held levels fade when a channel goes
+        # silent, pulses ring down on the same constant.
         stim_decay = math.exp(-dt / 5.0)
         for band in BrainWave:
             self._stimulus[band] *= stim_decay
+            self._held[band] *= stim_decay
 
     def _modulation_index(
         self, slow_phase: float, fast_amplitude: float, slow_band: BrainWave

@@ -5,10 +5,16 @@
 # Starting launches the daemon, cognitive CLI, retina, and TTS.
 # Ctrl-C in the running terminal tears them all down.
 #
-# Usage: ./run.sh          (start Genesis)
-#        ./run.sh --stop   (stop a running Genesis)
-#        ./run.sh --offline  (start in offline mode)
-# Flags can be combined in any order: ./run.sh --offline --stop
+# Usage: ./genesis            (wake Genesis)
+#        ./genesis wake       (the same, spelled out)
+#        ./genesis --stop     (stop a running Genesis)
+#        ./genesis --offline  (wake in offline mode)
+#        ./genesis --game     (wake already in game mode — the
+#                             competition sitting: focused play,
+#                             self-directed activity starved, the
+#                             network sealed, sleep fought through
+#                             her own chemistry)
+# Flags combine with the verb in any order: ./genesis wake --offline
 #
 # Optional: put a Discord channel webhook URL in .genesis-discord
 # (gitignored) or export GENESIS_DISCORD_WEBHOOK to give her a public
@@ -20,29 +26,17 @@
 
 set -m
 
-cd "$(dirname "$0")" || exit 1
+# Resolve through any symlink so a linked invocation still lands on the
+# real checkout (the launch path below is relative to it).
+cd "$(dirname "$(readlink -f "$0")")" || exit 1
 
-# An exported-but-blank GENESIS_DATA_DIR is treated as unset. Otherwise
-# it is a non-empty string, every `[ -z "$GENESIS_DATA_DIR" ]` guard below
-# reads as "explicitly configured", and the data dir resolves to a
-# garbage path built from the current directory (e.g. "<cwd>/genesis").
-# Other resolvers normalize this the same way; see the order in
-# src/data_dir.rs and python/tests/test_data_dir_conformance.py.
+# An exported-but-blank GENESIS_DATA_DIR is treated as unset; otherwise
+# it is the only override of the one canonical state directory,
+# ~/.local/share/genesis. There is no pin file and no XDG step — see
+# src/data_dir.rs and infrastructure/config.py, which implement the same
+# single rule.
 if [ -n "${GENESIS_DATA_DIR:-}" ] && [ -z "${GENESIS_DATA_DIR//[[:space:]]/}" ]; then
     unset GENESIS_DATA_DIR
-fi
-
-# Per-checkout data-dir override: an uncommitted .genesis-data-dir file
-# pins this checkout to its own state directory, so independent
-# checkouts stay fully disconnected without exporting GENESIS_DATA_DIR.
-# The pin outranks XDG_DATA_HOME, which is ambient environment rather
-# than Genesis config: a launcher (Flatpak/sandboxed agent host) can
-# point XDG_DATA_HOME somewhere else entirely, and honoring that would
-# silently fork this checkout into a second, divergent state directory.
-# Only an explicit GENESIS_DATA_DIR still overrides the pin.
-if [ -z "${GENESIS_DATA_DIR:-}" ] && [ -f .genesis-data-dir ]; then
-    GENESIS_DATA_DIR=$(head -n1 .genesis-data-dir)
-    export GENESIS_DATA_DIR
 fi
 
 # Same pattern for the Discord channel: an uncommitted, gitignored
@@ -62,8 +56,11 @@ if [ -z "${GENESIS_DISCORD_BOT_TOKEN:-}" ] && [ -f .genesis-discord-bot ]; then
     export GENESIS_DISCORD_BOT_TOKEN
 fi
 
-DATA_DIR=$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' \
-    "${GENESIS_DATA_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/genesis}") || exit 1
+# The one rule, in one line: GENESIS_DATA_DIR if set, else the canonical
+# ~/.local/share/genesis. readlink -m canonicalizes (., .., relative)
+# without requiring the directory to exist — so --stop works on a dir
+# that was never created, and no interpreter is needed this early.
+DATA_DIR="$(readlink -m "${GENESIS_DATA_DIR:-$HOME/.local/share/genesis}")"
 
 # ─── PID-file helpers ────────────────────────────────────────────────
 # The CLI writes PID files for itself, the daemon, and the retina to
@@ -113,58 +110,87 @@ _matches_pid() {
             ;;
         *) return 1 ;;
     esac
-    for ((i=1; i < ${#args[@]}-1; i++)); do
-        if [ "${args[i]}" = --data-dir ]; then
-            # An explicit --data-dir decides identity exactly: match or
-            # fail — never fall through to the default-dir heuristic,
-            # or a process bound to a different directory would be
-            # claimed by this instance.
-            [ "${args[i+1]}" = "$DATA_DIR" ] && return 0 || return 1
-        fi
+    for ((i=1; i < ${#args[@]}; i++)); do
+        case "${args[i]}" in
+            --data-dir)
+                # An explicit --data-dir decides identity exactly:
+                # match or fail — never fall through to the implicit
+                # check below, or a process bound to a different
+                # directory would be claimed by this instance.
+                [ $((i + 1)) -lt ${#args[@]} ] || return 1
+                [ "$(readlink -m "${args[i+1]}")" = "$DATA_DIR" ] && return 0 || return 1
+                ;;
+            --data-dir=*)
+                # argparse also accepts the equals form.
+                [ "$(readlink -m "${args[i]#--data-dir=}")" = "$DATA_DIR" ] && return 0 || return 1
+                ;;
+        esac
     done
-    # A daemon/CLI started without --data-dir uses the default dir.
-    # Only accept the match when this DATA_DIR *is* the default, so a
-    # custom-dir instance never claims a default-dir process.
-    local default_dir="$HOME/.local/share/genesis"
-    [ -n "${XDG_DATA_HOME:-}" ] && default_dir="$XDG_DATA_HOME/genesis"
-    [ -n "${GENESIS_DATA_DIR:-}" ] && default_dir="$GENESIS_DATA_DIR"
-    if [ "$DATA_DIR" = "$default_dir" ]; then
-        return 0
+    # A process launched without --data-dir resolved internally:
+    # GENESIS_DATA_DIR else the canonical dir. Replicate that from the
+    # target's own environment rather than comparing against our
+    # defaults — a process whose env resolves somewhere else is not
+    # ours no matter what we would have resolved. An unreadable
+    # environ means the process is not ours to claim either.
+    local env_dir="" env_home="" line resolved
+    while IFS= read -r line; do
+        case "$line" in
+            GENESIS_DATA_DIR=*) env_dir="${line#GENESIS_DATA_DIR=}" ;;
+            HOME=*)             env_home="${line#HOME=}" ;;
+        esac
+    done < <(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null)
+    env_dir="${env_dir#"${env_dir%%[![:space:]]*}"}"
+    env_dir="${env_dir%"${env_dir##*[![:space:]]}"}"
+    if [ -n "$env_dir" ]; then
+        resolved="$(readlink -m "$env_dir")"
+    elif [ -n "$env_home" ]; then
+        resolved="$(readlink -m "$env_home/.local/share/genesis")"
+    else
+        return 1
     fi
-    return 1
+    [ "$resolved" = "$DATA_DIR" ] && return 0 || return 1
 }
 
-_find_pid() {
+# Echo every matching PID — the pidfile's first (it is the freshest
+# identity), then any further /proc matches. Plural matters: retina
+# holds no lock, so a second matching process must be found rather than
+# silently surviving a --stop.
+_find_pids() {
     local pidfile="$1" entry pid
-    _read_pid "$pidfile" && return 0
+    _read_pid "$pidfile" 2>/dev/null
     for entry in /proc/[0-9]*/cmdline; do
         pid="${entry#/proc/}"
         pid="${pid%/cmdline}"
         if _matches_pid "$pid" "$pidfile" 2>/dev/null; then
             echo "$pid"
-            return 0
         fi
     done
-    return 1
 }
 
-# Request graceful shutdown and wait for the identified process to exit.
-# If signaling fails or shutdown takes too long, preserve all files and
-# return failure. A successful signal alone does not establish that the
-# process has finished saving state; never escalate to SIGKILL.
+# Request graceful shutdown of every matching process and wait for them
+# all to exit. If signaling fails or shutdown takes too long, preserve
+# all files and return failure. A successful signal alone does not
+# establish that a process has finished saving state; never escalate
+# to SIGKILL.
 _kill_pidfile() {
     local pidfile="$1"
     local signal="$2"
     local pid deadline
-    pid=$(_find_pid "$pidfile") || return 0
-    kill -"$signal" "$pid" 2>/dev/null || return 1
+    local -a pids=()
+    mapfile -t pids < <(_find_pids "$pidfile" | sort -un)
+    [ "${#pids[@]}" -gt 0 ] || return 0
+    for pid in "${pids[@]}"; do
+        kill -"$signal" "$pid" 2>/dev/null || return 1
+    done
     deadline=$((SECONDS + 120))
-    while _matches_pid "$pid" "$pidfile" 2>/dev/null; do
-        if [ "$SECONDS" -ge "$deadline" ]; then
-            echo "  Shutdown still pending for PID $pid; state and locks preserved." >&2
-            return 1
-        fi
-        sleep 1
+    for pid in "${pids[@]}"; do
+        while _matches_pid "$pid" "$pidfile" 2>/dev/null; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+                echo "  Shutdown still pending for PID $pid; state and locks preserved." >&2
+                return 1
+            fi
+            sleep 1
+        done
     done
     return 0
 }
@@ -178,11 +204,16 @@ _stop_all() {
     local daemon_pidfile="$DATA_DIR/genesis_daemon.pid"
     local retina_pidfile="$DATA_DIR/genesis_retina.pid"
 
+    # 0. Tell the body's mind-shepherd this absence is authored —
+    #    an orphaned daemon past the CLI's death must not regrow a
+    #    mind the operator is putting down (src/daemon/mind_shepherd.rs).
+    printf 'stopped %s\n' "$(date +%s%3N)" > "$DATA_DIR/mind.suppress" 2>/dev/null || true
+
     # 1. Stop the cognitive CLI first (it owns the daemon lifecycle).
     #    Validate PID files and fall back to exact /proc arguments.
     #    Each step has its own 120s grace period; a failure returns
     #    immediately so daemon/retina may be left running — retry
-    #    ./run.sh --stop after the CLI finishes saving state.
+    #    ./genesis --stop after the CLI finishes saving state.
     _kill_pidfile "$cli_pidfile" INT || { echo "  CLI shutdown pending; retry --stop once it exits." >&2; return 1; }
 
     # 2. The helper waits for the CLI to finish before proceeding.
@@ -193,7 +224,7 @@ _stop_all() {
     _kill_pidfile "$daemon_pidfile" TERM || { echo "  Daemon shutdown pending; state preserved, retry --stop." >&2; return 1; }
     _kill_pidfile "$retina_pidfile" TERM || { echo "  Retina shutdown pending; retry --stop." >&2; return 1; }
 
-    # Fallback discovery is handled by _find_pid using /proc arguments.
+    # Fallback discovery is handled by _find_pids using /proc arguments.
     # Exact data-directory matching avoids regex metacharacters and
     # whitespace confusing unrelated processes with this instance.
     # Retina is identified by its executable and per-instance log,
@@ -209,22 +240,25 @@ _is_running() {
     local cli_pidfile="$DATA_DIR/genesis_cli.pid"
     local daemon_pidfile="$DATA_DIR/genesis_daemon.pid"
     local retina_pidfile="$DATA_DIR/genesis_retina.pid"
-    _find_pid "$cli_pidfile" >/dev/null 2>&1 && return 0
-    _find_pid "$daemon_pidfile" >/dev/null 2>&1 && return 0
-    _find_pid "$retina_pidfile" >/dev/null 2>&1 && return 0
+    [ -n "$(_find_pids "$cli_pidfile")" ] && return 0
+    [ -n "$(_find_pids "$daemon_pidfile")" ] && return 0
+    [ -n "$(_find_pids "$retina_pidfile")" ] && return 0
     return 1
 }
 
 # ─── Parse arguments ─────────────────────────────────────────────────
 # Scan all args for flags so order doesn't matter. This prevents
-# silent misbehavior when the user passes e.g. ./run.sh --offline --stop
+# silent misbehavior when the user passes e.g. ./genesis --offline --stop
 # (which would otherwise try to START Genesis instead of stopping it).
 WANT_STOP=0
 OFFLINE_ARG=""
+GAME_ARG=""
 for arg in "$@"; do
     case "$arg" in
+        wake)      : ;;  # the explicit verb — starting is the default act
         --stop)    WANT_STOP=1 ;;
         --offline) OFFLINE_ARG="--offline" ;;
+        --game)    GAME_ARG="--game" ;;
         *) echo "  Unknown argument: $arg" >&2; exit 2 ;;
     esac
 done
@@ -256,11 +290,9 @@ if [ -f "$MARKER" ]; then
         echo "  This instance's state belongs to that tree. Two checkouts"
         echo "  sharing one data dir corrupt each other's developmental"
         echo "  record."
-        echo "  To point this checkout elsewhere, set GENESIS_DATA_DIR or"
-        echo "  edit .genesis-data-dir — note that XDG_DATA_HOME ranks"
-        echo "  *below* the pin, so setting it will not redirect a pinned"
-        echo "  checkout. Otherwise remove the state if you really intend to"
-        echo "  continue from here."
+        echo "  To point this checkout elsewhere, export GENESIS_DATA_DIR"
+        echo "  — the only override of the canonical location. Otherwise"
+        echo "  remove the state if you really intend to continue from here."
     fi
 else
     echo "$PWD" > "$MARKER"
@@ -272,8 +304,8 @@ fi
 # being refused, so mind and body are never deliberately kept apart.
 # A CLI mid-teardown still matches here and refuses, which is correct:
 # a new start must never interrupt a state save.
-if _find_pid "$DATA_DIR/genesis_cli.pid" >/dev/null 2>&1; then
-    echo "  Genesis is already running. Stop it with: ./run.sh --stop"
+if [ -n "$(_find_pids "$DATA_DIR/genesis_cli.pid")" ]; then
+    echo "  Genesis is already running. Stop it with: ./genesis --stop"
     exit 1
 fi
 
@@ -286,7 +318,7 @@ fi
 _atexit() {
     # Use validated process identities when checking for remaining work.
     if _is_running; then
-        echo "  Genesis processes remain; use ./run.sh --stop for graceful shutdown." >&2
+        echo "  Genesis processes remain; use ./genesis --stop for graceful shutdown." >&2
     fi
     # Preserve socket/lock/PID files for their owners and later recovery.
 }
@@ -310,8 +342,8 @@ if [ ! -x "$RELEASE_BIN" ]; then
     exit 1
 fi
 
-# Only run.sh is allowed to launch the CLI.
-export GENESIS_RUN=1
+# Only genesis is allowed to launch the CLI.
+export GENESIS_WAKE=1
 
 # Start Genesis — voice and ambient listening always on.
 # Ctrl-C in this terminal sends SIGINT to the foreground CLI, which
@@ -319,7 +351,8 @@ export GENESIS_RUN=1
 # reports any processes still needing a graceful shutdown.
 #
 # OFFLINE_ARG was parsed from the command line above (--offline for
-# no network access).
+# no network access), GAME_ARG likewise (--game to boot already in
+# game mode).
 #
 # One interpreter for every launch path: the installed venv is the
 # canonical runtime — created with --system-site-packages, it sees
@@ -332,4 +365,4 @@ if [ ! -x "$VENV_PY" ]; then
     echo "[genesis] $VENV_PY not found — run scripts/install.sh first"
     exit 1
 fi
-PYTHONPATH="$PWD/python:${PYTHONPATH:-}" "$VENV_PY" genesis_cli.py --data-dir "$DATA_DIR" ${ONLINE_ARG:-}
+PYTHONPATH="$PWD/python:${PYTHONPATH:-}" "$VENV_PY" genesis_cli.py --data-dir "$DATA_DIR" ${OFFLINE_ARG:+$OFFLINE_ARG} ${GAME_ARG:+$GAME_ARG}

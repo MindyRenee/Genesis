@@ -362,6 +362,195 @@ def test_emotion_guarded_still_overrides_warmth():
     assert emo.cause.startswith("guarded")
 
 
+# ─── Continuous field tests ───────────────────────────────────
+#
+# The label is a readout; the field underneath is continuous. These
+# pin the mathematics, not the categories.
+
+
+def test_field_memberships_are_continuous_and_bounded():
+    """Every category reports a finite membership in [0, 1] and the
+    winner's membership is the state's intensity."""
+    emo = assess_emotion(_summary(0.75, -0.3), {"norepinephrine": 0.5})
+    assert set(emo.memberships) == {c.value for c in EmotionCategory}
+    assert all(0.0 <= v <= 1.0 for v in emo.memberships.values())
+    assert emo.intensity == emo.memberships[emo.label]
+    assert emo.intensity == max(emo.memberships.values())
+
+
+def test_field_is_smooth_across_old_thresholds():
+    """Sweeping valence across a former hard boundary moves
+    memberships continuously — no step jumps."""
+    members = []
+    for i in range(41):
+        v = -0.4 + i * 0.02  # sweeps -0.4 .. 0.4 across the old ±0.1/0.2 edges
+        e = assess_emotion(_summary(0.5, v))
+        members.append(e.memberships)
+    from itertools import pairwise
+
+    for prev, cur in pairwise(members):
+        for key in cur:
+            assert abs(cur[key] - prev[key]) < 0.35, f"step in {key}"
+
+
+def test_field_mixed_states_coexist():
+    """At the event/climate boundary the field holds both: a tonic
+    vigilance substrate with a partial adrenal surge is a genuine
+    anxious-afraid mixture, not one erasing the other."""
+    from limbic_system.emotion import EmotionalContext
+
+    class _TP:
+        mode = "tonic"
+
+    chemicals = {"norepinephrine": 0.45, "epinephrine": 0.20}
+    ctx = EmotionalContext(tonic_phasic={"norepinephrine": _TP()})
+    emo = assess_emotion(_summary(0.75, -0.3), chemicals, ctx)
+    assert emo.memberships["afraid"] > 0.25
+    assert emo.memberships["anxious"] > 0.2
+
+
+def test_field_chemicals_move_membership_mathematically():
+    """The chemical vector is inside the function: raising endorphin
+    and oxytocin toward the bonding substrate raises tender
+    membership monotonically."""
+    from itertools import pairwise
+
+    from limbic_system.emotion import EmotionalContext
+
+    ctx = EmotionalContext()
+    vals = []
+    for k in range(5):
+        level = 0.1 + k * 0.1
+        e = assess_emotion(
+            _summary(0.45, 0.3),
+            {"oxytocin": level, "endorphin": level},
+            ctx,
+        )
+        vals.append(e.memberships["tender"])
+    assert all(a <= b + 1e-9 for a, b in pairwise(vals))
+    assert vals[-1] > vals[0]
+
+
+def test_field_wave_bands_corroborate_state():
+    """High-beta (20-30 Hz) power raises vigilance-state membership —
+    the oscillator state is evidence, in line with desynchronized
+    fast activity under arousal."""
+    from limbic_system.emotion import EmotionalContext, membership_field
+
+    class _Waves:
+        def __init__(self, powers):
+            self.powers = powers
+            self.focus = 0.5
+            self.integration = 0.5
+            self.gamma_plv = 0.5
+
+    class _Band:
+        def __init__(self, value):
+            self.value = value
+
+    chemicals = {"norepinephrine": 0.4, "epinephrine": 0.2}
+    ctx = EmotionalContext(tonic_phasic={"norepinephrine": type("T", (), {"mode": "phasic"})()})
+    summary = _summary(0.7, -0.25)
+    calm = _Waves({_Band("beta3"): 0.02, _Band("alpha"): 0.4})
+    vigilant = _Waves({_Band("beta3"): 0.45, _Band("gamma"): 0.1})
+    m_calm = membership_field(summary, chemicals, ctx, calm)[EmotionCategory.AFRAID]
+    m_vig = membership_field(summary, chemicals, ctx, vigilant)[EmotionCategory.AFRAID]
+    assert m_vig > m_calm
+
+
+def test_field_dynamics_relax_on_own_time_constants():
+    """EmotionField is an OU integrator: fear strikes fast and
+    lingers, and the field relaxes toward baseline after the
+    substrate clears."""
+    from limbic_system.emotion import EmotionField
+
+    class _TP:
+        mode = "phasic"
+
+    field = EmotionField()
+    from limbic_system.emotion import EmotionalContext
+
+    ctx = EmotionalContext(tonic_phasic={"norepinephrine": _TP()})
+    chem = {"norepinephrine": 0.45, "epinephrine": 0.30}
+    field.update(_summary(0.75, -0.3), chem, ctx, now=0.0)
+    assert field.memberships[EmotionCategory.AFRAID] > 0.9
+
+    # Threat removed — fear must persist (its release constant is
+    # ~25 s, not the 0.4 s attack).
+    field.update(_summary(0.5, 0.0), {}, None, now=1.0)
+    assert field.memberships[EmotionCategory.AFRAID] > 0.8
+
+    # Long after, the field relaxes toward the measured baseline.
+    field.update(_summary(0.5, 0.0), {}, None, now=120.0)
+    assert field.memberships[EmotionCategory.AFRAID] < 0.1
+    assert field.memberships[EmotionCategory.NEUTRAL] > 0.5
+
+
+def test_field_first_update_converges_and_missing_waves_neutral():
+    """The first field update equals the instantaneous readout, and
+    omitting the oscillator state drops wave terms without error."""
+    from limbic_system.emotion import EmotionField, membership_field
+
+    field = EmotionField()
+    summary = _summary(0.6, -0.2)
+    e1 = field.update(summary, {"norepinephrine": 0.3}, now=0.0)
+    e2 = assess_emotion(summary, {"norepinephrine": 0.3})
+    assert e1.label == e2.label
+    # The integrated vector starts at the instantaneous raw field.
+    raw = membership_field(summary, {"norepinephrine": 0.3})
+    assert field.memberships == raw
+
+
+def test_field_coherence_is_measured_evidence():
+    """The latent field's disagreement drives the coherence channel:
+    rising Fréchet variance of the body's fibers raises unsettled and
+    guarded monotonically — mood-as-precision (Clark & Friston 2018):
+    internal incoherence is a felt signal, not telemetry."""
+    from itertools import pairwise
+
+    from limbic_system.emotion import membership_field
+
+    class _Field:
+        def __init__(self, disagreement, consensus_norm=0.0):
+            self.disagreement = disagreement
+            self.consensus_norm = consensus_norm
+
+    summary = _summary(0.5, 0.4)
+    unsettled, guarded = [], []
+    for k in range(6):
+        d = 0.0 + k * 0.04  # sweeps coherent → past the 0.1 scale
+        m = membership_field(summary, field_state=_Field(d))
+        unsettled.append(m[EmotionCategory.UNSETTLED])
+        guarded.append(m[EmotionCategory.GUARDED])
+    assert all(a <= b + 1e-9 for a, b in pairwise(unsettled))
+    assert all(a <= b + 1e-9 for a, b in pairwise(guarded))
+    assert unsettled[-1] > 0.5
+    assert guarded[-1] > guarded[0] + 0.3
+
+
+def test_field_state_absent_drops_coherence_terms():
+    """No field reading → coherence terms drop out of the geometric
+    mean entirely (the weights renormalise); nothing is fabricated.
+    A coherent reading is a genuine measurement, and it differs
+    from an absent one."""
+    from limbic_system.emotion import membership_field
+
+    class _Field:
+        disagreement = 0.0
+        consensus_norm = 0.0
+
+    summary = _summary(0.45, -0.05)
+    absent = membership_field(summary)
+    coherent = membership_field(summary, field_state=_Field())
+    incoherent = membership_field(
+        summary, field_state=type("F", (), {"disagreement": 0.15, "consensus_norm": 0.3})()
+    )
+    # An absent channel is not a zero channel.
+    assert absent != coherent
+    # Measured incoherence is unsettling; measured coherence is not.
+    assert incoherent[EmotionCategory.UNSETTLED] > absent[EmotionCategory.UNSETTLED]
+
+
 # ─── Emotion word learning tests ──────────────────────────────
 
 
@@ -722,7 +911,7 @@ def _cleanup_test_daemon(proc, data_dir: str) -> None:
     """Terminate the daemon process and clean up the data directory."""
     project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     subprocess.run(
-        ["bash", os.path.join(project_root, "run.sh"), "--stop"],
+        ["bash", os.path.join(project_root, "genesis"), "--stop"],
         env={**os.environ, "GENESIS_DATA_DIR": data_dir},
         check=True,
         timeout=130,

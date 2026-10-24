@@ -141,7 +141,7 @@ def main() -> int:
 
     if _daemon_alive(args.data_dir / "genesis.sock"):
         raise SystemExit(
-            "daemon is running — stop it first (./run.sh --stop or "
+            "daemon is running — stop it first (./genesis --stop or "
             "genesis --stop). The index must only be edited offline."
         )
 

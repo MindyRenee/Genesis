@@ -13,7 +13,7 @@ over time? Buckets edges by ``created_at`` and reports, per day:
 
 Run: ``python eval/abstraction_gradient.py``
 Reads ``<data dir>/edge_log.jsonl`` (the live fold), resolving the
-data dir the way run.sh does.
+data dir the way genesis does.
 """
 
 from __future__ import annotations
@@ -22,9 +22,15 @@ import collections
 import datetime
 import json
 import math
-import os
 import statistics
+import sys
 from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from infrastructure.config import default_data_dir  # noqa: E402
 
 
 def _out(*args: object) -> None:
@@ -78,33 +84,7 @@ TAXONOMIC = {"is_a", "part_of"}
 CODE = {"calls", "defines", "depends_on"}
 
 
-def _default_data_dir() -> str:
-    """Resolve the data dir the way run.sh does.
-
-    GENESIS_DATA_DIR, then the checkout's .genesis-data-dir pin, then
-    XDG_DATA_HOME, then ~/.local/share. The pin outranks XDG_DATA_HOME
-    because the latter is ambient launcher environment, not Genesis
-    config — a sandboxed host sets it, and grading a sibling checkout's
-    edges would report its drift as this instance's.
-    """
-    # Blank counts as unset, matching run.sh and config.py.
-    explicit = (os.environ.get("GENESIS_DATA_DIR") or "").strip()
-    if explicit:
-        return explicit
-    pin = Path(__file__).resolve().parent.parent / ".genesis-data-dir"
-    if pin.is_file():
-        pinned = pin.read_text().splitlines()[0].strip()
-        if pinned:
-            return pinned
-    return str(
-        Path(
-            os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local" / "share")),
-        )
-        / "genesis",
-    )
-
-
-EDGE_LOG = Path(_default_data_dir()) / "edge_log.jsonl"
+EDGE_LOG = default_data_dir() / "edge_log.jsonl"
 
 
 def tier(origin: str) -> str:

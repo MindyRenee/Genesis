@@ -24,7 +24,7 @@ The binary is built from
 and is normally launched and supervised by
 .BR genesis-cli (1),
 which is in turn launched by
-.BR run.sh (1)
+.BR genesis (1)
 or the
 .BR genesis (1)
 console script. Direct invocation is supported for diagnostics. The
@@ -75,7 +75,7 @@ Retina stdout/stderr (rotated at 5 MB by the launcher).
 .TP
 .IR $DATA_DIR/genesis_retina.pid
 PID file written by the launcher so
-.BR run.sh " \fB--stop\fR"
+.BR genesis " \fB--stop\fR"
 can target this exact process.
 .SH SEE ALSO
 .BR genesis (1),
